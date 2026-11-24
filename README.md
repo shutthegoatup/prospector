@@ -31,7 +31,7 @@ On LinkedIn adds, `o` opens the profile and copies the note, `a` marks it added 
 
 ### Research: facts with sources
 
-Companies found by agents, imports and people wait here to be qualified or rejected. Every fact keeps the link it came from. "Pick" moves a suggested person into outreach, with a note from your template.
+Companies found by agents, imports and people wait here to be qualified or rejected. Every fact keeps the link it came from. "Pick" moves a suggested person into outreach, with a note from your template. Rejecting a company takes its people out of Today's queues; qualifying it again brings them back as they were.
 
 ![Research: two companies an agent found, with sourced facts and a suggested contact](docs/images/research.png)
 

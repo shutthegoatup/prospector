@@ -258,7 +258,7 @@ func deref(p *string) string {
 func (s *Store) Due(org int64, step string, now time.Time, set OrgSettings) ([]Contact, error) {
 	set = set.withDefaults()
 	var rows []Contact
-	q := s.in(org).Model(&Contact{})
+	q := s.in(org).Model(&Contact{}).Where(companyNotRejected)
 	switch step {
 	case "linkedin":
 		q = q.Where(openContacts + " and linkedin_added is null and note is not null and note <> ''").Order("fit nulls first, file")

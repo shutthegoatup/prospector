@@ -80,6 +80,8 @@ func TestPipelineTakesTheFurthestContact(t *testing.T) {
 		{"furthest wins", Company{}, []Contact{{Replied: d, Stage: "proposal"}, {Replied: d, Stage: "meeting"}}, "proposal"},
 		{"lost ranks with outreach", Company{}, []Contact{{Replied: d, Stage: "lost"}, {Replied: d}}, "replied"},
 		{"held still counts", Company{}, []Contact{{EmailSent: d, Hold: d}}, "outreach"},
+		{"a reply later declined is no conversation", Company{}, []Contact{{Replied: d, Stage: "meeting", Declined: d}}, "outreach"},
+		{"declined beside a live conversation", Company{}, []Contact{{Replied: d, Stage: "proposal", Declined: d}, {Replied: d}}, "replied"},
 	} {
 		if got := pipeline(tc.c, tc.people); got != tc.want {
 			t.Errorf("%s: pipeline = %q, want %q", tc.name, got, tc.want)
@@ -143,6 +145,63 @@ func TestQueriesAgreeWithPhase(t *testing.T) {
 	}
 	if got, want := keys(onBoard), keys(wantBoard); !slices.Equal(got, want) {
 		t.Errorf("the board holds %v, but the conversations are %v", got, want)
+	}
+}
+
+func TestRejectedCompanysPeopleLeaveTheQueues(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	co := Company{OrgID: o.ID, Name: "Larkmoor", Stage: CompanyQualified}
+	if err := s.db.Create(&co).Error; err != nil {
+		t.Fatal(err)
+	}
+	old := str("2020-01-01")
+	people := []Contact{
+		{OrgID: o.ID, Key: "new", File: "test", Person: str("Hannah Pryce"), Note: str("Hello"), CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "accepted", File: "test", Person: str("Jonas Weber"), LinkedinAdded: old, Accepted: old, CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "call", File: "test", Person: str("Nia Okafor"), Phone: str("+44 20 7946 0000"), CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "email", File: "test", Person: str("Max Muster"), LinkedinAdded: old, CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "followup", File: "test", Person: str("Ines Duarte"), EmailSent: old, CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "elsewhere", File: "test", Person: str("Tomas Reed"), Note: str("Hello")},
+	}
+	if err := s.db.Create(&people).Error; err != nil {
+		t.Fatal(err)
+	}
+	queued := func() int {
+		n := 0
+		for _, step := range []string{"linkedin", "accepted", "call", "email", "followup"} {
+			rows, err := s.Due(o.ID, step, time.Now(), o.Settings)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, r := range rows {
+				if r.CompanyID != nil {
+					n++
+				} else if r.Key != "elsewhere" {
+					t.Fatalf("%s is queued with no company", r.Key)
+				}
+			}
+		}
+		return n
+	}
+	before := queued()
+	if before < 5 {
+		t.Fatalf("only %d queue entries before rejecting: the test covers too little", before)
+	}
+	if err := s.SetCompanyStage(o.ID, co.ID, CompanyRejected, "", "ada"); err != nil {
+		t.Fatal(err)
+	}
+	if n := queued(); n != 0 {
+		t.Fatalf("%d people at a rejected company are still queued", n)
+	}
+	if rows, _ := s.Due(o.ID, "linkedin", time.Now(), o.Settings); len(rows) != 1 || rows[0].Key != "elsewhere" {
+		t.Fatalf("rejecting one company took someone with no company out of the queue: %+v", rows)
+	}
+	if err := s.SetCompanyStage(o.ID, co.ID, CompanyQualified, "", "ada"); err != nil {
+		t.Fatal(err)
+	}
+	if n := queued(); n != before {
+		t.Fatalf("%d queued after qualifying the company again, %d before it was rejected", n, before)
 	}
 }
 

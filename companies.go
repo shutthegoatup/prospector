@@ -283,6 +283,8 @@ func pipeline(c Company, people []Contact) string {
 	for _, p := range people {
 		st := ""
 		switch {
+		case p.Declined != nil:
+			st = "outreach"
 		case p.Replied != nil:
 			st = p.ConversationStage()
 		case p.Touched():
