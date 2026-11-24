@@ -89,8 +89,9 @@ Each organisation has an MCP endpoint at `/o/<slug>/mcp` (streamable HTTP) and a
 | `research:write` | `add_company`, `add_fact`, `add_contact`; these wait in Research for a person |
 | `drafts:write` | `draft_message`, shown as written by the agent |
 | `import` | `push` and `pull` |
+| `outcomes:write` | `mark`: record an outcome (sent, accepted, called, replied, declined, hold), shown as the agent's |
 
-- **What no key can do:** mark anything sent, change settings, or see another organisation.
+- **What no key can do:** send anything, change settings, or see another organisation. A key with `outcomes:write` can record what happened (sent, accepted, replied, declined…); each mark shows as the agent's, with its note, on Today and in the company's history.
 - **Writes are checked:** every fact and contact needs a source URL, and the never-contact list applies.
 
 ```sh

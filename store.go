@@ -275,6 +275,10 @@ func (s *Store) log(tx *gorm.DB, org, contact int64, company *int64, actor, acti
 }
 
 func (s *Store) Mark(org, id int64, step, date, actor string) error {
+	return s.mark(org, id, step, date, actor, "")
+}
+
+func (s *Store) mark(org, id int64, step, date, actor, note string) error {
 	column, ok := Marks[step]
 	if !ok {
 		return fmt.Errorf("unknown step %q", step)
@@ -291,7 +295,11 @@ func (s *Store) Mark(org, id int64, step, date, actor string) error {
 		if err := tx.Model(&c).Updates(updates).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, id, c.CompanyID, actor, "mark:"+step, &date)
+		value := date
+		if note != "" {
+			value += " · " + note
+		}
+		return s.log(tx, org, id, c.CompanyID, actor, "mark:"+step, &value)
 	})
 }
 

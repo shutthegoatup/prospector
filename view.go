@@ -66,6 +66,7 @@ type Card struct {
 	Next                                                int64
 	Step                                                string
 	Held                                                bool
+	AgentMarks                                          map[string]string
 }
 
 var (

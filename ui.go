@@ -83,6 +83,14 @@ func (a *App) today(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	ids := make([]int64, len(d.Cards))
+	for i, c := range d.Cards {
+		ids[i] = c.ID
+	}
+	marks := a.s.AgentMarks(q.Org.ID, ids)
+	for i := range d.Cards {
+		d.Cards[i].AgentMarks = marks[d.Cards[i].ID]
+	}
 	a.page(w, r, "today", TodayView(q, d))
 }
 

@@ -15,6 +15,7 @@ var mcpTools = []struct{ Name, Scope, What string }{
 	{"add_fact", "research:write", "field, value and source URL"},
 	{"add_contact", "research:write", "a suggested person; waits until someone picks them"},
 	{"draft_message", "drafts:write", "note, message, email or follow-up, marked as the agent's"},
+	{"mark", "outcomes:write", "record an outcome, shown as the agent's with its note"},
 }
 
 templ Code(s string) {

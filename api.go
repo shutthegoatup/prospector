@@ -56,6 +56,13 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 			respond(w, map[string]bool{"ok": true}, a.s.AgentDraft(q.Org.ID, q.Actor(), in))
 		}
 	}))
+	mux.HandleFunc("POST "+v1+"marks", a.agent("outcomes:write", func(w http.ResponseWriter, r *http.Request) {
+		var in MarkIn
+		if decode(w, r, &in) {
+			q := reqOf(r)
+			respond(w, map[string]bool{"ok": true}, a.s.AgentMark(q.Org.ID, q.Actor(), in))
+		}
+	}))
 	mux.HandleFunc("POST "+v1+"import", a.agent("import", func(w http.ResponseWriter, r *http.Request) {
 		var p ImportPayload
 		if decode(w, r, &p) {
@@ -146,6 +153,13 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 		mcp.AddTool(s, &mcp.Tool{Name: "draft_message", Description: "Write the LinkedIn note (300 characters at most), LinkedIn message, email or follow-up for a contact. It shows as written by an agent; a person edits and sends it."},
 			func(_ context.Context, _ *mcp.CallToolRequest, in DraftIn) (*mcp.CallToolResult, ok, error) {
 				err := a.s.AgentDraft(org.ID, actor, in)
+				return nil, ok{err == nil}, err
+			})
+	}
+	if k.Has("outcomes:write") {
+		mcp.AddTool(s, &mcp.Tool{Name: "mark", Description: "Record an outcome for a contact in outreach: LinkedIn request sent, accepted, email or follow-up sent, called, replied, declined or on hold. It shows as yours, with your note."},
+			func(_ context.Context, _ *mcp.CallToolRequest, in MarkIn) (*mcp.CallToolResult, ok, error) {
+				err := a.s.AgentMark(org.ID, actor, in)
 				return nil, ok{err == nil}, err
 			})
 	}
