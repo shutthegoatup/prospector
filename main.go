@@ -7,6 +7,8 @@
 //	prospector org add <slug> <name> [--owner=<email>]
 //	prospector member add <org> <email> [owner|member]
 //	prospector key add <org> <name> <scope>…   prints the key once
+//	prospector sso off <org>                 stop requiring single sign-on, when its provider has broken
+//	prospector secret-key                    print a new key for PROSPECTOR_SECRET_KEYS
 //	prospector version
 //
 // Per organisation, chosen with --org=<slug> or $PROSPECTOR_ORG:
@@ -15,6 +17,7 @@
 //	prospector export <file>                 write the contacts snapshot
 //	prospector restore <file>                replace the organisation's contacts with a snapshot
 //	prospector import-legacy <file.sqlite>   the same, from a legacy tracker database (read-only)
+//	prospector export-person <name> <file>   write everything held on one person, on their request
 //	prospector erase <name>                  delete a person for good, on their request
 //	prospector mark <name> <step> [date]
 //	prospector set <name> <field> <value>
@@ -122,7 +125,7 @@ func run(args []string) error {
 		fmt.Println(version)
 		return nil
 	case "help", "-h", "--help":
-		fmt.Println("usage: prospector serve | user | org | member | key | import | export | restore | import-legacy | mark | set | list | push | pull | version\nSee the README for details.")
+		fmt.Println("usage: prospector serve | user | org | member | key | sso | secret-key | import | export | restore | import-legacy | mark | set | list | push | pull | version\nSee the README for details.")
 		return nil
 	case "push":
 		if len(rest) < 1 {
@@ -156,6 +159,10 @@ func run(args []string) error {
 		return os.WriteFile(rest[1], text, 0o600)
 	}
 
+	if cmd == "secret-key" {
+		fmt.Println(newSecretKey())
+		return nil
+	}
 	dsn := defaultDSN()
 	s, err := Open(dsn)
 	if err != nil {
@@ -171,7 +178,19 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		return serve(&App{s: s, base: base}, arg(rest, 0, addr))
+		social, err := socialFromEnv(os.Getenv)
+		if err != nil {
+			return err
+		}
+		// Only the server uses the keys, so a mistyped one doesn't stop the other
+		// commands: `sso off` and `user password` are how a locked-out host is put right.
+		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
+			return err
+		}
+		s.resealAtStart()
+		return serve(&App{s: s, base: base, social: social}, arg(rest, 0, addr))
+	case "sso":
+		return ssoCommand(s, rest)
 	case "user":
 		switch arg(rest, 0, "") {
 		case "add":
@@ -296,6 +315,29 @@ func run(args []string) error {
 			return err
 		}
 		fmt.Printf("copied %d contacts from %s into %s\n", n, rest[0], org.Slug)
+	case "export-person":
+		if len(rest) < 2 {
+			return fmt.Errorf("usage: prospector export-person <name> <file>")
+		}
+		c, err := s.FindOne(org.ID, rest[0])
+		if err != nil {
+			return err
+		}
+		if !strings.EqualFold(strings.TrimSpace(rest[0]), displayName(*c)) {
+			return fmt.Errorf("export-person needs the full name, to be sure it's them: %q", displayName(*c))
+		}
+		out, err := s.ExportPerson(org.ID, c.ID, "cli")
+		if err != nil {
+			return err
+		}
+		text, err := json.MarshalIndent(out, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(rest[1], text, 0o600); err != nil {
+			return err
+		}
+		fmt.Println("wrote", rest[1])
 	case "erase":
 		if len(rest) < 1 {
 			return fmt.Errorf("usage: prospector erase <name>")

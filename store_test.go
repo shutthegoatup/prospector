@@ -30,16 +30,29 @@ func tempStore(t *testing.T) *Store {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := s.db.Migrator().DropTable(&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
-			&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}); err != nil {
+		if err := s.db.Migrator().DropTable(models...); err != nil {
 			t.Fatal(err)
 		}
+		closeStore(s)
 	}
 	s, err := Open(dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if s.keys, err = parseKeys("1:" + testKey); err != nil {
+		t.Fatal(err)
+	}
+	// Postgres allows only so many connections, and every test opens its own.
+	t.Cleanup(func() { closeStore(s) })
 	return s
+}
+
+var testKey = strings.Repeat("0a", 32)
+
+func closeStore(s *Store) {
+	if db, err := s.db.DB(); err == nil {
+		db.Close()
+	}
 }
 
 func mustOrg(t *testing.T, s *Store, slug string) *Org {
@@ -200,21 +213,21 @@ func TestAgentResearchToOutreach(t *testing.T) {
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AgentAddCompany(o.ID, "agent:bot", AddCompanyIn{Name: "Ostrel Aviation", Facts: []FactIn{{Field: "configurator", Value: "3D"}}}); err == nil {
+	if _, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, AddCompanyIn{Name: "Ostrel Aviation", Facts: []FactIn{{Field: "configurator", Value: "3D"}}}); err == nil {
 		t.Fatal("a fact without a source was accepted")
 	}
-	out, err := s.AgentAddCompany(o.ID, "agent:bot", AddCompanyIn{Name: "Ostrel Aviation", Country: "CH",
+	out, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, AddCompanyIn{Name: "Ostrel Aviation", Country: "CH",
 		Facts: []FactIn{{Field: "configurator", Value: "3D", SourceURL: "https://ostrel.example/configure"}}})
 	if err != nil || out.Existed || out.Stage != CompanyReview {
 		t.Fatalf("add company: %+v %v", out, err)
 	}
-	if _, err := s.AgentAddContact(o, "agent:bot", AddContactIn{Company: "Ostrel Aviation", Name: "Jonas Weber"}); err == nil {
+	if _, err := s.AgentAddContact(o, Actor{Name: "agent:bot"}, AddContactIn{Company: "Ostrel Aviation", Name: "Jonas Weber"}); err == nil {
 		t.Fatal("a contact without a source was accepted")
 	}
-	if _, err := s.AgentAddContact(o, "agent:bot", AddContactIn{Company: "Ostrel Aviation", Name: "Max Muster", Email: "max@blocked.example", SourceURL: "https://x.example"}); err == nil {
+	if _, err := s.AgentAddContact(o, Actor{Name: "agent:bot"}, AddContactIn{Company: "Ostrel Aviation", Name: "Max Muster", Email: "max@blocked.example", SourceURL: "https://x.example"}); err == nil {
 		t.Fatal("never-contact list ignored")
 	}
-	c, err := s.AgentAddContact(o, "agent:bot", AddContactIn{Company: "ostrel aviation", Name: "Jonas Weber", Title: "Head of Digital", SourceURL: "https://ostrel.example/team"})
+	c, err := s.AgentAddContact(o, Actor{Name: "agent:bot"}, AddContactIn{Company: "ostrel aviation", Name: "Jonas Weber", Title: "Head of Digital", SourceURL: "https://ostrel.example/team"})
 	if err != nil || c.Status != ContactSuggested {
 		t.Fatalf("add contact: %+v %v", c, err)
 	}
@@ -231,10 +244,10 @@ func TestAgentResearchToOutreach(t *testing.T) {
 	if len(due) != 1 || !strings.Contains(deref(due[0].Note), "Jonas") {
 		t.Fatalf("picked contact not queued with a note: %+v", due)
 	}
-	if err := s.AgentDraft(o.ID, "agent:bot", DraftIn{ContactID: c.ID, Kind: "note", Text: strings.Repeat("x", 301)}); err == nil {
+	if err := s.AgentDraft(o.ID, Actor{Name: "agent:bot"}, DraftIn{ContactID: c.ID, Kind: "note", Text: strings.Repeat("x", 301)}); err == nil {
 		t.Fatal("a note over 300 characters was accepted")
 	}
-	corvane, err := s.AgentAddCompany(o.ID, "agent:bot", AddCompanyIn{Name: "Corvane", Facts: []FactIn{{Field: "configurator", Value: "Vela builder", SourceURL: "https://corvane.example"}}})
+	corvane, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, AddCompanyIn{Name: "Corvane", Facts: []FactIn{{Field: "configurator", Value: "Vela builder", SourceURL: "https://corvane.example"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,7 +344,7 @@ func TestUI(t *testing.T) {
 			t.Fatalf("%s renders a javascript: link", page)
 		}
 	}
-	if _, err := s.AgentAddContact(o, "agent:x", AddContactIn{Company: "Larkmoor Yachts", Name: "Eve", Linkedin: "javascript:alert(1)", SourceURL: "https://x.example"}); err == nil {
+	if _, err := s.AgentAddContact(o, Actor{Name: "agent:x"}, AddContactIn{Company: "Larkmoor Yachts", Name: "Eve", Linkedin: "javascript:alert(1)", SourceURL: "https://x.example"}); err == nil {
 		t.Fatal("agent stored a javascript: link")
 	}
 	if code, _ := call(t, client, "POST", base+"ui/mark", "application/json", map[string]any{"id": c.ID, "step": "replied"}); code != http.StatusOK {
@@ -423,6 +436,15 @@ func TestMCP(t *testing.T) {
 	if err != nil || res.IsError {
 		t.Fatalf("add_company: %v %+v", err, res)
 	}
+	fact := map[string]any{"company": "Larkmoor Yachts", "field": "configurator", "value": "Day Cruiser 45 builder", "source_url": "https://larkmoor.example/build"}
+	res, err = session.CallTool(ctx, &mcp.CallToolParams{Name: "add_fact", Arguments: fact})
+	if err != nil || res.IsError || !strings.Contains(fmt.Sprint(res.StructuredContent), "existed:true") {
+		t.Fatalf("a fact sent twice should say it existed: %v %+v", err, res)
+	}
+	var keyed int64
+	if s.in(o.ID).Model(&Event{}).Where("key_id > 0").Count(&keyed); keyed != 1 {
+		t.Fatalf("want the one change recorded against its key, got %d events", keyed)
+	}
 	res, _ = session.CallTool(ctx, &mcp.CallToolParams{Name: "add_contact", Arguments: map[string]any{"company": "Larkmoor Yachts", "name": "Hannah Pryce"}})
 	if res == nil || !res.IsError {
 		t.Fatal("add_contact without a source should be a tool error")
@@ -444,30 +466,30 @@ func TestMCP(t *testing.T) {
 func TestAgentMarks(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	if _, err := s.AgentAddCompany(o.ID, "agent:bot", AddCompanyIn{Name: "Larkmoor Yachts",
+	if _, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, AddCompanyIn{Name: "Larkmoor Yachts",
 		Facts: []FactIn{{Field: "configurator", Value: "Day Cruiser 45", SourceURL: "https://larkmoor.example"}}}); err != nil {
 		t.Fatal(err)
 	}
-	c, err := s.AgentAddContact(o, "agent:bot", AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"})
+	c, err := s.AgentAddContact(o, Actor{Name: "agent:bot"}, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AgentMark(o.ID, "agent:bot", MarkIn{ContactID: c.ID, Step: "declined"}); err == nil {
+	if err := s.AgentMark(o.ID, Actor{Name: "agent:bot"}, MarkIn{ContactID: c.ID, Step: "declined"}); err == nil {
 		t.Fatal("an agent marked a contact nobody has picked yet")
 	}
 	if err := s.PickContact(o.ID, o, c.ID, "ada"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AgentMark(o.ID, "agent:bot", MarkIn{ContactID: c.ID, Step: "accepted", Date: "2999-01-01"}); err == nil {
+	if err := s.AgentMark(o.ID, Actor{Name: "agent:bot"}, MarkIn{ContactID: c.ID, Step: "accepted", Date: "2999-01-01"}); err == nil {
 		t.Fatal("a future date was accepted")
 	}
-	if err := s.AgentMark(o.ID, "agent:bot", MarkIn{ContactID: c.ID, Step: "sent"}); err == nil {
+	if err := s.AgentMark(o.ID, Actor{Name: "agent:bot"}, MarkIn{ContactID: c.ID, Step: "sent"}); err == nil {
 		t.Fatal("an unknown step was accepted")
 	}
-	if err := s.AgentMark(o.ID, "agent:bot", MarkIn{ContactID: c.ID, Step: "accepted", Note: "seen on LinkedIn"}); err != nil {
+	if err := s.AgentMark(o.ID, Actor{Name: "agent:bot"}, MarkIn{ContactID: c.ID, Step: "accepted", Note: "seen on LinkedIn"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AgentMark(o.ID, "agent:bot", MarkIn{ContactID: c.ID, Step: "declined", Date: "2026-11-24", Note: "Allan says no"}); err != nil {
+	if err := s.AgentMark(o.ID, Actor{Name: "agent:bot"}, MarkIn{ContactID: c.ID, Step: "declined", Date: "2026-11-24", Note: "Allan says no"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Mark(o.ID, c.ID, "accepted", today(), "ada"); err != nil {

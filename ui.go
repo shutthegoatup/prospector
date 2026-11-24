@@ -192,12 +192,26 @@ type SettingsData struct {
 	Members []Member
 	Me      Membership
 	Covered []string
+	SSO     *SSO
+	// Callback is where a provider sends people back; empty until PROSPECTOR_URL is set.
+	Callback string
+	// Sealing is whether the server has a key to keep a client secret under.
+	Sealing bool
+	Intake  string
 }
 
 func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	members, _ := a.s.Members(q.Org.ID)
-	a.page(w, r, "settings", SettingsView(q, SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org)}))
+	d := SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org), Intake: a.baseURL(r) + q.Base() + "intake"}
+	d.Sealing = a.s.keys != nil
+	if d.SSO, _ = a.s.SSO(q.Org.ID); d.SSO == nil {
+		d.SSO = &SSO{}
+	}
+	if a.base != "" {
+		d.Callback = a.callbackURL()
+	}
+	a.page(w, r, "settings", SettingsView(q, d))
 }
 
 type AgentsData struct {
@@ -312,6 +326,10 @@ func (a *App) uiSettings(w http.ResponseWriter, r *http.Request) {
 		fail(w, errors.New("waits are between 0 and 60 days"), http.StatusBadRequest)
 		return
 	}
+	if _, err := enquiryOrigins(in.EnquirySites); err != nil {
+		fail(w, err, http.StatusBadRequest)
+		return
+	}
 	o := reqOf(r).Org
 	o.Name, o.Color, o.Settings = strings.TrimSpace(in.Name), in.Color, in.OrgSettings
 	err := a.s.SaveOrg(o)
@@ -348,6 +366,9 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	msg := u.Email + " added to " + q.Org.Name + "."
+	if !u.HasPassword() {
+		msg += " They have no password: they sign in through a provider, so they can open this organisation only by one it accepts."
+	}
 	if password != "" {
 		msg += " Their first password, shown once: " + password + " (they choose their own when they first sign in)"
 	}
@@ -371,6 +392,23 @@ func (a *App) uiRemoveMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+func (a *App) uiExport(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID int64 `json:"id"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	q := reqOf(r)
+	out, err := a.s.ExportPerson(q.Org.ID, in.ID, q.Actor())
+	if err != nil {
+		fail(w, err, http.StatusNotFound)
+		return
+	}
+	w.Header().Set("cache-control", "no-store")
+	writeJSON(w, out)
 }
 
 func (a *App) uiErase(w http.ResponseWriter, r *http.Request) {

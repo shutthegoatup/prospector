@@ -82,10 +82,10 @@ templ ResearchView(q *Req, f string, rows []ResearchRow, counts map[string]int) 
 }
 
 templ ResearchItem(q *Req, r ResearchRow, i int) {
-	<article class="rise rounded-xl border border-border bg-card" style={ itemStyle(i) }>
+	<article class="rise panel" style={ itemStyle(i) }>
 		<div class="flex flex-wrap items-start gap-x-6 gap-y-3 px-5 py-4">
 			<div class="min-w-[200px] flex-[2_1_220px]">
-				<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(r.ID, 10)) } class="font-heading text-lg font-semibold text-foreground hover:text-primary">{ r.Name }</a>
+				<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(r.ID, 10)) } class="font-heading text-lg font-semibold text-foreground hover:text-mark">{ r.Name }</a>
 				<p class="font-mono text-xs text-muted-foreground">
 					{ joinNonEmpty(" · ", r.Country, r.Segment, r.Domain) }
 				</p>
@@ -113,7 +113,7 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 				}
 			</div>
 		</div>
-		<details class="group border-t border-border/70 bg-black/10" open?={ i == 0 }>
+		<details class="group border-t border-border/70 bg-muted" open?={ i == 0 }>
 			<summary class="flex cursor-pointer list-none items-center gap-2 px-5 py-2.5 font-mono text-xs text-muted-foreground hover:text-foreground">
 				<span class="transition-transform group-open:rotate-90">›</span>
 				{ plural(len(r.Facts), "fact") + " · " + plural(len(r.People), "person") }

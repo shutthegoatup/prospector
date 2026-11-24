@@ -40,7 +40,7 @@ jobs:
         env:
           PROSPECTOR_TEST_PG: postgres://postgres:test@localhost:5432/prospector?sslmode=disable
 
-  # Every green push to main becomes the next patch release, which hosts pull.
+  # Every green push to main becomes the next patch release, which deploy.yml installs.
   # A tag pushed with GITHUB_TOKEN doesn't start release.yml, so goreleaser runs here.
   release:
     needs: test
@@ -51,6 +51,8 @@ jobs:
     concurrency:
       group: release
       cancel-in-progress: false
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -62,7 +64,9 @@ jobs:
       - name: Tag the next patch version
         id: tag
         run: |
-          if git tag --points-at HEAD | grep -q '^v'; then
+          # Also when a later commit was released first: this one is already in that
+          # release, and tagging it now would make the older commit the newest.
+          if git tag --contains HEAD --list 'v*' | grep -q .; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -80,3 +84,14 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    needs: release
+    if: needs.release.outputs.tag
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      version: ${{ needs.release.outputs.tag }}
+    secrets: inherit

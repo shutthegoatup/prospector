@@ -256,11 +256,11 @@ func LandingPage() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" width=\"1424\" height=\"900\" alt=\"The Today page: seven things due, best first, with a Do now list beside them\"></div><span class=\"lp-chip is-green a\">Tue 13:30 in Zurich: good time to call</span> <span class=\"lp-chip is-violet b\">agent · research-agent</span></div></div></div></header><div class=\"lp-wrap\"><div class=\"lp-facts\"><div class=\"lp-fact is-coral\"><b>1</b><p><strong>queue a day</strong>across LinkedIn, email and phone.</p></div><div class=\"lp-fact is-violet\"><b>0</b><p><strong>messages sent by agents</strong>They draft. Only people send.</p></div><div class=\"lp-fact is-green\"><b>1</b><p><strong>source link per fact</strong>An agent's fact without one is refused.</p></div></div></div><section class=\"lp-section\" id=\"loop\"><div class=\"lp-wrap\"><div class=\"lp-section-head\"><p class=\"lp-label\">How it works</p><h2>From a company name to a signed deal, in three pages.</h2><p>Research fills the list. Today works it. Conversations closes it. The screenshots show invented companies and people.</p></div><div class=\"lp-step is-green\"><div class=\"lp-step-copy\"><span class=\"lp-tag\">01 · Research</span><h3>Facts with the link they came from</h3><p>Companies found by agents, imports and people wait here until someone qualifies or rejects them. Nothing reaches outreach on its own.</p><p>Every fact keeps its source. Pick a suggested person and they move into outreach with a note from your template.</p></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" width=\"1440\" height=\"900\" alt=\"The Today page: everything due, best first, with a Do now list beside them\"></div><span class=\"lp-chip is-green a\">Tue 16:39 in London: good time to call</span> <span class=\"lp-chip is-violet b\">agent · research-agent</span></div></div></div></header><div class=\"lp-wrap\"><div class=\"lp-facts\"><div class=\"lp-fact is-coral\"><b>1</b><p><strong>queue a day</strong>across LinkedIn, email and phone.</p></div><div class=\"lp-fact is-violet\"><b>0</b><p><strong>messages sent by agents</strong>They draft. Only people send.</p></div><div class=\"lp-fact is-green\"><b>1</b><p><strong>source link per fact</strong>An agent's fact without one is refused.</p></div></div></div><section class=\"lp-section\" id=\"loop\"><div class=\"lp-wrap\"><div class=\"lp-section-head\"><p class=\"lp-label\">How it works</p><h2>From a company name to a signed deal, in three pages.</h2><p>Research fills the list. Today works it. Conversations closes it. The screenshots show invented companies and people.</p></div><div class=\"lp-step is-green\"><div class=\"lp-step-copy\"><span class=\"lp-tag\">01 · Research</span><h3>Facts with the link they came from</h3><p>Companies found by agents, imports and people wait here until someone qualifies or rejects them. Nothing reaches outreach on its own.</p><p>Every fact keeps its source. Pick a suggested person and they move into outreach with a note from your template.</p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = Shot("research.webp", "1425", "928", "Research: two companies an agent found, each with sourced facts and a suggested contact", "").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Shot("research.webp", "1440", "900", "Research: two companies an agent found, each with sourced facts and a suggested contact", "").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -268,7 +268,7 @@ func LandingPage() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = Shot("linkedin.webp", "1424", "900", "The LinkedIn queue: the connection note ready to copy, with keyboard shortcuts", "").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Shot("linkedin.webp", "1440", "900", "The LinkedIn queue: the connection note ready to copy, with keyboard shortcuts", "").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -284,7 +284,7 @@ func LandingPage() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = Shot("agents.webp", "1424", "765", "Agents and API: the MCP endpoint, REST calls and the tools each key gets", "is-violet").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Shot("agents.webp", "1440", "765", "Agents and API: the MCP endpoint, REST calls and the tools each key gets", "is-violet").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

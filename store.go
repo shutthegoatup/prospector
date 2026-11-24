@@ -30,6 +30,7 @@ type OrgSettings struct {
 	NeverContact      string `json:"never_contact"`
 	IncorporatedOnly  bool   `json:"incorporated_only"`
 	AgentGuidance     string `json:"agent_guidance"`
+	EnquirySites      string `json:"enquiry_sites"`
 }
 
 func (s OrgSettings) withDefaults() OrgSettings {
@@ -71,6 +72,10 @@ type Session struct {
 	TokenHash string `gorm:"uniqueIndex;not null"`
 	UserID    int64  `gorm:"index"`
 	ExpiresAt time.Time
+	// SSOOrgs are the organisations whose own sign-in this session has been through
+	// (see proofs). A Limited session began at one and opens nothing else.
+	SSOOrgs string `gorm:"not null;default:''"`
+	Limited bool   `gorm:"not null;default:false"`
 }
 
 type APIKey struct {
@@ -185,9 +190,17 @@ type Event struct {
 	ContactID int64  `gorm:"index"`
 	CompanyID *int64 `gorm:"index"`
 	User      string
-	Action    string
-	Value     *string
-	At        time.Time `gorm:"index"`
+	// KeyID is the API key behind an agent's action, since key names can repeat; 0 for people.
+	KeyID  int64 `gorm:"not null;default:0"`
+	Action string
+	Value  *string
+	At     time.Time `gorm:"index"`
+}
+
+// Actor is who an agent operation is recorded against: "agent:<key name>" and its key.
+type Actor struct {
+	Name  string
+	KeyID int64
 }
 
 var Editable = map[string]bool{"phone": true, "email": true, "linkedin": true, "sources": true,
@@ -201,7 +214,15 @@ var stringFields = map[string]bool{"stage": true, "next_step": true, "lost_reaso
 var Marks = map[string]string{"linkedin": "linkedin_added", "email": "email_sent", "followup": "followup_sent",
 	"call": "called", "replied": "replied", "declined": "declined", "hold": "hold", "accepted": "accepted"}
 
-type Store struct{ db *gorm.DB }
+type Store struct {
+	db *gorm.DB
+	// keys seal what is stored but mustn't be readable from the database alone; nil
+	// when the server was given none.
+	keys *keyring
+}
+
+var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
+	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}}
 
 // Open takes a postgres:// URL or a SQLite file path.
 func Open(dsn string) (*Store, error) {
@@ -215,8 +236,7 @@ func Open(dsn string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := db.AutoMigrate(&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
-		&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}); err != nil {
+	if err := db.AutoMigrate(models...); err != nil {
 		return nil, err
 	}
 	return &Store{db: db}, nil
@@ -252,7 +272,7 @@ func deref(p *string) string {
 func (s *Store) Due(org int64, step string, now time.Time, set OrgSettings) ([]Contact, error) {
 	set = set.withDefaults()
 	var rows []Contact
-	q := s.in(org).Model(&Contact{})
+	q := s.in(org).Model(&Contact{}).Where(companyNotRejected)
 	switch step {
 	case "linkedin":
 		q = q.Where(openContacts + " and linkedin_added is null and note is not null and note <> ''").Order("fit nulls first, file")
@@ -286,14 +306,18 @@ func (s *Store) Due(org int64, step string, now time.Time, set OrgSettings) ([]C
 }
 
 func (s *Store) log(tx *gorm.DB, org, contact int64, company *int64, actor, action string, value *string) error {
-	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: actor, Action: action, Value: value, At: time.Now()}).Error
+	return s.logAs(tx, org, contact, company, Actor{Name: actor}, action, value)
+}
+
+func (s *Store) logAs(tx *gorm.DB, org, contact int64, company *int64, who Actor, action string, value *string) error {
+	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: who.Name, KeyID: who.KeyID, Action: action, Value: value, At: time.Now()}).Error
 }
 
 func (s *Store) Mark(org, id int64, step, date, actor string) error {
-	return s.mark(org, id, step, date, actor, "")
+	return s.mark(org, id, step, date, Actor{Name: actor}, "")
 }
 
-func (s *Store) mark(org, id int64, step, date, actor, note string) error {
+func (s *Store) mark(org, id int64, step, date string, who Actor, note string) error {
 	column, ok := Marks[step]
 	if !ok {
 		return fmt.Errorf("unknown step %q", step)
@@ -320,7 +344,7 @@ func (s *Store) mark(org, id int64, step, date, actor, note string) error {
 		if note != "" {
 			value += " · " + note
 		}
-		return s.log(tx, org, id, c.CompanyID, actor, "mark:"+step, &value)
+		return s.logAs(tx, org, id, c.CompanyID, who, "mark:"+step, &value)
 	})
 }
 
