@@ -341,8 +341,10 @@ func (s *Store) SessionFor(token string) (*Session, *User, error) {
 	if err := s.db.Where("token_hash in ? and expires_at > ?", s.keys.lookups(sessions, token), time.Now()).First(&sess).Error; err != nil {
 		return nil, nil, err
 	}
-	// Found by an older key: moved to the current one, so that key can be removed.
-	if current := s.keys.lookup(sessions, token); sess.TokenHash != current {
+	// Found by an older key: moved to the current one, so that key can be removed. One
+	// under a newer key is another server's doing and is left alone.
+	if s.keys.lookupBehind(sess.TokenHash) {
+		current := s.keys.lookup(sessions, token)
 		if s.db.Model(&sess).Update("token_hash", current).Error == nil {
 			sess.TokenHash = current
 		}
@@ -410,15 +412,17 @@ func (s *Store) CreateKey(org int64, name string, scopes []string, by string) (s
 func (s *Store) KeyFor(secret string) (*APIKey, error) {
 	var k APIKey
 	// A key made before there was a secret key is still found by its plain hash: an
-	// agent can't be asked to sign in again the way a person can. It moves on first use.
+	// agent can't be asked to sign in again the way a person can. It moves on first
+	// use. The cost is that a row written straight into the database with a plain hash
+	// is taken for one of those, so the keyed lookup guards sessions and not API keys.
 	found := append(s.keys.lookups(apiKeys, secret), hashToken(secret))
 	if err := s.db.Where("hash in ? and revoked_at is null", found).First(&k).Error; err != nil {
 		return nil, err
 	}
 	now := time.Now()
 	set := map[string]any{"last_used_at": now}
-	if current := s.keys.lookup(apiKeys, secret); k.Hash != current {
-		set["hash"] = current
+	if s.keys.lookupBehind(k.Hash) {
+		set["hash"] = s.keys.lookup(apiKeys, secret)
 	}
 	s.db.Model(&k).Updates(set)
 	return &k, nil

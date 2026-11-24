@@ -389,9 +389,8 @@ func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 	}
 	spec, err := a.s.spec(sso)
 	if err != nil {
-		// Not an outage, and trying again won't help: the secret has to be typed again.
 		log.Printf("single sign-on for %s: %v", org.Slug, err)
-		a.signInProblem(w, r, query.Get("next"), http.StatusServiceUnavailable, org.Name+"'s single sign-on needs setting up again by one of its owners.")
+		a.signInProblem(w, r, query.Get("next"), http.StatusServiceUnavailable, unopenable(org))
 		return
 	}
 	p, err := a.idp(r.Context(), spec)
@@ -401,6 +400,13 @@ func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.beginAttempt(w, r, p, attempt{Way: "sso", Org: org.ID, Next: query.Get("next")}, oauth2.SetAuthURLParam("login_hint", email))
+}
+
+// unopenable is what people are told when a connection's kept secret can't be opened.
+// It isn't an outage, and trying again won't help: the server needs its key back, or
+// an owner has to type the secret again.
+func unopenable(org *Org) string {
+	return org.Name + "'s single sign-on isn't working here, and trying again won't help. Tell one of its owners, or whoever runs this server."
 }
 
 func (a *App) loginCallback(w http.ResponseWriter, r *http.Request) {
@@ -471,10 +477,12 @@ func (a *App) finishSSO(w http.ResponseWriter, r *http.Request, att attempt, ref
 		return
 	}
 	spec, err := a.s.spec(sso)
-	var p *idp
-	if err == nil {
-		p, err = a.idp(r.Context(), spec)
+	if err != nil {
+		log.Printf("single sign-on for %s: %v", org.Slug, err)
+		a.signInProblem(w, r, att.Next, http.StatusServiceUnavailable, unopenable(org))
+		return
 	}
+	p, err := a.idp(r.Context(), spec)
 	if err != nil {
 		refuse(err)
 		return

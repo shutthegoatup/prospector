@@ -29,11 +29,9 @@ const (
 	// sessions and apiKeys key what a session token and an API key are stored and found by.
 	sessions purpose = "prospector: sessions"
 	apiKeys  purpose = "prospector: API keys"
-	// devices signs the cookie that marks a browser as having signed in before.
-	devices purpose = "prospector: known devices"
 )
 
-var purposes = []purpose{sealing, attempts, sessions, apiKeys, devices}
+var purposes = []purpose{sealing, attempts, sessions, apiKeys}
 
 const keySize = 32
 
@@ -147,50 +145,56 @@ func (k *keyring) open(stored string) (string, error) {
 	return string(plain), nil
 }
 
-// versionOf is the key version a stored value names: a sealed secret's kid, or the
-// "k<version>:" a lookup begins with. -1 for a value that names none.
-func versionOf(stored string) int {
-	kid := ""
-	if rest, ok := strings.CutPrefix(stored, "k"); ok {
-		kid, _, _ = strings.Cut(rest, ":")
-	} else if sealed(stored) {
-		var header struct {
-			KID string `json:"kid"`
-		}
-		raw, _ := base64.RawURLEncoding.DecodeString(stored[:strings.IndexByte(stored, '.')])
-		json.Unmarshal(raw, &header)
-		kid = header.KID
-	}
-	if v, err := strconv.Atoi(kid); err == nil && strconv.Itoa(v) == kid {
+// plainVersion reads a version written the one way parseKeys takes it. -1 otherwise.
+func plainVersion(kid string) int {
+	if v, err := strconv.Atoi(kid); err == nil && v >= 0 && strconv.Itoa(v) == kid {
 		return v
 	}
 	return -1
 }
 
-func (k *keyring) version() int {
-	v, _ := strconv.Atoi(k.keys[0].kid)
-	return v
-}
-
-// behind is a stored value under an older key than this server uses, or under none.
-// One under a newer key isn't: another server was given the next key first, and its
-// work isn't to be undone.
-func (k *keyring) behind(stored string) bool {
-	return k != nil && versionOf(stored) < k.version()
-}
-
-// lookup is what a token is stored and found by: its HMAC under the current key, which
-// it names, so that nobody who can only write to the database can mint one. With no
-// key it is the token's SHA-256.
-func (k *keyring) lookup(p purpose, token string) string {
-	if k == nil {
-		return hashToken(token)
+// sealedVersion is the key version a sealed secret's header names. -1 for a value
+// kept in clear, whatever it looks like.
+func sealedVersion(stored string) int {
+	if !sealed(stored) {
+		return -1
 	}
-	return "k" + k.keys[0].kid + ":" + mac(k.keys[0].derived[p], token)
+	var header struct {
+		KID string `json:"kid"`
+	}
+	raw, _ := base64.RawURLEncoding.DecodeString(stored[:strings.IndexByte(stored, '.')])
+	json.Unmarshal(raw, &header)
+	return plainVersion(header.KID)
 }
 
-// lookups is lookup under every key held, the current one first, so a token made
-// before a key was replaced is still found until that key is removed.
+// lookupVersion is the key version a token's lookup names, as "k<version>:<hmac>". -1
+// for a plain hash.
+func lookupVersion(stored string) int {
+	rest, ok := strings.CutPrefix(stored, "k")
+	kid, _, colon := strings.Cut(rest, ":")
+	if !ok || !colon {
+		return -1
+	}
+	return plainVersion(kid)
+}
+
+func (k *keyring) version() int { return plainVersion(k.keys[0].kid) }
+
+// behind is a sealed secret under an older key than this server uses, or one kept in
+// clear. One under a newer key isn't: another server was given the next key first,
+// and its work isn't to be undone.
+func (k *keyring) behind(stored string) bool {
+	return k != nil && sealedVersion(stored) < k.version()
+}
+
+// lookupBehind is behind, for a token's lookup.
+func (k *keyring) lookupBehind(stored string) bool {
+	return k != nil && lookupVersion(stored) < k.version()
+}
+
+// lookups is what a token is stored and found by: its HMAC under each key held, the
+// current one first, each naming its key. A token made before a key was replaced is
+// still found until that key is removed. With no key it is the token's SHA-256.
 func (k *keyring) lookups(p purpose, token string) []string {
 	if k == nil {
 		return []string{hashToken(token)}
@@ -201,6 +205,9 @@ func (k *keyring) lookups(p purpose, token string) []string {
 	}
 	return out
 }
+
+// lookup is the one a new token is stored under.
+func (k *keyring) lookup(p purpose, token string) string { return k.lookups(p, token)[0] }
 
 func mac(key []byte, message string) string {
 	h := hmac.New(sha256.New, key)
@@ -293,8 +300,14 @@ func (s *Store) resealAtStart() {
 	}
 	// An API key can't be moved until it is next shown, so an old key that is removed
 	// first takes with it whichever haven't been used since.
-	var waiting int64
-	s.db.Model(&APIKey{}).Where("revoked_at is null and hash not like ?", "k"+current+":%").Count(&waiting)
+	var hashes []string
+	s.db.Model(&APIKey{}).Where("revoked_at is null").Pluck("hash", &hashes)
+	waiting := 0
+	for _, h := range hashes {
+		if s.keys.lookupBehind(h) {
+			waiting++
+		}
+	}
 	if waiting > 0 {
 		log.Printf("secrets: API keys still found by an older key or none: %d. Each moves to key %s when it is next used, and stops working if its key is removed first", waiting, current)
 	}

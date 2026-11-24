@@ -257,6 +257,10 @@ func run(args []string) error {
 		if arg(rest, 0, "") != "add" || len(rest) < 4 {
 			return fmt.Errorf("usage: prospector key add <org> <name> <scope>…")
 		}
+		// So a key made here is stored the way the server stores one.
+		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
+			return err
+		}
 		o, err := s.OrgBySlug(rest[1])
 		if err != nil {
 			return fmt.Errorf("no organisation %q", rest[1])

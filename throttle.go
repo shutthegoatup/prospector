@@ -124,25 +124,18 @@ const (
 )
 
 // A device token is what a browser keeps after signing in: a random value and its
-// MAC over the account's password hash, under the server's key for it. Only this
-// server can make one, it names nobody, and it stops working when the password changes.
-func (s *Store) newDeviceToken(u *User) string {
+// MAC under the account's password hash. Only this server can make one, it names
+// nobody, and it stops working when the password changes. It isn't signed under the
+// server's secret key: whoever can read the password hash could make one, but all it
+// buys is being counted apart from other guessers, and a year of browsers would
+// otherwise be forgotten the day a key is set.
+func newDeviceToken(u *User) string {
 	nonce := randomToken(16)
-	if s.keys != nil {
-		return nonce + "." + s.keys.sign(devices, deviceMessage(u, nonce))
-	}
-	return nonce + "." + mac([]byte(u.PasswordHash), "device\x00"+nonce)
+	return nonce + "." + deviceMAC(u, nonce)
 }
 
-func deviceMessage(u *User, nonce string) string { return u.PasswordHash + "\x00" + nonce }
-
-// With no secret key the password hash is the key, so whoever can read the database
-// could make one; all that buys is being counted apart from other guessers.
-func (s *Store) deviceSigned(u *User, nonce, signature string) bool {
-	if s.keys != nil {
-		return s.keys.verify(devices, deviceMessage(u, nonce), signature)
-	}
-	return hmac.Equal([]byte(mac([]byte(u.PasswordHash), "device\x00"+nonce)), []byte(signature))
+func deviceMAC(u *User, nonce string) string {
+	return mac([]byte(u.PasswordHash), "device\x00"+nonce)
 }
 
 // knownDevice reports whether token was issued to this email's account, and if so
@@ -154,7 +147,7 @@ func (s *Store) knownDevice(email, token string) (who string, ok bool) {
 		return "", false
 	}
 	u, err := s.UserByEmail(email)
-	if err != nil || !s.deviceSigned(u, nonce, signature) {
+	if err != nil || !hmac.Equal([]byte(signature), []byte(deviceMAC(u, nonce))) {
 		return "", false
 	}
 	return signInBucket(u.Email) + "\x00" + nonce, true

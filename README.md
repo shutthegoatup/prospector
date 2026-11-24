@@ -126,10 +126,10 @@ People start from "Use your organisation's single sign-on" on the sign-in page a
 
 - **A master key is never used directly.** Each job gets its own key derived from it with HKDF-SHA256 (RFC 5869).
 - **What it seals** is each organisation's single sign-on client secret, stored as a compact JWE (RFC 7516, `dir` with `A256GCM`) whose `kid` is the key's version.
-- **What it keys** is how a session and an API key are found: by an HMAC of the token under the server's key, where without a key it is the token's plain hash. Someone who can write to the database but hasn't the key can't mint a session or an API key.
-- **What it signs** is the cookie that carries a sign-in to a provider and back, and the one that marks a browser as having signed in before.
+- **What it keys** is how a session and an API key are found: by an HMAC of the token under the server's key, where without a key it is the token's plain hash. Someone who can write to the database but hasn't the key can't mint a session. An API key is not protected that far: one made before the server had a key is still accepted by its plain hash, because an agent can't sign in again, so a row written with a plain hash is accepted too.
+- **What it signs** is the cookie that carries a sign-in to a provider and back.
 - **Passwords** are bcrypt hashes and take no part: a key mixed into them couldn't be replaced without everyone choosing a new password.
-- **Giving a server its first key signs everybody out**, once. API keys keep working: each is found by its plain hash one last time and moves to the keyed one.
+- **Giving a server its first key signs everybody out**, once. API keys keep working: each is found by its plain hash and moves to the keyed one the first time it is used. That move is one-way: going back to a release from before it, or running a server with no key beside one that has, signs everybody out again and refuses every API key that has been used since, which then have to be made again.
 - **Without it** the server runs, but no client secret can be saved, so no new single sign-on connection. A secret stored in clear by an earlier release still works, its connection's other settings can still be changed, and it is sealed the first time the server starts with a key. After that, going back to any release from before sealing breaks those sign-ins until each owner types the secret again.
 - **Back it up apart from the database.** A database without the key can't read the secrets; a key that is lost takes them with it, and each owner types theirs again.
 

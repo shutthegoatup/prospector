@@ -81,7 +81,7 @@ func TestTokensAreFoundByAKeyedLookup(t *testing.T) {
 	var sess Session
 	s.db.First(&sess)
 	for what, stored := range map[string]string{"session": sess.TokenHash, "API key": key.Hash} {
-		if versionOf(stored) != 1 || strings.Contains(stored, hashToken(token)) || strings.Contains(stored, hashToken(secret)) {
+		if lookupVersion(stored) != 1 || strings.Contains(stored, hashToken(token)) || strings.Contains(stored, hashToken(secret)) {
 			t.Fatalf("a %s is stored as %q, not under key 1", what, stored)
 		}
 	}
@@ -108,7 +108,7 @@ func TestTokensAreFoundByAKeyedLookup(t *testing.T) {
 	}
 	s.db.First(&sess, sess.ID)
 	s.db.First(key, key.ID)
-	if versionOf(sess.TokenHash) != 2 || versionOf(key.Hash) != 2 {
+	if lookupVersion(sess.TokenHash) != 2 || lookupVersion(key.Hash) != 2 {
 		t.Fatalf("after use under the new key: session %q, API key %q", sess.TokenHash, key.Hash)
 	}
 	s.keys = mustKeys(t, "2:"+newKey)
@@ -163,7 +163,7 @@ func TestAnAgentsKeyOutlivesTheServerBeingGivenASecretKey(t *testing.T) {
 		t.Fatalf("an API key from before there was a key: %v", err)
 	}
 	s.db.First(key, key.ID)
-	if versionOf(key.Hash) != 1 {
+	if lookupVersion(key.Hash) != 1 {
 		t.Fatalf("the API key after its first use: %q", key.Hash)
 	}
 	if _, err := s.KeyFor(secret); err != nil {
@@ -173,24 +173,47 @@ func TestAnAgentsKeyOutlivesTheServerBeingGivenASecretKey(t *testing.T) {
 		t.Fatal("a made-up API key was accepted")
 	}
 
-	// The device cookie is signed under the server's key too, and still dies with the password.
-	cookie := s.newDeviceToken(u)
+	// A browser known before the server had a key is still known after: everyone has
+	// to sign in again that day, and shouldn't be held up by somebody else's guessing.
+	s.keys = nil
+	cookie := newDeviceToken(u)
+	s.keys = keys
 	if _, ok := s.knownDevice(u.Email, cookie); !ok {
-		t.Fatal("a device cookie this server just made isn't known")
+		t.Fatal("a browser known before there was a key was forgotten")
 	}
-	nonce, _, _ := strings.Cut(cookie, ".")
-	if _, ok := s.knownDevice(u.Email, nonce+"."+mac([]byte(u.PasswordHash), "device\x00"+nonce)); ok {
-		t.Fatal("a device cookie made from the password hash alone is accepted")
-	}
+
+	// Two servers part-way through a key change don't move a token back and forth: one
+	// under a newer key is left where it is.
 	s.keys = mustKeys(t, "2:"+newKey+",1:"+oldKey)
-	if _, ok := s.knownDevice(u.Email, cookie); !ok {
-		t.Fatal("a device cookie stopped being known when the key changed")
-	}
-	if err := s.SetPassword(u.Email, "another of my own"); err != nil {
+	fresh, _ := s.NewSession(u.ID, 0)
+	if _, err := s.KeyFor(secret); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := s.knownDevice(u.Email, cookie); ok {
-		t.Fatal("a device cookie outlived the password it was made under")
+	s.keys = mustKeys(t, "1:"+oldKey+",2:"+newKey)
+	if _, err := s.SessionUser(fresh); err != nil {
+		t.Fatalf("a session under the newer key, on a server still using the older: %v", err)
+	}
+	if _, err := s.KeyFor(secret); err != nil {
+		t.Fatalf("an API key under the newer key, on a server still using the older: %v", err)
+	}
+	var sess Session
+	s.db.Where("token_hash in ?", s.keys.lookups(sessions, fresh)).First(&sess)
+	s.db.First(key, key.ID)
+	if lookupVersion(sess.TokenHash) != 2 || lookupVersion(key.Hash) != 2 {
+		t.Fatalf("moved back to the older key: session %q, API key %q", sess.TokenHash, key.Hash)
+	}
+}
+
+func TestAClearSecretIsSealedWhateverItLooksLike(t *testing.T) {
+	// A secret kept in clear that happens to look like a token's lookup is still in clear.
+	k := mustKeys(t, "1:"+oldKey)
+	for _, clear := range []string{"k7:abc", "k12345", "kept-in-clear"} {
+		if !k.behind(clear) {
+			t.Errorf("%q, kept in clear, passes for sealed under a key", clear)
+		}
+	}
+	if lookupVersion("k12345") != -1 || lookupVersion(hashToken("x")) != -1 || lookupVersion("k3:abc") != 3 {
+		t.Fatal("reading the key a lookup names")
 	}
 }
 
@@ -366,7 +389,7 @@ func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
 		t.Fatalf("resealing: %d %v", moved, err)
 	}
 	under2 := clientSecret(t, s, alpha.ID)
-	if under2 == under1 || s.keys.behind(under2) || versionOf(under2) != 2 {
+	if under2 == under1 || s.keys.behind(under2) || sealedVersion(under2) != 2 {
 		t.Fatal("the stored secret wasn't moved to the new key")
 	}
 	if moved, err := s.Reseal(); err != nil || moved != 0 {
@@ -424,7 +447,7 @@ func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
 		t.Fatalf("resealing what no held key opens: %d %v", moved, err)
 	}
 	// It isn't an outage, and people aren't told to try again.
-	if code, body, _ := newBrowser(t, srv.URL).through(okta, start); code != http.StatusServiceUnavailable || !strings.Contains(body, "setting up again") || strings.Contains(body, "key") {
+	if code, body, _ := newBrowser(t, srv.URL).through(okta, start); code != http.StatusServiceUnavailable || !strings.Contains(body, "trying again won&#39;t help") || strings.Contains(body, "key") {
 		t.Fatalf("signing in when the secret can't be opened: %d", code)
 	}
 	if clientSecret(t, s, alpha.ID) != under2 {
