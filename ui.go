@@ -302,7 +302,11 @@ func (a *App) uiSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	o := reqOf(r).Org
 	o.Name, o.Color, o.Settings = strings.TrimSpace(in.Name), in.Color, in.OrgSettings
-	done(w, a.s.SaveOrg(o))
+	err := a.s.SaveOrg(o)
+	if err == nil {
+		a.dropMCPServers()
+	}
+	done(w, err)
 }
 
 func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {

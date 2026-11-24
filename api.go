@@ -101,8 +101,12 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 	}
 	org, actor, k := q.Org, q.Actor(), q.Key
 	s := mcp.NewServer(&mcp.Implementation{Name: "prospect", Title: "Prospecting: " + org.Name, Version: "1"},
-		&mcp.ServerOptions{Instructions: agentInstructions(org.Name, k)})
+		&mcp.ServerOptions{Instructions: agentInstructions(org, k)})
 	if k.Has("read") {
+		mcp.AddTool(s, &mcp.Tool{Name: "guidance", Description: "How to research and draft for this organisation: the same text as the server instructions. Read it first if your client doesn't show those."},
+			func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, *GuidanceOut, error) {
+				return nil, &GuidanceOut{Guidance: agentInstructions(org, k)}, nil
+			})
 		mcp.AddTool(s, &mcp.Tool{Name: "search", Description: "Find companies and contacts by name, domain, email or notes."},
 			func(_ context.Context, _ *mcp.CallToolRequest, in SearchIn) (*mcp.CallToolResult, []SearchHit, error) {
 				hits, err := a.s.AgentSearch(org.ID, in.Query)
@@ -150,4 +154,12 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 	}
 	a.mcp[k.ID] = s
 	return s
+}
+
+// dropMCPServers makes new sessions pick up changed settings; open sessions keep
+// the instructions they were given when they connected.
+func (a *App) dropMCPServers() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.mcp = nil
 }

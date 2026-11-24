@@ -312,8 +312,8 @@ func (s *Store) AgentDue(o *Org) ([]DueItem, error) {
 
 // agentInstructions describes each task rather than naming a model: the client
 // picks the model, and the agents page shows how each key's suggestions fare.
-func agentInstructions(org string, k *APIKey) string {
-	parts := []string{"Research and outreach data for " + org + ". Companies and contacts you add wait in Research until a person qualifies them. Every fact and contact needs a source URL. Search before adding, to avoid duplicates. You can draft messages; only people send them."}
+func agentInstructions(o *Org, k *APIKey) string {
+	parts := []string{"Research and outreach data for " + o.Name + ". Companies and contacts you add wait in Research until a person qualifies them. Every fact and contact needs a source URL. Search before adding, to avoid duplicates. You can draft messages; only people send them."}
 	if k.Has("research:write") {
 		parts = append(parts,
 			"Companies and facts are high volume with simple judgement, so a small, fast model does them well. One claim per fact, from the page that shows it. Leave built_by and platform empty unless a source says so.",
@@ -324,7 +324,14 @@ func agentInstructions(org string, k *APIKey) string {
 			"Drafts need a capable model. Write to the person: say plainly what you offer and why it fits them, in a few sentences. Claim nothing a source doesn't show. LinkedIn notes are 300 characters at most.")
 	}
 	parts = append(parts, "People approve or reject what you add, and the agents page shows each key's record, so one key per agent keeps the record useful.")
+	if g := strings.TrimSpace(o.Settings.AgentGuidance); g != "" {
+		parts = append(parts, "From "+o.Name+":\n"+g)
+	}
 	return strings.Join(parts, "\n\n")
+}
+
+type GuidanceOut struct {
+	Guidance string `json:"guidance"`
 }
 
 type AgentScore struct {

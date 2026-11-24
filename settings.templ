@@ -76,6 +76,10 @@ templ SettingsView(q *Req, d SettingsData) {
 						<textarea name="never_contact" rows="3" placeholder="domains, emails or LinkedIn links, one per line" class={ areaClass }>{ set.NeverContact }</textarea>
 						@Meta("Applied to everything people and agents add.")
 					}
+					@Row("Agent guidance") {
+						<textarea name="agent_guidance" rows="8" placeholder="Who you sell to, who's off-limits, how to judge fit" class={ areaClass }>{ set.AgentGuidance }</textarea>
+						@Meta("Sent to every agent when it connects, after the built-in task guidance, and returned by the guidance tool.")
+					}
 					@Row("Cold email") {
 						<span class="flex items-center gap-2.5 pt-2 text-sm"><input type="checkbox" name="incorporated_only" checked?={ set.IncorporatedOnly } class="size-4 accent-[var(--primary)]"/> Only email incorporated companies (UK PECR)</span>
 					}

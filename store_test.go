@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -390,6 +391,10 @@ func (f roundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f
 
 func TestMCP(t *testing.T) {
 	s, o, srv, _ := signedIn(t)
+	o.Settings.AgentGuidance = "Never suggest anyone at Brandtech."
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
 	key, _, _ := s.CreateKey(o.ID, "claude", []string{"read", "research:write"}, "test")
 	transport := &mcp.StreamableClientTransport{Endpoint: srv.URL + "/o/alpha/mcp", HTTPClient: &http.Client{
 		Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
@@ -423,8 +428,13 @@ func TestMCP(t *testing.T) {
 		t.Fatal("add_contact without a source should be a tool error")
 	}
 	init := session.InitializeResult()
-	if !strings.Contains(init.Instructions, "Contacts need care") || strings.Contains(init.Instructions, "Drafts need") {
+	if !strings.Contains(init.Instructions, "Contacts need care") || strings.Contains(init.Instructions, "Drafts need") ||
+		!strings.Contains(init.Instructions, "Never suggest anyone at Brandtech.") {
 		t.Fatalf("instructions don't follow the key's scopes: %q", init.Instructions)
+	}
+	g, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "guidance", Arguments: map[string]any{}})
+	if err != nil || g.IsError || !strings.Contains(fmt.Sprint(g.StructuredContent), "Never suggest anyone at Brandtech.") {
+		t.Fatalf("guidance tool: %v %+v", err, g)
 	}
 	if rows, _ := s.Research(o.ID, "review"); len(rows) != 1 || rows[0].FoundBy != "agent:claude" {
 		t.Fatalf("MCP-added company not waiting in Research: %+v", rows)
