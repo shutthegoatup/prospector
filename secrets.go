@@ -151,6 +151,21 @@ func (k *keyring) underCurrent(stored string) bool {
 	return k != nil && strings.HasPrefix(stored, k.header)
 }
 
+// newer is a value sealed under a later version than this server seals with: another
+// server has been given the next key first, and its work isn't to be undone.
+func (k *keyring) newer(stored string) bool {
+	if k == nil || !sealed(stored) {
+		return false
+	}
+	obj, err := jose.ParseEncryptedCompact(stored, []jose.KeyAlgorithm{jose.DIRECT}, []jose.ContentEncryption{jose.A256GCM})
+	if err != nil {
+		return false
+	}
+	theirs, err1 := strconv.Atoi(obj.Header.KeyID)
+	ours, err2 := strconv.Atoi(k.keys[0].kid)
+	return err1 == nil && err2 == nil && theirs > ours
+}
+
 func mac(key []byte, message string) string {
 	h := hmac.New(sha256.New, key)
 	h.Write([]byte(message))
@@ -181,15 +196,20 @@ func (s *Store) Reseal() (moved int, err error) {
 	}
 	var failed []error
 	for _, c := range conns {
-		if s.keys.underCurrent(c.ClientSecret) {
+		plain, err := s.keys.open(c.ClientSecret)
+		// One that names the current key is still opened: a key replaced under the same
+		// version would otherwise pass for current and open nothing.
+		if err == nil && (s.keys.underCurrent(c.ClientSecret) || s.keys.newer(c.ClientSecret)) {
 			continue
 		}
-		plain, err := s.keys.open(c.ClientSecret)
 		if err == nil {
 			var again string
 			if again, err = s.keys.seal(plain); err == nil {
 				// Only the value that was read is replaced, so an owner's change made meanwhile wins.
-				err = s.db.Model(&SSOConnection{}).Where("org_id = ? and client_secret = ?", c.OrgID, c.ClientSecret).Update("client_secret", again).Error
+				res := s.db.Model(&SSOConnection{}).Where("org_id = ? and client_secret = ?", c.OrgID, c.ClientSecret).Update("client_secret", again)
+				if err = res.Error; err == nil && res.RowsAffected == 0 {
+					err = errors.New("changed while it was being sealed again: restart to check it")
+				}
 			}
 		}
 		if err != nil {
@@ -210,7 +230,7 @@ func (s *Store) resealAtStart() {
 	switch {
 	case s.keys == nil:
 	case err == nil:
-		log.Printf("secrets: every stored secret is sealed under key %s (%d moved to it now); older keys can be removed", s.keys.keys[0].kid, moved)
+		log.Printf("secrets: every stored secret opens, and none is under a key older than %s (%d moved to it now)", s.keys.keys[0].kid, moved)
 	default:
 		log.Printf("secrets: %d moved to key %s, but not all: keep the older keys", moved, s.keys.keys[0].kid)
 	}

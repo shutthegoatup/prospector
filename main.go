@@ -162,16 +162,11 @@ func run(args []string) error {
 		fmt.Println(newSecretKey())
 		return nil
 	}
-	keys, err := parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS"))
-	if err != nil {
-		return err
-	}
 	dsn := defaultDSN()
 	s, err := Open(dsn)
 	if err != nil {
 		return fmt.Errorf("open %s: %w", redact(dsn), err)
 	}
-	s.keys = keys
 	switch cmd {
 	case "serve":
 		addr := "127.0.0.1:8766"
@@ -184,6 +179,11 @@ func run(args []string) error {
 		}
 		social, err := socialFromEnv(os.Getenv)
 		if err != nil {
+			return err
+		}
+		// Only the server uses the keys, so a mistyped one doesn't stop the other
+		// commands: `sso off` and `user password` are how a locked-out host is put right.
+		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
 			return err
 		}
 		s.resealAtStart()

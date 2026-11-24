@@ -125,14 +125,14 @@ People start from "Use your organisation's single sign-on" on the sign-in page a
 
 - **A master key is never used directly.** Each job gets its own key derived from it with HKDF-SHA256 (RFC 5869): one seals stored secrets, another signs the cookie that carries a sign-in to a provider and back.
 - **What it seals** is each organisation's single sign-on client secret, stored as a compact JWE (RFC 7516, `dir` with `A256GCM`) whose `kid` is the key's version. Passwords, sessions and API keys are stored as hashes and need no key.
-- **Without it** the server runs, but no client secret can be saved, so no new single sign-on connection. A secret stored in clear by v0.1.32 still works, its connection's other settings can still be changed, and it is sealed the first time the server starts with a key. After that, going back to v0.1.32 breaks those sign-ins until each owner types the secret again.
+- **Without it** the server runs, but no client secret can be saved, so no new single sign-on connection. A secret stored in clear by an earlier release still works, its connection's other settings can still be changed, and it is sealed the first time the server starts with a key. After that, going back to any release from before sealing breaks those sign-ins until each owner types the secret again.
 - **Back it up apart from the database.** A database without the key can't read the secrets; a key that is lost takes them with it, and each owner types theirs again.
 
-The first key in the list seals and signs; every key in the list opens and verifies. To replace a key:
+The first key in the list seals and signs; every key in the list opens and verifies. A new key always gets a new, higher version: one swapped in under an old version opens nothing, and the server says so in its log when it starts. Only `prospector serve` reads the keys, so a mistyped one doesn't stop `sso off` or `user password`. To replace a key:
 
 1. **Publish.** Add the new key after the current one, `1:<old>,2:<new>`, and restart. Needed only when several servers share the database, so each can open version 2 before any seals with it.
-2. **Promote.** Put the new key first, `2:<new>,1:<old>`, and restart. At start-up every stored secret is sealed again under the new key.
-3. **Retire.** Once the log says `every stored secret is sealed under key 2`, remove the old key and restart. Sign-ins in flight under the old key, at most ten minutes old, have to start again.
+2. **Promote.** Put the new key first, `2:<new>,1:<old>`, and restart. At start-up every stored secret is sealed again under the new key. A server still listing the old key first leaves those alone.
+3. **Retire.** Once every server has been restarted with the new key first and its log says `none is under a key older than 2`, remove the old key and restart. Sign-ins in flight under the old key, at most ten minutes old, have to start again.
 
 ## Agents: MCP and REST
 

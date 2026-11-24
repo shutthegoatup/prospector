@@ -3,13 +3,16 @@ package main
 import (
 	"crypto/hkdf"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-jose/go-jose/v4"
 )
@@ -217,6 +220,16 @@ func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
 		t.Fatalf("a sign-in begun before the key changed: %d", code)
 	}
 
+	// The signature outlives the browser's cookie, so an old attempt is refused by its age.
+	stale, _ := json.Marshal(attempt{State: "st", Verifier: "v", Nonce: "n", Way: "sso", Org: alpha.ID, At: time.Now().Add(-attemptLife - time.Minute).Unix()})
+	value := base64.RawURLEncoding.EncodeToString(stale)
+	home, _ := url.Parse(srv.URL)
+	b.c.Jar.SetCookies(home, []*http.Cookie{{Name: attemptCookie, Value: value + "." + s.keys.sign(attempts, value), Path: "/login"}})
+	asked := okta.asked
+	if code, _, _ := b.get("/login/callback?state=st&code=x&iss=" + url.QueryEscape(okta.issuer())); code != http.StatusBadRequest || okta.asked != asked {
+		t.Fatalf("an attempt signed more than ten minutes ago: %d", code)
+	}
+
 	signsIn("after the new key is promoted")
 	if moved, err := s.Reseal(); err != nil || moved != 1 {
 		t.Fatalf("resealing: %d %v", moved, err)
@@ -227,6 +240,27 @@ func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
 	}
 	if moved, err := s.Reseal(); err != nil || moved != 0 {
 		t.Fatalf("resealing again, with nothing to do: %d %v", moved, err)
+	}
+	// Another server, restarted while it still lists the old key first, leaves alone what
+	// is already under the newer one: otherwise retiring the old key would lose it.
+	s.keys = mustKeys(t, "1:"+oldKey+",2:"+newKey)
+	if moved, err := s.Reseal(); err != nil || moved != 0 || clientSecret(t, s, alpha.ID) != under2 {
+		t.Fatalf("a server still sealing with the old key moved a secret back: %d %v", moved, err)
+	}
+	// A key swapped under the same version opens nothing, and the reseal says so
+	// rather than calling it current.
+	s.keys = mustKeys(t, "2:"+strings.Repeat("0d", 32))
+	if moved, err := s.Reseal(); moved != 0 || err == nil {
+		t.Fatalf("a different key given the same version: %d %v", moved, err)
+	}
+	// Its owner can still change the rest, such as no longer requiring it.
+	owner := newBrowser(t, srv.URL)
+	owner.login("ada@alpha.example", "correct horse battery")
+	if code, body := owner.post("/o/alpha/ui/sso", map[string]any{"issuer": okta.srv.URL, "client_id": "client", "auto_join": true}); code != http.StatusOK {
+		t.Fatalf("changing a rule when the kept secret can't be opened: %d %s", code, body)
+	}
+	if clientSecret(t, s, alpha.ID) != under2 {
+		t.Fatal("changing a rule rewrote a secret that couldn't be opened")
 	}
 	s.keys = mustKeys(t, "2:"+newKey)
 	signsIn("after the old key is removed")
@@ -287,8 +321,9 @@ func TestASecretKeptInClearIsSealedOnceThereIsAKey(t *testing.T) {
 	if code, body := owner.post("/o/alpha/ui/sso", map[string]any{"issuer": ""}); code != http.StatusOK {
 		t.Fatalf("turning single sign-on off needs no key: %d %s", code, body)
 	}
-	if _, page, _ := owner.get("/o/alpha/settings"); !strings.Contains(page, "PROSPECTOR_SECRET_KEYS") || strings.Contains(page, `name="client_secret"`) {
-		t.Fatal("with no key and no connection, Settings should say a key is needed, not offer the form")
+	// Domains need no key, so they stay in reach with no key and no connection.
+	if _, page, _ := owner.get("/o/alpha/settings"); !strings.Contains(page, "PROSPECTOR_SECRET_KEYS") || !strings.Contains(page, "alpha.example") || !strings.Contains(page, `id="sso-domain"`) {
+		t.Fatal("with no key and no connection, Settings should say a key is needed and still list the domains")
 	}
 	if err := s.db.Create(&SSOConnection{OrgID: alpha.ID, Issuer: okta.srv.URL, ClientID: "client", ClientSecret: "secret"}).Error; err != nil {
 		t.Fatal(err)

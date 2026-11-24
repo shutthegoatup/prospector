@@ -101,6 +101,14 @@ func (s *Store) SSO(org int64) (*SSO, error) {
 
 // SaveSSO keeps the connection; an empty issuer turns the organisation's sign-in off.
 func (s *Store) SaveSSO(c *SSOConnection, actor string) error {
+	// Sealed here, whoever is saving, so nothing a key could seal is written in clear.
+	if c.ClientSecret != "" && !sealed(c.ClientSecret) && s.keys != nil {
+		stored, err := s.keys.seal(c.ClientSecret)
+		if err != nil {
+			return err
+		}
+		c.ClientSecret = stored
+	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("org_id = ?", c.OrgID).Delete(&SSOConnection{}).Error; err != nil {
 			return err
@@ -577,19 +585,16 @@ func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
 	}
 	secret := strings.TrimSpace(in.Secret)
 	switch {
+	case secret != "" && a.s.keys == nil:
+		fail(w, fmt.Errorf("a client secret is kept sealed, and %w", errNoKeys), http.StatusBadRequest)
+		return
 	case secret != "":
-		if c.ClientSecret, err = a.s.keys.seal(secret); err != nil {
-			fail(w, fmt.Errorf("a client secret is kept sealed, and %w", err), http.StatusBadRequest)
-			return
-		}
+		c.ClientSecret = secret
 	// The kept secret belongs to the provider and client it was typed for, and goes to
-	// no other. It stays as stored, so the rest can be changed on a server with no key.
+	// no other. It stays as stored and unopened, so the rest can be changed on a server
+	// with no key, or with a key that no longer opens it.
 	case c.Issuer == sso.Issuer && c.ClientID == sso.ClientID:
 		c.ClientSecret = sso.ClientSecret
-		if secret, err = a.s.keys.open(sso.ClientSecret); err != nil {
-			fail(w, fmt.Errorf("the kept client secret can't be opened, so type it again: %w", err), http.StatusBadRequest)
-			return
-		}
 	}
 	verified := false
 	for _, d := range sso.Domains {
@@ -607,7 +612,8 @@ func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
 	}
 	if err == nil {
 		// Reading the provider now catches a mistyped issuer before anyone is sent to it.
-		if _, derr := a.probe(r.Context(), idpSpec{Issuer: c.Issuer, ClientID: c.ClientID, Secret: secret}); errors.Is(derr, errManyTenants) {
+		// Discovery sends no secret.
+		if _, derr := a.probe(r.Context(), idpSpec{Issuer: c.Issuer, ClientID: c.ClientID}); errors.Is(derr, errManyTenants) {
 			err = derr
 		} else if derr != nil {
 			err = fmt.Errorf("that issuer couldn't be read, so nothing was saved: %w", derr)

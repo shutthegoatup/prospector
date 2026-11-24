@@ -45,11 +45,6 @@ func SSOSettings(q *Req, d SettingsData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-			} else if !d.Sealing && !d.SSO.On() {
-				templ_7745c5c3_Err = Meta("Set PROSPECTOR_SECRET_KEYS first: the provider's client secret is kept sealed under it. `prospector secret-key` makes a key.").Render(ctx, templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
 			} else {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex flex-col gap-2\">")
 				if templ_7745c5c3_Err != nil {
@@ -67,7 +62,7 @@ func SSOSettings(q *Req, d SettingsData) templ.Component {
 					var templ_7745c5c3_Var3 string
 					templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(dom.Domain)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 17, Col: 22}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 15, Col: 22}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 					if templ_7745c5c3_Err != nil {
@@ -150,7 +145,7 @@ func SSOSettings(q *Req, d SettingsData) templ.Component {
 						var templ_7745c5c3_Var6 string
 						templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(dom.Record())
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 35, Col: 153}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 33, Col: 153}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 						if templ_7745c5c3_Err != nil {
@@ -163,7 +158,7 @@ func SSOSettings(q *Req, d SettingsData) templ.Component {
 						var templ_7745c5c3_Var7 string
 						templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(dom.Token)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 35, Col: 258}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 33, Col: 258}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 						if templ_7745c5c3_Err != nil {
@@ -280,7 +275,7 @@ func SSOSettings(q *Req, d SettingsData) templ.Component {
 						var templ_7745c5c3_Var12 string
 						templ_7745c5c3_Var12, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.SSO.Issuer).Resolve(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 51, Col: 57}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 49, Col: 57}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 						if templ_7745c5c3_Err != nil {
@@ -355,7 +350,7 @@ func SSOSettings(q *Req, d SettingsData) templ.Component {
 						var templ_7745c5c3_Var16 string
 						templ_7745c5c3_Var16, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.SSO.ClientID).Resolve(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 55, Col: 51}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 53, Col: 51}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 						if templ_7745c5c3_Err != nil {
@@ -426,7 +421,7 @@ func SSOSettings(q *Req, d SettingsData) templ.Component {
 						var templ_7745c5c3_Var20 string
 						templ_7745c5c3_Var20, templ_7745c5c3_Err = templruntime.NewAttributeExpression(secretHint(d.SSO)).Resolve(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 58, Col: 108}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 56, Col: 108}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 						if templ_7745c5c3_Err != nil {
@@ -469,7 +464,7 @@ func SSOSettings(q *Req, d SettingsData) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					if !d.Sealing {
-						templ_7745c5c3_Err = Meta("A new secret can't be kept until PROSPECTOR_SECRET_KEYS is set; everything else here can still be changed.").Render(ctx, templ_7745c5c3_Buffer)
+						templ_7745c5c3_Err = Meta("A secret is kept sealed, so none can be saved until whoever runs this server sets PROSPECTOR_SECRET_KEYS (`prospector secret-key` makes one). Everything else here can still be changed.").Render(ctx, templ_7745c5c3_Buffer)
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -499,7 +494,7 @@ func SSOSettings(q *Req, d SettingsData) templ.Component {
 					var templ_7745c5c3_Var24 string
 					templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(d.Callback)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 64, Col: 75}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 62, Col: 75}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 					if templ_7745c5c3_Err != nil {

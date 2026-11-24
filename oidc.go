@@ -129,9 +129,14 @@ type attempt struct {
 	Way  string `json:"w"`
 	Org  int64  `json:"o,omitempty"`
 	Next string `json:"x,omitempty"`
+	// At is when it began. The signature outlives the browser's cookie, so the age is checked here.
+	At int64 `json:"t"`
 }
 
-const attemptCookie = "signin"
+const (
+	attemptCookie = "signin"
+	attemptLife   = 10 * time.Minute
+)
 
 // processKey signs the attempt cookie on a server given no secret key. It lasts as long
 // as the process, so a restart costs the sign-ins in flight.
@@ -155,6 +160,7 @@ func (a *App) attemptSigned(value, signature string) bool {
 
 func (a *App) beginAttempt(w http.ResponseWriter, r *http.Request, p *idp, att attempt, options ...oauth2.AuthCodeOption) {
 	att.State, att.Verifier, att.Nonce = randomToken(32), oauth2.GenerateVerifier(), randomToken(32)
+	att.At = time.Now().Unix()
 	if len(att.Next) > 512 {
 		att.Next = ""
 	}
@@ -183,6 +189,9 @@ func (a *App) resumeAttempt(w http.ResponseWriter, r *http.Request) (attempt, er
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(value)
 	if err != nil || json.Unmarshal(raw, &att) != nil || att.State == "" || att.Way == "" {
+		return att, errNotStartedHere
+	}
+	if age := time.Since(time.Unix(att.At, 0)); age < -time.Minute || age > attemptLife {
 		return att, errNotStartedHere
 	}
 	if subtle.ConstantTimeCompare([]byte(r.URL.Query().Get("state")), []byte(att.State)) != 1 {
