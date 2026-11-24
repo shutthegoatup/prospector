@@ -6,6 +6,8 @@ templ SSOSettings(q *Req, d SettingsData) {
 	@Section("Single sign-on", "Let people at your company's email domains sign in through your own provider: Okta, Entra ID, Google Workspace or anything else that speaks OpenID Connect.") {
 		if d.Callback == "" {
 			@Meta("Set PROSPECTOR_URL to this app's address first: it is where the provider sends people back.")
+		} else if !d.Sealing {
+			@Meta("Set PROSPECTOR_SECRET_KEYS first: the provider's client secret is kept sealed under it. `prospector secret-key` makes a key.")
 		} else {
 			<div class="flex flex-col gap-2">
 				@Label("Your domains")

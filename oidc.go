@@ -3,10 +3,8 @@ package main
 import (
 	"context"
 	"crypto/hmac"
-	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -135,15 +133,24 @@ type attempt struct {
 
 const attemptCookie = "signin"
 
-// attemptKey signs the attempt cookie, so a callback nobody started here can't make
-// the server call a provider. It lasts as long as the process: a restart only costs
-// the sign-ins in flight.
-var attemptKey = []byte(randomToken(32))
+// processKey signs the attempt cookie on a server given no secret key. It lasts as long
+// as the process, so a restart costs the sign-ins in flight.
+var processKey = []byte(randomToken(32))
 
-func attemptMAC(value string) string {
-	mac := hmac.New(sha256.New, attemptKey)
-	mac.Write([]byte(value))
-	return hex.EncodeToString(mac.Sum(nil))
+// signAttempt signs the attempt cookie, so a callback nobody started here can't make
+// the server call a provider.
+func (a *App) signAttempt(value string) string {
+	if a.s.keys != nil {
+		return a.s.keys.sign(attempts, value)
+	}
+	return mac(processKey, value)
+}
+
+func (a *App) attemptSigned(value, signature string) bool {
+	if a.s.keys != nil {
+		return a.s.keys.verify(attempts, value, signature)
+	}
+	return hmac.Equal([]byte(mac(processKey, value)), []byte(signature))
 }
 
 func (a *App) beginAttempt(w http.ResponseWriter, r *http.Request, p *idp, att attempt, options ...oauth2.AuthCodeOption) {
@@ -154,7 +161,7 @@ func (a *App) beginAttempt(w http.ResponseWriter, r *http.Request, p *idp, att a
 	raw, _ := json.Marshal(att)
 	value := base64.RawURLEncoding.EncodeToString(raw)
 	// Lax, because the answer is a top-level navigation from the provider's site.
-	http.SetCookie(w, &http.Cookie{Name: attemptCookie, Value: value + "." + attemptMAC(value), Path: "/login",
+	http.SetCookie(w, &http.Cookie{Name: attemptCookie, Value: value + "." + a.signAttempt(value), Path: "/login",
 		MaxAge: 600, HttpOnly: true, Secure: a.secure(r), SameSite: http.SameSiteLaxMode})
 	if !p.spec.Plain {
 		options = append(options, oauth2.S256ChallengeOption(att.Verifier), oidc.Nonce(att.Nonce))
@@ -163,15 +170,15 @@ func (a *App) beginAttempt(w http.ResponseWriter, r *http.Request, p *idp, att a
 }
 
 // resumeAttempt forgets the attempt as it reads it, so an answer is taken once.
-func resumeAttempt(w http.ResponseWriter, r *http.Request) (attempt, error) {
+func (a *App) resumeAttempt(w http.ResponseWriter, r *http.Request) (attempt, error) {
 	http.SetCookie(w, &http.Cookie{Name: attemptCookie, Value: "", Path: "/login", MaxAge: -1, HttpOnly: true})
 	var att attempt
 	c, err := r.Cookie(attemptCookie)
 	if err != nil {
 		return att, errNotStartedHere
 	}
-	value, mac, _ := strings.Cut(c.Value, ".")
-	if !hmac.Equal([]byte(mac), []byte(attemptMAC(value))) {
+	value, signature, _ := strings.Cut(c.Value, ".")
+	if !a.attemptSigned(value, signature) {
 		return att, errNotStartedHere
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(value)

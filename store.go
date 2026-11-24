@@ -206,7 +206,12 @@ var stringFields = map[string]bool{"stage": true, "next_step": true, "lost_reaso
 var Marks = map[string]string{"linkedin": "linkedin_added", "email": "email_sent", "followup": "followup_sent",
 	"call": "called", "replied": "replied", "declined": "declined", "hold": "hold", "accepted": "accepted"}
 
-type Store struct{ db *gorm.DB }
+type Store struct {
+	db *gorm.DB
+	// keys seal what is stored but mustn't be readable from the database alone; nil
+	// when the server was given none.
+	keys *keyring
+}
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
 	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}}
