@@ -230,6 +230,13 @@ func (s *Store) replaceContacts(org int64, rows []Contact) (int, error) {
 			kept = append(kept, r)
 		}
 		rows = kept
+		if err := forgetStrays(tx, org); err != nil {
+			return err
+		}
+		var before []Contact
+		if err := tx.Select("id", "key").Where("org_id = ?", org).Find(&before).Error; err != nil {
+			return err
+		}
 		if err := tx.Where("org_id = ?", org).Delete(&Contact{}).Error; err != nil {
 			return err
 		}
@@ -241,7 +248,66 @@ func (s *Store) replaceContacts(org int64, rows []Contact) (int, error) {
 				return err
 			}
 		}
+		if err := follow(tx, org, before, rows); err != nil {
+			return err
+		}
 		return linkCompanies(tx, org, nil)
 	})
 	return len(rows), err
+}
+
+var pointAtContacts = []any{&Event{}, &Fact{}, &Enquiry{}}
+
+// follow keeps history, facts and enquiries with their person across a restore. They
+// point at a contact by id, and a restore can drop a contact or give its id to someone
+// else, so they are moved by the contact's key, and what belonged to nobody who came
+// back is forgotten.
+func follow(tx *gorm.DB, org int64, before, after []Contact) error {
+	now := map[string]int64{}
+	for _, c := range after {
+		now[c.Key] = c.ID
+	}
+	moved := map[int64]int64{}
+	for _, c := range before {
+		if now[c.Key] != c.ID {
+			moved[c.ID] = now[c.Key]
+		}
+	}
+	repoint := func(from, to int64) error {
+		for _, table := range pointAtContacts {
+			if err := tx.Model(table).Where("org_id = ? and contact_id = ?", org, from).Update("contact_id", to).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	// Parked on negative ids first, so two contacts trading ids don't pick up each other's.
+	for old := range moved {
+		if err := repoint(old, -old); err != nil {
+			return err
+		}
+	}
+	for old, id := range moved {
+		if id != 0 {
+			if err := repoint(-old, id); err != nil {
+				return err
+			}
+		}
+	}
+	return forgetStrays(tx, org)
+}
+
+// forgetStrays deals with what points at a contact that isn't there: history is
+// scrubbed as it is for an erased person, facts about them go, and an enquiry is
+// kept as it arrived but matched to nobody.
+func forgetStrays(tx *gorm.DB, org int64) error {
+	here := tx.Model(&Contact{}).Select("id").Where("org_id = ?", org)
+	if err := forgetEvents(tx.Where("org_id = ? and contact_id <> 0 and contact_id not in (?)", org, here)); err != nil {
+		return err
+	}
+	if err := tx.Where("org_id = ? and contact_id is not null and contact_id not in (?)", org, here).Delete(&Fact{}).Error; err != nil {
+		return err
+	}
+	return tx.Model(&Enquiry{}).Where("org_id = ? and contact_id is not null and contact_id not in (?)", org, here).
+		Update("contact_id", nil).Error
 }

@@ -77,16 +77,8 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if strings.HasPrefix(c.Key, "org:") {
 			return errors.New("that row stands for a company, not a person")
 		}
-		var events []Event
-		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Find(&events).Error; err != nil {
+		if err := forgetEvents(tx.Where("org_id = ? and contact_id = ?", org, id)); err != nil {
 			return err
-		}
-		for _, e := range events {
-			// Detached as well as scrubbed, so a later contact given this id can't inherit them.
-			if err := tx.Model(&Event{}).Where("id = ?", e.ID).
-				Updates(map[string]any{"contact_id": 0, "value": keptValue(e)}).Error; err != nil {
-				return err
-			}
 		}
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Delete(&Fact{}).Error; err != nil {
 			return err
@@ -110,6 +102,23 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		}
 		return s.log(tx, org, 0, c.CompanyID, actor, "erase", nil)
 	})
+}
+
+// forgetEvents scrubs the events a query matches and detaches them from their contact,
+// so a later contact given the same id can't inherit them.
+func forgetEvents(matching *gorm.DB) error {
+	var events []Event
+	if err := matching.Find(&events).Error; err != nil {
+		return err
+	}
+	tx := matching.Session(&gorm.Session{NewDB: true})
+	for _, e := range events {
+		if err := tx.Model(&Event{}).Where("id = ?", e.ID).
+			Updates(map[string]any{"contact_id": 0, "value": keptValue(e)}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // keptValue is what an event may still say once its person is gone: a stage, or the
