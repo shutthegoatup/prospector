@@ -1,5 +1,7 @@
 github.com/Oudwins/tailwind-merge-go v0.2.2 h1:5CvKoyU8riD05wawuJpcr2OxtxHQHkSm+V6nCcsa/ao=
 github.com/Oudwins/tailwind-merge-go v0.2.2/go.mod h1:kkZodgOPvZQ8f7SIrlWkG/w1g9JTbtnptnePIh3V72U=
+github.com/Oudwins/tailwind-merge-go v0.2.3 h1:RCiZ/DlLpoJnE5QSs1sRPDtIs3We0RQpsLH7bBWfbUI=
+github.com/Oudwins/tailwind-merge-go v0.2.3/go.mod h1:kkZodgOPvZQ8f7SIrlWkG/w1g9JTbtnptnePIh3V72U=
 github.com/a-h/parse v0.0.42 h1:OUb8soeTG5+mRWieRyS/OyNU7Xl0+4wr4kPKKPa/WUQ=
 github.com/a-h/parse v0.0.42/go.mod h1:X9OHJ1IjgakwZoDSoHYhdtKKD0zXZ2agpoIztPAA95w=
 github.com/a-h/templ v0.3.1118 h1:rZv90g1xVb7ieNz4j5WK6yQePZfsg7j7fVvP8qVmeJI=
