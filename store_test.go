@@ -33,12 +33,21 @@ func tempStore(t *testing.T) *Store {
 		if err := s.db.Migrator().DropTable(models...); err != nil {
 			t.Fatal(err)
 		}
+		closeStore(s)
 	}
 	s, err := Open(dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Postgres allows only so many connections, and every test opens its own.
+	t.Cleanup(func() { closeStore(s) })
 	return s
+}
+
+func closeStore(s *Store) {
+	if db, err := s.db.DB(); err == nil {
+		db.Close()
+	}
 }
 
 func mustOrg(t *testing.T, s *Store, slug string) *Org {
