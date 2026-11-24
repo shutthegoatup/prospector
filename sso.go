@@ -388,10 +388,13 @@ func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	spec, err := a.s.spec(sso)
-	var p *idp
-	if err == nil {
-		p, err = a.idp(r.Context(), spec)
+	if err != nil {
+		// Not an outage, and trying again won't help: the secret has to be typed again.
+		log.Printf("single sign-on for %s: %v", org.Slug, err)
+		a.signInProblem(w, r, query.Get("next"), http.StatusServiceUnavailable, org.Name+"'s single sign-on needs setting up again by one of its owners.")
+		return
 	}
+	p, err := a.idp(r.Context(), spec)
 	if err != nil {
 		log.Printf("single sign-on for %s: %v", org.Slug, err)
 		a.signInProblem(w, r, query.Get("next"), http.StatusBadGateway, org.Name+"'s sign-in couldn't be reached. Try again shortly.")
@@ -589,12 +592,22 @@ func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
 		fail(w, fmt.Errorf("a client secret is kept sealed, and %w", errNoKeys), http.StatusBadRequest)
 		return
 	case secret != "":
-		c.ClientSecret = secret
+		// Sealed here, where it is known to have been typed: one that happens to look
+		// sealed already would otherwise be stored as it came.
+		if c.ClientSecret, err = a.s.keys.seal(secret); err != nil {
+			fail(w, err, http.StatusInternalServerError)
+			return
+		}
 	// The kept secret belongs to the provider and client it was typed for, and goes to
 	// no other. It stays as stored and unopened, so the rest can be changed on a server
 	// with no key, or with a key that no longer opens it.
 	case c.Issuer == sso.Issuer && c.ClientID == sso.ClientID:
 		c.ClientSecret = sso.ClientSecret
+		// But nobody is made to depend on a sign-in that can't work.
+		if _, oerr := a.s.keys.open(c.ClientSecret); oerr != nil && ((c.Required && !sso.Required) || (c.AutoJoin && !sso.AutoJoin)) {
+			fail(w, errors.New("this server can't open the kept client secret, so single sign-on isn't working here: type the secret again before requiring it or letting people join"), http.StatusBadRequest)
+			return
+		}
 	}
 	verified := false
 	for _, d := range sso.Domains {

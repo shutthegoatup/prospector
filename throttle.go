@@ -2,8 +2,6 @@ package main
 
 import (
 	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"strings"
 	"sync"
 	"time"
@@ -126,29 +124,37 @@ const (
 )
 
 // A device token is what a browser keeps after signing in: a random value and its
-// MAC under the account's password hash. Only this server can make one, it names
-// nobody, and it stops working when the password changes.
-func newDeviceToken(u *User) string {
+// MAC over the account's password hash, under the server's key for it. Only this
+// server can make one, it names nobody, and it stops working when the password changes.
+func (s *Store) newDeviceToken(u *User) string {
 	nonce := randomToken(16)
-	return nonce + "." + deviceMAC(u, nonce)
+	if s.keys != nil {
+		return nonce + "." + s.keys.sign(devices, deviceMessage(u, nonce))
+	}
+	return nonce + "." + mac([]byte(u.PasswordHash), "device\x00"+nonce)
 }
 
-func deviceMAC(u *User, nonce string) string {
-	mac := hmac.New(sha256.New, []byte(u.PasswordHash))
-	mac.Write([]byte("device\x00" + nonce))
-	return hex.EncodeToString(mac.Sum(nil))
+func deviceMessage(u *User, nonce string) string { return u.PasswordHash + "\x00" + nonce }
+
+// With no secret key the password hash is the key, so whoever can read the database
+// could make one; all that buys is being counted apart from other guessers.
+func (s *Store) deviceSigned(u *User, nonce, signature string) bool {
+	if s.keys != nil {
+		return s.keys.verify(devices, deviceMessage(u, nonce), signature)
+	}
+	return hmac.Equal([]byte(mac([]byte(u.PasswordHash), "device\x00"+nonce)), []byte(signature))
 }
 
 // knownDevice reports whether token was issued to this email's account, and if so
 // the name its attempts are counted under: the email and the device together, so
 // guesses made elsewhere don't hold this browser up, and its own are still slowed.
 func (s *Store) knownDevice(email, token string) (who string, ok bool) {
-	nonce, mac, found := strings.Cut(token, ".")
+	nonce, signature, found := strings.Cut(token, ".")
 	if !found || len(token) > 200 {
 		return "", false
 	}
 	u, err := s.UserByEmail(email)
-	if err != nil || !hmac.Equal([]byte(mac), []byte(deviceMAC(u, nonce))) {
+	if err != nil || !s.deviceSigned(u, nonce, signature) {
 		return "", false
 	}
 	return signInBucket(u.Email) + "\x00" + nonce, true

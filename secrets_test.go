@@ -61,6 +61,137 @@ func TestSecretKeysAreRefusedWhenMalformed(t *testing.T) {
 	} else if _, err := parseKeys("1:" + fresh); err != nil {
 		t.Fatalf("a new key isn't accepted: %v", err)
 	}
+	if err := run([]string{"secret-key", "two"}); err == nil {
+		t.Fatal("secret-key took a version that isn't a number")
+	}
+}
+
+func TestTokensAreFoundByAKeyedLookup(t *testing.T) {
+	s := tempStore(t)
+	alpha := mustOrg(t, s, "alpha")
+	u := mustUser(t, s, alpha, "ada@alpha.example", "Ada Lovelace", "owner")
+	token, err := s.NewSession(u.ID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret, key, err := s.CreateKey(alpha.ID, "bot", []string{"read"}, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sess Session
+	s.db.First(&sess)
+	for what, stored := range map[string]string{"session": sess.TokenHash, "API key": key.Hash} {
+		if versionOf(stored) != 1 || strings.Contains(stored, hashToken(token)) || strings.Contains(stored, hashToken(secret)) {
+			t.Fatalf("a %s is stored as %q, not under key 1", what, stored)
+		}
+	}
+	if sess.TokenHash == s.keys.lookup(apiKeys, token) {
+		t.Fatal("sessions and API keys share a key")
+	}
+
+	// Whoever can write to the database but hasn't the key can't mint either: a row
+	// holding a plain hash, as before there was a key, signs nobody in.
+	if err := s.db.Create(&Session{TokenHash: hashToken("made-up"), UserID: u.ID, ExpiresAt: time.Now().Add(time.Hour)}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SessionUser("made-up"); err == nil {
+		t.Fatal("a session row written with a plain hash signed somebody in")
+	}
+
+	// A new key: both are still found, and move to it as they are used.
+	s.keys = mustKeys(t, "2:"+newKey+",1:"+oldKey)
+	if _, err := s.SessionUser(token); err != nil {
+		t.Fatalf("a session from before the key changed: %v", err)
+	}
+	if _, err := s.KeyFor(secret); err != nil {
+		t.Fatalf("an API key from before the key changed: %v", err)
+	}
+	s.db.First(&sess, sess.ID)
+	s.db.First(key, key.ID)
+	if versionOf(sess.TokenHash) != 2 || versionOf(key.Hash) != 2 {
+		t.Fatalf("after use under the new key: session %q, API key %q", sess.TokenHash, key.Hash)
+	}
+	s.keys = mustKeys(t, "2:"+newKey)
+	if _, err := s.SessionUser(token); err != nil {
+		t.Fatalf("a session after the old key is removed: %v", err)
+	}
+	if _, err := s.KeyFor(secret); err != nil {
+		t.Fatalf("an API key after the old key is removed: %v", err)
+	}
+	// Changing a password still signs out every session but the one doing it.
+	other, _ := s.NewSession(u.ID, 0)
+	if err := s.ChangePassword(u, "correct horse battery", "another of my own", token); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SessionUser(token); err != nil {
+		t.Fatal("the session that changed the password was signed out")
+	}
+	if _, err := s.SessionUser(other); err == nil {
+		t.Fatal("another session outlived a password change")
+	}
+	if err := s.Logout(token); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SessionUser(token); err == nil {
+		t.Fatal("signing out left the session open")
+	}
+}
+
+func TestAnAgentsKeyOutlivesTheServerBeingGivenASecretKey(t *testing.T) {
+	s := tempStore(t)
+	alpha := mustOrg(t, s, "alpha")
+	u := mustUser(t, s, alpha, "ada@alpha.example", "Ada Lovelace", "owner")
+	keys := s.keys
+	// As a server with no key leaves them.
+	s.keys = nil
+	token, _ := s.NewSession(u.ID, 0)
+	secret, key, err := s.CreateKey(alpha.ID, "bot", []string{"read"}, "test")
+	if err != nil || key.Hash != hashToken(secret) {
+		t.Fatalf("an API key made with no secret key: %q %v", key.Hash, err)
+	}
+	if _, err := s.SessionUser(token); err != nil {
+		t.Fatalf("a session on a server with no key: %v", err)
+	}
+
+	s.keys = keys
+	// People sign in again, which they can. An agent can't, so its key still works, once
+	// by its plain hash and from then on by the keyed one.
+	if _, err := s.SessionUser(token); err == nil {
+		t.Fatal("a session found by its plain hash once there is a key")
+	}
+	if _, err := s.KeyFor(secret); err != nil {
+		t.Fatalf("an API key from before there was a key: %v", err)
+	}
+	s.db.First(key, key.ID)
+	if versionOf(key.Hash) != 1 {
+		t.Fatalf("the API key after its first use: %q", key.Hash)
+	}
+	if _, err := s.KeyFor(secret); err != nil {
+		t.Fatalf("the API key the second time: %v", err)
+	}
+	if _, err := s.KeyFor("pk_not-a-key"); err == nil {
+		t.Fatal("a made-up API key was accepted")
+	}
+
+	// The device cookie is signed under the server's key too, and still dies with the password.
+	cookie := s.newDeviceToken(u)
+	if _, ok := s.knownDevice(u.Email, cookie); !ok {
+		t.Fatal("a device cookie this server just made isn't known")
+	}
+	nonce, _, _ := strings.Cut(cookie, ".")
+	if _, ok := s.knownDevice(u.Email, nonce+"."+mac([]byte(u.PasswordHash), "device\x00"+nonce)); ok {
+		t.Fatal("a device cookie made from the password hash alone is accepted")
+	}
+	s.keys = mustKeys(t, "2:"+newKey+",1:"+oldKey)
+	if _, ok := s.knownDevice(u.Email, cookie); !ok {
+		t.Fatal("a device cookie stopped being known when the key changed")
+	}
+	if err := s.SetPassword(u.Email, "another of my own"); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := s.knownDevice(u.Email, cookie); ok {
+		t.Fatal("a device cookie outlived the password it was made under")
+	}
 }
 
 func TestSealedSecretsOutliveAKeyChange(t *testing.T) {
@@ -75,12 +206,12 @@ func TestSealedSecretsOutliveAKeyChange(t *testing.T) {
 
 	// Published: the new key is held, and the old one still seals.
 	published := mustKeys(t, "1:"+oldKey+",2:"+newKey)
-	if plain, err := published.open(stored); err != nil || plain != "s3cret-value" || !published.underCurrent(stored) {
+	if plain, err := published.open(stored); err != nil || plain != "s3cret-value" || published.behind(stored) {
 		t.Fatalf("after the new key is published: %q %v", plain, err)
 	}
 	// Promoted: the new key seals, and the old one still opens.
 	promoted := mustKeys(t, "2:"+newKey+",1:"+oldKey)
-	if plain, err := promoted.open(stored); err != nil || plain != "s3cret-value" || promoted.underCurrent(stored) {
+	if plain, err := promoted.open(stored); err != nil || plain != "s3cret-value" || !promoted.behind(stored) {
 		t.Fatalf("after the new key is promoted: %q %v", plain, err)
 	}
 	// Retired too early: a value still under the old key says which key it needs.
@@ -235,7 +366,7 @@ func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
 		t.Fatalf("resealing: %d %v", moved, err)
 	}
 	under2 := clientSecret(t, s, alpha.ID)
-	if under2 == under1 || !s.keys.underCurrent(under2) {
+	if under2 == under1 || s.keys.behind(under2) || versionOf(under2) != 2 {
 		t.Fatal("the stored secret wasn't moved to the new key")
 	}
 	if moved, err := s.Reseal(); err != nil || moved != 0 {
@@ -256,11 +387,33 @@ func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
 	// Its owner can still change the rest, such as no longer requiring it.
 	owner := newBrowser(t, srv.URL)
 	owner.login("ada@alpha.example", "correct horse battery")
-	if code, body := owner.post("/o/alpha/ui/sso", map[string]any{"issuer": okta.srv.URL, "client_id": "client", "auto_join": true}); code != http.StatusOK {
-		t.Fatalf("changing a rule when the kept secret can't be opened: %d %s", code, body)
+	same := map[string]any{"issuer": okta.srv.URL, "client_id": "client"}
+	if code, body := owner.post("/o/alpha/ui/sso", same); code != http.StatusOK {
+		t.Fatalf("saving a connection whose kept secret can't be opened: %d %s", code, body)
 	}
 	if clientSecret(t, s, alpha.ID) != under2 {
-		t.Fatal("changing a rule rewrote a secret that couldn't be opened")
+		t.Fatal("saving rewrote a secret that couldn't be opened")
+	}
+	// But nobody is newly made to depend on a sign-in that can't work.
+	for _, rule := range []string{"required", "auto_join"} {
+		in := map[string]any{"issuer": okta.srv.URL, "client_id": "client", rule: true}
+		if code, body := owner.post("/o/alpha/ui/sso", in); code != http.StatusBadRequest || !strings.Contains(body, "type the secret again") {
+			t.Fatalf("turning on %s when the kept secret can't be opened: %d %s", rule, code, body)
+		}
+	}
+	// A typed secret is sealed whatever it looks like, even like something sealed already.
+	lookalike := "eyJhbGciOiJub25lIn0.a.b.c.d"
+	typed := map[string]any{"issuer": okta.srv.URL, "client_id": "client", "client_secret": lookalike}
+	if code, body := owner.post("/o/alpha/ui/sso", typed); code != http.StatusOK {
+		t.Fatalf("typing a secret shaped like a sealed one: %d %s", code, body)
+	}
+	if stored := clientSecret(t, s, alpha.ID); stored == lookalike {
+		t.Fatal("a typed secret shaped like a sealed one was stored as it came")
+	} else if plain, err := s.keys.open(stored); err != nil || plain != lookalike {
+		t.Fatalf("opening it again: %q %v", plain, err)
+	}
+	if err := s.db.Model(&SSOConnection{}).Where("org_id = ?", alpha.ID).Update("client_secret", under2).Error; err != nil {
+		t.Fatal(err)
 	}
 	s.keys = mustKeys(t, "2:"+newKey)
 	signsIn("after the old key is removed")
@@ -270,7 +423,8 @@ func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
 	if moved, err := s.Reseal(); moved != 0 || !errors.Is(err, errUnknownKey) {
 		t.Fatalf("resealing what no held key opens: %d %v", moved, err)
 	}
-	if code, body, _ := newBrowser(t, srv.URL).through(okta, start); code != http.StatusBadGateway || strings.Contains(body, "key") {
+	// It isn't an outage, and people aren't told to try again.
+	if code, body, _ := newBrowser(t, srv.URL).through(okta, start); code != http.StatusServiceUnavailable || !strings.Contains(body, "setting up again") || strings.Contains(body, "key") {
 		t.Fatalf("signing in when the secret can't be opened: %d", code)
 	}
 	if clientSecret(t, s, alpha.ID) != under2 {

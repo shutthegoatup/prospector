@@ -453,7 +453,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !known {
-		http.SetCookie(w, &http.Cookie{Name: deviceCookie, Value: newDeviceToken(u), Path: "/login", HttpOnly: true, Secure: a.secure(r),
+		http.SetCookie(w, &http.Cookie{Name: deviceCookie, Value: a.s.newDeviceToken(u), Path: "/login", HttpOnly: true, Secure: a.secure(r),
 			SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(deviceLife)})
 	}
 	a.setSession(w, r, token)
@@ -544,7 +544,7 @@ func (a *App) changePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	// The old password vouched for this browser's device cookie; the new one does now.
 	if changed, err := a.s.UserByEmail(u.Email); err == nil {
-		http.SetCookie(w, &http.Cookie{Name: deviceCookie, Value: newDeviceToken(changed), Path: "/login", HttpOnly: true, Secure: a.secure(r),
+		http.SetCookie(w, &http.Cookie{Name: deviceCookie, Value: a.s.newDeviceToken(changed), Path: "/login", HttpOnly: true, Secure: a.secure(r),
 			SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(deviceLife)})
 	}
 	if u.MustChangePassword {

@@ -5,7 +5,9 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -24,9 +26,14 @@ const (
 	sealing purpose = "prospector: sealed secrets"
 	// attempts signs the cookie that carries a sign-in to a provider and back.
 	attempts purpose = "prospector: sign-in attempts"
+	// sessions and apiKeys key what a session token and an API key are stored and found by.
+	sessions purpose = "prospector: sessions"
+	apiKeys  purpose = "prospector: API keys"
+	// devices signs the cookie that marks a browser as having signed in before.
+	devices purpose = "prospector: known devices"
 )
 
-var purposes = []purpose{sealing, attempts}
+var purposes = []purpose{sealing, attempts, sessions, apiKeys, devices}
 
 const keySize = 32
 
@@ -45,8 +52,6 @@ type secretKey struct {
 type keyring struct {
 	keys  []secretKey
 	byKID map[string]secretKey
-	// header is how every value sealed under the current key begins.
-	header string
 }
 
 // parseKeys reads PROSPECTOR_SECRET_KEYS: comma-separated "<version>:<64 hex>" entries.
@@ -83,11 +88,6 @@ func parseKeys(spec string) (*keyring, error) {
 		k.keys = append(k.keys, key)
 		k.byKID[version] = key
 	}
-	probe, err := k.seal("")
-	if err != nil {
-		return nil, err
-	}
-	k.header = probe[:strings.IndexByte(probe, '.')+1]
 	return k, nil
 }
 
@@ -147,23 +147,59 @@ func (k *keyring) open(stored string) (string, error) {
 	return string(plain), nil
 }
 
-func (k *keyring) underCurrent(stored string) bool {
-	return k != nil && strings.HasPrefix(stored, k.header)
+// versionOf is the key version a stored value names: a sealed secret's kid, or the
+// "k<version>:" a lookup begins with. -1 for a value that names none.
+func versionOf(stored string) int {
+	kid := ""
+	if rest, ok := strings.CutPrefix(stored, "k"); ok {
+		kid, _, _ = strings.Cut(rest, ":")
+	} else if sealed(stored) {
+		var header struct {
+			KID string `json:"kid"`
+		}
+		raw, _ := base64.RawURLEncoding.DecodeString(stored[:strings.IndexByte(stored, '.')])
+		json.Unmarshal(raw, &header)
+		kid = header.KID
+	}
+	if v, err := strconv.Atoi(kid); err == nil && strconv.Itoa(v) == kid {
+		return v
+	}
+	return -1
 }
 
-// newer is a value sealed under a later version than this server seals with: another
-// server has been given the next key first, and its work isn't to be undone.
-func (k *keyring) newer(stored string) bool {
-	if k == nil || !sealed(stored) {
-		return false
+func (k *keyring) version() int {
+	v, _ := strconv.Atoi(k.keys[0].kid)
+	return v
+}
+
+// behind is a stored value under an older key than this server uses, or under none.
+// One under a newer key isn't: another server was given the next key first, and its
+// work isn't to be undone.
+func (k *keyring) behind(stored string) bool {
+	return k != nil && versionOf(stored) < k.version()
+}
+
+// lookup is what a token is stored and found by: its HMAC under the current key, which
+// it names, so that nobody who can only write to the database can mint one. With no
+// key it is the token's SHA-256.
+func (k *keyring) lookup(p purpose, token string) string {
+	if k == nil {
+		return hashToken(token)
 	}
-	obj, err := jose.ParseEncryptedCompact(stored, []jose.KeyAlgorithm{jose.DIRECT}, []jose.ContentEncryption{jose.A256GCM})
-	if err != nil {
-		return false
+	return "k" + k.keys[0].kid + ":" + mac(k.keys[0].derived[p], token)
+}
+
+// lookups is lookup under every key held, the current one first, so a token made
+// before a key was replaced is still found until that key is removed.
+func (k *keyring) lookups(p purpose, token string) []string {
+	if k == nil {
+		return []string{hashToken(token)}
 	}
-	theirs, err1 := strconv.Atoi(obj.Header.KeyID)
-	ours, err2 := strconv.Atoi(k.keys[0].kid)
-	return err1 == nil && err2 == nil && theirs > ours
+	out := make([]string, 0, len(k.keys))
+	for _, key := range k.keys {
+		out = append(out, "k"+key.kid+":"+mac(key.derived[p], token))
+	}
+	return out
 }
 
 func mac(key []byte, message string) string {
@@ -190,48 +226,76 @@ func (k *keyring) verify(p purpose, message, signature string) bool {
 // Reseal moves every stored secret onto the current key, sealing for the first time any
 // stored before there was one. Once it reports nothing left, an older key can be removed.
 func (s *Store) Reseal() (moved int, err error) {
+	if s.keys == nil {
+		return 0, errNoKeys
+	}
 	var conns []SSOConnection
 	if err := s.db.Where("client_secret <> ''").Find(&conns).Error; err != nil {
 		return 0, err
 	}
 	var failed []error
 	for _, c := range conns {
-		plain, err := s.keys.open(c.ClientSecret)
-		// One that names the current key is still opened: a key replaced under the same
-		// version would otherwise pass for current and open nothing.
-		if err == nil && (s.keys.underCurrent(c.ClientSecret) || s.keys.newer(c.ClientSecret)) {
-			continue
-		}
-		if err == nil {
-			var again string
-			if again, err = s.keys.seal(plain); err == nil {
-				// Only the value that was read is replaced, so an owner's change made meanwhile wins.
-				res := s.db.Model(&SSOConnection{}).Where("org_id = ? and client_secret = ?", c.OrgID, c.ClientSecret).Update("client_secret", again)
-				if err = res.Error; err == nil && res.RowsAffected == 0 {
-					err = errors.New("changed while it was being sealed again: restart to check it")
+		was, raced, err := s.resealOne(c)
+		// Somebody else changed it meanwhile: another server sealing it too, or its owner.
+		// What is there now is what counts.
+		if err == nil && raced {
+			var now SSOConnection
+			if err = s.db.Where("org_id = ?", c.OrgID).Limit(1).Find(&now).Error; err == nil && now.ClientSecret != "" {
+				if _, err = s.keys.open(now.ClientSecret); err == nil && s.keys.behind(now.ClientSecret) {
+					err = errors.New("changed while it was being sealed again, and is still under an older key: restart to move it")
 				}
 			}
 		}
 		if err != nil {
 			failed = append(failed, fmt.Errorf("organisation %d's single sign-on secret: %w", c.OrgID, err))
-			continue
+		} else if was {
+			moved++
 		}
-		moved++
 	}
 	return moved, errors.Join(failed...)
 }
 
+// resealOne moves one connection's secret to the current key, if it isn't under it
+// already. raced is the row having changed between being read and being written.
+func (s *Store) resealOne(c SSOConnection) (moved, raced bool, err error) {
+	// One that names the current key is still opened: a key replaced under the same
+	// version would otherwise pass for current and open nothing.
+	plain, err := s.keys.open(c.ClientSecret)
+	if err != nil || !s.keys.behind(c.ClientSecret) {
+		return false, false, err
+	}
+	again, err := s.keys.seal(plain)
+	if err != nil {
+		return false, false, err
+	}
+	// Only the value that was read is replaced, so an owner's change made meanwhile wins.
+	res := s.db.Model(&SSOConnection{}).Where("org_id = ? and client_secret = ?", c.OrgID, c.ClientSecret).Update("client_secret", again)
+	return res.RowsAffected > 0, res.RowsAffected == 0, res.Error
+}
+
 // resealAtStart runs when the server starts, since a new key only ever arrives with a restart.
 func (s *Store) resealAtStart() {
+	if s.keys == nil {
+		var clear int64
+		s.db.Model(&SSOConnection{}).Where("client_secret <> ''").Count(&clear)
+		if clear > 0 {
+			log.Printf("secrets: PROSPECTOR_SECRET_KEYS isn't set: single sign-on secrets kept as stored, which none can be changed from: %d", clear)
+		}
+		return
+	}
 	moved, err := s.Reseal()
+	current := s.keys.keys[0].kid
 	if err != nil {
 		log.Printf("secrets: %v", err)
+		log.Printf("secrets: not every stored secret is under key %s: keep the older keys", current)
+	} else {
+		log.Printf("secrets: every stored secret opens, and none is under a key older than %s (%d moved to it now)", current, moved)
 	}
-	switch {
-	case s.keys == nil:
-	case err == nil:
-		log.Printf("secrets: every stored secret opens, and none is under a key older than %s (%d moved to it now)", s.keys.keys[0].kid, moved)
-	default:
-		log.Printf("secrets: %d moved to key %s, but not all: keep the older keys", moved, s.keys.keys[0].kid)
+	// An API key can't be moved until it is next shown, so an old key that is removed
+	// first takes with it whichever haven't been used since.
+	var waiting int64
+	s.db.Model(&APIKey{}).Where("revoked_at is null and hash not like ?", "k"+current+":%").Count(&waiting)
+	if waiting > 0 {
+		log.Printf("secrets: API keys still found by an older key or none: %d. Each moves to key %s when it is next used, and stops working if its key is removed first", waiting, current)
 	}
 }

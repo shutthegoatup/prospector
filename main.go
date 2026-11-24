@@ -8,7 +8,7 @@
 //	prospector member add <org> <email> [owner|member]
 //	prospector key add <org> <name> <scope>…   prints the key once
 //	prospector sso off <org>                 stop requiring single sign-on, when its provider has broken
-//	prospector secret-key                    print a new key for PROSPECTOR_SECRET_KEYS
+//	prospector secret-key [version]          print a new entry for PROSPECTOR_SECRET_KEYS
 //	prospector version
 //
 // Per organisation, chosen with --org=<slug> or $PROSPECTOR_ORG:
@@ -41,6 +41,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	_ "time/tzdata"
@@ -160,7 +161,12 @@ func run(args []string) error {
 	}
 
 	if cmd == "secret-key" {
-		fmt.Println(newSecretKey())
+		// Printed as an entry of PROSPECTOR_SECRET_KEYS, version and all.
+		version := arg(rest, 0, "1")
+		if v, err := strconv.Atoi(version); err != nil || v < 0 || strconv.Itoa(v) != version {
+			return fmt.Errorf("usage: prospector secret-key [version], a whole number one more than the key it replaces")
+		}
+		fmt.Println(version + ":" + newSecretKey())
 		return nil
 	}
 	dsn := defaultDSN()
