@@ -1,0 +1,5 @@
+name,segment,country,website,configurator_url,fit_reason,buyer_role,priority,verified,configurator_built_by
+Larkmoor Yachts,Marine,UK,https://larkmoor.example,https://larkmoor.example/build,Invented fixture,Head of Marketing,A,yes,unknown
+Ostrel Aviation,Aviation,CH,https://ostrel.example,https://ostrel.example/configure,Invented fixture,Head of Digital,A,yes,unknown
+Corvane Motors,Cars,DE,https://corvane.example,,Invented fixture,Brand Marketing Lead,B,no,
+Brightwater Caravans,Caravans,UK,https://brightwater.example,,COMPETITOR in an invented fixture,,C,no,

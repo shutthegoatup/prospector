@@ -1,0 +1,117 @@
+package main
+
+import (
+	"github.com/shutthegoatup/prospector/components/button"
+	"strings"
+)
+
+var mcpTools = []struct{ Name, Scope, What string }{
+	{"search", "read", "companies and people by name, domain, email or notes"},
+	{"get_company", "read", "details, facts with sources, people"},
+	{"list_due", "read", "what's on Today, and whether its text is written"},
+	{"add_company", "research:write", "lands in Research to review, with facts"},
+	{"add_fact", "research:write", "field, value and source URL"},
+	{"add_contact", "research:write", "a suggested person; waits until someone picks them"},
+	{"draft_message", "drafts:write", "note, message, email or follow-up, marked as the agent's"},
+}
+
+templ Code(s string) {
+	<pre class="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border border-border bg-[#141414] px-3.5 py-3 font-mono text-[13px] leading-relaxed text-[#dcdcdc]">{ s }</pre>
+}
+
+templ AgentsView(q *Req, d AgentsData) {
+	@PageHead("Agents & API")
+	<p class="mb-5 max-w-[72ch] text-sm text-muted-foreground">Let your own agents research, add and draft for <b class="text-foreground">{ q.Org.Name }</b>. A key works for this organisation only. What agents add waits in Research for a person; agents can draft, but only people send.</p>
+	<div class="flex flex-wrap items-start gap-5">
+		<div class="flex min-w-0 flex-[3_1_520px] flex-col gap-5">
+			@Section("Connect", "MCP for Claude and other agents, and the same operations as a JSON API.") {
+				<div>@Label("MCP endpoint")@Code(d.Base + "mcp")</div>
+				<div>
+					@Label("Claude Code")
+					@Code("claude mcp add --transport http prospect " + d.Base + "mcp \\\n  --header \"Authorization: Bearer $PROSPECT_KEY\"")
+				</div>
+				<div>
+					@Label("REST")
+					@Code("GET  " + d.Base + "api/v1/search?q=…\nGET  " + d.Base + "api/v1/companies/{id or name}\nGET  " + d.Base + "api/v1/due\nPOST " + d.Base + "api/v1/companies   {name, domain, facts: [{field, value, source_url}]}\nPOST " + d.Base + "api/v1/facts       {company, field, value, source_url}\nPOST " + d.Base + "api/v1/contacts    {company, name, title, email, source_url}\nPOST " + d.Base + "api/v1/drafts      {contact_id, kind, text}")
+				</div>
+			}
+			@Section("Keys", "No key can mark anything sent, change settings or reach another organisation.") {
+				if len(d.Keys) == 0 {
+					<p class="text-sm text-muted-foreground">No keys yet.</p>
+				}
+				for _, k := range d.Keys {
+					<div class="flex flex-wrap items-center justify-between gap-3 border-b border-dashed border-border py-2 text-sm">
+						<span>
+							<b>{ k.Name }</b>
+							<span class="block font-mono text-xs text-muted-foreground">{ k.Prefix + "… · made by " + k.CreatedBy + " · " + lastUsed(k) }</span>
+						</span>
+						<span class="flex flex-wrap items-center gap-1.5">
+							for _, s := range strings.Fields(k.Scopes) {
+								<span class="rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">{ s }</span>
+							}
+							if q.Owner() {
+								@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/keys/revoke", "data-body": jsonBody("id", k.ID), "data-confirm": "Revoke " + k.Name + "? Agents using it stop working."}}) {
+									Revoke
+								}
+							}
+						</span>
+					</div>
+				}
+				if q.Owner() {
+					<form data-form="ui/keys" data-reset="true" class="flex flex-col gap-3 rounded-lg bg-muted p-4">
+						<label class="flex flex-col gap-1.5">
+							@Label("New key name")
+							<input name="name" required placeholder="research-bot" class={ fieldClass }/>
+						</label>
+						<fieldset class="flex flex-col gap-1.5">
+							<legend class="mb-1">@Label("Scopes")</legend>
+							for _, s := range Scopes {
+								<label class="flex items-start gap-2.5 text-sm">
+									<input type="checkbox" name="scopes" value={ s.Name } data-multi="true" checked?={ s.Name == "read" || s.Name == "research:write" } class="mt-1 size-4 accent-[var(--primary)]"/>
+									<span><span class="font-mono text-xs text-primary">{ s.Name }</span> <span class="text-muted-foreground">{ s.What }</span></span>
+								</label>
+							}
+						</fieldset>
+						<div>
+							@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+								Create key
+							}
+						</div>
+						<p data-result class="select-all break-all font-mono text-sm text-[var(--ok)]" role="status"></p>
+					</form>
+				}
+			}
+		</div>
+		<div class="flex min-w-0 flex-[2_1_340px] flex-col gap-5">
+			@Section("Tools agents get", "Writes need a source URL, and go through this organisation's never-contact list.") {
+				<div>
+					for _, t := range mcpTools {
+						<div class="grid grid-cols-[120px_1fr] gap-3 border-b border-dashed border-border py-2 text-sm last:border-0">
+							<code class="font-mono text-[13px] text-primary">{ t.Name }</code>
+							<span>{ t.What } <span class="font-mono text-[11px] text-muted-foreground">{ t.Scope }</span></span>
+						</div>
+					}
+				</div>
+			}
+			@Section("Recent agent activity", "") {
+				if len(d.Activity) == 0 {
+					<p class="text-sm text-muted-foreground">None yet.</p>
+				}
+				for _, e := range d.Activity {
+					<div class="grid grid-cols-[84px_110px_1fr] gap-2 border-b border-dashed border-border py-1.5 text-[13px]">
+						<span class="font-mono text-xs text-muted-foreground">{ e.At.Format("2 Jan 15:04") }</span>
+						<span class="truncate font-mono text-xs text-primary">{ e.Actor }</span>
+						<span>{ historyText(HistoryItem{Action: e.Action, Value: e.Value}) }</span>
+					</div>
+				}
+			}
+		</div>
+	</div>
+}
+
+func lastUsed(k APIKey) string {
+	if k.LastUsedAt == nil {
+		return "never used"
+	}
+	return "used " + k.LastUsedAt.Format("2 Jan 15:04")
+}

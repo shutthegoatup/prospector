@@ -1,0 +1,175 @@
+@import "tailwindcss";
+@import "./tw-animate.css";
+@import "./shadcn-tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-heading: "Bricolage Grotesque", var(--font-sans);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+/* The old Python tracker's palette: #181818 page, #232323 cards, #56c5f4 accent. */
+.dark {
+  --background: #181818;
+  --foreground: #f2f2f2;
+  --card: #232323;
+  --card-foreground: #f2f2f2;
+  --popover: #232323;
+  --popover-foreground: #f2f2f2;
+  --primary: #56c5f4;
+  --primary-foreground: #0d1a21;
+  --secondary: #2d2d2d;
+  --secondary-foreground: #f2f2f2;
+  --muted: #1b1b1b;
+  --muted-foreground: #9a9a9a;
+  --accent: #2d2d2d;
+  --accent-foreground: #f2f2f2;
+  --destructive: #ff8a8a;
+  --border: #2e2e2e;
+  --input: #3a3a3a;
+  --ring: #56c5f4;
+  --chart-1: #56c5f4;
+  --chart-2: #7fe0a8;
+  --chart-3: #f5c66b;
+  --chart-4: #ff9a9a;
+  --chart-5: #9a9a9a;
+  --sidebar: #1e1e1e;
+  --sidebar-foreground: #f2f2f2;
+  --sidebar-primary: #56c5f4;
+  --sidebar-primary-foreground: #0d1a21;
+  --sidebar-accent: #2d2d2d;
+  --sidebar-accent-foreground: #f2f2f2;
+  --sidebar-border: #2e2e2e;
+  --sidebar-ring: #56c5f4;
+  --ok: #7fe0a8;
+  --warn: #f5c66b;
+  --stop: #ff9a9a;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 35%, transparent);
+  }
+}
+
+/* A faint accent glow at the top and a grain over the flat #181818. */
+.queue-backdrop {
+  background:
+    radial-gradient(60rem 28rem at 50% -12rem, color-mix(in oklab, var(--primary) 9%, transparent), transparent 70%),
+    var(--background);
+}
+.queue-backdrop::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Cards rise in one after another on load, capped so a 300-card tab doesn't crawl. */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+}
+.rise {
+  animation: rise 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: min(calc(var(--i, 0) * 40ms), 400ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rise { animation: none; }
+}
+.settled .rise { animation: none; }
+
+/* The rail down a card's left edge shows its call-time state at a glance. */
+.rail { position: relative; overflow: hidden; }
+.rail::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--rail, var(--border));
+}
+.rail[data-state="ok"] { --rail: var(--ok); }
+.rail[data-state="warn"] { --rail: var(--warn); }
+.rail[data-state="stop"] { --rail: var(--stop); }

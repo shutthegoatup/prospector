@@ -1,0 +1,84 @@
+package main
+
+import "github.com/shutthegoatup/prospector/components/button"
+
+templ AddForm(q *Req, in QuickAdd, popup bool) {
+	<form data-form="ui/add" data-reset="true" data-close={ boolAttr(popup) } class="flex flex-col gap-4">
+		<label class="flex flex-col gap-1.5">
+			@Label("LinkedIn profile")
+			<input name="linkedin" type="url" value={ in.Linkedin } autofocus?={ in.Linkedin == "" } placeholder="https://www.linkedin.com/in/…" class="h-10 rounded-lg border border-input bg-muted px-3 text-sm"/>
+		</label>
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+			<label class="flex flex-col gap-1.5">
+				@Label("Name")
+				<input name="name" required value={ in.Name } autofocus?={ in.Linkedin != "" && in.Name == "" } class="h-10 rounded-lg border border-input bg-muted px-3 text-sm"/>
+			</label>
+			<label class="flex flex-col gap-1.5">
+				@Label("Role")
+				<input name="title" value={ in.Title } placeholder="Head of Marketing" class="h-10 rounded-lg border border-input bg-muted px-3 text-sm"/>
+			</label>
+			<label class="flex flex-col gap-1.5">
+				@Label("Company")
+				<input name="company" value={ in.Company } class="h-10 rounded-lg border border-input bg-muted px-3 text-sm"/>
+			</label>
+			<label class="flex flex-col gap-1.5">
+				@Label("Email (optional)")
+				<input name="email" type="email" value={ in.Email } class="h-10 rounded-lg border border-input bg-muted px-3 text-sm"/>
+			</label>
+		</div>
+		<label class="flex flex-col gap-1.5">
+			@Label("Connection note")
+			<textarea name="note" rows="5" maxlength="300" placeholder={ "Leave empty to use your template:\n\n" + q.Org.Settings.withDefaults().NoteTemplate } class="rounded-lg border border-input bg-muted px-3 py-2 text-sm leading-relaxed">{ in.Note }</textarea>
+		</label>
+		<label class="flex items-center gap-2.5 text-sm">
+			<input type="checkbox" name="added" class="size-4 accent-[var(--primary)]"/>
+			I've already sent the connection request
+		</label>
+		<div class="flex flex-wrap items-center gap-3">
+			@button.Button(button.Props{Type: button.TypeSubmit}) {
+				Add to { q.Org.Name }
+			}
+			<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
+		</div>
+	</form>
+}
+
+func boolAttr(b bool) string {
+	if b {
+		return "true"
+	}
+	return ""
+}
+
+templ AddView(q *Req, in QuickAdd, bookmarklet string) {
+	@PageHead("Add person")
+	<div class="flex flex-wrap items-start gap-8">
+		<section class="min-w-0 flex-[999_1_480px] rounded-xl border border-border bg-card p-6">
+			@AddForm(q, in, false)
+		</section>
+		<aside class="flex min-w-0 flex-[1_1_280px] flex-col gap-3 rounded-xl border border-border bg-card p-5 text-sm">
+			@Label("Faster: from LinkedIn itself")
+			<p class="text-muted-foreground">Drag this to your bookmarks bar. On someone's LinkedIn profile, click it: this form opens filled in with their name, role and company.</p>
+			<a href={ templ.SafeURL(bookmarklet) } class="self-start rounded-lg border border-dashed border-primary px-3 py-2 font-medium text-primary" onclick="event.preventDefault()" draggable="true">+ { q.Org.Name }</a>
+			<p class="text-muted-foreground">It reads only the profile's title and headline, when you click. Nothing runs on LinkedIn by itself.</p>
+			@Label("Then")
+			<p class="text-muted-foreground">They land in Today under LinkedIn adds, with your note ready: <b class="text-foreground">o</b> opens the profile and copies the note, <b class="text-foreground">a</b> marks them added.</p>
+		</aside>
+	</div>
+}
+
+templ AddPopup(q *Req, in QuickAdd) {
+	<!DOCTYPE html>
+	<html lang="en" class="dark">
+		<head>
+			@Head("Add to " + q.Org.Name)
+		</head>
+		<body class="queue-backdrop min-h-svh px-5 py-5 font-sans text-[15px] antialiased" data-base={ q.Base() }>
+			<div class="mb-4 flex items-center gap-2.5">
+				@OrgMark(q.Org.Name, q.Org.Color, "size-7 text-sm")
+				<h1 class="font-heading text-xl font-bold">Add to { q.Org.Name }</h1>
+			</div>
+			@AddForm(q, in, true)
+		</body>
+	</html>
+}

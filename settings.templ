@@ -1,0 +1,132 @@
+package main
+
+import (
+	"github.com/shutthegoatup/prospector/components/button"
+	"strconv"
+)
+
+templ Section(title, hint string) {
+	<section class="flex flex-col gap-4 rounded-xl border border-border bg-card p-6">
+		<div>
+			<h2 class="font-heading text-lg font-semibold">{ title }</h2>
+			if hint != "" {
+				<p class="mt-0.5 text-sm text-muted-foreground">{ hint }</p>
+			}
+		</div>
+		{ children... }
+	</section>
+}
+
+templ Row(label string) {
+	<label class="grid grid-cols-1 items-start gap-1.5 sm:grid-cols-[170px_1fr] sm:gap-4">
+		<span class="pt-2.5">@Label(label)</span>
+		<span class="flex flex-col gap-1">{ children... }</span>
+	</label>
+}
+
+const fieldClass = "h-10 rounded-lg border border-input bg-muted px-3 text-sm disabled:opacity-60"
+const areaClass = "rounded-lg border border-input bg-muted px-3 py-2 text-sm leading-relaxed disabled:opacity-60"
+
+templ SettingsView(q *Req, d SettingsData) {
+	{{ set := q.Org.Settings.withDefaults() }}
+	@PageHead("Settings") {
+		<span class="text-sm text-muted-foreground">For <b class="text-foreground">{ q.Org.Name }</b> only</span>
+	}
+	<div class="flex max-w-3xl flex-col gap-5">
+		<form data-form="ui/voice" data-refresh="true">
+			@Section("Your voice", "Yours in this organisation: used in call scripts and added to copied emails.") {
+				@Row("Caller name") {
+					<input name="caller_name" value={ d.Me.CallerName } placeholder={ q.User.Name } class={ fieldClass }/>
+				}
+				@Row("Signature") {
+					<textarea name="signature" rows="4" class={ areaClass }>{ d.Me.Signature }</textarea>
+				}
+				<div class="flex items-center gap-3">
+					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+						Save
+					}
+					<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
+				</div>
+			}
+		</form>
+		<form data-form="ui/settings" data-refresh="true">
+			@Section("Organisation", ownerHint(q)) {
+				<fieldset disabled?={ !q.Owner() } class="flex flex-col gap-4">
+					@Row("Name") {
+						<input name="name" required value={ q.Org.Name } class={ fieldClass }/>
+					}
+					@Row("Colour") {
+						<input name="color" type="color" value={ q.Org.Color } class="h-10 w-20 rounded-lg border border-input bg-muted"/>
+					}
+					@Row("Email after") {
+						<span class="flex items-center gap-2 text-sm text-muted-foreground"><input name="email_after_days" type="number" min="0" max="60" value={ strconv.Itoa(set.EmailAfterDays) } class={ fieldClass + " w-24" }/> days without a LinkedIn accept</span>
+					}
+					@Row("Follow up after") {
+						<span class="flex items-center gap-2 text-sm text-muted-foreground"><input name="followup_after_days" type="number" min="0" max="60" value={ strconv.Itoa(set.FollowupAfterDays) } class={ fieldClass + " w-24" }/> days without a reply</span>
+					}
+					@Row("Connection note") {
+						<textarea name="note_template" rows="5" class={ areaClass }>{ set.NoteTemplate }</textarea>
+						@Meta("{first} {company} {org} are filled in. LinkedIn allows 300 characters.")
+					}
+					@Row("What you do") {
+						<textarea name="pitch" rows="3" class={ areaClass }>{ set.Pitch }</textarea>
+						@Meta("The call script's pitch line. {company} is filled in.")
+					}
+					@Row("Never contact") {
+						<textarea name="never_contact" rows="3" placeholder="domains, emails or LinkedIn links, one per line" class={ areaClass }>{ set.NeverContact }</textarea>
+						@Meta("Applied to everything people and agents add.")
+					}
+					@Row("Cold email") {
+						<span class="flex items-center gap-2.5 pt-2 text-sm"><input type="checkbox" name="incorporated_only" checked?={ set.IncorporatedOnly } class="size-4 accent-[var(--primary)]"/> Only email incorporated companies (UK PECR)</span>
+					}
+					<div class="flex items-center gap-3">
+						@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+							Save
+						}
+						<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
+					</div>
+				</fieldset>
+			}
+		</form>
+		@Section("Sequence", "Every contact goes through these steps; the waits come from above.") {
+			<ol class="flex max-w-lg flex-col gap-1 text-sm">
+				<li class="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3 py-2.5"><span class="grid size-5 place-items-center rounded-full bg-secondary font-mono text-xs">1</span>LinkedIn connection request</li>
+				<li class="pl-8 font-mono text-xs text-primary">{ "↓ on accept, or after " + plural(set.EmailAfterDays, "day") }</li>
+				<li class="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3 py-2.5"><span class="grid size-5 place-items-center rounded-full bg-secondary font-mono text-xs">2</span>LinkedIn message if accepted, else email</li>
+				<li class="pl-8 font-mono text-xs text-primary">{ "↓ " + plural(set.FollowupAfterDays, "day") + " without a reply" }</li>
+				<li class="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3 py-2.5"><span class="grid size-5 place-items-center rounded-full bg-secondary font-mono text-xs">3</span>Follow-up email</li>
+				<li class="pl-8 font-mono text-xs text-primary">↓ whenever a number is known, in office hours</li>
+				<li class="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3 py-2.5"><span class="grid size-5 place-items-center rounded-full bg-secondary font-mono text-xs">4</span>Call</li>
+			</ol>
+		}
+		@Section("Team", "") {
+			for _, m := range d.Members {
+				<div class="flex justify-between border-b border-dashed border-border py-1.5 text-sm">
+					<span><b>{ m.Name }</b> <span class="text-muted-foreground">{ m.Email }</span></span>
+					@Meta(m.Role)
+				</div>
+			}
+			if q.Owner() {
+				<form data-form="ui/member" data-reset="true" class="flex flex-wrap gap-2">
+					<label class="sr-only" for="m-email">Email</label>
+					<input id="m-email" name="email" type="email" required placeholder="email" class={ fieldClass + " min-w-[200px] flex-1" }/>
+					<label class="sr-only" for="m-name">Name</label>
+					<input id="m-name" name="name" placeholder="name" class={ fieldClass + " w-40" }/>
+					<label class="sr-only" for="m-role">Role</label>
+					<select id="m-role" name="role" class={ fieldClass }><option value="member">member</option><option value="owner">owner</option></select>
+					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantOutline, Class: "h-10"}) {
+						Add
+					}
+					<p data-result class="w-full select-all font-mono text-sm text-[var(--ok)]" role="status"></p>
+				</form>
+			}
+		}
+	</div>
+}
+
+func ownerHint(q *Req) string {
+	if q.Owner() {
+		return "Shared by everyone in this organisation."
+	}
+	return "Only an owner can change these."
+}

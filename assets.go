@@ -1,0 +1,39 @@
+package main
+
+import (
+	"crypto/sha256"
+	"embed"
+	"encoding/hex"
+	"io/fs"
+	"net/http"
+	"strings"
+)
+
+//go:embed assets/css/output.css assets/js
+var assetFS embed.FS
+
+// assetVersion busts caches for the unhashed files (output.css, app.js) on each build.
+var assetVersion = func() string {
+	h := sha256.New()
+	fs.WalkDir(assetFS, "assets", func(path string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			b, _ := assetFS.ReadFile(path)
+			h.Write(b)
+		}
+		return nil
+	})
+	return hex.EncodeToString(h.Sum(nil))[:12]
+}()
+
+func assetHandler() http.Handler {
+	sub, _ := fs.Sub(assetFS, "assets")
+	files := http.FileServer(http.FS(sub))
+	return http.StripPrefix("/assets/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "js/shadcn-templ-") || r.URL.Query().Get("v") == assetVersion {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
+		files.ServeHTTP(w, r)
+	}))
+}

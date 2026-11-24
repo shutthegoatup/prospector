@@ -1,0 +1,97 @@
+package main
+
+import (
+	"github.com/shutthegoatup/prospector/components/input"
+	"strconv"
+)
+
+func dealClass(c Contact, day string) string {
+	if NeedsNextStep(c, day) {
+		return "border-[color-mix(in_oklab,var(--warn)_55%,transparent)]"
+	}
+	if c.Stage == "lost" {
+		return "border-border opacity-60"
+	}
+	return "border-border"
+}
+
+func nextText(c Contact, day string) (string, string) {
+	if c.Stage == "won" || c.Stage == "lost" {
+		return "", ""
+	}
+	if c.NextStep == "" {
+		return "No next step yet", "warn"
+	}
+	when := deref(c.NextDate)
+	if when != "" && when < day {
+		return c.NextStep + " · overdue since " + when, "stop"
+	}
+	if when != "" {
+		return c.NextStep + " · " + when, "agent"
+	}
+	return c.NextStep, "agent"
+}
+
+templ ConversationsView(q *Req, convs map[string][]Contact, day string) {
+	@PageHead("Conversations")
+	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">Everyone who replied, until it's won or lost. Each needs a next step with a date; ones without, or due today, also show on Today.</p>
+	<div class="overflow-x-auto pb-4">
+		<div class="flex min-w-max gap-4">
+			for _, st := range Stages {
+				<section class="flex w-[280px] flex-col gap-2.5" aria-label={ st.Label }>
+					<div class="flex items-baseline justify-between border-b-2 border-border px-1 pb-1.5">
+						<h2 class="font-heading text-base font-semibold">{ st.Label }</h2>
+						<span class="font-mono text-xs text-muted-foreground">{ strconv.Itoa(len(convs[st.Key])) }</span>
+					</div>
+					if len(convs[st.Key]) == 0 {
+						<p class="rounded-xl border border-dashed border-border p-3.5 font-mono text-xs text-muted-foreground">None</p>
+					}
+					for _, c := range convs[st.Key] {
+						@Deal(q, c, day)
+					}
+				</section>
+			}
+		</div>
+	</div>
+}
+
+templ Deal(q *Req, c Contact, day string) {
+	<article class={ "flex flex-col gap-2.5 rounded-xl border bg-card p-3.5 text-sm", dealClass(c, day) } data-card={ strconv.FormatInt(c.ID, 10) }>
+		<div>
+			<b>{ displayName(c) }</b>
+			if c.CompanyID != nil {
+				<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(*c.CompanyID, 10)) } class="font-mono text-xs text-muted-foreground hover:text-primary">{ " · " + companyName(deref(c.Maker)) }</a>
+			}
+		</div>
+		if deref(c.CallNotes) != "" {
+			<p class="line-clamp-3 text-[13px] text-muted-foreground">{ deref(c.CallNotes) }</p>
+		}
+		{{ text, state := nextText(c, day) }}
+		if text != "" {
+			<div>@Pill(text, state)</div>
+		}
+		<details class="text-sm">
+			<summary class="cursor-pointer font-mono text-xs text-muted-foreground">Update</summary>
+			<div class="mt-2 flex flex-col gap-2">
+				@StageSelect(c)
+				<label class="flex flex-col gap-1">
+					@Label("Next step")
+					@input.Input(input.Props{Value: c.NextStep, Placeholder: "e.g. send recap", Class: "h-8 bg-muted",
+						Attributes: templ.Attributes{"data-field": "next_step", "data-id": strconv.FormatInt(c.ID, 10), "data-refresh": "true"}})
+				</label>
+				<label class="flex flex-col gap-1">
+					@Label("By")
+					@input.Input(input.Props{Type: "date", Value: deref(c.NextDate), Class: "h-8 bg-muted",
+						Attributes: templ.Attributes{"data-field": "next_date", "data-id": strconv.FormatInt(c.ID, 10), "data-refresh": "true"}})
+				</label>
+				if c.Stage == "lost" {
+					<label class="flex flex-col gap-1">
+						@Label("Why lost")
+						@input.Input(input.Props{Value: c.LostReason, Class: "h-8 bg-muted",
+							Attributes: templ.Attributes{"data-field": "lost_reason", "data-id": strconv.FormatInt(c.ID, 10)}})
+					</label>
+				}
+			</div>
+		</details>
+	</article>
+}

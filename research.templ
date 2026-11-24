@@ -1,0 +1,184 @@
+package main
+
+import (
+	"github.com/shutthegoatup/prospector/components/button"
+	"strconv"
+)
+
+func researchEmpty(f string) (string, string) {
+	switch f {
+	case "review":
+		return "Nothing to review", "Companies your agents and discovery jobs add will wait here."
+	case "contact":
+		return "Every qualified company has a contact", "Add someone with + Add person, or let an agent suggest people."
+	case "verify":
+		return "No emails to verify", "Contacts whose email is a pattern guess show up here."
+	}
+	return "Nothing here", ""
+}
+
+func jsonBody(pairs ...any) string {
+	s := "{"
+	for i := 0; i < len(pairs); i += 2 {
+		if i > 0 {
+			s += ","
+		}
+		s += strconv.Quote(pairs[i].(string)) + ":"
+		switch v := pairs[i+1].(type) {
+		case int64:
+			s += strconv.FormatInt(v, 10)
+		case string:
+			s += strconv.Quote(v)
+		}
+	}
+	return s + "}"
+}
+
+func platformText(c Company) string {
+	switch {
+	case c.Platform != "" && c.BuiltBy != "":
+		return c.Platform + ", by " + c.BuiltBy
+	case c.Platform != "":
+		return c.Platform
+	case c.ConfiguratorURL != "":
+		return "has one, platform unknown"
+	}
+	return "none found"
+}
+
+func platformState(c Company) string {
+	if c.Platform != "" || c.ConfiguratorURL != "" {
+		return "ok"
+	}
+	return ""
+}
+
+templ ResearchView(q *Req, f string, rows []ResearchRow, counts map[string]int) {
+	@PageHead("Research") {
+		<div class="flex flex-wrap gap-2">
+			@button.Button(button.Props{Href: q.Base() + "agents", Variant: button.VariantOutline, Size: button.SizeSm}) {
+				Connect an agent
+			}
+			@button.Button(button.Props{Href: q.Base() + "add", Size: button.SizeSm}) {
+				+ Add person
+			}
+		</div>
+	}
+	<p class="mb-4 max-w-[70ch] text-sm text-muted-foreground">Companies found by agents, jobs and imports. Nothing reaches outreach until someone qualifies it and picks a contact. Every fact keeps the link it came from.</p>
+	<nav class="mb-5 flex flex-wrap gap-2" aria-label="Filter">
+		for _, rf := range ResearchFilters {
+			@Chip(q.Base()+"research?f="+rf.Key, rf.Label, counts[rf.Key], rf.Key == f)
+		}
+	</nav>
+	if len(rows) == 0 {
+		{{ t, x := researchEmpty(f) }}
+		@Empty(t, x)
+	}
+	<div class="flex flex-col gap-3">
+		for i, r := range rows {
+			@ResearchItem(q, r, i)
+		}
+	</div>
+}
+
+templ ResearchItem(q *Req, r ResearchRow, i int) {
+	<article class="rise rounded-xl border border-border bg-card" style={ itemStyle(i) }>
+		<div class="flex flex-wrap items-start gap-x-6 gap-y-3 px-5 py-4">
+			<div class="min-w-[200px] flex-[2_1_220px]">
+				<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(r.ID, 10)) } class="font-heading text-lg font-semibold text-foreground hover:text-primary">{ r.Name }</a>
+				<p class="font-mono text-xs text-muted-foreground">
+					{ joinNonEmpty(" · ", r.Country, r.Segment, r.Domain) }
+				</p>
+			</div>
+			<div class="flex flex-[1_1_180px] flex-col gap-1">
+				@Label("Configurator")
+				<div>@Pill(platformText(r.Company), platformState(r.Company))</div>
+			</div>
+			<div class="flex flex-[1_1_150px] flex-col gap-1">
+				@Label("Found by")
+				<div>@Pill(actorLabel(r.FoundBy), actorState(r.FoundBy))</div>
+				@Meta(r.CreatedAt.Format("2 Jan 15:04"))
+			</div>
+			<div class="flex flex-[1_1_220px] flex-wrap items-center justify-end gap-2">
+				if r.Stage != CompanyQualified {
+					@FitPicker(r.Company)
+					@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "ui/company", "data-body": jsonBody("id", r.ID, "stage", CompanyQualified), "data-with-fit": "fit-" + strconv.FormatInt(r.ID, 10)}}) {
+						Qualify
+					}
+				}
+				if r.Stage != CompanyRejected {
+					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/company", "data-body": jsonBody("id", r.ID, "stage", CompanyRejected)}}) {
+						Reject
+					}
+				}
+			</div>
+		</div>
+		<details class="group border-t border-border/70 bg-black/10" open?={ i == 0 }>
+			<summary class="flex cursor-pointer list-none items-center gap-2 px-5 py-2.5 font-mono text-xs text-muted-foreground hover:text-foreground">
+				<span class="transition-transform group-open:rotate-90">›</span>
+				{ plural(len(r.Facts), "fact") + " · " + plural(len(r.People), "person") }
+			</summary>
+			<div class="flex flex-wrap gap-6 px-5 pb-5">
+				<div class="min-w-0 flex-[2_1_380px]">
+					@Label("Facts")
+					if r.Why != "" {
+						<div class="grid grid-cols-[130px_1fr] gap-3 border-b border-dashed border-border py-2 text-sm"><span class="font-mono text-xs text-muted-foreground">why it fits</span><span>{ r.Why }</span></div>
+					}
+					for _, f := range r.Facts {
+						<div class="grid grid-cols-[130px_1fr_auto] items-baseline gap-3 border-b border-dashed border-border py-2 text-sm">
+							<span class="font-mono text-xs text-muted-foreground">{ f.Field }</span>
+							<span>{ f.Value }</span>
+							<a href={ safeHref(f.SourceURL) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
+						</div>
+					}
+					if r.ConfiguratorURL != "" {
+						<div class="grid grid-cols-[130px_1fr] gap-3 py-2 text-sm"><span class="font-mono text-xs text-muted-foreground">configurator</span><a href={ safeHref(r.ConfiguratorURL) } target="_blank" rel="noopener" class="break-all">{ r.ConfiguratorURL }</a></div>
+					}
+				</div>
+				<div class="min-w-0 flex-[1_1_260px]">
+					@Label("People")
+					if len(r.People) == 0 {
+						<p class="py-2 text-sm text-muted-foreground">None yet. <a href={ templ.SafeURL(q.Base() + "add?company=" + r.Name) }>Add someone</a></p>
+					}
+					for _, p := range r.People {
+						<div class="flex flex-col gap-1.5 border-b border-dashed border-border py-2.5 text-sm">
+							<div><b>{ displayName(p) }</b><span class="text-muted-foreground">{ prefixed(", ", p.Title) }</span></div>
+							<div class="flex flex-wrap items-center gap-2">
+								switch p.EmailStatus {
+									case "verified":
+										@Pill("email verified", "ok")
+									case "guess":
+										@Pill("email is a guess", "warn")
+								}
+								if deref(p.Linkedin) != "" {
+									<a href={ safeHref(deref(p.Linkedin)) } target="_blank" rel="noopener" class="font-mono text-xs">LinkedIn ↗</a>
+								}
+								if deref(p.Sources) != "" {
+									<a href={ safeHref(firstLine(deref(p.Sources))) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
+								}
+							</div>
+							if p.Status == ContactSuggested {
+								<div>
+									@button.Button(button.Props{Size: button.SizeXs, Attributes: templ.Attributes{"data-post": "ui/pick", "data-body": jsonBody("id", p.ID)}}) {
+										Pick: start outreach
+									}
+								</div>
+							} else {
+								@Meta(contactStage(p))
+							}
+						</div>
+					}
+				</div>
+			</div>
+		</details>
+	</article>
+}
+
+templ FitPicker(c Company) {
+	<label class="sr-only" for={ "fit-" + strconv.FormatInt(c.ID, 10) }>Fit</label>
+	<select id={ "fit-" + strconv.FormatInt(c.ID, 10) } class="h-8 rounded-md border border-input bg-muted px-2 font-mono text-xs">
+		for _, g := range []string{"A", "B", "C"} {
+			<option value={ g } selected?={ g == c.Fit || (c.Fit == "" && g == "B") }>{ "Fit " + g }</option>
+		}
+	</select>
+}

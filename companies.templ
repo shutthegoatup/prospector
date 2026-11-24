@@ -1,0 +1,195 @@
+package main
+
+import (
+	"github.com/shutthegoatup/prospector/components/button"
+	"strconv"
+	"strings"
+)
+
+var pipelineStages = []string{"research", "outreach", "replied", "meeting", "proposal", "won", "lost", "rejected"}
+
+func stageClass(st string) string {
+	switch st {
+	case "replied", "meeting", "proposal", "won":
+		return "bg-[color-mix(in_oklab,var(--primary)_14%,transparent)] text-primary"
+	}
+	return "bg-secondary text-muted-foreground"
+}
+
+templ StageTag(st string) {
+	<span class={ "whitespace-nowrap rounded-md px-2 py-0.5 font-mono text-[11px] uppercase tracking-wide", stageClass(st) }>{ st }</span>
+}
+
+templ CompaniesView(q *Req, f CompanyFilter, rows []CompanyListRow, segments []string) {
+	@PageHead("Companies") {
+		<span class="font-mono text-xs text-muted-foreground">{ plural(len(rows), "company") }</span>
+	}
+	<form method="get" action={ templ.SafeURL(q.Base() + "companies") } class="mb-5 flex flex-wrap gap-2">
+		<label class="sr-only" for="q">Search</label>
+		<input id="q" type="search" name="q" value={ f.Q } placeholder="Search companies, people, notes" class="h-9 min-w-[220px] flex-1 rounded-lg border border-input bg-muted px-3 text-sm"/>
+		<label class="sr-only" for="segment">Segment</label>
+		<select id="segment" name="segment" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
+			<option value="">All segments</option>
+			for _, s := range segments {
+				<option value={ s } selected?={ s == f.Segment }>{ s }</option>
+			}
+		</select>
+		<label class="sr-only" for="stage">Stage</label>
+		<select id="stage" name="stage" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
+			<option value="">Any stage</option>
+			for _, s := range pipelineStages {
+				<option value={ s } selected?={ s == f.Stage }>{ s }</option>
+			}
+		</select>
+		@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantOutline, Class: "h-9"}) {
+			Filter
+		}
+	</form>
+	if len(rows) == 0 {
+		@Empty("No companies match", "Clear the filters, or add companies through Research or an agent.")
+	}
+	<div class="overflow-hidden rounded-xl border border-border bg-card">
+		for _, r := range rows {
+			<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(r.ID, 10)) } class="flex items-center justify-between gap-3 border-b border-[#2a2a2a] px-4 py-3 text-sm text-foreground last:border-0 hover:bg-[#262626] hover:text-foreground">
+				<span class="min-w-0">
+					<b>{ r.Name }</b>
+					<span class="block truncate font-mono text-xs text-muted-foreground">{ joinNonEmpty(" · ", r.Country, r.Segment, plural(r.People, "person")) }</span>
+				</span>
+				<span class="flex items-center gap-2">
+					if r.Fit != "" {
+						<span class="font-mono text-xs text-primary">{ r.Fit }</span>
+					}
+					@StageTag(r.Pipeline)
+				</span>
+			</a>
+		}
+	</div>
+}
+
+func historyText(h HistoryItem) string {
+	verb := map[string]string{
+		"mark:linkedin": "added on LinkedIn", "mark:email": "sent the email", "mark:followup": "sent the follow-up",
+		"mark:call": "called", "mark:replied": "marked replied", "mark:declined": "marked not interested",
+		"mark:hold": "put on hold", "mark:accepted": "marked accepted", "add:company": "added the company",
+		"add:facts": "added facts", "add:fact": "added a fact", "add:contact": "suggested a contact",
+		"add:person": "added", "pick": "picked for outreach", "company:qualified": "qualified the company",
+		"company:rejected": "rejected the company", "company:review": "sent back to review",
+	}[h.Action]
+	if verb == "" {
+		if f, ok := strings.CutPrefix(h.Action, "set:"); ok {
+			verb = "set " + strings.ReplaceAll(f, "_", " ")
+		} else if k, ok := strings.CutPrefix(h.Action, "draft:"); ok {
+			verb = "drafted the " + k
+		} else {
+			verb = h.Action
+		}
+	}
+	s := verb
+	if h.Person != "" {
+		s += " · " + h.Person
+	}
+	if h.Value != "" && !strings.HasPrefix(h.Action, "mark:") && h.Action != "add:contact" && len(h.Value) < 80 {
+		s += ": " + h.Value
+	}
+	return s
+}
+
+templ CompanyView(q *Req, p CompanyPage) {
+	<a href={ templ.SafeURL(q.Base() + "companies") } class="font-mono text-xs">← Companies</a>
+	<div class="mt-3 flex flex-col gap-5 rounded-xl border border-border bg-card p-6">
+		<div class="flex flex-wrap items-start justify-between gap-3">
+			<div>
+				<h1 class="font-heading text-3xl font-bold tracking-tight">{ p.Company.Name }</h1>
+				@Meta(joinNonEmpty(" · ", p.Company.Domain, p.Company.Country, p.Company.Segment, fitText(p.Company.Fit)))
+			</div>
+			<div class="flex items-center gap-2">
+				@StageTag(pipeline(p.Company, p.People))
+				if p.Company.Stage != CompanyQualified {
+					@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "ui/company", "data-body": jsonBody("id", p.Company.ID, "stage", CompanyQualified)}}) {
+						Qualify
+					}
+				}
+			</div>
+		</div>
+		if p.Company.Why != "" {
+			<p class="text-sm text-muted-foreground">{ p.Company.Why }</p>
+		}
+		<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+			<div class="rounded-lg bg-muted p-3">@Label("Configurator")<div class="mt-1 text-sm">{ platformText(p.Company) }</div></div>
+			<div class="rounded-lg bg-muted p-3">@Label("Found by")<div class="mt-1 text-sm">{ actorLabel(p.Company.FoundBy) }</div></div>
+			<div class="rounded-lg bg-muted p-3">@Label("Touches")<div class="mt-1 font-mono text-lg">{ strconv.Itoa(touches(p.History)) }</div></div>
+		</div>
+		<div>
+			<div class="flex items-center justify-between">
+				@Label("People")
+				<a href={ templ.SafeURL(q.Base() + "add?company=" + p.Company.Name) } class="font-mono text-xs">+ add</a>
+			</div>
+			if len(p.People) == 0 {
+				<p class="py-2 text-sm text-muted-foreground">No one yet.</p>
+			}
+			for _, c := range p.People {
+				<div class="flex flex-wrap justify-between gap-2 border-b border-dashed border-border py-2.5 text-sm">
+					<span><b>{ displayName(c) }</b> <span class="text-muted-foreground">{ prefixed("· ", c.Title) }</span></span>
+					<span class="flex items-center gap-2">
+						if deref(c.Linkedin) != "" {
+							<a href={ safeHref(deref(c.Linkedin)) } target="_blank" rel="noopener" class="font-mono text-xs">LinkedIn ↗</a>
+						}
+						@Meta(contactStage(c))
+					</span>
+				</div>
+			}
+		</div>
+		if len(p.Facts) > 0 || p.Company.ConfiguratorURL != "" {
+			<div>
+				@Label("Facts")
+				for _, f := range p.Facts {
+					<div class="grid grid-cols-[130px_1fr_auto] items-baseline gap-3 border-b border-dashed border-border py-2 text-sm">
+						<span class="font-mono text-xs text-muted-foreground">{ f.Field }</span>
+						<span>{ f.Value }</span>
+						<a href={ safeHref(f.SourceURL) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
+					</div>
+				}
+				if p.Company.ConfiguratorURL != "" {
+					<div class="grid grid-cols-[130px_1fr] gap-3 py-2 text-sm"><span class="font-mono text-xs text-muted-foreground">configurator</span><a href={ safeHref(p.Company.ConfiguratorURL) } target="_blank" rel="noopener" class="break-all">{ p.Company.ConfiguratorURL }</a></div>
+				}
+			</div>
+		}
+		<div>
+			@Label("History")
+			if len(p.History) == 0 {
+				<p class="py-2 text-sm text-muted-foreground">Nothing recorded yet.</p>
+			}
+			for _, h := range p.History {
+				<div class="grid grid-cols-[110px_1fr] gap-3 border-b border-dashed border-border py-2 text-sm">
+					<span class="font-mono text-xs text-muted-foreground">{ h.At.Format("2 Jan 15:04") }</span>
+					<span><span class={ "font-mono text-xs", actorColor(h.Actor) }>{ actorLabel(h.Actor) }</span> { historyText(h) }</span>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+func actorColor(actor string) string {
+	if strings.HasPrefix(actor, "agent:") {
+		return "text-primary"
+	}
+	return "text-muted-foreground"
+}
+
+func fitText(f string) string {
+	if f == "" {
+		return ""
+	}
+	return "fit " + f
+}
+
+func touches(h []HistoryItem) int {
+	n := 0
+	for _, e := range h {
+		switch e.Action {
+		case "mark:linkedin", "mark:email", "mark:followup", "mark:call":
+			n++
+		}
+	}
+	return n
+}

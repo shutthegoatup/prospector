@@ -1,0 +1,16 @@
+# Databases, snapshots and exports hold prospect data: never commit them.
+*.sqlite
+*.sqlite-*
+*.sql
+!testdata/**
+*.dump
+*.csv
+!testdata/**/*.csv
+.env
+.env.*
+
+/prospector
+/dist/
+/bin/
+node_modules/
+.playwright-mcp/
