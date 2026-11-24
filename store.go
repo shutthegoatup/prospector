@@ -30,6 +30,7 @@ type OrgSettings struct {
 	NeverContact      string `json:"never_contact"`
 	IncorporatedOnly  bool   `json:"incorporated_only"`
 	AgentGuidance     string `json:"agent_guidance"`
+	EnquirySites      string `json:"enquiry_sites"`
 }
 
 func (s OrgSettings) withDefaults() OrgSettings {
@@ -216,7 +217,7 @@ var Marks = map[string]string{"linkedin": "linkedin_added", "email": "email_sent
 type Store struct{ db *gorm.DB }
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
-	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}}
+	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}}
 
 // Open takes a postgres:// URL or a SQLite file path.
 func Open(dsn string) (*Store, error) {

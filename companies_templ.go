@@ -397,7 +397,7 @@ func historyText(h HistoryItem) string {
 		"add:facts": "added facts", "add:fact": "added a fact", "add:contact": "suggested a contact",
 		"add:person": "added", "pick": "picked for outreach", "company:qualified": "qualified the company",
 		"company:rejected": "rejected the company", "company:review": "sent back to review",
-		"erase": "erased a person on request",
+		"erase": "erased a person on request", "enquiry": "sent an enquiry",
 	}[h.Action]
 	if verb == "" {
 		if f, ok := strings.CutPrefix(h.Action, "set:"); ok {

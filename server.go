@@ -24,10 +24,11 @@ var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("unused"), bcrypt.DefaultC
 const sessionCookie = "session"
 
 type App struct {
-	s      *Store
-	mu     sync.Mutex
-	mcp    map[int64]*mcp.Server
-	logins loginGuard
+	s         *Store
+	mu        sync.Mutex
+	mcp       map[int64]*mcp.Server
+	logins    loginGuard
+	enquiries enquiryGuard
 	// base is the address people reach the app at, when the operator has said: then
 	// links and the cookie's Secure mark don't depend on what a proxy forwards.
 	base string
@@ -330,6 +331,9 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /o/{org}/add", a.member(a.addPage))
 	mux.HandleFunc("GET /o/{org}/settings", a.member(a.settings))
 	mux.HandleFunc("GET /o/{org}/agents", a.member(a.agents))
+	mux.HandleFunc("GET /o/{org}/enquiries", a.member(a.enquiriesPage))
+	mux.HandleFunc("OPTIONS "+intakePattern, a.intakePreflight)
+	mux.HandleFunc("POST "+intakePattern, a.intake)
 
 	mux.HandleFunc("POST /o/{org}/ui/mark", a.member(a.uiMark))
 	mux.HandleFunc("POST /o/{org}/ui/update", a.member(a.uiUpdate))
@@ -345,12 +349,16 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/sso/domain/remove", a.owner(a.uiSSODomainRemove))
 	mux.HandleFunc("POST /o/{org}/ui/sso/verify", a.owner(a.uiSSOVerify))
 	mux.HandleFunc("POST /o/{org}/ui/erase", a.owner(a.uiErase))
+	mux.HandleFunc("POST /o/{org}/ui/enquiry/delete", a.owner(a.uiDeleteEnquiry))
 	mux.HandleFunc("POST /o/{org}/ui/keys", a.owner(a.uiKey))
 	mux.HandleFunc("POST /o/{org}/ui/keys/revoke", a.owner(a.uiRevoke))
 
 	a.apiRoutes(mux)
 
 	sameOrigin := http.NewCrossOriginProtection()
+	// Enquiry forms live on other sites. The route checks the origin against the
+	// organisation's own list, and reads no session.
+	sameOrigin.AddInsecureBypassPattern("POST " + intakePattern)
 	if a.base != "" {
 		// Behind a proxy that rewrites Host, an older browser's Origin wouldn't match it.
 		if err := sameOrigin.AddTrustedOrigin(a.base); err != nil {
@@ -381,7 +389,8 @@ func (a *App) Routes() http.Handler {
 			}
 		}
 		// Signed-in browsers send cookies; a cross-site form can't send JSON without a
-		// CORS preflight, which is never answered. Login and the API key routes are exempt.
+		// CORS preflight, which only the enquiry route answers, and only for the sites an
+		// organisation lists. Login and the API key routes are exempt.
 		if r.Method == http.MethodPost && r.URL.Path != "/login" && r.URL.Path != "/logout" &&
 			!hasKey(r) && !strings.HasPrefix(r.Header.Get("content-type"), "application/json") {
 			http.Error(w, "POST bodies must be application/json", http.StatusUnsupportedMediaType)
