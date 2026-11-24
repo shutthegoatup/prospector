@@ -97,6 +97,10 @@ templ SettingsView(q *Req, d SettingsData) {
 						<textarea name="never_contact" rows="3" placeholder="domains, emails or LinkedIn links, one per line" class={ areaClass }>{ set.NeverContact }</textarea>
 						@Meta(neverContactHint(d.Covered))
 					}
+					@Row("What you look for") {
+						<textarea name="look_for" rows="4" placeholder={ "careers_page: a careers or jobs page on their site\nats: the applicant tracking system they use" } class={ areaClass }>{ set.LookFor }</textarea>
+						@Meta("One per line, a name and what counts. Agents record each as a fact under that name, and Research shows which a company has.")
+					}
 					@Row("Agent guidance") {
 						<textarea name="agent_guidance" rows="8" placeholder="Who you sell to, who's off-limits, how to judge fit" class={ areaClass }>{ set.AgentGuidance }</textarea>
 						@Meta("Sent to every agent when it connects, after the built-in task guidance, and returned by the guidance tool.")

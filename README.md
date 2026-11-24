@@ -54,7 +54,8 @@ Each organisation has an MCP endpoint and a REST API, with scoped keys. Agents c
 - **Export a person:** when someone asks what you hold on them, an owner can download it from their company's page (or `prospector export-person <name> <file>`): their details, drafts, notes, the facts recorded against them, what they wrote to you and their history. The history names the teammates and agents who acted, so read it through before you send it on. The export is itself noted in the history.
 - **Erase a person:** an owner can erase someone from their company's page (or `prospector erase <name>`) when they ask to be forgotten. Their details, drafts, notes and facts are deleted, the history keeps only that something happened and when, and an import, a restore or an agent can't add them again. A row that names several people goes whole. Company facts and other people's notes that mention them, your own lead files and database backups aren't touched: take them out there too.
 - **Add person:** paste a LinkedIn profile link and the name fills in. A bookmarklet opens the same form pre-filled from the profile you're viewing.
-- **Settings, per organisation:** waits between steps, connection-note template, call-script pitch, never-contact list and team. Each member sets their own caller name and signature.
+- **Settings, per organisation:** waits between steps, connection-note template, call-script pitch, never-contact list, what you look for at a company and team. Each member sets their own caller name and signature.
+- **What you look for:** each organisation names the things that make a company a fit, one per line in Settings, such as `configurator: a product configurator on their site` or `careers_page: a jobs page`. Agents are told the list and record each as a fact under that name; Research and the company page show which ones a company has.
 - **Several organisations per login:** each has its own prospects, wording, team and keys, and none can see another's.
 
 ## Run it
@@ -195,7 +196,7 @@ Erasing a person also deletes their enquiries, and an owner can delete any singl
 
 `prospector import --org=<slug> --dir=<folder>` reads this layout. `push` sends the same data to a running server.
 
-- `leads/prospects.csv`: one company per row. Columns: `name`, `segment`, `country`, `website`, `configurator_url`, `fit_reason`, `buyer_role`, `priority`, `configurator_built_by`.
+- `leads/prospects.csv`: one company per row. Columns: `name`, `segment`, `country`, `website`, `configurator_url`, `fit_reason`, `buyer_role`, `priority`, `configurator_built_by`. `configurator_url` and `configurator_built_by` become `configurator` and `built_by` facts.
 - `leads/outreach/NN-name.md`: one prospect per file, with a `| Primary | Name | Title |` contacts row and sections `## LinkedIn note`, `## Email` (with `**Subject:**`), `## Channel` and `## Follow-up`.
 - `leads/outreach/*.md`: several prospects per file, under a `| Fit | Maker | Contact | LinkedIn | Email |` send list, each with a `**LinkedIn note (N)**` block.
 - `leads/outreach/sent-log.md`: people listed under a `## YYYY-MM-DD` heading are marked added on LinkedIn that day.
