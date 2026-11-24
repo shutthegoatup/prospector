@@ -6,7 +6,7 @@ templ SSOSettings(q *Req, d SettingsData) {
 	@Section("Single sign-on", "Let people at your company's email domains sign in through your own provider: Okta, Entra ID, Google Workspace or anything else that speaks OpenID Connect.") {
 		if d.Callback == "" {
 			@Meta("Set PROSPECTOR_URL to this app's address first: it is where the provider sends people back.")
-		} else if !d.Sealing {
+		} else if !d.Sealing && !d.SSO.On() {
 			@Meta("Set PROSPECTOR_SECRET_KEYS first: the provider's client secret is kept sealed under it. `prospector secret-key` makes a key.")
 		} else {
 			<div class="flex flex-col gap-2">
@@ -56,6 +56,9 @@ templ SSOSettings(q *Req, d SettingsData) {
 				}
 				@Row("Client secret") {
 					<input name="client_secret" type="password" autocomplete="new-password" placeholder={ secretHint(d.SSO) } class={ fieldClass }/>
+					if !d.Sealing {
+						@Meta("A new secret can't be kept until PROSPECTOR_SECRET_KEYS is set; everything else here can still be changed.")
+					}
 				}
 				@Row("Redirect URI") {
 					<code class="select-all break-all pt-2 font-mono text-xs">{ d.Callback }</code>

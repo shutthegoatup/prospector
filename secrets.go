@@ -63,7 +63,8 @@ func parseKeys(spec string) (*keyring, error) {
 		}
 		v, err := strconv.Atoi(version)
 		if err != nil || v < 0 || strconv.Itoa(v) != version {
-			return nil, fmt.Errorf("PROSPECTOR_SECRET_KEYS: version %q isn't a plain whole number", version)
+			// The entry isn't quoted: written the wrong way round, its version is the key.
+			return nil, errors.New(`PROSPECTOR_SECRET_KEYS: a version is a plain whole number, as in "1:<64 hex characters>"`)
 		}
 		if _, twice := k.byKID[version]; twice {
 			return nil, fmt.Errorf("PROSPECTOR_SECRET_KEYS: version %d is given twice", v)

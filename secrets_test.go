@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -35,12 +36,18 @@ func TestSecretKeysAreRefusedWhenMalformed(t *testing.T) {
 		"a key that isn't hex":     "1:" + strings.Repeat("zz", 32),
 		"a short key":              "1:0a0b0c",
 		"a version given twice":    "1:" + oldKey + ",1:" + newKey,
+		"the key before a version": newKey + ":1",
 	} {
 		_, err := parseKeys(spec)
 		if err == nil {
 			t.Errorf("%s was accepted", what)
-		} else if strings.Contains(err.Error(), "0a0b") || strings.Contains(err.Error(), "zz") {
-			t.Errorf("%s: the refusal quotes the key: %v", what, err)
+			continue
+		}
+		// The refusal goes to the terminal and the server's log.
+		for _, secret := range []string{oldKey, newKey, "0a0b0c", "zz"} {
+			if strings.Contains(err.Error(), secret) {
+				t.Errorf("%s: the refusal quotes the key: %v", what, err)
+			}
 		}
 	}
 	if k, err := parseKeys("  "); k != nil || err != nil {
@@ -133,6 +140,43 @@ func TestEachJobHasAKeyOfItsOwnDerivedFromTheMaster(t *testing.T) {
 	}
 	if mustKeys(t, "2:"+newKey).verify(attempts, "an attempt", signature) {
 		t.Fatal("a signature still verifies once its key is removed")
+	}
+}
+
+func TestTheServerSealsWhatItFindsWhenItStartsWithAKey(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "p.sqlite")
+	seed, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alpha := mustOrg(t, seed, "alpha")
+	if err := seed.db.Create(&SSOConnection{OrgID: alpha.ID, Issuer: "https://login.alpha.example", ClientID: "client", ClientSecret: "kept-in-clear"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	closeStore(seed)
+
+	t.Setenv("DATABASE_URL", path)
+	t.Setenv("PROSPECTOR_URL", "")
+	// A social provider with nowhere to send people back stops serve before it listens.
+	t.Setenv("PROSPECTOR_GOOGLE_CLIENT_ID", "id")
+	t.Setenv("PROSPECTOR_GOOGLE_CLIENT_SECRET", "secret")
+	t.Setenv("PROSPECTOR_SECRET_KEYS", newKey+":1")
+	if err := run([]string{"serve", "127.0.0.1:0"}); err == nil || !strings.Contains(err.Error(), "PROSPECTOR_SECRET_KEYS") || strings.Contains(err.Error(), newKey) {
+		t.Fatalf("starting with a malformed key: %v", err)
+	}
+	t.Setenv("PROSPECTOR_SECRET_KEYS", "1:"+newKey)
+	if err := run([]string{"serve", "127.0.0.1:0"}); err == nil || !strings.Contains(err.Error(), "PROSPECTOR_URL") {
+		t.Fatalf("serve should have stopped for want of an address: %v", err)
+	}
+
+	after, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { closeStore(after) })
+	stored := clientSecret(t, after, alpha.ID)
+	if plain, err := mustKeys(t, "1:"+newKey).open(stored); err != nil || plain != "kept-in-clear" || !sealed(stored) {
+		t.Fatalf("after starting with a key: %q %v", stored, err)
 	}
 }
 
@@ -229,11 +273,22 @@ func TestASecretKeptInClearIsSealedOnceThereIsAKey(t *testing.T) {
 	if code, body := owner.post("/o/alpha/ui/sso", in); code != http.StatusBadRequest || !strings.Contains(body, "PROSPECTOR_SECRET_KEYS") {
 		t.Fatalf("saving a connection with no key: %d %s", code, body)
 	}
-	if _, page, _ := owner.get("/o/alpha/settings"); !strings.Contains(page, "PROSPECTOR_SECRET_KEYS") || strings.Contains(page, `name="client_secret"`) {
-		t.Fatal("Settings should say a key is needed, not offer the form")
+	// A connection made before there was a key can still be changed, short of its secret.
+	if _, page, _ := owner.get("/o/alpha/settings"); !strings.Contains(page, "PROSPECTOR_SECRET_KEYS") || !strings.Contains(page, `name="required"`) {
+		t.Fatal("Settings should still offer an existing connection's rules, and say a key is needed for a new secret")
+	}
+	in = map[string]any{"issuer": okta.srv.URL, "client_id": "client", "required": true}
+	if code, body := owner.post("/o/alpha/ui/sso", in); code != http.StatusOK {
+		t.Fatalf("changing a rule with no key: %d %s", code, body)
+	}
+	if sso, _ := s.SSO(alpha.ID); !sso.Required || sso.ClientSecret != "secret" {
+		t.Fatalf("after changing a rule with no key: %+v", sso.SSOConnection)
 	}
 	if code, body := owner.post("/o/alpha/ui/sso", map[string]any{"issuer": ""}); code != http.StatusOK {
 		t.Fatalf("turning single sign-on off needs no key: %d %s", code, body)
+	}
+	if _, page, _ := owner.get("/o/alpha/settings"); !strings.Contains(page, "PROSPECTOR_SECRET_KEYS") || strings.Contains(page, `name="client_secret"`) {
+		t.Fatal("with no key and no connection, Settings should say a key is needed, not offer the form")
 	}
 	if err := s.db.Create(&SSOConnection{OrgID: alpha.ID, Issuer: okta.srv.URL, ClientID: "client", ClientSecret: "secret"}).Error; err != nil {
 		t.Fatal(err)

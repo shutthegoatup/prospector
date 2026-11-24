@@ -45,7 +45,7 @@ func SSOSettings(q *Req, d SettingsData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-			} else if !d.Sealing {
+			} else if !d.Sealing && !d.SSO.On() {
 				templ_7745c5c3_Err = Meta("Set PROSPECTOR_SECRET_KEYS first: the provider's client secret is kept sealed under it. `prospector secret-key` makes a key.").Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -464,9 +464,15 @@ func SSOSettings(q *Req, d SettingsData) templ.Component {
 						}
 						templ.ReleaseBuffer(templ_7745c5c3_Buffer)
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, ">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "> ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
+					}
+					if !d.Sealing {
+						templ_7745c5c3_Err = Meta("A new secret can't be kept until PROSPECTOR_SECRET_KEYS is set; everything else here can still be changed.").Render(ctx, templ_7745c5c3_Buffer)
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
 					}
 					return nil
 				})
@@ -493,7 +499,7 @@ func SSOSettings(q *Req, d SettingsData) templ.Component {
 					var templ_7745c5c3_Var24 string
 					templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(d.Callback)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 61, Col: 75}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `sso.templ`, Line: 64, Col: 75}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 					if templ_7745c5c3_Err != nil {

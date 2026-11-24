@@ -575,21 +575,19 @@ func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
 		done(w, a.s.SaveSSO(&SSOConnection{OrgID: q.Org.ID}, q.Actor()))
 		return
 	}
-	if a.s.keys == nil {
-		fail(w, fmt.Errorf("the client secret has to be kept sealed, and %w", errNoKeys), http.StatusBadRequest)
-		return
-	}
 	secret := strings.TrimSpace(in.Secret)
-	// The kept secret belongs to the provider and client it was typed for, and goes to no other.
-	if secret == "" && c.Issuer == sso.Issuer && c.ClientID == sso.ClientID {
-		if secret, err = a.s.keys.open(sso.ClientSecret); err != nil {
-			fail(w, fmt.Errorf("the kept client secret can't be opened, so type it again: %w", err), http.StatusBadRequest)
+	switch {
+	case secret != "":
+		if c.ClientSecret, err = a.s.keys.seal(secret); err != nil {
+			fail(w, fmt.Errorf("a client secret is kept sealed, and %w", err), http.StatusBadRequest)
 			return
 		}
-	}
-	if secret != "" {
-		if c.ClientSecret, err = a.s.keys.seal(secret); err != nil {
-			fail(w, err, http.StatusInternalServerError)
+	// The kept secret belongs to the provider and client it was typed for, and goes to
+	// no other. It stays as stored, so the rest can be changed on a server with no key.
+	case c.Issuer == sso.Issuer && c.ClientID == sso.ClientID:
+		c.ClientSecret = sso.ClientSecret
+		if secret, err = a.s.keys.open(sso.ClientSecret); err != nil {
+			fail(w, fmt.Errorf("the kept client secret can't be opened, so type it again: %w", err), http.StatusBadRequest)
 			return
 		}
 	}

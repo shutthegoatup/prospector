@@ -125,7 +125,7 @@ People start from "Use your organisation's single sign-on" on the sign-in page a
 
 - **A master key is never used directly.** Each job gets its own key derived from it with HKDF-SHA256 (RFC 5869): one seals stored secrets, another signs the cookie that carries a sign-in to a provider and back.
 - **What it seals** is each organisation's single sign-on client secret, stored as a compact JWE (RFC 7516, `dir` with `A256GCM`) whose `kid` is the key's version. Passwords, sessions and API keys are stored as hashes and need no key.
-- **Without it** the server runs, but no single sign-on connection can be saved. A client secret stored in clear by a release before sealing still works, and is sealed the first time the server starts with a key.
+- **Without it** the server runs, but no client secret can be saved, so no new single sign-on connection. A secret stored in clear by v0.1.32 still works, its connection's other settings can still be changed, and it is sealed the first time the server starts with a key. After that, going back to v0.1.32 breaks those sign-ins until each owner types the secret again.
 - **Back it up apart from the database.** A database without the key can't read the secrets; a key that is lost takes them with it, and each owner types theirs again.
 
 The first key in the list seals and signs; every key in the list opens and verifies. To replace a key:
