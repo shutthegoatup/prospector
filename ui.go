@@ -188,7 +188,7 @@ func baseURL(r *http.Request) string {
 type SettingsData struct {
 	Members []Member
 	Me      Membership
-	Covered int
+	Covered []string
 }
 
 func (a *App) settings(w http.ResponseWriter, r *http.Request) {

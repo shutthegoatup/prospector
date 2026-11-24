@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/shutthegoatup/prospector/components/button"
 	"strconv"
+	"strings"
 )
 
 templ Section(title, hint string) {
@@ -158,12 +159,19 @@ func removeConfirm(q *Req, m Member) string {
 	return "Remove " + m.Email + " from " + q.Org.Name + "? They lose access to it; their account and what they added stay, and so do any API keys they made."
 }
 
-func neverContactHint(covered int) string {
-	hint := "Applied to everything people and agents add, and to who comes up on Today."
-	if covered > 0 {
-		hint += " It currently keeps " + plural(covered, "person") + " already here out of the queue."
+// neverContactHint names who the list is holding back, so an entry that catches the
+// wrong people is noticed.
+func neverContactHint(covered []string) string {
+	hint := "One per line: a domain, an email address or a LinkedIn profile link. Applied to everything people and agents add, and to who comes up for outreach on Today."
+	if len(covered) == 0 {
+		return hint
 	}
-	return hint
+	shown := covered[:min(len(covered), 8)]
+	hint += " It currently keeps " + plural(len(covered), "person") + " already here out of the queue: " + strings.Join(shown, ", ")
+	if more := len(covered) - len(shown); more > 0 {
+		hint += " and " + strconv.Itoa(more) + " more"
+	}
+	return hint + "."
 }
 
 func ownerHint(q *Req) string {

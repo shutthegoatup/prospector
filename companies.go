@@ -410,33 +410,62 @@ func (s *Store) allowed(o *Org, email, link string) error {
 }
 
 // listed reports the never-contact entry an email address or link falls under, if any.
+// Each entry is one thing: a LinkedIn profile, an email address, or a domain. Nothing
+// matches by loose substring, because the list also hides people from the queues and
+// a stray word must not hide the wrong ones.
 func (set OrgSettings) listed(email, link string) error {
-	email, link = strings.ToLower(email), strings.ToLower(link)
-	for _, entry := range strings.FieldsFunc(strings.ToLower(set.NeverContact), func(r rune) bool { return r == ',' || r == '\n' || r == ' ' }) {
+	email, profile := strings.ToLower(strings.TrimSpace(email)), linkedinPath(link)
+	for _, raw := range strings.FieldsFunc(strings.ToLower(set.NeverContact), func(r rune) bool { return r == ',' || r == '\n' || r == ' ' }) {
+		entry := strings.TrimRight(strings.TrimPrefix(schemeRe.ReplaceAllString(strings.TrimSpace(raw), ""), "www."), "/")
 		if entry == "" {
 			continue
 		}
-		if (email != "" && (email == entry || strings.HasSuffix(email, "@"+entry))) || (link != "" && strings.Contains(link, entry)) {
-			return fmt.Errorf("%s is on the never-contact list", entry)
+		hit := false
+		switch want := linkedinPath(entry); {
+		case want != "":
+			hit = profile == want || strings.HasPrefix(profile, want+"/")
+		case strings.Contains(entry, "@"):
+			hit = email == entry
+		default:
+			host, _, _ := strings.Cut(entry, "/")
+			hit = email != "" && (strings.HasSuffix(email, "@"+host) || strings.HasSuffix(email, "."+host))
+		}
+		if hit {
+			return fmt.Errorf("%s is on the never-contact list", raw)
 		}
 	}
 	return nil
 }
 
-// NeverContactCovers counts the people already stored that the list keeps out of the queues.
-func (s *Store) NeverContactCovers(o *Org) int {
+var schemeRe = regexp.MustCompile(`^[a-z]+://`)
+
+// linkedinPath is what identifies a LinkedIn page whatever the subdomain: "in/hannah-pryce".
+func linkedinPath(link string) string {
+	_, path, found := strings.Cut(strings.ToLower(strings.TrimSpace(link)), "linkedin.com/")
+	if !found {
+		return ""
+	}
+	if i := strings.IndexAny(path, "?#"); i >= 0 {
+		path = path[:i]
+	}
+	return strings.TrimRight(path, "/")
+}
+
+// NeverContactCovers names the people the list is keeping out of the outreach queues:
+// those who would otherwise be open for a next step.
+func (s *Store) NeverContactCovers(o *Org) []string {
 	if strings.TrimSpace(o.Settings.NeverContact) == "" {
-		return 0
+		return nil
 	}
 	var people []Contact
-	s.in(o.ID).Where("key not like 'org:%'").Find(&people)
-	n := 0
+	s.in(o.ID).Where(open_).Order("id").Find(&people)
+	var names []string
 	for _, p := range people {
 		if o.Settings.listed(deref(p.Email), deref(p.Linkedin)) != nil {
-			n++
+			names = append(names, displayName(p))
 		}
 	}
-	return n
+	return names
 }
 
 // LinkedIn page titles look like "(3) Hannah Pryce | LinkedIn"; headlines "Head of Marketing at Larkmoor Yachts".
