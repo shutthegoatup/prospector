@@ -382,3 +382,82 @@ func TestLoginRedirects(t *testing.T) {
 		t.Fatalf("a tab in next sent the browser to %q", got)
 	}
 }
+
+func TestRemoveMember(t *testing.T) {
+	s, o, srv, ada := signedIn(t)
+	other := mustOrg(t, s, "beta")
+	join := func(email string, org *Org, role string) (*User, *http.Client) {
+		t.Helper()
+		u, err := s.UserByEmail(email)
+		if err != nil {
+			if u, err = s.CreateUser(email, strings.Split(email, "@")[0], "correct horse battery"); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := s.AddMember(org.ID, u.ID, role, u.Name); err != nil {
+			t.Fatal(err)
+		}
+		jar, _ := cookiejar.New(nil)
+		client := &http.Client{Jar: jar}
+		res, err := client.PostForm(srv.URL+"/login", url.Values{"email": {email}, "password": {"correct horse battery"}})
+		if err != nil || res.StatusCode != http.StatusOK {
+			t.Fatalf("login %s: %v", email, err)
+		}
+		res.Body.Close()
+		return u, client
+	}
+	bob, bobClient := join("bob@example.com", o, "member")
+	join("bob@example.com", other, "owner")
+	adaUser, err := s.UserByEmail("ada@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	remove := func(client *http.Client, user int64) (int, string) {
+		return call(t, client, "POST", srv.URL+"/o/alpha/ui/member/remove", "application/json", map[string]int64{"user_id": user})
+	}
+
+	if code, _ := remove(bobClient, adaUser.ID); code != http.StatusForbidden {
+		t.Fatalf("a member removed someone: %d", code)
+	}
+	if code, _ := remove(ada, adaUser.ID); code != http.StatusBadRequest {
+		t.Fatalf("the last owner left: %d", code)
+	}
+	if code, _ := call(t, ada, "POST", srv.URL+"/o/alpha/ui/member", "application/json",
+		map[string]string{"email": "ada@example.com", "role": "member"}); code != http.StatusBadRequest {
+		t.Fatalf("the last owner was demoted: %d", code)
+	}
+	if m, err := s.Membership(o.ID, adaUser.ID); err != nil || m.Role != "owner" {
+		t.Fatalf("the last owner is now %+v %v", m, err)
+	}
+	if code, _ := remove(ada, 987654); code != http.StatusBadRequest {
+		t.Fatalf("removing someone who isn't a member: %d", code)
+	}
+
+	if _, body := call(t, ada, "GET", srv.URL+"/o/alpha/settings", "", nil); !strings.Contains(body, "ui/member/remove") {
+		t.Fatal("an owner isn't offered Remove")
+	}
+	if _, body := call(t, bobClient, "GET", srv.URL+"/o/alpha/settings", "", nil); !strings.Contains(body, "Your password") || strings.Contains(body, "ui/member/remove") {
+		t.Fatal("a member is offered Remove")
+	}
+	if code, _ := remove(ada, bob.ID); code != http.StatusOK {
+		t.Fatalf("remove: %d", code)
+	}
+	if code, _ := call(t, bobClient, "GET", srv.URL+"/o/alpha/today", "", nil); code != http.StatusNotFound {
+		t.Fatalf("a removed member still reaches the organisation: %d", code)
+	}
+	if _, body := call(t, bobClient, "GET", srv.URL+"/o/beta/settings", "", nil); !strings.Contains(body, "Your password") {
+		t.Fatal("removal from one organisation reached another")
+	}
+	if _, err := s.UserByEmail("bob@example.com"); err != nil {
+		t.Fatal("removing a member deleted their account")
+	}
+
+	join("carol@example.com", o, "owner")
+	code, body := remove(ada, adaUser.ID)
+	if code != http.StatusOK || !strings.Contains(body, `"go":"/"`) {
+		t.Fatalf("an owner leaving with another owner in place: %d %s", code, body)
+	}
+	if code, _ := call(t, ada, "GET", srv.URL+"/o/alpha/today", "", nil); code != http.StatusNotFound {
+		t.Fatalf("an owner who left still reaches the organisation: %d", code)
+	}
+}

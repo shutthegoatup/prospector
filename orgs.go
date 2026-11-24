@@ -131,9 +131,52 @@ func (s *Store) OrgBySlug(slug string) (*Org, error) {
 	return &o, s.db.Where("slug = ?", slug).First(&o).Error
 }
 
+var errLastOwner = errors.New("an organisation needs an owner: make someone else an owner first")
+
+// AddMember adds a user to an organisation, or changes the role of one already in it.
 func (s *Store) AddMember(org, user int64, role, callerName string) error {
-	m := Membership{OrgID: org, UserID: user, Role: role, CallerName: callerName}
-	return s.db.Where("org_id = ? and user_id = ?", org, user).Assign(Membership{Role: role}).FirstOrCreate(&m).Error
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var m Membership
+		err := tx.Where("org_id = ? and user_id = ?", org, user).First(&m).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return tx.Create(&Membership{OrgID: org, UserID: user, Role: role, CallerName: callerName}).Error
+		}
+		if err != nil {
+			return err
+		}
+		if m.Role == "owner" && role != "owner" && lastOwner(tx, org) {
+			return errLastOwner
+		}
+		return tx.Model(&m).Update("role", role).Error
+	})
+}
+
+func lastOwner(tx *gorm.DB, org int64) bool {
+	var owners int64
+	tx.Model(&Membership{}).Where("org_id = ? and role = ?", org, "owner").Count(&owners)
+	return owners <= 1
+}
+
+// RemoveMember takes a user out of an organisation and returns who it was. Their
+// account, and anything they added, stays.
+func (s *Store) RemoveMember(org, user int64, actor string) (*User, error) {
+	var u User
+	return &u, s.db.Transaction(func(tx *gorm.DB) error {
+		var m Membership
+		if err := tx.Where("org_id = ? and user_id = ?", org, user).First(&m).Error; err != nil {
+			return errors.New("that person isn't in this organisation")
+		}
+		if m.Role == "owner" && lastOwner(tx, org) {
+			return errLastOwner
+		}
+		if err := tx.First(&u, user).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&m).Error; err != nil {
+			return err
+		}
+		return s.log(tx, org, 0, nil, actor, "member:remove", &u.Email)
+	})
 }
 
 type OrgMembership struct {
