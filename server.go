@@ -193,6 +193,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /logout", a.logout)
 	mux.HandleFunc("GET /{$}", a.member(a.home))
 	mux.HandleFunc("POST /orgs", a.member(a.newOrg))
+	mux.HandleFunc("POST /password", a.member(a.changePassword))
 
 	mux.HandleFunc("GET /o/{org}/{$}", a.member(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, reqOf(r).Base()+"today", http.StatusSeeOther)
@@ -306,6 +307,25 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("content-type", "text/html; charset=utf-8")
 	NoOrgs(q.User).Render(r.Context(), w)
+}
+
+func (a *App) changePassword(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Current string `json:"current"`
+		New     string `json:"new"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	keep := ""
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		keep = c.Value
+	}
+	if err := a.s.ChangePassword(reqOf(r).User, in.Current, in.New, keep); err != nil {
+		fail(w, err, http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]string{"message": "Password changed. Your other sessions are signed out."})
 }
 
 func (a *App) newOrg(w http.ResponseWriter, r *http.Request) {

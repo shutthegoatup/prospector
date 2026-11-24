@@ -141,6 +141,46 @@ func TestLoginSlowsGuessing(t *testing.T) {
 	}
 }
 
+func TestChangePassword(t *testing.T) {
+	s, _, srv, client := signedIn(t)
+	elsewhere, _, err := s.Login("ada@example.com", "correct horse battery")
+	if err != nil {
+		t.Fatal(err)
+	}
+	change := func(current, password string) int {
+		code, _ := call(t, client, "POST", srv.URL+"/password", "application/json", map[string]string{"current": current, "new": password})
+		return code
+	}
+	if code := change("wrong", "a brand new password"); code != http.StatusBadRequest {
+		t.Fatalf("wrong current password: %d", code)
+	}
+	if code := change("correct horse battery", "short"); code != http.StatusBadRequest {
+		t.Fatalf("short password: %d", code)
+	}
+	if code := change("correct horse battery", "a brand new password"); code != http.StatusOK {
+		t.Fatalf("change: %d", code)
+	}
+	if code, _ := call(t, client, "GET", srv.URL+"/o/alpha/settings", "", nil); code != http.StatusOK {
+		t.Fatalf("the session that changed the password was signed out: %d", code)
+	}
+	if _, err := s.SessionUser(elsewhere); err == nil {
+		t.Fatal("another session survived the password change")
+	}
+	if _, _, err := s.Login("ada@example.com", "correct horse battery"); err == nil {
+		t.Fatal("the old password still works")
+	}
+	fresh, _, err := s.Login("ada@example.com", "a brand new password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetPassword("ada@example.com", "set from the command line"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SessionUser(fresh); err == nil {
+		t.Fatal("a session survived a password reset from the CLI")
+	}
+}
+
 func TestTransportHeaders(t *testing.T) {
 	_, _, srv, _ := signedIn(t)
 	get := func(proto string) http.Header {
