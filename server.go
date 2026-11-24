@@ -31,6 +31,45 @@ type App struct {
 	// base is the address people reach the app at, when the operator has said: then
 	// links and the cookie's Secure mark don't depend on what a proxy forwards.
 	base string
+	// How long a request's body may take to arrive, and its answer to be written;
+	// zero means bodyLimit and answerLimit.
+	readLimit, writeLimit time.Duration
+}
+
+const (
+	// bodyLimit lets the largest import through on a slow link and drops a client
+	// that trickles a body in.
+	bodyLimit = 5 * time.Minute
+	// answerLimit drops a client that never reads its answer.
+	answerLimit = 2 * time.Minute
+)
+
+// setDeadlines bounds this request alone. The server has no read or write timeout of
+// its own, because those would also cut an agent's MCP stream, which stays open. A
+// request with no body gets no read deadline: there is nothing to wait for, and on
+// an idle connection an expired one would be taken for the client hanging up.
+func (a *App) setDeadlines(w http.ResponseWriter, r *http.Request) {
+	rc := http.NewResponseController(w)
+	read, write := a.readLimit, a.writeLimit
+	if read == 0 {
+		read = bodyLimit
+	}
+	if write == 0 {
+		write = answerLimit
+	}
+	if r.ContentLength != 0 {
+		rc.SetReadDeadline(time.Now().Add(read))
+	}
+	rc.SetWriteDeadline(time.Now().Add(write))
+}
+
+// streaming lifts the answer deadline for a route whose answer stays open. It sits
+// behind the key check, so only a request that has shown a key is left unbounded.
+func streaming(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.NewResponseController(w).SetWriteDeadline(time.Time{})
+		next.ServeHTTP(w, r)
+	}
 }
 
 // Req is who is asking and in which organisation: a signed-in member, or an API key.
@@ -88,6 +127,8 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 		fail(w, fmt.Errorf("bad request body: %w", err), http.StatusBadRequest)
 		return false
 	}
+	// The answer's clock starts once the body is in, so a slow upload doesn't use it up.
+	http.NewResponseController(w).SetWriteDeadline(time.Now().Add(answerLimit))
 	return true
 }
 
@@ -265,6 +306,7 @@ func (a *App) Routes() http.Handler {
 		}
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		a.setDeadlines(w, r)
 		if wantsPage(r) {
 			page := &problemPage{ResponseWriter: w, r: r}
 			defer page.finish()
