@@ -1037,3 +1037,135 @@ func TestPublicURL(t *testing.T) {
 		t.Fatalf("with no address set, an Origin that doesn't match Host: %d", got)
 	}
 }
+
+func TestProblemsLookLikeTheApp(t *testing.T) {
+	s, o, srv, client := signedIn(t)
+	get := func(c *http.Client, method, path string, headers map[string]string) (int, string, string) {
+		t.Helper()
+		req, _ := http.NewRequest(method, srv.URL+path, strings.NewReader("{}"))
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		res, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		body, _ := io.ReadAll(res.Body)
+		return res.StatusCode, res.Header.Get("Content-Type"), string(body)
+	}
+	browser := map[string]string{"Accept": "text/html,application/xhtml+xml,*/*;q=0.8"}
+	styled := func(body string) bool {
+		return strings.Contains(body, "Back to Prospector") && strings.Contains(body, "/assets/css/output.css")
+	}
+
+	for path, want := range map[string]string{
+		"/o/nope/today":            "Nothing here",
+		"/o/alpha/companies/98765": "Nothing here",
+		"/no/such/page":            "Nothing here",
+		"/o/alpha/research?f=nope": "Unknown filter",
+	} {
+		code, ctype, body := get(client, "GET", path, browser)
+		if code < 400 || !strings.HasPrefix(ctype, "text/html") || !styled(body) || !strings.Contains(body, want) {
+			t.Errorf("GET %s in a browser: %d %s, styled=%v, want %q", path, code, ctype, styled(body), want)
+		}
+	}
+	code, _, body := get(client, "POST", "/login", map[string]string{"Accept": browser["Accept"], "Sec-Fetch-Site": "cross-site", "content-type": "application/x-www-form-urlencoded"})
+	if code != http.StatusForbidden || !styled(body) || !strings.Contains(body, "This request came from another site.") {
+		t.Fatalf("a refused form post in a browser: %d, styled=%v", code, styled(body))
+	}
+	if h := func() http.Header {
+		req, _ := http.NewRequest("GET", srv.URL+"/no/such/page", nil)
+		req.Header.Set("Accept", browser["Accept"])
+		res, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.Header
+	}(); h.Get("Content-Security-Policy") == "" || h.Get("X-Frame-Options") != "DENY" {
+		t.Fatalf("a problem page lacks the security headers: %v", h)
+	}
+
+	// The page script, the CLI and agents read the error as text, so theirs stay plain.
+	for name, c := range map[string]struct {
+		method, path string
+		headers      map[string]string
+	}{
+		"the page script":  {"POST", "/o/alpha/ui/mark", map[string]string{"content-type": "application/json", "Accept": "*/*"}},
+		"a page refresh":   {"GET", "/o/nope/today", map[string]string{"Accept": "text/html", "X-Fragment": "1"}},
+		"no Accept header": {"GET", "/o/nope/today", nil},
+	} {
+		code, ctype, body := get(client, c.method, c.path, c.headers)
+		if code < 400 || !strings.HasPrefix(ctype, "text/plain") || styled(body) {
+			t.Errorf("%s: %d %s, styled=%v", name, code, ctype, styled(body))
+		}
+	}
+	key, _, err := s.CreateKey(o.ID, "bot", []string{"read"}, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, ctype, body := get(http.DefaultClient, "GET", "/o/alpha/api/v1/companies/nope", map[string]string{"Accept": "text/html", "Authorization": "Bearer " + key})
+	if code != http.StatusNotFound || !strings.HasPrefix(ctype, "text/plain") || styled(body) {
+		t.Fatalf("an agent's error: %d %s, styled=%v", code, ctype, styled(body))
+	}
+
+	// What isn't a plain-text error passes through as it was: a redirect, the sign-in
+	// page's own refusal, and a method the route doesn't take keeping its Allow header.
+	stay := &http.Client{Jar: client.Jar, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	redirect, _ := http.NewRequest("GET", srv.URL+"/o/alpha/", nil)
+	redirect.Header.Set("Accept", browser["Accept"])
+	res, err := stay.Do(redirect)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/o/alpha/today" {
+		t.Fatalf("a redirect in a browser: %d to %q", res.StatusCode, res.Header.Get("Location"))
+	}
+	wrong, _ := http.NewRequest("POST", srv.URL+"/login", strings.NewReader("email=ada%40example.com&password=wrong"))
+	wrong.Header.Set("Accept", browser["Accept"])
+	wrong.Header.Set("content-type", "application/x-www-form-urlencoded")
+	res, err = http.DefaultClient.Do(wrong)
+	if err != nil {
+		t.Fatal(err)
+	}
+	form, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != http.StatusUnauthorized || !strings.Contains(string(form), `name="password"`) || styled(string(form)) {
+		t.Fatalf("a wrong password in a browser: %d, the sign-in form again: %v", res.StatusCode, strings.Contains(string(form), `name="password"`))
+	}
+	method, _ := http.NewRequest("DELETE", srv.URL+"/login", nil)
+	method.Header.Set("Accept", browser["Accept"])
+	method.Header.Set("Sec-Fetch-Site", "same-origin")
+	res, err = client.Do(method)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusMethodNotAllowed || res.Header.Get("Allow") == "" {
+		t.Fatalf("a method the route doesn't take: %d, Allow %q", res.StatusCode, res.Header.Get("Allow"))
+	}
+	if _, message := problemText(http.StatusUnauthorized, "an API key is needed: Authorization: Bearer pk_…"); strings.HasSuffix(message, "….") {
+		t.Fatalf("a full stop was added after an ellipsis: %q", message)
+	}
+
+	// A proxy's Basic sign-in travels with every request the browser makes, another
+	// site's included, so it doesn't count as a key.
+	basic := map[string]string{"Authorization": "Basic dXNlcjpwYXNz", "Sec-Fetch-Site": "cross-site", "content-type": "application/x-www-form-urlencoded"}
+	if code, _, _ := get(client, "POST", "/logout", basic); code != http.StatusForbidden {
+		t.Fatalf("a cross-site post carrying a proxy's Basic sign-in: %d", code)
+	}
+	basic["Sec-Fetch-Site"] = "same-origin"
+	if code, _, _ := get(client, "POST", "/o/alpha/ui/add", basic); code != http.StatusUnsupportedMediaType {
+		t.Fatalf("a form post carrying a proxy's Basic sign-in skipped the JSON rule: %d", code)
+	}
+
+	// Pages that work are passed through untouched, and a server fault keeps its detail to itself.
+	if code, ctype, body := get(client, "GET", "/o/alpha/today", browser); code != http.StatusOK || !strings.HasPrefix(ctype, "text/html") || styled(body) {
+		t.Fatalf("a working page: %d %s", code, ctype)
+	}
+	if title, message := problemText(http.StatusInternalServerError, "pq: relation \"contacts\" does not exist"); title != "Something went wrong" || strings.Contains(message, "contacts") {
+		t.Fatalf("a server fault shows %q %q", title, message)
+	}
+}
