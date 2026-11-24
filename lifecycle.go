@@ -42,13 +42,17 @@ func (c Contact) Touched() bool {
 	return c.EmailSent != nil || c.LinkedinAdded != nil || c.Called != nil
 }
 
-// Open is someone the outreach queues may still show.
+// Open is someone the outreach queues may still show, unless their company is rejected.
 func (c Contact) Open() bool {
 	p := c.Phase()
 	return (p == PhaseNew || p == PhaseOutreach) && !strings.HasPrefix(c.Key, "org:")
 }
 
 const openContacts = "hold is null and replied is null and declined is null and status <> 'suggested' and key not like 'org:%'"
+
+// A rejected company's people leave the queues without being marked, so qualifying
+// it again brings them back as they were.
+const companyNotRejected = "(company_id is null or company_id not in (select id from companies where stage = '" + CompanyRejected + "'))"
 
 const inConversation = "replied is not null and declined is null and status <> 'suggested'"
 
