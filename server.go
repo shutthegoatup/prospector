@@ -476,6 +476,11 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/o/"+q.Orgs[0].Slug+"/today", http.StatusSeeOther)
 		return
 	}
+	// A session an organisation's provider began, whose day has run out, opens nothing.
+	if q.Session.Limited {
+		http.Redirect(w, r, "/login/sso?"+url.Values{"email": {q.User.Email}}.Encode(), http.StatusSeeOther)
+		return
+	}
 	w.Header().Set("content-type", "text/html; charset=utf-8")
 	NoOrgs(q.User).Render(r.Context(), w)
 }

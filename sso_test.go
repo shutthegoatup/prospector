@@ -41,6 +41,8 @@ type fakeIdP struct {
 	userinfo map[string]any
 	grants   map[string]url.Values
 	nonce    string
+	// asked counts calls to the token endpoint.
+	asked int
 }
 
 func newIdP(t *testing.T, tenant string, plain bool) *fakeIdP {
@@ -67,6 +69,7 @@ func newIdP(t *testing.T, tenant string, plain bool) *fakeIdP {
 	mux.HandleFunc("POST /token", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		p.mu.Lock()
+		p.asked++
 		asked, ok := p.grants[r.PostForm.Get("code")]
 		delete(p.grants, r.PostForm.Get("code"))
 		p.mu.Unlock()
@@ -160,7 +163,7 @@ func (p *fakeIdP) approve(sentTo string) url.Values {
 }
 
 func (p *fakeIdP) way(key string) socialWay {
-	return socialWay{Key: key, Label: key, Issuer: p.srv.URL, ClientID: "client", Secret: "secret", Plain: p.plain}
+	return socialWay{Key: key, Label: key, Issuer: p.srv.URL, ClientID: "client", Secret: "secret", Plain: p.plain, ManyTenants: p.tenant != ""}
 }
 
 // ssoServer is the app at a known address, reaching the fake providers and a fake DNS.
@@ -221,6 +224,10 @@ func (b *browser) login(email, password string) {
 // through walks a sign-in from its first link, through the provider and back.
 func (b *browser) through(p *fakeIdP, start string) (code int, body, location string) {
 	b.t.Helper()
+	if strings.HasPrefix(start, "/login/sso/start") {
+		// The link is followed from the page that offers it.
+		b.get("/login/sso")
+	}
 	code, body, location = b.get(start)
 	if code != http.StatusSeeOther || !strings.HasPrefix(location, p.srv.URL+"/authorize") {
 		return code, body, location
@@ -341,6 +348,17 @@ func TestSocialSignIn(t *testing.T) {
 		refused("an ID token issued for another sign-in", b, start(b))
 		google.nonce = ""
 
+		// A cookie made up elsewhere can't make the server go to the provider with it.
+		b = newBrowser(t, srv.URL)
+		made, _ := json.Marshal(attempt{State: "made-up", Verifier: "v", Nonce: "n", Way: "google"})
+		home, _ := url.Parse(srv.URL)
+		b.c.Jar.SetCookies(home, []*http.Cookie{{Name: attemptCookie, Value: base64.RawURLEncoding.EncodeToString(made), Path: "/login"}})
+		before := google.asked
+		refused("an attempt cookie this server didn't write", b, url.Values{"state": {"made-up"}, "code": {"x"}, "iss": {google.issuer()}})
+		if google.asked != before {
+			t.Error("a made-up attempt reached the provider's token endpoint")
+		}
+
 		// An answer is taken once.
 		b = newBrowser(t, srv.URL)
 		answer = start(b)
@@ -455,9 +473,21 @@ func TestOrganisationSingleSignOn(t *testing.T) {
 	if _, body, _ := b.get("/login/sso?email=bob@elsewhere.example"); strings.Contains(body, "Continue to") {
 		t.Fatal("an organisation was offered to an address at no domain of its own")
 	}
-	// Nobody is sent to an owner's chosen provider on a link alone.
 	if code, _, location := b.get("/login/sso/start?org=alpha&email=bob@elsewhere.example"); code != http.StatusBadRequest || location != "" {
 		t.Fatalf("starting for an address the organisation doesn't speak for: %d %q", code, location)
+	}
+	// Nobody is sent to an owner's chosen provider, and into the account it names, on a
+	// link alone: a browser that hasn't seen the page is shown it first.
+	if code, _, location := newBrowser(t, srv.URL).get(start); code != http.StatusSeeOther || !strings.HasPrefix(location, "/login/sso?") {
+		t.Fatalf("the link to the provider, followed from somewhere else: %d %q", code, location)
+	}
+	res, err := http.Get(srv.URL + "/login/sso")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if cookies := res.Cookies(); len(cookies) != 1 || cookies[0].SameSite != http.SameSiteStrictMode || !cookies[0].HttpOnly {
+		t.Fatalf("the mark that the page was seen must not travel with a link from another site: %+v", cookies)
 	}
 
 	// The provider may speak only for the organisation's own domains.
@@ -748,6 +778,23 @@ func TestSingleSignOnSettings(t *testing.T) {
 	if sso, _ := s.SSO(alpha.ID); sso.ClientSecret != "s3cret-value" || sso.Required {
 		t.Fatalf("after saving again: %+v", sso.SSOConnection)
 	}
+	// The kept secret was typed for this provider and client, and is sent to no other.
+	other := newIdP(t, "", false)
+	for what, in := range map[string]map[string]any{
+		"another client": {"issuer": okta.srv.URL, "client_id": "another"},
+		"another issuer": {"issuer": other.srv.URL, "client_id": "client"},
+	} {
+		if code, body := owner.post("/o/alpha/ui/sso", in); code != http.StatusBadRequest || !strings.Contains(body, "secret again") {
+			t.Errorf("the kept secret with %s: %d %s", what, code, body)
+		}
+	}
+	// A provider that signs in every tenant under one registration pins nobody to this organisation.
+	if code, body := owner.post("/o/alpha/ui/sso", with("issuer", newIdP(t, "any-tenant", false).srv.URL)); code != http.StatusBadRequest || !strings.Contains(body, "every tenant") {
+		t.Errorf("an issuer for every tenant, at an address of its own: %d %s", code, body)
+	}
+	if sso, _ := s.SSO(alpha.ID); sso.Issuer != okta.srv.URL || sso.ClientID != "client" {
+		t.Fatalf("a refused change was saved: %+v", sso.SSOConnection)
+	}
 	_, page, _ := owner.get("/o/alpha/settings")
 	if !strings.Contains(page, srv.URL+"/login/callback") || !strings.Contains(page, "Kept. Type a new one") {
 		t.Fatal("Settings doesn't show the redirect URI to register, or that the secret is kept")
@@ -866,6 +913,40 @@ func TestSessionsSurviveTheSingleSignOnColumns(t *testing.T) {
 	}
 	if sess, _, _ = s.SessionFor(token); !sess.Proves(7) || !sess.Proves(71) || sess.Proves(1) || sess.Limited {
 		t.Fatalf("proofs added to a session: %+v", sess)
+	}
+}
+
+func TestSingleSignOnIsAskedAgainAfterADay(t *testing.T) {
+	sess := &Session{Limited: true}
+	sess.prove(3, time.Now().Add(-proofLife-time.Minute))
+	sess.prove(7, time.Now().Add(-time.Hour))
+	if sess.Proves(3) || sess.Opens(3) {
+		t.Fatal("going through the provider more than a day ago still counts")
+	}
+	if !sess.Proves(7) || !sess.Opens(7) {
+		t.Fatal("going through the provider an hour ago doesn't count")
+	}
+	sess.prove(3, time.Now())
+	if !sess.Proves(3) || !sess.Proves(7) {
+		t.Fatalf("going through it again: %q", sess.SSOOrgs)
+	}
+}
+
+func TestAnAccountWithNoPasswordIsRefusedAsSlowlyAsAnyOther(t *testing.T) {
+	s := tempStore(t)
+	if err := s.db.Create(&User{Email: "dan@example.com", Name: "Dan Okafor", PasswordHash: unusableHash()}).Error; err != nil {
+		t.Fatal(err)
+	}
+	timed := func(email string) time.Duration {
+		start := time.Now()
+		if _, _, err := s.Login(email, "a guess at it"); err != errWrongLogin {
+			t.Fatalf("signing in as %s: %v", email, err)
+		}
+		return time.Since(start)
+	}
+	// Otherwise the time taken says which addresses sign in through a provider.
+	if unknown, none := timed("nobody@example.com"), timed("dan@example.com"); none < unknown/4 {
+		t.Fatalf("an account with no password was refused in %v, an unknown address in %v", none, unknown)
 	}
 }
 

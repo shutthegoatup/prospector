@@ -104,14 +104,15 @@ Whoever runs the server registers an app with the provider and sets its `PROSPEC
 An owner sets this up in Settings, for Okta, Entra ID, Google Workspace or any other OpenID Connect provider:
 
 1. **Add the email domains that are yours** and prove each with the DNS TXT record Settings shows. The provider is believed only for addresses at a verified domain, matched whole.
-2. **Enter the issuer, client ID and client secret.** The issuer is read before anything is saved. The secret is kept in the database and never shown again.
+2. **Enter the issuer, client ID and client secret.** The issuer is read before anything is saved. The secret is kept in the database and never shown again; it has to be typed again when the issuer or client ID changes.
 3. Optionally **require it**: members at your domains can no longer open the organisation on a password. Owners still can, so a broken provider can be put right, and so can members at other domains, whom your provider couldn't sign in. API keys are unaffected. If no owner can get in, `prospector sso off <org>` stops requiring it.
 4. Optionally **let people join**: anyone at your domains becomes a member, never an owner, the first time they sign in. Without this, the provider signs in only people an owner has already added.
 
 People start from "Use your organisation's single sign-on" on the sign-in page and give their work address.
 
 - A session that began at an organisation's provider opens that organisation only, since the provider vouches for nothing else. Someone already signed in who goes through it keeps their session.
-- With Google as the provider, the account must also be in a Workspace for that domain (`hd`). Microsoft's sign-in for every tenant (`/common`) is refused as an issuer: use your own tenant's.
+- Going through the provider counts for a day, then it is asked again. Someone the provider has turned away is out within that day; to end it sooner, remove them from the team.
+- With Google as the provider, the account must also be in a Workspace for that domain (`hd`). An issuer that signs in every tenant under one registration, such as Microsoft's `/common`, is refused: use your own tenant's.
 - An issuer must be `https` at a public address; one inside the server's network is never contacted.
 - Someone invited with a first password who arrives through a provider instead isn't asked to change it: that password stops working.
 - Each change to the connection, and each person who joins through it, is recorded in the organisation's events with who and when. SAML and SCIM aren't supported.

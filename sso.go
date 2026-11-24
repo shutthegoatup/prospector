@@ -238,13 +238,17 @@ func (s *Store) SSOUser(org *Org, c *SSO, who *outsider, email string) (*User, e
 // socialWay is a sign-in the whole deployment offers, registered once by whoever runs it.
 type socialWay struct {
 	Key, Label, Issuer string
-	Plain              bool
+	Plain, ManyTenants bool
 	ClientID, Secret   string
+}
+
+func (way socialWay) spec() idpSpec {
+	return idpSpec{Issuer: way.Issuer, ClientID: way.ClientID, Secret: way.Secret, Plain: way.Plain, ManyTenants: way.ManyTenants}
 }
 
 var socialWays = []socialWay{
 	{Key: "google", Label: "Google", Issuer: googleIssuer},
-	{Key: "microsoft", Label: "Microsoft", Issuer: "https://login.microsoftonline.com/common/v2.0"},
+	{Key: "microsoft", Label: "Microsoft", Issuer: "https://login.microsoftonline.com/common/v2.0", ManyTenants: true},
 	{Key: "linkedin", Label: "LinkedIn", Issuer: "https://www.linkedin.com/oauth", Plain: true},
 }
 
@@ -290,7 +294,7 @@ func (a *App) loginWith(w http.ResponseWriter, r *http.Request) {
 		if way.Key != r.PathValue("way") {
 			continue
 		}
-		p, err := a.idp(r.Context(), idpSpec{Issuer: way.Issuer, ClientID: way.ClientID, Secret: way.Secret, Plain: way.Plain})
+		p, err := a.idp(r.Context(), way.spec())
 		if err != nil {
 			log.Printf("sign-in with %s: %v", way.Key, err)
 			a.signInProblem(w, r, next, http.StatusBadGateway, way.Label+" couldn't be reached. Try again, or sign in another way.")
@@ -336,20 +340,32 @@ func (a *App) ssoPage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	http.SetCookie(w, &http.Cookie{Name: askedCookie, Value: "1", Path: "/login/sso", MaxAge: 600, HttpOnly: true,
+		Secure: a.secure(r), SameSite: http.SameSiteStrictMode})
 	w.Header().Set("content-type", "text/html; charset=utf-8")
 	if err := SSOPage(v).Render(r.Context(), w); err != nil {
 		log.Print(err)
 	}
 }
 
+// askedCookie marks a browser that has seen the single sign-on page. It is Strict, so
+// it travels with a click on that page and not with a link from another site: nobody
+// can be walked through a provider of somebody else's choosing, and into the account
+// it names, by a link alone.
+const askedCookie = "sso-asked"
+
 func ssoStartURL(org *Org, email, next string) string {
 	return "/login/sso/start?" + url.Values{"org": {org.Slug}, "email": {email}, "next": {next}}.Encode()
 }
 
-// ssoStart sends somebody to an organisation's provider, and only for an address that
-// provider may speak for: nobody is sent to a page an owner chose on a link alone.
+// ssoStart sends somebody to an organisation's provider, only from the page that
+// offered it and only for an address that provider may speak for.
 func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
+	if _, err := r.Cookie(askedCookie); err != nil {
+		http.Redirect(w, r, "/login/sso?"+url.Values{"email": {query.Get("email")}, "next": {query.Get("next")}}.Encode(), http.StatusSeeOther)
+		return
+	}
 	email := strings.ToLower(strings.TrimSpace(query.Get("email")))
 	org, err := a.s.OrgBySlug(query.Get("org"))
 	var sso *SSO
@@ -393,7 +409,7 @@ func (a *App) loginCallback(w http.ResponseWriter, r *http.Request) {
 		if way.Key != att.Way {
 			continue
 		}
-		p, err := a.idp(r.Context(), idpSpec{Issuer: way.Issuer, ClientID: way.ClientID, Secret: way.Secret, Plain: way.Plain})
+		p, err := a.idp(r.Context(), way.spec())
 		if err != nil {
 			refuse(err)
 			return
@@ -501,8 +517,13 @@ func (a *App) ssoRequired(org *Org, u *User, m *Membership, sess *Session) bool 
 	if m.Role == "owner" || sess.Proves(org.ID) {
 		return false
 	}
+	// Most organisations require nothing, which one read of the connection settles.
+	var c SSOConnection
+	if err := a.s.db.Where("org_id = ?", org.ID).Limit(1).Find(&c).Error; err != nil || !c.Required {
+		return false
+	}
 	sso, err := a.s.SSO(org.ID)
-	return err == nil && sso.On() && sso.Required && sso.Proves(u.Email)
+	return err == nil && sso.On() && sso.Proves(u.Email)
 }
 
 var domainRe = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
@@ -543,7 +564,8 @@ func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
 		done(w, a.s.SaveSSO(&SSOConnection{OrgID: q.Org.ID}, q.Actor()))
 		return
 	}
-	if c.ClientSecret == "" {
+	// The kept secret belongs to the provider and client it was typed for, and goes to no other.
+	if c.ClientSecret == "" && c.Issuer == sso.Issuer && c.ClientID == sso.ClientID {
 		c.ClientSecret = sso.ClientSecret
 	}
 	verified := false
@@ -554,7 +576,7 @@ func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
 	case a.base == "":
 		err = errors.New("single sign-on needs PROSPECTOR_URL set to this app's address, so the provider knows where to send people back")
 	case c.ClientID == "" || c.ClientSecret == "":
-		err = errors.New("the provider's client ID and client secret are both needed")
+		err = errors.New("the provider's client ID and client secret are both needed, and the secret again when the issuer or client ID changes")
 	case (c.Required || c.AutoJoin) && !verified:
 		err = errors.New("verify a domain first: requiring single sign-on, or letting people join, applies to addresses at your verified domains")
 	default:
@@ -562,7 +584,9 @@ func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
 	}
 	if err == nil {
 		// Reading the provider now catches a mistyped issuer before anyone is sent to it.
-		if _, derr := a.idp(r.Context(), idpSpec{Issuer: c.Issuer, ClientID: c.ClientID, Secret: c.ClientSecret}); derr != nil {
+		if _, derr := a.probe(r.Context(), idpSpec{Issuer: c.Issuer, ClientID: c.ClientID, Secret: c.ClientSecret}); errors.Is(derr, errManyTenants) {
+			err = derr
+		} else if derr != nil {
 			err = fmt.Errorf("that issuer couldn't be read, so nothing was saved: %w", derr)
 		}
 	}

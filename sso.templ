@@ -53,7 +53,7 @@ templ SSOSettings(q *Req, d SettingsData) {
 					<input name="client_id" value={ d.SSO.ClientID } autocomplete="off" class={ fieldClass }/>
 				}
 				@Row("Client secret") {
-					<input name="client_secret" type="password" autocomplete="off" placeholder={ secretHint(d.SSO) } class={ fieldClass }/>
+					<input name="client_secret" type="password" autocomplete="new-password" placeholder={ secretHint(d.SSO) } class={ fieldClass }/>
 				}
 				@Row("Redirect URI") {
 					<code class="select-all break-all pt-2 font-mono text-xs">{ d.Callback }</code>

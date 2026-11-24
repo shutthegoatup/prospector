@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -272,6 +273,11 @@ func (s *Store) Login(email, password string) (string, *User, error) {
 		bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
 		return "", nil, errWrongLogin
 	}
+	// An account with no password takes as long to refuse as any other.
+	if !u.HasPassword() {
+		bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
+		return "", nil, errWrongLogin
+	}
 	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
 		return "", nil, errWrongLogin
 	}
@@ -285,27 +291,48 @@ func (s *Store) NewSession(user, ssoOrg int64) (string, error) {
 	token := randomToken(32)
 	sess := &Session{TokenHash: hashToken(token), UserID: user, ExpiresAt: time.Now().Add(sessionLife)}
 	if ssoOrg != 0 {
-		sess.Limited, sess.SSOOrgs = true, fmt.Sprintf(",%d,", ssoOrg)
+		sess.Limited = true
+		sess.prove(ssoOrg, time.Now())
 	}
 	return token, s.db.Create(sess).Error
 }
 
-func (sess *Session) Proves(org int64) bool {
-	return strings.Contains(sess.SSOOrgs, fmt.Sprintf(",%d,", org))
+// proofLife is how long going through an organisation's provider counts for. After it
+// the provider is asked again, so somebody it has since turned away is out within a day.
+const proofLife = 24 * time.Hour
+
+// proofs reads SSOOrgs: each organisation with when its proof runs out, as ",3:1795600000,".
+func (sess *Session) proofs() map[int64]int64 {
+	out := map[int64]int64{}
+	for _, part := range strings.Split(sess.SSOOrgs, ",") {
+		org, until, ok := strings.Cut(part, ":")
+		o, err1 := strconv.ParseInt(org, 10, 64)
+		u, err2 := strconv.ParseInt(until, 10, 64)
+		if ok && err1 == nil && err2 == nil {
+			out[o] = u
+		}
+	}
+	return out
 }
+
+func (sess *Session) prove(org int64, now time.Time) {
+	proofs := sess.proofs()
+	proofs[org] = now.Add(proofLife).Unix()
+	sess.SSOOrgs = ","
+	for o, until := range proofs {
+		if until > now.Unix() {
+			sess.SSOOrgs += fmt.Sprintf("%d:%d,", o, until)
+		}
+	}
+}
+
+func (sess *Session) Proves(org int64) bool { return sess.proofs()[org] > time.Now().Unix() }
 
 func (sess *Session) Opens(org int64) bool { return !sess.Limited || sess.Proves(org) }
 
 // AddProof records that a session already open has now been through org's own sign-in too.
 func (s *Store) AddProof(sess *Session, org int64) error {
-	if sess.Proves(org) {
-		return nil
-	}
-	orgs := sess.SSOOrgs
-	if orgs == "" {
-		orgs = ","
-	}
-	sess.SSOOrgs = orgs + fmt.Sprintf("%d,", org)
+	sess.prove(org, time.Now())
 	return s.db.Model(sess).Update("sso_orgs", sess.SSOOrgs).Error
 }
 

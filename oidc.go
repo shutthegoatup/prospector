@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,7 +41,12 @@ type idpSpec struct {
 	// Plain is LinkedIn: it documents neither PKCE nor a nonce, wants the secret in the
 	// form, and says whether the email is verified only at its userinfo endpoint.
 	Plain bool
+	// ManyTenants allows an issuer that serves every tenant under one registration.
+	// Only Microsoft's social sign-in is one: an organisation's own must pin its tenant.
+	ManyTenants bool
 }
+
+var errManyTenants = errors.New("that issuer signs in every tenant under one registration, so it pins nobody to yours: use your own tenant's issuer")
 
 type idp struct {
 	spec        idpSpec
@@ -51,14 +59,18 @@ type idp struct {
 }
 
 func discover(ctx context.Context, client *http.Client, spec idpSpec) (*idp, error) {
-	// The key set keeps fetching through this context for as long as the provider is used.
-	ctx = oidc.ClientContext(context.WithoutCancel(ctx), client)
 	template, err := discoveredIssuer(ctx, client, spec.Issuer)
 	if err != nil {
 		return nil, err
 	}
+	// The key set keeps fetching through this context for as long as the provider is
+	// used, so it mustn't be one request's.
+	ctx = oidc.ClientContext(context.Background(), client)
 	tenanted := ""
 	if strings.Contains(template, tenantPlaceholder) {
+		if !spec.ManyTenants {
+			return nil, errManyTenants
+		}
 		// The template is accepted here, and every token's issuer is checked against it in finish.
 		tenanted = template
 		ctx = oidc.InsecureIssuerURLContext(ctx, template)
@@ -123,14 +135,26 @@ type attempt struct {
 
 const attemptCookie = "signin"
 
+// attemptKey signs the attempt cookie, so a callback nobody started here can't make
+// the server call a provider. It lasts as long as the process: a restart only costs
+// the sign-ins in flight.
+var attemptKey = []byte(randomToken(32))
+
+func attemptMAC(value string) string {
+	mac := hmac.New(sha256.New, attemptKey)
+	mac.Write([]byte(value))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
 func (a *App) beginAttempt(w http.ResponseWriter, r *http.Request, p *idp, att attempt, options ...oauth2.AuthCodeOption) {
 	att.State, att.Verifier, att.Nonce = randomToken(32), oauth2.GenerateVerifier(), randomToken(32)
 	if len(att.Next) > 512 {
 		att.Next = ""
 	}
 	raw, _ := json.Marshal(att)
+	value := base64.RawURLEncoding.EncodeToString(raw)
 	// Lax, because the answer is a top-level navigation from the provider's site.
-	http.SetCookie(w, &http.Cookie{Name: attemptCookie, Value: base64.RawURLEncoding.EncodeToString(raw), Path: "/login",
+	http.SetCookie(w, &http.Cookie{Name: attemptCookie, Value: value + "." + attemptMAC(value), Path: "/login",
 		MaxAge: 600, HttpOnly: true, Secure: a.secure(r), SameSite: http.SameSiteLaxMode})
 	if !p.spec.Plain {
 		options = append(options, oauth2.S256ChallengeOption(att.Verifier), oidc.Nonce(att.Nonce))
@@ -146,7 +170,11 @@ func resumeAttempt(w http.ResponseWriter, r *http.Request) (attempt, error) {
 	if err != nil {
 		return att, errNotStartedHere
 	}
-	raw, err := base64.RawURLEncoding.DecodeString(c.Value)
+	value, mac, _ := strings.Cut(c.Value, ".")
+	if !hmac.Equal([]byte(mac), []byte(attemptMAC(value))) {
+		return att, errNotStartedHere
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(value)
 	if err != nil || json.Unmarshal(raw, &att) != nil || att.State == "" || att.Way == "" {
 		return att, errNotStartedHere
 	}
@@ -262,33 +290,55 @@ func (p *idp) ofTemplate(issuer string) bool {
 // so the server starts whether or not a provider can be reached.
 type idpCache struct {
 	mu sync.Mutex
-	m  map[string]*idp
+	m  map[string]*idpEntry
 }
 
-func (a *App) idp(ctx context.Context, spec idpSpec) (*idp, error) {
-	spec.Redirect = a.base + "/login/callback"
-	key := hashToken(strings.Join([]string{spec.Issuer, spec.ClientID, spec.Secret, spec.Redirect}, "\x00"))
-	a.idps.mu.Lock()
-	p := a.idps.m[key]
-	a.idps.mu.Unlock()
-	if p != nil {
-		return p, nil
-	}
+// idpEntry is one provider being discovered, or done. Its lock makes those asking at
+// once wait for one discovery, and a failure is remembered for retryAfter, so sign-in
+// links nobody need be signed in to follow can't be made to hammer a provider.
+type idpEntry struct {
+	mu     sync.Mutex
+	p      *idp
+	err    error
+	failed time.Time
+}
+
+const retryAfter = 30 * time.Second
+
+// probe reads a provider without remembering it: for a connection not yet saved.
+func (a *App) probe(ctx context.Context, spec idpSpec) (*idp, error) {
+	spec.Redirect = a.callbackURL()
 	client := a.outbound
 	if client == nil {
 		client = guardedClient
 	}
-	p, err := discover(ctx, client, spec)
-	if err != nil {
-		return nil, err
-	}
+	return discover(ctx, client, spec)
+}
+
+func (a *App) idp(ctx context.Context, spec idpSpec) (*idp, error) {
+	key := hashToken(strings.Join([]string{spec.Issuer, spec.ClientID, spec.Secret, a.callbackURL()}, "\x00"))
 	a.idps.mu.Lock()
-	defer a.idps.mu.Unlock()
 	if a.idps.m == nil {
-		a.idps.m = map[string]*idp{}
+		a.idps.m = map[string]*idpEntry{}
 	}
-	a.idps.m[key] = p
-	return p, nil
+	e := a.idps.m[key]
+	if e == nil {
+		e = &idpEntry{}
+		a.idps.m[key] = e
+	}
+	a.idps.mu.Unlock()
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.p != nil {
+		return e.p, nil
+	}
+	if e.err != nil && time.Since(e.failed) < retryAfter {
+		return nil, e.err
+	}
+	e.p, e.err = a.probe(ctx, spec)
+	e.failed = time.Now()
+	return e.p, e.err
 }
 
 // notPublic is address space no sign-in provider lives in: this host, private

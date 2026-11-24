@@ -71,8 +71,8 @@ type Session struct {
 	TokenHash string `gorm:"uniqueIndex;not null"`
 	UserID    int64  `gorm:"index"`
 	ExpiresAt time.Time
-	// SSOOrgs are the organisations whose own sign-in this session has been through,
-	// as ",3,7,". A Limited session began at one and opens nothing else.
+	// SSOOrgs are the organisations whose own sign-in this session has been through
+	// (see proofs). A Limited session began at one and opens nothing else.
 	SSOOrgs string `gorm:"not null;default:''"`
 	Limited bool   `gorm:"not null;default:false"`
 }
