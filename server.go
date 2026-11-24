@@ -265,6 +265,18 @@ func (a *App) Routes() http.Handler {
 		}
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if wantsPage(r) {
+			page := &problemPage{ResponseWriter: w, r: r}
+			defer page.finish()
+			w = page
+		}
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "same-origin")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Content-Security-Policy", contentPolicy)
+		if a.secure(r) {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+		}
 		// A browser says where a request came from. One from another site is refused, which
 		// also covers the sign-in and sign-out forms that the JSON rule below can't. Agents
 		// and the CLI send neither header and carry a key, so they pass.
@@ -280,13 +292,6 @@ func (a *App) Routes() http.Handler {
 			r.Header.Get("Authorization") == "" && !strings.HasPrefix(r.Header.Get("content-type"), "application/json") {
 			http.Error(w, "POST bodies must be application/json", http.StatusUnsupportedMediaType)
 			return
-		}
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Referrer-Policy", "same-origin")
-		w.Header().Set("X-Frame-Options", "DENY")
-		w.Header().Set("Content-Security-Policy", contentPolicy)
-		if a.secure(r) {
-			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		}
 		mux.ServeHTTP(w, r)
 	})
