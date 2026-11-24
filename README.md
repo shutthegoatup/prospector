@@ -77,7 +77,7 @@ prospector serve                                          # http://127.0.0.1:876
 - Put it behind HTTPS. Copy to clipboard needs a secure page, and the session cookie is marked Secure on HTTPS. Set `PROSPECTOR_URL` to the `https://` address so the cookie is always marked Secure; without it, that depends on the proxy sending `X-Forwarded-Proto: https`.
 - Pages carry a Content-Security-Policy that allows only what the app itself serves. The typefaces are bundled, so a visitor's browser contacts no other site.
 - A request's body has five minutes to arrive and its answer two minutes to be read, so a stalled client doesn't hold a connection open. An agent's MCP stream, once its key is accepted, stays open.
-- Repeated wrong passwords for one email are slowed, up to a minute between tries.
+- Repeated wrong passwords for one email are slowed, up to a minute between tries. A browser that has signed in to that account before is counted separately, so someone guessing elsewhere can't hold its owner up.
 - An owner adds and removes members in Settings. Removing someone ends their sign-in access to that organisation; their account, and other organisations, are untouched. API keys they created keep working until revoked on the Agents page.
 - Someone added from Settings gets a first password that the person adding them sees; they are made to choose their own the first time they sign in.
 - Members change their own password in Settings, which signs out their other sessions. `prospector user password` signs them out everywhere.

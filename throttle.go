@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 	"sync"
 	"time"
@@ -18,8 +21,9 @@ const (
 )
 
 // loginGuard slows repeated failed sign-ins to one email. It is keyed on the email
-// alone, known or not, because behind a proxy every request shares an address. The
-// cost: someone who keeps guessing at an address keeps its owner waiting too.
+// alone, known or not, because behind a proxy every request shares an address. That
+// would let someone guessing at an address keep its owner waiting too, so a browser
+// that has signed in before is counted on its own (see deviceCookie).
 type loginGuard struct {
 	mu    sync.Mutex
 	fails map[string]*failure
@@ -114,4 +118,38 @@ func (g *loginGuard) dropIdle(now time.Time) {
 			delete(g.fails, key)
 		}
 	}
+}
+
+const (
+	deviceCookie = "device"
+	deviceLife   = 365 * 24 * time.Hour
+)
+
+// A device token is what a browser keeps after signing in: a random value and its
+// MAC under the account's password hash. Only this server can make one, it names
+// nobody, and it stops working when the password changes.
+func newDeviceToken(u *User) string {
+	nonce := randomToken(16)
+	return nonce + "." + deviceMAC(u, nonce)
+}
+
+func deviceMAC(u *User, nonce string) string {
+	mac := hmac.New(sha256.New, []byte(u.PasswordHash))
+	mac.Write([]byte("device\x00" + nonce))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// knownDevice reports whether token was issued to this email's account, and if so
+// the name its attempts are counted under: the email and the device together, so
+// guesses made elsewhere don't hold this browser up, and its own are still slowed.
+func (s *Store) knownDevice(email, token string) (who string, ok bool) {
+	nonce, mac, found := strings.Cut(token, ".")
+	if !found || len(token) > 200 {
+		return "", false
+	}
+	u, err := s.UserByEmail(email)
+	if err != nil || !hmac.Equal([]byte(mac), []byte(deviceMAC(u, nonce))) {
+		return "", false
+	}
+	return u.Email + "\x00" + nonce, true
 }
