@@ -130,6 +130,15 @@ func (s *Store) AddEnquiry(org int64, via string, in EnquiryIn) (*Enquiry, error
 	})
 }
 
+// DeleteEnquiry removes one for good: spam, or a person asking for what they sent to go.
+func (s *Store) DeleteEnquiry(org, id int64) error {
+	res := s.in(org).Where("id = ?", id).Delete(&Enquiry{})
+	if res.Error == nil && res.RowsAffected == 0 {
+		return fmt.Errorf("no enquiry %d", id)
+	}
+	return res.Error
+}
+
 type EnquiryFilter struct {
 	Kind string
 	Spam bool
@@ -223,6 +232,9 @@ func (g *enquiryGuard) allow(key string, limit int) bool {
 		}
 	}
 	c := g.seen[key]
+	if c == nil && len(g.seen) >= maxTracked {
+		return false
+	}
 	if c == nil || now.Sub(c.since) > enquiryWindow {
 		if g.seen == nil {
 			g.seen = map[string]*enquiryCount{}
@@ -286,6 +298,15 @@ func (a *App) intake(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, ok{true})
+}
+
+func (a *App) uiDeleteEnquiry(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID int64 `json:"id"`
+	}
+	if decode(w, r, &in) {
+		done(w, a.s.DeleteEnquiry(reqOf(r).Org.ID, in.ID))
+	}
 }
 
 type EnquiriesData struct {

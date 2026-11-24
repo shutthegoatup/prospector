@@ -249,8 +249,17 @@ func TestEnquiryFromAProduct(t *testing.T) {
 	if theirs, _ := s.Enquiries(other.ID, EnquiryFilter{}); len(theirs) != 0 {
 		t.Error("another organisation sees it")
 	}
+	if err := s.DeleteEnquiry(other.ID, rows[0].ID); err == nil {
+		t.Error("another organisation could delete it")
+	}
 	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/enquiries", "", nil); !strings.Contains(page, "agent · back office") {
 		t.Error("the page doesn't say which key sent it")
+	}
+	if code, body := call(t, client, "POST", srv.URL+"/o/alpha/ui/enquiry/delete", "application/json", map[string]int64{"id": rows[0].ID}); code != http.StatusOK {
+		t.Fatalf("an owner deleting an enquiry: %d %s", code, body)
+	}
+	if left, _ := s.Enquiries(o.ID, EnquiryFilter{}); len(left) != 0 {
+		t.Error("a deleted enquiry is still here")
 	}
 }
 
@@ -272,5 +281,20 @@ func TestEnquirySitesSetting(t *testing.T) {
 	}
 	if res, _ := fromSite(t, "POST", srv.URL+"/o/alpha/intake", "http://localhost:4322", EnquiryIn{Email: "dev@shop.example"}); res.StatusCode != http.StatusOK {
 		t.Errorf("an enquiry from the second site: %d", res.StatusCode)
+	}
+}
+
+func TestEnquiryGuardStaysBounded(t *testing.T) {
+	var g enquiryGuard
+	for i := range maxTracked {
+		if !g.allow(fmt.Sprint("sender ", i), enquiriesPerSender) {
+			t.Fatalf("sender %d was refused", i)
+		}
+	}
+	if g.allow("one more", enquiriesPerSender) || len(g.seen) != maxTracked {
+		t.Errorf("the guard tracks %d senders, past its limit of %d", len(g.seen), maxTracked)
+	}
+	if !g.allow("sender 0", enquiriesPerSender) {
+		t.Error("a sender already tracked was refused")
 	}
 }

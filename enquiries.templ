@@ -1,6 +1,9 @@
 package main
 
-import "strconv"
+import (
+	"github.com/shutthegoatup/prospector/components/button"
+	"strconv"
+)
 
 func enquiryState(kind string) string {
 	switch kind {
@@ -61,9 +64,14 @@ templ EnquiriesView(q *Req, d EnquiriesData) {
 						<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(*e.CompanyID, 10)) } class="font-mono text-xs text-mark underline">{ d.Companies[*e.CompanyID] }</a>
 					}
 				</div>
-				if e.Page != "" {
+				<div class="flex flex-wrap items-center justify-between gap-2">
 					@Meta(e.Page)
-				}
+					if q.Owner() {
+						@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/enquiry/delete", "data-body": jsonBody("id", e.ID), "data-confirm": "Delete this enquiry from " + e.Email + " for good?"}}) {
+							Delete
+						}
+					}
+				</div>
 			</article>
 		}
 	</div>

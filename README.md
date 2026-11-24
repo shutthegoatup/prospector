@@ -134,7 +134,7 @@ curl https://<host>/o/<slug>/api/v1/enquiries -H "Authorization: Bearer $PROSPEC
   -d '{"kind":"signup","name":"Hannah Pryce","email":"hannah@quay.example","company":"Quay Marine","site":"app"}'
 ```
 
-Erasing a person also deletes their enquiries.
+Erasing a person also deletes their enquiries, and an owner can delete any single enquiry from the Enquiries page.
 
 ## Importing drafts from markdown
 
