@@ -13,6 +13,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const sessionLife = 30 * 24 * time.Hour
@@ -135,7 +136,13 @@ var errLastOwner = errors.New("an organisation needs an owner: make someone else
 
 // AddMember adds a user to an organisation, or changes the role of one already in it.
 func (s *Store) AddMember(org, user int64, role, callerName string) error {
+	if role != "owner" && role != "member" {
+		return fmt.Errorf("a role is owner or member, not %q", role)
+	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockOrg(tx, org); err != nil {
+			return err
+		}
 		var m Membership
 		err := tx.Where("org_id = ? and user_id = ?", org, user).First(&m).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -151,6 +158,12 @@ func (s *Store) AddMember(org, user int64, role, callerName string) error {
 	})
 }
 
+// lockOrg makes changes to one organisation's members take turns, so two owners
+// removing each other at the same moment can't both count the other as remaining.
+func lockOrg(tx *gorm.DB, org int64) error {
+	return tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&Org{}, org).Error
+}
+
 func lastOwner(tx *gorm.DB, org int64) bool {
 	var owners int64
 	tx.Model(&Membership{}).Where("org_id = ? and role = ?", org, "owner").Count(&owners)
@@ -162,9 +175,14 @@ func lastOwner(tx *gorm.DB, org int64) bool {
 func (s *Store) RemoveMember(org, user int64, actor string) (*User, error) {
 	var u User
 	return &u, s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockOrg(tx, org); err != nil {
+			return err
+		}
 		var m Membership
-		if err := tx.Where("org_id = ? and user_id = ?", org, user).First(&m).Error; err != nil {
+		if err := tx.Where("org_id = ? and user_id = ?", org, user).First(&m).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.New("that person isn't in this organisation")
+		} else if err != nil {
+			return err
 		}
 		if m.Role == "owner" && lastOwner(tx, org) {
 			return errLastOwner

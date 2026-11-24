@@ -460,4 +460,19 @@ func TestRemoveMember(t *testing.T) {
 	if code, _ := call(t, ada, "GET", srv.URL+"/o/alpha/today", "", nil); code != http.StatusNotFound {
 		t.Fatalf("an owner who left still reaches the organisation: %d", code)
 	}
+	carol, _ := s.UserByEmail("carol@example.com")
+	if m, err := s.Membership(o.ID, carol.ID); err != nil || m.Role != "owner" {
+		t.Fatalf("the remaining owner is now %+v %v", m, err)
+	}
+	if _, err := s.RemoveMember(o.ID, carol.ID, "test"); err == nil {
+		t.Fatal("the organisation was left with no owner")
+	}
+	if err := s.AddMember(o.ID, carol.ID, "", carol.Name); err == nil {
+		t.Fatal("an empty role was accepted")
+	}
+	var removals int64
+	s.in(o.ID).Model(&Event{}).Where("action = ?", "member:remove").Count(&removals)
+	if removals != 2 {
+		t.Fatalf("%d removals in the history, want 2", removals)
+	}
 }

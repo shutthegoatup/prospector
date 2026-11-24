@@ -1513,7 +1513,7 @@ func removeConfirm(q *Req, m Member) string {
 	if m.UserID == q.User.ID {
 		return "Leave " + q.Org.Name + "? You lose access to it."
 	}
-	return "Remove " + m.Email + " from " + q.Org.Name + "? They lose access to it; their account and what they added stay."
+	return "Remove " + m.Email + " from " + q.Org.Name + "? They lose access to it; their account and what they added stay, and so do any API keys they made."
 }
 
 func ownerHint(q *Req) string {
