@@ -1,26 +1,58 @@
 # Prospector
 
-A self-hosted, account-based prospecting workbench for small teams selling to a few hundred named accounts.
+**A self-hosted, account-based prospecting workbench for small teams selling to a few hundred named accounts.**
 
 People and agents research companies, keeping a source link for every fact. People then work one daily queue across LinkedIn, email and phone, from first touch to deal. Agents research and draft over MCP; only people send.
 
 One binary, one database (SQLite or Postgres), several organisations per login.
 
+[![CI](https://github.com/shutthegoatup/prospector/actions/workflows/ci.yml/badge.svg)](https://github.com/shutthegoatup/prospector/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/shutthegoatup/prospector)](https://github.com/shutthegoatup/prospector/releases/latest)
+
+![Today: everything due, best first, with a "Do now" list beside it](docs/images/today.png)
+
+<sub>Screenshots use invented companies and people.</sub>
+
 ## What it does
 
-- **Today:** everything due, best first:
-  1. conversations needing a next step;
-  2. calls where it's office hours for the contact (from their phone number's time zone);
-  3. LinkedIn messages, emails and follow-ups;
-  4. LinkedIn adds.
+### Today: one queue, best first
 
-  On LinkedIn adds, `o` opens the profile and copies the note, `a` marks it added and `s` skips it.
-- **Research:** companies found by agents, imports and people, with facts and their sources, waiting to be qualified or rejected. "Pick" moves a suggested person into outreach with a note from your template.
-- **Conversations:** a board of replies: replied, meeting, proposal, won, lost. Each needs a next step with a date.
+Everything due, in this order:
+1. conversations needing a next step;
+2. calls where it's office hours for the contact, from their phone number's time zone;
+3. LinkedIn messages, emails and follow-ups;
+4. LinkedIn adds.
+
+The side panel says what to do now, and counts the last week's touches, replies and meetings.
+
+On LinkedIn adds, `o` opens the profile and copies the note, `a` marks it added and `s` skips it. That's the whole loop for working through a list:
+
+![The LinkedIn queue: the note ready to copy, with keyboard shortcuts](docs/images/linkedin.png)
+
+### Research: facts with sources
+
+Companies found by agents, imports and people wait here to be qualified or rejected. Every fact keeps the link it came from. "Pick" moves a suggested person into outreach, with a note from your template.
+
+![Research: two companies an agent found, with sourced facts and a suggested contact](docs/images/research.png)
+
+### Conversations: replies to deals
+
+Replies move across a board: replied, meeting, proposal, won, lost. Each needs a next step with a date. Ones without, or due today, come back on Today.
+
+![Conversations: a board from replied to won](docs/images/conversations.png)
+
+### Agents and API
+
+Each organisation has an MCP endpoint and a REST API, with scoped keys. Agents can search, add companies, facts and suggested contacts, and draft messages. They can't send anything or change settings.
+
+![Agents & API: the MCP endpoint, REST calls and the tools each key gets](docs/images/agents.png)
+
+### Also
+
 - **Companies:** search, plus each company's people, facts and full history: who did what, people and agents alike.
 - **Add person:** paste a LinkedIn profile link and the name fills in. A bookmarklet opens the same form pre-filled from the profile you're viewing.
 - **Settings, per organisation:** waits between steps, connection-note template, call-script pitch, never-contact list and team. Each member sets their own caller name and signature.
-- **Agents & API:** an MCP endpoint and a REST API, with scoped keys per organisation.
+- **Several organisations per login:** each has its own prospects, wording, team and keys, and none can see another's.
 
 ## Run it
 

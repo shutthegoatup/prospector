@@ -52,7 +52,7 @@ templ Layout(n Nav, content templ.Component) {
 	<!DOCTYPE html>
 	<html lang="en" class="dark">
 		<head>
-			@Head(n.Org.Name + " · Prospecting")
+			@Head(n.Org.Name + " · Prospector")
 		</head>
 		<body class="queue-backdrop min-h-svh font-sans text-[15px] leading-relaxed antialiased" data-base={ n.Base() }>
 			<div class="flex min-h-svh flex-wrap">
@@ -122,11 +122,11 @@ templ LoginPage(next, problem string) {
 	<!DOCTYPE html>
 	<html lang="en" class="dark">
 		<head>
-			@Head("Sign in · Prospecting")
+			@Head("Sign in · Prospector")
 		</head>
 		<body class="queue-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased">
 			<form method="post" action="/login" class="flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-card p-7">
-				<h1 class="font-heading text-2xl font-bold">Prospecting<span class="text-primary">.</span></h1>
+				<h1 class="font-heading text-2xl font-bold">Prospector<span class="text-primary">.</span></h1>
 				if problem != "" {
 					<p class="text-sm text-[var(--stop)]" role="alert">{ problem }</p>
 				}
@@ -151,7 +151,7 @@ templ NoOrgs(u *User) {
 	<!DOCTYPE html>
 	<html lang="en" class="dark">
 		<head>
-			@Head("Prospecting")
+			@Head("Prospector")
 		</head>
 		<body class="queue-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased" data-base="/">
 			<form data-form="/orgs" class="flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-card p-7">
