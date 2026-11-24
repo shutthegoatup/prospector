@@ -43,14 +43,18 @@ type reqKey struct{}
 
 func reqOf(r *http.Request) *Req { return r.Context().Value(reqKey{}).(*Req) }
 
+// Actor is the name recorded against what this request does. A person is their full
+// name, so two with the same first name stay distinct in the history, or their email
+// when the name is missing or would read as an agent, the CLI or an import.
 func (q *Req) Actor() string {
 	if q.Key != nil {
 		return "agent:" + q.Key.Name
 	}
-	if q.User.Name != "" {
-		return firstField(q.User.Name)
+	name := strings.TrimSpace(q.User.Name)
+	if name == "" || strings.HasPrefix(name, "agent:") || name == "cli" || name == "import" {
+		return q.User.Email
 	}
-	return q.User.Email
+	return name
 }
 
 func (q *Req) Voice() Voice {

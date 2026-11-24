@@ -175,7 +175,8 @@ var Columns = []string{"id", "key", "file", "section", "fit", "maker", "person",
 	"linkedin_added", "email_sent", "followup_sent", "replied", "declined", "hold",
 	"sources", "phone", "called", "call_notes", "tz", "send_to", "accepted", "message"}
 
-// Event records who did what. User is a username, "agent:<key name>" or "cli".
+// Event records who did what. User is a person's full name (their first name in
+// older rows), "agent:<key name>" or "cli".
 type Event struct {
 	ID        int64  `gorm:"primaryKey"`
 	OrgID     int64  `gorm:"index"`
