@@ -69,6 +69,13 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 		t.Fatalf("what she wrote to us should stay, matched to nobody: %+v", enquiry)
 	}
 
+	if _, err := s.Restore(o.ID, "not a snapshot at all"); err == nil {
+		t.Fatal("a file with no contacts in it replaced everyone")
+	}
+	if h := history(hannah.ID); h["set:phone"] == "" || must(s.FindOne(o.ID, "Hannah")) == nil {
+		t.Fatal("a refused restore still changed something")
+	}
+
 	// A snapshot from another host can number the same people differently.
 	var rows []Contact
 	do(s.in(o.ID).Find(&rows).Error)
@@ -91,5 +98,18 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	}
 	if h := history(hannah.ID); h["set:tz"] != "Europe/Berlin" || h["set:phone"] != "" {
 		t.Fatalf("Jonas's history didn't follow him to his new id: %v", h)
+	}
+
+	do(s.in(o.ID).Find(&rows).Error)
+	for i := range rows {
+		if rows[i].ID == jonas.ID {
+			rows[i].Key = "hannah-pryce-lindqvist"
+		}
+	}
+	if _, err := s.replaceContacts(o.ID, rows); err != nil {
+		t.Fatal(err)
+	}
+	if h := history(jonas.ID); h["set:phone"] == "" {
+		t.Fatalf("renaming Hannah's row in the file cost her her history: %v", h)
 	}
 }

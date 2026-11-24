@@ -216,6 +216,9 @@ func (s *Store) ImportLegacy(org int64, path string) (int, error) {
 }
 
 func (s *Store) replaceContacts(org int64, rows []Contact) (int, error) {
+	if len(rows) == 0 {
+		return 0, errors.New("that holds no contacts, so nothing was replaced: is it the right file?")
+	}
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		kept := rows[:0]
 		for _, r := range rows {
@@ -263,12 +266,19 @@ var pointAtContacts = []any{&Event{}, &Fact{}, &Enquiry{}}
 // else, so they are moved by the contact's key, and what belonged to nobody who came
 // back is forgotten.
 func follow(tx *gorm.DB, org int64, before, after []Contact) error {
-	now := map[string]int64{}
+	now, keyOf, was := map[string]int64{}, map[int64]string{}, map[string]bool{}
 	for _, c := range after {
-		now[c.Key] = c.ID
+		now[c.Key], keyOf[c.ID] = c.ID, c.Key
+	}
+	for _, c := range before {
+		was[c.Key] = true
 	}
 	moved := map[int64]int64{}
 	for _, c := range before {
+		// Same id under a key nobody had before is the same row renamed, not a stranger.
+		if key, same := keyOf[c.ID]; now[c.Key] == 0 && same && !was[key] {
+			continue
+		}
 		if now[c.Key] != c.ID {
 			moved[c.ID] = now[c.Key]
 		}
