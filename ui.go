@@ -350,6 +350,25 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"message": msg})
 }
 
+func (a *App) uiRemoveMember(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		UserID int64 `json:"user_id"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	q := reqOf(r)
+	if _, err := a.s.RemoveMember(q.Org.ID, in.UserID, q.Actor()); err != nil {
+		fail(w, err, http.StatusBadRequest)
+		return
+	}
+	if in.UserID == q.User.ID {
+		writeJSON(w, map[string]string{"go": "/"})
+		return
+	}
+	writeJSON(w, map[string]bool{"ok": true})
+}
+
 func (a *App) uiKey(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Name   string   `json:"name"`

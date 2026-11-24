@@ -123,7 +123,14 @@ templ SettingsView(q *Req, d SettingsData) {
 			for _, m := range d.Members {
 				<div class="flex justify-between border-b border-dashed border-border py-1.5 text-sm">
 					<span><b>{ m.Name }</b> <span class="text-muted-foreground">{ m.Email }</span></span>
-					@Meta(m.Role)
+					<span class="flex items-center gap-3">
+						@Meta(m.Role)
+						if q.Owner() {
+							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/member/remove", "data-body": jsonBody("user_id", m.UserID), "data-confirm": removeConfirm(q, m)}}) {
+								Remove
+							}
+						}
+					</span>
 				</div>
 			}
 			if q.Owner() {
@@ -142,6 +149,13 @@ templ SettingsView(q *Req, d SettingsData) {
 			}
 		}
 	</div>
+}
+
+func removeConfirm(q *Req, m Member) string {
+	if m.UserID == q.User.ID {
+		return "Leave " + q.Org.Name + "? You lose access to it."
+	}
+	return "Remove " + m.Email + " from " + q.Org.Name + "? They lose access to it; their account and what they added stay, and so do any API keys they made."
 }
 
 func ownerHint(q *Req) string {

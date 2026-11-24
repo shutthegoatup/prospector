@@ -68,7 +68,8 @@ document.addEventListener("click", async (e) => {
       if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
       const body = JSON.parse(b.dataset.body || "{}");
       if (b.dataset.withFit) body.fit = document.getElementById(b.dataset.withFit)?.value || "";
-      await post(b.dataset.post, body);
+      const res = await post(b.dataset.post, body);
+      if (res.go) return void (location.href = res.go);
       refresh();
     }
   } catch (err) {

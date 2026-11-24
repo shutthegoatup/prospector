@@ -75,6 +75,7 @@ prospector serve                                          # http://127.0.0.1:876
 **Before exposing it beyond your machine:**
 - Put it behind HTTPS. Copy to clipboard needs a secure page, and the session cookie is marked Secure on HTTPS. A proxy in front must send `X-Forwarded-Proto: https`, or the cookie isn't marked Secure.
 - Repeated wrong passwords for one email are slowed, up to a minute between tries.
+- An owner adds and removes members in Settings. Removing someone ends their sign-in access to that organisation; their account, and other organisations, are untouched. API keys they created keep working until revoked on the Agents page.
 - Members change their own password in Settings, which signs out their other sessions. `prospector user password` signs them out everywhere.
 - Every page needs a sign-in, and every browser POST must be JSON, which blocks cross-site form posts.
 
