@@ -12,8 +12,14 @@ import (
 // wantsPage is a person's browser opening a page or submitting a form, as opposed to
 // the page script, the CLI or an agent, which read an error as plain text.
 func wantsPage(r *http.Request) bool {
-	return strings.Contains(r.Header.Get("Accept"), "text/html") &&
-		r.Header.Get("X-Fragment") == "" && r.Header.Get("Authorization") == ""
+	return strings.Contains(r.Header.Get("Accept"), "text/html") && r.Header.Get("X-Fragment") == "" && !hasKey(r)
+}
+
+// hasKey is a request carrying an API key. A browser never attaches a Bearer header by
+// itself, unlike the Basic one it resends once a proxy in front has asked for it, so
+// only Bearer can stand in for the checks that guard a signed-in browser.
+func hasKey(r *http.Request) bool {
+	return strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ")
 }
 
 // problemPage turns a plain-text error on its way to a browser into a page that looks
@@ -72,7 +78,7 @@ func problemText(code int, text string) (title, message string) {
 	if first, size := utf8.DecodeRuneInString(message); size > 0 {
 		message = string(unicode.ToUpper(first)) + message[size:]
 	}
-	if message != "" && !strings.ContainsAny(message[len(message)-1:], ".!?") {
+	if last, _ := utf8.DecodeLastRuneInString(message); message != "" && !strings.ContainsRune(".!?…", last) {
 		message += "."
 	}
 	switch {

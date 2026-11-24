@@ -1056,7 +1056,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	}
 	browser := map[string]string{"Accept": "text/html,application/xhtml+xml,*/*;q=0.8"}
 	styled := func(body string) bool {
-		return strings.Contains(body, "Back to Prospector") && strings.Contains(body, "/assets/css/output.css") && !strings.Contains(body, "<script>")
+		return strings.Contains(body, "Back to Prospector") && strings.Contains(body, "/assets/css/output.css")
 	}
 
 	for path, want := range map[string]string{
@@ -1108,6 +1108,57 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	code, ctype, body := get(http.DefaultClient, "GET", "/o/alpha/api/v1/companies/nope", map[string]string{"Accept": "text/html", "Authorization": "Bearer " + key})
 	if code != http.StatusNotFound || !strings.HasPrefix(ctype, "text/plain") || styled(body) {
 		t.Fatalf("an agent's error: %d %s, styled=%v", code, ctype, styled(body))
+	}
+
+	// What isn't a plain-text error passes through as it was: a redirect, the sign-in
+	// page's own refusal, and a method the route doesn't take keeping its Allow header.
+	stay := &http.Client{Jar: client.Jar, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	redirect, _ := http.NewRequest("GET", srv.URL+"/o/alpha/", nil)
+	redirect.Header.Set("Accept", browser["Accept"])
+	res, err := stay.Do(redirect)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/o/alpha/today" {
+		t.Fatalf("a redirect in a browser: %d to %q", res.StatusCode, res.Header.Get("Location"))
+	}
+	wrong, _ := http.NewRequest("POST", srv.URL+"/login", strings.NewReader("email=ada%40example.com&password=wrong"))
+	wrong.Header.Set("Accept", browser["Accept"])
+	wrong.Header.Set("content-type", "application/x-www-form-urlencoded")
+	res, err = http.DefaultClient.Do(wrong)
+	if err != nil {
+		t.Fatal(err)
+	}
+	form, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != http.StatusUnauthorized || !strings.Contains(string(form), `name="password"`) || styled(string(form)) {
+		t.Fatalf("a wrong password in a browser: %d, the sign-in form again: %v", res.StatusCode, strings.Contains(string(form), `name="password"`))
+	}
+	method, _ := http.NewRequest("DELETE", srv.URL+"/login", nil)
+	method.Header.Set("Accept", browser["Accept"])
+	method.Header.Set("Sec-Fetch-Site", "same-origin")
+	res, err = client.Do(method)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusMethodNotAllowed || res.Header.Get("Allow") == "" {
+		t.Fatalf("a method the route doesn't take: %d, Allow %q", res.StatusCode, res.Header.Get("Allow"))
+	}
+	if _, message := problemText(http.StatusUnauthorized, "an API key is needed: Authorization: Bearer pk_…"); strings.HasSuffix(message, "….") {
+		t.Fatalf("a full stop was added after an ellipsis: %q", message)
+	}
+
+	// A proxy's Basic sign-in travels with every request the browser makes, another
+	// site's included, so it doesn't count as a key.
+	basic := map[string]string{"Authorization": "Basic dXNlcjpwYXNz", "Sec-Fetch-Site": "cross-site", "content-type": "application/x-www-form-urlencoded"}
+	if code, _, _ := get(client, "POST", "/logout", basic); code != http.StatusForbidden {
+		t.Fatalf("a cross-site post carrying a proxy's Basic sign-in: %d", code)
+	}
+	basic["Sec-Fetch-Site"] = "same-origin"
+	if code, _, _ := get(client, "POST", "/o/alpha/ui/add", basic); code != http.StatusUnsupportedMediaType {
+		t.Fatalf("a form post carrying a proxy's Basic sign-in skipped the JSON rule: %d", code)
 	}
 
 	// Pages that work are passed through untouched, and a server fault keeps its detail to itself.

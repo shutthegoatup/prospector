@@ -280,7 +280,7 @@ func (a *App) Routes() http.Handler {
 		// A browser says where a request came from. One from another site is refused, which
 		// also covers the sign-in and sign-out forms that the JSON rule below can't. Agents
 		// and the CLI send neither header and carry a key, so they pass.
-		if r.Header.Get("Authorization") == "" {
+		if !hasKey(r) {
 			if err := sameOrigin.Check(r); err != nil {
 				http.Error(w, "this request came from another site", http.StatusForbidden)
 				return
@@ -289,7 +289,7 @@ func (a *App) Routes() http.Handler {
 		// Signed-in browsers send cookies; a cross-site form can't send JSON without a
 		// CORS preflight, which is never answered. Login and the API key routes are exempt.
 		if r.Method == http.MethodPost && r.URL.Path != "/login" && r.URL.Path != "/logout" &&
-			r.Header.Get("Authorization") == "" && !strings.HasPrefix(r.Header.Get("content-type"), "application/json") {
+			!hasKey(r) && !strings.HasPrefix(r.Header.Get("content-type"), "application/json") {
 			http.Error(w, "POST bodies must be application/json", http.StatusUnsupportedMediaType)
 			return
 		}
