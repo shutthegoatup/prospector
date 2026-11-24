@@ -391,6 +391,23 @@ func (a *App) uiRemoveMember(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
+func (a *App) uiExport(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID int64 `json:"id"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	q := reqOf(r)
+	out, err := a.s.ExportPerson(q.Org.ID, in.ID, q.Actor())
+	if err != nil {
+		fail(w, err, http.StatusNotFound)
+		return
+	}
+	w.Header().Set("cache-control", "no-store")
+	writeJSON(w, out)
+}
+
 func (a *App) uiErase(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		ID int64 `json:"id"`

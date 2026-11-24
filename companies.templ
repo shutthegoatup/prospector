@@ -75,6 +75,7 @@ func historyText(h HistoryItem) string {
 		"add:person": "added", "pick": "picked for outreach", "company:qualified": "qualified the company",
 		"company:rejected": "rejected the company", "company:review": "sent back to review",
 		"erase": "erased a person on request", "enquiry": "sent an enquiry",
+		"export": "exported what is held on them",
 	}[h.Action]
 	if verb == "" {
 		if f, ok := strings.CutPrefix(h.Action, "set:"); ok {
@@ -148,6 +149,9 @@ templ CompanyView(q *Req, p CompanyPage) {
 						}
 						@Meta(contactStage(c))
 						if q.Owner() {
+							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-download": "ui/export", "data-body": jsonBody("id", c.ID), "data-file": "person-" + strconv.FormatInt(c.ID, 10) + ".json"}}) {
+								Export
+							}
 							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/erase", "data-body": jsonBody("id", c.ID), "data-confirm": eraseConfirm(c)}}) {
 								Erase
 							}
