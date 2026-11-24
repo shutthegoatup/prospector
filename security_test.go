@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -1280,5 +1281,60 @@ func TestRequestsHaveDeadlines(t *testing.T) {
 	// A page with no body isn't cut short by the limit on bodies.
 	if a := (&App{}); a.readLimit != 0 || bodyLimit < answerLimit {
 		t.Fatal("the defaults changed without this test")
+	}
+}
+
+func TestFontsAreServedFromHere(t *testing.T) {
+	_, _, srv, client := signedIn(t)
+	fetch := func(path string) (http.Header, []byte) {
+		t.Helper()
+		res, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		body, _ := io.ReadAll(res.Body)
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("GET %s: %d", path, res.StatusCode)
+		}
+		return res.Header, body
+	}
+	h, css := fetch("/assets/css/fonts.css?v=" + assetVersion)
+	if !strings.HasPrefix(h.Get("Content-Type"), "text/css") || !strings.Contains(h.Get("Cache-Control"), "immutable") {
+		t.Fatalf("the font stylesheet: %v", h)
+	}
+	files := regexp.MustCompile(`url\((/assets/fonts/[a-z0-9-]+\.woff2)\)`).FindAllStringSubmatch(string(css), -1)
+	if len(files) < 6 || strings.Contains(string(css), "http") {
+		t.Fatalf("the font stylesheet names %d local files; it must name no other site", len(files))
+	}
+	for _, f := range files {
+		h, font := fetch(f[1])
+		if h.Get("Content-Type") != "font/woff2" || !strings.Contains(h.Get("Cache-Control"), "immutable") || !bytes.HasPrefix(font, []byte("wOF2")) {
+			t.Errorf("%s: %s, %q, %d bytes", f[1], h.Get("Content-Type"), h.Get("Cache-Control"), len(font))
+		}
+	}
+	for _, family := range []string{"Bricolage Grotesque", "IBM Plex Sans", "IBM Plex Mono"} {
+		if !strings.Contains(string(css), "font-family: '"+family+"'") {
+			t.Errorf("the font stylesheet lacks %s", family)
+		}
+	}
+	if _, licence := fetch("/assets/fonts/OFL.txt"); !strings.Contains(string(licence), "SIL OPEN FONT LICENSE Version 1.1") {
+		t.Fatal("the fonts' licence isn't served with them")
+	}
+
+	// Nothing a page loads, and nothing the policy allows, is on another site.
+	for _, page := range []string{"/login", "/o/alpha/today", "/o/alpha/settings"} {
+		_, body := call(t, client, "GET", srv.URL+page, "", nil)
+		if !strings.Contains(body, "/assets/css/fonts.css?v=") {
+			t.Errorf("%s doesn't load the fonts", page)
+		}
+		for _, outside := range regexp.MustCompile(`(?:href|src)="(https?:)?//[^"]+"`).FindAllString(body, -1) {
+			if !strings.Contains(outside, "linkedin.com") {
+				t.Errorf("%s loads from another site: %s", page, outside)
+			}
+		}
+	}
+	if strings.Contains(contentPolicy, "http") {
+		t.Fatalf("the policy allows another site: %s", contentPolicy)
 	}
 }

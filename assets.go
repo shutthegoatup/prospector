@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-//go:embed assets/css/output.css assets/js
+//go:embed assets/css/output.css assets/css/fonts.css assets/js assets/fonts
 var assetFS embed.FS
 
 // assetVersion busts caches for the unhashed files (output.css, app.js) on each build.
@@ -29,7 +29,13 @@ func assetHandler() http.Handler {
 	sub, _ := fs.Sub(assetFS, "assets")
 	files := http.FileServer(http.FS(sub))
 	return http.StripPrefix("/assets/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "js/shadcn-templ-") || r.URL.Query().Get("v") == assetVersion {
+		if strings.HasSuffix(r.URL.Path, ".woff2") {
+			// The release image has no system table of file types to find this in.
+			w.Header().Set("Content-Type", "font/woff2")
+		}
+		// Embedded files carry no date to revalidate against, so anything not cached
+		// for good is fetched again on every page. A font that changes gets a new name.
+		if strings.HasPrefix(r.URL.Path, "js/shadcn-templ-") || strings.HasPrefix(r.URL.Path, "fonts/") || r.URL.Query().Get("v") == assetVersion {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		} else {
 			w.Header().Set("Cache-Control", "no-cache")
