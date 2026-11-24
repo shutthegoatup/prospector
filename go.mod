@@ -3,7 +3,7 @@ module github.com/shutthegoatup/prospector
 go 1.27.4
 
 require (
-	github.com/Oudwins/tailwind-merge-go v0.2.2
+	github.com/Oudwins/tailwind-merge-go v0.2.3
 	github.com/a-h/templ v0.3.1118
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/glebarez/sqlite v1.11.0
