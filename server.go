@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -103,7 +104,7 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 		u := a.sessionUser(r)
 		if u == nil {
 			if r.Method == http.MethodGet && r.Header.Get("X-Fragment") == "" {
-				http.Redirect(w, r, "/login?next="+r.URL.RequestURI(), http.StatusSeeOther)
+				http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusSeeOther)
 			} else {
 				http.Error(w, "signed out", http.StatusUnauthorized)
 			}
@@ -236,12 +237,14 @@ func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
 	LoginPage(r.URL.Query().Get("next"), "").Render(r.Context(), w)
 }
 
-// safeNext keeps a post-login redirect on this site.
+// safeNext keeps a post-login redirect on this site. Browsers drop tabs and newlines
+// from a URL and read \ as /, so either could turn a path into //another.host.
 func safeNext(next string) string {
-	if strings.HasPrefix(next, "/") && !strings.HasPrefix(next, "//") && !strings.HasPrefix(next, "/\\") {
-		return next
+	if !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") ||
+		strings.ContainsFunc(next, func(r rune) bool { return r < 0x20 || r == 0x7f || r == '\\' }) {
+		return "/"
 	}
-	return "/"
+	return next
 }
 
 func (a *App) login(w http.ResponseWriter, r *http.Request) {
