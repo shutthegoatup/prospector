@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"net/http"
+	"strconv"
 
+	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -83,7 +85,11 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		return a.mcpServer(reqOf(r))
 	}, nil)
-	mux.Handle("/o/{org}/mcp", a.agent("", mcpHandler.ServeHTTP))
+	// The SDK ties each session to this id, so one key can't drive another key's session.
+	sameKey := auth.RequireBearerToken(func(_ context.Context, _ string, r *http.Request) (*auth.TokenInfo, error) {
+		return &auth.TokenInfo{UserID: strconv.FormatInt(reqOf(r).Key.ID, 10)}, nil
+	}, &auth.RequireBearerTokenOptions{AllowMissingExpiration: true})
+	mux.Handle("/o/{org}/mcp", a.agent("", sameKey(mcpHandler).ServeHTTP))
 }
 
 func respond(w http.ResponseWriter, v any, err error) {
@@ -99,7 +105,8 @@ type ok struct {
 }
 
 // mcpServer is built once per API key, with only the tools its scopes allow. The
-// key is checked again on every request, so revoking it cuts off its sessions.
+// key is checked again on every request, so revoking it cuts off its sessions, and
+// a session answers only to the key that opened it.
 func (a *App) mcpServer(q *Req) *mcp.Server {
 	a.mu.Lock()
 	defer a.mu.Unlock()

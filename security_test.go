@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -11,6 +12,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func TestSafeNext(t *testing.T) {
@@ -196,6 +199,64 @@ func TestChangePassword(t *testing.T) {
 	}
 	if code := guess(); code != http.StatusTooManyRequests {
 		t.Fatalf("after %d wrong guesses the next got %d", freeAttempts, code)
+	}
+}
+
+func TestMCPSessionsBelongToOneKey(t *testing.T) {
+	s, o, srv, _ := signedIn(t)
+	owner, _, err := s.CreateKey(o.ID, "claude", []string{"read", "research:write"}, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, _, err := s.CreateKey(o.ID, "reader", []string{"read"}, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	endpoint := srv.URL + "/o/alpha/mcp"
+	transport := &mcp.StreamableClientTransport{Endpoint: endpoint, HTTPClient: &http.Client{
+		Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
+			r.Header.Set("Authorization", "Bearer "+owner)
+			return http.DefaultTransport.RoundTrip(r)
+		})}}
+	ctx := context.Background()
+	session, err := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "1"}, nil).Connect(ctx, transport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	replay := func(key string) int {
+		req, _ := http.NewRequest("POST", endpoint, strings.NewReader(`{"jsonrpc":"2.0","id":99,"method":"tools/list"}`))
+		req.Header.Set("Authorization", "Bearer "+key)
+		req.Header.Set("content-type", "application/json")
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		req.Header.Set("Mcp-Session-Id", session.ID())
+		req.Header.Set("Mcp-Protocol-Version", session.InitializeResult().ProtocolVersion)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	if code := replay(owner); code != http.StatusOK {
+		t.Fatalf("the key that opened the session: %d", code)
+	}
+	if code := replay(other); code != http.StatusForbidden {
+		t.Fatalf("another key used the session: %d", code)
+	}
+	closing, _ := http.NewRequest("DELETE", endpoint, nil)
+	closing.Header.Set("Authorization", "Bearer "+other)
+	closing.Header.Set("Mcp-Session-Id", session.ID())
+	closed, err := http.DefaultClient.Do(closing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed.Body.Close()
+	if closed.StatusCode != http.StatusForbidden {
+		t.Fatalf("another key closed the session: %d", closed.StatusCode)
+	}
+	if code := replay(owner); code != http.StatusOK {
+		t.Fatalf("the session after another key tried to close it: %d", code)
 	}
 }
 
