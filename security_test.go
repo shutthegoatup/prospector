@@ -1011,4 +1011,29 @@ func TestPublicURL(t *testing.T) {
 	if _, c, _ := signIn(&App{s: s, base: "http://10.0.0.5:8766"}, nil); c.Secure {
 		t.Fatal("an http address marked the cookie Secure")
 	}
+
+	// A proxy that rewrites Host leaves Origin as the only sign of where a request came
+	// from in a browser that sends no Sec-Fetch-Site (any browser, over plain HTTP).
+	status := func(app *App, origin string) int {
+		srv := httptest.NewServer(app.Routes())
+		defer srv.Close()
+		req, _ := http.NewRequest("POST", srv.URL+"/login", strings.NewReader("email=ada%40example.com&password=correct+horse+battery"))
+		req.Header.Set("content-type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", origin)
+		res, err := (&http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}).Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	if got := status(&App{s: s, base: "https://prospector.example.com"}, "https://prospector.example.com"); got != http.StatusSeeOther {
+		t.Fatalf("sign-in from the address that was set, behind a proxy that rewrites Host: %d", got)
+	}
+	if got := status(&App{s: s, base: "https://prospector.example.com"}, "https://evil.example"); got != http.StatusForbidden {
+		t.Fatalf("sign-in from another site with an address set: %d", got)
+	}
+	if got := status(&App{s: s}, "https://prospector.example.com"); got != http.StatusForbidden {
+		t.Fatalf("with no address set, an Origin that doesn't match Host: %d", got)
+	}
 }

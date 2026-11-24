@@ -258,6 +258,12 @@ func (a *App) Routes() http.Handler {
 	a.apiRoutes(mux)
 
 	sameOrigin := http.NewCrossOriginProtection()
+	if a.base != "" {
+		// Behind a proxy that rewrites Host, an older browser's Origin wouldn't match it.
+		if err := sameOrigin.AddTrustedOrigin(a.base); err != nil {
+			log.Print(err)
+		}
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// A browser says where a request came from. One from another site is refused, which
 		// also covers the sign-in and sign-out forms that the JSON rule below can't. Agents
