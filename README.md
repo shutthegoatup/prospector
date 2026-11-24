@@ -123,10 +123,14 @@ People start from "Use your organisation's single sign-on" on the sign-in page a
 
 ## Secret keys
 
-`PROSPECTOR_SECRET_KEYS` holds the server's master keys, each with a version: `1:<64 hex characters>`. `prospector secret-key` prints a new one. It is the only secret of its own the server is given.
+`PROSPECTOR_SECRET_KEYS` holds the server's master keys, each with a version: `1:<64 hex characters>`. `prospector secret-key` prints a first entry, and `prospector secret-key 2` the one to replace it with. It is the only secret of its own the server is given.
 
-- **A master key is never used directly.** Each job gets its own key derived from it with HKDF-SHA256 (RFC 5869): one seals stored secrets, another signs the cookie that carries a sign-in to a provider and back.
-- **What it seals** is each organisation's single sign-on client secret, stored as a compact JWE (RFC 7516, `dir` with `A256GCM`) whose `kid` is the key's version. Passwords, sessions and API keys are stored as hashes and need no key.
+- **A master key is never used directly.** Each job gets its own key derived from it with HKDF-SHA256 (RFC 5869).
+- **What it seals** is each organisation's single sign-on client secret, stored as a compact JWE (RFC 7516, `dir` with `A256GCM`) whose `kid` is the key's version.
+- **What it keys** is how a session and an API key are found: by an HMAC of the token under the server's key, where without a key it is the token's plain hash. Someone who can write to the database but hasn't the key can't mint a session. An API key is not protected that far: one made before the server had a key is still accepted by its plain hash, because an agent can't sign in again, so a row written with a plain hash is accepted too.
+- **What it signs** is the cookie that carries a sign-in to a provider and back.
+- **Passwords** are bcrypt hashes and take no part: a key mixed into them couldn't be replaced without everyone choosing a new password.
+- **Giving a server its first key signs everybody out**, once. API keys keep working: each is found by its plain hash and moves to the keyed one the first time it is used. That move is one-way: going back to a release from before it, or running a server with no key beside one that has, signs everybody out again and refuses every API key that has been used since, which then have to be made again.
 - **Without it** the server runs, but no client secret can be saved, so no new single sign-on connection. A secret stored in clear by an earlier release still works, its connection's other settings can still be changed, and it is sealed the first time the server starts with a key. After that, going back to any release from before sealing breaks those sign-ins until each owner types the secret again.
 - **Back it up apart from the database.** A database without the key can't read the secrets; a key that is lost takes them with it, and each owner types theirs again.
 
@@ -134,7 +138,7 @@ The first key in the list seals and signs; every key in the list opens and verif
 
 1. **Publish.** Add the new key after the current one, `1:<old>,2:<new>`, and restart. Needed only when several servers share the database, so each can open version 2 before any seals with it.
 2. **Promote.** Put the new key first, `2:<new>,1:<old>`, and restart. At start-up every stored secret is sealed again under the new key. A server still listing the old key first leaves those alone.
-3. **Retire.** Once every server has been restarted with the new key first and its log says `none is under a key older than 2`, remove the old key and restart. Sign-ins in flight under the old key, at most ten minutes old, have to start again.
+3. **Retire.** Once every server has been restarted with the new key first and its log says `none is under a key older than 2`, remove the old key and restart. Sign-ins in flight under the old key, at most ten minutes old, have to start again. Sessions and API keys move to the new key as they are used; the log counts the API keys that haven't yet, and one whose key is removed first stops working and has to be made again.
 
 ## Agents: MCP and REST
 
