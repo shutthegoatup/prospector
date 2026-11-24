@@ -2,16 +2,38 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"gorm.io/gorm"
 )
 
 // Import merges a parsed repo into one organisation. Text from the markdown refreshes,
-// but a date or edit recorded in the tracker is never cleared.
+// but a date or edit recorded in the tracker is never cleared. It is refused whole if it
+// would bring in an address on the never-contact list; one already stored may stay, so
+// listing someone who opted out doesn't break every later import.
 func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
+	o, err := s.OrgByID(org)
+	if err != nil {
+		return 0, err
+	}
+	var blocked []string
+	for _, d := range p.Drafts {
+		listed := s.allowed(o, d.Email, d.Linkedin)
+		if listed == nil {
+			continue
+		}
+		var have Contact
+		known := s.in(org).Where("key = ?", d.Key).First(&have).Error == nil
+		if !known || (d.Email != "" && d.Email != deref(have.Email)) || (d.Linkedin != "" && d.Linkedin != deref(have.Linkedin)) {
+			blocked = append(blocked, fmt.Sprintf("%s in %s (%v)", d.Key, d.File, listed))
+		}
+	}
+	if len(blocked) > 0 {
+		return 0, fmt.Errorf("nothing imported: %s", strings.Join(blocked, "; "))
+	}
 	var total int64
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.db.Transaction(func(tx *gorm.DB) error {
 		for _, d := range p.Drafts {
 			if err := upsertDraft(tx, org, d); err != nil {
 				return err

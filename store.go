@@ -317,6 +317,19 @@ func (s *Store) Update(org, id int64, field, value, actor string) error {
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
 			return fmt.Errorf("no contact %d", id)
 		}
+		if field == "email" || field == "linkedin" {
+			var o Org
+			if err := tx.First(&o, org).Error; err != nil {
+				return err
+			}
+			email, link := value, ""
+			if field == "linkedin" {
+				email, link = "", value
+			}
+			if err := s.allowed(&o, email, link); err != nil {
+				return err
+			}
+		}
 		if err := tx.Model(&c).Update(field, v).Error; err != nil {
 			return err
 		}
