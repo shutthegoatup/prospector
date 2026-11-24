@@ -115,7 +115,7 @@ func (s *Store) savePassword(user int64, hash, keepToken string) error {
 		if err := tx.Model(&User{}).Where("id = ?", user).Updates(set).Error; err != nil {
 			return err
 		}
-		return tx.Where("user_id = ? and token_hash <> ?", user, hashToken(keepToken)).Delete(&Session{}).Error
+		return tx.Where("user_id = ? and token_hash not in ?", user, s.keys.lookups(sessions, keepToken)).Delete(&Session{}).Error
 	})
 }
 
@@ -289,7 +289,7 @@ func (s *Store) Login(email, password string) (string, *User, error) {
 // limited to that organisation: its provider vouches for nothing else.
 func (s *Store) NewSession(user, ssoOrg int64) (string, error) {
 	token := randomToken(32)
-	sess := &Session{TokenHash: hashToken(token), UserID: user, ExpiresAt: time.Now().Add(sessionLife)}
+	sess := &Session{TokenHash: s.keys.lookup(sessions, token), UserID: user, ExpiresAt: time.Now().Add(sessionLife)}
 	if ssoOrg != 0 {
 		sess.Limited = true
 		sess.prove(ssoOrg, time.Now())
@@ -338,8 +338,16 @@ func (s *Store) AddProof(sess *Session, org int64) error {
 
 func (s *Store) SessionFor(token string) (*Session, *User, error) {
 	var sess Session
-	if err := s.db.Where("token_hash = ? and expires_at > ?", hashToken(token), time.Now()).First(&sess).Error; err != nil {
+	if err := s.db.Where("token_hash in ? and expires_at > ?", s.keys.lookups(sessions, token), time.Now()).First(&sess).Error; err != nil {
 		return nil, nil, err
+	}
+	// Found by an older key: moved to the current one, so that key can be removed. One
+	// under a newer key is another server's doing and is left alone.
+	if s.keys.lookupBehind(sess.TokenHash) {
+		current := s.keys.lookup(sessions, token)
+		if s.db.Model(&sess).Update("token_hash", current).Error == nil {
+			sess.TokenHash = current
+		}
 	}
 	var u User
 	return &sess, &u, s.db.First(&u, sess.UserID).Error
@@ -351,7 +359,7 @@ func (s *Store) SessionUser(token string) (*User, error) {
 }
 
 func (s *Store) Logout(token string) error {
-	return s.db.Where("token_hash = ?", hashToken(token)).Delete(&Session{}).Error
+	return s.db.Where("token_hash in ?", s.keys.lookups(sessions, token)).Delete(&Session{}).Error
 }
 
 // Scopes an API key can carry. None of them can send, change settings or reach another org; only import skips review.
@@ -397,17 +405,26 @@ func (s *Store) CreateKey(org int64, name string, scopes []string, by string) (s
 		return "", nil, errors.New("pick at least one scope")
 	}
 	secret := "pk_" + randomToken(24)
-	k := &APIKey{OrgID: org, Name: name, Prefix: secret[:7], Hash: hashToken(secret), Scopes: strings.Join(scopes, " "), CreatedBy: by}
+	k := &APIKey{OrgID: org, Name: name, Prefix: secret[:7], Hash: s.keys.lookup(apiKeys, secret), Scopes: strings.Join(scopes, " "), CreatedBy: by}
 	return secret, k, s.db.Create(k).Error
 }
 
 func (s *Store) KeyFor(secret string) (*APIKey, error) {
 	var k APIKey
-	if err := s.db.Where("hash = ? and revoked_at is null", hashToken(secret)).First(&k).Error; err != nil {
+	// A key made before there was a secret key is still found by its plain hash: an
+	// agent can't be asked to sign in again the way a person can. It moves on first
+	// use. The cost is that a row written straight into the database with a plain hash
+	// is taken for one of those, so the keyed lookup guards sessions and not API keys.
+	found := append(s.keys.lookups(apiKeys, secret), hashToken(secret))
+	if err := s.db.Where("hash in ? and revoked_at is null", found).First(&k).Error; err != nil {
 		return nil, err
 	}
 	now := time.Now()
-	s.db.Model(&k).Update("last_used_at", now)
+	set := map[string]any{"last_used_at": now}
+	if s.keys.lookupBehind(k.Hash) {
+		set["hash"] = s.keys.lookup(apiKeys, secret)
+	}
+	s.db.Model(&k).Updates(set)
 	return &k, nil
 }
 

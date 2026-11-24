@@ -388,16 +388,25 @@ func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	spec, err := a.s.spec(sso)
-	var p *idp
-	if err == nil {
-		p, err = a.idp(r.Context(), spec)
+	if err != nil {
+		log.Printf("single sign-on for %s: %v", org.Slug, err)
+		a.signInProblem(w, r, query.Get("next"), http.StatusServiceUnavailable, unopenable(org))
+		return
 	}
+	p, err := a.idp(r.Context(), spec)
 	if err != nil {
 		log.Printf("single sign-on for %s: %v", org.Slug, err)
 		a.signInProblem(w, r, query.Get("next"), http.StatusBadGateway, org.Name+"'s sign-in couldn't be reached. Try again shortly.")
 		return
 	}
 	a.beginAttempt(w, r, p, attempt{Way: "sso", Org: org.ID, Next: query.Get("next")}, oauth2.SetAuthURLParam("login_hint", email))
+}
+
+// unopenable is what people are told when a connection's kept secret can't be opened.
+// It isn't an outage, and trying again won't help: the server needs its key back, or
+// an owner has to type the secret again.
+func unopenable(org *Org) string {
+	return org.Name + "'s single sign-on isn't working here, and trying again won't help. Tell one of its owners, or whoever runs this server."
 }
 
 func (a *App) loginCallback(w http.ResponseWriter, r *http.Request) {
@@ -468,10 +477,12 @@ func (a *App) finishSSO(w http.ResponseWriter, r *http.Request, att attempt, ref
 		return
 	}
 	spec, err := a.s.spec(sso)
-	var p *idp
-	if err == nil {
-		p, err = a.idp(r.Context(), spec)
+	if err != nil {
+		log.Printf("single sign-on for %s: %v", org.Slug, err)
+		a.signInProblem(w, r, att.Next, http.StatusServiceUnavailable, unopenable(org))
+		return
 	}
+	p, err := a.idp(r.Context(), spec)
 	if err != nil {
 		refuse(err)
 		return
@@ -589,12 +600,22 @@ func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
 		fail(w, fmt.Errorf("a client secret is kept sealed, and %w", errNoKeys), http.StatusBadRequest)
 		return
 	case secret != "":
-		c.ClientSecret = secret
+		// Sealed here, where it is known to have been typed: one that happens to look
+		// sealed already would otherwise be stored as it came.
+		if c.ClientSecret, err = a.s.keys.seal(secret); err != nil {
+			fail(w, err, http.StatusInternalServerError)
+			return
+		}
 	// The kept secret belongs to the provider and client it was typed for, and goes to
 	// no other. It stays as stored and unopened, so the rest can be changed on a server
 	// with no key, or with a key that no longer opens it.
 	case c.Issuer == sso.Issuer && c.ClientID == sso.ClientID:
 		c.ClientSecret = sso.ClientSecret
+		// But nobody is made to depend on a sign-in that can't work.
+		if _, oerr := a.s.keys.open(c.ClientSecret); oerr != nil && ((c.Required && !sso.Required) || (c.AutoJoin && !sso.AutoJoin)) {
+			fail(w, errors.New("this server can't open the kept client secret, so single sign-on isn't working here: type the secret again before requiring it or letting people join"), http.StatusBadRequest)
+			return
+		}
 	}
 	verified := false
 	for _, d := range sso.Domains {
