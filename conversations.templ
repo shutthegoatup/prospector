@@ -60,7 +60,7 @@ templ Deal(q *Req, c Contact, day string) {
 		<div>
 			<b>{ displayName(c) }</b>
 			if c.CompanyID != nil {
-				<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(*c.CompanyID, 10)) } class="font-mono text-xs text-muted-foreground hover:text-primary">{ " · " + companyName(deref(c.Maker)) }</a>
+				<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(*c.CompanyID, 10)) } class="font-mono text-xs text-muted-foreground hover:text-mark">{ " · " + companyName(deref(c.Maker)) }</a>
 			}
 		</div>
 		if deref(c.CallNotes) != "" {

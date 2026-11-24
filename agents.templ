@@ -19,7 +19,7 @@ var mcpTools = []struct{ Name, Scope, What string }{
 }
 
 templ Code(s string) {
-	<pre class="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border border-border bg-[#141414] px-3.5 py-3 font-mono text-[13px] leading-relaxed text-[#dcdcdc]">{ s }</pre>
+	<pre class="overflow-x-auto whitespace-pre-wrap break-all rounded-lg night border-2 border-ink bg-background px-3.5 py-3 font-mono text-[13px] leading-relaxed text-foreground">{ s }</pre>
 }
 
 templ AgentsView(q *Req, d AgentsData) {
@@ -71,7 +71,7 @@ templ AgentsView(q *Req, d AgentsData) {
 							for _, s := range Scopes {
 								<label class="flex items-start gap-2.5 text-sm">
 									<input type="checkbox" name="scopes" value={ s.Name } data-multi="true" checked?={ s.Name == "read" || s.Name == "research:write" } class="mt-1 size-4 accent-[var(--primary)]"/>
-									<span><span class="font-mono text-xs text-primary">{ s.Name }</span> <span class="text-muted-foreground">{ s.What }</span></span>
+									<span><span class="font-mono text-xs text-mark">{ s.Name }</span> <span class="text-muted-foreground">{ s.What }</span></span>
 								</label>
 							}
 						</fieldset>
@@ -90,7 +90,7 @@ templ AgentsView(q *Req, d AgentsData) {
 				<div>
 					for _, t := range mcpTools {
 						<div class="grid grid-cols-[120px_1fr] gap-3 border-b border-dashed border-border py-2 text-sm last:border-0">
-							<code class="font-mono text-[13px] text-primary">{ t.Name }</code>
+							<code class="font-mono text-[13px] text-mark">{ t.Name }</code>
 							<span>{ t.What } <span class="font-mono text-[11px] text-muted-foreground">{ t.Scope }</span></span>
 						</div>
 					}
@@ -102,7 +102,7 @@ templ AgentsView(q *Req, d AgentsData) {
 				}
 				for _, sc := range d.Scores {
 					<div class="border-b border-dashed border-border py-2 text-sm last:border-0">
-						<b class="font-mono text-[13px] text-primary">{ sc.Agent }</b>
+						<b class="font-mono text-[13px] text-mark">{ sc.Agent }</b>
 						<span class="block text-muted-foreground">{ scoreText(sc) }</span>
 					</div>
 				}
@@ -114,7 +114,7 @@ templ AgentsView(q *Req, d AgentsData) {
 				for _, e := range d.Activity {
 					<div class="grid grid-cols-[84px_110px_1fr] gap-2 border-b border-dashed border-border py-1.5 text-[13px]">
 						<span class="font-mono text-xs text-muted-foreground">{ e.At.Format("2 Jan 15:04") }</span>
-						<span class="truncate font-mono text-xs text-primary">{ e.Actor }</span>
+						<span class="truncate font-mono text-xs text-mark">{ e.Actor }</span>
 						<span>{ historyText(HistoryItem{Action: e.Action, Value: e.Value}) }</span>
 					</div>
 				}
