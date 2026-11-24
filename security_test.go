@@ -6,6 +6,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -605,6 +606,55 @@ func TestNeverContactEntries(t *testing.T) {
 		got := OrgSettings{NeverContact: c.entry}.listed(c.email, c.link) != nil
 		if got != c.listed {
 			t.Errorf("entry %q against %q %q: listed = %v, want %v", c.entry, c.email, c.link, got, c.listed)
+		}
+	}
+}
+
+func TestContentPolicy(t *testing.T) {
+	s, o, srv, client := signedIn(t)
+	if _, err := s.Import(o.ID, readFixtures(t)); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.CreateKey(o.ID, "bot", []string{"read"}, "test"); err != nil {
+		t.Fatal(err)
+	}
+	var company Company
+	if err := s.in(o.ID).First(&company).Error; err != nil {
+		t.Fatal(err)
+	}
+	res, err := http.Get(srv.URL + "/login")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	policy := res.Header.Get("Content-Security-Policy")
+	for _, want := range []string{"default-src 'none'", "script-src 'self';", "frame-ancestors 'none'", "base-uri 'none'", "form-action 'self'"} {
+		if !strings.Contains(policy, want) {
+			t.Errorf("policy %q lacks %q", policy, want)
+		}
+	}
+	if scripts := policy[strings.Index(policy, "script-src"):]; strings.Contains(scripts[:strings.Index(scripts, ";")], "unsafe") {
+		t.Errorf("the policy allows inline or evaluated scripts: %q", policy)
+	}
+
+	// The policy blocks inline scripts and handlers, so no page may depend on one.
+	tag := regexp.MustCompile(`(?i)<script[^>]*>`)
+	handler := regexp.MustCompile(`(?i)<[^>]*\son[a-z]+\s*=`)
+	pages := []string{"/login", "/o/alpha/today", "/o/alpha/today?step=linkedin", "/o/alpha/research", "/o/alpha/research?f=rejected",
+		"/o/alpha/conversations", "/o/alpha/companies", "/o/alpha/companies/" + strconv.FormatInt(company.ID, 10),
+		"/o/alpha/add", "/o/alpha/add?popup=1&name=Hannah", "/o/alpha/settings", "/o/alpha/agents"}
+	for _, page := range pages {
+		code, body := call(t, client, "GET", srv.URL+page, "", nil)
+		if code != http.StatusOK {
+			t.Fatalf("GET %s: %d", page, code)
+		}
+		for _, script := range tag.FindAllString(body, -1) {
+			if !strings.Contains(script, "src=") {
+				t.Errorf("%s has an inline script: %s", page, script)
+			}
+		}
+		if found := handler.FindString(body); found != "" {
+			t.Errorf("%s has an inline event handler: %s", page, found)
 		}
 	}
 }

@@ -184,6 +184,12 @@ func (a *App) page(w http.ResponseWriter, r *http.Request, active string, conten
 	}
 }
 
+// contentPolicy lets pages load only this app's own scripts, so text that slipped past
+// escaping still couldn't run. Styles are looser: templ writes style attributes, and the
+// fonts come from Google.
+const contentPolicy = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+	"font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+
 func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
@@ -232,6 +238,7 @@ func (a *App) Routes() http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "same-origin")
 		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Content-Security-Policy", contentPolicy)
 		if secure(r) {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		}

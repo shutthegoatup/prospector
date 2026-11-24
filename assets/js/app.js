@@ -54,6 +54,8 @@ function copy(button, text, link) {
 }
 
 document.addEventListener("click", async (e) => {
+  // The bookmarklet link is for dragging to the bookmarks bar, not for clicking here.
+  if (e.target.closest("[data-bookmarklet]")) return void e.preventDefault();
   const b = e.target.closest("button");
   if (!b) return;
   try {
