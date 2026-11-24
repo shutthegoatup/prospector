@@ -174,7 +174,7 @@ type AddContactOut struct {
 	Status  string `json:"status" jsonschema:"suggested: waits in Research until a person picks them; empty once picked"`
 	Existed bool   `json:"existed" jsonschema:"true if this person was already at the company; nothing about them was changed"`
 	// Suggested is nil for someone new, so older clients see the reply they always did.
-	Suggested []string `json:"suggested,omitempty" jsonschema:"for someone already here: which of email, phone and linkedin you sent are waiting for a person to accept"`
+	Suggested []string `json:"suggested,omitempty" jsonschema:"for someone already here under the name you sent: which of email, phone and linkedin you sent are waiting for a person to accept"`
 }
 
 // samePerson finds someone already at the company by profile, address or name, so a

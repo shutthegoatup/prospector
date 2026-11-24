@@ -236,6 +236,11 @@ func (s *Store) replaceContacts(org int64, rows []Contact) (int, error) {
 		if err := tx.CreateInBatches(rows, 100).Error; err != nil {
 			return fmt.Errorf("restore (another organisation may already use these ids): %w", err)
 		}
+		// What was suggested for someone the restore dropped has nobody left to wait for.
+		if err := tx.Where("org_id = ? and contact_id not in (?)", org, tx.Model(&Contact{}).Select("id").Where("org_id = ?", org)).
+			Delete(&Suggestion{}).Error; err != nil {
+			return err
+		}
 		if s.postgres() {
 			// Only ever forwards: winding back would hand a dropped person's id, and the
 			// history still filed under it, to whoever is added next.

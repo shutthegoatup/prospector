@@ -38,6 +38,13 @@ var suggestable = []string{"email", "phone", "linkedin"}
 // its path, a number by its digits.
 func sameDetail(field, a, b string) bool {
 	switch field {
+	case "email":
+		// The column can hold several addresses; one of them is already held.
+		for _, held := range emailRe.FindAllString(strings.ToLower(b), -1) {
+			if strings.EqualFold(strings.TrimSpace(a), strings.Trim(held, ".")) {
+				return true
+			}
+		}
 	case "linkedin":
 		if pa, pb := linkedinPath(a), linkedinPath(b); pa != "" || pb != "" {
 			return pa == pb
@@ -71,8 +78,12 @@ func detailOf(c Contact, field string) string {
 
 // suggestDetails keeps what an agent sent for someone already here and that they
 // don't have, and returns the fields now waiting. One already suggested, whether it
-// is still waiting or was dismissed, isn't raised again.
+// is still waiting or was dismissed, isn't raised again. Someone matched by address
+// or profile under another name gets nothing: the rest may be a colleague's.
 func (s *Store) suggestDetails(tx *gorm.DB, who Actor, p Contact, in AddContactIn) ([]string, error) {
+	if !strings.EqualFold(personKey(in.Name), personKey(displayName(p))) {
+		return []string{}, nil
+	}
 	sent := map[string]string{"email": in.Email, "phone": in.Phone, "linkedin": in.Linkedin}
 	var before []Suggestion
 	if err := tx.Where("org_id = ? and contact_id = ?", p.OrgID, p.ID).Find(&before).Error; err != nil {
@@ -136,6 +147,10 @@ func (s *Store) Pending(org int64, people []Contact) (map[int64][]PendingDetail,
 		return nil, err
 	}
 	for _, r := range rows {
+		// They have since been given it some other way.
+		if sameDetail(r.Field, r.Value, detailOf(byID[r.ContactID], r.Field)) {
+			continue
+		}
 		out[r.ContactID] = append(out[r.ContactID], PendingDetail{Suggestion: r, Current: detailOf(byID[r.ContactID], r.Field)})
 	}
 	return out, nil
