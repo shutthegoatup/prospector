@@ -406,8 +406,13 @@ func uniqueKey(tx *gorm.DB, org int64, key string) string {
 
 // allowed applies the org's never-contact list to an email address or link.
 func (s *Store) allowed(o *Org, email, link string) error {
+	return o.Settings.listed(email, link)
+}
+
+// listed reports the never-contact entry an email address or link falls under, if any.
+func (set OrgSettings) listed(email, link string) error {
 	email, link = strings.ToLower(email), strings.ToLower(link)
-	for _, entry := range strings.FieldsFunc(strings.ToLower(o.Settings.NeverContact), func(r rune) bool { return r == ',' || r == '\n' || r == ' ' }) {
+	for _, entry := range strings.FieldsFunc(strings.ToLower(set.NeverContact), func(r rune) bool { return r == ',' || r == '\n' || r == ' ' }) {
 		if entry == "" {
 			continue
 		}
@@ -416,6 +421,22 @@ func (s *Store) allowed(o *Org, email, link string) error {
 		}
 	}
 	return nil
+}
+
+// NeverContactCovers counts the people already stored that the list keeps out of the queues.
+func (s *Store) NeverContactCovers(o *Org) int {
+	if strings.TrimSpace(o.Settings.NeverContact) == "" {
+		return 0
+	}
+	var people []Contact
+	s.in(o.ID).Where("key not like 'org:%'").Find(&people)
+	n := 0
+	for _, p := range people {
+		if o.Settings.listed(deref(p.Email), deref(p.Linkedin)) != nil {
+			n++
+		}
+	}
+	return n
 }
 
 // LinkedIn page titles look like "(3) Hannah Pryce | LinkedIn"; headlines "Head of Marketing at Larkmoor Yachts".

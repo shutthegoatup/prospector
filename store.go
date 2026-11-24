@@ -246,6 +246,8 @@ func deref(p *string) string {
 const open_ = "hold is null and replied is null and declined is null and status <> 'suggested' and key not like 'org:%'"
 
 // Due returns one outreach step's queue for an organisation. NULLS FIRST keeps SQLite's ordering on Postgres.
+// People on the never-contact list are left out here rather than marked, so the list
+// and the queue can't drift apart: listing someone hides them, unlisting brings them back.
 func (s *Store) Due(org int64, step string, now time.Time, set OrgSettings) ([]Contact, error) {
 	set = set.withDefaults()
 	var rows []Contact
@@ -267,7 +269,19 @@ func (s *Store) Due(org int64, step string, now time.Time, set OrgSettings) ([]C
 	default:
 		return nil, fmt.Errorf("unknown step %q", step)
 	}
-	return rows, q.Order("id").Find(&rows).Error
+	if err := q.Order("id").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(set.NeverContact) == "" {
+		return rows, nil
+	}
+	due := rows[:0]
+	for _, c := range rows {
+		if set.listed(deref(c.Email), deref(c.Linkedin)) == nil {
+			due = append(due, c)
+		}
+	}
+	return due, nil
 }
 
 func (s *Store) log(tx *gorm.DB, org, contact int64, company *int64, actor, action string, value *string) error {

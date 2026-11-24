@@ -1058,7 +1058,7 @@ func SettingsView(q *Req, d SettingsData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Meta("Applied to everything people and agents add.").Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = Meta(neverContactHint(d.Covered)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -1514,6 +1514,14 @@ func removeConfirm(q *Req, m Member) string {
 		return "Leave " + q.Org.Name + "? You lose access to it."
 	}
 	return "Remove " + m.Email + " from " + q.Org.Name + "? They lose access to it; their account and what they added stay, and so do any API keys they made."
+}
+
+func neverContactHint(covered int) string {
+	hint := "Applied to everything people and agents add, and to who comes up on Today."
+	if covered > 0 {
+		hint += " It currently keeps " + plural(covered, "person") + " already here out of the queue."
+	}
+	return hint
 }
 
 func ownerHint(q *Req) string {
