@@ -103,13 +103,13 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	do(s.in(o.ID).Find(&rows).Error)
 	for i := range rows {
 		if rows[i].ID == jonas.ID {
-			rows[i].Key = "hannah-pryce-lindqvist"
+			rows[i].Key, rows[i].Person = "omar-haddad", str("Omar Haddad")
 		}
 	}
 	if _, err := s.replaceContacts(o.ID, rows); err != nil {
 		t.Fatal(err)
 	}
-	if h := history(jonas.ID); h["set:phone"] == "" {
-		t.Fatalf("renaming Hannah's row in the file cost her her history: %v", h)
+	if h := history(jonas.ID); len(h) != 0 {
+		t.Fatalf("a stranger who arrived under Hannah's id inherited her history: %v", h)
 	}
 }
