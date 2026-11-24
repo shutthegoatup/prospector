@@ -128,7 +128,14 @@ templ CompanyView(q *Req, p CompanyPage) {
 			<p class="text-sm text-muted-foreground">{ p.Company.Why }</p>
 		}
 		<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-			<div class="rounded-lg bg-muted p-3">@Label("Configurator")<div class="mt-1 text-sm">{ platformText(p.Company) }</div></div>
+			<div class="rounded-lg bg-muted p-3">
+				@Label("Looking for")
+				if found := assetsFound(q.Org.Settings, p.Facts); len(found) > 0 {
+					<div class="mt-1">@AssetPills(found)</div>
+				} else {
+					<div class="mt-1 text-sm text-muted-foreground"><a href={ templ.SafeURL(q.Base() + "settings") }>Name what you look for</a></div>
+				}
+			</div>
 			<div class="rounded-lg bg-muted p-3">@Label("Found by")<div class="mt-1 text-sm">{ actorLabel(p.Company.FoundBy) }</div></div>
 			<div class="rounded-lg bg-muted p-3">@Label("Touches")<div class="mt-1 font-mono text-lg">{ strconv.Itoa(touches(p.History)) }</div></div>
 		</div>
@@ -160,18 +167,19 @@ templ CompanyView(q *Req, p CompanyPage) {
 				</div>
 			}
 		</div>
-		if len(p.Facts) > 0 || p.Company.ConfiguratorURL != "" {
+		if len(p.Facts) > 0 {
 			<div>
 				@Label("Facts")
 				for _, f := range p.Facts {
 					<div class="grid grid-cols-[130px_1fr_auto] items-baseline gap-3 border-b border-dashed border-border py-2 text-sm">
 						<span class="font-mono text-xs text-muted-foreground">{ f.Field }</span>
 						<span>{ f.Value }</span>
-						<a href={ safeHref(f.SourceURL) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
+						if f.SourceURL != "" {
+							<a href={ safeHref(f.SourceURL) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
+						} else {
+							<span></span>
+						}
 					</div>
-				}
-				if p.Company.ConfiguratorURL != "" {
-					<div class="grid grid-cols-[130px_1fr] gap-3 py-2 text-sm"><span class="font-mono text-xs text-muted-foreground">configurator</span><a href={ safeHref(p.Company.ConfiguratorURL) } target="_blank" rel="noopener" class="break-all">{ p.Company.ConfiguratorURL }</a></div>
 				}
 			</div>
 		}

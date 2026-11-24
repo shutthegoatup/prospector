@@ -222,10 +222,15 @@ func linkCompanies(tx *gorm.DB, org int64, rows []CompanyRow) error {
 	byStem := map[string]int64{}
 	for _, r := range rows {
 		c, created, err := ensureCompany(tx, org, Company{Name: r["name"], Country: r["country"], Segment: r["segment"],
-			Fit: r["priority"], Stage: CompanyQualified, ConfiguratorURL: r["configurator_url"], BuiltBy: r["configurator_built_by"],
+			Fit: r["priority"], Stage: CompanyQualified,
 			Why: r["fit_reason"], Domain: domainOf(r["website"]), FoundBy: "import", Hold: competitorHold(r)})
 		if err != nil {
 			return err
+		}
+		for _, f := range configuratorFacts(r["configurator_url"], "", r["configurator_built_by"], domainOf(r["website"])) {
+			if _, _, err := addFact(tx, org, c.ID, f, "import"); err != nil {
+				return err
+			}
 		}
 		if !created {
 			if err := tx.Model(c).Updates(map[string]any{"fit": r["priority"], "segment": r["segment"], "why": r["fit_reason"]}).Error; err != nil {

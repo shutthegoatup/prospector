@@ -14,7 +14,7 @@ import (
 // organisation and actor taken from the API key, never from the request body.
 
 type FactIn struct {
-	Field     string `json:"field" jsonschema:"what the fact is about, e.g. configurator, built_by, team_page, press"`
+	Field     string `json:"field" jsonschema:"what the fact is about, e.g. team_page or press, or one of the things the guidance says this organisation looks for"`
 	Value     string `json:"value" jsonschema:"the fact itself, one sentence"`
 	SourceURL string `json:"source_url" jsonschema:"the page that shows it (required)"`
 }
@@ -25,9 +25,9 @@ type AddCompanyIn struct {
 	Country         string   `json:"country,omitempty" jsonschema:"ISO country code"`
 	Segment         string   `json:"segment,omitempty"`
 	Fit             string   `json:"fit,omitempty" jsonschema:"suggested fit grade A, B or C"`
-	ConfiguratorURL string   `json:"configurator_url,omitempty"`
-	Platform        string   `json:"platform,omitempty" jsonschema:"configurator platform if detected"`
-	BuiltBy         string   `json:"built_by,omitempty" jsonschema:"agency or vendor that built it, if a source says so"`
+	ConfiguratorURL string   `json:"configurator_url,omitempty" jsonschema:"older clients only: add a fact instead"`
+	Platform        string   `json:"platform,omitempty" jsonschema:"older clients only: add a fact instead"`
+	BuiltBy         string   `json:"built_by,omitempty" jsonschema:"older clients only: add a fact instead"`
 	Why             string   `json:"why,omitempty" jsonschema:"why it fits, one sentence"`
 	Facts           []FactIn `json:"facts,omitempty" jsonschema:"facts with their sources"`
 }
@@ -68,13 +68,18 @@ func addFact(tx *gorm.DB, org, company int64, in FactIn, actor string) (*Fact, b
 }
 
 func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddCompanyOut, error) {
+	if in.ConfiguratorURL != "" && !httpURL.MatchString(strings.TrimSpace(in.ConfiguratorURL)) {
+		return nil, errors.New("configurator_url must be an http(s) link")
+	}
+	older := configuratorFacts(in.ConfiguratorURL, in.Platform, in.BuiltBy, in.Domain)
+	if len(older) > 0 && older[0].SourceURL == "" {
+		return nil, errors.New("platform and built_by need a configurator_url or domain to cite; add them as facts instead")
+	}
+	in.Facts = append(in.Facts, older...)
 	for _, f := range in.Facts {
 		if err := checkFact(f); err != nil {
 			return nil, err
 		}
-	}
-	if in.ConfiguratorURL != "" && !httpURL.MatchString(strings.TrimSpace(in.ConfiguratorURL)) {
-		return nil, errors.New("configurator_url must be an http(s) link")
 	}
 	var out AddCompanyOut
 	err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -91,8 +96,7 @@ func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddComp
 		created := false
 		if c == nil {
 			c, created, err = ensureCompany(tx, org, Company{Name: in.Name, Domain: domain, Country: in.Country,
-				Segment: in.Segment, Fit: in.Fit, ConfiguratorURL: in.ConfiguratorURL, Platform: in.Platform, BuiltBy: in.BuiltBy,
-				Why: in.Why, FoundBy: who.Name, Stage: CompanyReview})
+				Segment: in.Segment, Fit: in.Fit, Why: in.Why, FoundBy: who.Name, Stage: CompanyReview})
 			if err != nil {
 				return err
 			}
@@ -497,7 +501,8 @@ func agentInstructions(o *Org, k *APIKey) string {
 		"Other agents and people work the same companies. get_company returns the company's history: read it before researching, don't suggest again what a person rejected, and if last_agent shows another agent was there within the hour, take a different company. by_you marks what this key did, perhaps in an earlier run."}
 	if k.Has("research:write") {
 		parts = append(parts,
-			"Companies and facts are high volume with simple judgement, so a small, fast model does them well. One claim per fact, from the page that shows it. Leave built_by and platform empty unless a source says so.",
+			"Companies and facts are high volume with simple judgement, so a small, fast model does them well. One claim per fact, from the page that shows it.",
+			lookForGuidance(o),
 			"Contacts need care more than speed, so use a capable model. Pick the person who owns the decision, not a general inbox. Confirm they hold the role now on a current page: an old bio, press release or speaker listing isn't enough. Set email_status to guess for any address inferred from a pattern. If you can't confirm someone, don't add them; add a team_page fact so a person can look.")
 	}
 	if k.Has("outcomes:write") {
@@ -513,6 +518,20 @@ func agentInstructions(o *Org, k *APIKey) string {
 		parts = append(parts, "From "+o.Name+":\n"+g)
 	}
 	return strings.Join(parts, "\n\n")
+}
+
+// lookForGuidance names the assets the organisation looks for, so agents record
+// each under the field the Research page checks.
+func lookForGuidance(o *Org) string {
+	assets, _ := o.Settings.Assets()
+	if len(assets) == 0 {
+		return "Add any fact a source shows that helps judge fit."
+	}
+	lines := []string{o.Name + " looks for these at each company. When a source shows one, add a fact with exactly this field. Add nothing for one you didn't find:"}
+	for _, a := range assets {
+		lines = append(lines, "- "+a.Field+prefixed(": ", a.Hint))
+	}
+	return strings.Join(lines, "\n")
 }
 
 type GuidanceOut struct {

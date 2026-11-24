@@ -83,14 +83,15 @@ func TestExportOrg(t *testing.T) {
 	if out.Organisation.Slug != "alpha" || len(out.Members) != 2 || out.Members[1].Email != "bob@example.com" || out.Members[1].Role != "member" {
 		t.Fatalf("organisation and members: %+v %+v", out.Organisation, out.Members)
 	}
-	var contacts, companies, events int64
+	var contacts, companies, events, facts int64
 	s.in(o.ID).Model(&Contact{}).Count(&contacts)
+	s.in(o.ID).Model(&Fact{}).Count(&facts)
 	s.in(o.ID).Model(&Company{}).Count(&companies)
 	s.in(o.ID).Model(&Event{}).Count(&events)
 	if contacts == 0 || int64(len(out.Contacts)) != contacts || int64(len(out.Companies)) != companies || int64(len(out.History)) != events {
 		t.Fatalf("%d of %d contacts, %d of %d companies, %d of %d history lines", len(out.Contacts), contacts, len(out.Companies), companies, len(out.History), events)
 	}
-	if len(out.Facts) != 1 || len(out.Enquiries) != 1 || out.Erased != 1 {
+	if facts < 2 || int64(len(out.Facts)) != facts || len(out.Enquiries) != 1 || out.Erased != 1 {
 		t.Fatalf("%d facts, %d enquiries, %d erased", len(out.Facts), len(out.Enquiries), out.Erased)
 	}
 	if len(out.Keys) != 1 || out.Keys[0].Name != "scout" || out.Keys[0].CreatedBy != "ada" {

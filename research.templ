@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/shutthegoatup/prospector/components/button"
 	"strconv"
+	"strings"
 )
 
 func researchEmpty(f string) (string, string) {
@@ -32,25 +33,6 @@ func jsonBody(pairs ...any) string {
 		}
 	}
 	return s + "}"
-}
-
-func platformText(c Company) string {
-	switch {
-	case c.Platform != "" && c.BuiltBy != "":
-		return c.Platform + ", by " + c.BuiltBy
-	case c.Platform != "":
-		return c.Platform
-	case c.ConfiguratorURL != "":
-		return "has one, platform unknown"
-	}
-	return "none found"
-}
-
-func platformState(c Company) string {
-	if c.Platform != "" || c.ConfiguratorURL != "" {
-		return "ok"
-	}
-	return ""
 }
 
 templ ResearchView(q *Req, f string, rows []ResearchRow, counts map[string]int) {
@@ -90,10 +72,12 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 					{ joinNonEmpty(" · ", r.Country, r.Segment, r.Domain) }
 				</p>
 			</div>
-			<div class="flex flex-[1_1_180px] flex-col gap-1">
-				@Label("Configurator")
-				<div>@Pill(platformText(r.Company), platformState(r.Company))</div>
-			</div>
+			if found := assetsFound(q.Org.Settings, r.Facts); len(found) > 0 {
+				<div class="flex flex-[1_1_180px] flex-col gap-1">
+					@Label("Looking for")
+					@AssetPills(found)
+				</div>
+			}
 			<div class="flex flex-[1_1_150px] flex-col gap-1">
 				@Label("Found by")
 				<div>@Pill(actorLabel(r.FoundBy), actorState(r.FoundBy))</div>
@@ -128,11 +112,12 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 						<div class="grid grid-cols-[130px_1fr_auto] items-baseline gap-3 border-b border-dashed border-border py-2 text-sm">
 							<span class="font-mono text-xs text-muted-foreground">{ f.Field }</span>
 							<span>{ f.Value }</span>
-							<a href={ safeHref(f.SourceURL) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
+							if f.SourceURL != "" {
+								<a href={ safeHref(f.SourceURL) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
+							} else {
+								<span></span>
+							}
 						</div>
-					}
-					if r.ConfiguratorURL != "" {
-						<div class="grid grid-cols-[130px_1fr] gap-3 py-2 text-sm"><span class="font-mono text-xs text-muted-foreground">configurator</span><a href={ safeHref(r.ConfiguratorURL) } target="_blank" rel="noopener" class="break-all">{ r.ConfiguratorURL }</a></div>
 					}
 				</div>
 				<div class="min-w-0 flex-[1_1_260px]">
@@ -181,4 +166,16 @@ templ FitPicker(c Company) {
 			<option value={ g } selected?={ g == c.Fit || (c.Fit == "" && g == "B") }>{ "Fit " + g }</option>
 		}
 	</select>
+}
+
+templ AssetPills(found []AssetFound) {
+	<div class="flex flex-wrap gap-1.5">
+		for _, a := range found {
+			if a.Has {
+				@Pill(strings.ReplaceAll(a.Field, "_", " "), "ok")
+			} else {
+				@Pill("no "+strings.ReplaceAll(a.Field, "_", " ")+" found", "")
+			}
+		}
+	</div>
 }
