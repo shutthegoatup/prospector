@@ -160,8 +160,8 @@ func TestChangePassword(t *testing.T) {
 	if code := change("correct horse battery", "a brand new password"); code != http.StatusOK {
 		t.Fatalf("change: %d", code)
 	}
-	if code, _ := call(t, client, "GET", srv.URL+"/o/alpha/settings", "", nil); code != http.StatusOK {
-		t.Fatalf("the session that changed the password was signed out: %d", code)
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/settings", "", nil); !strings.Contains(body, "Your password") {
+		t.Fatal("the session that changed the password was signed out")
 	}
 	if _, err := s.SessionUser(elsewhere); err == nil {
 		t.Fatal("another session survived the password change")
@@ -178,6 +178,24 @@ func TestChangePassword(t *testing.T) {
 	}
 	if _, err := s.SessionUser(fresh); err == nil {
 		t.Fatal("a session survived a password reset from the CLI")
+	}
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/settings", "", nil); strings.Contains(body, "Your password") {
+		t.Fatal("the browser session survived a password reset from the CLI")
+	}
+
+	// Guessing the current password from an open session is slowed like guessing at sign-in.
+	_, _, srv, client = signedIn(t)
+	guess := func() int {
+		code, _ := call(t, client, "POST", srv.URL+"/password", "application/json", map[string]string{"current": "a guess", "new": "a brand new password"})
+		return code
+	}
+	for i := range freeAttempts {
+		if code := guess(); code != http.StatusBadRequest {
+			t.Fatalf("guess %d: %d", i+1, code)
+		}
+	}
+	if code := guess(); code != http.StatusTooManyRequests {
+		t.Fatalf("after %d wrong guesses the next got %d", freeAttempts, code)
 	}
 }
 

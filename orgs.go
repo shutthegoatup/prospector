@@ -76,10 +76,12 @@ func (s *Store) SetPassword(email, password string) error {
 	return s.savePassword(u.ID, string(hash), "")
 }
 
+var errWrongCurrent = errors.New("the current password is wrong")
+
 // ChangePassword is a signed-in user changing their own; keepToken is the session doing it.
 func (s *Store) ChangePassword(u *User, current, password, keepToken string) error {
 	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(current)) != nil {
-		return errors.New("the current password is wrong")
+		return errWrongCurrent
 	}
 	if len(password) < 10 {
 		return errors.New("passwords need at least 10 characters")

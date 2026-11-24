@@ -321,7 +321,25 @@ func (a *App) changePassword(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionCookie); err == nil {
 		keep = c.Value
 	}
-	if err := a.s.ChangePassword(reqOf(r).User, in.Current, in.New, keep); err != nil {
+	// Guessing the current password from a borrowed session is slowed like guessing at sign-in.
+	u := reqOf(r).User
+	select {
+	case hashSlots <- struct{}{}:
+		defer func() { <-hashSlots }()
+	case <-r.Context().Done():
+		return
+	}
+	if wait := a.logins.begin(u.Email); wait > 0 {
+		seconds := int(wait.Seconds()) + 1
+		w.Header().Set("Retry-After", strconv.Itoa(seconds))
+		http.Error(w, "too many attempts: try again in "+plural(seconds, "second"), http.StatusTooManyRequests)
+		return
+	}
+	err := a.s.ChangePassword(u, in.Current, in.New, keep)
+	if err == nil || errors.Is(err, errWrongCurrent) {
+		a.logins.record(u.Email, err == nil)
+	}
+	if err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
