@@ -779,6 +779,16 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 	if code, _ := call(t, bob, "POST", srv.URL+"/orgs", "application/json", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
 		t.Fatalf("a new organisation before the first password is changed: %d", code)
 	}
+	fragment, _ := http.NewRequest("GET", srv.URL+"/o/alpha/today", nil)
+	fragment.Header.Set("X-Fragment", "1")
+	refreshed, err := bob.Do(fragment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	refreshed.Body.Close()
+	if refreshed.StatusCode != http.StatusForbidden {
+		t.Fatalf("a page refresh before the first password is changed: %d", refreshed.StatusCode)
+	}
 	if code, _ := change(given, given); code != http.StatusBadRequest {
 		t.Fatalf("keeping the given password: %d", code)
 	}
@@ -793,6 +803,9 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 	}
 	if u, err := s.UserByEmail("bob@example.com"); err != nil || u.MustChangePassword {
 		t.Fatalf("still marked for a change: %+v %v", u, err)
+	}
+	if _, _, err := s.Login("bob@example.com", given); err == nil {
+		t.Fatal("the password the inviter saw still signs in")
 	}
 	if code, body := change("a password of my own", "another of my own"); code != http.StatusOK || !strings.Contains(body, "Password changed") {
 		t.Fatalf("an ordinary change afterwards: %d %s", code, body)
@@ -811,8 +824,8 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 	if !strings.Contains(page("/o/beta/settings"), "Your password") {
 		t.Fatal("an existing account was asked to choose a password again")
 	}
-	if _, body := call(t, ada, "GET", srv.URL+"/password", "", nil); strings.Contains(body, "Choose your own password") {
-		t.Fatal("an account made by the CLI was asked to choose a password")
+	if _, body := call(t, ada, "GET", srv.URL+"/password", "", nil); strings.Contains(body, "Choose your own password") || !strings.Contains(body, "Alpha") {
+		t.Fatal("an account made by the CLI wasn't sent straight on to the app")
 	}
 }
 
