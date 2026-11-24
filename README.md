@@ -50,6 +50,7 @@ Each organisation has an MCP endpoint and a REST API, with scoped keys. Agents c
 ### Also
 
 - **Companies:** search, plus each company's people, facts and full history: who did what, people and agents alike.
+- **Erase a person:** an owner can erase someone from their company's page (or `prospector erase <name>`) when they ask to be forgotten. Their details, drafts, notes and facts are deleted, the history keeps only that something happened and when, and an import, a restore or an agent can't add them again. A row that names several people goes whole. Company facts and other people's notes that mention them, your own lead files and database backups aren't touched: take them out there too.
 - **Add person:** paste a LinkedIn profile link and the name fills in. A bookmarklet opens the same form pre-filled from the profile you're viewing.
 - **Settings, per organisation:** waits between steps, connection-note template, call-script pitch, never-contact list and team. Each member sets their own caller name and signature.
 - **Several organisations per login:** each has its own prospects, wording, team and keys, and none can see another's.

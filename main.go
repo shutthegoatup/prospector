@@ -15,6 +15,7 @@
 //	prospector export <file>                 write the contacts snapshot
 //	prospector restore <file>                replace the organisation's contacts with a snapshot
 //	prospector import-legacy <file.sqlite>   the same, from a legacy tracker database (read-only)
+//	prospector erase <name>                  delete a person for good, on their request
 //	prospector mark <name> <step> [date]
 //	prospector set <name> <field> <value>
 //	prospector list [step]
@@ -295,6 +296,21 @@ func run(args []string) error {
 			return err
 		}
 		fmt.Printf("copied %d contacts from %s into %s\n", n, rest[0], org.Slug)
+	case "erase":
+		if len(rest) < 1 {
+			return fmt.Errorf("usage: prospector erase <name>")
+		}
+		c, err := s.FindOne(org.ID, rest[0])
+		if err != nil {
+			return err
+		}
+		if !strings.EqualFold(strings.TrimSpace(rest[0]), displayName(*c)) {
+			return fmt.Errorf("erase needs the full name, to be sure it's them: %q", displayName(*c))
+		}
+		if err := s.ErasePerson(org.ID, c.ID, "cli"); err != nil {
+			return err
+		}
+		fmt.Printf("erased %s @ %s; take them out of your lead files too\n", deref(c.Person), deref(c.Maker))
 	case "mark":
 		if len(rest) < 2 {
 			return fmt.Errorf("usage: prospector mark <name> <step> [date]")

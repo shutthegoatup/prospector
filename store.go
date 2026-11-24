@@ -216,7 +216,7 @@ func Open(dsn string) (*Store, error) {
 		return nil, err
 	}
 	if err := db.AutoMigrate(&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
-		&Company{}, &Fact{}, &Contact{}, &Event{}); err != nil {
+		&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}); err != nil {
 		return nil, err
 	}
 	return &Store{db: db}, nil
@@ -353,6 +353,9 @@ func (s *Store) Update(org, id int64, field, value, actor string) error {
 				email, link = "", value
 			}
 			if err := s.allowed(&o, email, link); err != nil {
+				return err
+			}
+			if err := erased(tx, org, "", "", email, link); err != nil {
 				return err
 			}
 		}
