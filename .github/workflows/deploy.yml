@@ -55,6 +55,11 @@ jobs:
             echo "::notice::The DEPLOY_* secrets are not set, so $version was not installed anywhere."
             exit 0
           fi
+          # A secret is masked only as a whole, and ssh and curl name the bare host
+          # when they fail.
+          ca_host=${CA_ADDR#*://}
+          echo "::add-mask::${ca_host%%[:/]*}"
+          echo "::add-mask::${TARGET#*@}"
           # A release cut from an older commit must not replace a newer one. By hand, any
           # release may be installed.
           if [ "$GITHUB_EVENT_NAME" != workflow_dispatch ]; then
