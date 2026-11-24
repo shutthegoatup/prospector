@@ -83,6 +83,7 @@ prospector serve                                          # http://127.0.0.1:876
 - Someone added from Settings gets a first password that the person adding them sees; they are made to choose their own the first time they sign in.
 - Members change their own password in Settings, which signs out their other sessions. `prospector user password` signs them out everywhere.
 - Every page needs a sign-in except the sign-in form and the front page at `/`, which describes Prospector to a signed-out visitor and shows nothing from your data. Every browser POST must be JSON, which blocks cross-site form posts, and a request that a browser marks as coming from another site is refused, sign-in and sign-out included.
+- The one exception is the enquiry route, `/o/<slug>/intake`, which exists to be posted to from your own sites. It answers only the sites an owner lists in Settings, reads no session, and can add an enquiry and nothing else. With no sites listed it refuses everything.
 
 There's a Dockerfile for container hosting.
 
@@ -97,6 +98,7 @@ Each organisation has an MCP endpoint at `/o/<slug>/mcp` (streamable HTTP) and a
 | `drafts:write` | `draft_message`, shown as written by the agent |
 | `import` | `push` and `pull`: a full sync, for a person's own files rather than an agent |
 | `outcomes:write` | `mark`: record an outcome (sent, accepted, called, replied, declined, hold), shown as the agent's |
+| `enquiries:write` | `POST /api/v1/enquiries`: record an enquiry or sign-up from your own product or site backend |
 
 - **What no key can do:** send anything, change settings, or see another organisation. A key with `outcomes:write` can record what happened (sent, accepted, replied, declined…); each mark shows as the agent's, with its note, on Today and in the company's history. `import` is the one scope that skips review: it puts people from your own files straight into outreach and marks those in `sent-log.md` as added.
 - **Writes are checked:** every fact and contact an agent adds needs a source URL. The never-contact list applies to agents, imports and edits alike: an import that would bring in an address on it is refused whole, though people already stored stay as they are. Someone already stored who falls under the list drops out of the outreach queues on Today and the agents' due list until the entry is removed, and Settings names them; a person who has already replied stays in Conversations. An entry is a domain, an email address or a LinkedIn profile link, matched whole: a company name or a loose word matches nobody.
@@ -105,6 +107,34 @@ Each organisation has an MCP endpoint at `/o/<slug>/mcp` (streamable HTTP) and a
 ```sh
 claude mcp add --transport http prospector https://<host>/o/<slug>/mcp --header "Authorization: Bearer $PROSPECTOR_KEY"
 ```
+
+## Enquiries: website forms and sign-ups
+
+Enquiries is the inbox for what people send you: a help request, a feature request, a sales question, a demo request or a sign-up. Each is kept as sent, and tied to the person and company already here when the email address or its domain matches.
+
+**From a form on your site.** In Settings, list the sites whose forms may post (`https://www.example.com`, one per line). A page on one of them then posts JSON straight from the browser, with no key:
+
+```js
+await fetch("https://<host>/o/<slug>/intake", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ kind: "demo", name, email, company, phone, message, page: location.href, trap }),
+});
+```
+
+- `email` is required. `kind` is `sales`, `demo`, `signup`, `support`, `feature` or `other`; anything else is kept as `other`.
+- `trap` is a field your form hides from people; give it a name autofill will not recognise. An enquiry that fills it is kept, under Spam.
+- The same enquiry sent again within ten minutes is stored once, so a form can retry until it gets a `200`. Show your email address if it never does.
+- Only listed sites are answered, a sender is held to 5 an hour and an organisation to 300, and the route can add an enquiry and nothing else. A browser enforces the site list; a script can claim to be any site, so treat what arrives as unverified.
+
+**From your own backend**, such as a product reporting a sign-up, use a key with the `enquiries:write` scope:
+
+```sh
+curl https://<host>/o/<slug>/api/v1/enquiries -H "Authorization: Bearer $PROSPECTOR_KEY" \
+  -d '{"kind":"signup","name":"Hannah Pryce","email":"hannah@quay.example","company":"Quay Marine","site":"app"}'
+```
+
+Erasing a person also deletes their enquiries.
 
 ## Importing drafts from markdown
 

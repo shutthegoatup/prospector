@@ -192,12 +192,13 @@ type SettingsData struct {
 	Members []Member
 	Me      Membership
 	Covered []string
+	Intake  string
 }
 
 func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	members, _ := a.s.Members(q.Org.ID)
-	a.page(w, r, "settings", SettingsView(q, SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org)}))
+	a.page(w, r, "settings", SettingsView(q, SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org), Intake: a.baseURL(r) + q.Base() + "intake"}))
 }
 
 type AgentsData struct {
@@ -310,6 +311,10 @@ func (a *App) uiSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.EmailAfterDays < 0 || in.FollowupAfterDays < 0 || in.EmailAfterDays > 60 || in.FollowupAfterDays > 60 {
 		fail(w, errors.New("waits are between 0 and 60 days"), http.StatusBadRequest)
+		return
+	}
+	if _, err := enquiryOrigins(in.EnquirySites); err != nil {
+		fail(w, err, http.StatusBadRequest)
 		return
 	}
 	o := reqOf(r).Org

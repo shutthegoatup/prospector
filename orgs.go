@@ -300,6 +300,7 @@ var Scopes = []struct{ Name, What string }{
 	{"drafts:write", "write draft notes and emails, marked as written by the agent"},
 	{"outcomes:write", "record what happened (added, accepted, sent, called, replied, declined, hold), shown as the agent's"},
 	{"import", "push the repo's markdown and pull the snapshot"},
+	{"enquiries:write", "record an enquiry or sign-up from your own product or site backend"},
 }
 
 func validScope(s string) bool {

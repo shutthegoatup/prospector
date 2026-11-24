@@ -30,6 +30,7 @@ type OrgSettings struct {
 	NeverContact      string `json:"never_contact"`
 	IncorporatedOnly  bool   `json:"incorporated_only"`
 	AgentGuidance     string `json:"agent_guidance"`
+	EnquirySites      string `json:"enquiry_sites"`
 }
 
 func (s OrgSettings) withDefaults() OrgSettings {
@@ -216,7 +217,7 @@ func Open(dsn string) (*Store, error) {
 		return nil, err
 	}
 	if err := db.AutoMigrate(&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
-		&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}); err != nil {
+		&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Enquiry{}); err != nil {
 		return nil, err
 	}
 	return &Store{db: db}, nil
