@@ -147,6 +147,39 @@ templ LoginPage(next, problem string) {
 	</html>
 }
 
+templ ChoosePassword(u *User) {
+	<!DOCTYPE html>
+	<html lang="en" class="dark">
+		<head>
+			@Head("Choose a password · Prospector")
+		</head>
+		<body class="queue-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased" data-base="/">
+			<div class="flex w-full max-w-sm flex-col gap-4">
+				<form data-form="/password" class="flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-card p-7">
+					<h1 class="font-heading text-2xl font-bold">Choose your own password</h1>
+					<p class="text-sm text-muted-foreground">The one you signed in with was shown to whoever added you. Choose one only you know, 10 characters or more.</p>
+					<label class="flex flex-col gap-1.5 text-sm">
+						<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Password you were given</span>
+						<input name="current" type="password" required autocomplete="current-password" class="h-10 rounded-lg border border-input bg-muted px-3"/>
+					</label>
+					<label class="flex flex-col gap-1.5 text-sm">
+						<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">New password</span>
+						<input name="new" type="password" required minlength="10" autocomplete="new-password" class="h-10 rounded-lg border border-input bg-muted px-3"/>
+					</label>
+					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg}) {
+						Continue
+					}
+					<p data-result class="text-sm text-muted-foreground" role="status"></p>
+				</form>
+				<form method="post" action="/logout" class="flex items-center gap-2.5 px-2.5 text-sm text-muted-foreground">
+					<span class="flex-1 truncate">{ u.Email }</span>
+					<button type="submit" class="text-xs hover:text-foreground">Sign out</button>
+				</form>
+			</div>
+		</body>
+	</html>
+}
+
 templ NoOrgs(u *User) {
 	<!DOCTYPE html>
 	<html lang="en" class="dark">

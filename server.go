@@ -116,6 +116,15 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 			}
 			return
 		}
+		// Someone still on a password their inviter saw can only go and choose their own.
+		if u.MustChangePassword && r.URL.Path != "/password" {
+			if r.Method == http.MethodGet && r.Header.Get("X-Fragment") == "" {
+				http.Redirect(w, r, "/password", http.StatusSeeOther)
+			} else {
+				http.Error(w, "choose your own password first", http.StatusForbidden)
+			}
+			return
+		}
 		q := &Req{User: u}
 		q.Orgs, _ = a.s.OrgsFor(u.ID)
 		if slug := r.PathValue("org"); slug != "" {
@@ -203,6 +212,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /logout", a.logout)
 	mux.HandleFunc("GET /{$}", a.member(a.home))
 	mux.HandleFunc("POST /orgs", a.member(a.newOrg))
+	mux.HandleFunc("GET /password", a.member(a.passwordPage))
 	mux.HandleFunc("POST /password", a.member(a.changePassword))
 
 	mux.HandleFunc("GET /o/{org}/{$}", a.member(func(w http.ResponseWriter, r *http.Request) {
@@ -321,6 +331,18 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 	NoOrgs(q.User).Render(r.Context(), w)
 }
 
+// passwordPage is where a new member lands until they have chosen a password;
+// everyone else changes theirs in Settings.
+func (a *App) passwordPage(w http.ResponseWriter, r *http.Request) {
+	u := reqOf(r).User
+	if !u.MustChangePassword {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	w.Header().Set("content-type", "text/html; charset=utf-8")
+	ChoosePassword(u).Render(r.Context(), w)
+}
+
 func (a *App) changePassword(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Current string `json:"current"`
@@ -353,6 +375,10 @@ func (a *App) changePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		fail(w, err, http.StatusBadRequest)
+		return
+	}
+	if u.MustChangePassword {
+		writeJSON(w, map[string]string{"go": "/"})
 		return
 	}
 	writeJSON(w, map[string]string{"message": "Password changed. Your other sessions are signed out."})

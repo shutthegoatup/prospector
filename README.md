@@ -77,6 +77,7 @@ prospector serve                                          # http://127.0.0.1:876
 - Pages carry a Content-Security-Policy that allows only the app's own scripts, plus Google Fonts for the typefaces.
 - Repeated wrong passwords for one email are slowed, up to a minute between tries.
 - An owner adds and removes members in Settings. Removing someone ends their sign-in access to that organisation; their account, and other organisations, are untouched. API keys they created keep working until revoked on the Agents page.
+- Someone added from Settings gets a first password that the person adding them sees; they are made to choose their own the first time they sign in.
 - Members change their own password in Settings, which signs out their other sessions. `prospector user password` signs them out everywhere.
 - Every page needs a sign-in, and every browser POST must be JSON, which blocks cross-site form posts.
 

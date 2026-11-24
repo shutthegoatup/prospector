@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -643,10 +644,11 @@ func TestContentPolicy(t *testing.T) {
 	pages := []string{"/login", "/o/alpha/today", "/o/alpha/today?step=linkedin", "/o/alpha/research", "/o/alpha/research?f=rejected",
 		"/o/alpha/conversations", "/o/alpha/companies", "/o/alpha/companies/" + strconv.FormatInt(company.ID, 10),
 		"/o/alpha/add", "/o/alpha/add?popup=1&name=Hannah", "/o/alpha/settings", "/o/alpha/agents"}
-	for _, page := range pages {
+	check := func(page, marker string) {
+		t.Helper()
 		code, body := call(t, client, "GET", srv.URL+page, "", nil)
-		if code != http.StatusOK {
-			t.Fatalf("GET %s: %d", page, code)
+		if code != http.StatusOK || !strings.Contains(body, marker) {
+			t.Fatalf("GET %s: %d, without %q", page, code, marker)
 		}
 		for _, script := range tag.FindAllString(body, -1) {
 			if !strings.Contains(script, "src=") {
@@ -657,6 +659,13 @@ func TestContentPolicy(t *testing.T) {
 			t.Errorf("%s has an inline event handler: %s", page, found)
 		}
 	}
+	for _, page := range pages {
+		check(page, "<title>")
+	}
+	if err := s.db.Model(&User{}).Where("email = ?", "ada@example.com").Update("must_change_password", true).Error; err != nil {
+		t.Fatal(err)
+	}
+	check("/password", "Choose your own password")
 }
 
 func TestOrgIsCreatedWithItsOwner(t *testing.T) {
@@ -729,5 +738,114 @@ func TestHistoryNamesPeopleInFull(t *testing.T) {
 	}
 	if got := s.AgentActivity(o.ID, 10); len(got) != 0 {
 		t.Fatalf("a person's action is listed as an agent's: %+v", got)
+	}
+}
+
+func TestFirstPasswordMustBeChanged(t *testing.T) {
+	s, _, srv, ada := signedIn(t)
+	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/member", "application/json",
+		map[string]string{"email": "bob@example.com", "name": "Bob Stone", "role": "member"})
+	_, after, found := strings.Cut(body, "shown once: ")
+	if code != http.StatusOK || !found {
+		t.Fatalf("invite: %d %s", code, body)
+	}
+	given := strings.Fields(after)[0]
+	jar, _ := cookiejar.New(nil)
+	bob := &http.Client{Jar: jar}
+	res, err := bob.PostForm(srv.URL+"/login", url.Values{"email": {"bob@example.com"}, "password": {given}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	landing, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if !strings.Contains(string(landing), "Choose your own password") {
+		t.Fatal("a new member's first sign-in didn't land on the password page")
+	}
+	page := func(path string) string {
+		_, body := call(t, bob, "GET", srv.URL+path, "", nil)
+		return body
+	}
+	change := func(current, password string) (int, string) {
+		return call(t, bob, "POST", srv.URL+"/password", "application/json", map[string]string{"current": current, "new": password})
+	}
+	for _, path := range []string{"/", "/o/alpha/today", "/o/alpha/settings"} {
+		if !strings.Contains(page(path), "Choose your own password") {
+			t.Fatalf("%s is open before the first password is changed", path)
+		}
+	}
+	if code, _ := call(t, bob, "POST", srv.URL+"/o/alpha/ui/add", "application/json", QuickAdd{Name: "Hannah Pryce"}); code != http.StatusForbidden {
+		t.Fatalf("an action before the first password is changed: %d", code)
+	}
+	if code, _ := call(t, bob, "POST", srv.URL+"/orgs", "application/json", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
+		t.Fatalf("a new organisation before the first password is changed: %d", code)
+	}
+	fragment, _ := http.NewRequest("GET", srv.URL+"/o/alpha/today", nil)
+	fragment.Header.Set("X-Fragment", "1")
+	refreshed, err := bob.Do(fragment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	refreshed.Body.Close()
+	if refreshed.StatusCode != http.StatusForbidden {
+		t.Fatalf("a page refresh before the first password is changed: %d", refreshed.StatusCode)
+	}
+	if code, _ := change(given, given); code != http.StatusBadRequest {
+		t.Fatalf("keeping the given password: %d", code)
+	}
+	if !strings.Contains(page("/o/alpha/today"), "Choose your own password") {
+		t.Fatal("a refused change opened the app")
+	}
+	if code, body := change(given, "a password of my own"); code != http.StatusOK || !strings.Contains(body, `"go":"/"`) {
+		t.Fatalf("choosing a password: %d %s", code, body)
+	}
+	if body := page("/o/alpha/settings"); !strings.Contains(body, "Your password") || strings.Contains(body, "Choose your own password") {
+		t.Fatal("the app is still closed after choosing a password")
+	}
+	if u, err := s.UserByEmail("bob@example.com"); err != nil || u.MustChangePassword {
+		t.Fatalf("still marked for a change: %+v %v", u, err)
+	}
+	if _, _, err := s.Login("bob@example.com", given); err == nil {
+		t.Fatal("the password the inviter saw still signs in")
+	}
+	if code, body := change("a password of my own", "another of my own"); code != http.StatusOK || !strings.Contains(body, "Password changed") {
+		t.Fatalf("an ordinary change afterwards: %d %s", code, body)
+	}
+
+	// Being added to another organisation, or made by the CLI, doesn't ask again.
+	other := mustOrg(t, s, "beta")
+	adaUser, _ := s.UserByEmail("ada@example.com")
+	if err := s.AddMember(other.ID, adaUser.ID, "owner", adaUser.Name); err != nil {
+		t.Fatal(err)
+	}
+	if code, body := call(t, ada, "POST", srv.URL+"/o/beta/ui/member", "application/json",
+		map[string]string{"email": "bob@example.com", "role": "member"}); code != http.StatusOK || strings.Contains(body, "shown once") {
+		t.Fatalf("adding an existing account: %d %s", code, body)
+	}
+	if !strings.Contains(page("/o/beta/settings"), "Your password") {
+		t.Fatal("an existing account was asked to choose a password again")
+	}
+	if _, body := call(t, ada, "GET", srv.URL+"/password", "", nil); strings.Contains(body, "Choose your own password") || !strings.Contains(body, "Alpha") {
+		t.Fatal("an account made by the CLI wasn't sent straight on to the app")
+	}
+}
+
+func TestExistingAccountsSurviveTheNewColumn(t *testing.T) {
+	s := tempStore(t)
+	if _, err := s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery"); err != nil {
+		t.Fatal(err)
+	}
+	// A database from before the column existed, with an account already in it.
+	if err := s.db.Migrator().DropColumn(&User{}, "must_change_password"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.AutoMigrate(&User{}); err != nil {
+		t.Fatalf("adding the column to a table with rows: %v", err)
+	}
+	u, err := s.UserByEmail("ada@example.com")
+	if err != nil || u.MustChangePassword {
+		t.Fatalf("an existing account after the upgrade: %+v %v", u, err)
+	}
+	if _, _, err := s.Login("ada@example.com", "correct horse battery"); err != nil {
+		t.Fatalf("an existing account can't sign in after the upgrade: %v", err)
 	}
 }

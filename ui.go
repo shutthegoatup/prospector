@@ -335,7 +335,7 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 	password := ""
 	if err != nil {
 		password = randomToken(12)
-		u, err = a.s.CreateUser(in.Email, in.Name, password)
+		u, err = a.s.InviteUser(in.Email, in.Name, password)
 	}
 	if err == nil {
 		err = a.s.AddMember(q.Org.ID, u.ID, in.Role, u.Name)
@@ -346,7 +346,7 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 	}
 	msg := u.Email + " added to " + q.Org.Name + "."
 	if password != "" {
-		msg += " Their first password, shown once: " + password
+		msg += " Their first password, shown once: " + password + " (they choose their own when they first sign in)"
 	}
 	writeJSON(w, map[string]string{"message": msg})
 }

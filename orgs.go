@@ -47,6 +47,16 @@ func slugify(name string) string {
 }
 
 func (s *Store) CreateUser(email, name, password string) (*User, error) {
+	return s.newUser(email, name, password, false)
+}
+
+// InviteUser creates an account whose first password the inviter has seen, so its
+// owner is made to choose their own before doing anything else.
+func (s *Store) InviteUser(email, name, password string) (*User, error) {
+	return s.newUser(email, name, password, true)
+}
+
+func (s *Store) newUser(email, name, password string, mustChange bool) (*User, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if !strings.Contains(email, "@") {
 		return nil, fmt.Errorf("%q isn't an email address", email)
@@ -58,7 +68,7 @@ func (s *Store) CreateUser(email, name, password string) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	u := &User{Email: email, Name: strings.TrimSpace(name), PasswordHash: string(hash)}
+	u := &User{Email: email, Name: strings.TrimSpace(name), PasswordHash: string(hash), MustChangePassword: mustChange}
 	return u, s.db.Create(u).Error
 }
 
@@ -87,6 +97,9 @@ func (s *Store) ChangePassword(u *User, current, password, keepToken string) err
 	if len(password) < 10 {
 		return errors.New("passwords need at least 10 characters")
 	}
+	if password == current {
+		return errors.New("choose a password different from the current one")
+	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
@@ -97,7 +110,8 @@ func (s *Store) ChangePassword(u *User, current, password, keepToken string) err
 // savePassword also signs the user out everywhere except the session in keepToken.
 func (s *Store) savePassword(user int64, hash, keepToken string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&User{}).Where("id = ?", user).Update("password_hash", hash).Error; err != nil {
+		set := map[string]any{"password_hash": hash, "must_change_password": false}
+		if err := tx.Model(&User{}).Where("id = ?", user).Updates(set).Error; err != nil {
 			return err
 		}
 		return tx.Where("user_id = ? and token_hash <> ?", user, hashToken(keepToken)).Delete(&Session{}).Error
