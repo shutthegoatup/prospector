@@ -202,6 +202,58 @@ func TestChangePassword(t *testing.T) {
 	}
 }
 
+func TestNeverContactCatchesMistakes(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	p := readFixtures(t)
+	if _, err := s.Import(o.ID, p); err != nil {
+		t.Fatal(err)
+	}
+	c, err := s.FindOne(o.ID, "Hannah")
+	if err != nil {
+		t.Fatal(err)
+	}
+	o.Settings.NeverContact = "blocked.example\nlinkedin.com/in/off-limits"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Update(o.ID, c.ID, "email", "hannah@blocked.example", "test"); err == nil {
+		t.Fatal("an edit set a never-contact email")
+	}
+	if err := s.Update(o.ID, c.ID, "linkedin", "https://www.linkedin.com/in/off-limits", "test"); err == nil {
+		t.Fatal("an edit set a never-contact profile")
+	}
+	if err := s.Update(o.ID, c.ID, "email", "hannah@notblocked.example", "test"); err != nil {
+		t.Fatalf("an address that only ends like a listed domain was refused: %v", err)
+	}
+	fresh := readFixtures(t)
+	if fresh.Drafts[1].Email == "" {
+		t.Fatal("the fixture draft has no email to list")
+	}
+	o.Settings.NeverContact = "blocked.example\n" + fresh.Drafts[1].Email
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Import(o.ID, fresh); err != nil {
+		t.Fatalf("listing someone already stored broke the next import: %v", err)
+	}
+	fresh.Drafts[1].Linkedin = "https://www.linkedin.com/in/a-new-profile"
+	fresh.Drafts[1].Email = strings.ToUpper(fresh.Drafts[1].Email)
+	if _, err := s.Import(o.ID, fresh); err != nil {
+		t.Fatalf("a listed person's unlisted link couldn't change: %v", err)
+	}
+	p.Drafts[0].Email = "someone@blocked.example"
+	p.Drafts[0].Note = "changed"
+	if _, err := s.Import(o.ID, p); err == nil || !strings.Contains(err.Error(), p.Drafts[0].Key) {
+		t.Fatalf("an import with a never-contact address went through: %v", err)
+	}
+	var kept Contact
+	s.in(o.ID).Where("key = ?", p.Drafts[0].Key).First(&kept)
+	if deref(kept.Note) == "changed" {
+		t.Fatal("a refused import still wrote")
+	}
+}
+
 func TestMCPSessionsBelongToOneKey(t *testing.T) {
 	s, o, srv, _ := signedIn(t)
 	owner, _, err := s.CreateKey(o.ID, "claude", []string{"read", "research:write"}, "test")
@@ -257,6 +309,20 @@ func TestMCPSessionsBelongToOneKey(t *testing.T) {
 	}
 	if code := replay(owner); code != http.StatusOK {
 		t.Fatalf("the session after another key tried to close it: %d", code)
+	}
+
+	// A never-contact entry added while the session is open applies to its next call.
+	if _, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "add_company", Arguments: map[string]any{"name": "Larkmoor Yachts"}}); err != nil {
+		t.Fatal(err)
+	}
+	o.Settings.NeverContact = "blocked.example"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	res, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "add_contact", Arguments: map[string]any{
+		"company": "Larkmoor Yachts", "name": "Max Muster", "email": "max@blocked.example", "source_url": "https://larkmoor.example/team"}})
+	if err != nil || !res.IsError {
+		t.Fatalf("an open session ignored a new never-contact entry: %v %+v", err, res)
 	}
 }
 

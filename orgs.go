@@ -121,6 +121,11 @@ func (s *Store) CreateOrg(slug, name string) (*Org, error) {
 	return o, s.db.Create(o).Error
 }
 
+func (s *Store) OrgByID(id int64) (*Org, error) {
+	var o Org
+	return &o, s.db.First(&o, id).Error
+}
+
 func (s *Store) OrgBySlug(slug string) (*Org, error) {
 	var o Org
 	return &o, s.db.Where("slug = ?", slug).First(&o).Error
@@ -191,7 +196,7 @@ func (s *Store) Logout(token string) error {
 	return s.db.Where("token_hash = ?", hashToken(token)).Delete(&Session{}).Error
 }
 
-// Scopes an API key can carry. None of them can send, change settings or reach another org.
+// Scopes an API key can carry. None of them can send, change settings or reach another org; only import skips review.
 var Scopes = []struct{ Name, What string }{
 	{"read", "search companies and people, read what's due"},
 	{"research:write", "add companies, facts and suggested contacts (they wait in Research)"},

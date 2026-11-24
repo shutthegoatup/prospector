@@ -89,11 +89,11 @@ Each organisation has an MCP endpoint at `/o/<slug>/mcp` (streamable HTTP) and a
 | `read` | `search`, `get_company`, `list_due` |
 | `research:write` | `add_company`, `add_fact`, `add_contact`; these wait in Research for a person |
 | `drafts:write` | `draft_message`, shown as written by the agent |
-| `import` | `push` and `pull` |
+| `import` | `push` and `pull`: a full sync, for a person's own files rather than an agent |
 | `outcomes:write` | `mark`: record an outcome (sent, accepted, called, replied, declined, hold), shown as the agent's |
 
-- **What no key can do:** send anything, change settings, or see another organisation. A key with `outcomes:write` can record what happened (sent, accepted, replied, declined…); each mark shows as the agent's, with its note, on Today and in the company's history.
-- **Writes are checked:** every fact and contact needs a source URL, and the never-contact list applies.
+- **What no key can do:** send anything, change settings, or see another organisation. A key with `outcomes:write` can record what happened (sent, accepted, replied, declined…); each mark shows as the agent's, with its note, on Today and in the company's history. `import` is the one scope that skips review: it puts people from your own files straight into outreach and marks those in `sent-log.md` as added.
+- **Writes are checked:** every fact and contact an agent adds needs a source URL. The never-contact list applies to agents, imports and edits alike: an import that would bring in an address on it is refused whole, though people already stored stay as they are.
 - **Sessions:** an MCP session works only with the key that opened it.
 
 ```sh

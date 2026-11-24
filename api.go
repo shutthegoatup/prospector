@@ -114,6 +114,8 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 		return s
 	}
 	org, actor, k := q.Org, q.Actor(), q.Key
+	// Settings saved while a session is open (waits, the never-contact list) apply to its next call.
+	current := func() (*Org, error) { return a.s.OrgByID(org.ID) }
 	s := mcp.NewServer(&mcp.Implementation{Name: "prospector", Title: "Prospector: " + org.Name, Version: "1"},
 		&mcp.ServerOptions{Instructions: agentInstructions(org, k)})
 	if k.Has("read") {
@@ -135,7 +137,11 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "list_due", Description: "What is due on Today, and whether its text is written yet."},
 			func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, []DueItem, error) {
-				items, err := a.s.AgentDue(org)
+				o, err := current()
+				if err != nil {
+					return nil, nil, err
+				}
+				items, err := a.s.AgentDue(o)
 				return nil, items, err
 			})
 	}
@@ -152,7 +158,11 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "add_contact", Description: "Suggest a person at a company. They wait in Research until a person picks them. Never scrape LinkedIn; use links found by search."},
 			func(_ context.Context, _ *mcp.CallToolRequest, in AddContactIn) (*mcp.CallToolResult, *AddContactOut, error) {
-				out, err := a.s.AgentAddContact(org, actor, in)
+				o, err := current()
+				if err != nil {
+					return nil, nil, err
+				}
+				out, err := a.s.AgentAddContact(o, actor, in)
 				return nil, out, err
 			})
 	}
