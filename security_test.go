@@ -1373,7 +1373,7 @@ func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
 	const right, wrong = "correct horse battery", "a wrong guess"
 
 	code, issued := try("ada@example.com", right, "")
-	if code != http.StatusSeeOther || issued == nil || !issued.HttpOnly || issued.Path != "/login" || strings.Contains(issued.Value, "ada") {
+	if code != http.StatusSeeOther || issued == nil || !issued.HttpOnly || issued.Path != "/login" || strings.Contains(issued.Value, "example") {
 		t.Fatalf("first sign-in: %d, device cookie %+v", code, issued)
 	}
 	_, bobs := try("bob@example.com", right, "")
