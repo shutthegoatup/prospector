@@ -42,6 +42,7 @@ prospector serve                                          # http://127.0.0.1:876
 
 **Before exposing it beyond your machine:**
 - Put it behind HTTPS. Copy to clipboard needs a secure page, and the session cookie is marked Secure on HTTPS.
+- Repeated wrong passwords for one email are slowed, up to a minute between tries.
 - Every page needs a sign-in, and every browser POST must be JSON, which blocks cross-site form posts.
 
 There's a Dockerfile for container hosting.

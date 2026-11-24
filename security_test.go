@@ -2,8 +2,13 @@ package main
 
 import (
 	"net/http"
+	"net/http/cookiejar"
+	"net/http/httptest"
 	"net/url"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestSafeNext(t *testing.T) {
@@ -21,6 +26,61 @@ func TestSafeNext(t *testing.T) {
 		if got := safeNext(next); got != want {
 			t.Errorf("safeNext(%q) = %q, want %q", next, got, want)
 		}
+	}
+}
+
+func TestLoginSlowsGuessing(t *testing.T) {
+	s := tempStore(t)
+	if _, err := s.CreateUser("ada@example.com", "Ada", "correct horse battery"); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	app := &App{s: s}
+	app.logins.now = func() time.Time { return now }
+	srv := httptest.NewServer(app.Routes())
+	t.Cleanup(srv.Close)
+	try := func(email, password string) int {
+		jar, _ := cookiejar.New(nil)
+		res, err := (&http.Client{Jar: jar}).PostForm(srv.URL+"/login", url.Values{"email": {email}, "password": {password}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	for i := range freeAttempts {
+		if code := try("Ada@Example.com", "wrong"); code != http.StatusUnauthorized {
+			t.Fatalf("wrong password %d: %d", i+1, code)
+		}
+	}
+	if code := try("ada@example.com", "correct horse battery"); code != http.StatusTooManyRequests {
+		t.Fatalf("after %d failures the next attempt got %d", freeAttempts, code)
+	}
+	if code := try("someone-else@example.com", "wrong"); code != http.StatusUnauthorized {
+		t.Fatalf("another email was slowed too: %d", code)
+	}
+	now = now.Add(2 * time.Second)
+	if code := try("ada@example.com", "correct horse battery"); code != http.StatusOK {
+		t.Fatalf("the right password after the wait: %d", code)
+	}
+	var wg sync.WaitGroup
+	var hashed atomic.Int32
+	for range 40 {
+		wg.Go(func() {
+			if try("burst@example.com", "wrong") != http.StatusTooManyRequests {
+				hashed.Add(1)
+			}
+		})
+	}
+	wg.Wait()
+	if n := int(hashed.Load()); n > freeAttempts+cap(hashSlots) {
+		t.Fatalf("%d of 40 parallel guesses were checked", n)
+	}
+	for range 40 {
+		app.logins.record("ada@example.com", false)
+	}
+	if wait := app.logins.wait("ada@example.com"); wait > maxLoginWait {
+		t.Fatalf("the wait grew to %v", wait)
 	}
 }
 

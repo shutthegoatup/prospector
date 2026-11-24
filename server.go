@@ -23,9 +23,10 @@ var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("unused"), bcrypt.DefaultC
 const sessionCookie = "session"
 
 type App struct {
-	s   *Store
-	mu  sync.Mutex
-	mcp map[int64]*mcp.Server
+	s      *Store
+	mu     sync.Mutex
+	mcp    map[int64]*mcp.Server
+	logins loginGuard
 }
 
 // Req is who is asking and in which organisation: a signed-in member, or an API key.
@@ -252,11 +253,29 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
-	token, _, err := a.s.Login(r.PostForm.Get("email"), r.PostForm.Get("password"))
-	if err != nil {
+	email := r.PostForm.Get("email")
+	refuse := func(code int, problem string) {
 		w.Header().Set("content-type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusUnauthorized)
-		LoginPage(r.PostForm.Get("next"), err.Error()).Render(r.Context(), w)
+		w.WriteHeader(code)
+		LoginPage(r.PostForm.Get("next"), problem).Render(r.Context(), w)
+	}
+	select {
+	case hashSlots <- struct{}{}:
+		defer func() { <-hashSlots }()
+	case <-r.Context().Done():
+		return
+	}
+	// Checked while holding a slot, so a burst of parallel attempts can't all get in first.
+	if wait := a.logins.wait(email); wait > 0 {
+		seconds := int(wait.Seconds()) + 1
+		w.Header().Set("Retry-After", strconv.Itoa(seconds))
+		refuse(http.StatusTooManyRequests, "Too many attempts. Try again in "+plural(seconds, "second")+".")
+		return
+	}
+	token, _, err := a.s.Login(email, r.PostForm.Get("password"))
+	a.logins.record(email, err == nil)
+	if err != nil {
+		refuse(http.StatusUnauthorized, err.Error())
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: token, Path: "/", HttpOnly: true, Secure: secure(r),
