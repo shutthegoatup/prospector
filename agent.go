@@ -232,22 +232,10 @@ func (s *Store) AgentSearch(org int64, q string) ([]SearchHit, error) {
 }
 
 func contactStage(c Contact) string {
-	switch {
-	case c.Status == ContactSuggested:
-		return "suggested"
-	case c.Declined != nil:
-		return "declined"
-	case c.Replied != nil:
-		if c.Stage != "" {
-			return c.Stage
-		}
-		return "replied"
-	case c.Hold != nil:
-		return "hold"
-	case c.EmailSent != nil, c.LinkedinAdded != nil, c.Called != nil:
-		return "in outreach"
+	if p := c.Phase(); p != PhaseConversation {
+		return string(p)
 	}
-	return "not contacted"
+	return c.ConversationStage()
 }
 
 type CompanyDetail struct {
@@ -405,20 +393,6 @@ func (s *Store) AgentMark(org int64, actor string, in MarkIn) error {
 	date := strings.TrimSpace(in.Date)
 	if date == "" {
 		date = today()
-	}
-	d, err := time.Parse("2006-01-02", date)
-	if err != nil {
-		return errors.New("date is YYYY-MM-DD")
-	}
-	if d.After(time.Now()) {
-		return errors.New("date is in the future")
-	}
-	var c Contact
-	if err := s.in(org).Where("id = ?", in.ContactID).First(&c).Error; err != nil {
-		return fmt.Errorf("no contact %d", in.ContactID)
-	}
-	if c.Status == ContactSuggested {
-		return errors.New("this contact is still a suggestion in Research; a person picks them first")
 	}
 	return s.mark(org, in.ContactID, in.Step, date, actor, strings.TrimSpace(in.Note))
 }

@@ -193,7 +193,15 @@ func (s *Store) PickContact(org int64, o *Org, id int64, actor string) error {
 			return err
 		}
 		if c.CompanyID != nil {
-			tx.Model(&Company{}).Where("org_id = ? and id = ? and stage = ?", org, *c.CompanyID, CompanyReview).Update("stage", CompanyQualified)
+			res := tx.Model(&Company{}).Where("org_id = ? and id = ? and stage = ?", org, *c.CompanyID, CompanyReview).Update("stage", CompanyQualified)
+			if res.Error != nil {
+				return res.Error
+			}
+			if res.RowsAffected > 0 {
+				if err := s.log(tx, org, 0, c.CompanyID, actor, "company:"+CompanyQualified, nil); err != nil {
+					return err
+				}
+			}
 		}
 		return s.log(tx, org, id, c.CompanyID, actor, "pick", nil)
 	})
@@ -210,16 +218,12 @@ var Stages = []struct{ Key, Label string }{
 
 func (s *Store) Conversations(org int64) (map[string][]Contact, error) {
 	var rows []Contact
-	if err := s.in(org).Where("replied is not null and declined is null").Order("next_date nulls first, id").Find(&rows).Error; err != nil {
+	if err := s.in(org).Where(inConversation).Order("next_date nulls first, id").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := map[string][]Contact{}
 	for _, c := range rows {
-		st := c.Stage
-		if st == "" {
-			st = "replied"
-		}
-		out[st] = append(out[st], c)
+		out[c.ConversationStage()] = append(out[c.ConversationStage()], c)
 	}
 	return out, nil
 }
@@ -280,11 +284,8 @@ func pipeline(c Company, people []Contact) string {
 		st := ""
 		switch {
 		case p.Replied != nil:
-			st = p.Stage
-			if st == "" {
-				st = "replied"
-			}
-		case p.LinkedinAdded != nil || p.EmailSent != nil || p.Called != nil:
+			st = p.ConversationStage()
+		case p.Touched():
 			st = "outreach"
 		}
 		if st != "" && stageRankOrder[st] >= stageRankOrder[best] {
@@ -458,7 +459,7 @@ func (s *Store) NeverContactCovers(o *Org) []string {
 		return nil
 	}
 	var people []Contact
-	s.in(o.ID).Where(open_).Order("id").Find(&people)
+	s.in(o.ID).Where(openContacts).Order("id").Find(&people)
 	var names []string
 	for _, p := range people {
 		if o.Settings.listed(deref(p.Email), deref(p.Linkedin)) != nil {

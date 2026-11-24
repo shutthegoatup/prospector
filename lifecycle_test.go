@@ -1,0 +1,249 @@
+package main
+
+import (
+	"fmt"
+	"slices"
+	"testing"
+	"time"
+)
+
+// everyContact is one contact per combination of the fields a contact's standing is read from.
+func everyContact() []Contact {
+	var out []Contact
+	for i := 0; i < 1<<8; i++ {
+		on := func(bit int) bool { return i&(1<<bit) != 0 }
+		// An empty mark counts as set, as it does to "is null" in SQL.
+		opt := func(set bool, v string) *string {
+			if !set {
+				return nil
+			}
+			if on(7) {
+				v = ""
+			}
+			return &v
+		}
+		c := Contact{Key: fmt.Sprintf("p%03d", i), File: "test", Person: str("Person"), Note: str("Hello"),
+			Hold: opt(on(0), "2020-01-01"), Replied: opt(on(1), "2020-01-02"), Declined: opt(on(2), "2020-01-03"),
+			EmailSent: opt(on(3), "2020-01-04")}
+		if on(4) {
+			c.Status = ContactSuggested
+		}
+		if on(5) {
+			c.Stage = "meeting"
+		}
+		if on(6) {
+			c.Key = "org:" + c.Key
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+func TestContactStageNames(t *testing.T) {
+	d := str("2020-01-01")
+	for _, tc := range []struct {
+		c    Contact
+		want string
+	}{
+		{Contact{}, "not contacted"},
+		{Contact{LinkedinAdded: d}, "in outreach"},
+		{Contact{EmailSent: d}, "in outreach"},
+		{Contact{Called: d}, "in outreach"},
+		{Contact{Accepted: d}, "not contacted"},
+		{Contact{EmailSent: d, Hold: d}, "hold"},
+		{Contact{EmailSent: d, Replied: d}, "replied"},
+		{Contact{Replied: d, Stage: "proposal"}, "proposal"},
+		{Contact{Replied: d, Hold: d}, "replied"},
+		{Contact{Replied: d, Stage: "meeting", Declined: d}, "declined"},
+		{Contact{Status: ContactSuggested, Replied: d, Declined: d}, "suggested"},
+	} {
+		if got := contactStage(tc.c); got != tc.want {
+			t.Errorf("contactStage(%+v) = %q, want %q", tc.c, got, tc.want)
+		}
+	}
+}
+
+func TestPipelineTakesTheFurthestContact(t *testing.T) {
+	d := str("2020-01-01")
+	for _, tc := range []struct {
+		name   string
+		c      Company
+		people []Contact
+		want   string
+	}{
+		{"nobody", Company{}, nil, "research"},
+		{"rejected", Company{Stage: CompanyRejected}, nil, "rejected"},
+		{"untouched", Company{}, []Contact{{}}, "research"},
+		{"touched", Company{}, []Contact{{Called: d}}, "outreach"},
+		{"rejected but touched", Company{Stage: CompanyRejected}, []Contact{{Called: d}}, "outreach"},
+		{"replied", Company{}, []Contact{{Called: d}, {Replied: d}}, "replied"},
+		{"furthest wins", Company{}, []Contact{{Replied: d, Stage: "proposal"}, {Replied: d, Stage: "meeting"}}, "proposal"},
+		{"lost ranks with outreach", Company{}, []Contact{{Replied: d, Stage: "lost"}, {Replied: d}}, "replied"},
+		{"held still counts", Company{}, []Contact{{EmailSent: d, Hold: d}}, "outreach"},
+	} {
+		if got := pipeline(tc.c, tc.people); got != tc.want {
+			t.Errorf("%s: pipeline = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+// The queues and the board are SQL; the names shown for a contact are Go. Both must
+// read a contact's standing the same way.
+func TestQueriesAgreeWithPhase(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	all := everyContact()
+	for i := range all {
+		all[i].OrgID = o.ID
+	}
+	if err := s.db.CreateInBatches(all, 50).Error; err != nil {
+		t.Fatal(err)
+	}
+	keys := func(rows []Contact) []string {
+		var out []string
+		for _, r := range rows {
+			out = append(out, r.Key)
+		}
+		slices.Sort(out)
+		return out
+	}
+	var wantDue, wantBoard []Contact
+	for _, c := range all {
+		if c.Open() {
+			wantDue = append(wantDue, c)
+		}
+		if c.Phase() == PhaseConversation {
+			wantBoard = append(wantBoard, c)
+		}
+	}
+	if len(wantDue) == 0 || len(wantBoard) == 0 {
+		t.Fatal("the combinations cover no open contact or no conversation")
+	}
+
+	due, err := s.Due(o.ID, "linkedin", time.Now(), o.Settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := keys(due), keys(wantDue); !slices.Equal(got, want) {
+		t.Errorf("the LinkedIn queue holds %v, but the open contacts are %v", got, want)
+	}
+
+	board, err := s.Conversations(o.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var onBoard []Contact
+	for stage, list := range board {
+		for _, c := range list {
+			if c.ConversationStage() != stage {
+				t.Errorf("%s is under %q but its stage is %q", c.Key, stage, c.ConversationStage())
+			}
+		}
+		onBoard = append(onBoard, list...)
+	}
+	if got, want := keys(onBoard), keys(wantBoard); !slices.Equal(got, want) {
+		t.Errorf("the board holds %v, but the conversations are %v", got, want)
+	}
+}
+
+func TestStageIsOneOfTheBoardsColumns(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	c := Contact{OrgID: o.ID, Key: "hannah", File: "test", Person: str("Hannah Pryce")}
+	if err := s.db.Create(&c).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Update(o.ID, c.ID, "stage", "meeting", "test"); err == nil {
+		t.Fatal("someone who hasn't replied was given a conversation stage")
+	}
+	if err := s.Mark(o.ID, c.ID, "replied", "2020-01-02", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Update(o.ID, c.ID, "stage", "nearly", "test"); err == nil {
+		t.Fatal("a stage the board has no column for was saved")
+	}
+	for _, st := range Stages {
+		if err := s.Update(o.ID, c.ID, "stage", st.Key, "test"); err != nil {
+			t.Fatalf("stage %q refused: %v", st.Key, err)
+		}
+	}
+	if err := s.Update(o.ID, c.ID, "stage", "replied", "test"); err != nil {
+		t.Fatalf("a lost conversation couldn't be reopened: %v", err)
+	}
+	var events int64
+	s.in(o.ID).Model(&Event{}).Where("action = ?", "set:stage").Count(&events)
+	if int(events) != len(Stages)+1 {
+		t.Fatalf("%d stage changes logged, want %d: a refused one left a history line", events, len(Stages)+1)
+	}
+}
+
+func TestMarkChecksApplyToEveryCaller(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	suggested := Contact{OrgID: o.ID, Key: "jonas", File: "test", Person: str("Jonas Weber"), Status: ContactSuggested}
+	picked := Contact{OrgID: o.ID, Key: "hannah", File: "test", Person: str("Hannah Pryce")}
+	for _, c := range []*Contact{&suggested, &picked} {
+		if err := s.db.Create(c).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.Mark(o.ID, suggested.ID, "linkedin", today(), "test"); err == nil {
+		t.Fatal("a suggestion nobody picked was marked as contacted")
+	}
+	for _, bad := range []string{"", "yesterday", "02/01/2020", "2999-01-01"} {
+		if err := s.Mark(o.ID, picked.ID, "linkedin", bad, "test"); err == nil {
+			t.Fatalf("mark accepted the date %q", bad)
+		}
+	}
+	if err := s.Mark(o.ID, picked.ID, "linkedin", today(), "test"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMarkDateIsJudgedInLocalTime(t *testing.T) {
+	east := time.FixedZone("east", 2*60*60)
+	justAfterMidnight := time.Date(2024, 3, 10, 0, 30, 0, 0, east)
+	if err := markDate("2024-03-10", justAfterMidnight); err != nil {
+		t.Fatalf("today was refused just after midnight east of UTC: %v", err)
+	}
+	if err := markDate("2024-03-11", justAfterMidnight); err == nil {
+		t.Fatal("tomorrow was accepted")
+	}
+}
+
+func TestPickingSomeoneQualifiesTheirCompanyOnTheRecord(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	co := Company{OrgID: o.ID, Name: "Larkmoor", Stage: CompanyReview}
+	if err := s.db.Create(&co).Error; err != nil {
+		t.Fatal(err)
+	}
+	people := []Contact{
+		{OrgID: o.ID, Key: "hannah", File: "test", Person: str("Hannah Pryce"), Status: ContactSuggested, CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "jonas", File: "test", Person: str("Jonas Weber"), Status: ContactSuggested, CompanyID: &co.ID},
+	}
+	if err := s.db.Create(&people).Error; err != nil {
+		t.Fatal(err)
+	}
+	qualified := func() int64 {
+		var n int64
+		s.in(o.ID).Model(&Event{}).Where("company_id = ? and action = ? and \"user\" = ?", co.ID, "company:"+CompanyQualified, "ada").Count(&n)
+		return n
+	}
+	if err := s.PickContact(o.ID, o, people[0].ID, "ada"); err != nil {
+		t.Fatal(err)
+	}
+	back, err := s.CompanyByID(o.ID, co.ID)
+	if err != nil || back.Stage != CompanyQualified {
+		t.Fatalf("company stage is %q after a pick (%v)", back.Stage, err)
+	}
+	if qualified() != 1 {
+		t.Fatal("the company was qualified by a pick with no line in its history")
+	}
+	if err := s.PickContact(o.ID, o, people[1].ID, "ada"); err != nil {
+		t.Fatal(err)
+	}
+	if qualified() != 1 {
+		t.Fatal("picking a second person logged the company as qualified again")
+	}
+}
