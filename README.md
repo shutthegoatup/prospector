@@ -68,12 +68,13 @@ prospector serve                                          # http://127.0.0.1:876
 |---|---|
 | `DATABASE_URL` | A `postgres://` URL or a SQLite file path (default `prospector.sqlite`) |
 | `PORT` | Listen on `:PORT` instead of `127.0.0.1:8766` |
+| `PROSPECTOR_URL` | The address people reach it at, e.g. `https://prospector.example.com`. With an `https://` address the session cookie is always marked Secure, and links shown in the app use this address. Set it if a proxy in front changes the `Host` header |
 | `TZ` | The time zone "today" is counted in |
 | `PROSPECTOR_ORG` | Default organisation for CLI commands (`--org=` overrides it) |
 | `PROSPECTOR_KEY` | API key for `push` and `pull` |
 
 **Before exposing it beyond your machine:**
-- Put it behind HTTPS. Copy to clipboard needs a secure page, and the session cookie is marked Secure on HTTPS. A proxy in front must send `X-Forwarded-Proto: https`, or the cookie isn't marked Secure.
+- Put it behind HTTPS. Copy to clipboard needs a secure page, and the session cookie is marked Secure on HTTPS. Set `PROSPECTOR_URL` to the `https://` address so the cookie is always marked Secure; without it, that depends on the proxy sending `X-Forwarded-Proto: https`.
 - Pages carry a Content-Security-Policy that allows only the app's own scripts, plus Google Fonts for the typefaces.
 - Repeated wrong passwords for one email are slowed, up to a minute between tries.
 - An owner adds and removes members in Settings. Removing someone ends their sign-in access to that organisation; their account, and other organisations, are untouched. API keys they created keep working until revoked on the Agents page.

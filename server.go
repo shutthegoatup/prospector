@@ -28,6 +28,9 @@ type App struct {
 	mu     sync.Mutex
 	mcp    map[int64]*mcp.Server
 	logins loginGuard
+	// base is the address people reach the app at, when the operator has said: then
+	// links and the cookie's Secure mark don't depend on what a proxy forwards.
+	base string
 }
 
 // Req is who is asking and in which organisation: a signed-in member, or an API key.
@@ -88,8 +91,21 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 
-func secure(r *http.Request) bool {
-	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+func (a *App) secure(r *http.Request) bool {
+	return strings.HasPrefix(a.base, "https://") || r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+}
+
+// publicURL checks PROSPECTOR_URL: a scheme and host, nothing after.
+func publicURL(raw string) (string, error) {
+	raw = strings.TrimRight(strings.TrimSpace(raw), "/")
+	if raw == "" {
+		return "", nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
+		return "", fmt.Errorf("PROSPECTOR_URL should look like https://prospector.example.com, not %q", raw)
+	}
+	return u.Scheme + "://" + u.Host, nil
 }
 
 func (a *App) sessionUser(r *http.Request) *User {
@@ -242,6 +258,12 @@ func (a *App) Routes() http.Handler {
 	a.apiRoutes(mux)
 
 	sameOrigin := http.NewCrossOriginProtection()
+	if a.base != "" {
+		// Behind a proxy that rewrites Host, an older browser's Origin wouldn't match it.
+		if err := sameOrigin.AddTrustedOrigin(a.base); err != nil {
+			log.Print(err)
+		}
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// A browser says where a request came from. One from another site is refused, which
 		// also covers the sign-in and sign-out forms that the JSON rule below can't. Agents
@@ -263,7 +285,7 @@ func (a *App) Routes() http.Handler {
 		w.Header().Set("Referrer-Policy", "same-origin")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Content-Security-Policy", contentPolicy)
-		if secure(r) {
+		if a.secure(r) {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		}
 		mux.ServeHTTP(w, r)
@@ -318,7 +340,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		refuse(http.StatusUnauthorized, err.Error())
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: token, Path: "/", HttpOnly: true, Secure: secure(r),
+	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: token, Path: "/", HttpOnly: true, Secure: a.secure(r),
 		SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(sessionLife)})
 	http.Redirect(w, r, safeNext(r.PostForm.Get("next")), http.StatusSeeOther)
 }
@@ -415,6 +437,9 @@ func serve(a *App, addr string) error {
 	a.s.db.Model(&User{}).Count(&users)
 	if users == 0 {
 		log.Print("no users yet: create one with `prospector user add <email> <name>`")
+	}
+	if a.base == "" && !strings.HasPrefix(addr, "127.0.0.1:") && !strings.HasPrefix(addr, "localhost:") {
+		log.Print("PROSPECTOR_URL isn't set: the session cookie is marked Secure only when a proxy sends X-Forwarded-Proto: https")
 	}
 	srv := &http.Server{Addr: addr, Handler: a.Routes(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
 	log.Printf("listening on http://%s", addr)
