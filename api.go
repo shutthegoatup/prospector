@@ -65,6 +65,15 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 			respond(w, map[string]bool{"ok": true}, a.s.AgentMark(q.Org.ID, q.Actor(), in))
 		}
 	}))
+	mux.HandleFunc("POST "+v1+"enquiries", a.agent("enquiries:write", func(w http.ResponseWriter, r *http.Request) {
+		var in EnquiryIn
+		if decode(w, r, &in) {
+			q := reqOf(r)
+			in.Trap = ""
+			e, err := a.s.AddEnquiry(q.Org.ID, q.Actor(), in)
+			respond(w, e, err)
+		}
+	}))
 	mux.HandleFunc("POST "+v1+"import", a.agent("import", func(w http.ResponseWriter, r *http.Request) {
 		var p ImportPayload
 		if decode(w, r, &p) {

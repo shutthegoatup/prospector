@@ -30,6 +30,7 @@ type OrgSettings struct {
 	NeverContact      string `json:"never_contact"`
 	IncorporatedOnly  bool   `json:"incorporated_only"`
 	AgentGuidance     string `json:"agent_guidance"`
+	EnquirySites      string `json:"enquiry_sites"`
 }
 
 func (s OrgSettings) withDefaults() OrgSettings {
@@ -208,7 +209,7 @@ var Marks = map[string]string{"linkedin": "linkedin_added", "email": "email_sent
 type Store struct{ db *gorm.DB }
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
-	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}}
+	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}}
 
 // Open takes a postgres:// URL or a SQLite file path.
 func Open(dsn string) (*Store, error) {
@@ -258,7 +259,7 @@ func deref(p *string) string {
 func (s *Store) Due(org int64, step string, now time.Time, set OrgSettings) ([]Contact, error) {
 	set = set.withDefaults()
 	var rows []Contact
-	q := s.in(org).Model(&Contact{})
+	q := s.in(org).Model(&Contact{}).Where(companyNotRejected)
 	switch step {
 	case "linkedin":
 		q = q.Where(openContacts + " and linkedin_added is null and note is not null and note <> ''").Order("fit nulls first, file")

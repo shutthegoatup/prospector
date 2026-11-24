@@ -32,6 +32,12 @@ func TestExportPerson(t *testing.T) {
 	do(s.AgentMark(o.ID, "agent:scout", MarkIn{ContactID: hannah.ID, Step: "replied", Date: "2020-01-02", Note: "she wrote back from her own gmail"}))
 	do(s.Update(o.ID, hannah.ID, "stage", "meeting", "ada"))
 	do(s.db.Create(&Fact{OrgID: o.ID, CompanyID: *hannah.CompanyID, ContactID: &hannah.ID, Field: "role", Value: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}).Error)
+	do(s.db.Create(&[]Enquiry{
+		{OrgID: o.ID, Name: "Hannah Pryce", Email: hannahEmail, Message: "Could you send pricing?", ContactID: &hannah.ID},
+		{OrgID: o.ID, Name: "H. Pryce", Email: hannahEmail, Message: "Following up on pricing"},
+		{OrgID: o.ID, Name: "Nia Okafor", Email: "nia.okafor@larkmoor.example", Message: "Please ring the front desk", ContactID: &colleague.ID},
+		{OrgID: other.ID, Name: "Hannah Pryce", Email: hannahEmail, Message: "A note to the other organisation"},
+	}).Error)
 	var placeholder Contact
 	do(s.in(o.ID).Where("key like 'org:%'").First(&placeholder).Error)
 	theirs := must(s.FindOne(other.ID, "Hannah"))
@@ -99,6 +105,9 @@ func TestExportPerson(t *testing.T) {
 	if len(out.Facts) != 1 || out.Facts[0].Value != "Head of Marketing" {
 		t.Fatalf("facts: %+v", out.Facts)
 	}
+	if len(out.Enquiries) != 2 || out.Enquiries[0].Message != "Could you send pricing?" || out.Enquiries[1].Message != "Following up on pricing" {
+		t.Fatalf("the export should hold what she wrote to us, matched to her or not: %+v", out.Enquiries)
+	}
 	said := map[string]ExportEvent{}
 	for _, e := range out.History {
 		said[e.Action] = e
@@ -110,7 +119,7 @@ func TestExportPerson(t *testing.T) {
 		t.Fatalf("the history lost her edits: %+v", out.History)
 	}
 	whole := string(must(json.Marshal(out)))
-	for _, notHers := range []string{"Nia", "nia.okafor", "callback in spring", `"OrgID"`, "org_id"} {
+	for _, notHers := range []string{"Nia", "nia.okafor", "callback in spring", "front desk", "other organisation", `"OrgID"`, "org_id"} {
 		if strings.Contains(whole, notHers) {
 			t.Errorf("the export holds %q, which isn't hers to see", notHers)
 		}

@@ -91,6 +91,14 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Delete(&Fact{}).Error; err != nil {
 			return err
 		}
+		// What they wrote to us goes too, whether or not it was matched to them.
+		gone := tx.Where("org_id = ? and contact_id = ?", org, id)
+		if emails := emailRe.FindAllString(strings.ToLower(deref(c.Email)), -1); len(emails) > 0 {
+			gone = tx.Where("org_id = ? and (contact_id = ? or email in ?)", org, id, emails)
+		}
+		if err := gone.Delete(&Enquiry{}).Error; err != nil {
+			return err
+		}
 		if err := tx.Delete(&c).Error; err != nil {
 			return err
 		}
