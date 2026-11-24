@@ -49,6 +49,22 @@ templ SettingsView(q *Req, d SettingsData) {
 				</div>
 			}
 		</form>
+		<form data-form="/password" data-reset="true">
+			@Section("Your password", "For your sign-in across every organisation. Changing it signs out your other sessions.") {
+				@Row("Current") {
+					<input name="current" type="password" required autocomplete="current-password" class={ fieldClass }/>
+				}
+				@Row("New") {
+					<input name="new" type="password" required minlength="10" autocomplete="new-password" class={ fieldClass }/>
+				}
+				<div class="flex items-center gap-3">
+					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+						Change
+					}
+					<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
+				</div>
+			}
+		</form>
 		<form data-form="ui/settings" data-refresh="true">
 			@Section("Organisation", ownerHint(q)) {
 				<fieldset disabled?={ !q.Owner() } class="flex flex-col gap-4">

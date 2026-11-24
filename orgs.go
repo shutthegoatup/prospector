@@ -69,11 +69,38 @@ func (s *Store) SetPassword(email, password string) error {
 	if err != nil {
 		return err
 	}
-	res := s.db.Model(&User{}).Where("email = ?", strings.ToLower(email)).Update("password_hash", string(hash))
-	if res.RowsAffected == 0 {
+	u, err := s.UserByEmail(email)
+	if err != nil {
 		return fmt.Errorf("no user %s", email)
 	}
-	return res.Error
+	return s.savePassword(u.ID, string(hash), "")
+}
+
+var errWrongCurrent = errors.New("the current password is wrong")
+
+// ChangePassword is a signed-in user changing their own; keepToken is the session doing it.
+func (s *Store) ChangePassword(u *User, current, password, keepToken string) error {
+	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(current)) != nil {
+		return errWrongCurrent
+	}
+	if len(password) < 10 {
+		return errors.New("passwords need at least 10 characters")
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	return s.savePassword(u.ID, string(hash), keepToken)
+}
+
+// savePassword also signs the user out everywhere except the session in keepToken.
+func (s *Store) savePassword(user int64, hash, keepToken string) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&User{}).Where("id = ?", user).Update("password_hash", hash).Error; err != nil {
+			return err
+		}
+		return tx.Where("user_id = ? and token_hash <> ?", user, hashToken(keepToken)).Delete(&Session{}).Error
+	})
 }
 
 func (s *Store) UserByEmail(email string) (*User, error) {
