@@ -275,18 +275,52 @@ func (s *Store) Login(email, password string) (string, *User, error) {
 	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
 		return "", nil, errWrongLogin
 	}
-	token := randomToken(32)
-	err = s.db.Create(&Session{TokenHash: hashToken(token), UserID: u.ID, ExpiresAt: time.Now().Add(sessionLife)}).Error
+	token, err := s.NewSession(u.ID, 0)
 	return token, u, err
 }
 
-func (s *Store) SessionUser(token string) (*User, error) {
+// NewSession signs a user in. One that began at an organisation's own sign-in is
+// limited to that organisation: its provider vouches for nothing else.
+func (s *Store) NewSession(user, ssoOrg int64) (string, error) {
+	token := randomToken(32)
+	sess := &Session{TokenHash: hashToken(token), UserID: user, ExpiresAt: time.Now().Add(sessionLife)}
+	if ssoOrg != 0 {
+		sess.Limited, sess.SSOOrgs = true, fmt.Sprintf(",%d,", ssoOrg)
+	}
+	return token, s.db.Create(sess).Error
+}
+
+func (sess *Session) Proves(org int64) bool {
+	return strings.Contains(sess.SSOOrgs, fmt.Sprintf(",%d,", org))
+}
+
+func (sess *Session) Opens(org int64) bool { return !sess.Limited || sess.Proves(org) }
+
+// AddProof records that a session already open has now been through org's own sign-in too.
+func (s *Store) AddProof(sess *Session, org int64) error {
+	if sess.Proves(org) {
+		return nil
+	}
+	orgs := sess.SSOOrgs
+	if orgs == "" {
+		orgs = ","
+	}
+	sess.SSOOrgs = orgs + fmt.Sprintf("%d,", org)
+	return s.db.Model(sess).Update("sso_orgs", sess.SSOOrgs).Error
+}
+
+func (s *Store) SessionFor(token string) (*Session, *User, error) {
 	var sess Session
 	if err := s.db.Where("token_hash = ? and expires_at > ?", hashToken(token), time.Now()).First(&sess).Error; err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var u User
-	return &u, s.db.First(&u, sess.UserID).Error
+	return &sess, &u, s.db.First(&u, sess.UserID).Error
+}
+
+func (s *Store) SessionUser(token string) (*User, error) {
+	_, u, err := s.SessionFor(token)
+	return u, err
 }
 
 func (s *Store) Logout(token string) error {

@@ -30,8 +30,7 @@ func tempStore(t *testing.T) *Store {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := s.db.Migrator().DropTable(&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
-			&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}); err != nil {
+		if err := s.db.Migrator().DropTable(models...); err != nil {
 			t.Fatal(err)
 		}
 	}

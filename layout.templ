@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/shutthegoatup/prospector/components"
 	"github.com/shutthegoatup/prospector/components/button"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -118,31 +119,92 @@ templ PageHead(title string) {
 	</header>
 }
 
-templ LoginPage(next, problem string) {
+templ LoginPage(v LoginView) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
 			@Head("Sign in · Prospector")
 		</head>
 		<body class="front-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased">
-			<form method="post" action="/login" class="flex w-full max-w-sm flex-col gap-4 panel panel-lift p-7">
+			<main class="flex w-full max-w-sm flex-col gap-4 panel panel-lift p-7">
 				<h1 class="flex items-center gap-2.5 font-heading text-2xl font-bold"><img src={ "/assets/img/mark.svg?v=" + assetVersion } width="30" height="30" alt=""/>Prospector.</h1>
-				if problem != "" {
-					<p class="text-sm text-[var(--stop)]" role="alert">{ problem }</p>
+				if v.Problem != "" {
+					<p class="text-sm text-[var(--stop)]" role="alert">{ v.Problem }</p>
 				}
-				<input type="hidden" name="next" value={ next }/>
-				<label class="flex flex-col gap-1.5 text-sm">
-					<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Email</span>
-					<input name="email" type="email" required autocomplete="username" class="h-10 rounded-lg border border-input bg-muted px-3"/>
-				</label>
-				<label class="flex flex-col gap-1.5 text-sm">
-					<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Password</span>
-					<input name="password" type="password" required autocomplete="current-password" class="h-10 rounded-lg border border-input bg-muted px-3"/>
-				</label>
-				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg}) {
-					Sign in
+				<form method="post" action="/login" class="flex flex-col gap-4">
+					<input type="hidden" name="next" value={ v.Next }/>
+					<label class="flex flex-col gap-1.5 text-sm">
+						<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Email</span>
+						<input name="email" type="email" required autocomplete="username" class="h-10 rounded-lg border border-input bg-muted px-3"/>
+					</label>
+					<label class="flex flex-col gap-1.5 text-sm">
+						<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Password</span>
+						<input name="password" type="password" required autocomplete="current-password" class="h-10 rounded-lg border border-input bg-muted px-3"/>
+					</label>
+					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg}) {
+						Sign in
+					}
+				</form>
+				if len(v.Ways) > 0 || v.SSO {
+					<nav class="flex flex-col gap-2 border-t border-dashed border-border pt-2" aria-label="Other ways to sign in">
+						<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Or</span>
+						for _, way := range v.Ways {
+							@button.Button(button.Props{Href: "/login/with/" + way.Key + nextQuery(v.Next), Variant: button.VariantOutline}) {
+								Continue with { way.Label }
+							}
+						}
+						if v.SSO {
+							@button.Button(button.Props{Href: "/login/sso" + nextQuery(v.Next), Variant: button.VariantOutline}) {
+								Use your organisation's single sign-on
+							}
+						}
+					</nav>
 				}
-			</form>
+			</main>
+		</body>
+	</html>
+}
+
+func nextQuery(next string) string {
+	if next == "" {
+		return ""
+	}
+	return "?next=" + url.QueryEscape(next)
+}
+
+// SSOPage answers with links and never a redirect: a form here may only end on this site.
+templ SSOPage(v SSOView) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			@Head("Single sign-on · Prospector")
+		</head>
+		<body class="front-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased">
+			<main class="flex w-full max-w-sm flex-col gap-4 panel panel-lift p-7">
+				<h1 class="font-heading text-2xl font-bold">Single sign-on<span class="text-coral">.</span></h1>
+				if v.Problem != "" {
+					<p class="text-sm text-[var(--stop)]" role="alert">{ v.Problem }</p>
+				}
+				if v.Asked != "" {
+					<p class="text-sm text-muted-foreground">{ v.Asked } asks its people to sign in through its own provider.</p>
+				}
+				for _, o := range v.Orgs {
+					@button.Button(button.Props{Href: ssoStartURL(&o, v.Email, v.Next), Size: button.SizeLg}) {
+						Continue to { o.Name }
+					}
+				}
+				<form method="get" action="/login/sso" class="flex flex-col gap-4">
+					<input type="hidden" name="next" value={ v.Next }/>
+					<label class="flex flex-col gap-1.5 text-sm">
+						<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Work email</span>
+						<input name="email" type="email" required autocomplete="username" value={ v.Email } class="h-10 rounded-lg border border-input bg-muted px-3"/>
+					</label>
+					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline}) {
+						Find my organisation
+					}
+				</form>
+				<a href={ templ.SafeURL("/login" + nextQuery(v.Next)) } class="text-sm text-muted-foreground hover:text-foreground">Sign in with a password instead</a>
+			</main>
 		</body>
 	</html>
 }

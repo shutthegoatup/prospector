@@ -71,6 +71,10 @@ type Session struct {
 	TokenHash string `gorm:"uniqueIndex;not null"`
 	UserID    int64  `gorm:"index"`
 	ExpiresAt time.Time
+	// SSOOrgs are the organisations whose own sign-in this session has been through,
+	// as ",3,7,". A Limited session began at one and opens nothing else.
+	SSOOrgs string `gorm:"not null;default:''"`
+	Limited bool   `gorm:"not null;default:false"`
 }
 
 type APIKey struct {
@@ -203,6 +207,9 @@ var Marks = map[string]string{"linkedin": "linkedin_added", "email": "email_sent
 
 type Store struct{ db *gorm.DB }
 
+var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
+	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}}
+
 // Open takes a postgres:// URL or a SQLite file path.
 func Open(dsn string) (*Store, error) {
 	var dialector gorm.Dialector
@@ -215,8 +222,7 @@ func Open(dsn string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := db.AutoMigrate(&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
-		&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}); err != nil {
+	if err := db.AutoMigrate(models...); err != nil {
 		return nil, err
 	}
 	return &Store{db: db}, nil

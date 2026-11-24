@@ -70,6 +70,7 @@ prospector serve                                          # http://127.0.0.1:876
 | `DATABASE_URL` | A `postgres://` URL or a SQLite file path (default `prospector.sqlite`) |
 | `PORT` | Listen on `:PORT` instead of `127.0.0.1:8766` |
 | `PROSPECTOR_URL` | The address people reach it at, e.g. `https://prospector.example.com`. With an `https://` address the session cookie is always marked Secure, and links shown in the app use this address. Set it if a proxy in front changes the `Host` header |
+| `PROSPECTOR_GOOGLE_CLIENT_ID`, `PROSPECTOR_GOOGLE_CLIENT_SECRET` | Offer "Continue with Google" on the sign-in page. The same pair exists for `MICROSOFT` and `LINKEDIN`. Each needs `PROSPECTOR_URL` (see [Signing in](#signing-in)) |
 | `TZ` | The time zone "today" is counted in |
 | `PROSPECTOR_ORG` | Default organisation for CLI commands (`--org=` overrides it) |
 | `PROSPECTOR_KEY` | API key for `push` and `pull` |
@@ -79,12 +80,41 @@ prospector serve                                          # http://127.0.0.1:876
 - Pages carry a Content-Security-Policy that allows only what the app itself serves. The typefaces are bundled, so a visitor's browser contacts no other site.
 - A request's body has five minutes to arrive and its answer two minutes to be read, so a stalled client doesn't hold a connection open. An agent's MCP stream, once its key is accepted, stays open.
 - Repeated wrong passwords for one email are slowed, up to a minute between tries. A browser that has signed in to that account before is counted separately, so someone guessing elsewhere can't hold its owner up.
-- An owner adds and removes members in Settings. Removing someone ends their sign-in access to that organisation; their account, and other organisations, are untouched. API keys they created keep working until revoked on the Agents page.
+- An owner adds and removes members in Settings. Removing someone ends their sign-in access to that organisation; their account, and other organisations, are untouched. API keys they created keep working until revoked on the Agents page. If the organisation lets people join through its single sign-on, someone removed here joins again while its provider still lets them in: remove them there too.
 - Someone added from Settings gets a first password that the person adding them sees; they are made to choose their own the first time they sign in.
 - Members change their own password in Settings, which signs out their other sessions. `prospector user password` signs them out everywhere.
-- Every page needs a sign-in except the sign-in form and the front page at `/`, which describes Prospector to a signed-out visitor and shows nothing from your data. Every browser POST must be JSON, which blocks cross-site form posts, and a request that a browser marks as coming from another site is refused, sign-in and sign-out included.
+- Every page needs a sign-in except the sign-in pages and the front page at `/`, which describes Prospector to a signed-out visitor and shows nothing from your data. The single sign-on page does name the organisations that have verified an email domain to anyone who types an address at it. Every browser POST must be JSON, which blocks cross-site form posts, and a request that a browser marks as coming from another site is refused, sign-in and sign-out included.
 
 There's a Dockerfile for container hosting.
+
+## Signing in
+
+Everyone can sign in with an email and password. Two more ways can be turned on, both OpenID Connect, and both needing `PROSPECTOR_URL`: the provider sends people back to `<PROSPECTOR_URL>/login/callback`, which is the redirect URI to register with it.
+
+### Google, Microsoft and LinkedIn, for the whole server
+
+Whoever runs the server registers an app with the provider and sets its `PROSPECTOR_<PROVIDER>_CLIENT_ID` and `_CLIENT_SECRET`. The sign-in page then offers it to everybody.
+
+- It signs in people who already have an account, matched the first time by an email address the provider has verified and after that by the provider's own ID for them. It never creates an account.
+- Microsoft's `email` claim is whatever a tenant's admin typed, so an address counts only when the token carries `xms_edov`. Add `xms_edov` to the ID token's optional claims in the app registration, or nobody can be matched.
+- LinkedIn is asked without PKCE or a nonce, which it doesn't document.
+
+### An organisation's own single sign-on
+
+An owner sets this up in Settings, for Okta, Entra ID, Google Workspace or any other OpenID Connect provider:
+
+1. **Add the email domains that are yours** and prove each with the DNS TXT record Settings shows. The provider is believed only for addresses at a verified domain, matched whole.
+2. **Enter the issuer, client ID and client secret.** The issuer is read before anything is saved. The secret is kept in the database and never shown again.
+3. Optionally **require it**: members at your domains can no longer open the organisation on a password. Owners still can, so a broken provider can be put right, and so can members at other domains, whom your provider couldn't sign in. API keys are unaffected. If no owner can get in, `prospector sso off <org>` stops requiring it.
+4. Optionally **let people join**: anyone at your domains becomes a member, never an owner, the first time they sign in. Without this, the provider signs in only people an owner has already added.
+
+People start from "Use your organisation's single sign-on" on the sign-in page and give their work address.
+
+- A session that began at an organisation's provider opens that organisation only, since the provider vouches for nothing else. Someone already signed in who goes through it keeps their session.
+- With Google as the provider, the account must also be in a Workspace for that domain (`hd`). Microsoft's sign-in for every tenant (`/common`) is refused as an issuer: use your own tenant's.
+- An issuer must be `https` at a public address; one inside the server's network is never contacted.
+- Someone invited with a first password who arrives through a provider instead isn't asked to change it: that password stops working.
+- Each change to the connection, and each person who joins through it, is recorded in the organisation's events with who and when. SAML and SCIM aren't supported.
 
 ## Agents: MCP and REST
 
