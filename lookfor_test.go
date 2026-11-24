@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -75,8 +76,17 @@ func TestOlderAgentsConfiguratorBecomesFacts(t *testing.T) {
 // organisation's to name, with the configurator columns filled in.
 func TestConfiguratorColumnsMove(t *testing.T) {
 	dsn := filepath.Join(t.TempDir(), "old.sqlite")
+	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
+		dsn = pg
+	}
 	s, err := Open(dsn)
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.Migrator().DropTable(models...); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.AutoMigrate(models...); err != nil {
 		t.Fatal(err)
 	}
 	renders := mustOrg(t, s, "renders")
