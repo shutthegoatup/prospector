@@ -395,7 +395,7 @@ func (s *Store) QuickAddPerson(o *Org, in QuickAdd, actor string) (*Contact, err
 		if err := tx.Create(&out).Error; err != nil {
 			return err
 		}
-		return s.log(tx, o.ID, out.ID, companyID, actor, "add:person", nonEmpty(in.Linkedin))
+		return s.log(tx, o.ID, out.ID, companyID, actor, "add:person", nil)
 	})
 	return &out, err
 }
