@@ -67,8 +67,17 @@ func TestOlderAgentsConfiguratorBecomesFacts(t *testing.T) {
 	if facts["configurator"] != "https://larkmoor.example/build" || facts["platform"] != "Kickflip" || facts["built_by"] != "Studio Vell" {
 		t.Fatalf("facts: %v", facts)
 	}
-	if _, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, AddCompanyIn{Name: "Corvane", Platform: "Kickflip"}); err == nil {
-		t.Fatal("a platform with nothing to cite was accepted")
+	corvane, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, AddCompanyIn{Name: "Corvane", Platform: "Kickflip"})
+	if err != nil {
+		t.Fatalf("an older agent's platform with no configurator link was refused: %v", err)
+	}
+	var uncited Fact
+	s.in(o.ID).Where("company_id = ? and field = 'platform'", corvane.ID).First(&uncited)
+	if uncited.Value != "Kickflip" || uncited.SourceURL != "" || uncited.Actor != "agent:bot" {
+		t.Fatalf("a platform with nothing to cite: %+v", uncited)
+	}
+	if o, _ = s.OrgBySlug("alpha"); !strings.HasPrefix(o.Settings.LookFor, "configurator:") {
+		t.Fatalf("an organisation given configurators doesn't look for them: %q", o.Settings.LookFor)
 	}
 }
 
@@ -102,7 +111,7 @@ func TestConfiguratorColumnsMove(t *testing.T) {
 		}
 	}
 	add := func(org int64, name, domain, url, platform, builtBy string) int64 {
-		c := Company{OrgID: org, Name: name, Domain: domain, Stage: CompanyQualified}
+		c := Company{OrgID: org, Name: name, Domain: domain, Stage: CompanyQualified, FoundBy: "agent:scout"}
 		if err := s.db.Create(&c).Error; err != nil {
 			t.Fatal(err)
 		}
@@ -132,7 +141,7 @@ func TestConfiguratorColumnsMove(t *testing.T) {
 	}
 	var cited Fact
 	s.db.Where("company_id = ? and field = 'platform'", ostrel).First(&cited)
-	if cited.Value != "Threekit" || cited.SourceURL != "https://ostrel.example" {
+	if cited.Value != "Threekit" || cited.SourceURL != "" || cited.Actor != "agent:scout" {
 		t.Fatalf("a platform without a configurator link: %+v", cited)
 	}
 	var total, left int64
@@ -160,4 +169,17 @@ func (s *Store) companyFacts(t *testing.T, org, company int64) map[string]string
 		out[f.Field] = f.Value
 	}
 	return out
+}
+
+func TestImportedConfiguratorsShow(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	if _, err := s.Import(o.ID, readFixtures(t)); err != nil {
+		t.Fatal(err)
+	}
+	var facts int64
+	s.in(o.ID).Model(&Fact{}).Where("field = 'configurator'").Count(&facts)
+	if o, _ = s.OrgBySlug("alpha"); facts == 0 || !strings.HasPrefix(o.Settings.LookFor, "configurator:") {
+		t.Fatalf("%d configurator facts imported, looking for %q", facts, o.Settings.LookFor)
+	}
 }

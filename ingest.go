@@ -227,10 +227,8 @@ func linkCompanies(tx *gorm.DB, org int64, rows []CompanyRow) error {
 		if err != nil {
 			return err
 		}
-		for _, f := range configuratorFacts(r["configurator_url"], "", r["configurator_built_by"], domainOf(r["website"])) {
-			if _, _, err := addFact(tx, org, c.ID, f, "import"); err != nil {
-				return err
-			}
+		if _, err := addConfiguratorFacts(tx, org, c.ID, r["configurator_url"], "", r["configurator_built_by"], "import"); err != nil {
+			return err
 		}
 		if !created {
 			if err := tx.Model(c).Updates(map[string]any{"fit": r["priority"], "segment": r["segment"], "why": r["fit_reason"]}).Error; err != nil {

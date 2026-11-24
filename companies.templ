@@ -133,7 +133,13 @@ templ CompanyView(q *Req, p CompanyPage) {
 				if found := assetsFound(q.Org.Settings, p.Facts); len(found) > 0 {
 					<div class="mt-1">@AssetPills(found)</div>
 				} else {
-					<div class="mt-1 text-sm text-muted-foreground"><a href={ templ.SafeURL(q.Base() + "settings") }>Name what you look for</a></div>
+					<div class="mt-1 text-sm text-muted-foreground">
+						if q.Owner() {
+							<a href={ templ.SafeURL(q.Base() + "settings") }>Name what you look for</a>
+						} else {
+							Nothing named yet
+						}
+					</div>
 				}
 			</div>
 			<div class="rounded-lg bg-muted p-3">@Label("Found by")<div class="mt-1 text-sm">{ actorLabel(p.Company.FoundBy) }</div></div>
@@ -171,15 +177,7 @@ templ CompanyView(q *Req, p CompanyPage) {
 			<div>
 				@Label("Facts")
 				for _, f := range p.Facts {
-					<div class="grid grid-cols-[130px_1fr_auto] items-baseline gap-3 border-b border-dashed border-border py-2 text-sm">
-						<span class="font-mono text-xs text-muted-foreground">{ f.Field }</span>
-						<span>{ f.Value }</span>
-						if f.SourceURL != "" {
-							<a href={ safeHref(f.SourceURL) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
-						} else {
-							<span></span>
-						}
-					</div>
+					@FactRow(f)
 				}
 			</div>
 		}
@@ -221,4 +219,16 @@ func touches(h []HistoryItem) int {
 		}
 	}
 	return n
+}
+
+templ FactRow(f Fact) {
+	<div class="grid grid-cols-[130px_1fr_auto] items-baseline gap-3 border-b border-dashed border-border py-2 text-sm">
+		<span class="font-mono text-xs text-muted-foreground">{ f.Field }</span>
+		<span>{ f.Value }</span>
+		if f.SourceURL != "" {
+			<a href={ safeHref(f.SourceURL) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
+		} else {
+			<span></span>
+		}
+	</div>
 }

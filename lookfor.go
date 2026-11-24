@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 
@@ -17,8 +18,10 @@ type Asset struct {
 
 // assetKey lets "Careers page", "careers-page" and "careers_page" name one field.
 func assetKey(field string) string {
-	return strings.NewReplacer(" ", "_", "-", "_").Replace(strings.ToLower(strings.TrimSpace(field)))
+	return underscores.Replace(strings.ToLower(strings.TrimSpace(field)))
 }
+
+var underscores = strings.NewReplacer(" ", "_", "-", "_")
 
 // Assets reads LookFor, one "field: hint" per line; the hint is optional.
 func (s OrgSettings) Assets() ([]Asset, error) {
@@ -63,15 +66,12 @@ func assetsFound(set OrgSettings, facts []Fact) []AssetFound {
 
 // configuratorFacts are the configurator_url, platform and built_by a company could
 // carry before each organisation named its own assets, as facts. They cite the
-// configurator, else the company's site, else nothing.
-func configuratorFacts(url, platform, builtBy, domain string) []FactIn {
+// configurator's page, or nothing when there is none.
+func configuratorFacts(url, platform, builtBy string) []FactIn {
 	url, platform, builtBy = strings.TrimSpace(url), strings.TrimSpace(platform), strings.TrimSpace(builtBy)
-	source := url
-	if !httpURL.MatchString(source) {
-		source = ""
-		if d := bareDomain(domain); d != "" {
-			source = "https://" + d
-		}
+	source := ""
+	if httpURL.MatchString(url) {
+		source = url
 	}
 	var out []FactIn
 	add := func(field, value string) {
@@ -79,22 +79,43 @@ func configuratorFacts(url, platform, builtBy, domain string) []FactIn {
 			out = append(out, FactIn{Field: field, Value: value, SourceURL: source})
 		}
 	}
-	add("configurator", orElse(url, platform))
+	add("configurator", cmp.Or(url, platform))
 	add("platform", platform)
 	add("built_by", builtBy)
 	return out
 }
 
-func orElse(a, b string) string {
-	if a != "" {
-		return a
+// addConfiguratorFacts stores configuratorFacts for a company and, when there are
+// any, makes sure its organisation looks for a configurator, so they show.
+func addConfiguratorFacts(tx *gorm.DB, org, company int64, url, platform, builtBy, actor string) (int, error) {
+	facts := configuratorFacts(url, platform, builtBy)
+	added := 0
+	for _, f := range facts {
+		_, had, err := addFact(tx, org, company, f, actor)
+		if err != nil {
+			return 0, err
+		}
+		if !had {
+			added++
+		}
 	}
-	return b
+	if len(facts) == 0 {
+		return 0, nil
+	}
+	var o Org
+	if err := tx.First(&o, org).Error; err != nil {
+		return 0, err
+	}
+	if strings.TrimSpace(o.Settings.LookFor) != "" {
+		return added, nil
+	}
+	o.Settings.LookFor = "configurator: a product configurator or builder on their site"
+	return added, tx.Model(&o).Select("settings").Updates(&o).Error
 }
 
 // moveAssetColumns turns what companies hold in the old configurator columns into
-// facts, then empties the columns so the next start finds nothing to move. An
-// organisation that had any gets "configurator" to look for, so it keeps seeing it.
+// facts, credited to whoever found the company, then empties the columns so the next
+// start finds nothing to move. They are kept so an earlier release still starts.
 func moveAssetColumns(db *gorm.DB) error {
 	for _, col := range []string{"configurator_url", "platform", "built_by"} {
 		if !db.Migrator().HasColumn(&Company{}, col) {
@@ -104,32 +125,16 @@ func moveAssetColumns(db *gorm.DB) error {
 	const held = "coalesce(configurator_url, '') <> '' or coalesce(platform, '') <> '' or coalesce(built_by, '') <> ''"
 	return db.Transaction(func(tx *gorm.DB) error {
 		var rows []struct {
-			ID, OrgID                                  int64
-			Domain, ConfiguratorURL, Platform, BuiltBy string
+			ID, OrgID                                   int64
+			FoundBy, ConfiguratorURL, Platform, BuiltBy string
 		}
-		if err := tx.Raw(`select id, org_id, coalesce(domain, '') as domain, coalesce(configurator_url, '') as configurator_url,
+		if err := tx.Raw(`select id, org_id, coalesce(found_by, '') as found_by, coalesce(configurator_url, '') as configurator_url,
 			coalesce(platform, '') as platform, coalesce(built_by, '') as built_by from companies where ` + held).Scan(&rows).Error; err != nil {
 			return err
 		}
-		orgs := map[int64]bool{}
 		for _, r := range rows {
-			for _, f := range configuratorFacts(r.ConfiguratorURL, r.Platform, r.BuiltBy, r.Domain) {
-				if _, _, err := addFact(tx, r.OrgID, r.ID, f, "import"); err != nil {
-					return err
-				}
-			}
-			orgs[r.OrgID] = true
-		}
-		for id := range orgs {
-			var o Org
-			if err := tx.First(&o, id).Error; err != nil {
+			if _, err := addConfiguratorFacts(tx, r.OrgID, r.ID, r.ConfiguratorURL, r.Platform, r.BuiltBy, cmp.Or(r.FoundBy, "import")); err != nil {
 				return err
-			}
-			if strings.TrimSpace(o.Settings.LookFor) == "" {
-				o.Settings.LookFor = "configurator: a product configurator or builder on their site"
-				if err := tx.Model(&o).Select("settings").Updates(&o).Error; err != nil {
-					return err
-				}
 			}
 		}
 		return tx.Exec(`update companies set configurator_url = '', platform = '', built_by = '' where ` + held).Error

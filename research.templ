@@ -109,15 +109,7 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 						<div class="grid grid-cols-[130px_1fr] gap-3 border-b border-dashed border-border py-2 text-sm"><span class="font-mono text-xs text-muted-foreground">why it fits</span><span>{ r.Why }</span></div>
 					}
 					for _, f := range r.Facts {
-						<div class="grid grid-cols-[130px_1fr_auto] items-baseline gap-3 border-b border-dashed border-border py-2 text-sm">
-							<span class="font-mono text-xs text-muted-foreground">{ f.Field }</span>
-							<span>{ f.Value }</span>
-							if f.SourceURL != "" {
-								<a href={ safeHref(f.SourceURL) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
-							} else {
-								<span></span>
-							}
-						</div>
+						@FactRow(f)
 					}
 				</div>
 				<div class="min-w-0 flex-[1_1_260px]">

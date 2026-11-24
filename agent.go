@@ -71,11 +71,6 @@ func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddComp
 	if in.ConfiguratorURL != "" && !httpURL.MatchString(strings.TrimSpace(in.ConfiguratorURL)) {
 		return nil, errors.New("configurator_url must be an http(s) link")
 	}
-	older := configuratorFacts(in.ConfiguratorURL, in.Platform, in.BuiltBy, in.Domain)
-	if len(older) > 0 && older[0].SourceURL == "" {
-		return nil, errors.New("platform and built_by need a configurator_url or domain to cite; add them as facts instead")
-	}
-	in.Facts = append(in.Facts, older...)
 	for _, f := range in.Facts {
 		if err := checkFact(f); err != nil {
 			return nil, err
@@ -112,6 +107,12 @@ func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddComp
 				added++
 			}
 		}
+		// Older clients' fields become facts; with no configurator link they cite nothing, as they did as columns.
+		older, err := addConfiguratorFacts(tx, org, c.ID, in.ConfiguratorURL, in.Platform, in.BuiltBy, who.Name)
+		if err != nil {
+			return err
+		}
+		added += older
 		if !created && added == 0 {
 			return nil
 		}
