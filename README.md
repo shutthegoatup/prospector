@@ -91,7 +91,7 @@ node build-css.mjs <node_modules with tailwindcss v4>   # or the standalone tail
 
 ## Releases
 
-Pushing a `v*` tag runs GoReleaser: binaries for Linux and macOS (amd64 and arm64) and `checksums.txt` are attached to the GitHub release. `prospector version` prints the version a binary was built from.
+Every push to `main` that passes CI is released as the next patch version (`v0.1.1`, `v0.1.2`, …) by `ci.yml`. Push a `v*` tag by hand for a minor or major bump; `release.yml` builds that one. Each release has binaries for Linux and macOS (amd64 and arm64) and `checksums.txt`. `prospector version` prints the version a binary was built from.
 
 ## Data
 
