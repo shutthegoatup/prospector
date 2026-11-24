@@ -241,7 +241,17 @@ func (a *App) Routes() http.Handler {
 
 	a.apiRoutes(mux)
 
+	sameOrigin := http.NewCrossOriginProtection()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A browser says where a request came from. One from another site is refused, which
+		// also covers the sign-in and sign-out forms that the JSON rule below can't. Agents
+		// and the CLI send neither header and carry a key, so they pass.
+		if r.Header.Get("Authorization") == "" {
+			if err := sameOrigin.Check(r); err != nil {
+				http.Error(w, "this request came from another site", http.StatusForbidden)
+				return
+			}
+		}
 		// Signed-in browsers send cookies; a cross-site form can't send JSON without a
 		// CORS preflight, which is never answered. Login and the API key routes are exempt.
 		if r.Method == http.MethodPost && r.URL.Path != "/login" && r.URL.Path != "/logout" &&
