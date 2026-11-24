@@ -192,12 +192,13 @@ type SettingsData struct {
 	Members []Member
 	Me      Membership
 	Covered []string
+	Mail    MailView
 }
 
 func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	members, _ := a.s.Members(q.Org.ID)
-	a.page(w, r, "settings", SettingsView(q, SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org)}))
+	a.page(w, r, "settings", SettingsView(q, SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org), Mail: a.mailView(q.Org.ID)}))
 }
 
 type AgentsData struct {
@@ -348,6 +349,17 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	msg := u.Email + " added to " + q.Org.Name + "."
+	// Someone who never chose a password is sent the link again, so a lost one isn't the end.
+	if password != "" || u.MustChangePassword {
+		sent, err := a.invite(r.Context(), q, u)
+		if sent {
+			writeJSON(w, map[string]string{"message": msg + " They've been emailed a link to choose their password; it lasts 7 days."})
+			return
+		}
+		if err != nil {
+			msg += " The invitation couldn't be emailed (" + err.Error() + ")."
+		}
+	}
 	if password != "" {
 		msg += " Their first password, shown once: " + password + " (they choose their own when they first sign in)"
 	}

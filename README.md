@@ -70,6 +70,9 @@ prospector serve                                          # http://127.0.0.1:876
 | `DATABASE_URL` | A `postgres://` URL or a SQLite file path (default `prospector.sqlite`) |
 | `PORT` | Listen on `:PORT` instead of `127.0.0.1:8766` |
 | `PROSPECTOR_URL` | The address people reach it at, e.g. `https://prospector.example.com`. With an `https://` address the session cookie is always marked Secure, and links shown in the app use this address. Set it if a proxy in front changes the `Host` header |
+| `SMTP_ADDR`, `MAIL_FROM` | The mail server the app's own mail leaves through, e.g. `smtp.example.com:587` and `Prospector <prospector@example.com>`. Set both or neither; see [Mail](#mail) |
+| `SMTP_USERNAME`, `SMTP_PASSWORD` | What that server asks for, if anything |
+| `PROSPECTOR_SECRET_KEY` | 64 hex characters (`openssl rand -hex 32`) that seal each organisation's mail password in the database. Without it none can be saved |
 | `TZ` | The time zone "today" is counted in |
 | `PROSPECTOR_ORG` | Default organisation for CLI commands (`--org=` overrides it) |
 | `PROSPECTOR_KEY` | API key for `push` and `pull` |
@@ -81,10 +84,24 @@ prospector serve                                          # http://127.0.0.1:876
 - Repeated wrong passwords for one email are slowed, up to a minute between tries. A browser that has signed in to that account before is counted separately, so someone guessing elsewhere can't hold its owner up.
 - An owner adds and removes members in Settings. Removing someone ends their sign-in access to that organisation; their account, and other organisations, are untouched. API keys they created keep working until revoked on the Agents page.
 - Someone added from Settings gets a first password that the person adding them sees; they are made to choose their own the first time they sign in.
+- With [mail](#mail) set up, whoever reads a member's mailbox can choose that member's password. Without it there is no reset but `prospector user password`.
 - Members change their own password in Settings, which signs out their other sessions. `prospector user password` signs them out everywhere.
 - Every page needs a sign-in except the sign-in form and the front page at `/`, which describes Prospector to a signed-out visitor and shows nothing from your data. Every browser POST must be JSON, which blocks cross-site form posts, and a request that a browser marks as coming from another site is refused, sign-in and sign-out included.
 
 There's a Dockerfile for container hosting.
+
+## Mail
+
+The app sends two kinds of mail, both to its own members. It never sends outreach: people do that from their own mailbox.
+
+- **Password resets.** The sign-in page offers "Forgot your password?", which emails a link that lasts an hour and works once.
+- **Invitations.** Someone an owner adds is emailed a link to choose their password, good for 7 days, instead of the owner being shown a first password to pass on.
+
+Both need `SMTP_ADDR`, `MAIL_FROM` and `PROSPECTOR_URL`: a link is only ever built from the address you gave, never from what a request claims. With any of them missing there is no reset and first passwords are shown as before. `prospector mail test you@example.com` sends a message through the server you set.
+
+Any SMTP submission service that takes a username and password (`AUTH PLAIN`) works, a transactional mail provider's included. Mail goes over TLS (STARTTLS, or implicit TLS on port 465) or not at all; only a server on the same machine is spoken to in the clear.
+
+**An organisation can use a server of its own**, set by an owner under Settings → Outgoing mail. Invitations to that organisation then leave through it, from its address. Resets belong to the account, not to an organisation, so they always use the app's. The password is sealed with `PROSPECTOR_SECRET_KEY` and never shown again, and the server must be on port 587, 465, 2525 or 25.
 
 ## Agents: MCP and REST
 

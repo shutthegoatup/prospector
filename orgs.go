@@ -109,13 +109,19 @@ func (s *Store) ChangePassword(u *User, current, password, keepToken string) err
 
 // savePassword also signs the user out everywhere except the session in keepToken.
 func (s *Store) savePassword(user int64, hash, keepToken string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		set := map[string]any{"password_hash": hash, "must_change_password": false}
-		if err := tx.Model(&User{}).Where("id = ?", user).Updates(set).Error; err != nil {
-			return err
-		}
-		return tx.Where("user_id = ? and token_hash <> ?", user, hashToken(keepToken)).Delete(&Session{}).Error
-	})
+	return s.db.Transaction(func(tx *gorm.DB) error { return savePassword(tx, user, hash, keepToken) })
+}
+
+// A new password also ends any emailed link that could still have set one.
+func savePassword(tx *gorm.DB, user int64, hash, keepToken string) error {
+	set := map[string]any{"password_hash": hash, "must_change_password": false}
+	if err := tx.Model(&User{}).Where("id = ?", user).Updates(set).Error; err != nil {
+		return err
+	}
+	if err := tx.Where("user_id = ?", user).Delete(&PasswordToken{}).Error; err != nil {
+		return err
+	}
+	return tx.Where("user_id = ? and token_hash <> ?", user, hashToken(keepToken)).Delete(&Session{}).Error
 }
 
 func (s *Store) UserByEmail(email string) (*User, error) {

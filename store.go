@@ -216,7 +216,7 @@ func Open(dsn string) (*Store, error) {
 		return nil, err
 	}
 	if err := db.AutoMigrate(&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
-		&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}); err != nil {
+		&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &PasswordToken{}, &OrgMail{}); err != nil {
 		return nil, err
 	}
 	return &Store{db: db}, nil

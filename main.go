@@ -7,6 +7,7 @@
 //	prospector org add <slug> <name> [--owner=<email>]
 //	prospector member add <org> <email> [owner|member]
 //	prospector key add <org> <name> <scope>…   prints the key once
+//	prospector mail test <address>           send a test through SMTP_ADDR
 //	prospector version
 //
 // Per organisation, chosen with --org=<slug> or $PROSPECTOR_ORG:
@@ -25,6 +26,9 @@
 //	prospector push https://host/o/<org> [--dir=.] [--own-domain=…]
 //	prospector pull https://host/o/<org> <file>
 //
+// SMTP_ADDR, SMTP_USERNAME, SMTP_PASSWORD and MAIL_FROM name the mail server that
+// password resets and invitations leave through; without them there are neither.
+//
 // DATABASE_URL picks the database: a postgres:// URL or a SQLite path
 // (default prospector.sqlite in the current directory).
 package main
@@ -32,6 +36,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -171,7 +176,32 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		return serve(&App{s: s, base: base}, arg(rest, 0, addr))
+		app := &App{s: s, base: base}
+		if app.mail, err = mailFromEnv(os.Getenv); err != nil {
+			return err
+		}
+		if app.seal, err = newSealer(os.Getenv("PROSPECTOR_SECRET_KEY")); err != nil {
+			return err
+		}
+		return serve(app, arg(rest, 0, addr))
+	case "mail":
+		if arg(rest, 0, "") != "test" || len(rest) < 2 {
+			return fmt.Errorf("usage: prospector mail test <address>")
+		}
+		via, err := mailFromEnv(os.Getenv)
+		if err != nil {
+			return err
+		}
+		if via == nil {
+			return fmt.Errorf("set SMTP_ADDR and MAIL_FROM first")
+		}
+		err = smtpSend(context.Background(), *via, Message{To: rest[1], Subject: "Prospector can send mail",
+			Body: "This is the test from `prospector mail test`.\n\nIt was sent through " + via.Host + " as " + via.From + ".\n"})
+		if err != nil {
+			return err
+		}
+		fmt.Println("sent to", rest[1], "through", via.Host)
+		return nil
 	case "user":
 		switch arg(rest, 0, "") {
 		case "add":

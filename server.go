@@ -31,6 +31,13 @@ type App struct {
 	// base is the address people reach the app at, when the operator has said: then
 	// links and the cookie's Secure mark don't depend on what a proxy forwards.
 	base string
+	// mail is the app's own server, for password resets and invitations; nil is none.
+	mail *MailServer
+	// seal keeps organisations' mail passwords; nil means none can be saved.
+	seal *sealer
+	// send and later stand in for SMTP and for a goroutine in tests.
+	send  sendFunc
+	later func(func())
 	// How long a request's body may take to arrive, and its answer to be written;
 	// zero means bodyLimit and answerLimit.
 	readLimit, writeLimit time.Duration
@@ -267,6 +274,10 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /login", a.loginPage)
 	mux.HandleFunc("POST /login", a.login)
 	mux.HandleFunc("POST /logout", a.logout)
+	mux.HandleFunc("GET /forgot", a.forgotPage)
+	mux.HandleFunc("POST /forgot", a.forgot)
+	mux.HandleFunc("GET /reset/{token}", a.resetPage)
+	mux.HandleFunc("POST /reset/{token}", a.reset)
 	mux.HandleFunc("GET /{$}", a.front)
 	mux.HandleFunc("POST /orgs", a.member(a.newOrg))
 	mux.HandleFunc("GET /password", a.member(a.passwordPage))
@@ -293,6 +304,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/settings", a.owner(a.uiSettings))
 	mux.HandleFunc("POST /o/{org}/ui/member", a.owner(a.uiMember))
 	mux.HandleFunc("POST /o/{org}/ui/member/remove", a.owner(a.uiRemoveMember))
+	mux.HandleFunc("POST /o/{org}/ui/mail", a.owner(a.uiMail))
+	mux.HandleFunc("POST /o/{org}/ui/mail/test", a.owner(a.uiMailTest))
 	mux.HandleFunc("POST /o/{org}/ui/erase", a.owner(a.uiErase))
 	mux.HandleFunc("POST /o/{org}/ui/keys", a.owner(a.uiKey))
 	mux.HandleFunc("POST /o/{org}/ui/keys/revoke", a.owner(a.uiRevoke))
@@ -330,8 +343,9 @@ func (a *App) Routes() http.Handler {
 			}
 		}
 		// Signed-in browsers send cookies; a cross-site form can't send JSON without a
-		// CORS preflight, which is never answered. Login and the API key routes are exempt.
-		if r.Method == http.MethodPost && r.URL.Path != "/login" && r.URL.Path != "/logout" &&
+		// CORS preflight, which is never answered. The signed-out forms and the API key
+		// routes are exempt.
+		if r.Method == http.MethodPost && !signedOutForm(r.URL.Path) &&
 			!hasKey(r) && !strings.HasPrefix(r.Header.Get("content-type"), "application/json") {
 			http.Error(w, "POST bodies must be application/json", http.StatusUnsupportedMediaType)
 			return
@@ -340,9 +354,24 @@ func (a *App) Routes() http.Handler {
 	})
 }
 
+// signedOutForm is a plain HTML form somebody with no session posts.
+func signedOutForm(path string) bool {
+	return path == "/login" || path == "/logout" || path == "/forgot" || strings.HasPrefix(path, "/reset/")
+}
+
+type LoginView struct {
+	Next, Problem, Notice string
+	// Forgot offers the reset link, which needs mail.
+	Forgot bool
+}
+
 func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
+	v := LoginView{Next: r.URL.Query().Get("next"), Forgot: a.mailOn()}
+	if r.URL.Query().Has("reset") {
+		v.Notice = "Password saved. Sign in with it."
+	}
 	w.Header().Set("content-type", "text/html; charset=utf-8")
-	LoginPage(r.URL.Query().Get("next"), "").Render(r.Context(), w)
+	LoginPage(v).Render(r.Context(), w)
 }
 
 // safeNext keeps a post-login redirect on this site. Browsers drop tabs and newlines
@@ -365,7 +394,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	refuse := func(code int, problem string) {
 		w.Header().Set("content-type", "text/html; charset=utf-8")
 		w.WriteHeader(code)
-		LoginPage(r.PostForm.Get("next"), problem).Render(r.Context(), w)
+		LoginPage(LoginView{Next: r.PostForm.Get("next"), Problem: problem, Forgot: a.mailOn()}).Render(r.Context(), w)
 	}
 	select {
 	case hashSlots <- struct{}{}:
@@ -517,6 +546,9 @@ func serve(a *App, addr string) error {
 	}
 	if a.base == "" && !strings.HasPrefix(addr, "127.0.0.1:") && !strings.HasPrefix(addr, "localhost:") {
 		log.Print("PROSPECTOR_URL isn't set: the session cookie is marked Secure only when a proxy sends X-Forwarded-Proto: https")
+	}
+	if a.mail != nil && a.base == "" {
+		log.Print("PROSPECTOR_URL isn't set: mail is off, because an emailed link needs the address to point at")
 	}
 	srv := &http.Server{Addr: addr, Handler: a.Routes(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
 	log.Printf("listening on http://%s", addr)
