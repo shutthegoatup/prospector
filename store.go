@@ -27,6 +27,7 @@ type OrgSettings struct {
 	NoteTemplate      string `json:"note_template"`
 	NeverContact      string `json:"never_contact"`
 	IncorporatedOnly  bool   `json:"incorporated_only"`
+	AgentGuidance     string `json:"agent_guidance"`
 }
 
 func (s OrgSettings) withDefaults() OrgSettings {

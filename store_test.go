@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -233,6 +234,17 @@ func TestAgentResearchToOutreach(t *testing.T) {
 	if err := s.AgentDraft(o.ID, "agent:bot", DraftIn{ContactID: c.ID, Kind: "note", Text: strings.Repeat("x", 301)}); err == nil {
 		t.Fatal("a note over 300 characters was accepted")
 	}
+	corvane, err := s.AgentAddCompany(o.ID, "agent:bot", AddCompanyIn{Name: "Corvane", Facts: []FactIn{{Field: "configurator", Value: "Vela builder", SourceURL: "https://corvane.example"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetCompanyStage(o.ID, corvane.ID, CompanyRejected, "", "ada"); err != nil {
+		t.Fatal(err)
+	}
+	scores := s.AgentScores(o.ID)
+	if len(scores) != 1 || scores[0] != (AgentScore{Agent: "bot", Companies: 2, Qualified: 1, Rejected: 1, Contacts: 1, Picked: 1}) {
+		t.Fatalf("agent scores: %+v", scores)
+	}
 }
 
 func TestParseLinkedIn(t *testing.T) {
@@ -379,6 +391,10 @@ func (f roundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f
 
 func TestMCP(t *testing.T) {
 	s, o, srv, _ := signedIn(t)
+	o.Settings.AgentGuidance = "Never suggest anyone at Brandtech."
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
 	key, _, _ := s.CreateKey(o.ID, "claude", []string{"read", "research:write"}, "test")
 	transport := &mcp.StreamableClientTransport{Endpoint: srv.URL + "/o/alpha/mcp", HTTPClient: &http.Client{
 		Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
@@ -410,6 +426,15 @@ func TestMCP(t *testing.T) {
 	res, _ = session.CallTool(ctx, &mcp.CallToolParams{Name: "add_contact", Arguments: map[string]any{"company": "Larkmoor Yachts", "name": "Hannah Pryce"}})
 	if res == nil || !res.IsError {
 		t.Fatal("add_contact without a source should be a tool error")
+	}
+	init := session.InitializeResult()
+	if !strings.Contains(init.Instructions, "Contacts need care") || strings.Contains(init.Instructions, "Drafts need") ||
+		!strings.Contains(init.Instructions, "Never suggest anyone at Brandtech.") {
+		t.Fatalf("instructions don't follow the key's scopes: %q", init.Instructions)
+	}
+	g, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "guidance", Arguments: map[string]any{}})
+	if err != nil || g.IsError || !strings.Contains(fmt.Sprint(g.StructuredContent), "Never suggest anyone at Brandtech.") {
+		t.Fatalf("guidance tool: %v %+v", err, g)
 	}
 	if rows, _ := s.Research(o.ID, "review"); len(rows) != 1 || rows[0].FoundBy != "agent:claude" {
 		t.Fatalf("MCP-added company not waiting in Research: %+v", rows)
