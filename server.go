@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -249,6 +250,7 @@ func safeNext(next string) string {
 }
 
 func (a *App) login(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 	if err := r.ParseForm(); err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return
@@ -265,15 +267,17 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	case <-r.Context().Done():
 		return
 	}
-	// Checked while holding a slot, so a burst of parallel attempts can't all get in first.
-	if wait := a.logins.wait(email); wait > 0 {
+	if wait := a.logins.begin(email); wait > 0 {
 		seconds := int(wait.Seconds()) + 1
 		w.Header().Set("Retry-After", strconv.Itoa(seconds))
 		refuse(http.StatusTooManyRequests, "Too many attempts. Try again in "+plural(seconds, "second")+".")
 		return
 	}
 	token, _, err := a.s.Login(email, r.PostForm.Get("password"))
-	a.logins.record(email, err == nil)
+	// A failure that isn't a wrong password (the database, say) doesn't count against anyone.
+	if err == nil || errors.Is(err, errWrongLogin) {
+		a.logins.record(email, err == nil)
+	}
 	if err != nil {
 		refuse(http.StatusUnauthorized, err.Error())
 		return

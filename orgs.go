@@ -135,14 +135,16 @@ func (s *Store) Members(org int64) ([]Member, error) {
 	return out, err
 }
 
+var errWrongLogin = errors.New("wrong email or password")
+
 func (s *Store) Login(email, password string) (string, *User, error) {
 	u, err := s.UserByEmail(email)
 	if err != nil {
 		bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
-		return "", nil, errors.New("wrong email or password")
+		return "", nil, errWrongLogin
 	}
 	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
-		return "", nil, errors.New("wrong email or password")
+		return "", nil, errWrongLogin
 	}
 	token := randomToken(32)
 	err = s.db.Create(&Session{TokenHash: hashToken(token), UserID: u.ID, ExpiresAt: time.Now().Add(sessionLife)}).Error
