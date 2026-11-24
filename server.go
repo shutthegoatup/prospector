@@ -332,6 +332,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /o/{org}/settings", a.member(a.settings))
 	mux.HandleFunc("GET /o/{org}/agents", a.member(a.agents))
 	mux.HandleFunc("GET /o/{org}/enquiries", a.member(a.enquiriesPage))
+	a.taskRoutes(mux)
 	mux.HandleFunc("OPTIONS "+intakePattern, a.intakePreflight)
 	mux.HandleFunc("POST "+intakePattern, a.intake)
 

@@ -99,6 +99,14 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if err := gone.Delete(&Enquiry{}).Error; err != nil {
 			return err
 		}
+		// Agents' notes are free text that can't be searched for a name, so every note
+		// about their company goes, and every note on a task that touched it.
+		if c.CompanyID != nil {
+			tasks := tx.Model(&Event{}).Select("task_id").Where("org_id = ? and company_id = ? and task_id > 0", org, *c.CompanyID)
+			if err := tx.Where("org_id = ? and (company_id = ? or task_id in (?))", org, *c.CompanyID, tasks).Delete(&TaskNote{}).Error; err != nil {
+				return err
+			}
+		}
 		if err := tx.Delete(&c).Error; err != nil {
 			return err
 		}
