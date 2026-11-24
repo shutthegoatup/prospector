@@ -16,6 +16,7 @@
 //	prospector export <file>                 write the contacts snapshot
 //	prospector restore <file>                replace the organisation's contacts with a snapshot
 //	prospector import-legacy <file.sqlite>   the same, from a legacy tracker database (read-only)
+//	prospector export-person <name> <file>   write everything held on one person, on their request
 //	prospector erase <name>                  delete a person for good, on their request
 //	prospector mark <name> <step> [date]
 //	prospector set <name> <field> <value>
@@ -303,6 +304,29 @@ func run(args []string) error {
 			return err
 		}
 		fmt.Printf("copied %d contacts from %s into %s\n", n, rest[0], org.Slug)
+	case "export-person":
+		if len(rest) < 2 {
+			return fmt.Errorf("usage: prospector export-person <name> <file>")
+		}
+		c, err := s.FindOne(org.ID, rest[0])
+		if err != nil {
+			return err
+		}
+		if !strings.EqualFold(strings.TrimSpace(rest[0]), displayName(*c)) {
+			return fmt.Errorf("export-person needs the full name, to be sure it's them: %q", displayName(*c))
+		}
+		out, err := s.ExportPerson(org.ID, c.ID, "cli")
+		if err != nil {
+			return err
+		}
+		text, err := json.MarshalIndent(out, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(rest[1], text, 0o600); err != nil {
+			return err
+		}
+		fmt.Println("wrote", rest[1])
 	case "erase":
 		if len(rest) < 1 {
 			return fmt.Errorf("usage: prospector erase <name>")
