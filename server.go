@@ -267,7 +267,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /login", a.loginPage)
 	mux.HandleFunc("POST /login", a.login)
 	mux.HandleFunc("POST /logout", a.logout)
-	mux.HandleFunc("GET /{$}", a.member(a.home))
+	mux.HandleFunc("GET /{$}", a.front)
 	mux.HandleFunc("POST /orgs", a.member(a.newOrg))
 	mux.HandleFunc("GET /password", a.member(a.passwordPage))
 	mux.HandleFunc("POST /password", a.member(a.changePassword))
@@ -409,6 +409,18 @@ func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+// front is the one page a signed-out visitor sees besides the sign-in form.
+func (a *App) front(w http.ResponseWriter, r *http.Request) {
+	if a.sessionUser(r) != nil {
+		a.member(a.home)(w, r)
+		return
+	}
+	w.Header().Set("content-type", "text/html; charset=utf-8")
+	if err := LandingPage().Render(r.Context(), w); err != nil {
+		log.Print(err)
+	}
 }
 
 func (a *App) home(w http.ResponseWriter, r *http.Request) {
