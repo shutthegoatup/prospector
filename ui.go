@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -384,6 +387,24 @@ func (a *App) uiRemoveMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+func (a *App) personExport(w http.ResponseWriter, r *http.Request) {
+	q := reqOf(r)
+	id := idParam(r, "id")
+	out, err := a.s.ExportPerson(q.Org.ID, id, q.Actor())
+	if err != nil {
+		fail(w, err, http.StatusNotFound)
+		return
+	}
+	w.Header().Set("cache-control", "no-store")
+	w.Header().Set("content-disposition", fmt.Sprintf(`attachment; filename="person-%d.json"`, id))
+	w.Header().Set("content-type", "application/json")
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(out); err != nil {
+		log.Print(err)
+	}
 }
 
 func (a *App) uiErase(w http.ResponseWriter, r *http.Request) {

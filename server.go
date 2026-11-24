@@ -340,6 +340,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/sso/domain", a.owner(a.uiSSODomain))
 	mux.HandleFunc("POST /o/{org}/ui/sso/domain/remove", a.owner(a.uiSSODomainRemove))
 	mux.HandleFunc("POST /o/{org}/ui/sso/verify", a.owner(a.uiSSOVerify))
+	mux.HandleFunc("GET /o/{org}/people/{id}/export", a.owner(a.personExport))
 	mux.HandleFunc("POST /o/{org}/ui/erase", a.owner(a.uiErase))
 	mux.HandleFunc("POST /o/{org}/ui/keys", a.owner(a.uiKey))
 	mux.HandleFunc("POST /o/{org}/ui/keys/revoke", a.owner(a.uiRevoke))
