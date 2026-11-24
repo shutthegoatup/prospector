@@ -254,11 +254,11 @@ func (a *App) page(w http.ResponseWriter, r *http.Request, active string, conten
 	}
 }
 
-// contentPolicy lets pages load only this app's own scripts, so text that slipped past
-// escaping still couldn't run. Styles are looser: templ writes style attributes, and the
-// fonts come from Google.
-const contentPolicy = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-	"font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+// contentPolicy lets pages load only what this app serves, so text that slipped past
+// escaping still couldn't run and nothing is fetched from anywhere else. Styles also
+// allow inline attributes, which templ writes.
+const contentPolicy = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+	"font-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
 
 func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
