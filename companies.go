@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var (
@@ -48,7 +49,41 @@ func ensureCompany(tx *gorm.DB, org int64, c Company) (*Company, bool, error) {
 	if c.Stage == "" {
 		c.Stage = CompanyReview
 	}
-	return &c, true, tx.Create(&c).Error
+	res := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&c)
+	if res.Error != nil {
+		return nil, false, res.Error
+	}
+	if res.RowsAffected == 0 {
+		// Someone added it between the look-up and the insert.
+		err := tx.Where("org_id = ? and name = ?", org, c.Name).First(&found).Error
+		return &found, false, err
+	}
+	return &c, true, nil
+}
+
+// companyAt finds the company an agent means by its website, so one company found
+// under two spellings of its name stays one row. Imports don't use it: a group's
+// brands can share a site.
+func companyAt(tx *gorm.DB, org int64, domain string) (*Company, error) {
+	if domain == "" {
+		return nil, nil
+	}
+	var found Company
+	err := tx.Where("org_id = ? and lower(domain) = ?", org, domain).Order("id").First(&found).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return &found, err
+}
+
+// bareDomain reads "https://www.Example.com/about" and "example.com" alike.
+func bareDomain(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	if d := domainOf(v); d != "" {
+		return d
+	}
+	v, _, _ = strings.Cut(v, "/")
+	return strings.TrimPrefix(v, "www.")
 }
 
 func (s *Store) CompanyByID(org, id int64) (*Company, error) {

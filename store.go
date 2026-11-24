@@ -189,9 +189,17 @@ type Event struct {
 	ContactID int64  `gorm:"index"`
 	CompanyID *int64 `gorm:"index"`
 	User      string
-	Action    string
-	Value     *string
-	At        time.Time `gorm:"index"`
+	// KeyID is the API key behind an agent's action, since key names can repeat; 0 for people.
+	KeyID  int64 `gorm:"not null;default:0"`
+	Action string
+	Value  *string
+	At     time.Time `gorm:"index"`
+}
+
+// Actor is who an agent operation is recorded against: "agent:<key name>" and its key.
+type Actor struct {
+	Name  string
+	KeyID int64
 }
 
 var Editable = map[string]bool{"phone": true, "email": true, "linkedin": true, "sources": true,
@@ -292,14 +300,18 @@ func (s *Store) Due(org int64, step string, now time.Time, set OrgSettings) ([]C
 }
 
 func (s *Store) log(tx *gorm.DB, org, contact int64, company *int64, actor, action string, value *string) error {
-	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: actor, Action: action, Value: value, At: time.Now()}).Error
+	return s.logAs(tx, org, contact, company, Actor{Name: actor}, action, value)
+}
+
+func (s *Store) logAs(tx *gorm.DB, org, contact int64, company *int64, who Actor, action string, value *string) error {
+	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: who.Name, KeyID: who.KeyID, Action: action, Value: value, At: time.Now()}).Error
 }
 
 func (s *Store) Mark(org, id int64, step, date, actor string) error {
-	return s.mark(org, id, step, date, actor, "")
+	return s.mark(org, id, step, date, Actor{Name: actor}, "")
 }
 
-func (s *Store) mark(org, id int64, step, date, actor, note string) error {
+func (s *Store) mark(org, id int64, step, date string, who Actor, note string) error {
 	column, ok := Marks[step]
 	if !ok {
 		return fmt.Errorf("unknown step %q", step)
@@ -326,7 +338,7 @@ func (s *Store) mark(org, id int64, step, date, actor, note string) error {
 		if note != "" {
 			value += " · " + note
 		}
-		return s.log(tx, org, id, c.CompanyID, actor, "mark:"+step, &value)
+		return s.logAs(tx, org, id, c.CompanyID, who, "mark:"+step, &value)
 	})
 }
 

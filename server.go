@@ -107,6 +107,10 @@ func (q *Req) Actor() string {
 	return name
 }
 
+func (q *Req) Agent() Actor {
+	return Actor{Name: q.Actor(), KeyID: q.Key.ID}
+}
+
 func (q *Req) Voice() Voice {
 	caller := q.Member.CallerName
 	if caller == "" {

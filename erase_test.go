@@ -32,7 +32,7 @@ func TestErasePerson(t *testing.T) {
 	do(s.Update(o.ID, hannah.ID, "linkedin", "https://www.linkedin.com/in/hannah-pryce-4a2b1c/", "ada"))
 	do(s.Update(o.ID, hannah.ID, "phone", "+44 20 7946 0000", "ada"))
 	do(s.Update(o.ID, hannah.ID, "call_notes", "prefers mornings, has a dog called Biscuit", "ada"))
-	do(s.AgentMark(o.ID, "agent:scout", MarkIn{ContactID: hannah.ID, Step: "replied", Date: "2020-01-02", Note: "she wrote back from her own gmail"}))
+	do(s.AgentMark(o.ID, Actor{Name: "agent:scout"}, MarkIn{ContactID: hannah.ID, Step: "replied", Date: "2020-01-02", Note: "she wrote back from her own gmail"}))
 	do(s.Update(o.ID, hannah.ID, "stage", "meeting", "ada"))
 	do(s.db.Create(&Fact{OrgID: o.ID, CompanyID: *hannah.CompanyID, ContactID: &hannah.ID, Field: "role", Value: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}).Error)
 	var placeholder Contact
@@ -111,7 +111,7 @@ func TestErasePerson(t *testing.T) {
 	if _, err := s.QuickAddPerson(o, QuickAdd{Name: "H Pryce", Email: " Hannah.Pryce@Larkmoor.example "}, "ada"); !errors.Is(err, errErased) {
 		t.Fatalf("she was added again by email: %v", err)
 	}
-	if _, err := s.AgentAddContact(o, "agent:scout", AddContactIn{Company: strconv.FormatInt(*hannah.CompanyID, 10), Name: "H Pryce",
+	if _, err := s.AgentAddContact(o, Actor{Name: "agent:scout"}, AddContactIn{Company: strconv.FormatInt(*hannah.CompanyID, 10), Name: "H Pryce",
 		Linkedin: "https://uk.linkedin.com/in/hannah-pryce-4a2b1c?trk=x", SourceURL: "https://larkmoor.example/team"}); !errors.Is(err, errErased) {
 		t.Fatalf("an agent suggested her again by profile: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestErasePerson(t *testing.T) {
 	if _, err := s.QuickAddPerson(o, QuickAdd{Name: "H Pryce", Email: "mailto:" + hannahEmail}, "ada"); !errors.Is(err, errErased) {
 		t.Fatalf("she was added again by a mailto link: %v", err)
 	}
-	if _, err := s.AgentAddContact(o, "agent:scout", AddContactIn{Company: strconv.FormatInt(*hannah.CompanyID, 10), Name: "hannah pryce",
+	if _, err := s.AgentAddContact(o, Actor{Name: "agent:scout"}, AddContactIn{Company: strconv.FormatInt(*hannah.CompanyID, 10), Name: "hannah pryce",
 		Title: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}); !errors.Is(err, errErased) {
 		t.Fatalf("an agent suggested her again by name at the same company: %v", err)
 	}
