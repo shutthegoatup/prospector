@@ -132,7 +132,8 @@ func (s *Store) matched(tx *gorm.DB, org int64, who Actor, contact int64, compan
 	if who.Task == 0 {
 		return nil
 	}
-	q := tx.Model(&Event{}).Where("org_id = ? and task_id = ? and company_id = ?", org, who.Task, company)
+	// A note about a company doesn't make it a result.
+	q := tx.Model(&Event{}).Where("org_id = ? and task_id = ? and company_id = ? and action not like 'note:%'", org, who.Task, company)
 	if contact != 0 {
 		q = q.Where("contact_id = ?", contact)
 	}

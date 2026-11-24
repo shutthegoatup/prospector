@@ -37,6 +37,19 @@ func TestPickingUpATaskIsRecordedOnceARun(t *testing.T) {
 	}
 }
 
+func TestACompanyNotedOnATaskCanStillBeFoundForIt(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	scout := Actor{Name: "agent:scout", KeyID: 1}
+	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
+	must(s.AgentNote(o.ID, scout, NoteIn{Task: task.ID, Company: "Larkmoor Yachts", Kind: "skipped", Text: "Looked, unsure."}))
+	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts", Task: task.ID}))
+	if found := must(s.AgentTask(o.ID, scout, task.ID)).Companies; len(found) != 1 {
+		t.Fatalf("a note on the company kept it out of the task's results: %+v", found)
+	}
+}
+
 func TestErasingSomeoneWithNoCompanyTakesTheirTasksNotes(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
