@@ -35,8 +35,10 @@ func TestExportOrg(t *testing.T) {
 	do(s.ErasePerson(o.ID, jonas.ID, "ada"))
 	key, _, err := s.CreateKey(o.ID, "scout", []string{"read", "research:write", "outcomes:write", "import"}, "ada")
 	do(err)
-	_, _, err = s.CreateKey(other.ID, "their-bot", []string{"read"}, "test")
+	theirKey, _, err := s.CreateKey(other.ID, "their-bot", []string{"read"}, "test")
 	do(err)
+	outsider := must(s.CreateUser("carol@example.com", "Carol Outsider", "correct horse battery"))
+	do(s.AddMember(other.ID, outsider.ID, "owner", outsider.Name))
 	do(s.SaveSSO(&SSOConnection{OrgID: o.ID, Issuer: "https://id.larkmoor.example", ClientID: "prospector-client", ClientSecret: "s3cret-client-value"}, "ada"))
 	do(s.db.Create(&SSODomain{OrgID: o.ID, Domain: "alpha.example", Token: "dns-proof-token"}).Error)
 
@@ -84,11 +86,11 @@ func TestExportOrg(t *testing.T) {
 	var contacts, companies, events int64
 	s.in(o.ID).Model(&Contact{}).Count(&contacts)
 	s.in(o.ID).Model(&Company{}).Count(&companies)
-	s.in(o.ID).Model(&Event{}).Where("action <> ?", "export:org").Count(&events)
+	s.in(o.ID).Model(&Event{}).Count(&events)
 	if contacts == 0 || int64(len(out.Contacts)) != contacts || int64(len(out.Companies)) != companies || int64(len(out.History)) != events {
 		t.Fatalf("%d of %d contacts, %d of %d companies, %d of %d history lines", len(out.Contacts), contacts, len(out.Companies), companies, len(out.History), events)
 	}
-	if len(out.Facts) != 1 || len(out.Enquiries) != 1 || out.Erased == 0 {
+	if len(out.Facts) != 1 || len(out.Enquiries) != 1 || out.Erased != 1 {
 		t.Fatalf("%d facts, %d enquiries, %d erased", len(out.Facts), len(out.Enquiries), out.Erased)
 	}
 	if len(out.Keys) != 1 || out.Keys[0].Name != "scout" || out.Keys[0].CreatedBy != "ada" {
@@ -102,14 +104,22 @@ func TestExportOrg(t *testing.T) {
 	}
 
 	var keys []APIKey
-	do(s.in(o.ID).Find(&keys).Error)
+	do(s.db.Find(&keys).Error)
+	var sessions []Session
+	do(s.db.Find(&sessions).Error)
 	var conn SSOConnection
 	do(s.db.Where("org_id = ?", o.ID).First(&conn).Error)
 	var users []User
 	do(s.db.Find(&users).Error)
 	var erasures []Erasure
 	do(s.in(o.ID).Find(&erasures).Error)
-	secrets := []string{key, keys[0].Hash, "s3cret-client-value", conn.ClientSecret, "dns-proof-token", "correct horse battery"}
+	secrets := []string{key, theirKey, "s3cret-client-value", conn.ClientSecret, "dns-proof-token", "correct horse battery"}
+	for _, k := range keys {
+		secrets = append(secrets, k.Hash, k.Prefix)
+	}
+	for _, sess := range sessions {
+		secrets = append(secrets, sess.TokenHash)
+	}
 	for _, u := range users {
 		secrets = append(secrets, u.PasswordHash)
 	}
@@ -124,7 +134,7 @@ func TestExportOrg(t *testing.T) {
 			t.Errorf("the export holds a secret: %.12s…", secret)
 		}
 	}
-	for _, theirs := range []string{"Betamax", "their-bot", "other organisation", "org_id", "OrgID"} {
+	for _, theirs := range []string{"Betamax", "their-bot", "carol", "Carol", "other organisation", "org_id", "OrgID"} {
 		if strings.Contains(body, theirs) {
 			t.Errorf("the export holds %q, which belongs to another organisation or to nobody outside", theirs)
 		}

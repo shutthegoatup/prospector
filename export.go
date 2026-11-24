@@ -94,30 +94,39 @@ type OrgExport struct {
 type ExportedOrg struct {
 	Slug      string      `json:"slug"`
 	Name      string      `json:"name"`
+	Color     string      `json:"color"`
 	Settings  OrgSettings `json:"settings"`
 	CreatedAt time.Time   `json:"created_at"`
 }
 
 type ExportMember struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Role  string `json:"role"`
+	Name       string `json:"name"`
+	Email      string `json:"email"`
+	Role       string `json:"role"`
+	CallerName string `json:"caller_name,omitempty"`
+	Signature  string `json:"signature,omitempty"`
 }
 
 type ExportKey struct {
-	Name      string     `json:"name"`
-	Scopes    string     `json:"scopes"`
-	CreatedBy string     `json:"created_by"`
-	CreatedAt time.Time  `json:"created_at"`
-	RevokedAt *time.Time `json:"revoked_at,omitempty"`
+	Name       string     `json:"name"`
+	Scopes     string     `json:"scopes"`
+	CreatedBy  string     `json:"created_by"`
+	CreatedAt  time.Time  `json:"created_at"`
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+	RevokedAt  *time.Time `json:"revoked_at,omitempty"`
 }
 
 type ExportSignOn struct {
-	Issuer   string   `json:"issuer"`
-	ClientID string   `json:"client_id"`
-	Required bool     `json:"required"`
-	AutoJoin bool     `json:"auto_join"`
-	Domains  []string `json:"domains"`
+	Issuer   string         `json:"issuer"`
+	ClientID string         `json:"client_id"`
+	Required bool           `json:"required"`
+	AutoJoin bool           `json:"auto_join"`
+	Domains  []ExportDomain `json:"domains"`
+}
+
+type ExportDomain struct {
+	Domain     string     `json:"domain"`
+	VerifiedAt *time.Time `json:"verified_at,omitempty"`
 }
 
 type ExportRecord struct {
@@ -129,12 +138,17 @@ type ExportRecord struct {
 func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 	out := &OrgExport{ExportedAt: time.Now().UTC(), Members: []ExportMember{}, Keys: []ExportKey{}, History: []ExportRecord{}}
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// Written before anything is read: SQLite refuses a write that follows reads in
+		// a transaction if anyone else wrote meanwhile, and this one reads for a while.
+		if err := s.log(tx, org, 0, nil, actor, "export:org", nil); err != nil {
+			return err
+		}
 		var o Org
 		if err := tx.First(&o, org).Error; err != nil {
 			return err
 		}
-		out.Organisation = ExportedOrg{Slug: o.Slug, Name: o.Name, Settings: o.Settings, CreatedAt: o.CreatedAt}
-		if err := tx.Table("memberships").Select("users.name, users.email, memberships.role").
+		out.Organisation = ExportedOrg{Slug: o.Slug, Name: o.Name, Color: o.Color, Settings: o.Settings, CreatedAt: o.CreatedAt}
+		if err := tx.Table("memberships").Select("users.name, users.email, memberships.role, memberships.caller_name, memberships.signature").
 			Joins("join users on users.id = memberships.user_id").
 			Where("memberships.org_id = ?", org).Order("users.email").Scan(&out.Members).Error; err != nil {
 			return err
@@ -144,8 +158,8 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 		}
 		var conn SSOConnection
 		if err := tx.Where("org_id = ?", org).First(&conn).Error; err == nil {
-			out.SignOn = &ExportSignOn{Issuer: conn.Issuer, ClientID: conn.ClientID, Required: conn.Required, AutoJoin: conn.AutoJoin, Domains: []string{}}
-			if err := tx.Model(&SSODomain{}).Where("org_id = ?", org).Order("domain").Pluck("domain", &out.SignOn.Domains).Error; err != nil {
+			out.SignOn = &ExportSignOn{Issuer: conn.Issuer, ClientID: conn.ClientID, Required: conn.Required, AutoJoin: conn.AutoJoin, Domains: []ExportDomain{}}
+			if err := tx.Model(&SSODomain{}).Where("org_id = ?", org).Order("domain").Find(&out.SignOn.Domains).Error; err != nil {
 				return err
 			}
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -162,12 +176,12 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			return err
 		}
 		for _, e := range events {
+			if e.Action == "erase" {
+				out.Erased++
+			}
 			out.History = append(out.History, ExportRecord{ExportEvent{At: e.At, By: e.User, Action: e.Action, Value: deref(e.Value)}, e.ContactID, e.CompanyID})
 		}
-		if err := tx.Model(&Erasure{}).Where("org_id = ?", org).Count(&out.Erased).Error; err != nil {
-			return err
-		}
-		return s.log(tx, org, 0, nil, actor, "export:org", nil)
+		return nil
 	})
 	if err != nil {
 		return nil, err
