@@ -319,6 +319,10 @@ func agentInstructions(o *Org, k *APIKey) string {
 			"Companies and facts are high volume with simple judgement, so a small, fast model does them well. One claim per fact, from the page that shows it. Leave built_by and platform empty unless a source says so.",
 			"Contacts need care more than speed, so use a capable model. Pick the person who owns the decision, not a general inbox. Confirm they hold the role now on a current page: an old bio, press release or speaker listing isn't enough. Set email_status to guess for any address inferred from a pattern. If you can't confirm someone, don't add them; add a team_page fact so a person can look.")
 	}
+	if k.Has("outcomes:write") {
+		parts = append(parts,
+			"Record an outcome with mark only when a person tells you it happened or you can see it yourself, and say how you know in note. Each mark shows as yours.")
+	}
 	if k.Has("drafts:write") {
 		parts = append(parts,
 			"Drafts need a capable model. Write to the person: say plainly what you offer and why it fits them, in a few sentences. Claim nothing a source doesn't show. LinkedIn notes are 300 characters at most.")
@@ -385,5 +389,59 @@ func (s *Store) AgentScores(org int64) []AgentScore {
 		out = append(out, *a)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Agent < out[j].Agent })
+	return out
+}
+
+type MarkIn struct {
+	ContactID int64  `json:"contact_id"`
+	Step      string `json:"step" jsonschema:"linkedin (request sent), accepted, email, followup, call, replied, declined or hold"`
+	Date      string `json:"date,omitempty" jsonschema:"YYYY-MM-DD it happened; today if empty"`
+	Note      string `json:"note,omitempty" jsonschema:"how you know, e.g. 'Allan said he replied rudely'"`
+}
+
+// AgentMark records an outcome for a contact already in outreach. Suggested
+// contacts haven't been picked by a person yet, so nothing has happened to them.
+func (s *Store) AgentMark(org int64, actor string, in MarkIn) error {
+	date := strings.TrimSpace(in.Date)
+	if date == "" {
+		date = today()
+	}
+	d, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return errors.New("date is YYYY-MM-DD")
+	}
+	if d.After(time.Now()) {
+		return errors.New("date is in the future")
+	}
+	var c Contact
+	if err := s.in(org).Where("id = ?", in.ContactID).First(&c).Error; err != nil {
+		return fmt.Errorf("no contact %d", in.ContactID)
+	}
+	if c.Status == ContactSuggested {
+		return errors.New("this contact is still a suggestion in Research; a person picks them first")
+	}
+	return s.mark(org, in.ContactID, in.Step, date, actor, strings.TrimSpace(in.Note))
+}
+
+// AgentMarks is, per contact and step, the agent behind the latest mark, so a
+// person re-marking a step takes it back.
+func (s *Store) AgentMarks(org int64, ids []int64) map[int64]map[string]string {
+	out := map[int64]map[string]string{}
+	if len(ids) == 0 {
+		return out
+	}
+	var events []Event
+	s.in(org).Where("contact_id in ? and action like 'mark:%'", ids).Order("at, id").Find(&events)
+	for _, e := range events {
+		step := strings.TrimPrefix(e.Action, "mark:")
+		if out[e.ContactID] == nil {
+			out[e.ContactID] = map[string]string{}
+		}
+		if strings.HasPrefix(e.User, "agent:") {
+			out[e.ContactID][step] = e.User
+		} else {
+			delete(out[e.ContactID], step)
+		}
+	}
 	return out
 }

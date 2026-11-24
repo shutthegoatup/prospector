@@ -88,6 +88,9 @@ func historyText(h HistoryItem) string {
 	if h.Person != "" {
 		s += " · " + h.Person
 	}
+	if _, note, found := strings.Cut(h.Value, " · "); found && strings.HasPrefix(h.Action, "mark:") {
+		s += ": " + note
+	}
 	if h.Value != "" && !strings.HasPrefix(h.Action, "mark:") && h.Action != "add:contact" && len(h.Value) < 80 {
 		s += ": " + h.Value
 	}

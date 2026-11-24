@@ -196,6 +196,7 @@ var Scopes = []struct{ Name, What string }{
 	{"read", "search companies and people, read what's due"},
 	{"research:write", "add companies, facts and suggested contacts (they wait in Research)"},
 	{"drafts:write", "write draft notes and emails, marked as written by the agent"},
+	{"outcomes:write", "record what happened (added, accepted, sent, called, replied, declined, hold), shown as the agent's"},
 	{"import", "push the repo's markdown and pull the snapshot"},
 }
 

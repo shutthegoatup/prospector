@@ -415,7 +415,7 @@ func TestMCP(t *testing.T) {
 	for _, tool := range tools.Tools {
 		names = append(names, tool.Name)
 	}
-	if strings.Contains(strings.Join(names, " "), "draft_message") || !strings.Contains(strings.Join(names, " "), "add_company") {
+	if strings.Contains(strings.Join(names, " "), "draft_message") || strings.Contains(strings.Join(names, " "), " mark") || !strings.Contains(strings.Join(names, " "), "add_company") {
 		t.Fatalf("tools don't follow the key's scopes: %v", names)
 	}
 	res, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "add_company", Arguments: map[string]any{
@@ -439,4 +439,57 @@ func TestMCP(t *testing.T) {
 	if rows, _ := s.Research(o.ID, "review"); len(rows) != 1 || rows[0].FoundBy != "agent:claude" {
 		t.Fatalf("MCP-added company not waiting in Research: %+v", rows)
 	}
+}
+
+func TestAgentMarks(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	if _, err := s.AgentAddCompany(o.ID, "agent:bot", AddCompanyIn{Name: "Larkmoor Yachts",
+		Facts: []FactIn{{Field: "configurator", Value: "Day Cruiser 45", SourceURL: "https://larkmoor.example"}}}); err != nil {
+		t.Fatal(err)
+	}
+	c, err := s.AgentAddContact(o, "agent:bot", AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AgentMark(o.ID, "agent:bot", MarkIn{ContactID: c.ID, Step: "declined"}); err == nil {
+		t.Fatal("an agent marked a contact nobody has picked yet")
+	}
+	if err := s.PickContact(o.ID, o, c.ID, "ada"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AgentMark(o.ID, "agent:bot", MarkIn{ContactID: c.ID, Step: "accepted", Date: "2999-01-01"}); err == nil {
+		t.Fatal("a future date was accepted")
+	}
+	if err := s.AgentMark(o.ID, "agent:bot", MarkIn{ContactID: c.ID, Step: "sent"}); err == nil {
+		t.Fatal("an unknown step was accepted")
+	}
+	if err := s.AgentMark(o.ID, "agent:bot", MarkIn{ContactID: c.ID, Step: "accepted", Note: "seen on LinkedIn"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AgentMark(o.ID, "agent:bot", MarkIn{ContactID: c.ID, Step: "declined", Date: "2026-11-24", Note: "Allan says no"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Mark(o.ID, c.ID, "accepted", today(), "ada"); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.AgentMarks(o.ID, []int64{c.ID})[c.ID]; len(got) != 1 || got["declined"] != "agent:bot" {
+		t.Fatalf("agent marks should keep the agent's decline and drop the accept Ada re-marked: %v", got)
+	}
+	var h []HistoryItem
+	for _, it := range must(s.History(o.ID, must(s.AgentCompany(o.ID, "Larkmoor Yachts")).Company.ID, 20)) {
+		if it.Action == "mark:declined" {
+			h = append(h, it)
+		}
+	}
+	if len(h) != 1 || h[0].Actor != "agent:bot" || historyText(h[0]) != "marked not interested · Hannah Pryce: Allan says no" {
+		t.Fatalf("decline history: %+v %q", h, historyText(h[0]))
+	}
+}
+
+func must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
 }

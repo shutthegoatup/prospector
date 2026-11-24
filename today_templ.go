@@ -1392,16 +1392,23 @@ func nextMeta(c Contact) string {
 func callMeta(c Card) string {
 	s := "Not on LinkedIn yet"
 	if c.LinkedinAdded != nil {
-		s = "Added on LinkedIn " + *c.LinkedinAdded
+		s = "Added on LinkedIn " + *c.LinkedinAdded + markedBy(c, "linkedin")
 	}
 	if c.EmailSent != nil {
-		s += " · emailed " + *c.EmailSent
+		s += " · emailed " + *c.EmailSent + markedBy(c, "email")
 	}
 	return s
 }
 
+func markedBy(c Card, step string) string {
+	if a := c.AgentMarks[step]; a != "" {
+		return " (" + actorLabel(a) + ")"
+	}
+	return ""
+}
+
 func acceptedMeta(c Card) string {
-	s := "Accepted " + deref(c.Accepted) + " · LinkedIn message"
+	s := "Accepted " + deref(c.Accepted) + markedBy(c, "accepted") + " · LinkedIn message"
 	if deref(c.Message) == "" {
 		s += " (none written yet, so this is the email; edit it down)"
 	}
@@ -1409,7 +1416,7 @@ func acceptedMeta(c Card) string {
 }
 
 func emailMeta(c Card) string {
-	s := "added " + deref(c.LinkedinAdded)
+	s := "added " + deref(c.LinkedinAdded) + markedBy(c, "linkedin")
 	if c.Step == "email" {
 		s = "Subject: " + deref(c.Subject) + " · " + s
 	}
