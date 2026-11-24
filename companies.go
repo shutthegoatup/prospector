@@ -61,19 +61,18 @@ func ensureCompany(tx *gorm.DB, org int64, c Company) (*Company, bool, error) {
 	return &c, true, nil
 }
 
-// companyAt finds the company an agent means by its website, so one company found
-// under two spellings of its name stays one row. Imports don't use it: a group's
-// brands can share a site.
+// companyAt finds the company an agent means by its website when the name is new,
+// so one company found under two spellings stays one row. A site that several
+// companies share (a group's brands, a marketplace) identifies none of them.
 func companyAt(tx *gorm.DB, org int64, domain string) (*Company, error) {
 	if domain == "" {
 		return nil, nil
 	}
-	var found Company
-	err := tx.Where("org_id = ? and lower(domain) = ?", org, domain).Order("id").First(&found).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
+	var found []Company
+	if err := tx.Where("org_id = ? and lower(domain) = ?", org, domain).Limit(2).Find(&found).Error; err != nil || len(found) != 1 {
+		return nil, err
 	}
-	return &found, err
+	return &found[0], nil
 }
 
 // bareDomain reads "https://www.Example.com/about" and "example.com" alike.
@@ -430,7 +429,14 @@ func (s *Store) QuickAddPerson(o *Org, in QuickAdd, actor string) (*Contact, err
 		if err := tx.Create(&out).Error; err != nil {
 			return err
 		}
-		return s.log(tx, o.ID, out.ID, companyID, actor, "add:person", nonEmpty(in.Linkedin))
+		if err := s.log(tx, o.ID, out.ID, companyID, actor, "add:person", nonEmpty(in.Linkedin)); err != nil {
+			return err
+		}
+		if typed := strings.TrimSpace(in.Note); typed != "" {
+			// Recorded as an edit so an agent's draft doesn't replace a note the person wrote.
+			return s.log(tx, o.ID, out.ID, companyID, actor, "set:note", &typed)
+		}
+		return nil
 	})
 	return &out, err
 }

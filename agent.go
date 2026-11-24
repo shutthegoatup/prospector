@@ -21,7 +21,7 @@ type FactIn struct {
 
 type AddCompanyIn struct {
 	Name            string   `json:"name" jsonschema:"company name"`
-	Domain          string   `json:"domain,omitempty" jsonschema:"website domain, e.g. example.com"`
+	Domain          string   `json:"domain,omitempty" jsonschema:"the company's own website domain, e.g. example.com; leave empty rather than give a shared site"`
 	Country         string   `json:"country,omitempty" jsonschema:"ISO country code"`
 	Segment         string   `json:"segment,omitempty"`
 	Fit             string   `json:"fit,omitempty" jsonschema:"suggested fit grade A, B or C"`
@@ -54,14 +54,15 @@ func checkFact(f FactIn) error {
 func addFact(tx *gorm.DB, org, company int64, in FactIn, actor string) (*Fact, bool, error) {
 	f := Fact{OrgID: org, CompanyID: company, Field: strings.TrimSpace(in.Field), Value: strings.TrimSpace(in.Value),
 		SourceURL: strings.TrimSpace(in.SourceURL), Actor: actor}
-	var had Fact
-	err := tx.Where("org_id = ? and company_id = ? and lower(field) = ? and lower(value) = ? and source_url = ?",
-		org, company, strings.ToLower(f.Field), strings.ToLower(f.Value), f.SourceURL).First(&had).Error
-	if err == nil {
-		return &had, true, nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
+	var from []Fact
+	if err := tx.Where("org_id = ? and company_id = ? and source_url = ?", org, company, f.SourceURL).Order("id").Find(&from).Error; err != nil {
 		return nil, false, err
+	}
+	// Compared here because SQLite's lower() only folds ASCII.
+	for i, had := range from {
+		if strings.EqualFold(had.Field, f.Field) && strings.EqualFold(strings.TrimSpace(had.Value), f.Value) {
+			return &from[i], true, nil
+		}
 	}
 	return &f, false, tx.Create(&f).Error
 }
@@ -78,7 +79,12 @@ func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddComp
 	var out AddCompanyOut
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		domain := bareDomain(in.Domain)
-		c, err := companyAt(tx, org, domain)
+		var c *Company
+		var named int64
+		err := tx.Model(&Company{}).Where("org_id = ? and lower(name) = ?", org, strings.ToLower(strings.TrimSpace(in.Name))).Count(&named).Error
+		if err == nil && named == 0 {
+			c, err = companyAt(tx, org, domain)
+		}
 		if err != nil {
 			return err
 		}

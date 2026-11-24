@@ -84,6 +84,64 @@ func TestRepeatedAgentWorkAddsNothing(t *testing.T) {
 	}
 }
 
+func TestASharedSiteNamesNoCompany(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	scout := Actor{Name: "agent:scout", KeyID: 1}
+	add := func(name string, facts ...FactIn) *AddCompanyOut {
+		t.Helper()
+		out, err := s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: name, Domain: "brandtech.example", Facts: facts})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	first := add("Larkmoor Yachts")
+	// A group's second brand on the same site, as an import files it.
+	second, err := s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Corvane"})
+	if err != nil || second.Existed {
+		t.Fatalf("add company: %+v %v", second, err)
+	}
+	if err := s.in(o.ID).Model(&Company{}).Where("id = ?", second.ID).Update("domain", "brandtech.example").Error; err != nil {
+		t.Fatal(err)
+	}
+	if again := add("larkmoor yachts"); again.ID != first.ID {
+		t.Fatalf("a known name should win over the site: %+v", again)
+	}
+	fact := FactIn{Field: "press", Value: "Österreichs Boot des Jahres", SourceURL: "https://brandtech.example/news"}
+	if got := add("corvane", fact); !got.Existed || got.ID != second.ID {
+		t.Fatalf("facts for the second brand went to %+v, not company %d", got, second.ID)
+	}
+	if third := add("Ostrel Aviation"); third.Existed {
+		t.Fatalf("a site two companies share picked one of them for a third: %+v", third)
+	}
+	shouted := fact
+	shouted.Value = "ÖSTERREICHS BOOT DES JAHRES"
+	if got, err := s.AgentAddFact(o.ID, scout, AddFactIn{Company: "Corvane", FactIn: shouted}); err != nil || !got.Existed {
+		t.Fatalf("the same fact in capitals was stored again: %+v %v", got, err)
+	}
+}
+
+func TestANoteTypedWhenAddingSomeoneIsTheirs(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	c, err := s.QuickAddPerson(o, QuickAdd{Linkedin: "https://www.linkedin.com/in/hannah-pryce", Name: "Hannah Pryce",
+		Company: "Larkmoor Yachts", Note: "Hannah, we met at the boat show."}, "Ada Lovelace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AgentDraft(o.ID, Actor{Name: "agent:scout", KeyID: 1}, DraftIn{ContactID: c.ID, Kind: "note", Text: "Hi Hannah."}); err == nil {
+		t.Fatal("an agent replaced the note a person typed when adding them")
+	}
+	templated, err := s.QuickAddPerson(o, QuickAdd{Linkedin: "https://www.linkedin.com/in/jonas-weber", Name: "Jonas Weber", Company: "Larkmoor Yachts"}, "Ada Lovelace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AgentDraft(o.ID, Actor{Name: "agent:scout", KeyID: 1}, DraftIn{ContactID: templated.ID, Kind: "note", Text: "Hi Jonas."}); err != nil {
+		t.Fatalf("the template note is there to be improved on: %v", err)
+	}
+}
+
 func TestAgentsLeaveAPersonsWordsAlone(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
