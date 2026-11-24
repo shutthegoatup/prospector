@@ -849,3 +849,77 @@ func TestExistingAccountsSurviveTheNewColumn(t *testing.T) {
 		t.Fatalf("an existing account can't sign in after the upgrade: %v", err)
 	}
 }
+
+func TestOtherSitesCantPost(t *testing.T) {
+	s, _, srv, client := signedIn(t)
+	host := strings.TrimPrefix(srv.URL, "http://")
+	signedInAs := func() bool {
+		_, body := call(t, client, "GET", srv.URL+"/o/alpha/settings", "", nil)
+		return strings.Contains(body, "Your password")
+	}
+	post := func(c *http.Client, path, body, ctype string, headers map[string]string) int {
+		t.Helper()
+		req, _ := http.NewRequest("POST", srv.URL+path, strings.NewReader(body))
+		req.Header.Set("content-type", ctype)
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		res, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	form := "application/x-www-form-urlencoded"
+	login := "email=ada%40example.com&password=correct+horse+battery"
+	stay := func() *http.Client {
+		jar, _ := cookiejar.New(nil)
+		return &http.Client{Jar: jar, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	}
+
+	for name, c := range map[string]struct {
+		headers map[string]string
+		want    int
+	}{
+		"this site, a current browser":           {map[string]string{"Sec-Fetch-Site": "same-origin", "Origin": srv.URL}, http.StatusSeeOther},
+		"typed address or bookmark":              {map[string]string{"Sec-Fetch-Site": "none"}, http.StatusSeeOther},
+		"this site, an older browser":            {map[string]string{"Origin": srv.URL}, http.StatusSeeOther},
+		"no browser headers (curl, the CLI)":     {nil, http.StatusSeeOther},
+		"another site, a current browser":        {map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"}, http.StatusForbidden},
+		"a sibling subdomain, a current browser": {map[string]string{"Sec-Fetch-Site": "same-site", "Origin": "http://other." + host}, http.StatusForbidden},
+		"another site, an older browser":         {map[string]string{"Origin": "https://evil.example"}, http.StatusForbidden},
+	} {
+		if got := post(stay(), "/login", login, form, c.headers); got != c.want {
+			t.Errorf("sign-in from %s: %d, want %d", name, got, c.want)
+		}
+	}
+
+	// Another site can't sign this browser out, or act through it.
+	cross := map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"}
+	if got := post(client, "/logout", "", form, cross); got != http.StatusForbidden || !signedInAs() {
+		t.Fatalf("sign-out from another site: %d, still signed in: %v", got, signedInAs())
+	}
+	if got := post(client, "/o/alpha/ui/add", `{"name":"Mallory"}`, "application/json", cross); got != http.StatusForbidden {
+		t.Fatalf("an action from another site: %d", got)
+	}
+	if got := post(client, "/o/alpha/ui/add", `{"name":"Hannah Pryce"}`, "application/json",
+		map[string]string{"Sec-Fetch-Site": "same-origin", "Origin": srv.URL}); got != http.StatusOK {
+		t.Fatalf("an action from this site: %d", got)
+	}
+
+	// A key isn't a browser session, so where the request came from doesn't matter.
+	o, _ := s.OrgBySlug("alpha")
+	key, _, err := s.CreateKey(o.ID, "bot", []string{"read", "research:write"}, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cross["Authorization"] = "Bearer " + key
+	if got := post(http.DefaultClient, "/o/alpha/api/v1/companies", `{"name":"Quay Marine"}`, "application/json", cross); got != http.StatusOK {
+		t.Fatalf("an API key with browser headers: %d", got)
+	}
+	delete(cross, "Authorization")
+	if got := post(client, "/logout", "", form, map[string]string{"Sec-Fetch-Site": "same-origin"}); got != http.StatusOK || signedInAs() {
+		t.Fatalf("sign-out from this site: %d, still signed in: %v", got, signedInAs())
+	}
+}
