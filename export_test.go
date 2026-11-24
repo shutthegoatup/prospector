@@ -115,7 +115,7 @@ func TestExportPerson(t *testing.T) {
 	if e := said["mark:replied"]; !strings.Contains(e.Value, "gmail") || e.By != "agent:scout" || e.At.IsZero() {
 		t.Fatalf("the history lost the agent's mark: %+v", out.History)
 	}
-	if said["set:stage"].Value != "meeting" || !strings.Contains(said["set:call_notes"].Value, "Biscuit") {
+	if said["set:stage"].Value != "meeting" || said["set:call_notes"].By != "ada" {
 		t.Fatalf("the history lost her edits: %+v", out.History)
 	}
 	whole := string(must(json.Marshal(out)))
