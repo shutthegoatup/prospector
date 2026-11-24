@@ -692,3 +692,42 @@ func TestOrgIsCreatedWithItsOwner(t *testing.T) {
 		t.Fatalf("a name with no usable characters: %d", code)
 	}
 }
+
+func TestHistoryNamesPeopleInFull(t *testing.T) {
+	for _, c := range []struct{ name, email, want string }{
+		{"Sam Reed", "sam.reed@example.com", "Sam Reed"},
+		{"  Sam Hale ", "sam.hale@example.com", "Sam Hale"},
+		{"", "nameless@example.com", "nameless@example.com"},
+		{"agent:claude", "sly@example.com", "sly@example.com"},
+		{"cli", "sly@example.com", "sly@example.com"},
+		{"import", "sly@example.com", "sly@example.com"},
+	} {
+		if got := (&Req{User: &User{Name: c.name, Email: c.email}}).Actor(); got != c.want {
+			t.Errorf("a person named %q is recorded as %q, want %q", c.name, got, c.want)
+		}
+	}
+	if got := (&Req{User: &User{Name: "Sam Reed"}, Key: &APIKey{Name: "claude"}}).Actor(); got != "agent:claude" {
+		t.Errorf("a key is recorded as %q", got)
+	}
+
+	s, o, srv, client := signedIn(t)
+	code, _ := call(t, client, "POST", srv.URL+"/o/alpha/ui/add", "application/json",
+		QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Linkedin: "https://www.linkedin.com/in/hannah-pryce"})
+	if code != http.StatusOK {
+		t.Fatalf("quick add: %d", code)
+	}
+	c, err := s.FindOne(o.ID, "Hannah")
+	if err != nil {
+		t.Fatal(err)
+	}
+	history, err := s.History(o.ID, *c.CompanyID, 10)
+	if err != nil || len(history) != 1 || history[0].Actor != "Ada Lovelace" {
+		t.Fatalf("history: %+v %v", history, err)
+	}
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/companies/"+strconv.FormatInt(*c.CompanyID, 10), "", nil); !strings.Contains(body, "Ada Lovelace") {
+		t.Fatal("the company page doesn't name who added the person")
+	}
+	if got := s.AgentActivity(o.ID, 10); len(got) != 0 {
+		t.Fatalf("a person's action is listed as an agent's: %+v", got)
+	}
+}
