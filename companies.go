@@ -327,7 +327,7 @@ type AgentEvent struct {
 
 func (s *Store) AgentActivity(org int64, limit int) []AgentEvent {
 	var events []Event
-	s.in(org).Where("user like 'agent:%'").Order("at desc").Limit(limit).Find(&events)
+	s.in(org).Where(`"user" like 'agent:%'`).Order("at desc").Limit(limit).Find(&events)
 	out := make([]AgentEvent, len(events))
 	for i, e := range events {
 		out[i] = AgentEvent{e.At, strings.TrimPrefix(e.User, "agent:"), e.Action, deref(e.Value)}

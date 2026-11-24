@@ -324,6 +324,9 @@ func TestMCPSessionsBelongToOneKey(t *testing.T) {
 	if err != nil || !res.IsError {
 		t.Fatalf("an open session ignored a new never-contact entry: %v %+v", err, res)
 	}
+	if got := s.AgentActivity(o.ID, 20); len(got) != 1 || got[0].Actor != "claude" {
+		t.Fatalf("agent activity: %+v", got)
+	}
 }
 
 func TestTransportHeaders(t *testing.T) {
