@@ -141,6 +141,28 @@ func TestLoginSlowsGuessing(t *testing.T) {
 	}
 }
 
+func TestTransportHeaders(t *testing.T) {
+	_, _, srv, _ := signedIn(t)
+	get := func(proto string) http.Header {
+		req, _ := http.NewRequest("GET", srv.URL+"/healthz", nil)
+		if proto != "" {
+			req.Header.Set("X-Forwarded-Proto", proto)
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.Header
+	}
+	if h := get("https"); h.Get("Strict-Transport-Security") == "" || h.Get("X-Frame-Options") != "DENY" || h.Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("behind HTTPS: %v", h)
+	}
+	if h := get(""); h.Get("Strict-Transport-Security") != "" {
+		t.Fatal("HSTS sent over plain HTTP")
+	}
+}
+
 func TestLoginRedirects(t *testing.T) {
 	_, _, srv, _ := signedIn(t)
 	stay := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}

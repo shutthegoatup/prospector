@@ -230,6 +230,9 @@ func (a *App) Routes() http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "same-origin")
 		w.Header().Set("X-Frame-Options", "DENY")
+		if secure(r) {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+		}
 		mux.ServeHTTP(w, r)
 	})
 }
@@ -330,7 +333,7 @@ func serve(a *App, addr string) error {
 	if users == 0 {
 		log.Print("no users yet: create one with `prospector user add <email> <name>`")
 	}
-	srv := &http.Server{Addr: addr, Handler: a.Routes(), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Addr: addr, Handler: a.Routes(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
 	log.Printf("listening on http://%s", addr)
 	return srv.ListenAndServe()
 }
