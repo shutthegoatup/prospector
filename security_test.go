@@ -1415,6 +1415,58 @@ func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
 		t.Fatalf("a known browser after %d wrong passwords: %d", freeAttempts, code)
 	}
 
+	// However the address is typed, and whatever else is typed with it, a guess
+	// lands in the one count for that address.
+	now = now.Add(maxLoginWait + time.Second)
+	for _, typed := range []string{" bob@example.com", "BOB@example.com ", "bob@example.com", "\tbob@example.com", "Bob@Example.com"} {
+		if code, _ := try(typed, wrong, ""); code != http.StatusUnauthorized {
+			t.Fatalf("a wrong password for %q: %d", typed, code)
+		}
+	}
+	if code, _ := try("bob@example.com", right, ""); code != http.StatusTooManyRequests {
+		t.Fatalf("spelling the address differently got fresh guesses: %d", code)
+	}
+
+	// Guessing at the sign-in form doesn't hold up a signed-in person changing their
+	// password, and the change leaves their browser known under the new one.
+	bob, err := s.UserByEmail("bob@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, _, err := s.Login("bob@example.com", right)
+	if err != nil {
+		t.Fatal(err)
+	}
+	change, _ := http.NewRequest("POST", srv.URL+"/password", strings.NewReader(`{"current":"correct horse battery","new":"bob's new password"}`))
+	change.Header.Set("content-type", "application/json")
+	change.AddCookie(&http.Cookie{Name: sessionCookie, Value: session})
+	changed, err := http.DefaultClient.Do(change)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed.Body.Close()
+	var renewed *http.Cookie
+	for _, c := range changed.Cookies() {
+		if c.Name == deviceCookie {
+			renewed = c
+		}
+	}
+	if changed.StatusCode != http.StatusOK || renewed == nil || renewed.Path != "/login" {
+		t.Fatalf("changing a password while the address is held: %d, device cookie %+v", changed.StatusCode, renewed)
+	}
+	if _, ok := s.knownDevice("bob@example.com", bobs.Value); ok {
+		t.Fatal("the device cookie from before the change still verifies")
+	}
+	if code, _ := try("bob@example.com", "bob's new password", renewed.Value); code != http.StatusSeeOther {
+		t.Fatalf("signing in with the renewed device cookie while the address is held: %d", code)
+	}
+	if code, _ := try("bob@example.com\x00"+strings.Split(renewed.Value, ".")[0], wrong, ""); code != http.StatusUnauthorized {
+		t.Fatalf("an address with a NUL in it: %d", code)
+	}
+	if got := app.logins.wait(changeBucket(bob)); got != 0 {
+		t.Fatalf("sign-in guesses reached the password-change count: %v", got)
+	}
+
 	// Changing the password ends what the old one vouched for.
 	now = now.Add(maxLoginWait + time.Second)
 	if err := s.SetPassword("ada@example.com", "a different password"); err != nil {

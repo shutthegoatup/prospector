@@ -151,5 +151,13 @@ func (s *Store) knownDevice(email, token string) (who string, ok bool) {
 	if err != nil || !hmac.Equal([]byte(mac), []byte(deviceMAC(u, nonce))) {
 		return "", false
 	}
-	return u.Email + "\x00" + nonce, true
+	return signInBucket(u.Email) + "\x00" + nonce, true
 }
+
+// The guard counts under names that say what is being guessed at, so the sign-in
+// form, whatever is typed into it, can't reach the count for anything else.
+func signInBucket(email string) string {
+	return "sign-in\x00" + strings.ToLower(strings.TrimSpace(email))
+}
+
+func changeBucket(u *User) string { return "change\x00" + u.Email }

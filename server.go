@@ -373,7 +373,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// A browser that has signed in to this account before is counted by itself.
-	who, known := email, false
+	who, known := signInBucket(email), false
 	if c, err := r.Cookie(deviceCookie); err == nil {
 		if device, ok := a.s.knownDevice(email, c.Value); ok {
 			who, known = device, true
@@ -453,7 +453,8 @@ func (a *App) changePassword(w http.ResponseWriter, r *http.Request) {
 	case <-r.Context().Done():
 		return
 	}
-	if wait := a.logins.begin(u.Email); wait > 0 {
+	// Counted apart from sign-in, so guesses made there by someone else don't hold this up.
+	if wait := a.logins.begin(changeBucket(u)); wait > 0 {
 		seconds := int(wait.Seconds()) + 1
 		w.Header().Set("Retry-After", strconv.Itoa(seconds))
 		http.Error(w, "too many attempts: try again in "+plural(seconds, "second"), http.StatusTooManyRequests)
@@ -461,11 +462,16 @@ func (a *App) changePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	err := a.s.ChangePassword(u, in.Current, in.New, keep)
 	if err == nil || errors.Is(err, errWrongCurrent) {
-		a.logins.record(u.Email, err == nil)
+		a.logins.record(changeBucket(u), err == nil)
 	}
 	if err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return
+	}
+	// The old password vouched for this browser's device cookie; the new one does now.
+	if changed, err := a.s.UserByEmail(u.Email); err == nil {
+		http.SetCookie(w, &http.Cookie{Name: deviceCookie, Value: newDeviceToken(changed), Path: "/login", HttpOnly: true, Secure: a.secure(r),
+			SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(deviceLife)})
 	}
 	if u.MustChangePassword {
 		writeJSON(w, map[string]string{"go": "/"})
