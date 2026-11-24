@@ -166,20 +166,23 @@ func (a *App) addPage(w http.ResponseWriter, r *http.Request) {
 		AddPopup(q, in).Render(r.Context(), w)
 		return
 	}
-	a.page(w, r, "add", AddView(q, in, bookmarklet(r, q)))
+	a.page(w, r, "add", AddView(q, in, bookmarklet(a.baseURL(r), q)))
 }
 
 // bookmarklet sends the LinkedIn profile you're looking at to the add form. It reads only
 // the page's title and headline, on your click.
-func bookmarklet(r *http.Request, q *Req) string {
-	base := baseURL(r) + q.Base() + "add?popup=1"
+func bookmarklet(site string, q *Req) string {
+	base := site + q.Base() + "add?popup=1"
 	return `javascript:(()=>{const h=(document.querySelector('.text-body-medium')||{}).innerText||'';` +
 		`window.open('` + base + `&url='+encodeURIComponent(location.href)+'&name='+encodeURIComponent(document.title)+'&headline='+encodeURIComponent(h),'prospect','width=520,height=760')})()`
 }
 
-func baseURL(r *http.Request) string {
+func (a *App) baseURL(r *http.Request) string {
+	if a.base != "" {
+		return a.base
+	}
 	scheme := "http"
-	if secure(r) {
+	if a.secure(r) {
 		scheme = "https"
 	}
 	return scheme + "://" + r.Host
@@ -207,7 +210,7 @@ type AgentsData struct {
 func (a *App) agents(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	keys, _ := a.s.Keys(q.Org.ID)
-	a.page(w, r, "agents", AgentsView(q, AgentsData{Base: baseURL(r) + q.Base(), Keys: keys, Activity: a.s.AgentActivity(q.Org.ID, 20), Scores: a.s.AgentScores(q.Org.ID)}))
+	a.page(w, r, "agents", AgentsView(q, AgentsData{Base: a.baseURL(r) + q.Base(), Keys: keys, Activity: a.s.AgentActivity(q.Org.ID, 20), Scores: a.s.AgentScores(q.Org.ID)}))
 }
 
 func done(w http.ResponseWriter, err error) {

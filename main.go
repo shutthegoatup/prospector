@@ -166,7 +166,11 @@ func run(args []string) error {
 		if port := os.Getenv("PORT"); port != "" {
 			addr = ":" + port
 		}
-		return serve(&App{s: s}, arg(rest, 0, addr))
+		base, err := publicURL(os.Getenv("PROSPECTOR_URL"))
+		if err != nil {
+			return err
+		}
+		return serve(&App{s: s, base: base}, arg(rest, 0, addr))
 	case "user":
 		switch arg(rest, 0, "") {
 		case "add":

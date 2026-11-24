@@ -923,3 +923,92 @@ func TestOtherSitesCantPost(t *testing.T) {
 		t.Fatalf("sign-out from this site: %d, still signed in: %v", got, signedInAs())
 	}
 }
+
+func TestPublicURL(t *testing.T) {
+	for raw, want := range map[string]string{
+		"":                                 "",
+		"https://prospector.example.com":   "https://prospector.example.com",
+		" https://prospector.example.com/": "https://prospector.example.com",
+		"http://10.0.0.5:8766":             "http://10.0.0.5:8766",
+	} {
+		if got, err := publicURL(raw); err != nil || got != want {
+			t.Errorf("publicURL(%q) = %q, %v; want %q", raw, got, err, want)
+		}
+	}
+	for _, raw := range []string{"prospector.example.com", "ftp://x.example", "https://", "https://x.example/app", "https://x.example?a=1", "https://u:p@x.example"} {
+		if got, err := publicURL(raw); err == nil {
+			t.Errorf("publicURL(%q) = %q, want an error", raw, got)
+		}
+	}
+
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	u, err := s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddMember(o.ID, u.ID, "owner", u.Name); err != nil {
+		t.Fatal(err)
+	}
+	signIn := func(app *App, headers map[string]string) (*httptest.Server, *http.Cookie, http.Header) {
+		t.Helper()
+		srv := httptest.NewServer(app.Routes())
+		t.Cleanup(srv.Close)
+		req, _ := http.NewRequest("POST", srv.URL+"/login", strings.NewReader("email=ada%40example.com&password=correct+horse+battery"))
+		req.Header.Set("content-type", "application/x-www-form-urlencoded")
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		res, err := (&http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}).Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		for _, c := range res.Cookies() {
+			if c.Name == sessionCookie {
+				return srv, c, res.Header
+			}
+		}
+		t.Fatalf("no session cookie: %d", res.StatusCode)
+		return nil, nil, nil
+	}
+	page := func(srv *httptest.Server, c *http.Cookie, path string) string {
+		t.Helper()
+		req, _ := http.NewRequest("GET", srv.URL+path, nil)
+		req.AddCookie(c)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		body, _ := io.ReadAll(res.Body)
+		return string(body)
+	}
+
+	// Not set: as before, the request decides.
+	srv, c, h := signIn(&App{s: s}, nil)
+	if c.Secure || h.Get("Strict-Transport-Security") != "" {
+		t.Fatal("plain HTTP with no address set was treated as HTTPS")
+	}
+	if !strings.Contains(page(srv, c, "/o/alpha/agents"), srv.URL+"/o/alpha/mcp") {
+		t.Fatal("with no address set, the agents page doesn't use the request's host")
+	}
+	if _, c, _ := signIn(&App{s: s}, map[string]string{"X-Forwarded-Proto": "https"}); !c.Secure {
+		t.Fatal("a proxy's X-Forwarded-Proto no longer marks the cookie Secure")
+	}
+
+	// Set to an https address: Secure whatever the proxy sends, and links use it.
+	srv, c, h = signIn(&App{s: s, base: "https://prospector.example.com"}, nil)
+	if !c.Secure || h.Get("Strict-Transport-Security") == "" {
+		t.Fatalf("with an https address set: Secure=%v, HSTS=%q", c.Secure, h.Get("Strict-Transport-Security"))
+	}
+	if body := page(srv, c, "/o/alpha/agents"); !strings.Contains(body, "https://prospector.example.com/o/alpha/mcp") || strings.Contains(body, srv.URL) {
+		t.Fatal("the agents page doesn't use the address that was set")
+	}
+	if body := page(srv, c, "/o/alpha/add"); !strings.Contains(body, "https://prospector.example.com/o/alpha/add?popup=1") {
+		t.Fatal("the bookmarklet doesn't use the address that was set")
+	}
+	if _, c, _ := signIn(&App{s: s, base: "http://10.0.0.5:8766"}, nil); c.Secure {
+		t.Fatal("an http address marked the cookie Secure")
+	}
+}
