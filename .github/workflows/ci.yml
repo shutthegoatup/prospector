@@ -39,3 +39,44 @@ jobs:
         run: go test -count=1 -p 1 ./...
         env:
           PROSPECTOR_TEST_PG: postgres://postgres:test@localhost:5432/prospector?sslmode=disable
+
+  # Every green push to main becomes the next patch release, which hosts pull.
+  # A tag pushed with GITHUB_TOKEN doesn't start release.yml, so goreleaser runs here.
+  release:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Tag the next patch version
+        id: tag
+        run: |
+          if git tag --points-at HEAD | grep -q '^v'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          last=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+          IFS=. read -r major minor patch <<< "${last#v}"
+          next="v${major:-0}.${minor:-1}.$(( ${patch:-0} + 1 ))"
+          git tag "$next"
+          git push origin "$next"
+          echo "tag=$next" >> "$GITHUB_OUTPUT"
+
+      - uses: goreleaser/goreleaser-action@v6
+        if: steps.tag.outputs.skip != 'true'
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

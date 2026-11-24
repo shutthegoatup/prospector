@@ -1,6 +1,6 @@
 name: release
 
-# Push a tag like v0.2.0 to publish binaries and checksums as a GitHub release.
+# ci.yml releases every green push to main. Push a tag by hand (say v0.2.0) for a minor or major bump.
 on:
   push:
     tags: ["v*"]
