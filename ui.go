@@ -195,13 +195,16 @@ type SettingsData struct {
 	SSO     *SSO
 	// Callback is where a provider sends people back; empty until PROSPECTOR_URL is set.
 	Callback string
-	Intake   string
+	// Sealing is whether the server has a key to keep a client secret under.
+	Sealing bool
+	Intake  string
 }
 
 func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	members, _ := a.s.Members(q.Org.ID)
 	d := SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org), Intake: a.baseURL(r) + q.Base() + "intake"}
+	d.Sealing = a.s.keys != nil
 	if d.SSO, _ = a.s.SSO(q.Org.ID); d.SSO == nil {
 		d.SSO = &SSO{}
 	}

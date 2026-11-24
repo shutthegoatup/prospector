@@ -610,7 +610,8 @@ func TestRequiredSingleSignOn(t *testing.T) {
 	if code, _, _ := fresh.get("/o/alpha/today"); code != http.StatusOK {
 		t.Fatalf("a password after `sso off`: %d", code)
 	}
-	if sso, _ := s.SSO(alpha.ID); !sso.On() || sso.ClientSecret != "secret" {
+	sso, _ := s.SSO(alpha.ID)
+	if spec, err := s.spec(sso); err != nil || !sso.On() || spec.Secret != "secret" {
 		t.Fatal("`sso off` lost the connection itself")
 	}
 }
@@ -775,8 +776,14 @@ func TestSingleSignOnSettings(t *testing.T) {
 	if code, body := owner.post("/o/alpha/ui/sso", with("client_secret", "")); code != http.StatusOK {
 		t.Fatalf("saving without the secret: %d %s", code, body)
 	}
-	if sso, _ := s.SSO(alpha.ID); sso.ClientSecret != "s3cret-value" || sso.Required {
-		t.Fatalf("after saving again: %+v", sso.SSOConnection)
+	sso, _ = s.SSO(alpha.ID)
+	if spec, err := s.spec(sso); err != nil || spec.Secret != "s3cret-value" || sso.Required {
+		t.Fatalf("after saving again: %+v %v", sso.SSOConnection, err)
+	}
+	// The database holds it sealed: a compact JWE naming the key's version and nothing else.
+	header, _ := base64.RawURLEncoding.DecodeString(strings.SplitN(sso.ClientSecret, ".", 2)[0])
+	if strings.Contains(sso.ClientSecret, "s3cret-value") || string(header) != `{"alg":"dir","enc":"A256GCM","kid":"1"}` {
+		t.Fatalf("the client secret as stored: %q, header %s", sso.ClientSecret, header)
 	}
 	// The kept secret was typed for this provider and client, and is sent to no other.
 	other := newIdP(t, "", false)

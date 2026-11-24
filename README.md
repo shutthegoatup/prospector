@@ -71,6 +71,7 @@ prospector serve                                          # http://127.0.0.1:876
 | `DATABASE_URL` | A `postgres://` URL or a SQLite file path (default `prospector.sqlite`) |
 | `PORT` | Listen on `:PORT` instead of `127.0.0.1:8766` |
 | `PROSPECTOR_URL` | The address people reach it at, e.g. `https://prospector.example.com`. With an `https://` address the session cookie is always marked Secure, and links shown in the app use this address. Set it if a proxy in front changes the `Host` header |
+| `PROSPECTOR_SECRET_KEYS` | The server's secret keys, newest first: `2:<64 hex>,1:<64 hex>`. Needed for an organisation's single sign-on (see [Secret keys](#secret-keys)) |
 | `PROSPECTOR_GOOGLE_CLIENT_ID`, `PROSPECTOR_GOOGLE_CLIENT_SECRET` | Offer "Continue with Google" on the sign-in page. The same pair exists for `MICROSOFT` and `LINKEDIN`. Each needs `PROSPECTOR_URL` (see [Signing in](#signing-in)) |
 | `TZ` | The time zone "today" is counted in |
 | `PROSPECTOR_ORG` | Default organisation for CLI commands (`--org=` overrides it) |
@@ -106,7 +107,7 @@ Whoever runs the server registers an app with the provider and sets its `PROSPEC
 An owner sets this up in Settings, for Okta, Entra ID, Google Workspace or any other OpenID Connect provider:
 
 1. **Add the email domains that are yours** and prove each with the DNS TXT record Settings shows. The provider is believed only for addresses at a verified domain, matched whole.
-2. **Enter the issuer, client ID and client secret.** The issuer is read before anything is saved. The secret is kept in the database and never shown again; it has to be typed again when the issuer or client ID changes.
+2. **Enter the issuer, client ID and client secret.** The issuer is read before anything is saved. The secret is kept sealed under the server's [secret key](#secret-keys), which must be set first, and is never shown again; it has to be typed again when the issuer or client ID changes.
 3. Optionally **require it**: members at your domains can no longer open the organisation on a password. Owners still can, so a broken provider can be put right, and so can members at other domains, whom your provider couldn't sign in. API keys are unaffected. If no owner can get in, `prospector sso off <org>` stops requiring it.
 4. Optionally **let people join**: anyone at your domains becomes a member, never an owner, the first time they sign in. Without this, the provider signs in only people an owner has already added.
 
@@ -118,6 +119,21 @@ People start from "Use your organisation's single sign-on" on the sign-in page a
 - An issuer must be `https` at a public address; one inside the server's network is never contacted.
 - Someone invited with a first password who arrives through a provider instead isn't asked to change it: that password stops working.
 - Each change to the connection, and each person who joins through it, is recorded in the organisation's events with who and when. SAML and SCIM aren't supported.
+
+## Secret keys
+
+`PROSPECTOR_SECRET_KEYS` holds the server's master keys, each with a version: `1:<64 hex characters>`. `prospector secret-key` prints a new one. It is the only secret of its own the server is given.
+
+- **A master key is never used directly.** Each job gets its own key derived from it with HKDF-SHA256 (RFC 5869): one seals stored secrets, another signs the cookie that carries a sign-in to a provider and back.
+- **What it seals** is each organisation's single sign-on client secret, stored as a compact JWE (RFC 7516, `dir` with `A256GCM`) whose `kid` is the key's version. Passwords, sessions and API keys are stored as hashes and need no key.
+- **Without it** the server runs, but no client secret can be saved, so no new single sign-on connection. A secret stored in clear by an earlier release still works, its connection's other settings can still be changed, and it is sealed the first time the server starts with a key. After that, going back to any release from before sealing breaks those sign-ins until each owner types the secret again.
+- **Back it up apart from the database.** A database without the key can't read the secrets; a key that is lost takes them with it, and each owner types theirs again.
+
+The first key in the list seals and signs; every key in the list opens and verifies. A new key always gets a new, higher version: one swapped in under an old version opens nothing, and the server says so in its log when it starts. Only `prospector serve` reads the keys, so a mistyped one doesn't stop `sso off` or `user password`. To replace a key:
+
+1. **Publish.** Add the new key after the current one, `1:<old>,2:<new>`, and restart. Needed only when several servers share the database, so each can open version 2 before any seals with it.
+2. **Promote.** Put the new key first, `2:<new>,1:<old>`, and restart. At start-up every stored secret is sealed again under the new key. A server still listing the old key first leaves those alone.
+3. **Retire.** Once every server has been restarted with the new key first and its log says `none is under a key older than 2`, remove the old key and restart. Sign-ins in flight under the old key, at most ten minutes old, have to start again.
 
 ## Agents: MCP and REST
 

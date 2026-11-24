@@ -39,10 +39,15 @@ func tempStore(t *testing.T) *Store {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if s.keys, err = parseKeys("1:" + testKey); err != nil {
+		t.Fatal(err)
+	}
 	// Postgres allows only so many connections, and every test opens its own.
 	t.Cleanup(func() { closeStore(s) })
 	return s
 }
+
+var testKey = strings.Repeat("0a", 32)
 
 func closeStore(s *Store) {
 	if db, err := s.db.DB(); err == nil {

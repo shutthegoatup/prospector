@@ -8,6 +8,7 @@
 //	prospector member add <org> <email> [owner|member]
 //	prospector key add <org> <name> <scope>…   prints the key once
 //	prospector sso off <org>                 stop requiring single sign-on, when its provider has broken
+//	prospector secret-key                    print a new key for PROSPECTOR_SECRET_KEYS
 //	prospector version
 //
 // Per organisation, chosen with --org=<slug> or $PROSPECTOR_ORG:
@@ -124,7 +125,7 @@ func run(args []string) error {
 		fmt.Println(version)
 		return nil
 	case "help", "-h", "--help":
-		fmt.Println("usage: prospector serve | user | org | member | key | sso | import | export | restore | import-legacy | mark | set | list | push | pull | version\nSee the README for details.")
+		fmt.Println("usage: prospector serve | user | org | member | key | sso | secret-key | import | export | restore | import-legacy | mark | set | list | push | pull | version\nSee the README for details.")
 		return nil
 	case "push":
 		if len(rest) < 1 {
@@ -158,6 +159,10 @@ func run(args []string) error {
 		return os.WriteFile(rest[1], text, 0o600)
 	}
 
+	if cmd == "secret-key" {
+		fmt.Println(newSecretKey())
+		return nil
+	}
 	dsn := defaultDSN()
 	s, err := Open(dsn)
 	if err != nil {
@@ -177,6 +182,12 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
+		// Only the server uses the keys, so a mistyped one doesn't stop the other
+		// commands: `sso off` and `user password` are how a locked-out host is put right.
+		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
+			return err
+		}
+		s.resealAtStart()
 		return serve(&App{s: s, base: base, social: social}, arg(rest, 0, addr))
 	case "sso":
 		return ssoCommand(s, rest)
