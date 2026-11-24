@@ -204,8 +204,14 @@ func TestChangePassword(t *testing.T) {
 
 func TestMCPSessionsBelongToOneKey(t *testing.T) {
 	s, o, srv, _ := signedIn(t)
-	owner, _, _ := s.CreateKey(o.ID, "claude", []string{"read", "research:write"}, "test")
-	other, _, _ := s.CreateKey(o.ID, "reader", []string{"read"}, "test")
+	owner, _, err := s.CreateKey(o.ID, "claude", []string{"read", "research:write"}, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, _, err := s.CreateKey(o.ID, "reader", []string{"read"}, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
 	endpoint := srv.URL + "/o/alpha/mcp"
 	transport := &mcp.StreamableClientTransport{Endpoint: endpoint, HTTPClient: &http.Client{
 		Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
@@ -237,6 +243,20 @@ func TestMCPSessionsBelongToOneKey(t *testing.T) {
 	}
 	if code := replay(other); code != http.StatusForbidden {
 		t.Fatalf("another key used the session: %d", code)
+	}
+	closing, _ := http.NewRequest("DELETE", endpoint, nil)
+	closing.Header.Set("Authorization", "Bearer "+other)
+	closing.Header.Set("Mcp-Session-Id", session.ID())
+	closed, err := http.DefaultClient.Do(closing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed.Body.Close()
+	if closed.StatusCode != http.StatusForbidden {
+		t.Fatalf("another key closed the session: %d", closed.StatusCode)
+	}
+	if code := replay(owner); code != http.StatusOK {
+		t.Fatalf("the session after another key tried to close it: %d", code)
 	}
 }
 
