@@ -1177,18 +1177,20 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 func TestRequestsHaveDeadlines(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	key, _, err := s.CreateKey(o.ID, "bot", []string{"read"}, "test")
+	key, _, err := s.CreateKey(o.ID, "bot", []string{"read", "research:write"}, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	const limit = 300 * time.Millisecond
 	var host string
-	srv := httptest.NewServer((&App{s: s, readLimit: limit, writeLimit: limit}).Routes())
-	host = strings.TrimPrefix(srv.URL, "http://")
-	t.Cleanup(srv.Close)
+	serve := func(app *App) {
+		srv := httptest.NewServer(app.Routes())
+		t.Cleanup(srv.Close)
+		host = strings.TrimPrefix(srv.URL, "http://")
+	}
 	dial := func() (net.Conn, *bufio.Reader) {
 		t.Helper()
-		conn, err := net.Dial("tcp", strings.TrimPrefix(srv.URL, "http://"))
+		conn, err := net.Dial("tcp", host)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1204,59 +1206,60 @@ func TestRequestsHaveDeadlines(t *testing.T) {
 		io.Copy(io.Discard, io.LimitReader(res.Body, 1<<16))
 		return res, nil
 	}
-
-	// A body that stops arriving is given up on, not waited for.
-	conn, r := dial()
-	fmt.Fprint(conn, "POST /login HTTP/1.1\r\nHost: "+host+"\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 200\r\n\r\nemail=ada")
-	began := time.Now()
-	if res, err := answer(conn, r, 5*time.Second); err == nil && res.StatusCode < 400 {
-		t.Fatalf("a stalled sign-in form got %d", res.StatusCode)
+	head := func(method, path, extra string, length int) string {
+		return fmt.Sprintf("%s %s HTTP/1.1\r\nHost: %s\r\n%sContent-Type: application/json\r\nAccept: application/json, text/event-stream\r\nContent-Length: %d\r\n\r\n", method, path, host, extra, length)
 	}
-	if waited := time.Since(began); waited > 3*time.Second {
-		t.Fatalf("a stalled body was waited on for %v", waited)
+	bearer := "Authorization: Bearer " + key + "\r\n"
+
+	// A body that stops arriving is given up on, wherever it is sent: a page's form, a
+	// path that doesn't exist, and the agents' route before any key has been accepted.
+	serve(&App{s: s, readLimit: limit})
+	for _, path := range []string{"/login", "/nope/mcp", "/o/alpha/mcp", "/o/alpha/api/v1/companies"} {
+		conn, r := dial()
+		fmt.Fprint(conn, head("POST", path, "", 200)+`{"name":`)
+		began := time.Now()
+		if res, err := answer(conn, r, 5*time.Second); err == nil && res.StatusCode < 400 {
+			t.Fatalf("a stalled body to %s got %d", path, res.StatusCode)
+		}
+		if waited := time.Since(began); waited > 3*time.Second {
+			t.Fatalf("a stalled body to %s was waited on for %v", path, waited)
+		}
 	}
 
-	// An ordinary request, then an agent's on the same connection once the first
-	// one's deadline has passed: the agent's answer must still be written.
+	// A body that arrives slowly but in time is still answered: the answer's clock
+	// starts when the body is in, and an agent's answer has none.
+	serve(&App{s: s, writeLimit: limit})
+	slowly := func(path, body string) (*http.Response, error) {
+		conn, r := dial()
+		fmt.Fprint(conn, head("POST", path, bearer, len(body))+body[:10])
+		time.Sleep(3 * limit)
+		fmt.Fprint(conn, body[10:])
+		return answer(conn, r, 3*time.Second)
+	}
+	if res, err := slowly("/o/alpha/api/v1/companies", `{"name":"Quay Marine"}`); err != nil || res.StatusCode != http.StatusOK {
+		t.Fatalf("a slow upload to the API: %v %v", res, err)
+	}
 	initialize := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}`
-	conn, r = dial()
-	fmt.Fprint(conn, "GET /healthz HTTP/1.1\r\nHost: "+host+"\r\n\r\n")
-	if res, err := answer(conn, r, 2*time.Second); err != nil || res.StatusCode != http.StatusOK {
-		t.Fatalf("healthz: %v %v", res, err)
-	}
-	time.Sleep(2 * limit)
-	fmt.Fprintf(conn, "POST /o/alpha/mcp HTTP/1.1\r\nHost: "+host+"\r\nAuthorization: Bearer %s\r\nContent-Type: application/json\r\nAccept: application/json, text/event-stream\r\nContent-Length: %d\r\n\r\n%s", key, len(initialize), initialize)
-	res, err := answer(conn, r, 3*time.Second)
+	res, err := slowly("/o/alpha/mcp", initialize)
 	if err != nil || res.StatusCode != http.StatusOK || res.Header.Get("Mcp-Session-Id") == "" {
-		t.Fatalf("an agent's request after an ordinary one on the same connection: %v %v", res, err)
+		t.Fatalf("a slow request from an agent: %v %v", res, err)
 	}
 
-	// And the reverse: after an agent's request, an ordinary one is bounded again.
-	time.Sleep(2 * limit)
-	fmt.Fprint(conn, "GET /healthz HTTP/1.1\r\nHost: "+host+"\r\n\r\n")
-	if res, err := answer(conn, r, 2*time.Second); err != nil || res.StatusCode != http.StatusOK {
-		t.Fatalf("healthz after an agent's request: %v %v", res, err)
+	// An agent's listening stream stays open well past both limits.
+	serve(&App{s: s, readLimit: limit, writeLimit: limit})
+	conn, r := dial()
+	fmt.Fprint(conn, head("POST", "/o/alpha/mcp", bearer, len(initialize))+initialize)
+	if res, err = answer(conn, r, 3*time.Second); err != nil || res.StatusCode != http.StatusOK {
+		t.Fatalf("an agent's first request: %v %v", res, err)
 	}
-	fmt.Fprint(conn, "POST /login HTTP/1.1\r\nHost: "+host+"\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 200\r\n\r\nemail=ada")
-	began = time.Now()
-	if res, err := answer(conn, r, 5*time.Second); err == nil && res.StatusCode < 400 {
-		t.Fatalf("a stalled form after an agent's request got %d", res.StatusCode)
-	}
-	if waited := time.Since(began); waited > 3*time.Second {
-		t.Fatalf("after an agent's request a stalled body was waited on for %v", waited)
-	}
-
-	// An agent's listening stream stays open well past the limit.
-	session := res.Header.Get("Mcp-Session-Id")
-	agent := "Host: " + host + "\r\nAuthorization: Bearer " + key + "\r\nMcp-Session-Id: " + session + "\r\n"
+	agent := bearer + "Mcp-Session-Id: " + res.Header.Get("Mcp-Session-Id") + "\r\n"
 	ready := `{"jsonrpc":"2.0","method":"notifications/initialized"}`
-	conn, r = dial()
-	fmt.Fprintf(conn, "POST /o/alpha/mcp HTTP/1.1\r\n%sContent-Type: application/json\r\nAccept: application/json, text/event-stream\r\nContent-Length: %d\r\n\r\n%s", agent, len(ready), ready)
+	fmt.Fprint(conn, head("POST", "/o/alpha/mcp", agent, len(ready))+ready)
 	if res, err := answer(conn, r, 3*time.Second); err != nil || res.StatusCode >= 300 {
 		t.Fatalf("finishing the agent's handshake: %v %v", res, err)
 	}
 	stream, sr := dial()
-	fmt.Fprintf(stream, "GET /o/alpha/mcp HTTP/1.1\r\n%sAccept: text/event-stream\r\n\r\n", agent)
+	fmt.Fprintf(stream, "GET /o/alpha/mcp HTTP/1.1\r\nHost: %s\r\n%sAccept: text/event-stream\r\n\r\n", host, agent)
 	stream.SetReadDeadline(time.Now().Add(3 * time.Second))
 	opened, err := http.ReadResponse(sr, nil)
 	if err != nil || opened.StatusCode != http.StatusOK {
@@ -1264,13 +1267,18 @@ func TestRequestsHaveDeadlines(t *testing.T) {
 	}
 	time.Sleep(4 * limit)
 	stream.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
-	var timeout net.Error
 	// Whatever the server has already sent is read off; what matters is that the
 	// read then waits rather than finding the stream closed.
 	for err = error(nil); err == nil; {
 		_, err = sr.ReadByte()
 	}
+	var timeout net.Error
 	if !errors.As(err, &timeout) || !timeout.Timeout() {
 		t.Fatalf("the agent's stream was closed: %v", err)
+	}
+
+	// A page with no body isn't cut short by the limit on bodies.
+	if a := (&App{}); a.readLimit != 0 || bodyLimit < answerLimit {
+		t.Fatal("the defaults changed without this test")
 	}
 }

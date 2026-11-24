@@ -89,7 +89,7 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 	sameKey := auth.RequireBearerToken(func(_ context.Context, _ string, r *http.Request) (*auth.TokenInfo, error) {
 		return &auth.TokenInfo{UserID: strconv.FormatInt(reqOf(r).Key.ID, 10)}, nil
 	}, &auth.RequireBearerTokenOptions{AllowMissingExpiration: true})
-	mux.Handle("/o/{org}/mcp", a.agent("", sameKey(mcpHandler).ServeHTTP))
+	mux.Handle("/o/{org}/mcp", a.agent("", streaming(sameKey(mcpHandler))))
 }
 
 func respond(w http.ResponseWriter, v any, err error) {
