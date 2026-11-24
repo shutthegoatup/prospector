@@ -195,12 +195,13 @@ type SettingsData struct {
 	SSO     *SSO
 	// Callback is where a provider sends people back; empty until PROSPECTOR_URL is set.
 	Callback string
+	Intake   string
 }
 
 func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	members, _ := a.s.Members(q.Org.ID)
-	d := SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org)}
+	d := SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org), Intake: a.baseURL(r) + q.Base() + "intake"}
 	if d.SSO, _ = a.s.SSO(q.Org.ID); d.SSO == nil {
 		d.SSO = &SSO{}
 	}
@@ -320,6 +321,10 @@ func (a *App) uiSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.EmailAfterDays < 0 || in.FollowupAfterDays < 0 || in.EmailAfterDays > 60 || in.FollowupAfterDays > 60 {
 		fail(w, errors.New("waits are between 0 and 60 days"), http.StatusBadRequest)
+		return
+	}
+	if _, err := enquiryOrigins(in.EnquirySites); err != nil {
+		fail(w, err, http.StatusBadRequest)
 		return
 	}
 	o := reqOf(r).Org

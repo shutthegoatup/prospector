@@ -101,6 +101,10 @@ templ SettingsView(q *Req, d SettingsData) {
 						<textarea name="agent_guidance" rows="8" placeholder="Who you sell to, who's off-limits, how to judge fit" class={ areaClass }>{ set.AgentGuidance }</textarea>
 						@Meta("Sent to every agent when it connects, after the built-in task guidance, and returned by the guidance tool.")
 					}
+					@Row("Enquiry form sites") {
+						<textarea name="enquiry_sites" rows="2" placeholder="https://www.example.com" class={ areaClass }>{ set.EnquirySites }</textarea>
+						@Meta("One per line. A form on these sites can POST an enquiry as JSON to " + d.Intake + " and it shows under Enquiries. Leave empty to accept none.")
+					}
 					@Row("Cold email") {
 						<span class="flex items-center gap-2.5 pt-2 text-sm"><input type="checkbox" name="incorporated_only" checked?={ set.IncorporatedOnly } class="size-4 accent-[var(--primary)]"/> Only email incorporated companies (UK PECR)</span>
 					}
