@@ -18,15 +18,21 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 		return 0, err
 	}
 	var blocked []string
+	stored := func(fresh string, have *string) bool {
+		return strings.EqualFold(strings.TrimSpace(fresh), strings.TrimSpace(deref(have)))
+	}
 	for _, d := range p.Drafts {
-		listed := s.allowed(o, d.Email, d.Linkedin)
-		if listed == nil {
+		email, link := s.allowed(o, d.Email, ""), s.allowed(o, "", d.Linkedin)
+		if email == nil && link == nil {
 			continue
 		}
 		var have Contact
 		known := s.in(org).Where("key = ?", d.Key).First(&have).Error == nil
-		if !known || (d.Email != "" && d.Email != deref(have.Email)) || (d.Linkedin != "" && d.Linkedin != deref(have.Linkedin)) {
-			blocked = append(blocked, fmt.Sprintf("%s in %s (%v)", d.Key, d.File, listed))
+		if email != nil && !(known && stored(d.Email, have.Email)) {
+			blocked = append(blocked, fmt.Sprintf("%s in %s (%v)", d.Key, d.File, email))
+		}
+		if link != nil && !(known && stored(d.Linkedin, have.Linkedin)) {
+			blocked = append(blocked, fmt.Sprintf("%s in %s (%v)", d.Key, d.File, link))
 		}
 	}
 	if len(blocked) > 0 {

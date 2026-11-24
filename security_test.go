@@ -237,6 +237,11 @@ func TestNeverContactCatchesMistakes(t *testing.T) {
 	if _, err := s.Import(o.ID, fresh); err != nil {
 		t.Fatalf("listing someone already stored broke the next import: %v", err)
 	}
+	fresh.Drafts[1].Linkedin = "https://www.linkedin.com/in/a-new-profile"
+	fresh.Drafts[1].Email = strings.ToUpper(fresh.Drafts[1].Email)
+	if _, err := s.Import(o.ID, fresh); err != nil {
+		t.Fatalf("a listed person's unlisted link couldn't change: %v", err)
+	}
 	p.Drafts[0].Email = "someone@blocked.example"
 	p.Drafts[0].Note = "changed"
 	if _, err := s.Import(o.ID, p); err == nil || !strings.Contains(err.Error(), p.Drafts[0].Key) {
