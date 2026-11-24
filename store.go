@@ -31,6 +31,9 @@ type OrgSettings struct {
 	IncorporatedOnly  bool   `json:"incorporated_only"`
 	AgentGuidance     string `json:"agent_guidance"`
 	EnquirySites      string `json:"enquiry_sites"`
+	// LookFor is what this organisation looks for at a company, one "field: hint"
+	// per line; see Assets.
+	LookFor string `json:"look_for"`
 }
 
 func (s OrgSettings) withDefaults() OrgSettings {
@@ -92,23 +95,20 @@ type APIKey struct {
 }
 
 type Company struct {
-	ID              int64     `gorm:"primaryKey" json:"id"`
-	OrgID           int64     `gorm:"uniqueIndex:idx_org_company;not null" json:"-"`
-	Name            string    `gorm:"uniqueIndex:idx_org_company;not null" json:"name"`
-	Domain          string    `json:"domain"`
-	Country         string    `json:"country"`
-	Segment         string    `json:"segment"`
-	Fit             string    `json:"fit"`
-	Stage           string    `gorm:"index" json:"stage"`
-	ConfiguratorURL string    `json:"configurator_url"`
-	Platform        string    `json:"platform"`
-	BuiltBy         string    `json:"built_by"`
-	Why             string    `json:"why"`
-	FoundBy         string    `json:"found_by"`
-	Incorporated    *bool     `json:"incorporated"`
-	Hold            *string   `json:"hold"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID           int64     `gorm:"primaryKey" json:"id"`
+	OrgID        int64     `gorm:"uniqueIndex:idx_org_company;not null" json:"-"`
+	Name         string    `gorm:"uniqueIndex:idx_org_company;not null" json:"name"`
+	Domain       string    `json:"domain"`
+	Country      string    `json:"country"`
+	Segment      string    `json:"segment"`
+	Fit          string    `json:"fit"`
+	Stage        string    `gorm:"index" json:"stage"`
+	Why          string    `json:"why"`
+	FoundBy      string    `json:"found_by"`
+	Incorporated *bool     `json:"incorporated"`
+	Hold         *string   `json:"hold"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 const (
@@ -242,6 +242,9 @@ func Open(dsn string) (*Store, error) {
 		return nil, err
 	}
 	if err := db.AutoMigrate(models...); err != nil {
+		return nil, err
+	}
+	if err := moveAssetColumns(db); err != nil {
 		return nil, err
 	}
 	return &Store{db: db}, nil

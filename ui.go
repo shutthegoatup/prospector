@@ -340,6 +340,10 @@ func (a *App) uiSettings(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
+	if _, err := in.Assets(); err != nil {
+		fail(w, err, http.StatusBadRequest)
+		return
+	}
 	o := reqOf(r).Org
 	o.Name, o.Color, o.Settings = strings.TrimSpace(in.Name), in.Color, in.OrgSettings
 	err := a.s.SaveOrg(o)
