@@ -81,7 +81,7 @@ prospector serve                                          # http://127.0.0.1:876
 - An owner adds and removes members in Settings. Removing someone ends their sign-in access to that organisation; their account, and other organisations, are untouched. API keys they created keep working until revoked on the Agents page.
 - Someone added from Settings gets a first password that the person adding them sees; they are made to choose their own the first time they sign in.
 - Members change their own password in Settings, which signs out their other sessions. `prospector user password` signs them out everywhere.
-- Every page needs a sign-in. Every browser POST must be JSON, which blocks cross-site form posts, and a request that a browser marks as coming from another site is refused, sign-in and sign-out included.
+- Every page needs a sign-in except the sign-in form and the front page at `/`, which describes Prospector to a signed-out visitor and shows nothing from your data. Every browser POST must be JSON, which blocks cross-site form posts, and a request that a browser marks as coming from another site is refused, sign-in and sign-out included.
 
 There's a Dockerfile for container hosting.
 
