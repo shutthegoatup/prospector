@@ -42,7 +42,7 @@ func (c Contact) Touched() bool {
 	return c.EmailSent != nil || c.LinkedinAdded != nil || c.Called != nil
 }
 
-// Open is someone the outreach queues may still show.
+// Open is someone the outreach queues may still show, unless their company is rejected.
 func (c Contact) Open() bool {
 	p := c.Phase()
 	return (p == PhaseNew || p == PhaseOutreach) && !strings.HasPrefix(c.Key, "org:")

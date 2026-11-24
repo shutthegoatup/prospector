@@ -284,7 +284,9 @@ func pipeline(c Company, people []Contact) string {
 		st := ""
 		switch {
 		case p.Declined != nil:
-			st = "outreach"
+			if p.Touched() || p.Replied != nil {
+				st = "outreach"
+			}
 		case p.Replied != nil:
 			st = p.ConversationStage()
 		case p.Touched():
@@ -464,7 +466,7 @@ func (s *Store) NeverContactCovers(o *Org) []string {
 		return nil
 	}
 	var people []Contact
-	s.in(o.ID).Where(openContacts).Order("id").Find(&people)
+	s.in(o.ID).Where(openContacts).Where(companyNotRejected).Order("id").Find(&people)
 	var names []string
 	for _, p := range people {
 		if o.Settings.listed(deref(p.Email), deref(p.Linkedin)) != nil {

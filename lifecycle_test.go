@@ -81,6 +81,7 @@ func TestPipelineTakesTheFurthestContact(t *testing.T) {
 		{"lost ranks with outreach", Company{}, []Contact{{Replied: d, Stage: "lost"}, {Replied: d}}, "replied"},
 		{"held still counts", Company{}, []Contact{{EmailSent: d, Hold: d}}, "outreach"},
 		{"a reply later declined is no conversation", Company{}, []Contact{{Replied: d, Stage: "meeting", Declined: d}}, "outreach"},
+		{"declined before anyone reached them", Company{Stage: CompanyRejected}, []Contact{{Declined: d}}, "rejected"},
 		{"declined beside a live conversation", Company{}, []Contact{{Replied: d, Stage: "proposal", Declined: d}, {Replied: d}}, "replied"},
 	} {
 		if got := pipeline(tc.c, tc.people); got != tc.want {
@@ -197,8 +198,19 @@ func TestRejectedCompanysPeopleLeaveTheQueues(t *testing.T) {
 	if rows, _ := s.Due(o.ID, "linkedin", time.Now(), o.Settings); len(rows) != 1 || rows[0].Key != "elsewhere" {
 		t.Fatalf("rejecting one company took someone with no company out of the queue: %+v", rows)
 	}
+	listed := *o
+	listed.Settings.NeverContact = "larkmoor.example"
+	if err := s.db.Model(&Contact{}).Where("key = ?", "new").Update("email", "hannah.pryce@larkmoor.example").Error; err != nil {
+		t.Fatal(err)
+	}
+	if names := s.NeverContactCovers(&listed); len(names) != 0 {
+		t.Fatalf("the never-contact list is said to hold back %v, whose company is rejected anyway", names)
+	}
 	if err := s.SetCompanyStage(o.ID, co.ID, CompanyQualified, "", "ada"); err != nil {
 		t.Fatal(err)
+	}
+	if names := s.NeverContactCovers(&listed); len(names) != 1 {
+		t.Fatalf("the never-contact list holds back %v once the company is qualified again", names)
 	}
 	if n := queued(); n != before {
 		t.Fatalf("%d queued after qualifying the company again, %d before it was rejected", n, before)
