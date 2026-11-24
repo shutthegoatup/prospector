@@ -1,10 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -389,22 +386,21 @@ func (a *App) uiRemoveMember(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
-func (a *App) personExport(w http.ResponseWriter, r *http.Request) {
+func (a *App) uiExport(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID int64 `json:"id"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
 	q := reqOf(r)
-	id := idParam(r, "id")
-	out, err := a.s.ExportPerson(q.Org.ID, id, q.Actor())
+	out, err := a.s.ExportPerson(q.Org.ID, in.ID, q.Actor())
 	if err != nil {
 		fail(w, err, http.StatusNotFound)
 		return
 	}
 	w.Header().Set("cache-control", "no-store")
-	w.Header().Set("content-disposition", fmt.Sprintf(`attachment; filename="person-%d.json"`, id))
-	w.Header().Set("content-type", "application/json")
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(out); err != nil {
-		log.Print(err)
-	}
+	writeJSON(w, out)
 }
 
 func (a *App) uiErase(w http.ResponseWriter, r *http.Request) {

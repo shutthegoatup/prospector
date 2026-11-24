@@ -46,31 +46,49 @@ func TestExportPerson(t *testing.T) {
 	}
 	res.Body.Close()
 
-	link := func(id int64) string { return "/o/alpha/people/" + strconv.FormatInt(id, 10) + "/export" }
 	companyPage := srv.URL + "/o/alpha/companies/" + strconv.FormatInt(*hannah.CompanyID, 10)
-	if code, _ := call(t, bob, "GET", srv.URL+link(hannah.ID), "", nil); code != http.StatusForbidden {
+	export := func(client *http.Client, id int64) (int, string) {
+		return call(t, client, "POST", srv.URL+"/o/alpha/ui/export", "application/json", map[string]int64{"id": id})
+	}
+	if code, _ := export(bob, hannah.ID); code != http.StatusForbidden {
 		t.Fatalf("a member who isn't an owner exported someone: %d", code)
 	}
-	if _, page := call(t, bob, "GET", companyPage, "", nil); strings.Contains(page, "/export") {
-		t.Fatal("the company page offers the export to someone who isn't an owner")
+	key, _, err := s.CreateKey(o.ID, "scout", []string{"read", "research:write", "outcomes:write", "import"}, "test")
+	do(err)
+	agent := &http.Client{Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
+		r.Header.Set("Authorization", "Bearer "+key)
+		return http.DefaultTransport.RoundTrip(r)
+	})}
+	if code, _ := export(agent, hannah.ID); code == http.StatusOK {
+		t.Fatal("an agent's key exported someone")
 	}
-	if _, page := call(t, ada, "GET", companyPage, "", nil); !strings.Contains(page, `href="`+link(hannah.ID)+`"`) {
-		t.Fatal("the company page gives an owner no way to export a person")
+	// A link on another site can send an owner's browser anywhere a GET reaches.
+	if code, _ := call(t, ada, "GET", srv.URL+"/o/alpha/ui/export?id="+strconv.FormatInt(hannah.ID, 10), "", nil); code == http.StatusOK {
+		t.Fatal("following a link exported someone")
 	}
 	for what, id := range map[string]int64{"a company's placeholder row": placeholder.ID, "someone in another organisation": theirs.ID, "nobody": 999999} {
-		if code, body := call(t, ada, "GET", srv.URL+link(id), "", nil); code == http.StatusOK {
+		if code, body := export(ada, id); code == http.StatusOK {
 			t.Fatalf("exported %s: %s", what, body)
 		}
 	}
+	var early int64
+	s.in(o.ID).Model(&Event{}).Where("action = ?", "export").Count(&early)
+	if early != 0 {
+		t.Fatalf("%d refused exports were written into the history", early)
+	}
+	if _, page := call(t, bob, "GET", companyPage, "", nil); strings.Contains(page, "ui/export") {
+		t.Fatal("the company page offers the export to someone who isn't an owner")
+	}
+	if _, page := call(t, ada, "GET", companyPage, "", nil); !strings.Contains(page, `data-download="ui/export"`) {
+		t.Fatal("the company page gives an owner no way to export a person")
+	}
 
-	res, err = ada.Get(srv.URL + link(hannah.ID))
-	do(err)
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK || !strings.HasPrefix(res.Header.Get("content-disposition"), "attachment") || res.Header.Get("cache-control") != "no-store" {
-		t.Fatalf("export: %d, %v", res.StatusCode, res.Header)
+	code, body := export(ada, hannah.ID)
+	if code != http.StatusOK {
+		t.Fatalf("export: %d %s", code, body)
 	}
 	var out PersonExport
-	do(json.NewDecoder(res.Body).Decode(&out))
+	do(json.Unmarshal([]byte(body), &out))
 	if deref(out.Person.Email) != hannahEmail || deref(out.Person.Phone) != "+44 20 7946 0000" || out.Person.Stage != "meeting" ||
 		!strings.Contains(deref(out.Person.CallNotes), "Biscuit") || deref(out.Person.Note) == "" {
 		t.Fatalf("the export is missing her details: %+v", out.Person)

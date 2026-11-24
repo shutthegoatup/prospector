@@ -148,7 +148,9 @@ templ CompanyView(q *Req, p CompanyPage) {
 						}
 						@Meta(contactStage(c))
 						if q.Owner() {
-							<a href={ templ.SafeURL(q.Base() + "people/" + strconv.FormatInt(c.ID, 10) + "/export") } download class="font-mono text-xs">Export</a>
+							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-download": "ui/export", "data-body": jsonBody("id", c.ID), "data-file": "person-" + strconv.FormatInt(c.ID, 10) + ".json"}}) {
+								Export
+							}
 							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/erase", "data-body": jsonBody("id", c.ID), "data-confirm": eraseConfirm(c)}}) {
 								Erase
 							}
