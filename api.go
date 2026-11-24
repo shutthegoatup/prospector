@@ -170,7 +170,7 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 				out, err := a.s.AgentAddFact(org.ID, actor, in)
 				return nil, factAdded{OK: err == nil, Existed: err == nil && out.Existed}, err
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "add_contact", Description: "Suggest a person at a company. They wait in Research until a person picks them. Someone already at the company comes back as existed, unchanged. Never scrape LinkedIn; use links found by search."},
+		mcp.AddTool(s, &mcp.Tool{Name: "add_contact", Description: "Suggest a person at a company. They wait in Research until a person picks them. Someone already at the company comes back as existed: an email, phone or profile you send that they lack isn't filled in, it waits for a person to accept and is listed in suggested. Never scrape LinkedIn; use links found by search."},
 			func(_ context.Context, _ *mcp.CallToolRequest, in AddContactIn) (*mcp.CallToolResult, *AddContactOut, error) {
 				o, err := current()
 				if err != nil {

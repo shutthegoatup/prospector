@@ -135,6 +135,7 @@ type CompanyPage struct {
 	Company Company
 	Facts   []Fact
 	People  []Contact
+	Pending map[int64][]PendingDetail
 	History []HistoryItem
 }
 
@@ -148,6 +149,7 @@ func (a *App) company(w http.ResponseWriter, r *http.Request) {
 	p := CompanyPage{Company: *c}
 	p.Facts, _ = a.s.Facts(q.Org.ID, c.ID)
 	p.People, _ = a.s.People(q.Org.ID, c.ID)
+	p.Pending, _ = a.s.Pending(q.Org.ID, p.People)
 	p.History, _ = a.s.History(q.Org.ID, c.ID, 50)
 	a.page(w, r, "companies", CompanyView(q, p))
 }
@@ -277,6 +279,17 @@ func (a *App) uiPick(w http.ResponseWriter, r *http.Request) {
 	if decode(w, r, &in) {
 		q := reqOf(r)
 		done(w, a.s.PickContact(q.Org.ID, q.Org, in.ID, q.Actor()))
+	}
+}
+
+func (a *App) uiSuggestion(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID       int64  `json:"id"`
+		Decision string `json:"decision"`
+	}
+	if decode(w, r, &in) {
+		q := reqOf(r)
+		done(w, a.s.DecideSuggestion(q.Org.ID, in.ID, in.Decision, q.Actor()))
 	}
 }
 

@@ -22,7 +22,7 @@ var mcpTools = []struct{ Name, Scope, What string }{
 	{"list_due", "read", "what's on Today, and whether its text is written"},
 	{"add_company", "research:write", "lands in Research to review, with facts"},
 	{"add_fact", "research:write", "field, value and source URL"},
-	{"add_contact", "research:write", "a suggested person; waits until someone picks them"},
+	{"add_contact", "research:write", "a suggested person, who waits until someone picks them; new details for someone already here wait to be accepted"},
 	{"draft_message", "drafts:write", "note, message, email or follow-up, marked as the agent's"},
 	{"mark", "outcomes:write", "record an outcome, shown as the agent's with its note"},
 }

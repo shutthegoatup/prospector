@@ -14,6 +14,8 @@ func researchEmpty(f string) (string, string) {
 		return "Every qualified company has a contact", "Add someone with + Add person, or let an agent suggest people."
 	case "verify":
 		return "No emails to verify", "Contacts whose email is a pattern guess show up here."
+	case "details":
+		return "No details to check", "An email, phone or profile an agent finds for someone already here waits for you to accept it."
 	}
 	return "Nothing here", ""
 }
@@ -143,6 +145,7 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 							} else {
 								@Meta(contactStage(p))
 							}
+							@SuggestedDetails(r.Pending[p.ID])
 						</div>
 					}
 				</div>
@@ -170,4 +173,51 @@ templ AssetPills(found []AssetFound) {
 			}
 		}
 	</div>
+}
+
+func detailLabel(field string) string {
+	switch field {
+	case "linkedin":
+		return "LinkedIn profile"
+	case "phone":
+		return "phone number"
+	}
+	return field
+}
+
+func suggestedNote(d PendingDetail) string {
+	var notes []string
+	if d.EmailStatus == "guess" {
+		notes = append(notes, "a guess")
+	}
+	if d.Current != "" {
+		notes = append(notes, "in place of "+d.Current)
+	}
+	return strings.Join(notes, ", ")
+}
+
+templ SuggestedDetails(list []PendingDetail) {
+	for _, d := range list {
+		<div class="flex flex-wrap items-center gap-2 rounded-lg bg-muted p-3 text-sm">
+			<span class="min-w-0 flex-[1_1_220px]">
+				<span class="font-mono text-xs text-muted-foreground">{ "suggested " + detailLabel(d.Field) }</span>
+				<span class="block break-all">{ d.Value }</span>
+				if note := suggestedNote(d); note != "" {
+					<span class="block text-muted-foreground">{ note }</span>
+				}
+				<span class="flex flex-wrap items-center gap-2">
+					<span class="font-mono text-xs text-mark">{ actorLabel(d.By) }</span>
+					if d.SourceURL != "" {
+						<a href={ safeHref(d.SourceURL) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
+					}
+				</span>
+			</span>
+			@button.Button(button.Props{Size: button.SizeXs, Attributes: templ.Attributes{"data-post": "ui/suggestion", "data-body": jsonBody("id", d.ID, "decision", SuggestionAccepted)}}) {
+				Accept
+			}
+			@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/suggestion", "data-body": jsonBody("id", d.ID, "decision", SuggestionDismissed)}}) {
+				Dismiss
+			}
+		</div>
+	}
 }

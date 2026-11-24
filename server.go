@@ -339,6 +339,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/update", a.member(a.uiUpdate))
 	mux.HandleFunc("POST /o/{org}/ui/company", a.member(a.uiCompany))
 	mux.HandleFunc("POST /o/{org}/ui/pick", a.member(a.uiPick))
+	mux.HandleFunc("POST /o/{org}/ui/suggestion", a.member(a.uiSuggestion))
 	mux.HandleFunc("POST /o/{org}/ui/add", a.member(a.uiAdd))
 	mux.HandleFunc("POST /o/{org}/ui/voice", a.member(a.uiVoice))
 	mux.HandleFunc("POST /o/{org}/ui/settings", a.owner(a.uiSettings))

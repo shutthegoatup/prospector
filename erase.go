@@ -91,6 +91,27 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Delete(&Fact{}).Error; err != nil {
 			return err
 		}
+		// An address or profile suggested for them identifies them too, unless someone
+		// dismissed it as not theirs.
+		var suggested []Suggestion
+		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Find(&suggested).Error; err != nil {
+			return err
+		}
+		hashes := identifiers(org, displayName(c), deref(c.Maker), deref(c.Email), deref(c.Linkedin))
+		for _, sg := range suggested {
+			if sg.Decision == SuggestionDismissed {
+				continue
+			}
+			switch sg.Field {
+			case "email":
+				hashes = append(hashes, identifiers(org, "", "", sg.Value, "")...)
+			case "linkedin":
+				hashes = append(hashes, identifiers(org, "", "", "", sg.Value)...)
+			}
+		}
+		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Delete(&Suggestion{}).Error; err != nil {
+			return err
+		}
 		// What they wrote to us goes too, whether or not it was matched to them.
 		gone := tx.Where("org_id = ? and contact_id = ?", org, id)
 		if emails := emailRe.FindAllString(strings.ToLower(deref(c.Email)), -1); len(emails) > 0 {
@@ -102,7 +123,7 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if err := tx.Delete(&c).Error; err != nil {
 			return err
 		}
-		for _, h := range identifiers(org, displayName(c), deref(c.Maker), deref(c.Email), deref(c.Linkedin)) {
+		for _, h := range hashes {
 			row := Erasure{OrgID: org, Hash: h, At: time.Now()}
 			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
 				return err

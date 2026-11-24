@@ -18,6 +18,7 @@ type PersonExport struct {
 	Person     Contact       `json:"person"`
 	Facts      []Fact        `json:"facts"`
 	Enquiries  []Enquiry     `json:"enquiries"`
+	Suggested  []Suggestion  `json:"suggested_details"`
 	History    []ExportEvent `json:"history"`
 }
 
@@ -29,7 +30,7 @@ type ExportEvent struct {
 }
 
 func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error) {
-	out := &PersonExport{ExportedAt: time.Now().UTC(), Facts: []Fact{}, Enquiries: []Enquiry{}, History: []ExportEvent{}}
+	out := &PersonExport{ExportedAt: time.Now().UTC(), Facts: []Fact{}, Enquiries: []Enquiry{}, Suggested: []Suggestion{}, History: []ExportEvent{}}
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		c := &out.Person
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(c).Error; err != nil {
@@ -57,6 +58,9 @@ func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error)
 			wrote = tx.Where("org_id = ? and (contact_id = ? or email in ?)", org, id, emails)
 		}
 		if err := wrote.Order("id").Find(&out.Enquiries).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("id").Find(&out.Suggested).Error; err != nil {
 			return err
 		}
 		var events []Event
@@ -87,6 +91,7 @@ type OrgExport struct {
 	Facts        []Fact         `json:"facts"`
 	Contacts     []Contact      `json:"contacts"`
 	Enquiries    []Enquiry      `json:"enquiries"`
+	Suggested    []Suggestion   `json:"suggested_details"`
 	History      []ExportRecord `json:"history"`
 	Erased       int64          `json:"people_erased"`
 }
@@ -166,7 +171,7 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			return err
 		}
 		mine := func() *gorm.DB { return tx.Where("org_id = ?", org).Order("id") }
-		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Enquiries} {
+		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Enquiries, &out.Suggested} {
 			if err := mine().Find(rows).Error; err != nil {
 				return err
 			}

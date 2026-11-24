@@ -76,6 +76,8 @@ func historyText(h HistoryItem) string {
 		"company:rejected": "rejected the company", "company:review": "sent back to review",
 		"erase": "erased a person on request", "enquiry": "sent an enquiry",
 		"export": "exported what is held on them",
+		"suggest:email": "suggested an email", "suggest:phone": "suggested a phone number", "suggest:linkedin": "suggested a LinkedIn profile",
+		"dismiss:email": "dismissed a suggested email", "dismiss:phone": "dismissed a suggested phone number", "dismiss:linkedin": "dismissed a suggested LinkedIn profile",
 	}[h.Action]
 	if verb == "" {
 		if f, ok := strings.CutPrefix(h.Action, "set:"); ok {
@@ -171,6 +173,7 @@ templ CompanyView(q *Req, p CompanyPage) {
 						}
 					</span>
 				</div>
+				@SuggestedDetails(p.Pending[c.ID])
 			}
 		</div>
 		if len(p.Facts) > 0 {
