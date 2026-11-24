@@ -74,6 +74,7 @@ prospector serve                                          # http://127.0.0.1:876
 
 **Before exposing it beyond your machine:**
 - Put it behind HTTPS. Copy to clipboard needs a secure page, and the session cookie is marked Secure on HTTPS. A proxy in front must send `X-Forwarded-Proto: https`, or the cookie isn't marked Secure.
+- Pages carry a Content-Security-Policy that allows only the app's own scripts, plus Google Fonts for the typefaces.
 - Repeated wrong passwords for one email are slowed, up to a minute between tries.
 - An owner adds and removes members in Settings. Removing someone ends their sign-in access to that organisation; their account, and other organisations, are untouched. API keys they created keep working until revoked on the Agents page.
 - Members change their own password in Settings, which signs out their other sessions. `prospector user password` signs them out everywhere.

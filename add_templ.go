@@ -300,14 +300,14 @@ func AddView(q *Req, in QuickAdd, bookmarklet string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\" class=\"self-start rounded-lg border border-dashed border-primary px-3 py-2 font-medium text-primary\" onclick=\"event.preventDefault()\" draggable=\"true\">+ ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\" class=\"self-start rounded-lg border border-dashed border-primary px-3 py-2 font-medium text-primary\" data-bookmarklet draggable=\"true\">+ ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(q.Org.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `add.templ`, Line: 62, Col: 207}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `add.templ`, Line: 62, Col: 191}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {

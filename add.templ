@@ -59,7 +59,7 @@ templ AddView(q *Req, in QuickAdd, bookmarklet string) {
 		<aside class="flex min-w-0 flex-[1_1_280px] flex-col gap-3 rounded-xl border border-border bg-card p-5 text-sm">
 			@Label("Faster: from LinkedIn itself")
 			<p class="text-muted-foreground">Drag this to your bookmarks bar. On someone's LinkedIn profile, click it: this form opens filled in with their name, role and company.</p>
-			<a href={ templ.SafeURL(bookmarklet) } class="self-start rounded-lg border border-dashed border-primary px-3 py-2 font-medium text-primary" onclick="event.preventDefault()" draggable="true">+ { q.Org.Name }</a>
+			<a href={ templ.SafeURL(bookmarklet) } class="self-start rounded-lg border border-dashed border-primary px-3 py-2 font-medium text-primary" data-bookmarklet draggable="true">+ { q.Org.Name }</a>
 			<p class="text-muted-foreground">It reads only the profile's title and headline, when you click. Nothing runs on LinkedIn by itself.</p>
 			@Label("Then")
 			<p class="text-muted-foreground">They land in Today under LinkedIn adds, with your note ready: <b class="text-foreground">o</b> opens the profile and copies the note, <b class="text-foreground">a</b> marks them added.</p>
