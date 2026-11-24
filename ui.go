@@ -188,12 +188,13 @@ func baseURL(r *http.Request) string {
 type SettingsData struct {
 	Members []Member
 	Me      Membership
+	Covered []string
 }
 
 func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	members, _ := a.s.Members(q.Org.ID)
-	a.page(w, r, "settings", SettingsView(q, SettingsData{Members: members, Me: *q.Member}))
+	a.page(w, r, "settings", SettingsView(q, SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org)}))
 }
 
 type AgentsData struct {

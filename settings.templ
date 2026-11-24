@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/shutthegoatup/prospector/components/button"
 	"strconv"
+	"strings"
 )
 
 templ Section(title, hint string) {
@@ -90,7 +91,7 @@ templ SettingsView(q *Req, d SettingsData) {
 					}
 					@Row("Never contact") {
 						<textarea name="never_contact" rows="3" placeholder="domains, emails or LinkedIn links, one per line" class={ areaClass }>{ set.NeverContact }</textarea>
-						@Meta("Applied to everything people and agents add.")
+						@Meta(neverContactHint(d.Covered))
 					}
 					@Row("Agent guidance") {
 						<textarea name="agent_guidance" rows="8" placeholder="Who you sell to, who's off-limits, how to judge fit" class={ areaClass }>{ set.AgentGuidance }</textarea>
@@ -156,6 +157,21 @@ func removeConfirm(q *Req, m Member) string {
 		return "Leave " + q.Org.Name + "? You lose access to it."
 	}
 	return "Remove " + m.Email + " from " + q.Org.Name + "? They lose access to it; their account and what they added stay, and so do any API keys they made."
+}
+
+// neverContactHint names who the list is holding back, so an entry that catches the
+// wrong people is noticed.
+func neverContactHint(covered []string) string {
+	hint := "One per line: a domain, an email address or a LinkedIn profile link. Applied to everything people and agents add, and to who comes up for outreach on Today."
+	if len(covered) == 0 {
+		return hint
+	}
+	shown := covered[:min(len(covered), 8)]
+	hint += " It currently keeps " + plural(len(covered), "person") + " already here out of the queue: " + strings.Join(shown, ", ")
+	if more := len(covered) - len(shown); more > 0 {
+		hint += " and " + strconv.Itoa(more) + " more"
+	}
+	return hint + "."
 }
 
 func ownerHint(q *Req) string {

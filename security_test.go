@@ -476,3 +476,135 @@ func TestRemoveMember(t *testing.T) {
 		t.Fatalf("%d removals in the history, want 2", removals)
 	}
 }
+
+func TestNeverContactLeavesTheQueue(t *testing.T) {
+	s, o, srv, client := signedIn(t)
+	c, err := s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah.pryce@larkmoor.example",
+		Linkedin: "https://www.linkedin.com/in/hannah-pryce"}, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	email := deref(c.Email)
+	domain := email[strings.Index(email, "@")+1:]
+	now := time.Now()
+	queued := func(step, list string) bool {
+		t.Helper()
+		rows, err := s.Due(o.ID, step, now, OrgSettings{NeverContact: list})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range rows {
+			if r.ID == c.ID {
+				return true
+			}
+		}
+		return false
+	}
+	do := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	steps := []struct {
+		step  string
+		reach func()
+	}{
+		{"linkedin", func() {}},
+		{"call", func() { do(s.Update(o.ID, c.ID, "phone", "+44 20 7946 0000", "test")) }},
+		{"email", func() { do(s.Mark(o.ID, c.ID, "linkedin", "2020-01-01", "test")) }},
+		{"accepted", func() { do(s.Mark(o.ID, c.ID, "accepted", "2020-01-02", "test")) }},
+		{"followup", func() { do(s.Mark(o.ID, c.ID, "email", "2020-01-03", "test")) }},
+	}
+	for _, st := range steps {
+		st.reach()
+		if !queued(st.step, "") {
+			t.Fatalf("%s: the contact isn't due with an empty list", st.step)
+		}
+		for _, list := range []string{domain, strings.ToUpper(email), "other.example\n" + email, "linkedin.com/in/hannah-pryce"} {
+			if queued(st.step, list) {
+				t.Fatalf("%s: still due with %q on the list", st.step, list)
+			}
+		}
+		// The domain rule matches from the @, so a domain that only ends the same stays.
+		if !queued(st.step, domain[1:]) {
+			t.Fatalf("%s: dropped by %q, which isn't their domain", st.step, domain[1:])
+		}
+	}
+
+	settings := func() string {
+		_, body := call(t, client, "GET", srv.URL+"/o/alpha/settings", "", nil)
+		return body
+	}
+	if strings.Contains(settings(), "out of the queue") {
+		t.Fatal("settings reports people held back by an empty list")
+	}
+	o.Settings.NeverContact = domain
+	do(s.SaveOrg(o))
+	if !strings.Contains(settings(), "keeps 1 person already here out of the queue: Hannah Pryce.") {
+		t.Fatal("settings doesn't name who the list holds back")
+	}
+	do(s.Mark(o.ID, c.ID, "replied", "2020-01-04", "test"))
+	if strings.Contains(settings(), "out of the queue") {
+		t.Fatal("settings counts someone who has replied, whom the list doesn't hide")
+	}
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/conversations", "", nil); !strings.Contains(body, "Hannah") {
+		t.Fatal("a listed person who replied left Conversations")
+	}
+	var back Contact
+	do(s.in(o.ID).First(&back, c.ID).Error)
+	do(s.db.Model(&back).Updates(map[string]any{"replied": nil, "stage": ""}).Error)
+	fresh, err := s.OrgByID(o.ID)
+	do(err)
+	due, err := s.AgentDue(fresh)
+	do(err)
+	for _, item := range due {
+		if item.ContactID == c.ID {
+			t.Fatalf("an agent is told a listed person is due: %+v", item)
+		}
+	}
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(body, "Hannah") {
+		t.Fatal("a listed person is on Today")
+	}
+	o.Settings.NeverContact = ""
+	do(s.SaveOrg(o))
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); !strings.Contains(body, "Hannah") {
+		t.Fatal("unlisting didn't bring the person back to Today")
+	}
+}
+
+func TestNeverContactEntries(t *testing.T) {
+	const email, profile = "hannah.pryce@larkmoor.example", "https://www.linkedin.com/in/hannah-pryce?trk=x"
+	search := "https://www.linkedin.com/search/results/people/?keywords=Hannah%20Pryce%20Larkmoor"
+	for _, c := range []struct {
+		entry, email, link string
+		listed             bool
+	}{
+		{"larkmoor.example", email, "", true},
+		{"https://www.larkmoor.example/", email, "", true},
+		{"LARKMOOR.example", email, "", true},
+		{"example", email, "", true},
+		{"hannah.pryce@larkmoor.example", email, "", true},
+		{"pryce@larkmoor.example", email, "", false},
+		{"moor.example", email, "", false},
+		{"larkmoor", email, search, false},
+		{"The Larkmoor Company", email, search, false},
+		{"hannah", email, profile, false},
+		{"linkedin.com", email, profile, false},
+		{"linkedin.com/", email, profile, false},
+		{"https", email, profile, false},
+		{"linkedin.com/in/hannah-pryce", "", profile, true},
+		{"https://uk.linkedin.com/in/hannah-pryce/", "", profile, true},
+		{"linkedin.com/in/hannah", "", profile, false},
+		{"linkedin.com/in/hannah-pryce-2", "", profile, false},
+		{"linkedin.com/in/hannah-pryce", "", "https://www.linkedin.com/in/hannah-pryce/details/experience", true},
+		{"linkedin.com/in/hannah-pryce", email, "https://linkedin.com/", false},
+		{"other.example, larkmoor.example", email, "", true},
+		{"", email, profile, false},
+	} {
+		got := OrgSettings{NeverContact: c.entry}.listed(c.email, c.link) != nil
+		if got != c.listed {
+			t.Errorf("entry %q against %q %q: listed = %v, want %v", c.entry, c.email, c.link, got, c.listed)
+		}
+	}
+}
