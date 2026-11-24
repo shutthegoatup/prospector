@@ -93,6 +93,7 @@ Each organisation has an MCP endpoint at `/o/<slug>/mcp` (streamable HTTP) and a
 
 - **What no key can do:** mark anything sent, change settings, or see another organisation.
 - **Writes are checked:** every fact and contact needs a source URL, and the never-contact list applies.
+- **Sessions:** an MCP session works only with the key that opened it.
 
 ```sh
 claude mcp add --transport http prospector https://<host>/o/<slug>/mcp --header "Authorization: Bearer $PROSPECTOR_KEY"
