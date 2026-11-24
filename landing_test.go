@@ -53,3 +53,18 @@ func TestFrontPage(t *testing.T) {
 		t.Fatalf("a signed-in member at / didn't land on their organisation: %d", code)
 	}
 }
+
+// The app shares the front page's light palette: a page left on the old dark class
+// would turn the components' dark variants back on.
+func TestAppUsesTheLightPalette(t *testing.T) {
+	_, _, srv, member := signedIn(t)
+	for _, page := range []string{"/o/alpha/today", "/o/alpha/settings"} {
+		_, body := call(t, member, "GET", srv.URL+page, "", nil)
+		if strings.Contains(body, `class="dark"`) || !strings.Contains(body, `<meta name="color-scheme" content="light"`) {
+			t.Errorf("%s isn't on the light palette", page)
+		}
+		if !strings.Contains(body, `<img src="/assets/img/mark.svg`) {
+			t.Errorf("%s doesn't show the logo", page)
+		}
+	}
+}

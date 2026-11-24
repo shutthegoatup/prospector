@@ -56,7 +56,7 @@ type Props struct {
 
 // 1:1 base/ui/button.tsx: structure lives here, the look comes from the
 // active style-*.css via the classes.
-const baseClasses = "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-lg border border-transparent bg-clip-padding text-sm font-medium focus-visible:ring-3 aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0"
+const baseClasses = "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-lg border-2 border-transparent bg-clip-padding text-sm font-semibold focus-visible:ring-3 aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0"
 
 func Button(props ...Props) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -377,7 +377,7 @@ func (b Props) variantClasses() string {
 	case VariantDestructive:
 		return "bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/20 text-destructive focus-visible:border-destructive/40 dark:hover:bg-destructive/30"
 	case VariantOutline:
-		return "border-border bg-background hover:bg-muted hover:text-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 aria-expanded:bg-muted aria-expanded:text-foreground"
+		return "border-foreground bg-card hover:bg-secondary hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground"
 	case VariantSecondary:
 		return "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground"
 	case VariantGhost:
@@ -385,7 +385,7 @@ func (b Props) variantClasses() string {
 	case VariantLink:
 		return "text-primary underline-offset-4 hover:underline"
 	default:
-		return "bg-primary text-primary-foreground hover:bg-primary/80"
+		return "border-foreground bg-primary text-primary-foreground shadow-[2px_2px_0_var(--foreground)] hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_var(--foreground)]"
 	}
 }
 

@@ -20,7 +20,7 @@ var pipelineStages = []string{"research", "outreach", "replied", "meeting", "pro
 func stageClass(st string) string {
 	switch st {
 	case "replied", "meeting", "proposal", "won":
-		return "bg-[color-mix(in_oklab,var(--primary)_14%,transparent)] text-primary"
+		return "bg-[color-mix(in_oklab,var(--primary)_14%,transparent)] text-mark"
 	}
 	return "bg-secondary text-muted-foreground"
 }
@@ -305,7 +305,7 @@ func CompaniesView(q *Req, f CompanyFilter, rows []CompanyListRow, segments []st
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<div class=\"overflow-hidden rounded-xl border border-border bg-card\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<div class=\"overflow-hidden panel\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -323,7 +323,7 @@ func CompaniesView(q *Req, f CompanyFilter, rows []CompanyListRow, segments []st
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "\" class=\"flex items-center justify-between gap-3 border-b border-[#2a2a2a] px-4 py-3 text-sm text-foreground last:border-0 hover:bg-[#262626] hover:text-foreground\"><span class=\"min-w-0\"><b>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "\" class=\"flex items-center justify-between gap-3 border-b border-border px-4 py-3 text-sm text-foreground last:border-0 hover:bg-secondary hover:text-foreground\"><span class=\"min-w-0\"><b>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -354,14 +354,14 @@ func CompaniesView(q *Req, f CompanyFilter, rows []CompanyListRow, segments []st
 				return templ_7745c5c3_Err
 			}
 			if r.Fit != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<span class=\"font-mono text-xs text-primary\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<span class=\"font-mono text-xs text-mark\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(r.Fit)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 60, Col: 58}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 60, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -459,7 +459,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" class=\"font-mono text-xs\">← Companies</a><div class=\"mt-3 flex flex-col gap-5 rounded-xl border border-border bg-card p-6\"><div class=\"flex flex-wrap items-start justify-between gap-3\"><div><h1 class=\"font-heading text-3xl font-bold tracking-tight\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" class=\"font-mono text-xs\">← Companies</a><div class=\"mt-3 flex flex-col gap-5 panel p-6\"><div class=\"flex flex-wrap items-start justify-between gap-3\"><div><h1 class=\"font-heading text-3xl font-bold tracking-tight\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -916,7 +916,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 
 func actorColor(actor string) string {
 	if strings.HasPrefix(actor, "agent:") {
-		return "text-primary"
+		return "text-mark"
 	}
 	return "text-muted-foreground"
 }

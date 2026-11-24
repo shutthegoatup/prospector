@@ -7,7 +7,7 @@ import (
 )
 
 templ Section(title, hint string) {
-	<section class="flex flex-col gap-4 rounded-xl border border-border bg-card p-6">
+	<section class="flex flex-col gap-4 panel p-6">
 		<div>
 			<h2 class="font-heading text-lg font-semibold">{ title }</h2>
 			if hint != "" {
@@ -112,11 +112,11 @@ templ SettingsView(q *Req, d SettingsData) {
 		@Section("Sequence", "Every contact goes through these steps; the waits come from above.") {
 			<ol class="flex max-w-lg flex-col gap-1 text-sm">
 				<li class="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3 py-2.5"><span class="grid size-5 place-items-center rounded-full bg-secondary font-mono text-xs">1</span>LinkedIn connection request</li>
-				<li class="pl-8 font-mono text-xs text-primary">{ "↓ on accept, or after " + plural(set.EmailAfterDays, "day") }</li>
+				<li class="pl-8 font-mono text-xs text-mark">{ "↓ on accept, or after " + plural(set.EmailAfterDays, "day") }</li>
 				<li class="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3 py-2.5"><span class="grid size-5 place-items-center rounded-full bg-secondary font-mono text-xs">2</span>LinkedIn message if accepted, else email</li>
-				<li class="pl-8 font-mono text-xs text-primary">{ "↓ " + plural(set.FollowupAfterDays, "day") + " without a reply" }</li>
+				<li class="pl-8 font-mono text-xs text-mark">{ "↓ " + plural(set.FollowupAfterDays, "day") + " without a reply" }</li>
 				<li class="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3 py-2.5"><span class="grid size-5 place-items-center rounded-full bg-secondary font-mono text-xs">3</span>Follow-up email</li>
-				<li class="pl-8 font-mono text-xs text-primary">↓ whenever a number is known, in office hours</li>
+				<li class="pl-8 font-mono text-xs text-mark">↓ whenever a number is known, in office hours</li>
 				<li class="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3 py-2.5"><span class="grid size-5 place-items-center rounded-full bg-secondary font-mono text-xs">4</span>Call</li>
 			</ol>
 		}
