@@ -658,3 +658,37 @@ func TestContentPolicy(t *testing.T) {
 		}
 	}
 }
+
+func TestOrgIsCreatedWithItsOwner(t *testing.T) {
+	s, _, srv, client := signedIn(t)
+	ada, err := s.UserByEmail("ada@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, body := call(t, client, "POST", srv.URL+"/orgs", "application/json", map[string]string{"name": "Gamma Boats"})
+	if code != http.StatusOK || !strings.Contains(body, "/o/gamma-boats/settings") {
+		t.Fatalf("new organisation: %d %s", code, body)
+	}
+	gamma, err := s.OrgBySlug("gamma-boats")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m, err := s.Membership(gamma.ID, ada.ID); err != nil || m.Role != "owner" || m.CallerName != ada.Name {
+		t.Fatalf("the creator's membership: %+v %v", m, err)
+	}
+
+	// The owner's row can't be written (one is already there for the id the next
+	// organisation will get), so the organisation must not be left behind either.
+	if err := s.db.Create(&Membership{OrgID: gamma.ID + 1, UserID: ada.ID, Role: "member"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if o, err := s.CreateOrgWithOwner("delta", "Delta", ada); err == nil {
+		t.Fatalf("expected the owner's row to be refused, got organisation %d", o.ID)
+	}
+	if _, err := s.OrgBySlug("delta"); err == nil {
+		t.Fatal("an organisation was left with nobody in it")
+	}
+	if code, _ := call(t, client, "POST", srv.URL+"/orgs", "application/json", map[string]string{"name": "!!!"}); code != http.StatusBadRequest {
+		t.Fatalf("a name with no usable characters: %d", code)
+	}
+}
