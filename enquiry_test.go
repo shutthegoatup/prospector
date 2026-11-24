@@ -158,7 +158,7 @@ func TestEnquiryFindsWhoSentIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	added, err := s.AgentAddCompany(o.ID, "agent:bot", AddCompanyIn{Name: "Reef Boats", Domain: "reef.example"})
+	added, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, AddCompanyIn{Name: "Reef Boats", Domain: "reef.example"})
 	if err != nil {
 		t.Fatal(err)
 	}
