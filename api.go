@@ -12,11 +12,11 @@ import (
 func (a *App) apiRoutes(mux *http.ServeMux) {
 	v1 := "/o/{org}/api/v1/"
 	mux.HandleFunc("GET "+v1+"search", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
-		hits, err := a.s.AgentSearch(reqOf(r).Org.ID, r.URL.Query().Get("q"))
+		hits, err := a.s.AgentSearch(reqOf(r).Org.ID, reqOf(r).Agent(), r.URL.Query().Get("q"))
 		respond(w, hits, err)
 	}))
 	mux.HandleFunc("GET "+v1+"companies/{ref}", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
-		c, err := a.s.AgentCompany(reqOf(r).Org.ID, r.PathValue("ref"))
+		c, err := a.s.AgentCompany(reqOf(r).Org.ID, reqOf(r).Agent(), r.PathValue("ref"))
 		if err != nil {
 			fail(w, err, http.StatusNotFound)
 			return
@@ -137,16 +137,16 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 			func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, *GuidanceOut, error) {
 				return nil, &GuidanceOut{Guidance: agentInstructions(org, k)}, nil
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "search", Description: "Find companies and contacts by name, domain, email or notes."},
+		mcp.AddTool(s, &mcp.Tool{Name: "search", Description: "Find companies and contacts by name, domain, email or notes. Each company says which agent last changed it."},
 			func(_ context.Context, _ *mcp.CallToolRequest, in SearchIn) (*mcp.CallToolResult, []SearchHit, error) {
-				hits, err := a.s.AgentSearch(org.ID, in.Query)
+				hits, err := a.s.AgentSearch(org.ID, actor, in.Query)
 				return nil, hits, err
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "get_company", Description: "A company's details, facts with sources, and people."},
+		mcp.AddTool(s, &mcp.Tool{Name: "get_company", Description: "A company's details, facts with sources, people, and its history: what people and agents did here, newest first. Read the history before researching, so you don't redo work or suggest what a person rejected."},
 			func(_ context.Context, _ *mcp.CallToolRequest, in struct {
 				Company string `json:"company" jsonschema:"company id or exact name"`
 			}) (*mcp.CallToolResult, *CompanyDetail, error) {
-				c, err := a.s.AgentCompany(org.ID, in.Company)
+				c, err := a.s.AgentCompany(org.ID, actor, in.Company)
 				return nil, c, err
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "list_due", Description: "What is due on Today, and whether its text is written yet."},

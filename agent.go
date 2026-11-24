@@ -317,14 +317,47 @@ type SearchIn struct {
 }
 
 type SearchHit struct {
-	Kind    string `json:"kind"`
-	ID      int64  `json:"id"`
-	Name    string `json:"name"`
-	Company string `json:"company,omitempty"`
-	Stage   string `json:"stage"`
+	Kind      string     `json:"kind"`
+	ID        int64      `json:"id"`
+	Name      string     `json:"name"`
+	Company   string     `json:"company,omitempty"`
+	Stage     string     `json:"stage"`
+	LastAgent *LastAgent `json:"last_agent,omitempty" jsonschema:"the agent that last changed this company, if any"`
 }
 
-func (s *Store) AgentSearch(org int64, q string) ([]SearchHit, error) {
+// LastAgent is the latest change an agent made to a company. People's actions
+// don't count: someone qualifying a company is the cue to work on it.
+type LastAgent struct {
+	Actor string    `json:"actor"`
+	At    time.Time `json:"at"`
+	ByYou bool      `json:"by_you" jsonschema:"true if it was this key, perhaps in an earlier run"`
+}
+
+func (who Actor) did(e Event) bool {
+	if e.KeyID != 0 && who.KeyID != 0 {
+		return e.KeyID == who.KeyID
+	}
+	return e.User == who.Name
+}
+
+func (s *Store) lastAgents(org int64, who Actor, companies []int64) (map[int64]*LastAgent, error) {
+	out := map[int64]*LastAgent{}
+	if len(companies) == 0 {
+		return out, nil
+	}
+	latest := s.db.Model(&Event{}).Select("max(id)").
+		Where(`org_id = ? and company_id in ? and "user" like 'agent:%'`, org, companies).Group("company_id")
+	var events []Event
+	if err := s.in(org).Where("id in (?)", latest).Find(&events).Error; err != nil {
+		return nil, err
+	}
+	for _, e := range events {
+		out[*e.CompanyID] = &LastAgent{Actor: e.User, At: e.At, ByYou: who.did(e)}
+	}
+	return out, nil
+}
+
+func (s *Store) AgentSearch(org int64, who Actor, q string) ([]SearchHit, error) {
 	q = strings.ToLower(strings.TrimSpace(q))
 	if len(q) < 2 {
 		return nil, errors.New("search for at least two characters")
@@ -334,9 +367,17 @@ func (s *Store) AgentSearch(org int64, q string) ([]SearchHit, error) {
 	if err := s.in(org).Where("lower(name) like ? or lower(domain) like ? or lower(why) like ?", like, like, like).Limit(25).Find(&companies).Error; err != nil {
 		return nil, err
 	}
+	ids := make([]int64, len(companies))
+	for i, c := range companies {
+		ids[i] = c.ID
+	}
+	last, err := s.lastAgents(org, who, ids)
+	if err != nil {
+		return nil, err
+	}
 	hits := []SearchHit{}
 	for _, c := range companies {
-		hits = append(hits, SearchHit{Kind: "company", ID: c.ID, Name: c.Name, Stage: c.Stage})
+		hits = append(hits, SearchHit{Kind: "company", ID: c.ID, Name: c.Name, Stage: c.Stage, LastAgent: last[c.ID]})
 	}
 	var people []Contact
 	if err := s.in(org).Where("key not like 'org:%' and (lower(person) like ? or lower(email) like ? or lower(maker) like ?)", like, like, like).Limit(25).Find(&people).Error; err != nil {
@@ -356,9 +397,11 @@ func contactStage(c Contact) string {
 }
 
 type CompanyDetail struct {
-	Company Company       `json:"company"`
-	Facts   []Fact        `json:"facts"`
-	People  []PersonBrief `json:"people"`
+	Company   Company       `json:"company"`
+	Facts     []Fact        `json:"facts"`
+	People    []PersonBrief `json:"people"`
+	LastAgent *LastAgent    `json:"last_agent,omitempty" jsonschema:"the agent that last changed this company, if any"`
+	History   []Happened    `json:"history" jsonschema:"what people and agents did here, newest first"`
 }
 
 type PersonBrief struct {
@@ -369,9 +412,24 @@ type PersonBrief struct {
 	EmailStatus string `json:"email_status,omitempty"`
 	Linkedin    string `json:"linkedin,omitempty"`
 	Stage       string `json:"stage"`
+	NextStep    string `json:"next_step,omitempty" jsonschema:"what the person working this conversation plans to do"`
+	NextDate    string `json:"next_date,omitempty"`
+	LostReason  string `json:"lost_reason,omitempty"`
 }
 
-func (s *Store) AgentCompany(org int64, ref string) (*CompanyDetail, error) {
+// Happened is one line of a company's history as an agent sees it.
+type Happened struct {
+	At     time.Time `json:"at"`
+	Actor  string    `json:"actor" jsonschema:"a person's name, or agent:<key name>"`
+	Action string    `json:"action" jsonschema:"e.g. add:fact, add:contact, pick, company:rejected, draft:email, mark:replied"`
+	Value  string    `json:"value,omitempty" jsonschema:"the day of a mark, or a conversation stage"`
+	Person string    `json:"person,omitempty"`
+	ByYou  bool      `json:"by_you,omitempty"`
+}
+
+const agentHistory = 20
+
+func (s *Store) AgentCompany(org int64, who Actor, ref string) (*CompanyDetail, error) {
 	c, err := s.companyRef(org, ref)
 	if err != nil {
 		return nil, err
@@ -384,10 +442,27 @@ func (s *Store) AgentCompany(org int64, ref string) (*CompanyDetail, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := &CompanyDetail{Company: *c, Facts: facts, People: []PersonBrief{}}
+	out := &CompanyDetail{Company: *c, Facts: facts, People: []PersonBrief{}, History: []Happened{}}
+	names := map[int64]string{}
 	for _, p := range people {
+		names[p.ID] = displayName(p)
 		out.People = append(out.People, PersonBrief{ID: p.ID, Name: displayName(p), Title: p.Title, Email: deref(p.Email),
-			EmailStatus: p.EmailStatus, Linkedin: deref(p.Linkedin), Stage: contactStage(p)})
+			EmailStatus: p.EmailStatus, Linkedin: deref(p.Linkedin), Stage: contactStage(p),
+			NextStep: p.NextStep, NextDate: deref(p.NextDate), LostReason: p.LostReason})
+	}
+	last, err := s.lastAgents(org, who, []int64{c.ID})
+	if err != nil {
+		return nil, err
+	}
+	out.LastAgent = last[c.ID]
+	var events []Event
+	if err := s.in(org).Where("company_id = ?", c.ID).Order("at desc, id desc").Limit(agentHistory).Find(&events).Error; err != nil {
+		return nil, err
+	}
+	for _, e := range events {
+		// Only what erasure would keep: an event's value can hold a note or someone's details.
+		out.History = append(out.History, Happened{At: e.At, Actor: e.User, Action: e.Action, Value: deref(keptValue(e)),
+			Person: names[e.ContactID], ByYou: who.did(e)})
 	}
 	return out, nil
 }
@@ -418,7 +493,8 @@ func (s *Store) AgentDue(o *Org) ([]DueItem, error) {
 // agentInstructions describes each task rather than naming a model: the client
 // picks the model, and the agents page shows how each key's suggestions fare.
 func agentInstructions(o *Org, k *APIKey) string {
-	parts := []string{"Research and outreach data for " + o.Name + ". Companies and contacts you add wait in Research until a person qualifies them. Every fact and contact needs a source URL. Search before adding, to avoid duplicates. You can draft messages; only people send them."}
+	parts := []string{"Research and outreach data for " + o.Name + ". Companies and contacts you add wait in Research until a person qualifies them. Every fact and contact needs a source URL. Search before adding, to avoid duplicates. You can draft messages; only people send them.",
+		"Other agents and people work the same companies. get_company returns the company's history: read it before researching, don't suggest again what a person rejected, and if last_agent shows another agent was there within the hour, take a different company. by_you marks what this key did, perhaps in an earlier run."}
 	if k.Has("research:write") {
 		parts = append(parts,
 			"Companies and facts are high volume with simple judgement, so a small, fast model does them well. One claim per fact, from the page that shows it. Leave built_by and platform empty unless a source says so.",

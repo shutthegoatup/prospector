@@ -188,7 +188,7 @@ func TestOrganisationsAreIsolated(t *testing.T) {
 	if err := s.Update(b.ID, ca.ID, "email", "x@y.z", "test"); err == nil {
 		t.Fatal("org beta edited org alpha's contact")
 	}
-	if hits, _ := s.AgentSearch(b.ID, "analytical"); len(hits) != 2 {
+	if hits, _ := s.AgentSearch(b.ID, Actor{}, "analytical"); len(hits) != 2 {
 		t.Fatalf("beta's search should see only its own company and person, got %+v", hits)
 	}
 	for _, h := range mustSearch(t, s, b.ID, "ada") {
@@ -199,7 +199,7 @@ func TestOrganisationsAreIsolated(t *testing.T) {
 }
 
 func mustSearch(t *testing.T, s *Store, org int64, q string) []SearchHit {
-	hits, err := s.AgentSearch(org, q)
+	hits, err := s.AgentSearch(org, Actor{}, q)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -445,6 +445,10 @@ func TestMCP(t *testing.T) {
 	if s.in(o.ID).Model(&Event{}).Where("key_id > 0").Count(&keyed); keyed != 1 {
 		t.Fatalf("want the one change recorded against its key, got %d events", keyed)
 	}
+	res, err = session.CallTool(ctx, &mcp.CallToolParams{Name: "get_company", Arguments: map[string]any{"company": "Larkmoor Yachts"}})
+	if seen := fmt.Sprint(res.StructuredContent); err != nil || res.IsError || !strings.Contains(seen, "by_you:true") || !strings.Contains(seen, "action:add:company") {
+		t.Fatalf("get_company should show the key its own earlier work: %v %+v", err, res)
+	}
 	res, _ = session.CallTool(ctx, &mcp.CallToolParams{Name: "add_contact", Arguments: map[string]any{"company": "Larkmoor Yachts", "name": "Hannah Pryce"}})
 	if res == nil || !res.IsError {
 		t.Fatal("add_contact without a source should be a tool error")
@@ -499,7 +503,7 @@ func TestAgentMarks(t *testing.T) {
 		t.Fatalf("agent marks should keep the agent's decline and drop the accept Ada re-marked: %v", got)
 	}
 	var h []HistoryItem
-	for _, it := range must(s.History(o.ID, must(s.AgentCompany(o.ID, "Larkmoor Yachts")).Company.ID, 20)) {
+	for _, it := range must(s.History(o.ID, must(s.AgentCompany(o.ID, Actor{}, "Larkmoor Yachts")).Company.ID, 20)) {
 		if it.Action == "mark:declined" {
 			h = append(h, it)
 		}
