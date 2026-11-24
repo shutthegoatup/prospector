@@ -233,6 +233,17 @@ func TestAgentResearchToOutreach(t *testing.T) {
 	if err := s.AgentDraft(o.ID, "agent:bot", DraftIn{ContactID: c.ID, Kind: "note", Text: strings.Repeat("x", 301)}); err == nil {
 		t.Fatal("a note over 300 characters was accepted")
 	}
+	corvane, err := s.AgentAddCompany(o.ID, "agent:bot", AddCompanyIn{Name: "Corvane", Facts: []FactIn{{Field: "configurator", Value: "Vela builder", SourceURL: "https://corvane.example"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetCompanyStage(o.ID, corvane.ID, CompanyRejected, "", "ada"); err != nil {
+		t.Fatal(err)
+	}
+	scores := s.AgentScores(o.ID)
+	if len(scores) != 1 || scores[0] != (AgentScore{Agent: "bot", Companies: 2, Qualified: 1, Rejected: 1, Contacts: 1, Picked: 1}) {
+		t.Fatalf("agent scores: %+v", scores)
+	}
 }
 
 func TestParseLinkedIn(t *testing.T) {
@@ -410,6 +421,10 @@ func TestMCP(t *testing.T) {
 	res, _ = session.CallTool(ctx, &mcp.CallToolParams{Name: "add_contact", Arguments: map[string]any{"company": "Larkmoor Yachts", "name": "Hannah Pryce"}})
 	if res == nil || !res.IsError {
 		t.Fatal("add_contact without a source should be a tool error")
+	}
+	init := session.InitializeResult()
+	if !strings.Contains(init.Instructions, "Contacts need care") || strings.Contains(init.Instructions, "Drafts need") {
+		t.Fatalf("instructions don't follow the key's scopes: %q", init.Instructions)
 	}
 	if rows, _ := s.Research(o.ID, "review"); len(rows) != 1 || rows[0].FoundBy != "agent:claude" {
 		t.Fatalf("MCP-added company not waiting in Research: %+v", rows)

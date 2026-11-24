@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/shutthegoatup/prospector/components/button"
 	"strings"
 )
@@ -93,6 +94,17 @@ templ AgentsView(q *Req, d AgentsData) {
 					}
 				</div>
 			}
+			@Section("How each agent is doing", "What people did with each key's suggestions. Use one key per agent to compare them.") {
+				if len(d.Scores) == 0 {
+					<p class="text-sm text-muted-foreground">Nothing suggested yet.</p>
+				}
+				for _, sc := range d.Scores {
+					<div class="border-b border-dashed border-border py-2 text-sm last:border-0">
+						<b class="font-mono text-[13px] text-primary">{ sc.Agent }</b>
+						<span class="block text-muted-foreground">{ scoreText(sc) }</span>
+					</div>
+				}
+			}
 			@Section("Recent agent activity", "") {
 				if len(d.Activity) == 0 {
 					<p class="text-sm text-muted-foreground">None yet.</p>
@@ -107,6 +119,21 @@ templ AgentsView(q *Req, d AgentsData) {
 			}
 		</div>
 	</div>
+}
+
+func scoreText(sc AgentScore) string {
+	var parts []string
+	if sc.Companies > 0 {
+		parts = append(parts, fmt.Sprintf("Companies: %d suggested, %d qualified (%s), %d rejected", sc.Companies, sc.Qualified, percent(sc.Qualified, sc.Companies), sc.Rejected))
+	}
+	if sc.Contacts > 0 {
+		parts = append(parts, fmt.Sprintf("Contacts: %d suggested, %d picked (%s), %d replied", sc.Contacts, sc.Picked, percent(sc.Picked, sc.Contacts), sc.Replied))
+	}
+	return strings.Join(parts, " · ")
+}
+
+func percent(n, of int) string {
+	return fmt.Sprintf("%d%%", n*100/of)
 }
 
 func lastUsed(k APIKey) string {

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -307,4 +308,75 @@ func (s *Store) AgentDue(o *Org) ([]DueItem, error) {
 		}
 	}
 	return items, nil
+}
+
+// agentInstructions describes each task rather than naming a model: the client
+// picks the model, and the agents page shows how each key's suggestions fare.
+func agentInstructions(org string, k *APIKey) string {
+	parts := []string{"Research and outreach data for " + org + ". Companies and contacts you add wait in Research until a person qualifies them. Every fact and contact needs a source URL. Search before adding, to avoid duplicates. You can draft messages; only people send them."}
+	if k.Has("research:write") {
+		parts = append(parts,
+			"Companies and facts are high volume with simple judgement, so a small, fast model does them well. One claim per fact, from the page that shows it. Leave built_by and platform empty unless a source says so.",
+			"Contacts need care more than speed, so use a capable model. Pick the person who owns the decision, not a general inbox. Confirm they hold the role now on a current page: an old bio, press release or speaker listing isn't enough. Set email_status to guess for any address inferred from a pattern. If you can't confirm someone, don't add them; add a team_page fact so a person can look.")
+	}
+	if k.Has("drafts:write") {
+		parts = append(parts,
+			"Drafts need a capable model. Write to the person: say plainly what you offer and why it fits them, in a few sentences. Claim nothing a source doesn't show. LinkedIn notes are 300 characters at most.")
+	}
+	parts = append(parts, "People approve or reject what you add, and the agents page shows each key's record, so one key per agent keeps the record useful.")
+	return strings.Join(parts, "\n\n")
+}
+
+type AgentScore struct {
+	Agent                          string
+	Companies, Qualified, Rejected int
+	Contacts, Picked, Replied      int
+}
+
+// AgentScores is each agent's record: how many of its companies people qualified
+// or rejected, and how many of its contacts were picked and later replied.
+func (s *Store) AgentScores(org int64) []AgentScore {
+	by := map[string]*AgentScore{}
+	get := func(actor string) *AgentScore {
+		name := strings.TrimPrefix(actor, "agent:")
+		if by[name] == nil {
+			by[name] = &AgentScore{Agent: name}
+		}
+		return by[name]
+	}
+	var companies []struct {
+		FoundBy, Stage string
+		N              int
+	}
+	s.db.Raw(`select found_by, stage, count(*) as n from companies
+		where org_id = ? and found_by like 'agent:%' group by found_by, stage`, org).Scan(&companies)
+	for _, r := range companies {
+		a := get(r.FoundBy)
+		a.Companies += r.N
+		switch r.Stage {
+		case CompanyQualified:
+			a.Qualified += r.N
+		case CompanyRejected:
+			a.Rejected += r.N
+		}
+	}
+	var contacts []struct {
+		Actor                     string
+		Contacts, Picked, Replied int
+	}
+	s.db.Raw(`select e."user" as actor, count(*) as contacts,
+		sum(case when exists (select 1 from events p where p.org_id = e.org_id and p.contact_id = e.contact_id and p.action = 'pick') then 1 else 0 end) as picked,
+		sum(case when c.replied is not null then 1 else 0 end) as replied
+		from events e join contacts c on c.id = e.contact_id
+		where e.org_id = ? and e.action = 'add:contact' and e."user" like 'agent:%' group by e."user"`, org).Scan(&contacts)
+	for _, r := range contacts {
+		a := get(r.Actor)
+		a.Contacts, a.Picked, a.Replied = r.Contacts, r.Picked, r.Replied
+	}
+	out := make([]AgentScore, 0, len(by))
+	for _, a := range by {
+		out = append(out, *a)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Agent < out[j].Agent })
+	return out
 }

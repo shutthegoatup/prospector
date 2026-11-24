@@ -101,7 +101,7 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 	}
 	org, actor, k := q.Org, q.Actor(), q.Key
 	s := mcp.NewServer(&mcp.Implementation{Name: "prospect", Title: "Prospecting: " + org.Name, Version: "1"},
-		&mcp.ServerOptions{Instructions: "Research and outreach data for " + org.Name + ". Companies and contacts you add wait in Research until a person qualifies them. Every fact and contact needs a source URL. Search before adding, to avoid duplicates. You can draft messages; only people send them."})
+		&mcp.ServerOptions{Instructions: agentInstructions(org.Name, k)})
 	if k.Has("read") {
 		mcp.AddTool(s, &mcp.Tool{Name: "search", Description: "Find companies and contacts by name, domain, email or notes."},
 			func(_ context.Context, _ *mcp.CallToolRequest, in SearchIn) (*mcp.CallToolResult, []SearchHit, error) {
