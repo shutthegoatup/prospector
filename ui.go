@@ -411,6 +411,21 @@ func (a *App) uiExport(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out)
 }
 
+func (a *App) uiExportOrg(w http.ResponseWriter, r *http.Request) {
+	var in struct{}
+	if !decode(w, r, &in) {
+		return
+	}
+	q := reqOf(r)
+	out, err := a.s.ExportOrg(q.Org.ID, q.Actor())
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("cache-control", "no-store")
+	writeJSON(w, out)
+}
+
 func (a *App) uiErase(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		ID int64 `json:"id"`

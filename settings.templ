@@ -160,6 +160,16 @@ templ SettingsView(q *Req, d SettingsData) {
 				</form>
 			}
 		}
+		if q.Owner() {
+			@Section("Your data", "") {
+				<p class="text-sm text-muted-foreground">Everything this organisation holds here, in one file: companies, people, facts, enquiries, history, settings and who has access. It holds no passwords, keys or sign-on secrets.</p>
+				<div>
+					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-download": "ui/export-org", "data-file": q.Org.Slug + ".json"}}) {
+						Download everything
+					}
+				</div>
+			}
+		}
 	</div>
 }
 
