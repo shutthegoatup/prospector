@@ -31,6 +31,33 @@ type App struct {
 	// base is the address people reach the app at, when the operator has said: then
 	// links and the cookie's Secure mark don't depend on what a proxy forwards.
 	base string
+	// How long one request may take to arrive and to be answered; zero means requestLimit.
+	readLimit, writeLimit time.Duration
+}
+
+// requestLimit is generous enough for a large import over a slow link, and short
+// enough that a client trickling a request in, or never reading the answer, is dropped.
+const requestLimit = 2 * time.Minute
+
+// setDeadlines bounds this request alone. The server has no read or write timeout of
+// its own, because those would also cut an agent's MCP stream, which stays open; that
+// route clears both rather than trust that nothing was left on the connection.
+func (a *App) setDeadlines(w http.ResponseWriter, r *http.Request) {
+	rc := http.NewResponseController(w)
+	if strings.HasSuffix(r.URL.Path, "/mcp") {
+		rc.SetReadDeadline(time.Time{})
+		rc.SetWriteDeadline(time.Time{})
+		return
+	}
+	read, write := a.readLimit, a.writeLimit
+	if read == 0 {
+		read = requestLimit
+	}
+	if write == 0 {
+		write = requestLimit
+	}
+	rc.SetReadDeadline(time.Now().Add(read))
+	rc.SetWriteDeadline(time.Now().Add(write))
 }
 
 // Req is who is asking and in which organisation: a signed-in member, or an API key.
@@ -265,6 +292,7 @@ func (a *App) Routes() http.Handler {
 		}
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		a.setDeadlines(w, r)
 		if wantsPage(r) {
 			page := &problemPage{ResponseWriter: w, r: r}
 			defer page.finish()
