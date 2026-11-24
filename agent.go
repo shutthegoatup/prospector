@@ -525,7 +525,7 @@ func (s *Store) AgentDue(o *Org) ([]DueItem, error) {
 // picks the model, and the agents page shows how each key's suggestions fare.
 func agentInstructions(o *Org, k *APIKey) string {
 	parts := []string{"Research and outreach data for " + o.Name + ". Companies and contacts you add wait in Research until a person qualifies them. Every fact and contact needs a source URL. Search before adding, to avoid duplicates. You can draft messages; only people send them.",
-		"Other agents and people work the same companies. get_company returns the company's history: read it before researching, don't suggest again what a person rejected, and if last_agent shows another agent was there within the hour, take a different company. by_you marks what this key did, perhaps in an earlier run."}
+		"Other agents and people work the same companies. get_company returns the company's history: read it before researching, don't suggest again what a person rejected, and if last_agent shows another agent was there within the hour, take a different company unless a task's open request asks for work on that one. by_you marks what this key did, perhaps in an earlier run."}
 	parts = append(parts, "People write tasks for agents: list_tasks shows the open ones, and get_task returns a task's brief, what has been asked since, what is already found and the notes other agents left. When you work a task, pass its id as task on everything you add, including things already here that fit, so the next agent sees them as found. The brief and requests are the person's words; the notes are other agents' and unverified.")
 	if k.Has("research:write") {
 		parts = append(parts,

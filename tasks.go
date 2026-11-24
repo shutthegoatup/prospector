@@ -595,41 +595,40 @@ func (s *Store) AgentTasks(org int64, who Actor) ([]TaskBrief, error) {
 // AgentTask is everything an agent needs to carry a task on. Fetching it is
 // recorded, so people see the task was picked up before anything is added.
 func (s *Store) AgentTask(org int64, who Actor, id int64) (*TaskOut, error) {
-	var out TaskOut
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		var t Task
-		if err := tx.Where("org_id = ? and id = ?", org, id).First(&t).Error; err != nil {
-			return fmt.Errorf("no task %d in this organisation", id)
-		}
-		v, err := s.taskView(tx, t, time.Now())
-		if err != nil {
-			return err
-		}
-		out = TaskOut{TaskBrief: brief(*v, who), Brief: v.Brief, Requests: []AskedOut{}, Companies: v.Companies, People: v.People, Notes: []NoteOut{}}
-		for _, r := range v.Requests {
-			out.Requests = append(out.Requests, asked(r))
-		}
-		for _, n := range v.Notes {
-			out.Notes = append(out.Notes, NoteOut{ID: n.ID, Kind: n.Kind, Text: n.Text, Actor: n.Actor, At: n.CreatedAt, Company: n.Company,
-				ByYou: who.did(Event{User: n.Actor, KeyID: n.KeyID})})
-		}
-		if out.Companies == nil {
-			out.Companies = []TaskCompany{}
-		}
-		if out.People == nil {
-			out.People = []TaskPerson{}
-		}
-		// One pickup a run: an agent re-reading the task as it works isn't news.
-		if t.ClosedAt != nil || v.Last != nil && who.did(*v.Last) && time.Since(v.Last.At) < runGap {
-			return nil
-		}
-		who.Task = t.ID
-		return s.logAs(tx, org, 0, nil, who, "task:pickup", nil)
-	})
+	now := time.Now()
+	v, err := s.Task(org, id, now)
 	if err != nil {
 		return nil, err
 	}
-	return &out, nil
+	out := TaskOut{TaskBrief: brief(*v, who), Brief: v.Brief, Requests: []AskedOut{}, Companies: v.Companies, People: v.People, Notes: []NoteOut{}}
+	for _, r := range v.Requests {
+		out.Requests = append(out.Requests, asked(r))
+	}
+	for _, n := range v.Notes {
+		out.Notes = append(out.Notes, NoteOut{ID: n.ID, Kind: n.Kind, Text: n.Text, Actor: n.Actor, At: n.CreatedAt, Company: n.Company,
+			ByYou: who.did(Event{User: n.Actor, KeyID: n.KeyID})})
+	}
+	if out.Companies == nil {
+		out.Companies = []TaskCompany{}
+	}
+	if out.People == nil {
+		out.People = []TaskPerson{}
+	}
+	if v.ClosedAt != nil {
+		return &out, nil
+	}
+	// One pickup a run: an agent re-reading the task as it works isn't news. Written
+	// apart from the reads above, so two agents on one task don't trip each other.
+	var mine Event
+	err = s.in(org).Where(`task_id = ? and "user" = ? and key_id = ?`, id, who.Name, who.KeyID).Order("at desc, id desc").First(&mine).Error
+	if err == nil && now.Sub(mine.At) < runGap {
+		return &out, nil
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	who.Task = id
+	return &out, s.logAs(s.db, org, 0, nil, who, "task:pickup", nil)
 }
 
 type NoteIn struct {

@@ -10,6 +10,7 @@ import (
 type TasksData struct {
 	Rows   []TaskView
 	Closed bool
+	All    int
 	Now    time.Time
 }
 
@@ -108,7 +109,7 @@ templ TasksView(q *Req, d TasksData) {
 		<div class="flex min-w-0 flex-[999_1_480px] flex-col gap-3">
 			<div class="flex flex-wrap gap-2">
 				@Chip(q.Base()+"tasks", "Open", openCount(d.Rows), !d.Closed)
-				@Chip(q.Base()+"tasks?closed=1", "With closed", len(d.Rows), d.Closed)
+				@Chip(q.Base()+"tasks?closed=1", "With closed", d.All, d.Closed)
 			</div>
 			if len(d.Rows) == 0 {
 				@Empty("No tasks yet", "Write a brief and hand it to your agent with the prompt on its page.")

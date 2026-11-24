@@ -97,7 +97,7 @@ func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
 	}
 
 	view := must(s.Task(o.ID, task.ID, time.Now()))
-	if len(view.Runs) != 2 || view.Runs[0].Actor != "agent:scout" || view.Runs[0].People != 1 || view.Runs[0].Companies != 2 || view.Runs[1].Actor != "agent:second" {
+	if len(view.Runs) != 2 || view.Runs[0].Actor != "agent:second" || view.Runs[1].Actor != "agent:scout" || view.Runs[1].People != 1 || view.Runs[1].Companies != 2 {
 		t.Fatalf("each agent's stretch of work: %+v", view.Runs)
 	}
 	later := must(s.Task(o.ID, task.ID, time.Now().Add(time.Hour)))

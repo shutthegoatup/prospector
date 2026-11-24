@@ -27,7 +27,9 @@ func (a *App) tasksPage(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, http.StatusInternalServerError)
 		return
 	}
-	a.page(w, r, "tasks", TasksView(q, TasksData{Rows: rows, Closed: closed, Now: now}))
+	var all int64
+	a.s.in(q.Org.ID).Model(&Task{}).Count(&all)
+	a.page(w, r, "tasks", TasksView(q, TasksData{Rows: rows, Closed: closed, All: int(all), Now: now}))
 }
 
 func (a *App) taskPage(w http.ResponseWriter, r *http.Request) {
