@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -215,10 +216,20 @@ func (s *Store) ImportLegacy(org int64, path string) (int, error) {
 }
 
 func (s *Store) replaceContacts(org int64, rows []Contact) (int, error) {
-	for i := range rows {
-		rows[i].OrgID = org
-	}
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		kept := rows[:0]
+		for _, r := range rows {
+			err := erased(tx, org, displayName(r), deref(r.Maker), deref(r.Email), deref(r.Linkedin))
+			if errors.Is(err, errErased) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			r.OrgID = org
+			kept = append(kept, r)
+		}
+		rows = kept
 		if err := tx.Where("org_id = ?", org).Delete(&Contact{}).Error; err != nil {
 			return err
 		}

@@ -359,6 +359,9 @@ func (s *Store) QuickAddPerson(o *Org, in QuickAdd, actor string) (*Contact, err
 	if err := s.allowed(o, in.Email, in.Linkedin); err != nil {
 		return nil, err
 	}
+	if err := erased(s.db, o.ID, in.Name, in.Company, in.Email, in.Linkedin); err != nil {
+		return nil, err
+	}
 	var out Contact
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		var companyID *int64

@@ -373,6 +373,16 @@ func (a *App) uiRemoveMember(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
+func (a *App) uiErase(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID int64 `json:"id"`
+	}
+	if decode(w, r, &in) {
+		q := reqOf(r)
+		done(w, a.s.ErasePerson(q.Org.ID, in.ID, q.Actor()))
+	}
+}
+
 func (a *App) uiKey(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Name   string   `json:"name"`

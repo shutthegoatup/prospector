@@ -138,6 +138,9 @@ func (s *Store) AgentAddContact(o *Org, actor string, in AddContactIn) (*AddCont
 	if err != nil {
 		return nil, err
 	}
+	if err := erased(s.db, o.ID, in.Name, c.Name, in.Email, in.Linkedin); err != nil {
+		return nil, err
+	}
 	person := strings.TrimSpace(in.Name)
 	if in.Title != "" {
 		person += ", " + strings.TrimSpace(in.Title)

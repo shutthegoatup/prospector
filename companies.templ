@@ -74,6 +74,7 @@ func historyText(h HistoryItem) string {
 		"add:facts": "added facts", "add:fact": "added a fact", "add:contact": "suggested a contact",
 		"add:person": "added", "pick": "picked for outreach", "company:qualified": "qualified the company",
 		"company:rejected": "rejected the company", "company:review": "sent back to review",
+		"erase": "erased a person on request",
 	}[h.Action]
 	if verb == "" {
 		if f, ok := strings.CutPrefix(h.Action, "set:"); ok {
@@ -95,6 +96,14 @@ func historyText(h HistoryItem) string {
 		s += ": " + h.Value
 	}
 	return s
+}
+
+func eraseConfirm(c Contact) string {
+	who := displayName(c)
+	if len(alternates(deref(c.Person))) > 1 {
+		who = "everyone on this row (" + deref(c.Person) + ")"
+	}
+	return "Erase " + who + "? Their details, drafts and notes are deleted for good, and they can't be added again. Facts and notes about the company that mention them aren't found for you, and nor are your own lead files: take them out there too."
 }
 
 templ CompanyView(q *Req, p CompanyPage) {
@@ -138,6 +147,11 @@ templ CompanyView(q *Req, p CompanyPage) {
 							<a href={ safeHref(deref(c.Linkedin)) } target="_blank" rel="noopener" class="font-mono text-xs">LinkedIn ↗</a>
 						}
 						@Meta(contactStage(c))
+						if q.Owner() {
+							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/erase", "data-body": jsonBody("id", c.ID), "data-confirm": eraseConfirm(c)}}) {
+								Erase
+							}
+						}
 					</span>
 				</div>
 			}
