@@ -321,7 +321,7 @@ func Layout(n Nav, content templ.Component) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = Head(n.Org.Name+" · Prospecting").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Head(n.Org.Name+" · Prospector").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -642,11 +642,11 @@ func LoginPage(next, problem string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = Head("Sign in · Prospecting").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Head("Sign in · Prospector").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</head><body class=\"queue-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased\"><form method=\"post\" action=\"/login\" class=\"flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-card p-7\"><h1 class=\"font-heading text-2xl font-bold\">Prospecting<span class=\"text-primary\">.</span></h1>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</head><body class=\"queue-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased\"><form method=\"post\" action=\"/login\" class=\"flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-card p-7\"><h1 class=\"font-heading text-2xl font-bold\">Prospector<span class=\"text-primary\">.</span></h1>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -737,7 +737,7 @@ func NoOrgs(u *User) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = Head("Prospecting").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Head("Prospector").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

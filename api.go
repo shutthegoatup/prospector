@@ -100,7 +100,7 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 		return s
 	}
 	org, actor, k := q.Org, q.Actor(), q.Key
-	s := mcp.NewServer(&mcp.Implementation{Name: "prospect", Title: "Prospecting: " + org.Name, Version: "1"},
+	s := mcp.NewServer(&mcp.Implementation{Name: "prospector", Title: "Prospector: " + org.Name, Version: "1"},
 		&mcp.ServerOptions{Instructions: agentInstructions(org, k)})
 	if k.Has("read") {
 		mcp.AddTool(s, &mcp.Tool{Name: "guidance", Description: "How to research and draft for this organisation: the same text as the server instructions. Read it first if your client doesn't show those."},

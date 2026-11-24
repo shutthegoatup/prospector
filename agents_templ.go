@@ -134,7 +134,7 @@ func AgentsView(q *Req, d AgentsData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = Code("claude mcp add --transport http prospect "+d.Base+"mcp \\\n  --header \"Authorization: Bearer $PROSPECT_KEY\"").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = Code("claude mcp add --transport http prospector "+d.Base+"mcp \\\n  --header \"Authorization: Bearer $PROSPECTOR_KEY\"").Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

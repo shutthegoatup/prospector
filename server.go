@@ -145,7 +145,7 @@ func (a *App) agent(scope string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		secret, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if !ok {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="prospect"`)
+			w.Header().Set("WWW-Authenticate", `Bearer realm="prospector"`)
 			http.Error(w, "an API key is needed: Authorization: Bearer pk_…", http.StatusUnauthorized)
 			return
 		}

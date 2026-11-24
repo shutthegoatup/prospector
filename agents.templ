@@ -30,7 +30,7 @@ templ AgentsView(q *Req, d AgentsData) {
 				<div>@Label("MCP endpoint")@Code(d.Base + "mcp")</div>
 				<div>
 					@Label("Claude Code")
-					@Code("claude mcp add --transport http prospect " + d.Base + "mcp \\\n  --header \"Authorization: Bearer $PROSPECT_KEY\"")
+					@Code("claude mcp add --transport http prospector " + d.Base + "mcp \\\n  --header \"Authorization: Bearer $PROSPECTOR_KEY\"")
 				</div>
 				<div>
 					@Label("REST")
