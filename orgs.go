@@ -109,7 +109,29 @@ func (s *Store) UserByEmail(email string) (*User, error) {
 	return &u, s.db.Where("email = ?", strings.ToLower(strings.TrimSpace(email))).First(&u).Error
 }
 
+// CreateOrg makes an organisation nobody belongs to yet, for the CLI to add members to.
 func (s *Store) CreateOrg(slug, name string) (*Org, error) {
+	return createOrg(s.db, slug, name)
+}
+
+// CreateOrgWithOwner makes the organisation and its first owner together, so a failure
+// can't leave one nobody can get into.
+func (s *Store) CreateOrgWithOwner(slug, name string, owner *User) (*Org, error) {
+	var o *Org
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		if o, err = createOrg(tx, slug, name); err != nil {
+			return err
+		}
+		return tx.Create(&Membership{OrgID: o.ID, UserID: owner.ID, Role: "owner", CallerName: owner.Name}).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return o, nil
+}
+
+func createOrg(tx *gorm.DB, slug, name string) (*Org, error) {
 	if slug == "" {
 		slug = slugify(name)
 	}
@@ -117,9 +139,9 @@ func (s *Store) CreateOrg(slug, name string) (*Org, error) {
 		return nil, fmt.Errorf("%q can't be used in a URL: use a-z, 0-9 and -", slug)
 	}
 	var n int64
-	s.db.Model(&Org{}).Count(&n)
+	tx.Model(&Org{}).Count(&n)
 	o := &Org{Slug: slug, Name: strings.TrimSpace(name), Color: orgColors[int(n)%len(orgColors)]}
-	return o, s.db.Create(o).Error
+	return o, tx.Create(o).Error
 }
 
 func (s *Store) OrgByID(id int64) (*Org, error) {

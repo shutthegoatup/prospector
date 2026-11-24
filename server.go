@@ -360,10 +360,7 @@ func (a *App) newOrg(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := reqOf(r)
-	o, err := a.s.CreateOrg("", in.Name)
-	if err == nil {
-		err = a.s.AddMember(o.ID, q.User.ID, "owner", q.User.Name)
-	}
+	o, err := a.s.CreateOrgWithOwner("", in.Name, q.User)
 	if err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return

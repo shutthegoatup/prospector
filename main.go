@@ -4,7 +4,7 @@
 //	prospector serve [addr]                  the app (127.0.0.1:8766, or :$PORT when set)
 //	prospector user add <email> <name>       password from stdin
 //	prospector user password <email>         password from stdin
-//	prospector org add <slug> <name>
+//	prospector org add <slug> <name> [--owner=<email>]
 //	prospector member add <org> <email> [owner|member]
 //	prospector key add <org> <name> <scope>…   prints the key once
 //	prospector version
@@ -188,13 +188,27 @@ func run(args []string) error {
 		return fmt.Errorf("usage: prospector user add|password …")
 	case "org":
 		if arg(rest, 0, "") != "add" || len(rest) < 3 {
-			return fmt.Errorf("usage: prospector org add <slug> <name>")
+			return fmt.Errorf("usage: prospector org add <slug> <name> [--owner=<email>]")
 		}
-		o, err := s.CreateOrg(rest[1], strings.Join(rest[2:], " "))
+		name := strings.Join(rest[2:], " ")
+		if opts["owner"] == "" {
+			o, err := s.CreateOrg(rest[1], name)
+			if err != nil {
+				return err
+			}
+			fmt.Println("added /o/" + o.Slug)
+			fmt.Fprintf(os.Stderr, "nobody can open it yet: prospector member add %s <email> owner\n", o.Slug)
+			return nil
+		}
+		u, err := s.UserByEmail(opts["owner"])
+		if err != nil {
+			return fmt.Errorf("no user %q", opts["owner"])
+		}
+		o, err := s.CreateOrgWithOwner(rest[1], name, u)
 		if err != nil {
 			return err
 		}
-		fmt.Println("added /o/" + o.Slug)
+		fmt.Printf("added /o/%s, owned by %s\n", o.Slug, u.Email)
 		return nil
 	case "member":
 		if arg(rest, 0, "") != "add" || len(rest) < 3 {
