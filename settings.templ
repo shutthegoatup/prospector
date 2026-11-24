@@ -50,22 +50,26 @@ templ SettingsView(q *Req, d SettingsData) {
 				</div>
 			}
 		</form>
-		<form data-form="/password" data-reset="true">
-			@Section("Your password", "For your sign-in across every organisation. Changing it signs out your other sessions.") {
-				@Row("Current") {
-					<input name="current" type="password" required autocomplete="current-password" class={ fieldClass }/>
-				}
-				@Row("New") {
-					<input name="new" type="password" required minlength="10" autocomplete="new-password" class={ fieldClass }/>
-				}
-				<div class="flex items-center gap-3">
-					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-						Change
+		if q.User.HasPassword() {
+			<form data-form="/password" data-reset="true">
+				@Section("Your password", "For your sign-in across every organisation. Changing it signs out your other sessions.") {
+					@Row("Current") {
+						<input name="current" type="password" required autocomplete="current-password" class={ fieldClass }/>
 					}
-					<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
-				</div>
-			}
-		</form>
+					@Row("New") {
+						<input name="new" type="password" required minlength="10" autocomplete="new-password" class={ fieldClass }/>
+					}
+					<div class="flex items-center gap-3">
+						@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+							Change
+						}
+						<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
+					</div>
+				}
+			</form>
+		} else {
+			@Section("Your sign-in", "You sign in through a provider, so there is no password here to change. Whoever runs this server can give you one.")
+		}
 		<form data-form="ui/settings" data-refresh="true">
 			@Section("Organisation", ownerHint(q)) {
 				<fieldset disabled?={ !q.Owner() } class="flex flex-col gap-4">
@@ -123,6 +127,9 @@ templ SettingsView(q *Req, d SettingsData) {
 				<li class="pl-8 font-mono text-xs text-mark">↓ whenever a number is known, in office hours</li>
 				<li class="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3 py-2.5"><span class="grid size-5 place-items-center rounded-full bg-secondary font-mono text-xs">4</span>Call</li>
 			</ol>
+		}
+		if q.Owner() {
+			@SSOSettings(q, d)
 		}
 		@Section("Team", "") {
 			for _, m := range d.Members {

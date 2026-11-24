@@ -72,6 +72,10 @@ type Session struct {
 	TokenHash string `gorm:"uniqueIndex;not null"`
 	UserID    int64  `gorm:"index"`
 	ExpiresAt time.Time
+	// SSOOrgs are the organisations whose own sign-in this session has been through
+	// (see proofs). A Limited session began at one and opens nothing else.
+	SSOOrgs string `gorm:"not null;default:''"`
+	Limited bool   `gorm:"not null;default:false"`
 }
 
 type APIKey struct {
@@ -204,6 +208,9 @@ var Marks = map[string]string{"linkedin": "linkedin_added", "email": "email_sent
 
 type Store struct{ db *gorm.DB }
 
+var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
+	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}}
+
 // Open takes a postgres:// URL or a SQLite file path.
 func Open(dsn string) (*Store, error) {
 	var dialector gorm.Dialector
@@ -216,8 +223,7 @@ func Open(dsn string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := db.AutoMigrate(&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
-		&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Enquiry{}); err != nil {
+	if err := db.AutoMigrate(models...); err != nil {
 		return nil, err
 	}
 	return &Store{db: db}, nil
@@ -253,7 +259,7 @@ func deref(p *string) string {
 func (s *Store) Due(org int64, step string, now time.Time, set OrgSettings) ([]Contact, error) {
 	set = set.withDefaults()
 	var rows []Contact
-	q := s.in(org).Model(&Contact{})
+	q := s.in(org).Model(&Contact{}).Where(companyNotRejected)
 	switch step {
 	case "linkedin":
 		q = q.Where(openContacts + " and linkedin_added is null and note is not null and note <> ''").Order("fit nulls first, file")

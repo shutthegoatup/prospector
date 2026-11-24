@@ -192,13 +192,23 @@ type SettingsData struct {
 	Members []Member
 	Me      Membership
 	Covered []string
-	Intake  string
+	SSO     *SSO
+	// Callback is where a provider sends people back; empty until PROSPECTOR_URL is set.
+	Callback string
+	Intake   string
 }
 
 func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	members, _ := a.s.Members(q.Org.ID)
-	a.page(w, r, "settings", SettingsView(q, SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org), Intake: a.baseURL(r) + q.Base() + "intake"}))
+	d := SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org), Intake: a.baseURL(r) + q.Base() + "intake"}
+	if d.SSO, _ = a.s.SSO(q.Org.ID); d.SSO == nil {
+		d.SSO = &SSO{}
+	}
+	if a.base != "" {
+		d.Callback = a.callbackURL()
+	}
+	a.page(w, r, "settings", SettingsView(q, d))
 }
 
 type AgentsData struct {
@@ -353,6 +363,9 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	msg := u.Email + " added to " + q.Org.Name + "."
+	if !u.HasPassword() {
+		msg += " They have no password: they sign in through a provider, so they can open this organisation only by one it accepts."
+	}
 	if password != "" {
 		msg += " Their first password, shown once: " + password + " (they choose their own when they first sign in)"
 	}
