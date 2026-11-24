@@ -16,7 +16,9 @@ type User struct {
 	Email        string `gorm:"uniqueIndex;not null"`
 	Name         string
 	PasswordHash string
-	CreatedAt    time.Time
+	// MustChangePassword is set while the password is one somebody else has seen.
+	MustChangePassword bool `gorm:"not null;default:false"`
+	CreatedAt          time.Time
 }
 
 // OrgSettings is what differs between organisations: timings, wording and rules.
