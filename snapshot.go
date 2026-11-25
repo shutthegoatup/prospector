@@ -230,15 +230,30 @@ func (s *Store) replaceContacts(org int64, rows []Contact) (int, error) {
 			kept = append(kept, r)
 		}
 		rows = kept
+		var waitedFor []Contact
+		if err := tx.Select("id", "key").Where("org_id = ? and id in (?)", org,
+			tx.Model(&Suggestion{}).Select("contact_id").Where("org_id = ?", org)).Find(&waitedFor).Error; err != nil {
+			return err
+		}
 		if err := tx.Where("org_id = ?", org).Delete(&Contact{}).Error; err != nil {
 			return err
 		}
 		if err := tx.CreateInBatches(rows, 100).Error; err != nil {
 			return fmt.Errorf("restore (another organisation may already use these ids): %w", err)
 		}
-		// What was suggested for someone the restore dropped has nobody left to wait for.
-		if err := tx.Where("org_id = ? and contact_id not in (?)", org, tx.Model(&Contact{}).Select("id").Where("org_id = ?", org)).
-			Delete(&Suggestion{}).Error; err != nil {
+		// What was suggested for someone the restore dropped has nobody left to wait for,
+		// and an id that now belongs to somebody else mustn't bring it to them.
+		same := []int64{0}
+		restored := map[int64]string{}
+		for _, r := range rows {
+			restored[r.ID] = r.Key
+		}
+		for _, c := range waitedFor {
+			if restored[c.ID] == c.Key {
+				same = append(same, c.ID)
+			}
+		}
+		if err := tx.Where("org_id = ? and contact_id not in ?", org, same).Delete(&Suggestion{}).Error; err != nil {
 			return err
 		}
 		if s.postgres() {

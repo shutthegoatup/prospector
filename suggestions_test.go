@@ -322,3 +322,68 @@ func TestADetailFoundForATaskWaitsAndCountsTowardsTheTask(t *testing.T) {
 		t.Fatalf("the task should show who the number was found for: %+v", view.People)
 	}
 }
+
+func TestAnAgentsGuessesDontPileUpOnOnePerson(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	scout := Actor{Name: "agent:scout", KeyID: 1}
+	in := AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
+	co := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	hannah := must(s.AgentAddContact(o, scout, in))
+	for _, guess := range []string{"hannah", "h.pryce", "hpryce", "hannah.pryce", "pryce.h"} {
+		in.Email = guess + "@larkmoor.example"
+		must(s.AgentAddContact(o, scout, in))
+	}
+	in.Email, in.Phone = "", strings.Repeat("7", maxDetail+1)
+	must(s.AgentAddContact(o, scout, in))
+	var waiting int64
+	if s.db.Model(&Suggestion{}).Where("contact_id = ?", hannah.ID).Count(&waiting); waiting != maxWaiting {
+		t.Fatalf("want %d addresses waiting and no overlong number, got %d rows", maxWaiting, waiting)
+	}
+
+	// Typed in by a person meanwhile, a suggestion leaves nothing to check.
+	if rows := must(s.Research(o.ID, "details")); len(rows) != 1 || rows[0].ID != co.ID {
+		t.Fatalf("the company should be under Details to check: %+v", rows)
+	}
+	for _, guess := range []string{"hannah", "h.pryce", "hpryce"} {
+		if err := s.Update(o.ID, hannah.ID, "email", guess+"@larkmoor.example", "ada"); err != nil {
+			t.Fatal(err)
+		}
+		if guess != "hpryce" {
+			var sg Suggestion
+			s.db.Where("contact_id = ? and value = ?", hannah.ID, guess+"@larkmoor.example").First(&sg)
+			if err := s.DecideSuggestion(o.ID, sg.ID, SuggestionDismissed, "ada"); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if rows := must(s.Research(o.ID, "details")); len(rows) != 0 {
+		t.Fatalf("a company with nothing left to check is still listed: %+v", rows[0].Pending)
+	}
+}
+
+func TestARestoreDoesntHandASuggestionToWhoeverGotTheId(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	scout := Actor{Name: "agent:scout", KeyID: 1}
+	in := AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
+	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	hannah := must(s.AgentAddContact(o, scout, in))
+	in.Phone = "+44 20 7946 0000"
+	must(s.AgentAddContact(o, scout, in))
+	snapshot := must(s.SnapshotText(o.ID))
+	count := func() (n int64) {
+		s.db.Model(&Suggestion{}).Count(&n)
+		return n
+	}
+	if _, err := s.Restore(o.ID, snapshot); err != nil || count() != 1 {
+		t.Fatalf("a restore that brings the same person back keeps what waits for her: %d %v", count(), err)
+	}
+	// The id is somebody else now; the snapshot gives it back to Hannah.
+	if err := s.db.Model(&Contact{}).Where("id = ?", hannah.ID).Update("key", "somebody-else").Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Restore(o.ID, snapshot); err != nil || count() != 0 {
+		t.Fatalf("a suggestion followed an id to a different person: %d %v", count(), err)
+	}
+}

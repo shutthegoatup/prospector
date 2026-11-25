@@ -34,6 +34,13 @@ const (
 
 var suggestable = []string{"email", "phone", "linkedin"}
 
+// maxWaiting is how many suggestions for one field of one person may wait at once, and
+// maxDetail how long one may be.
+const (
+	maxWaiting = 3
+	maxDetail  = 320
+)
+
 // sameDetail compares the way a person would: an address by its letters, a profile by
 // its path, a number by its digits.
 func sameDetail(field, a, b string) bool {
@@ -95,8 +102,11 @@ func (s *Store) suggestDetails(tx *gorm.DB, who Actor, p Contact, in AddContactI
 		if value == "" || sameDetail(field, value, detailOf(p, field)) {
 			continue
 		}
-		known := false
+		known, pending := false, 0
 		for _, b := range before {
+			if b.Field == field && b.Decision == "" {
+				pending++
+			}
 			if b.Field == field && sameDetail(field, b.Value, value) {
 				known = true
 				if b.Decision == "" {
@@ -105,7 +115,8 @@ func (s *Store) suggestDetails(tx *gorm.DB, who Actor, p Contact, in AddContactI
 				break
 			}
 		}
-		if known {
+		// An agent trying one guess after another mustn't bury the person's page.
+		if known || pending >= maxWaiting || len(value) > maxDetail {
 			continue
 		}
 		row := Suggestion{OrgID: p.OrgID, ContactID: p.ID, Field: field, Value: value, SourceURL: strings.TrimSpace(in.SourceURL),

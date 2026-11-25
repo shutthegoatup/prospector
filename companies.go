@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -189,6 +190,10 @@ func (s *Store) Research(org int64, filter string) ([]ResearchRow, error) {
 		rows[i].Facts, _ = s.Facts(org, c.ID)
 		rows[i].People, _ = s.People(org, c.ID)
 		rows[i].Pending, _ = s.Pending(org, rows[i].People)
+	}
+	if filter == "details" {
+		// A suggestion the person was since given some other way leaves nothing to check.
+		rows = slices.DeleteFunc(rows, func(r ResearchRow) bool { return len(r.Pending) == 0 })
 	}
 	return rows, nil
 }
