@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -175,11 +176,19 @@ func (a *App) company(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := CompanyPage{Company: *c}
-	p.Facts, _ = a.s.Facts(q.Org.ID, c.ID)
-	p.People, _ = a.s.People(q.Org.ID, c.ID)
-	p.Pending, _ = a.s.Pending(q.Org.ID, p.People)
-	p.History, _ = a.s.History(q.Org.ID, c.ID, 50)
-	notes, _ := a.s.CompanyNotes(q.Org.ID, c.ID, 20)
+	// Half a company's page would read as the whole of it, so any part failing fails the page.
+	var failed [5]error
+	p.Facts, failed[0] = a.s.Facts(q.Org.ID, c.ID)
+	p.People, failed[1] = a.s.People(q.Org.ID, c.ID)
+	p.Pending, failed[2] = a.s.Pending(q.Org.ID, p.People)
+	p.History, failed[3] = a.s.History(q.Org.ID, c.ID, 50)
+	notes, err := a.s.CompanyNotes(q.Org.ID, c.ID, 20)
+	failed[4] = err
+	if err := errors.Join(failed[:]...); err != nil {
+		log.Printf("company %d: %v", c.ID, err)
+		http.Error(w, "the company couldn't be read", http.StatusInternalServerError)
+		return
+	}
 	for _, n := range notes {
 		p.Notes = append(p.Notes, NoteView{TaskNote: n})
 	}

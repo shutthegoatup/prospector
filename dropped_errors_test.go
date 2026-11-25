@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -61,6 +65,14 @@ func TestAFailedQueryIsntTakenForNothingThere(t *testing.T) {
 	}
 	if _, err := s.History(o.ID, co.ID, 10); err == nil {
 		t.Error("a company's history came back as if complete when its people couldn't be read")
+	}
+	a := &App{s: s}
+	page := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/o/alpha/companies/1", nil)
+	req.SetPathValue("id", fmt.Sprint(co.ID))
+	a.company(page, req.WithContext(context.WithValue(req.Context(), reqKey{}, &Req{Org: o, User: &User{}, Member: &Membership{}})))
+	if page.Code != http.StatusInternalServerError {
+		t.Errorf("a company's page with its people unreadable: %d, want a failure and not half a page", page.Code)
 	}
 	if !lastOwner(s.db, o.ID) {
 		t.Error("with the owners uncountable, the one being removed was taken not to be the last")
