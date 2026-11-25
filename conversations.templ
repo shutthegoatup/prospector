@@ -331,13 +331,14 @@ templ OtherDealCard(q *Req, o OtherDeal, members []Member, after AfterWin, day s
 // organisation has written its steps, and which companies have an onboarding already.
 type AfterWin struct {
 	Planned int
-	Started map[int64]bool
+	// Started are the companies with an onboarding, and Running those with one not yet live.
+	Started, Running map[int64]bool
 }
 
 // WonNext offers to start onboarding the company a won deal is with, or says it has begun.
 templ WonNext(q *Req, company *int64, after AfterWin, day string) {
 	if company != nil && after.Started[*company] {
-		<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(*company, 10)) } class="font-mono text-xs text-mark underline">Onboarding started</a>
+		<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(*company, 10)) } class="font-mono text-xs text-mark underline">{ onboardingWord(after.Running[*company]) }</a>
 	} else if company != nil && after.Planned > 0 {
 		<div>
 			@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "ui/onboarding", "data-body": jsonBody("company", *company, "start", day)}}) {
@@ -345,4 +346,11 @@ templ WonNext(q *Req, company *int64, after AfterWin, day string) {
 			}
 		</div>
 	}
+}
+
+func onboardingWord(running bool) string {
+	if running {
+		return "Onboarding under way"
+	}
+	return "Onboarded"
 }

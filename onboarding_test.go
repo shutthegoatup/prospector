@@ -285,7 +285,7 @@ func TestAWonDealOffersOnboarding(t *testing.T) {
 	if code, text := call(t, client, "POST", srv.URL+"/o/alpha/ui/onboarding", "application/json", map[string]any{"company": *won.CompanyID, "start": today()}); code != http.StatusOK {
 		t.Fatalf("starting onboarding from a won deal: %d %s", code, text)
 	}
-	if page = board(); strings.Contains(page, "Start onboarding") || !strings.Contains(page, "Onboarding started") {
+	if page = board(); strings.Contains(page, "Start onboarding") || !strings.Contains(page, "Onboarding under way") {
 		t.Error("a won deal whose company is being onboarded still offers to start")
 	}
 	// A renewal that is won, with the same company, says the same.
@@ -293,7 +293,29 @@ func TestAWonDealOffersOnboarding(t *testing.T) {
 	if err := s.ChangeDeal(o.ID, renewal.ID, "stage", "won", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if n := strings.Count(board(), "Onboarding started"); n != 2 {
+	if n := strings.Count(board(), "Onboarding under way"); n != 2 {
 		t.Errorf("%d cards say onboarding has started, want the won deal and the won renewal", n)
+	}
+}
+
+// Once every step is done the won card says so, and the way to start another is the company page.
+func TestAWonDealSaysWhenItsCompanyIsOnboarded(t *testing.T) {
+	s, o, srv, client := signedIn(t)
+	won := repliedPerson(t, s, o, "Hannah Pryce")
+	if err := s.Update(o.ID, won.ID, "stage", "won", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	o.Settings.OnboardingSteps = "Go live"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	must(s.StartOnboarding(o.ID, OnboardingIn{Company: *won.CompanyID, Start: today()}, "Ada Lovelace"))
+	step := must(s.Onboardings(o.ID, 0, today()))[0].Steps[0]
+	if err := s.SetOnboardingStep(o.ID, step.ID, "done", "yes", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	_, page := call(t, client, "GET", srv.URL+"/o/alpha/conversations", "", nil)
+	if !strings.Contains(page, ">Onboarded<") || strings.Contains(page, "Onboarding under way") || strings.Contains(page, "Start onboarding") {
+		t.Error("a won deal whose company is live lacks Onboarded, or still offers to start")
 	}
 }

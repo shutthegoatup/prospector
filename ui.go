@@ -186,7 +186,7 @@ func (a *App) conversations(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, http.StatusInternalServerError)
 		return
 	}
-	after := AfterWin{Started: map[int64]bool{}}
+	after := AfterWin{Started: map[int64]bool{}, Running: map[int64]bool{}}
 	if plan, err := q.Org.Settings.Onboarding(); err == nil {
 		after.Planned = len(plan)
 	}
@@ -197,6 +197,9 @@ func (a *App) conversations(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, ob := range started {
 		after.Started[ob.CompanyID] = true
+		if !ob.Live() {
+			after.Running[ob.CompanyID] = true
+		}
 	}
 	a.page(w, r, "conversations", ConversationsView(q, Board{convs, deals, others, members, after}, time.Now().Format("2006-01-02")))
 }
