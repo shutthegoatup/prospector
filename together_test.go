@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -65,6 +66,17 @@ func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
 	if n := count(t, s, &Company{}, "org_id = ? and domain = ?", o.ID, "fenwick.example"); n != 1 {
 		t.Fatalf("one website added under %d names at once became %d companies", atOnce, n)
 	}
+
+	var before Company
+	if err := s.in(o.ID).Where("lower(name) = ?", "larkmoor").First(&before).Error; err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		var after Company
+		if s.db.First(&after, before.ID); !after.UpdatedAt.Equal(before.UpdatedAt) {
+			t.Errorf("adding to a company counted as changing it: updated %v, was %v", after.UpdatedAt, before.UpdatedAt)
+		}
+	}()
 
 	together(t, atOnce, func(i int) error {
 		_, err := s.AgentAddFact(o.ID, scout(i), AddFactIn{Company: "Larkmoor", Task: task.ID,
@@ -143,7 +155,10 @@ func TestAnAgentDraftingDuringAnEditLeavesThePersonsWords(t *testing.T) {
 				return s.Update(o.ID, p.ID, "body", "Nia's own words", "Nia")
 			}
 			// Refused when the edit got there first, which is as it should be.
-			s.AgentDraft(o.ID, agent, DraftIn{ContactID: p.ID, Kind: "email", Text: "The agent's draft"})
+			err := s.AgentDraft(o.ID, agent, DraftIn{ContactID: p.ID, Kind: "email", Text: "The agent's draft"})
+			if err != nil && !strings.Contains(err.Error(), "edited this text") {
+				return err
+			}
 			return nil
 		})
 		var got Contact

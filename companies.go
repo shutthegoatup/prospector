@@ -570,6 +570,9 @@ func (s *Store) QuickAddPerson(o *Org, in QuickAdd, actor string) (*Contact, err
 	}
 	var out Contact
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := holdOrg(tx, o.ID); err != nil {
+			return err
+		}
 		var companyID *int64
 		maker := strings.TrimSpace(in.Company)
 		if maker != "" {

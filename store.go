@@ -283,7 +283,8 @@ func holdOrg(tx *gorm.DB, org int64) error {
 }
 
 func hold(tx *gorm.DB, model any, org, id int64) error {
-	return tx.Model(model).Where("org_id = ? and id = ?", org, id).Update("id", gorm.Expr("id")).Error
+	// UpdateColumn, so holding a company doesn't count as changing it.
+	return tx.Model(model).Where("org_id = ? and id = ?", org, id).UpdateColumn("id", gorm.Expr("id")).Error
 }
 
 // oneNameWhateverItsCapitals backs ensureCompany's look-up with an index. Companies
