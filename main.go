@@ -8,6 +8,8 @@
 //	prospector member add <org> <email> [owner|member]
 //	prospector key add <org> <name> <scope>…   prints the key once
 //	prospector mail test <address>           send a test through SMTP_ADDR
+//	prospector sso off <org>                 stop requiring single sign-on, when its provider has broken
+//	prospector secret-key [version]          print a new entry for PROSPECTOR_SECRET_KEYS
 //	prospector version
 //
 // Per organisation, chosen with --org=<slug> or $PROSPECTOR_ORG:
@@ -16,6 +18,8 @@
 //	prospector export <file>                 write the contacts snapshot
 //	prospector restore <file>                replace the organisation's contacts with a snapshot
 //	prospector import-legacy <file.sqlite>   the same, from a legacy tracker database (read-only)
+//	prospector export-org <file>             write everything the organisation holds, without secrets
+//	prospector export-person <name> <file>   write everything held on one person, on their request
 //	prospector erase <name>                  delete a person for good, on their request
 //	prospector mark <name> <step> [date]
 //	prospector set <name> <field> <value>
@@ -43,6 +47,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	_ "time/tzdata"
@@ -127,7 +132,7 @@ func run(args []string) error {
 		fmt.Println(version)
 		return nil
 	case "help", "-h", "--help":
-		fmt.Println("usage: prospector serve | user | org | member | key | import | export | restore | import-legacy | mark | set | list | push | pull | version\nSee the README for details.")
+		fmt.Println("usage: prospector serve | user | org | member | key | sso | secret-key | import | export | restore | import-legacy | mark | set | list | push | pull | version\nSee the README for details.")
 		return nil
 	case "push":
 		if len(rest) < 1 {
@@ -161,6 +166,15 @@ func run(args []string) error {
 		return os.WriteFile(rest[1], text, 0o600)
 	}
 
+	if cmd == "secret-key" {
+		// Printed as an entry of PROSPECTOR_SECRET_KEYS, version and all.
+		version := arg(rest, 0, "1")
+		if v, err := strconv.Atoi(version); err != nil || v < 0 || strconv.Itoa(v) != version {
+			return fmt.Errorf("usage: prospector secret-key [version], a whole number one more than the key it replaces")
+		}
+		fmt.Println(version + ":" + newSecretKey())
+		return nil
+	}
 	dsn := defaultDSN()
 	s, err := Open(dsn)
 	if err != nil {
@@ -176,14 +190,23 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		app := &App{s: s, base: base}
-		if app.mail, err = mailFromEnv(os.Getenv); err != nil {
+		social, err := socialFromEnv(os.Getenv)
+		if err != nil {
 			return err
 		}
-		if app.seal, err = newSealer(os.Getenv("PROSPECTOR_SECRET_KEY")); err != nil {
+		via, err := mailFromEnv(os.Getenv)
+		if err != nil {
 			return err
 		}
-		return serve(app, arg(rest, 0, addr))
+		// Only the server uses the keys, so a mistyped one doesn't stop the other
+		// commands: `sso off` and `user password` are how a locked-out host is put right.
+		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
+			return err
+		}
+		s.resealAtStart()
+		return serve(&App{s: s, base: base, social: social, mail: via}, arg(rest, 0, addr))
+	case "sso":
+		return ssoCommand(s, rest)
 	case "mail":
 		if arg(rest, 0, "") != "test" || len(rest) < 2 {
 			return fmt.Errorf("usage: prospector mail test <address>")
@@ -262,6 +285,10 @@ func run(args []string) error {
 		if arg(rest, 0, "") != "add" || len(rest) < 4 {
 			return fmt.Errorf("usage: prospector key add <org> <name> <scope>…")
 		}
+		// So a key made here is stored the way the server stores one.
+		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
+			return err
+		}
 		o, err := s.OrgBySlug(rest[1])
 		if err != nil {
 			return fmt.Errorf("no organisation %q", rest[1])
@@ -326,6 +353,45 @@ func run(args []string) error {
 			return err
 		}
 		fmt.Printf("copied %d contacts from %s into %s\n", n, rest[0], org.Slug)
+	case "export-org":
+		if len(rest) < 1 {
+			return fmt.Errorf("usage: prospector export-org <file>")
+		}
+		out, err := s.ExportOrg(org.ID, "cli")
+		if err != nil {
+			return err
+		}
+		text, err := json.MarshalIndent(out, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(rest[0], text, 0o600); err != nil {
+			return err
+		}
+		fmt.Println("wrote", rest[0])
+	case "export-person":
+		if len(rest) < 2 {
+			return fmt.Errorf("usage: prospector export-person <name> <file>")
+		}
+		c, err := s.FindOne(org.ID, rest[0])
+		if err != nil {
+			return err
+		}
+		if !strings.EqualFold(strings.TrimSpace(rest[0]), displayName(*c)) {
+			return fmt.Errorf("export-person needs the full name, to be sure it's them: %q", displayName(*c))
+		}
+		out, err := s.ExportPerson(org.ID, c.ID, "cli")
+		if err != nil {
+			return err
+		}
+		text, err := json.MarshalIndent(out, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(rest[1], text, 0o600); err != nil {
+			return err
+		}
+		fmt.Println("wrote", rest[1])
 	case "erase":
 		if len(rest) < 1 {
 			return fmt.Errorf("usage: prospector erase <name>")

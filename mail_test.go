@@ -65,10 +65,13 @@ func linkIn(t *testing.T, m sent) string {
 	return found[1]
 }
 
+var mailTestKey = strings.Repeat("ab", 32)
+
 // mailSite is signedIn with mail configured: Ada owns alpha and is signed in.
 func mailSite(t *testing.T, configure func(*App)) (*Store, *httptest.Server, *http.Client, *outbox) {
 	t.Helper()
 	s := tempStore(t)
+	s.keys = mustKeys(t, "1:"+mailTestKey)
 	o := mustOrg(t, s, "alpha")
 	u := must(s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery"))
 	if err := s.AddMember(o.ID, u.ID, "owner", u.Name); err != nil {
@@ -77,20 +80,19 @@ func mailSite(t *testing.T, configure func(*App)) (*Store, *httptest.Server, *ht
 	box := &outbox{}
 	a := &App{s: s, base: testSite, send: box.send, later: func(f func()) { f() },
 		mail: &MailServer{Host: "smtp.site.example", Port: 587, From: "Prospector <site@prospector.example>"}}
-	a.seal = must(newSealer(strings.Repeat("ab", 32)))
 	if configure != nil {
 		configure(a)
 	}
 	srv := httptest.NewServer(a.Routes())
 	t.Cleanup(srv.Close)
-	client := newBrowser()
+	client := newMailClient()
 	if !signIn(t, client, srv, "ada@example.com", "correct horse battery") {
 		t.Fatal("Ada can't sign in")
 	}
 	return s, srv, client, box
 }
 
-func newBrowser() *http.Client {
+func newMailClient() *http.Client {
 	jar, _ := cookiejar.New(nil)
 	return &http.Client{Jar: jar}
 }
@@ -209,10 +211,10 @@ func TestPasswordReset(t *testing.T) {
 	if _, body := call(t, ada, "GET", srv.URL+"/o/alpha/settings", "", nil); strings.Contains(body, "Your password") {
 		t.Error("the session from before the reset still works")
 	}
-	if signIn(t, newBrowser(), srv, "ada@example.com", "correct horse battery") {
+	if signIn(t, newMailClient(), srv, "ada@example.com", "correct horse battery") {
 		t.Error("the old password still works")
 	}
-	if !signIn(t, newBrowser(), srv, "ada@example.com", "a brand new password") {
+	if !signIn(t, newMailClient(), srv, "ada@example.com", "a brand new password") {
 		t.Error("the new password doesn't work")
 	}
 	if code, _ := postForm(t, http.DefaultClient, srv.URL+link, url.Values{"password": {"yet another password"}}); code != http.StatusGone {
@@ -273,7 +275,7 @@ func TestSignedOutFormsRefuseOtherSites(t *testing.T) {
 		}
 	}
 	box.take(t, 0)
-	if !signIn(t, newBrowser(), srv, "ada@example.com", "correct horse battery") {
+	if !signIn(t, newMailClient(), srv, "ada@example.com", "correct horse battery") {
 		t.Error("another site changed the password")
 	}
 
@@ -305,7 +307,7 @@ func TestInvitationByEmail(t *testing.T) {
 	if code, _ := postForm(t, http.DefaultClient, srv.URL+linkIn(t, mail), url.Values{"password": {"grace's own password"}}); code != http.StatusOK {
 		t.Fatalf("choosing a password from the invitation: %d", code)
 	}
-	grace := newBrowser()
+	grace := newMailClient()
 	if !signIn(t, grace, srv, "grace@example.com", "grace's own password") {
 		t.Fatal("Grace can't sign in with the password she chose")
 	}
@@ -372,7 +374,7 @@ func TestOrganisationMailServer(t *testing.T) {
 		t.Fatalf("saving: %d %s", code, body)
 	}
 	stored := must(s.OrgMail(o.ID))
-	if strings.Contains(stored.Password, "s3cret") || !strings.HasPrefix(stored.Password, "v1:") {
+	if strings.Contains(stored.Password, "s3cret") || !sealed(stored.Password) {
 		t.Fatalf("the password is stored unsealed: %q", stored.Password)
 	}
 	_, page := call(t, ada, "GET", srv.URL+"/o/alpha/settings", "", nil)
@@ -416,7 +418,7 @@ func TestOrganisationMailServer(t *testing.T) {
 	if err := s.SetPassword(grace.Email, "grace's own password"); err != nil {
 		t.Fatal(err)
 	}
-	member := newBrowser()
+	member := newMailClient()
 	signIn(t, member, srv, grace.Email, "grace's own password")
 	if code, _ := save(member, server); code != http.StatusForbidden {
 		t.Errorf("a member saving the mail server: %d", code)
@@ -434,27 +436,63 @@ func TestOrganisationMailServer(t *testing.T) {
 }
 
 func TestMailPasswordNeedsAKey(t *testing.T) {
-	s, srv, ada, _ := mailSite(t, func(a *App) { a.seal = nil })
+	s, srv, ada, _ := mailSite(t, func(a *App) { a.s.keys = nil })
 	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/mail", "application/json",
 		map[string]any{"host": "smtp.alpha.example", "port": 587, "username": "u", "password": "s3cret-smtp-pass", "sender": "a@alpha.example"})
-	if code != http.StatusBadRequest || !strings.Contains(body, "PROSPECTOR_SECRET_KEY") {
+	if code != http.StatusBadRequest || !strings.Contains(body, "no secret key") {
 		t.Fatalf("saving a password with nothing to seal it: %d %s", code, body)
 	}
 	if _, err := s.OrgMail(must(s.OrgBySlug("alpha")).ID); err == nil {
 		t.Error("it was stored anyway")
 	}
+}
 
-	for _, bad := range []string{"short", strings.Repeat("zz", 32)} {
-		if _, err := newSealer(bad); err == nil {
-			t.Errorf("a key of %q was accepted", bad)
-		}
+func TestAResetGivesAProviderOnlyAccountAPassword(t *testing.T) {
+	s, srv, _, box := mailSite(t, nil)
+	dan := must(s.CreateUser("dan@example.com", "Dan Okafor", "a first password"))
+	if err := s.db.Model(&User{}).Where("id = ?", dan.ID).Update("password_hash", unusableHash()).Error; err != nil {
+		t.Fatal(err)
 	}
-	a, b := must(newSealer(strings.Repeat("01", 32))), must(newSealer(strings.Repeat("02", 32)))
-	if got, err := a.open(a.seal("hunter2hunter2")); err != nil || got != "hunter2hunter2" {
-		t.Errorf("a sealed password came back as %q, %v", got, err)
+	postForm(t, http.DefaultClient, srv.URL+"/forgot", url.Values{"email": {"dan@example.com"}})
+	link := linkIn(t, box.take(t, 1)[0])
+	if code, _ := postForm(t, http.DefaultClient, srv.URL+link, url.Values{"password": {"dan's chosen password"}}); code != http.StatusOK {
+		t.Fatalf("choosing a password: %d", code)
 	}
-	if _, err := b.open(a.seal("hunter2hunter2")); err == nil {
-		t.Error("another key opened it")
+	if u := must(s.UserByEmail("dan@example.com")); !u.HasPassword() {
+		t.Fatal("the account still has no password")
+	}
+	if !signIn(t, newMailClient(), srv, "dan@example.com", "dan's chosen password") {
+		t.Error("the chosen password doesn't sign in")
+	}
+}
+
+func TestAMailPasswordFollowsAKeyChange(t *testing.T) {
+	s, srv, ada, _ := mailSite(t, nil)
+	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/mail", "application/json",
+		map[string]any{"host": "smtp.alpha.example", "port": 587, "username": "u", "password": "s3cret-smtp-pass", "sender": "a@alpha.example"})
+	if code != http.StatusOK {
+		t.Fatalf("saving the mail server: %d %s", code, body)
+	}
+	o := must(s.OrgBySlug("alpha"))
+	under1 := must(s.OrgMail(o.ID)).Password
+
+	newKey := strings.Repeat("cd", 32)
+	s.keys = mustKeys(t, "2:"+newKey+",1:"+mailTestKey)
+	if moved, err := s.Reseal(); err != nil || moved != 1 {
+		t.Fatalf("resealing: %d %v", moved, err)
+	}
+	under2 := must(s.OrgMail(o.ID)).Password
+	if under2 == under1 || sealedVersion(under2) != 2 {
+		t.Fatal("the mail password wasn't moved to the new key")
+	}
+	// The old key retired, the password still opens.
+	s.keys = mustKeys(t, "2:"+newKey)
+	if via, err := (&App{s: s}).mailFor(o.ID); err != nil || via.Password != "s3cret-smtp-pass" {
+		t.Fatalf("after the old key is removed: %+v %v", via, err)
+	}
+	s.keys = nil
+	if _, err := (&App{s: s}).mailFor(o.ID); !errors.Is(err, errNoKeys) {
+		t.Fatalf("a server with no key read a sealed mail password: %v", err)
 	}
 }
 

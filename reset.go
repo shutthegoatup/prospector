@@ -101,7 +101,7 @@ func (s *Store) RedeemPasswordToken(token, password string) error {
 		if spent.RowsAffected != 1 {
 			return errBadLink
 		}
-		return savePassword(tx, u.ID, string(hash), "")
+		return s.savePasswordIn(tx, u.ID, string(hash), "")
 	})
 }
 
@@ -155,11 +155,8 @@ func (a *App) mailFor(org int64) (*MailServer, error) {
 	}
 	via := &MailServer{Host: m.Host, Port: m.Port, Username: m.Username, From: m.Sender}
 	if m.Password != "" {
-		if a.seal == nil {
-			return nil, errors.New("this organisation's mail password can't be read without PROSPECTOR_SECRET_KEY")
-		}
-		if via.Password, err = a.seal.open(m.Password); err != nil {
-			return nil, err
+		if via.Password, err = a.s.keys.open(m.Password); err != nil {
+			return nil, fmt.Errorf("this organisation's mail password can't be read: %w", err)
 		}
 	}
 	return via, nil
@@ -326,11 +323,16 @@ func (a *App) uiMail(w http.ResponseWriter, r *http.Request) {
 	if old, err := a.s.OrgMail(org); err == nil && in.Password == "" && old.Host == m.Host && old.Username == m.Username {
 		m.Password = old.Password
 	} else if in.Password != "" {
-		if a.seal == nil {
-			fail(w, errors.New("this server has no PROSPECTOR_SECRET_KEY, so it can't keep a mail password safely: ask whoever runs it"), http.StatusBadRequest)
+		if a.s.keys == nil {
+			fail(w, errors.New("this server has no secret key, so it can't keep a mail password safely: ask whoever runs it"), http.StatusBadRequest)
 			return
 		}
-		m.Password = a.seal.seal(in.Password)
+		kept, err := a.s.keys.seal(in.Password)
+		if err != nil {
+			fail(w, err, http.StatusInternalServerError)
+			return
+		}
+		m.Password = kept
 	}
 	done(w, a.s.SaveOrgMail(m))
 }

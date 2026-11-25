@@ -3,12 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
 	"crypto/tls"
-	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"mime"
@@ -167,46 +162,4 @@ func compose(from, to *mail.Address, m Message, now time.Time) []byte {
 	body.Write([]byte(strings.ReplaceAll(strings.ReplaceAll(m.Body, "\r\n", "\n"), "\n", "\r\n")))
 	body.Close()
 	return b.Bytes()
-}
-
-// sealer keeps an organisation's mail password unreadable in the database and its
-// dumps. The key is PROSPECTOR_SECRET_KEY: 32 bytes, as 64 hex characters.
-type sealer struct{ aead cipher.AEAD }
-
-func newSealer(key string) (*sealer, error) {
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return nil, nil
-	}
-	raw, err := hex.DecodeString(key)
-	if err != nil || len(raw) != 32 {
-		return nil, errors.New("PROSPECTOR_SECRET_KEY should be 64 hex characters: openssl rand -hex 32")
-	}
-	block, err := aes.NewCipher(raw)
-	if err != nil {
-		return nil, err
-	}
-	aead, err := cipher.NewGCM(block)
-	return &sealer{aead}, err
-}
-
-func (s *sealer) seal(plain string) string {
-	nonce := make([]byte, s.aead.NonceSize())
-	if _, err := rand.Read(nonce); err != nil {
-		panic(err)
-	}
-	return "v1:" + base64.RawStdEncoding.EncodeToString(s.aead.Seal(nonce, nonce, []byte(plain), nil))
-}
-
-func (s *sealer) open(sealed string) (string, error) {
-	body, ok := strings.CutPrefix(sealed, "v1:")
-	raw, err := base64.RawStdEncoding.DecodeString(body)
-	if !ok || err != nil || len(raw) < s.aead.NonceSize() {
-		return "", errors.New("the saved mail password can't be read")
-	}
-	plain, err := s.aead.Open(nil, raw[:s.aead.NonceSize()], raw[s.aead.NonceSize():], nil)
-	if err != nil {
-		return "", errors.New("the saved mail password was sealed with a different PROSPECTOR_SECRET_KEY: enter it again")
-	}
-	return string(plain), nil
 }

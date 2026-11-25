@@ -22,4 +22,4 @@ Several sessions may be working on this machine at once. These are the commands 
 
 ## Merging is releasing
 
-`main` only takes pull requests, and the `test` and `vulncheck` checks must pass. Every green push to `main` is tagged as the next patch version and published as a release. Nothing installs a release on its own: a running host changes only when its operator deploys one, and by default that is the latest. Treat a merge as a release that the next deploy will ship.
+`main` only takes pull requests, and the `test` and `vulncheck` checks must pass. Every green push to `main` is tagged as the next patch version and published as a release, which `deploy.yml` then installs on the host its `DEPLOY_*` secrets name. Treat a merge as a deploy. To go back, run the `deploy` workflow by hand with an earlier version.
