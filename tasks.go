@@ -448,45 +448,37 @@ func (s *Store) taskViews(tx *gorm.DB, org int64, tasks []Task, now time.Time) (
 		claims[c.RequestID] = c
 	}
 	requestsOf, eventsOf, notesOf := map[int64][]TaskRequest{}, map[int64][]Event{}, map[int64][]TaskNote{}
-	var companyIDs, personIDs []int64
 	for _, r := range requests {
 		requestsOf[r.TaskID] = append(requestsOf[r.TaskID], r)
 	}
 	for _, e := range events {
 		eventsOf[e.TaskID] = append(eventsOf[e.TaskID], e)
-		if e.CompanyID != nil {
-			companyIDs = append(companyIDs, *e.CompanyID)
-		}
-		if e.ContactID != 0 {
-			personIDs = append(personIDs, e.ContactID)
-		}
 	}
 	for _, n := range notes {
 		if len(notesOf[n.TaskID]) < taskNotesShown {
 			notesOf[n.TaskID] = append(notesOf[n.TaskID], n)
-			if n.CompanyID != 0 {
-				companyIDs = append(companyIDs, n.CompanyID)
-			}
 		}
 	}
+	// Found through the events and notes in the database, not by listing their ids: a
+	// busy organisation's would be more than one query can name.
+	inEvents := func(column string) *gorm.DB {
+		return tx.Model(&Event{}).Select(column).Where("org_id = ? and task_id in ?", org, ids)
+	}
+	inNotes := tx.Model(&TaskNote{}).Select("company_id").Where("org_id = ? and task_id in ?", org, ids)
 	companies, people := map[int64]Company{}, map[int64]Contact{}
-	if len(companyIDs) > 0 {
-		var rows []Company
-		if err := tx.Where("org_id = ? and id in ?", org, companyIDs).Find(&rows).Error; err != nil {
-			return nil, err
-		}
-		for _, c := range rows {
-			companies[c.ID] = c
-		}
+	var found []Company
+	if err := tx.Where("org_id = ? and (id in (?) or id in (?))", org, inEvents("company_id"), inNotes).Find(&found).Error; err != nil {
+		return nil, err
 	}
-	if len(personIDs) > 0 {
-		var rows []Contact
-		if err := tx.Where("org_id = ? and id in ? and key not like 'org:%'", org, personIDs).Find(&rows).Error; err != nil {
-			return nil, err
-		}
-		for _, p := range rows {
-			people[p.ID] = p
-		}
+	for _, c := range found {
+		companies[c.ID] = c
+	}
+	var met []Contact
+	if err := tx.Where("org_id = ? and id in (?) and key not like 'org:%'", org, inEvents("contact_id")).Find(&met).Error; err != nil {
+		return nil, err
+	}
+	for _, p := range met {
+		people[p.ID] = p
 	}
 
 	out := make([]TaskView, len(tasks))
