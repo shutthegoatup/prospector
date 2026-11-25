@@ -508,6 +508,15 @@ func TestOrganisationSingleSignOn(t *testing.T) {
 	if code, _, location := b.through(okta, start); code != http.StatusSeeOther || location != "/o/alpha/today" {
 		t.Fatalf("a member signing in: %d to %q", code, location)
 	}
+	if err := s.SetAreas(alpha.ID, bob.ID, []string{areaSupport}); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, location := b.through(okta, start); code != http.StatusSeeOther || location != "/o/alpha/enquiries" {
+		t.Fatalf("someone in support only signing in: %d to %q", code, location)
+	}
+	if err := s.SetAreas(alpha.ID, bob.ID, []string{areaSales, areaSupport}); err != nil {
+		t.Fatal(err)
+	}
 	if code, body, _ := b.get("/o/alpha/today"); code != http.StatusOK || !strings.Contains(body, "Bob Stone") {
 		t.Fatalf("the organisation after its own sign-in: %d", code)
 	}

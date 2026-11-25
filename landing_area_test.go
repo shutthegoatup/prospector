@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -40,5 +41,8 @@ func TestSomeoneInSupportOnlyStartsOnEnquiries(t *testing.T) {
 	}
 	if got := starts(ada, "/"); got != "/o/alpha/today" {
 		t.Errorf("an owner starts on %q", got)
+	}
+	if _, page := call(t, ada, "GET", srv.URL+"/o/alpha/companies", "", nil); !strings.Contains(page, `href="/o/alpha/"`) || strings.Contains(page, `href="/o/alpha/today" class="flex items-center gap-3`) {
+		t.Error("the organisation switcher doesn't open an organisation where its member starts")
 	}
 }
