@@ -61,7 +61,7 @@ func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
 	if counts["state:"+EnquiryOpen] != 1 || counts["state:"+EnquiryWaiting] != 1 || counts[""] != 3 || counts["spam"] != 1 {
 		t.Errorf("the counts: %+v", counts)
 	}
-	waiting := must(s.Enquiries(o.ID, EnquiryFilter{State: EnquiryWaiting}))
+	waiting := must(firstOf(s.Enquiries(o.ID, EnquiryFilter{State: EnquiryWaiting}, 1)))
 	if len(waiting) != 1 || waiting[0].ID != help.ID || waiting[0].Owner != "Ada Lovelace" || waiting[0].Note != "Display profile on their embed" || waiting[0].Message != "Colours look pale on phones" {
 		t.Errorf("the ones waiting on them: %+v", waiting)
 	}
@@ -90,7 +90,7 @@ func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
 	if err := s.ErasePerson(o.ID, known.ID, u.Name); err != nil {
 		t.Fatal(err)
 	}
-	if left := must(s.Enquiries(o.ID, EnquiryFilter{})); len(left) != 2 {
+	if left := must(firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1))); len(left) != 2 {
 		t.Errorf("after erasing the person, %d enquiries are left, want the stranger's and the old one", len(left))
 	}
 }
@@ -158,7 +158,7 @@ func TestEnquiriesFromBeforeTheyWereTrackedStayAsTheyWere(t *testing.T) {
 	}
 
 	s := must(Open(dsn))
-	rows := must(s.Enquiries(o.ID, EnquiryFilter{}))
+	rows := must(firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1)))
 	if len(rows) != 1 || rows[0].ID != sent.ID || rows[0].State != "" || rows[0].Owner != "" || rows[0].Message != "From last year" {
 		t.Fatalf("the enquiry after the upgrade: %+v", rows)
 	}

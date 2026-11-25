@@ -126,4 +126,7 @@ templ EnquiriesView(q *Req, d EnquiriesData) {
 			</article>
 		}
 	</div>
+	@Pager(d.Page, func(n int) string {
+		return pageLink(q.Base()+"enquiries", n, "kind", d.Filter.Kind, "state", d.Filter.State, "spam", enquirySpamParam(d.Filter))
+	})
 }
