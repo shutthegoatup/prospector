@@ -422,6 +422,7 @@ func (a *App) Routes() http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a.setDeadlines(w, r)
+		cleanRequest(r)
 		if wantsPage(r) {
 			page := &problemPage{ResponseWriter: w, r: r}
 			defer page.finish()
@@ -483,8 +484,7 @@ func safeNext(next string) string {
 }
 
 func (a *App) login(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
-	if err := r.ParseForm(); err != nil {
+	if err := parseForm(w, r, 64<<10); err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}

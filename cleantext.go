@@ -1,0 +1,118 @@
+package main
+
+import (
+	"io"
+	"mime"
+	"net/http"
+	"net/url"
+	"strings"
+)
+
+// Postgres won't keep a NUL in text, nor bytes that aren't UTF-8; SQLite keeps both. No
+// one means to send either, so they are taken out of what arrives before anything reads
+// it, and the two databases hold the same text.
+
+func cleanText(s string) string {
+	if strings.IndexByte(s, 0) < 0 && isUTF8(s) {
+		return s
+	}
+	return strings.ToValidUTF8(strings.ReplaceAll(s, "\x00", ""), "�")
+}
+
+func isUTF8(s string) bool { return strings.ToValidUTF8(s, "") == s }
+
+func cleanValues(v url.Values) {
+	for k, vs := range v {
+		for i := range vs {
+			vs[i] = cleanText(vs[i])
+		}
+		if c := cleanText(k); c != k {
+			delete(v, k)
+			v[c] = append(v[c], vs...)
+		}
+	}
+}
+
+// cleanRequest cleans the query, and a JSON body as it is read. A JSON decoder already
+// turns bytes that aren't UTF-8 into U+FFFD, and a NUL can only reach it written as
+// \u0000. A form is left to parseForm, since each handler bounds its own.
+func cleanRequest(r *http.Request) {
+	if q := r.URL.Query(); r.URL.RawQuery != "" {
+		before := q.Encode()
+		cleanValues(q)
+		if after := q.Encode(); after != before {
+			r.URL.RawQuery = after
+		}
+	}
+	kind, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if kind == "application/json" || strings.HasSuffix(kind, "+json") {
+		r.Body = &withoutNUL{src: r.Body}
+	}
+}
+
+// parseForm parses a form body of at most limit bytes and cleans what it holds.
+func parseForm(w http.ResponseWriter, r *http.Request, limit int64) error {
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
+	if err := r.ParseForm(); err != nil {
+		return err
+	}
+	cleanValues(r.PostForm)
+	cleanValues(r.Form)
+	return nil
+}
+
+// withoutNUL passes JSON through without its \u0000 escapes. Outside a string JSON has no
+// backslashes, so each escape can be read where it starts; one split across two reads
+// is held back until the rest arrives.
+type withoutNUL struct {
+	src     io.ReadCloser
+	held    []byte
+	ready   []byte
+	err     error
+	scratch [32 << 10]byte
+}
+
+func (w *withoutNUL) Close() error { return w.src.Close() }
+
+func (w *withoutNUL) Read(p []byte) (int, error) {
+	for len(w.ready) == 0 {
+		if w.err != nil {
+			return 0, w.err
+		}
+		n, err := w.src.Read(w.scratch[:])
+		w.held = append(w.held, w.scratch[:n]...)
+		w.err = err
+		w.ready, w.held = dropNULEscapes(w.held, err != nil)
+	}
+	n := copy(p, w.ready)
+	w.ready = w.ready[n:]
+	return n, nil
+}
+
+func dropNULEscapes(b []byte, last bool) (out, rest []byte) {
+	out = make([]byte, 0, len(b))
+	for i := 0; i < len(b); {
+		if b[i] != '\\' {
+			out = append(out, b[i])
+			i++
+			continue
+		}
+		width := 2
+		if i+1 < len(b) && b[i+1] == 'u' {
+			width = 6
+		}
+		if i+width > len(b) {
+			if last {
+				return append(out, b[i:]...), nil
+			}
+			return out, append([]byte(nil), b[i:]...)
+		}
+		if width == 6 && string(b[i+2:i+6]) == "0000" {
+			i += 6
+			continue
+		}
+		out = append(out, b[i:i+width]...)
+		i += width
+	}
+	return out, nil
+}
