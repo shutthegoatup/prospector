@@ -336,6 +336,10 @@ templ AgentForm(v AgentView) {
 			</datalist>
 			@Meta(agentModelHint(v))
 		}
+		@Row("Search") {
+			<input name="search_url" value={ v.SearchURL } placeholder="https://searx.example.com" autocomplete="off" class={ fieldClass }/>
+			@Meta("A SearXNG instance you run: free, open-source search, with json among its search.formats. The agent searches through it, and reads pages itself, with no paid search service.")
+		}
 		@Row("Tools") {
 			<input name="tools_url" value={ v.ToolsURL } placeholder="https://mcp.example.com/mcp" autocomplete="off" class={ fieldClass }/>
 			@Meta("An MCP server, such as a gateway's federated /mcp. It's sent the endpoint's key only when it's on the same address.")

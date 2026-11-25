@@ -380,7 +380,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 	if ext != nil {
 		defer ext.Close()
 	}
-	t := &turnState{app: a, run: run, own: own, ext: ext, seen: map[string]bool{}, offered: map[string]bool{}}
+	t := &turnState{app: a, run: run, agent: cfg, own: own, ext: ext, seen: map[string]bool{}, offered: map[string]bool{}}
 	for _, d := range tools {
 		t.offered[d.Function.Name] = true
 	}
@@ -640,6 +640,10 @@ func agentTools(ctx context.Context, own, ext *mcp.ClientSession, cfg *Agent) ([
 			}
 		}
 	}
+	for _, d := range webTools(cfg) {
+		out = append(out, d)
+		names[d.Function.Name] = true
+	}
 	if ext == nil {
 		return out, nil
 	}
@@ -656,10 +660,11 @@ func agentTools(ctx context.Context, own, ext *mcp.ClientSession, cfg *Agent) ([
 }
 
 type turnState struct {
-	app *App
-	run *AgentRun
-	own *mcp.ClientSession
-	ext *mcp.ClientSession
+	app   *App
+	run   *AgentRun
+	agent *Agent
+	own   *mcp.ClientSession
+	ext   *mcp.ClientSession
 	// seen are the pages tools showed the model in this run; offered, the tools it has.
 	seen    map[string]bool
 	offered map[string]bool
@@ -759,29 +764,36 @@ func (t *turnState) call(ctx context.Context, name, rawArgs string) (string, err
 			args["task"] = t.run.TaskID
 		}
 	}
-	if session == nil {
+	web := builtinWeb(name)
+	if session == nil && !web {
 		return "", fmt.Errorf("there is no tool called %s", name)
 	}
-	var res *mcp.CallToolResult
+	var text string
 	for failures := 0; ; failures++ {
 		callCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 		var err error
-		res, err = session.CallTool(callCtx, &mcp.CallToolParams{Name: name, Arguments: args})
+		if web {
+			text, err = t.app.webCall(callCtx, t.agent, name, args)
+		} else {
+			var res *mcp.CallToolResult
+			if res, err = session.CallTool(callCtx, &mcp.CallToolParams{Name: name, Arguments: args}); err == nil {
+				text = toolText(res)
+				if res.IsError {
+					err = errors.New(text)
+				}
+			}
+		}
 		cancel()
 		if err == nil {
 			break
 		}
-		// A tool server behind the same limits as the model is waited out the same way.
+		// A search or tool server behind limits is waited out as the model is.
 		if ctx.Err() != nil || !strings.Contains(err.Error(), "Too Many Requests") {
 			return "", err
 		}
 		if err := t.app.wait(ctx, t.run, time.Now().Add(backoff(failures))); err != nil {
 			return "", err
 		}
-	}
-	text := toolText(res)
-	if res.IsError {
-		return "", errors.New(text)
 	}
 	t.see(text)
 	if !isOwn {

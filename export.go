@@ -148,12 +148,13 @@ type ExportSignOn struct {
 
 // ExportAgent is one of the organisation's own agents, without its key.
 type ExportAgent struct {
-	Name     string   `json:"name"`
-	Kind     string   `json:"kind"`
-	Endpoint string   `json:"endpoint"`
-	Model    string   `json:"model"`
-	ToolsURL string   `json:"tools_url,omitempty"`
-	Tools    []string `json:"allowed_tools"`
+	Name      string   `json:"name"`
+	Kind      string   `json:"kind"`
+	Endpoint  string   `json:"endpoint"`
+	Model     string   `json:"model"`
+	ToolsURL  string   `json:"tools_url,omitempty"`
+	SearchURL string   `json:"search_url,omitempty"`
+	Tools     []string `json:"allowed_tools"`
 	// FallsBackTo is the agent that takes over after FallbackMinutes of waiting.
 	FallsBackTo     string `json:"falls_back_to,omitempty"`
 	FallbackMinutes int    `json:"fallback_minutes,omitempty"`
@@ -224,7 +225,7 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			names[a.ID] = a.Name
 		}
 		for _, a := range agents {
-			e := ExportAgent{Name: a.Name, Kind: a.Kind, Endpoint: a.BaseURL, Model: a.Model, ToolsURL: a.ToolsURL, Tools: a.AllowedTools()}
+			e := ExportAgent{Name: a.Name, Kind: a.Kind, Endpoint: a.BaseURL, Model: a.Model, ToolsURL: a.ToolsURL, SearchURL: a.SearchURL, Tools: a.AllowedTools()}
 			if next, ok := names[a.FallbackID]; ok {
 				e.FallsBackTo, e.FallbackMinutes = next, a.FallbackMinutes
 			}
