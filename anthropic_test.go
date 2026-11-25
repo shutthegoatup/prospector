@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -49,6 +50,11 @@ func newFakeClaude(t *testing.T) *fakeClaude {
 		reply := f.reply
 		f.mu.Unlock()
 		status, text := reply(n)
+		if status < 0 {
+			conn, _, _ := w.(http.Hijacker).Hijack()
+			conn.Close()
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		if status == http.StatusTooManyRequests {
 			w.Header().Set("Retry-After", "45")
@@ -185,6 +191,58 @@ func TestAClaudeAgentWorksATaskThroughAnthropicsAPI(t *testing.T) {
 	if answers["role"] != "user" || len(results) != 2 || !strings.Contains(fmt.Sprint(results[1]), "wasn't on any page") ||
 		results[0].(map[string]any)["tool_use_id"] != "toolu_0" || results[1].(map[string]any)["tool_use_id"] != "toolu_1" {
 		t.Fatalf("both tool results should go back in one message, each to its call: %v", answers)
+	}
+}
+
+func TestAnAgentChangesKindOnlyWhenTold(t *testing.T) {
+	r, _, tools := claudeSetup(t)
+	ctx := context.Background()
+	c := must(r.s.AgentByID(r.o.ID, r.agent))
+	same := AgentSettingsIn{ID: c.ID, Name: c.Name, BaseURL: c.BaseURL, Model: c.Model, ToolsURL: c.ToolsURL, Tools: []string{searchTool}}
+	kept := must(r.a.saveAgent(ctx, r.o.ID, same, "Ada Lovelace"))
+	if kept.Kind != kindAnthropic || kept.Problem != "" {
+		t.Fatalf("a save that names no kind should keep the agent's own, and its key: %+v", kept)
+	}
+
+	toOpenAI := same
+	toOpenAI.Kind = kindOpenAI
+	if _, err := r.a.saveAgent(ctx, r.o.ID, toOpenAI, "Ada Lovelace"); err == nil || !strings.Contains(err.Error(), "API key") {
+		t.Fatalf("a change of kind should need its key entered again: %v", err)
+	}
+	toOpenAI.BaseURL, toOpenAI.APIKey, toOpenAI.Model = tools.srv.URL+"/v1", agentTestKey, ""
+	moved := must(r.a.saveAgent(ctx, r.o.ID, toOpenAI, "Ada Lovelace"))
+	stored := must(r.s.AgentByID(r.o.ID, r.agent))
+	if stored.Kind != kindOpenAI || slices.Contains(stored.ModelList(), defaultClaude) || moved.Kind != kindOpenAI {
+		t.Fatalf("the new kind should be stored, with the old endpoint's models gone: %+v", stored)
+	}
+}
+
+func TestAClaudeRunWaitsOutAnOverloadAnOutageAndADroppedConnection(t *testing.T) {
+	r, claude, _ := claudeSetup(t)
+	claude.reply = func(n int) (int, string) {
+		switch n {
+		case 0:
+			return 529, `{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}`
+		case 1:
+			return http.StatusBadGateway, `bad gateway`
+		case 2:
+			return -1, ""
+		case 3:
+			// Claude can answer a tool's result with nothing at all.
+			return 200, `{"id":"msg_3","type":"message","role":"assistant","model":"claude-opus-5-5","content":[],"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":0}}`
+		}
+		return 200, claudeTurn("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
+	}
+	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
+	if got.Status != RunFinished || len(r.sleeps) != 3 {
+		t.Fatalf("a run should wait out an overload, an outage and a dropped connection, and go on past an empty answer: %+v, waited %v", got, r.sleeps)
+	}
+	claude.mu.Lock()
+	defer claude.mu.Unlock()
+	for _, m := range claude.bodies[4]["messages"].([]any) {
+		if content, _ := m.(map[string]any)["content"].([]any); len(content) == 0 {
+			t.Fatalf("a message with nothing in it was sent on: %v", claude.bodies[4]["messages"])
+		}
 	}
 }
 

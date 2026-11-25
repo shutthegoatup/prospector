@@ -154,7 +154,12 @@ func (c *claudeChat) next(ctx context.Context) (*modelTurn, error) {
 	if err != nil {
 		return nil, claudeErr(err)
 	}
-	c.params.Messages = append(c.params.Messages, resp.ToParam())
+	said := resp.ToParam()
+	// An empty answer can only stand last, and a nudge follows it.
+	if len(resp.Content) == 0 && said.OfAssistant != nil {
+		said.OfAssistant.Content = []anthropic.BetaContentBlockParamUnion{anthropic.NewBetaTextBlock("(no reply)")}
+	}
+	c.params.Messages = append(c.params.Messages, said)
 	if resp.StopReason == anthropic.BetaStopReasonRefusal {
 		return nil, fmt.Errorf("%s declined to go on with this task", c.params.Model)
 	}

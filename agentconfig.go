@@ -388,9 +388,16 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	if err != nil {
 		return nil, err
 	}
+	c := &Agent{OrgID: org, Kind: kindOpenAI, Models: "[]", Tools: "[]", Allowed: "[]"}
+	if in.ID != 0 {
+		if c, err = a.s.AgentByID(org, in.ID); err != nil {
+			return nil, err
+		}
+	}
+	// A save that doesn't say keeps the agent's kind.
 	kind := strings.TrimSpace(in.Kind)
 	if kind == "" {
-		kind = kindOpenAI
+		kind = c.Kind
 	}
 	if !slices.ContainsFunc(AgentKinds, func(k struct{ Key, Label string }) bool { return k.Key == kind }) {
 		return nil, fmt.Errorf("an agent is OpenAI-compatible or Anthropic, not %q", kind)
@@ -406,12 +413,6 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	tools, err := endpointURL(in.ToolsURL)
 	if err != nil {
 		return nil, fmt.Errorf("tools: %w", err)
-	}
-	c := &Agent{OrgID: org, Kind: kind, Models: "[]", Tools: "[]", Allowed: "[]"}
-	if in.ID != 0 {
-		if c, err = a.s.AgentByID(org, in.ID); err != nil {
-			return nil, err
-		}
 	}
 	var taken int64
 	if err := a.s.db.Model(&Agent{}).Where("org_id = ? and name = ? and id <> ?", org, name, c.ID).Count(&taken).Error; err != nil {
