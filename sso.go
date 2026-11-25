@@ -29,9 +29,10 @@ type Identity struct {
 
 // SSOConnection is an organisation's own sign-in: its OpenID Connect provider.
 type SSOConnection struct {
-	OrgID        int64  `gorm:"primaryKey;autoIncrement:false"`
-	Issuer       string `gorm:"not null;default:''"`
-	ClientID     string
+	OrgID    int64  `gorm:"primaryKey;autoIncrement:false"`
+	Issuer   string `gorm:"not null;default:''"`
+	ClientID string
+	// ClientSecret is sealed (see keyring.seal); Store.spec opens it.
 	ClientSecret string
 	// Required turns a password away from members at the organisation's domains.
 	Required bool `gorm:"not null;default:false"`
@@ -83,8 +84,10 @@ func (c *SSO) Proves(email string) bool {
 	return false
 }
 
-func (c *SSO) spec() idpSpec {
-	return idpSpec{Issuer: c.Issuer, ClientID: c.ClientID, Secret: c.ClientSecret}
+// spec opens the connection's client secret, which the database holds sealed.
+func (s *Store) spec(c *SSO) (idpSpec, error) {
+	secret, err := s.keys.open(c.ClientSecret)
+	return idpSpec{Issuer: c.Issuer, ClientID: c.ClientID, Secret: secret}, err
 }
 
 func (s *Store) SSO(org int64) (*SSO, error) {
@@ -98,6 +101,14 @@ func (s *Store) SSO(org int64) (*SSO, error) {
 
 // SaveSSO keeps the connection; an empty issuer turns the organisation's sign-in off.
 func (s *Store) SaveSSO(c *SSOConnection, actor string) error {
+	// Sealed here, whoever is saving, so nothing a key could seal is written in clear.
+	if c.ClientSecret != "" && !sealed(c.ClientSecret) && s.keys != nil {
+		stored, err := s.keys.seal(c.ClientSecret)
+		if err != nil {
+			return err
+		}
+		c.ClientSecret = stored
+	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("org_id = ?", c.OrgID).Delete(&SSOConnection{}).Error; err != nil {
 			return err
@@ -376,7 +387,13 @@ func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 		a.signInProblem(w, r, query.Get("next"), http.StatusBadRequest, "That organisation has no single sign-on for that address.")
 		return
 	}
-	p, err := a.idp(r.Context(), sso.spec())
+	spec, err := a.s.spec(sso)
+	if err != nil {
+		log.Printf("single sign-on for %s: %v", org.Slug, err)
+		a.signInProblem(w, r, query.Get("next"), http.StatusServiceUnavailable, unopenable(org))
+		return
+	}
+	p, err := a.idp(r.Context(), spec)
 	if err != nil {
 		log.Printf("single sign-on for %s: %v", org.Slug, err)
 		a.signInProblem(w, r, query.Get("next"), http.StatusBadGateway, org.Name+"'s sign-in couldn't be reached. Try again shortly.")
@@ -385,8 +402,15 @@ func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 	a.beginAttempt(w, r, p, attempt{Way: "sso", Org: org.ID, Next: query.Get("next")}, oauth2.SetAuthURLParam("login_hint", email))
 }
 
+// unopenable is what people are told when a connection's kept secret can't be opened.
+// It isn't an outage, and trying again won't help: the server needs its key back, or
+// an owner has to type the secret again.
+func unopenable(org *Org) string {
+	return org.Name + "'s single sign-on isn't working here, and trying again won't help. Tell one of its owners, or whoever runs this server."
+}
+
 func (a *App) loginCallback(w http.ResponseWriter, r *http.Request) {
-	att, err := resumeAttempt(w, r)
+	att, err := a.resumeAttempt(w, r)
 	if err != nil {
 		a.signInProblem(w, r, "", http.StatusBadRequest, sentence(err))
 		return
@@ -452,7 +476,13 @@ func (a *App) finishSSO(w http.ResponseWriter, r *http.Request, att attempt, ref
 		refuse(errors.Join(err, errors.New("the organisation's single sign-on is off")))
 		return
 	}
-	p, err := a.idp(r.Context(), sso.spec())
+	spec, err := a.s.spec(sso)
+	if err != nil {
+		log.Printf("single sign-on for %s: %v", org.Slug, err)
+		a.signInProblem(w, r, att.Next, http.StatusServiceUnavailable, unopenable(org))
+		return
+	}
+	p, err := a.idp(r.Context(), spec)
 	if err != nil {
 		refuse(err)
 		return
@@ -559,14 +589,33 @@ func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := SSOConnection{OrgID: q.Org.ID, Issuer: strings.TrimSpace(in.Issuer), ClientID: strings.TrimSpace(in.ClientID),
-		ClientSecret: strings.TrimSpace(in.Secret), Required: in.Required, AutoJoin: in.AutoJoin}
+		Required: in.Required, AutoJoin: in.AutoJoin}
 	if c.Issuer == "" {
 		done(w, a.s.SaveSSO(&SSOConnection{OrgID: q.Org.ID}, q.Actor()))
 		return
 	}
-	// The kept secret belongs to the provider and client it was typed for, and goes to no other.
-	if c.ClientSecret == "" && c.Issuer == sso.Issuer && c.ClientID == sso.ClientID {
+	secret := strings.TrimSpace(in.Secret)
+	switch {
+	case secret != "" && a.s.keys == nil:
+		fail(w, fmt.Errorf("a client secret is kept sealed, and %w", errNoKeys), http.StatusBadRequest)
+		return
+	case secret != "":
+		// Sealed here, where it is known to have been typed: one that happens to look
+		// sealed already would otherwise be stored as it came.
+		if c.ClientSecret, err = a.s.keys.seal(secret); err != nil {
+			fail(w, err, http.StatusInternalServerError)
+			return
+		}
+	// The kept secret belongs to the provider and client it was typed for, and goes to
+	// no other. It stays as stored and unopened, so the rest can be changed on a server
+	// with no key, or with a key that no longer opens it.
+	case c.Issuer == sso.Issuer && c.ClientID == sso.ClientID:
 		c.ClientSecret = sso.ClientSecret
+		// But nobody is made to depend on a sign-in that can't work.
+		if _, oerr := a.s.keys.open(c.ClientSecret); oerr != nil && ((c.Required && !sso.Required) || (c.AutoJoin && !sso.AutoJoin)) {
+			fail(w, errors.New("this server can't open the kept client secret, so single sign-on isn't working here: type the secret again before requiring it or letting people join"), http.StatusBadRequest)
+			return
+		}
 	}
 	verified := false
 	for _, d := range sso.Domains {
@@ -584,7 +633,8 @@ func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
 	}
 	if err == nil {
 		// Reading the provider now catches a mistyped issuer before anyone is sent to it.
-		if _, derr := a.probe(r.Context(), idpSpec{Issuer: c.Issuer, ClientID: c.ClientID, Secret: c.ClientSecret}); errors.Is(derr, errManyTenants) {
+		// Discovery sends no secret.
+		if _, derr := a.probe(r.Context(), idpSpec{Issuer: c.Issuer, ClientID: c.ClientID}); errors.Is(derr, errManyTenants) {
 			err = derr
 		} else if derr != nil {
 			err = fmt.Errorf("that issuer couldn't be read, so nothing was saved: %w", derr)

@@ -17,8 +17,8 @@ import (
 
 var mcpTools = []struct{ Name, Scope, What string }{
 	{"guidance", "read", "how to research and draft for this organisation"},
-	{"search", "read", "companies and people by name, domain, email or notes"},
-	{"get_company", "read", "details, facts with sources, people"},
+	{"search", "read", "companies and people by name, domain, email or notes, and which agent was last there"},
+	{"get_company", "read", "details, facts with sources, people, and who did what"},
 	{"list_due", "read", "what's on Today, and whether its text is written"},
 	{"add_company", "research:write", "lands in Research to review, with facts"},
 	{"add_fact", "research:write", "field, value and source URL"},

@@ -195,13 +195,16 @@ type SettingsData struct {
 	SSO     *SSO
 	// Callback is where a provider sends people back; empty until PROSPECTOR_URL is set.
 	Callback string
-	Intake   string
+	// Sealing is whether the server has a key to keep a client secret under.
+	Sealing bool
+	Intake  string
 }
 
 func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	members, _ := a.s.Members(q.Org.ID)
 	d := SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org), Intake: a.baseURL(r) + q.Base() + "intake"}
+	d.Sealing = a.s.keys != nil
 	if d.SSO, _ = a.s.SSO(q.Org.ID); d.SSO == nil {
 		d.SSO = &SSO{}
 	}
@@ -327,6 +330,10 @@ func (a *App) uiSettings(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
+	if _, err := in.Assets(); err != nil {
+		fail(w, err, http.StatusBadRequest)
+		return
+	}
 	o := reqOf(r).Org
 	o.Name, o.Color, o.Settings = strings.TrimSpace(in.Name), in.Color, in.OrgSettings
 	err := a.s.SaveOrg(o)
@@ -389,6 +396,38 @@ func (a *App) uiRemoveMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+func (a *App) uiExport(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID int64 `json:"id"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	q := reqOf(r)
+	out, err := a.s.ExportPerson(q.Org.ID, in.ID, q.Actor())
+	if err != nil {
+		fail(w, err, http.StatusNotFound)
+		return
+	}
+	w.Header().Set("cache-control", "no-store")
+	writeJSON(w, out)
+}
+
+func (a *App) uiExportOrg(w http.ResponseWriter, r *http.Request) {
+	var in struct{}
+	if !decode(w, r, &in) {
+		return
+	}
+	q := reqOf(r)
+	out, err := a.s.ExportOrg(q.Org.ID, q.Actor())
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("cache-control", "no-store")
+	writeJSON(w, out)
 }
 
 func (a *App) uiErase(w http.ResponseWriter, r *http.Request) {

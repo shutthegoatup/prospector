@@ -54,6 +54,9 @@ templ SSOSettings(q *Req, d SettingsData) {
 				}
 				@Row("Client secret") {
 					<input name="client_secret" type="password" autocomplete="new-password" placeholder={ secretHint(d.SSO) } class={ fieldClass }/>
+					if !d.Sealing {
+						@Meta("A secret is kept sealed, so none can be saved until whoever runs this server sets PROSPECTOR_SECRET_KEYS (`prospector secret-key` makes one). Everything else here can still be changed.")
+					}
 				}
 				@Row("Redirect URI") {
 					<code class="select-all break-all pt-2 font-mono text-xs">{ d.Callback }</code>

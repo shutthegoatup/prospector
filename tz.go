@@ -4,7 +4,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/nyaruka/phonenumbers"
+	"github.com/nyaruka/phonenumbers/v2"
+	"github.com/nyaruka/phonenumbers/v2/timezone"
 )
 
 var countryTag = regexp.MustCompile(`\(([A-Z]{2})(?:/[A-Z]{2})?[,)]`)
@@ -19,7 +20,7 @@ func GuessTZ(phone, maker string) *string {
 		switch phonenumbers.GetNumberType(n) {
 		case phonenumbers.MOBILE, phonenumbers.TOLL_FREE, phonenumbers.UAN, phonenumbers.VOIP:
 		default:
-			if zones, err := phonenumbers.GetTimezonesForNumber(n); err == nil && len(zones) == 1 && zones[0] != phonenumbers.UNKNOWN_TIMEZONE {
+			if zones, err := timezone.GetTimeZonesForNumber(n); err == nil && len(zones) == 1 && zones[0] != timezone.Unknown {
 				return &zones[0]
 			}
 		}
@@ -42,8 +43,8 @@ func regionTZ(region string) *string {
 	if example == nil {
 		return nil
 	}
-	zones, err := phonenumbers.GetTimezonesForNumber(example)
-	if err != nil || len(zones) == 0 || zones[0] == phonenumbers.UNKNOWN_TIMEZONE {
+	zones, err := timezone.GetTimeZonesForNumber(example)
+	if err != nil || len(zones) == 0 || zones[0] == timezone.Unknown {
 		return nil
 	}
 	return &zones[0]

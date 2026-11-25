@@ -2,8 +2,6 @@ package main
 
 import (
 	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"strings"
 	"sync"
 	"time"
@@ -127,28 +125,29 @@ const (
 
 // A device token is what a browser keeps after signing in: a random value and its
 // MAC under the account's password hash. Only this server can make one, it names
-// nobody, and it stops working when the password changes.
+// nobody, and it stops working when the password changes. It isn't signed under the
+// server's secret key: whoever can read the password hash could make one, but all it
+// buys is being counted apart from other guessers, and a year of browsers would
+// otherwise be forgotten the day a key is set.
 func newDeviceToken(u *User) string {
 	nonce := randomToken(16)
 	return nonce + "." + deviceMAC(u, nonce)
 }
 
 func deviceMAC(u *User, nonce string) string {
-	mac := hmac.New(sha256.New, []byte(u.PasswordHash))
-	mac.Write([]byte("device\x00" + nonce))
-	return hex.EncodeToString(mac.Sum(nil))
+	return mac([]byte(u.PasswordHash), "device\x00"+nonce)
 }
 
 // knownDevice reports whether token was issued to this email's account, and if so
 // the name its attempts are counted under: the email and the device together, so
 // guesses made elsewhere don't hold this browser up, and its own are still slowed.
 func (s *Store) knownDevice(email, token string) (who string, ok bool) {
-	nonce, mac, found := strings.Cut(token, ".")
+	nonce, signature, found := strings.Cut(token, ".")
 	if !found || len(token) > 200 {
 		return "", false
 	}
 	u, err := s.UserByEmail(email)
-	if err != nil || !hmac.Equal([]byte(mac), []byte(deviceMAC(u, nonce))) {
+	if err != nil || !hmac.Equal([]byte(signature), []byte(deviceMAC(u, nonce))) {
 		return "", false
 	}
 	return signInBucket(u.Email) + "\x00" + nonce, true

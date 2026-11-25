@@ -108,6 +108,10 @@ func (q *Req) Actor() string {
 	return name
 }
 
+func (q *Req) Agent() Actor {
+	return Actor{Name: q.Actor(), KeyID: q.Key.ID}
+}
+
 func (q *Req) Voice() Voice {
 	caller := q.Member.CallerName
 	if caller == "" {
@@ -344,6 +348,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/sso/domain", a.owner(a.uiSSODomain))
 	mux.HandleFunc("POST /o/{org}/ui/sso/domain/remove", a.owner(a.uiSSODomainRemove))
 	mux.HandleFunc("POST /o/{org}/ui/sso/verify", a.owner(a.uiSSOVerify))
+	mux.HandleFunc("POST /o/{org}/ui/export", a.owner(a.uiExport))
+	mux.HandleFunc("POST /o/{org}/ui/export-org", a.owner(a.uiExportOrg))
 	mux.HandleFunc("POST /o/{org}/ui/erase", a.owner(a.uiErase))
 	mux.HandleFunc("POST /o/{org}/ui/enquiry/delete", a.owner(a.uiDeleteEnquiry))
 	mux.HandleFunc("POST /o/{org}/ui/keys", a.owner(a.uiKey))
