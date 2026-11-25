@@ -410,3 +410,10 @@ func profileHref(c Contact) string {
 	}
 	return "https://www.linkedin.com/search/results/people/?keywords=" + strings.ReplaceAll(url.QueryEscape(words), "+", "%20")
 }
+
+func openLabel(c Contact) string {
+	if safeHref(deref(c.Linkedin)) == "#" {
+		return "Search + copy"
+	}
+	return "Open + copy"
+}

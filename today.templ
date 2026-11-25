@@ -271,7 +271,7 @@ templ StepBody(c Card) {
 				Attributes: templ.Attributes{"data-field": "note", "data-id": id(c)}})
 			@Actions() {
 				@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-copy-from": "note-" + id(c), "data-open": profileHref(c.Contact), "data-key": "o"}}) {
-					Open + copy
+					{ openLabel(c.Contact) }
 				}
 				@Mark(c, "linkedin", "Added", false)
 				@Mark(c, "hold", "Skip", false)
@@ -285,7 +285,7 @@ templ StepBody(c Card) {
 				Attributes: templ.Attributes{"data-field": "message", "data-id": id(c)}})
 			@Actions() {
 				@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-copy-from": "message-" + id(c), "data-open": profileHref(c.Contact)}}) {
-					Open + copy
+					{ openLabel(c.Contact) }
 				}
 				@Mark(c, "email", "Sent", false)
 				@Mark(c, "replied", "Replied", false)
