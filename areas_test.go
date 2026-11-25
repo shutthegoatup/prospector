@@ -72,7 +72,10 @@ func TestEachAreaChangesOnlyItsOwnWork(t *testing.T) {
 	if _, page := call(t, ada, "GET", base+"settings", "", nil); !strings.Contains(page, "member · support") {
 		t.Error("the Team list doesn't say what someone works on")
 	}
-	for name, try := range map[string]func(*http.Client) (int, string){"a contact's notes": sales, "a deal": deal} {
+	task := func(cl *http.Client) (int, string) {
+		return call(t, cl, "POST", base+"api/v1/tasks", "application/json", map[string]any{"title": "Yachts", "brief": "Yacht builders."})
+	}
+	for name, try := range map[string]func(*http.Client) (int, string){"a contact's notes": sales, "a deal": deal, "a task": task} {
 		if code, body := try(asGrace); code != http.StatusForbidden || !strings.Contains(body, "Team list") {
 			t.Errorf("support changed %s: %d %s", name, code, body)
 		}
@@ -91,6 +94,9 @@ func TestEachAreaChangesOnlyItsOwnWork(t *testing.T) {
 	}
 	if code, body := deal(asGrace); code != http.StatusCreated {
 		t.Errorf("sales can't start a deal: %d %s", code, body)
+	}
+	if code, body := task(asGrace); code != http.StatusCreated {
+		t.Errorf("sales can't start a task: %d %s", code, body)
 	}
 
 	areas()

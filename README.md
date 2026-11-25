@@ -229,6 +229,7 @@ The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml),
 | `pipeline:write` | work deals (`/api/v1/deals`, `/api/v1/contacts/{id}/deal`); set an enquiry's state, owner and note (`PATCH /api/v1/enquiries/{id}`) and put its sender on the board (`…/conversation`) |
 | `enquiries:triage` | the enquiry half of `pipeline:write` alone: `PATCH /api/v1/enquiries/{id}` and `…/conversation`, for a support agent that shouldn't touch deals |
 | `enquiries:delete` | `DELETE /api/v1/enquiries/{id}`: delete an enquiry for good |
+| `tasks:write` | Start tasks, ask them for more, mark their requests done or not, and close and reopen them, through `/api/v1/tasks` and `/api/v1/task-requests` |
 | `agents:run` | Start and stop Prospector's own agents on a task, and list a task's runs |
 | `agents:configure` | Add, change and delete Prospector's own agents: endpoint, key, model, tools and fallback. Owner-level: a signed-in member needs to be an owner |
 
