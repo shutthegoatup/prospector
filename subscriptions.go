@@ -221,6 +221,16 @@ func (st Standing) Attention() string {
 	return st.TermEnd
 }
 
+// soonDays is how far ahead a date counts as coming up: long enough to talk to the
+// customer before a day to cancel by, short enough that the list means something.
+const soonDays = 30
+
+// Soon is a subscription whose next date to know about falls within soonDays of day.
+func (st Standing) Soon(day string) bool {
+	at := st.Attention()
+	return st.Status != SubEnded && at >= day && at <= mustDay(day).AddDate(0, 0, soonDays).Format(dayLayout)
+}
+
 // SubscriptionIn is what someone types to record a subscription.
 type SubscriptionIn struct {
 	Company    int64  `json:"company"`

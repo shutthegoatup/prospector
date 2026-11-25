@@ -80,7 +80,12 @@ templ SubscriptionLine(q *Req, r SubscriptionRow, day string, named bool) {
 				}
 				<span class="block font-mono text-xs text-muted-foreground">{ joinNonEmpty(" · ", r.Price(), termText(r.Subscription), standingText(r, day)) }</span>
 			</span>
-			@Pill(r.Status, subscriptionState(r))
+			<span class="flex items-center gap-2">
+				if r.Soon(day) {
+					@Pill("within 30 days", "warn")
+				}
+				@Pill(r.Status, subscriptionState(r))
+			</span>
 		</div>
 		<details class="mt-1 text-sm">
 			<summary class="cursor-pointer font-mono text-xs text-muted-foreground">Update</summary>

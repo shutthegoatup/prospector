@@ -78,8 +78,10 @@ type TodayData struct {
 	// Deals are the renewals and other further deals with no next step, or one that's due.
 	// Like companies to review, they are worked elsewhere, so they aren't in Total.
 	Deals int
-	Week  Stats
-	Now   string
+	// Subs are the subscriptions with a day to cancel by, a renewal or an end coming soon.
+	Subs int
+	Week Stats
+	Now  string
 }
 
 func (a *App) today(w http.ResponseWriter, r *http.Request) {
@@ -98,6 +100,16 @@ func (a *App) today(w http.ResponseWriter, r *http.Request) {
 			if o.needsNextStep(now.Format("2006-01-02")) {
 				d.Deals++
 			}
+		}
+	}
+	subs, err := a.s.Subscriptions(q.Org.ID, 0, now.Format(dayLayout))
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	for _, sub := range subs {
+		if sub.Soon(now.Format(dayLayout)) {
+			d.Subs++
 		}
 	}
 	for _, c := range cards {
