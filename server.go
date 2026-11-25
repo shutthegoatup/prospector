@@ -40,6 +40,7 @@ type Req struct {
 	Member *Membership
 	Orgs   []OrgMembership
 	Key    *APIKey
+	due    map[string][]Contact
 }
 
 type reqKey struct{}

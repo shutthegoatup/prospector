@@ -274,6 +274,28 @@ templ Empty(title, text string) {
 	</div>
 }
 
+templ Pager(pg Page, href func(int) string) {
+	if pg.Pages() > 1 {
+		<nav class="mt-3 flex flex-wrap items-center justify-between gap-3" aria-label="Pages">
+			<span>
+				if pg.N > 1 {
+					@button.Button(button.Props{Href: href(pg.N - 1), Variant: button.VariantOutline, Size: button.SizeSm}) {
+						← Previous
+					}
+				}
+			</span>
+			@Meta(fmt.Sprintf("Page %d of %d", pg.N, pg.Pages()))
+			<span>
+				if pg.N < pg.Pages() {
+					@button.Button(button.Props{Href: href(pg.N + 1), Variant: button.VariantOutline, Size: button.SizeSm}) {
+						Next →
+					}
+				}
+			</span>
+		</nav>
+	}
+}
+
 templ Chip(href, label string, count int, on bool) {
 	<a href={ templ.SafeURL(href) } class={ "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors", chipClass(on) }>
 		{ label }

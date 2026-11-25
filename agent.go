@@ -212,9 +212,9 @@ func (s *Store) AgentSearch(org int64, q string) ([]SearchHit, error) {
 	if len(q) < 2 {
 		return nil, errors.New("search for at least two characters")
 	}
-	like := "%" + q + "%"
 	var companies []Company
-	if err := s.in(org).Where("lower(name) like ? or lower(domain) like ? or lower(why) like ?", like, like, like).Limit(25).Find(&companies).Error; err != nil {
+	cond, args := s.companyMatch(q)
+	if err := s.in(org).Where(cond, args...).Order("id").Limit(25).Find(&companies).Error; err != nil {
 		return nil, err
 	}
 	hits := []SearchHit{}
@@ -222,7 +222,8 @@ func (s *Store) AgentSearch(org int64, q string) ([]SearchHit, error) {
 		hits = append(hits, SearchHit{Kind: "company", ID: c.ID, Name: c.Name, Stage: c.Stage})
 	}
 	var people []Contact
-	if err := s.in(org).Where("key not like 'org:%' and (lower(person) like ? or lower(email) like ? or lower(maker) like ?)", like, like, like).Limit(25).Find(&people).Error; err != nil {
+	cond, args = s.contactMatch(q, true)
+	if err := s.in(org).Where("key not like 'org:%'").Where(cond, args...).Order("id").Limit(25).Find(&people).Error; err != nil {
 		return nil, err
 	}
 	for _, p := range people {

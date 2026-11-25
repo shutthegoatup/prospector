@@ -53,7 +53,7 @@ func platformState(c Company) string {
 	return ""
 }
 
-templ ResearchView(q *Req, f string, rows []ResearchRow, counts map[string]int) {
+templ ResearchView(q *Req, f string, rows []ResearchRow, pg Page, counts map[string]int) {
 	@PageHead("Research") {
 		<div class="flex flex-wrap gap-2">
 			@button.Button(button.Props{Href: q.Base() + "agents", Variant: button.VariantOutline, Size: button.SizeSm}) {
@@ -79,6 +79,7 @@ templ ResearchView(q *Req, f string, rows []ResearchRow, counts map[string]int) 
 			@ResearchItem(q, r, i)
 		}
 	</div>
+	@Pager(pg, func(n int) string { return pageLink(q.Base()+"research", n, "f", f) })
 }
 
 templ ResearchItem(q *Req, r ResearchRow, i int) {

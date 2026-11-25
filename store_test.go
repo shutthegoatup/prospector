@@ -221,7 +221,7 @@ func TestAgentResearchToOutreach(t *testing.T) {
 	if due, _ := s.Due(o.ID, "linkedin", time.Now(), o.Settings); len(due) != 0 {
 		t.Fatal("a suggested contact reached the LinkedIn queue before anyone picked them")
 	}
-	if rows, _ := s.Research(o.ID, "review"); len(rows) != 1 || len(rows[0].Facts) != 1 || len(rows[0].People) != 1 {
+	if rows, _, _ := s.Research(o.ID, "review", 1); len(rows) != 1 || len(rows[0].Facts) != 1 || len(rows[0].People) != 1 {
 		t.Fatalf("research review: %+v", rows)
 	}
 	if err := s.PickContact(o.ID, o, c.ID, "ada"); err != nil {
@@ -436,7 +436,7 @@ func TestMCP(t *testing.T) {
 	if err != nil || g.IsError || !strings.Contains(fmt.Sprint(g.StructuredContent), "Never suggest anyone at Brandtech.") {
 		t.Fatalf("guidance tool: %v %+v", err, g)
 	}
-	if rows, _ := s.Research(o.ID, "review"); len(rows) != 1 || rows[0].FoundBy != "agent:claude" {
+	if rows, _, _ := s.Research(o.ID, "review", 1); len(rows) != 1 || rows[0].FoundBy != "agent:claude" {
 		t.Fatalf("MCP-added company not waiting in Research: %+v", rows)
 	}
 }

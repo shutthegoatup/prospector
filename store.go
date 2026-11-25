@@ -157,8 +157,8 @@ type Contact struct {
 	Accepted      *string `json:"accepted"`
 	Message       *string `json:"message"`
 
-	OrgID       int64   `gorm:"uniqueIndex:idx_org_key;not null" json:"-"`
-	CompanyID   *int64  `gorm:"index" json:"company_id"`
+	OrgID       int64   `gorm:"uniqueIndex:idx_org_key;index:idx_contacts_org_company,priority:1;not null" json:"-"`
+	CompanyID   *int64  `gorm:"index;index:idx_contacts_org_company,priority:2" json:"company_id"`
 	Status      string  `gorm:"not null;default:''" json:"status"`
 	Title       string  `json:"title"`
 	EmailStatus string  `json:"email_status"`
@@ -201,7 +201,10 @@ var stringFields = map[string]bool{"stage": true, "next_step": true, "lost_reaso
 var Marks = map[string]string{"linkedin": "linkedin_added", "email": "email_sent", "followup": "followup_sent",
 	"call": "called", "replied": "replied", "declined": "declined", "hold": "hold", "accepted": "accepted"}
 
-type Store struct{ db *gorm.DB }
+type Store struct {
+	db  *gorm.DB
+	fts bool
+}
 
 // Open takes a postgres:// URL or a SQLite file path.
 func Open(dsn string) (*Store, error) {
@@ -219,7 +222,9 @@ func Open(dsn string) (*Store, error) {
 		&Company{}, &Fact{}, &Contact{}, &Event{}); err != nil {
 		return nil, err
 	}
-	return &Store{db: db}, nil
+	s := &Store{db: db}
+	s.indexSearch()
+	return s, nil
 }
 
 func (s *Store) postgres() bool { return s.db.Dialector.Name() == "postgres" }

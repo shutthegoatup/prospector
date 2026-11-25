@@ -20,9 +20,9 @@ templ StageTag(st string) {
 	<span class={ "whitespace-nowrap rounded-md px-2 py-0.5 font-mono text-[11px] uppercase tracking-wide", stageClass(st) }>{ st }</span>
 }
 
-templ CompaniesView(q *Req, f CompanyFilter, rows []CompanyListRow, segments []string) {
+templ CompaniesView(q *Req, f CompanyFilter, rows []CompanyListRow, pg Page, segments []string) {
 	@PageHead("Companies") {
-		<span class="font-mono text-xs text-muted-foreground">{ plural(len(rows), "company") }</span>
+		<span class="font-mono text-xs text-muted-foreground">{ plural(pg.Total, "company") }</span>
 	}
 	<form method="get" action={ templ.SafeURL(q.Base() + "companies") } class="mb-5 flex flex-wrap gap-2">
 		<label class="sr-only" for="q">Search</label>
@@ -64,6 +64,9 @@ templ CompaniesView(q *Req, f CompanyFilter, rows []CompanyListRow, segments []s
 			</a>
 		}
 	</div>
+	@Pager(pg, func(n int) string {
+		return pageLink(q.Base()+"companies", n, "q", f.Q, "segment", f.Segment, "stage", f.Stage)
+	})
 }
 
 func historyText(h HistoryItem) string {
