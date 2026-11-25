@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/mail"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"gorm.io/gorm"
 )
@@ -30,6 +32,8 @@ type EnquiryMessage struct {
 
 const (
 	replyLimit = 10000
+	// repliesUnanswered is how many replies can go to one enquiry with no answer recorded between.
+	repliesUnanswered = 3
 	// replyGap is how long the same words to the same enquiry count as a second press
 	// of the button and not a second reply.
 	replyGap = 2 * time.Minute
@@ -49,7 +53,7 @@ func threadText(text string) (string, error) {
 	switch {
 	case text == "":
 		return "", errors.New("write something first")
-	case len(text) > replyLimit:
+	case utf8.RuneCountInString(text) > replyLimit:
 		return "", fmt.Errorf("that is longer than %d characters", replyLimit)
 	}
 	return text, nil
@@ -117,6 +121,23 @@ func (s *Store) startReply(o *Org, enquiry int64, text, actor string) (*EnquiryM
 		}
 		if to, err = answerable(o, e); err != nil {
 			return err
+		}
+		if err := erased(tx, o.ID, "", "", to, ""); err != nil {
+			return errors.New("that address belongs to someone who was erased on request, so nothing is sent to it")
+		}
+		// Replies in a row with no answer between: a card pressed again and again, or a
+		// key in a loop, shouldn't be able to fill someone's inbox from here.
+		var last EnquiryMessage
+		heard := tx.Where("org_id = ? and enquiry_id = ? and ours = ?", o.ID, enquiry, false).Order("id desc").Limit(1).Find(&last)
+		if heard.Error != nil {
+			return heard.Error
+		}
+		var unanswered int64
+		if err := tx.Model(&EnquiryMessage{}).Where("org_id = ? and enquiry_id = ? and ours = ? and id > ? and (sent_at is not null or created_at > ?)", o.ID, enquiry, true, last.ID, time.Now().Add(-replyStale)).Count(&unanswered).Error; err != nil {
+			return err
+		}
+		if unanswered >= repliesUnanswered {
+			return fmt.Errorf("%d replies have gone with no answer recorded; record what they said, or leave it there", repliesUnanswered)
 		}
 		now := time.Now()
 		mine := tx.Where("org_id = ? and enquiry_id = ? and ours = ?", o.ID, enquiry, true)
@@ -231,7 +252,9 @@ func (a *App) replyEnquiry(ctx context.Context, o *Org, enquiry int64, text, act
 		return nil, err
 	}
 	if sendErr != nil {
-		return nil, notSent{fmt.Errorf("the reply couldn't be sent, and nothing was recorded: %w", sendErr)}
+		// The mail server's own words name hosts and addresses, some of them the host's operator's.
+		log.Printf("a reply to enquiry %d wasn't sent: %v", enquiry, sendErr)
+		return nil, notSent{errors.New("the mail server didn't take the reply, and nothing was recorded; try again, or ask an owner to check the mail settings")}
 	}
 	return m, nil
 }

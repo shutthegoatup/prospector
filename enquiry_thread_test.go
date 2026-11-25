@@ -240,3 +240,76 @@ func TestAReplyToAddressCannotAddAHeader(t *testing.T) {
 		}
 	}
 }
+
+// What the review of replies found: an address dressed up to dodge erasure, replies
+// without end, a reply that never left showing in an export, and the mail server's own
+// words in an answer.
+func TestRepliesKeepToTheirLimits(t *testing.T) {
+	s, srv, member, box := mailSite(t, nil)
+	o := must(s.OrgBySlug("alpha"))
+	for _, dressed := range []string{"Bob<bob@larkmoor.example>", "bob@larkmoor.example(c)", "\"Bob\" <bob@larkmoor.example>", "a@larkmoor.example,b@larkmoor.example"} {
+		if _, err := s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Bob", Email: dressed, Message: "hello"}); err == nil {
+			t.Errorf("an enquiry was taken from %q, which is more than an address", dressed)
+		}
+	}
+	e := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Hannah Pryce", Email: "Hannah@Larkmoor.example", Message: "Do you cover Leith?"}))
+	base := srv.URL + "/o/alpha/api/v1/enquiries/" + itoa(e.ID)
+	reply := func(text string) (int, string) {
+		return call(t, member, "POST", base+"/replies", "application/json", map[string]any{"text": text})
+	}
+
+	// A reply that never left is in neither export nor the thread.
+	if err := s.db.Create(&EnquiryMessage{OrgID: o.ID, EnquiryID: e.ID, Ours: true, Text: "never left", By: "Ada Lovelace", CreatedAt: time.Now().Add(-time.Hour)}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if export := must(s.ExportOrg(o.ID, "Ada Lovelace")); len(export.EnquiryThread) != 0 {
+		t.Errorf("the export carries a reply that never left: %+v", export.EnquiryThread)
+	}
+
+	// The mail server's own words stay in the log.
+	box.mu.Lock()
+	box.fail = errors.New("reach smtp.internal.example:587: dial tcp 10.0.0.9: refused")
+	box.mu.Unlock()
+	if code, body := reply("Yes."); code != http.StatusBadGateway || strings.Contains(body, "smtp.internal") || strings.Contains(body, "10.0.0.9") {
+		t.Errorf("a refused send answered %d %s", code, body)
+	}
+	box.mu.Lock()
+	box.fail = nil
+	box.mu.Unlock()
+
+	// Three in a row, abandoned sends not counted, and then no more until they answer.
+	for i, text := range []string{"Yes.", "Did that reach you?", "One last try."} {
+		if code, body := reply(text); code != http.StatusCreated {
+			t.Fatalf("reply %d: %d %s", i+1, code, body)
+		}
+	}
+	box.take(t, 3)
+	if code, body := reply("And again."); code != http.StatusBadRequest || !strings.Contains(body, "no answer recorded") {
+		t.Errorf("a fourth reply with no answer: %d %s", code, body)
+	}
+	box.take(t, 0)
+	if code, body := call(t, member, "POST", base+"/answers", "application/json", map[string]any{"text": "Got them all, thanks."}); code != http.StatusCreated {
+		t.Fatalf("recording their answer: %d %s", code, body)
+	}
+	if code, body := reply("Good."); code != http.StatusCreated {
+		t.Errorf("a reply after their answer: %d %s", code, body)
+	}
+	box.take(t, 1)
+
+	// Someone erased is not written to, though their enquiry was never matched to them.
+	bob := must(s.QuickAddPerson(o, QuickAdd{Name: "Bob Carr", Company: "Larkmoor Yachts", Email: "bob@larkmoor.example"}, "Ada Lovelace"))
+	if err := s.ErasePerson(o.ID, bob.ID, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.Create(&Enquiry{OrgID: o.ID, Kind: "other", Email: "Bob <bob@larkmoor.example>", Message: "from before addresses were checked", Via: "form", State: EnquiryOpen, CreatedAt: time.Now()}).Error; err != nil {
+		t.Fatal(err)
+	}
+	var old Enquiry
+	if err := s.db.Where("message like ?", "from before%").First(&old).Error; err != nil {
+		t.Fatal(err)
+	}
+	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/enquiries/"+itoa(old.ID)+"/replies", "application/json", map[string]any{"text": "Hello Bob."}); code == http.StatusCreated || !strings.Contains(body, "erased") {
+		t.Errorf("a reply to someone erased: %d %s", code, body)
+	}
+	box.take(t, 0)
+}

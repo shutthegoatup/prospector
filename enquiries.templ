@@ -153,7 +153,7 @@ func threadMeta(m EnquiryMessage) string {
 // EnquiryThreadView is what has been said since an enquiry arrived, and the two ways to
 // add to it: a reply that is emailed, and their answer, pasted in from wherever it came.
 templ EnquiryThreadView(e Enquiry, thread []EnquiryMessage, mailOn bool) {
-	<div class="flex flex-col gap-2 border-t border-border pt-3">
+	<div class="flex flex-col gap-2 border-t border-border pt-2">
 		for _, m := range thread {
 			<div class="rounded-lg bg-muted p-3">
 				@Meta(threadMeta(m))

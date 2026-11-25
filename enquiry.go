@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"strconv"
 	"strings"
@@ -171,7 +172,9 @@ func (s *Store) AddEnquiry(org int64, via string, in EnquiryIn) (*Enquiry, error
 	if !e.Spam {
 		e.State = EnquiryOpen
 	}
-	if !emailRe.MatchString(e.Email) || strings.ContainsAny(e.Email, " \t\r\n") {
+	// One bare address and nothing round it: a name or a comment beside it would hide it
+	// from the look-ups that erasure and matching to a contact make by address.
+	if at, err := mail.ParseAddress(e.Email); err != nil || at.Address != e.Email || !emailRe.MatchString(e.Email) || strings.ContainsAny(e.Email, " \t\r\n") {
 		return nil, errEnquiryEmail
 	}
 	return &e, s.db.Transaction(func(tx *gorm.DB) error {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -244,6 +245,8 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 				return err
 			}
 		}
+		// A reply that never left isn't part of what was said.
+		out.EnquiryThread = slices.DeleteFunc(out.EnquiryThread, func(m EnquiryMessage) bool { return m.Ours && m.SentAt == nil })
 		var events []Event
 		if err := mine().Find(&events).Error; err != nil {
 			return err

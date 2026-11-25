@@ -151,7 +151,10 @@ func submit(conn net.Conn, via MailServer, from, to *mail.Address, m Message, se
 	if err := w.Close(); err != nil {
 		return err
 	}
-	return c.Quit()
+	// The server took the message when the data closed. A goodbye that fails after that
+	// isn't a failed send, and calling it one would have the same mail sent twice.
+	c.Quit()
+	return nil
 }
 
 func compose(from, to *mail.Address, m Message, now time.Time) []byte {
