@@ -85,8 +85,7 @@ func historyText(h HistoryItem) string {
 		"task:new": "wrote a task", "task:ask": "asked for more on a task", "task:pickup": "picked up a task",
 		"task:done": "finished a request", "task:reopen": "reopened a request", "task:close": "closed a task", "task:open": "reopened a task",
 		"deal:start": "started another deal", "deal:remove": "removed a deal",
-		"sub:start": "recorded a subscription starting", "sub:remove": "removed a subscription",
-		"sub:notice_on": "recorded notice on a subscription", "sub:ended_on": "recorded a subscription ending",
+		"sub:new": "recorded a subscription", "sub:remove": "removed a subscription",
 	}[h.Action]
 	if verb == "" {
 		if f, ok := strings.CutPrefix(h.Action, "set:"); ok {

@@ -51,6 +51,7 @@ const (
 	SubScheduled = "scheduled"
 	SubActive    = "active"
 	SubNotice    = "notice given"
+	SubEnding    = "ending"
 	SubEnded     = "ended"
 )
 
@@ -62,7 +63,8 @@ const dayLayout = "2006-01-02"
 
 func parseDay(text string) (time.Time, error) {
 	d, err := time.Parse(dayLayout, text)
-	if err != nil {
+	// A year typed short ("0026") would otherwise be terms counted for two thousand years.
+	if err != nil || d.Year() < 1990 || d.Year() > 2200 {
 		return d, fmt.Errorf("%q isn't a date", text)
 	}
 	return d, nil
@@ -108,17 +110,19 @@ type Standing struct {
 	Status string
 	// TermEnd is the last day of the term that day falls in; empty before it starts.
 	TermEnd string
-	// CancelBy is the last day notice can be given for it to end at TermEnd; empty when
-	// it ends then anyway, or notice has been given.
-	CancelBy string
+	// CancelBy is the next day still to come by which notice can be given, and Out the
+	// last day of the term that notice would end it at. Both are empty when it ends
+	// anyway, or notice has been given.
+	CancelBy, Out string
 	// Ends is the last day, once that is settled: notice given, an end recorded, or a
 	// term that doesn't renew.
 	Ends string
 }
 
-// Missed is a cancel-by date that has gone: the next term is now committed to.
-func (st Standing) Missed(day string) bool {
-	return st.CancelBy != "" && st.CancelBy < day
+// Missed is when the chance to stop at the end of this term has gone: notice now
+// would only end a later one.
+func (st Standing) Missed() bool {
+	return st.Out != "" && st.Out != st.TermEnd
 }
 
 // terms calls each for every term in turn, as its first day and its last, until each
@@ -172,18 +176,25 @@ func (s Subscription) On(day string) Standing {
 	case ends:
 		st.Ends = st.TermEnd
 	default:
-		st.CancelBy = cancelBy(mustDay(st.TermEnd))
+		// The first term, from the one day is in, that notice could still end. With notice
+		// longer than a term that is never the current one.
+		s.terms(start, func(first, last time.Time) bool {
+			st.CancelBy, st.Out = cancelBy(last), text(last)
+			return day <= st.Out && day <= st.CancelBy
+		})
 	}
 	if s.EndedOn != nil && (st.Ends == "" || *s.EndedOn < st.Ends) {
-		st.Ends, st.CancelBy = *s.EndedOn, ""
+		st.Ends, st.CancelBy, st.Out = *s.EndedOn, "", ""
 	}
 	switch {
 	case day < s.Start:
 		st.Status = SubScheduled
 	case st.Ends != "" && st.Ends < day:
-		st.Status, st.CancelBy = SubEnded, ""
-	case s.NoticeOn != nil || s.EndedOn != nil:
+		st.Status, st.CancelBy, st.Out = SubEnded, "", ""
+	case s.NoticeOn != nil:
 		st.Status = SubNotice
+	case s.EndedOn != nil:
+		st.Status = SubEnding
 	default:
 		st.Status = SubActive
 	}
@@ -195,16 +206,17 @@ func mustDay(text string) time.Time {
 	return d
 }
 
-// Attention is the next day someone has to do something about it: the cancel-by date
-// while that is still to come, else the day it ends or renews. Ended ones sort last.
-func (st Standing) Attention(day string) string {
+// Attention is the next day someone has to know about: the sooner of the day to cancel
+// by and the day the term ends, or the day it stops once that is settled. Ended ones
+// sort last.
+func (st Standing) Attention() string {
 	switch {
 	case st.Status == SubEnded:
 		return "9999"
-	case st.CancelBy >= day:
-		return st.CancelBy
 	case st.Ends != "":
 		return st.Ends
+	case st.CancelBy != "" && st.CancelBy < st.TermEnd:
+		return st.CancelBy
 	}
 	return st.TermEnd
 }
@@ -260,6 +272,10 @@ func (s *Store) AddSubscription(org int64, in SubscriptionIn, actor string) (*Su
 	if err := checkTerm(in.TermMonths, in.NoticeDays); err != nil {
 		return nil, err
 	}
+	if in.TermMonths == 0 {
+		// With nothing committed there is no term to renew or end: it rolls on.
+		in.Then = ThenRolls
+	}
 	if _, err := parseDay(in.Start); err != nil {
 		return nil, err
 	}
@@ -282,7 +298,7 @@ func (s *Store) AddSubscription(org int64, in SubscriptionIn, actor string) (*Su
 		if err := tx.Create(&sub).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, 0, &c.ID, actor, "sub:start", &in.Start)
+		return s.log(tx, org, 0, &c.ID, actor, "sub:new", &in.Start)
 	})
 	if err != nil {
 		return nil, err
@@ -330,10 +346,18 @@ func (s *Store) ChangeSubscription(org, id int64, field, value, actor string) er
 			if !validThen(value) {
 				return fmt.Errorf("unknown end of term %q", value)
 			}
+			if sub.TermMonths == 0 && value != ThenRolls {
+				return errors.New("with no months committed it rolls on: say how many months first")
+			}
 			updates["then"] = value
 		case "start":
 			if _, err := parseDay(value); err != nil {
 				return err
+			}
+			for _, later := range []*string{sub.NoticeOn, sub.EndedOn} {
+				if later != nil && value > *later {
+					return errors.New("that is after notice was given or it ended: clear that date first")
+				}
 			}
 			updates["start"] = value
 		case "notice_on", "ended_on":
@@ -361,6 +385,9 @@ func (s *Store) ChangeSubscription(org, id int64, field, value, actor string) er
 				return err
 			}
 			updates[field] = n
+			if months == 0 {
+				updates["then"] = ThenRolls
+			}
 		default:
 			return fmt.Errorf("a subscription has no %q", field)
 		}
@@ -419,7 +446,7 @@ func (s *Store) Subscriptions(org, company int64, day string) ([]SubscriptionRow
 	for i, sub := range subs {
 		rows[i] = SubscriptionRow{sub, names[sub.CompanyID], sub.On(day)}
 	}
-	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Attention(day) < rows[j].Attention(day) })
+	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Attention() < rows[j].Attention() })
 	return rows, nil
 }
 
@@ -428,7 +455,7 @@ func (s *Store) Subscriptions(org, company int64, day string) ([]SubscriptionRow
 func contracted(rows []SubscriptionRow) string {
 	sums := map[string]int64{}
 	for _, r := range rows {
-		if (r.Status == SubActive || r.Status == SubNotice) && r.Amount != 0 {
+		if (r.Status == SubActive || r.Status == SubNotice || r.Status == SubEnding) && r.Amount != 0 {
 			sums[r.Currency] += r.Yearly()
 		}
 	}

@@ -29,8 +29,8 @@ func standingText(r SubscriptionRow, day string) string {
 		return "starts " + r.Start
 	case r.Ends != "":
 		return "ends " + r.Ends
-	case r.Missed(day):
-		return "term ends " + r.TermEnd + " · the day to cancel by, " + r.CancelBy + ", has passed"
+	case r.Missed():
+		return "term ends " + r.TermEnd + " and the next is committed to · cancel by " + r.CancelBy + " to end " + r.Out
 	}
 	return "term ends " + r.TermEnd + " · cancel by " + r.CancelBy
 }
@@ -39,7 +39,7 @@ func subscriptionState(r SubscriptionRow) string {
 	switch r.Status {
 	case SubActive:
 		return "ok"
-	case SubNotice:
+	case SubNotice, SubEnding:
 		return "warn"
 	}
 	return ""
@@ -52,7 +52,7 @@ func subField(s Subscription, field string) templ.Attributes {
 templ SubscriptionsView(q *Req, rows []SubscriptionRow, day string) {
 	@PageHead("Subscriptions") {
 		if worth := contracted(rows); worth != "" {
-			<span class="font-mono text-xs text-muted-foreground">{ worth + " a year contracted" }</span>
+			<span class="font-mono text-xs text-muted-foreground">{ worth + " a year at today's prices" }</span>
 		}
 	}
 	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">What each customer is on, and until when. The one that needs someone soonest comes first: a day to cancel by, a renewal or an end. Record one from a company's page. Prospector notes what was agreed and when it's due; it takes no payment and sends no invoice.</p>
@@ -131,7 +131,7 @@ templ SubscriptionLine(q *Req, r SubscriptionRow, day string, named bool) {
 
 // SubscriptionForm records a new subscription for a company.
 templ SubscriptionForm(company int64, day string) {
-	<form data-form="ui/subscription" data-refresh="true" data-reset="true" class="mt-2 flex flex-wrap items-end gap-2">
+	<form data-form="ui/subscription" data-refresh="true" data-reset="true" class="mt-2 flex flex-wrap items-start gap-2">
 		<input type="number" name="company" value={ strconv.FormatInt(company, 10) } hidden/>
 		<label class="flex min-w-[220px] flex-1 flex-col gap-1">
 			@Label("What they're on")
@@ -168,9 +168,12 @@ templ SubscriptionForm(company int64, day string) {
 			@Label("Days' notice")
 			<input name="notice_days" type="number" min="0" max="730" value="30" class="h-9 w-24 rounded-lg border border-input bg-muted px-3 text-sm"/>
 		</label>
-		@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Class: "h-9"}) {
-			Record
-		}
+		<span class="flex flex-col gap-1">
+			@Label("When it's right")
+			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Class: "h-9"}) {
+				Record
+			}
+		</span>
 		<span class="font-mono text-xs text-muted-foreground" data-result></span>
 	</form>
 }

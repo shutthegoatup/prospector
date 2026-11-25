@@ -38,8 +38,8 @@ func standingText(r SubscriptionRow, day string) string {
 		return "starts " + r.Start
 	case r.Ends != "":
 		return "ends " + r.Ends
-	case r.Missed(day):
-		return "term ends " + r.TermEnd + " · the day to cancel by, " + r.CancelBy + ", has passed"
+	case r.Missed():
+		return "term ends " + r.TermEnd + " and the next is committed to · cancel by " + r.CancelBy + " to end " + r.Out
 	}
 	return "term ends " + r.TermEnd + " · cancel by " + r.CancelBy
 }
@@ -48,7 +48,7 @@ func subscriptionState(r SubscriptionRow) string {
 	switch r.Status {
 	case SubActive:
 		return "ok"
-	case SubNotice:
+	case SubNotice, SubEnding:
 		return "warn"
 	}
 	return ""
@@ -93,9 +93,9 @@ func SubscriptionsView(q *Req, rows []SubscriptionRow, day string) templ.Compone
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var3 string
-				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(worth + " a year contracted")
+				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(worth + " a year at today's prices")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `subscriptions.templ`, Line: 55, Col: 87}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `subscriptions.templ`, Line: 55, Col: 94}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -506,7 +506,7 @@ func SubscriptionForm(company int64, day string) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<form data-form=\"ui/subscription\" data-refresh=\"true\" data-reset=\"true\" class=\"mt-2 flex flex-wrap items-end gap-2\"><input type=\"number\" name=\"company\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<form data-form=\"ui/subscription\" data-refresh=\"true\" data-reset=\"true\" class=\"mt-2 flex flex-wrap items-start gap-2\"><input type=\"number\" name=\"company\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -650,7 +650,11 @@ func SubscriptionForm(company int64, day string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<input name=\"notice_days\" type=\"number\" min=\"0\" max=\"730\" value=\"30\" class=\"h-9 w-24 rounded-lg border border-input bg-muted px-3 text-sm\"></label>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<input name=\"notice_days\" type=\"number\" min=\"0\" max=\"730\" value=\"30\" class=\"h-9 w-24 rounded-lg border border-input bg-muted px-3 text-sm\"></label> <span class=\"flex flex-col gap-1\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = Label("When it's right").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -676,7 +680,7 @@ func SubscriptionForm(company int64, day string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<span class=\"font-mono text-xs text-muted-foreground\" data-result></span></form>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</span> <span class=\"font-mono text-xs text-muted-foreground\" data-result></span></form>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

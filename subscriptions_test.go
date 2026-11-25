@@ -45,38 +45,43 @@ func TestWhereASubscriptionStands(t *testing.T) {
 		on   string
 		want Standing
 	}{
-		{"first term, the day to cancel by gone", yearly, "2026-11-25", Standing{SubActive, "2027-01-11", "2026-11-13", ""}},
-		{"its last day", yearly, "2027-01-11", Standing{SubActive, "2027-01-11", "2026-11-13", ""}},
-		{"renewed once", yearly, "2027-01-12", Standing{SubActive, "2028-01-11", "2027-11-13", ""}},
-		{"renewed several times", yearly, "2030-06-01", Standing{SubActive, "2031-01-11", "2030-11-13", ""}},
-		{"not started", yearly, "2025-12-01", Standing{SubScheduled, "2027-01-11", "2026-11-13", ""}},
-		{"notice in time", withNotice("2026-11-13"), "2026-11-25", Standing{SubNotice, "2027-01-11", "", "2027-01-11"}},
-		{"notice in time, after its end", withNotice("2026-11-13"), "2027-01-12", Standing{SubEnded, "2028-01-11", "", "2027-01-11"}},
-		{"notice a day late runs another term", withNotice("2026-11-14"), "2026-11-25", Standing{SubNotice, "2027-01-11", "", "2028-01-11"}},
-		{"ended early, before the day", endedEarly, "2026-06-01", Standing{SubNotice, "2027-01-11", "", "2026-06-30"}},
-		{"ended early, on the day", endedEarly, "2026-06-30", Standing{SubNotice, "2027-01-11", "", "2026-06-30"}},
-		{"ended early, after", endedEarly, "2026-07-01", Standing{SubEnded, "2027-01-11", "", "2026-06-30"}},
-		{"monthly from the 31st, in February", monthly, "2026-02-10", Standing{SubActive, "2026-02-27", "2026-02-27", ""}},
-		{"monthly from the 31st, back on the 31st", monthly, "2026-03-31", Standing{SubActive, "2026-04-29", "2026-04-29", ""}},
-		{"notice longer than the term", longNotice, "2026-01-10", Standing{SubActive, "2026-01-31", "2025-11-03", ""}},
-		{"notice longer than the term, given", longNoticeGiven, "2026-01-10", Standing{SubNotice, "2026-01-31", "", "2026-04-30"}},
-		{"from 29 February", leap, "2027-06-01", Standing{SubActive, "2028-02-28", "2028-01-30", ""}},
-		{"from 29 February, in the next leap year", leap, "2028-02-29", Standing{SubActive, "2029-02-27", "2029-01-29", ""}},
-		{"a fixed term", fixed, "2026-06-01", Standing{SubActive, "2027-12-31", "", "2027-12-31"}},
-		{"a fixed term, over", fixed, "2028-01-01", Standing{SubEnded, "2027-12-31", "", "2027-12-31"}},
-		{"committed then rolling, in the commitment", rolling, "2026-03-01", Standing{SubActive, "2026-06-30", "2026-06-01", ""}},
-		{"committed then rolling, after it", rolling, "2026-07-15", Standing{SubActive, "2026-07-31", "2026-07-02", ""}},
+		{"first term, too late to stop at its end", yearly, "2026-11-25", Standing{SubActive, "2027-01-11", "2027-11-13", "2028-01-11", ""}},
+		{"its last day", yearly, "2027-01-11", Standing{SubActive, "2027-01-11", "2027-11-13", "2028-01-11", ""}},
+		{"the last day to cancel", yearly, "2026-11-13", Standing{SubActive, "2027-01-11", "2026-11-13", "2027-01-11", ""}},
+		{"renewed once", yearly, "2027-01-12", Standing{SubActive, "2028-01-11", "2027-11-13", "2028-01-11", ""}},
+		{"renewed several times", yearly, "2030-06-01", Standing{SubActive, "2031-01-11", "2030-11-13", "2031-01-11", ""}},
+		{"not started", yearly, "2025-12-01", Standing{SubScheduled, "2027-01-11", "2026-11-13", "2027-01-11", ""}},
+		{"notice in time", withNotice("2026-11-13"), "2026-11-25", Standing{SubNotice, "2027-01-11", "", "", "2027-01-11"}},
+		{"notice in time, after its end", withNotice("2026-11-13"), "2027-01-12", Standing{SubEnded, "2028-01-11", "", "", "2027-01-11"}},
+		{"notice a day late runs another term", withNotice("2026-11-14"), "2026-11-25", Standing{SubNotice, "2027-01-11", "", "", "2028-01-11"}},
+		{"ended early, before the day", endedEarly, "2026-06-01", Standing{SubEnding, "2027-01-11", "", "", "2026-06-30"}},
+		{"ended early, on the day", endedEarly, "2026-06-30", Standing{SubEnding, "2027-01-11", "", "", "2026-06-30"}},
+		{"ended early, after", endedEarly, "2026-07-01", Standing{SubEnded, "2027-01-11", "", "", "2026-06-30"}},
+		{"monthly from the 31st, in February", monthly, "2026-02-10", Standing{SubActive, "2026-02-27", "2026-02-27", "2026-02-27", ""}},
+		{"monthly from the 31st, back on the 31st", monthly, "2026-03-31", Standing{SubActive, "2026-04-29", "2026-04-29", "2026-04-29", ""}},
+		{"notice longer than the term", longNotice, "2026-01-10", Standing{SubActive, "2026-01-31", "2026-01-31", "2026-04-30", ""}},
+		{"notice longer than the term, months on", longNotice, "2026-11-25", Standing{SubActive, "2026-11-30", "2026-12-01", "2027-02-28", ""}},
+		{"notice longer than the term, given", longNoticeGiven, "2026-01-10", Standing{SubNotice, "2026-01-31", "", "", "2026-04-30"}},
+		{"from 29 February", leap, "2027-06-01", Standing{SubActive, "2028-02-28", "2028-01-30", "2028-02-28", ""}},
+		{"from 29 February, in the next leap year", leap, "2028-02-29", Standing{SubActive, "2029-02-27", "2029-01-29", "2029-02-27", ""}},
+		{"a fixed term", fixed, "2026-06-01", Standing{SubActive, "2027-12-31", "", "", "2027-12-31"}},
+		{"a fixed term, over", fixed, "2028-01-01", Standing{SubEnded, "2027-12-31", "", "", "2027-12-31"}},
+		{"committed then rolling, in the commitment", rolling, "2026-03-01", Standing{SubActive, "2026-06-30", "2026-06-01", "2026-06-30", ""}},
+		{"committed then rolling, after it", rolling, "2026-07-15", Standing{SubActive, "2026-07-31", "2026-08-02", "2026-08-31", ""}},
 		{"no start date", Subscription{}, "2026-01-01", Standing{Status: SubScheduled}},
 	} {
 		if got := c.sub.On(c.on); got != c.want {
 			t.Errorf("%s, on %s:\n got %+v\nwant %+v", c.name, c.on, got, c.want)
 		}
 	}
-	if st := yearly.On("2026-11-25"); !st.Missed("2026-11-25") || st.Attention("2026-11-25") != "2027-01-11" {
-		t.Errorf("with the day to cancel by gone, attention moves to the term's end: %+v", st)
+	if st := yearly.On("2026-11-25"); !st.Missed() || st.Attention() != "2027-01-11" {
+		t.Errorf("too late to stop this term, the next thing to know is that it renews: %+v", st)
 	}
-	if st := yearly.On("2026-10-01"); st.Missed("2026-10-01") || st.Attention("2026-10-01") != "2026-11-13" {
+	if st := yearly.On("2026-10-01"); st.Missed() || st.Attention() != "2026-11-13" {
 		t.Errorf("before the day to cancel by, that is what needs attention: %+v", st)
+	}
+	if st := withNotice("2026-11-13").On("2026-11-25"); st.Attention() != "2027-01-11" {
+		t.Errorf("with notice given, the day it stops is what needs attention: %+v", st)
 	}
 }
 
@@ -133,6 +138,16 @@ func TestASubscriptionIsRecordedAgainstACompany(t *testing.T) {
 	rows = must(s.Subscriptions(o.ID, company, "2026-11-26"))
 	if got := rows[len(rows)-1]; got.Name != "Standard plan, 3 sites" || got.Price() != "£18,000 a year" || got.Status != SubNotice || got.Ends != "2027-01-11" {
 		t.Errorf("after the changes: %+v", got)
+	}
+
+	if err := change("start", "2026-12-01"); err == nil {
+		t.Error("the start was moved to after notice was given")
+	}
+	if err := s.ChangeSubscription(o.ID, second.ID, "then", ThenEnds, "Ada Lovelace"); err == nil {
+		t.Error("a subscription with nothing committed was told to end at the end of its term")
+	}
+	if second.Then != ThenRolls {
+		t.Errorf("a subscription with nothing committed was recorded as %q", second.Then)
 	}
 
 	// The history says what was agreed and when, never the name or the price.
@@ -199,10 +214,10 @@ func TestSubscriptionsAreRecordedAndChangedFromThePages(t *testing.T) {
 			}
 		}
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil); !strings.Contains(page, "Larkmoor Yachts") || !strings.Contains(page, "a year contracted") {
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil); !strings.Contains(page, "Larkmoor Yachts") || !strings.Contains(page, "a year at today") {
 		t.Error("the subscriptions page doesn't name the company or say what is contracted")
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/companies/"+itoa(company), "", nil); !strings.Contains(page, "recorded a subscription starting") || !strings.Contains(page, `data-form="ui/subscription"`) {
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/companies/"+itoa(company), "", nil); !strings.Contains(page, "recorded a subscription: ") || !strings.Contains(page, `data-form="ui/subscription"`) {
 		t.Error("the company's page lacks the history line or the form")
 	}
 	if code, body := post("subscription/remove", map[string]any{"id": sub.ID}); code != http.StatusOK {
