@@ -50,6 +50,15 @@ func (m *Membership) Works(area string) bool {
 	return area == "" || m.Role == "owner" || slices.Contains(strings.Fields(m.Areas), area)
 }
 
+// landing is the page someone starts on: Today is outreach, so someone who works only
+// in support starts on what is theirs to answer.
+func landing(m *Membership) string {
+	if !m.Works(areaSales) && m.Works(areaSupport) {
+		return "enquiries"
+	}
+	return "today"
+}
+
 func areaRefusal(area string) string {
 	if area == areaAny {
 		return "you read only here: an owner can give you an area on the Team list in Settings"
