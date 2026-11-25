@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -531,13 +532,22 @@ func (s *Store) SetKeyScopes(org, id int64, scopes []string) error {
 		return err
 	}
 	var k APIKey
-	if err := s.in(org).Where("id = ? and revoked_at is null", id).First(&k).Error; err != nil {
+	if err := s.in(org).Where("id = ? and revoked_at is null", id).First(&k).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+		return errors.New("that key isn't in this organisation, or has been revoked")
+	} else if err != nil {
 		return err
 	}
 	if k.Prefix == builtinPrefix {
 		return errBuiltinKey
 	}
-	return s.in(org).Model(&APIKey{}).Where("id = ? and revoked_at is null", id).Update("scopes", strings.Join(scopes, " ")).Error
+	// In a fixed order, so the same scopes resent don't end the key's open sessions.
+	var ordered []string
+	for _, sc := range Scopes {
+		if slices.Contains(scopes, sc.Name) {
+			ordered = append(ordered, sc.Name)
+		}
+	}
+	return s.in(org).Model(&APIKey{}).Where("id = ? and revoked_at is null", id).Update("scopes", strings.Join(ordered, " ")).Error
 }
 
 func (s *Store) RevokeKey(org, id int64) error {

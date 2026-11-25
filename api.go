@@ -194,14 +194,14 @@ type factAdded struct {
 	Existed bool `json:"existed" jsonschema:"true if the company already had this fact from this page"`
 }
 
-// mcpServer is built once per API key, with only the tools its scopes allow. The
-// key is checked again on every request, so revoking it cuts off its sessions, and
-// a session answers only to the key that opened it.
 type builtMCP struct {
 	scopes string
 	*mcp.Server
 }
 
+// mcpServer is built once per API key, with only the tools its scopes allow. The
+// key is checked again on every request, so revoking it cuts off its sessions, and
+// a session answers only to the key that opened it.
 func (a *App) mcpServer(q *Req) *mcp.Server {
 	a.mu.Lock()
 	defer a.mu.Unlock()

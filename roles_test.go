@@ -125,6 +125,14 @@ func TestChangingAKeysScopes(t *testing.T) {
 		t.Fatal("a new MCP session doesn't get the new scope's tools")
 	}
 
+	stillOpen := connect()
+	if code, body := scopes(ada, k.ID, "research:write", "read"); code != http.StatusOK {
+		t.Fatalf("resend scopes: %d %s", code, body)
+	}
+	if _, err := stillOpen.ListTools(ctx, nil); err != nil {
+		t.Fatalf("the same scopes in another order ended an open session: %v", err)
+	}
+
 	if code, body := scopes(ada, k.ID, "read"); code != http.StatusOK {
 		t.Fatalf("narrow scopes: %d %s", code, body)
 	}
