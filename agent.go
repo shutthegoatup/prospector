@@ -183,7 +183,9 @@ type AddContactIn struct {
 type AddContactOut struct {
 	ID      int64  `json:"id"`
 	Status  string `json:"status" jsonschema:"suggested: waits in Research until a person picks them; empty once picked"`
-	Existed bool   `json:"existed" jsonschema:"true if this person was already at the company; nothing was added or changed"`
+	Existed bool   `json:"existed" jsonschema:"true if this person was already at the company; nothing about them was changed"`
+	// Suggested is nil for someone new, so older clients see the reply they always did.
+	Suggested []string `json:"suggested,omitempty" jsonschema:"for someone already here under the name you sent: which of email, phone and linkedin you sent are waiting for a person to accept"`
 }
 
 // samePerson finds someone already at the company by profile, address or name, so a
@@ -239,7 +241,11 @@ func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContact
 			return err
 		}
 		if p := samePerson(people, in); p != nil {
-			out = AddContactOut{ID: p.ID, Status: p.Status, Existed: true}
+			waiting, err := s.suggestDetails(tx, who, *p, in)
+			if err != nil {
+				return err
+			}
+			out = AddContactOut{ID: p.ID, Status: p.Status, Existed: true, Suggested: waiting}
 			return s.matched(tx, o.ID, who, p.ID, &c.ID)
 		}
 		contact := Contact{OrgID: o.ID, Key: uniqueKey(tx, o.ID, personKey(in.Name)), File: "added by " + who.Name,
@@ -540,7 +546,7 @@ func agentInstructions(o *Org, k *APIKey) string {
 		parts = append(parts,
 			"Companies and facts are high volume with simple judgement, so a small, fast model does them well. One claim per fact, from the page that shows it.",
 			lookForGuidance(o),
-			"Contacts need care more than speed, so use a capable model. Pick the person who owns the decision, not a general inbox. Confirm they hold the role now on a current page: an old bio, press release or speaker listing isn't enough. Set email_status to guess for any address inferred from a pattern. If you can't confirm someone, don't add them; add a team_page fact so a person can look.")
+			"Contacts need care more than speed, so use a capable model. Pick the person who owns the decision, not a general inbox. Confirm they hold the role now on a current page: an old bio, press release or speaker listing isn't enough. Set email_status to guess for any address inferred from a pattern. If you can't confirm someone, don't add them; add a team_page fact so a person can look. To add an email, phone or profile for someone already here, call add_contact for them again with it: it waits for a person to accept, so don't send it twice.")
 	}
 	if k.Has("outcomes:write") {
 		parts = append(parts,
