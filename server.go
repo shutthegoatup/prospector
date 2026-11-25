@@ -379,9 +379,6 @@ func (a *App) Routes() http.Handler {
 
 	mux.HandleFunc("POST /o/{org}/ui/mark", a.member(a.uiMark))
 	mux.HandleFunc("POST /o/{org}/ui/update", a.member(a.uiUpdate))
-	mux.HandleFunc("POST /o/{org}/ui/deal", a.member(a.uiDeal))
-	mux.HandleFunc("POST /o/{org}/ui/deal/start", a.member(a.uiDealStart))
-	mux.HandleFunc("POST /o/{org}/ui/deal/remove", a.member(a.uiDealRemove))
 	mux.HandleFunc("POST /o/{org}/ui/company", a.member(a.uiCompany))
 	mux.HandleFunc("POST /o/{org}/ui/pick", a.member(a.uiPick))
 	mux.HandleFunc("POST /o/{org}/ui/suggestion", a.member(a.uiSuggestion))
@@ -399,9 +396,6 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/export", a.owner(a.uiExport))
 	mux.HandleFunc("POST /o/{org}/ui/export-org", a.owner(a.uiExportOrg))
 	mux.HandleFunc("POST /o/{org}/ui/erase", a.owner(a.uiErase))
-	mux.HandleFunc("POST /o/{org}/ui/enquiry/delete", a.owner(a.uiDeleteEnquiry))
-	mux.HandleFunc("POST /o/{org}/ui/enquiry/update", a.member(a.uiSetEnquiry))
-	mux.HandleFunc("POST /o/{org}/ui/enquiry/converse", a.member(a.uiConverseEnquiry))
 	mux.HandleFunc("POST /o/{org}/ui/keys", a.owner(a.uiKey))
 	mux.HandleFunc("POST /o/{org}/ui/keys/revoke", a.owner(a.uiRevoke))
 

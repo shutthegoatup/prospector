@@ -29,6 +29,8 @@ tags:
     description: The steps a new customer and the organisation take before the customer is live, and the customer's own page of theirs.
   - name: subscriptions
     description: What a customer is on, its term and notice, and its renewal.
+  - name: deals
+    description: What each conversation is worth, who has it and when it should close.
 
 paths:
   /o/{org}/api/v1/agents:
@@ -512,6 +514,215 @@ paths:
                   contact: { type: integer, format: int64 }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/deals:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listDeals
+      tags: [deals]
+      summary: Every deal on the Conversations board
+      description: |
+        Each conversation has a deal of its own (`seq` 0), which stands where its contact
+        does; its `id` is 0 until it is given a value, an owner or a date. Deals started
+        after it (`seq` 1 and up) hold their own stage and next step.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: By stage, in the board's order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Deal" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: startDeal
+      tags: [deals]
+      summary: Start another deal with someone already in conversation
+      security:
+        - session: []
+        - bearer: ["pipeline:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact]
+              properties:
+                contact: { type: integer, format: int64 }
+                kind: { type: string, description: "`new`, `renewal` or `expansion`." }
+      responses:
+        "201":
+          description: The deal as started.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Deal" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/deals/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeDeal
+      tags: [deals]
+      summary: Change a deal started after the conversation's own
+      description: Send only what changes; they are saved together or not at all. A conversation's own deal is changed through its contact.
+      security:
+        - session: []
+        - bearer: ["pipeline:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DealChange" }
+      responses:
+        "200":
+          description: The deal as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Deal" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: removeDeal
+      tags: [deals]
+      summary: Remove a deal started by mistake
+      description: The conversation's own deal can't be removed.
+      security:
+        - session: []
+        - bearer: ["pipeline:write"]
+      responses:
+        "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/contacts/{id}/deal:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeOwnDeal
+      tags: [deals]
+      summary: Change a conversation's own deal
+      description: |
+        Its kind, value, close date and owner. Send only what changes; they are saved
+        together or not at all. Its stage and next step are the contact's, and are not
+        set here. The contact has to have replied.
+      security:
+        - session: []
+        - bearer: ["pipeline:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DealChange" }
+      responses:
+        "200":
+          description: The deal as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Deal" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/enquiries:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listEnquiries
+      tags: [enquiries]
+      summary: What people sent in, newest first
+      parameters:
+        - { name: kind, in: query, schema: { type: string }, description: Only this kind. }
+        - { name: state, in: query, schema: { type: string }, description: "Only those `open`, `waiting` or `closed`." }
+        - { name: spam, in: query, schema: { type: boolean }, description: "Those marked as spam, which are otherwise left out." }
+        - { name: page, in: query, schema: { type: integer }, description: "Which page, from 1." }
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: One page of them.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enquiries, page, pages, total]
+                properties:
+                  enquiries:
+                    type: array
+                    items: { $ref: "#/components/schemas/Enquiry" }
+                  page: { type: integer }
+                  pages: { type: integer }
+                  total: { type: integer }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/enquiries/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeEnquiry
+      tags: [enquiries]
+      summary: Say where answering an enquiry stands, who has it, or note something on it
+      description: Send only what changes; they are saved together or not at all. The note is never sent, but it is in the sender's export.
+      security:
+        - session: []
+        - bearer: ["pipeline:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                state: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "`open`, `waiting` or `closed`." }
+                owner: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "A member's name, or empty for nobody." }
+                note: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+      responses:
+        "200":
+          description: The enquiry as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Enquiry" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: deleteEnquiry
+      tags: [enquiries]
+      summary: Delete an enquiry for good
+      description: With what was said in answering it. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["enquiries:delete"]
+      responses:
+        "204": { description: Deleted. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/enquiries/{id}/conversation:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: converseEnquiry
+      tags: [enquiries]
+      summary: Put whoever sent an enquiry on the Conversations board
+      description: Someone not held yet is added first, under the never-contact and erasure rules that adding anyone goes through.
+      security:
+        - session: []
+        - bearer: ["pipeline:write"]
+      responses:
+        "201":
+          description: Who they are here.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [contact]
+                properties:
+                  contact: { type: integer, format: int64 }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -794,3 +1005,58 @@ components:
         renewing: { type: boolean, description: Whether a renewal deal for it is open. }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+
+    Deal:
+      type: object
+      required: [id, contact_id, person, company_id, seq, kind, stage, next_step, next_date, lost_reason, amount, currency, value, close_date, owner, subscription_id]
+      properties:
+        id: { type: integer, format: int64, description: "0 for a conversation's own deal that nothing has been set on yet." }
+        contact_id: { type: integer, format: int64 }
+        person: { type: string }
+        company_id: { type: integer, format: int64, description: "0 when they have no company here." }
+        seq: { type: integer, description: "0 for the conversation's own deal." }
+        kind: { type: string }
+        stage: { type: string, description: "`replied`, `meeting`, `proposal`, `won` or `lost`." }
+        next_step: { type: string }
+        next_date: { type: string, description: "YYYY-MM-DD, or empty." }
+        lost_reason: { type: string }
+        amount: { type: integer, format: int64, description: "In the currency's hundredths." }
+        currency: { type: string }
+        value: { type: string, description: "The amount as written, such as £14,000; empty when there is none." }
+        close_date: { type: string, description: "YYYY-MM-DD, or empty." }
+        owner: { type: string }
+        subscription_id: { type: integer, format: int64, description: "The subscription a renewal is for; 0 for none." }
+
+    DealChange:
+      type: object
+      properties:
+        kind: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        amount: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "As you would write it: `14,000`, `€5,000`; empty for none." }
+        close_date: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        owner: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "A member's name, or empty for nobody." }
+        stage: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: Only for a deal after the conversation's own. }
+        next_step: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: Only for a deal after the conversation's own. }
+        next_date: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: Only for a deal after the conversation's own. }
+        lost_reason: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: Only for a deal after the conversation's own. }
+
+    Enquiry:
+      type: object
+      required: [id, kind, name, email, company, phone, message, site, page, via, spam, contact_id, company_id, created_at, state, owner, note]
+      properties:
+        id: { type: integer, format: int64 }
+        kind: { type: string }
+        name: { type: string }
+        email: { type: string }
+        company: { type: string }
+        phone: { type: string }
+        message: { type: string, description: "Their words, exactly as sent. Whoever filled the form in chose every one." }
+        site: { type: string }
+        page: { type: string }
+        via: { type: string }
+        spam: { type: boolean }
+        contact_id: { type: integer, format: int64, description: "The contact it was matched to; 0 for none." }
+        company_id: { type: integer, format: int64, description: "The company it was matched to; 0 for none." }
+        created_at: { type: string, format: date-time }
+        state: { type: string, description: "`open`, `waiting` or `closed`; empty for one from before answering was tracked." }
+        owner: { type: string }
+        note: { type: string }

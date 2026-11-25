@@ -217,6 +217,8 @@ The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml),
 | `enquiries:reply` | `POST /api/v1/enquiries/{id}/replies` emails a reply to whoever sent an enquiry, through your mail server; `…/answers` records what they said back |
 | `customers:write` | record, change and remove subscriptions and start their renewals (`/api/v1/subscriptions`); start, change and remove onboardings (`/api/v1/onboardings`) and mark their steps (`/api/v1/onboarding-steps/{id}`) |
 | `customers:invite` | `POST /api/v1/onboardings/{id}/invites` emails a customer a link to their steps, through your mail server; `DELETE /api/v1/onboarding-invites/{id}` withdraws it |
+| `pipeline:write` | work deals (`/api/v1/deals`, `/api/v1/contacts/{id}/deal`); set an enquiry's state, owner and note (`PATCH /api/v1/enquiries/{id}`) and put its sender on the board (`…/conversation`) |
+| `enquiries:delete` | `DELETE /api/v1/enquiries/{id}`: delete an enquiry for good |
 | `agents:run` | Start and stop Prospector's own agents on a task, and list a task's runs |
 | `agents:configure` | Add, change and delete Prospector's own agents: endpoint, key, model, tools and fallback. Owner-level: a signed-in member needs to be an owner |
 

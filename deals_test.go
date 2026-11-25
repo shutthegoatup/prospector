@@ -446,29 +446,26 @@ func TestAnotherDealWithSomeoneInConversation(t *testing.T) {
 func TestARenewalIsStartedAndWorkedFromTheBoard(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	c := repliedPerson(t, s, o, "Hannah Pryce")
-	post := func(path string, body map[string]any) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/"+path, "application/json", body)
-	}
-	if code, body := post("deal/start", map[string]any{"contact": c.ID, "kind": "renewal"}); code != http.StatusOK {
+	if code, body := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/deals", "application/json", map[string]any{"contact": c.ID, "kind": "renewal"}); code != http.StatusCreated {
 		t.Fatalf("starting a renewal: %d %s", code, body)
 	}
 	var renewal Deal
 	if err := s.db.Where("org_id = ? and seq > 0", o.ID).First(&renewal).Error; err != nil {
 		t.Fatal(err)
 	}
-	if code, body := post("deal", map[string]any{"id": renewal.ID, "field": "amount", "value": "9,500"}); code != http.StatusOK {
+	if code, body := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/deals/"+itoa(renewal.ID), "application/json", map[string]any{"amount": "9,500"}); code != http.StatusOK {
 		t.Fatalf("valuing the renewal: %d %s", code, body)
 	}
-	if code, _ := post("deal", map[string]any{"id": renewal.ID, "field": "stage", "value": "signed"}); code == http.StatusOK {
+	if code, _ := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/deals/"+itoa(renewal.ID), "application/json", map[string]any{"stage": "signed"}); code == http.StatusOK {
 		t.Error("a renewal was moved to a stage there isn't")
 	}
 	_, page := call(t, client, "GET", srv.URL+"/o/alpha/conversations", "", nil)
-	for _, want := range []string{"Renewal", "with Hannah Pryce", "£9,500", `data-deal="` + strconv.FormatInt(renewal.ID, 10) + `"`, `data-form="ui/deal/start"`, "No next step yet"} {
+	for _, want := range []string{"Renewal", "with Hannah Pryce", "£9,500", `data-deal="` + strconv.FormatInt(renewal.ID, 10) + `"`, `data-form="api/v1/deals"`, "No next step yet"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the board doesn't show %q", want)
 		}
 	}
-	if code, body := post("deal/remove", map[string]any{"id": renewal.ID}); code != http.StatusOK {
+	if code, body := call(t, client, "DELETE", srv.URL+"/o/alpha/api/v1/deals/"+itoa(renewal.ID), "", nil); code != http.StatusNoContent {
 		t.Fatalf("removing the renewal: %d %s", code, body)
 	}
 	if _, page = call(t, client, "GET", srv.URL+"/o/alpha/conversations", "", nil); strings.Contains(page, "with Hannah Pryce") {
@@ -519,5 +516,133 @@ func TestTodayPointsAtDealsThatNeedANextStep(t *testing.T) {
 	}
 	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); !strings.Contains(page, prompt) {
 		t.Error("Today says nothing of a renewal whose next step is overdue")
+	}
+}
+
+func TestARobotWorksDealsAndEnquiriesAsItsScopesAllow(t *testing.T) {
+	s, o, srv, owner := signedIn(t)
+	other := mustOrg(t, s, "beta")
+	key := func(org int64, scopes ...string) string {
+		secret, _, err := s.CreateKey(org, "robot "+strings.Join(scopes, "+"), scopes, "Ada Lovelace")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return secret
+	}
+	reader, worker, deleter, stranger := key(o.ID, "read"), key(o.ID, "pipeline:write"), key(o.ID, "enquiries:delete"), key(other.ID, "read", "pipeline:write", "enquiries:delete")
+	c := repliedPerson(t, s, o, "Hannah Pryce")
+	base, theirs := srv.URL+"/o/alpha/api/v1/", srv.URL+"/o/beta/api/v1/"
+
+	// A conversation has a deal of its own before anything is set on it.
+	code, body := asKey(t, "GET", base+"deals", reader, nil)
+	if code != http.StatusOK || !strings.Contains(body, `"person":"Hannah Pryce"`) || !strings.Contains(body, `"seq":0`) || !strings.Contains(body, `"stage":"replied"`) || !strings.Contains(body, `"kind":"new"`) {
+		t.Fatalf("listing deals: %d %s", code, body)
+	}
+	own := base + "contacts/" + itoa(c.ID) + "/deal"
+	if code, body := asKey(t, "PATCH", own, reader, map[string]any{"amount": "14,000"}); code != http.StatusForbidden || !strings.Contains(body, "pipeline:write") {
+		t.Errorf("a read key valuing a deal: %d %s", code, body)
+	}
+	// Saved together or not at all.
+	if code, body := asKey(t, "PATCH", own, worker, map[string]any{"amount": "14,000", "close_date": "soon"}); code != http.StatusBadRequest {
+		t.Errorf("a change with a bad date: %d %s", code, body)
+	}
+	if deals := must(s.Deals(o.ID)); deals[c.ID].Amount != 0 {
+		t.Errorf("the part before the refused one was saved: %+v", deals[c.ID])
+	}
+	if code, body := asKey(t, "PATCH", own, worker, map[string]any{"amount": "14,000", "close_date": "2027-01-31", "kind": "expansion"}); code != http.StatusOK || !strings.Contains(body, `"value":"£14,000"`) || !strings.Contains(body, `"close_date":"2027-01-31"`) || !strings.Contains(body, `"kind":"expansion"`) {
+		t.Errorf("valuing the conversation's own deal: %d %s", code, body)
+	}
+	if code, body := asKey(t, "PATCH", own, worker, map[string]any{"stage": "won"}); code != http.StatusBadRequest || !strings.Contains(body, "contact") {
+		t.Errorf("setting the own deal's stage here: %d %s", code, body)
+	}
+
+	code, body = asKey(t, "POST", base+"deals", worker, map[string]any{"contact": c.ID, "kind": "renewal"})
+	if code != http.StatusCreated || !strings.Contains(body, `"seq":1`) || !strings.Contains(body, `"kind":"renewal"`) {
+		t.Fatalf("starting another deal: %d %s", code, body)
+	}
+	var second Deal
+	if err := s.db.Where("org_id = ? and seq = 1", o.ID).First(&second).Error; err != nil {
+		t.Fatal(err)
+	}
+	one := "deals/" + itoa(second.ID)
+	if code, body := asKey(t, "PATCH", base+one, worker, map[string]any{"stage": "proposal", "next_step": "Send the order form", "amount": "9,500"}); code != http.StatusOK || !strings.Contains(body, `"stage":"proposal"`) || !strings.Contains(body, `"next_step":"Send the order form"`) || !strings.Contains(body, `"value":"£9,500"`) {
+		t.Errorf("working another deal: %d %s", code, body)
+	}
+	if code, body := asKey(t, "PATCH", base+one, worker, map[string]any{"next_step": "Chase", "stage": "signed"}); code != http.StatusBadRequest {
+		t.Errorf("a stage that is not one: %d %s", code, body)
+	} else if err := s.db.First(&second, second.ID).Error; err != nil || second.NextStep != "Send the order form" {
+		t.Errorf("the part before the refused one was saved: %q (%v)", second.NextStep, err)
+	}
+	for what, try := range map[string][2]string{"changing": {"PATCH", theirs + one}, "removing": {"DELETE", theirs + one}, "valuing": {"PATCH", theirs + "contacts/" + itoa(c.ID) + "/deal"}} {
+		var sent any
+		if try[0] == "PATCH" {
+			sent = map[string]any{"amount": "1"}
+		}
+		if code, body := asKey(t, try[0], try[1], stranger, sent); code != http.StatusNotFound {
+			t.Errorf("another organisation %s our deal by number: %d %s", what, code, body)
+		}
+	}
+	if code, _ := asKey(t, "GET", base+"deals", stranger, nil); code < 400 {
+		t.Errorf("another organisation's key listing our deals: %d", code)
+	}
+	if code, body := asKey(t, "DELETE", base+one, worker, nil); code != http.StatusNoContent {
+		t.Errorf("removing the deal: %d %s", code, body)
+	}
+
+	// Enquiries: listed, tracked, and deleted only by a key given that, or an owner.
+	e := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Tom Ellery", Email: "tom@larkmoor.example", Message: "Do you cover Leith?"}))
+	spam := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Bot", Email: "bot@spam.example", Message: "hello", Trap: "caught"}))
+	code, body = asKey(t, "GET", base+"enquiries", reader, nil)
+	if code != http.StatusOK || !strings.Contains(body, `"email":"tom@larkmoor.example"`) || strings.Contains(body, "bot@spam.example") || !strings.Contains(body, `"total":1`) || !strings.Contains(body, `"state":"open"`) {
+		t.Errorf("listing enquiries: %d %s", code, body)
+	}
+	if code, body := asKey(t, "GET", base+"enquiries?spam=true", reader, nil); code != http.StatusOK || !strings.Contains(body, "bot@spam.example") {
+		t.Errorf("listing spam: %d %s", code, body)
+	}
+	if code, body := asKey(t, "GET", base+"enquiries?state=closed", reader, nil); code != http.StatusOK || strings.Contains(body, "tom@larkmoor.example") {
+		t.Errorf("listing closed ones: %d %s", code, body)
+	}
+	one = "enquiries/" + itoa(e.ID)
+	if code, body := asKey(t, "PATCH", base+one, reader, map[string]any{"state": "closed"}); code != http.StatusForbidden {
+		t.Errorf("a read key closing an enquiry: %d %s", code, body)
+	}
+	if code, body := asKey(t, "PATCH", base+one, worker, map[string]any{"note": "Rang them", "state": "ignored"}); code != http.StatusBadRequest {
+		t.Errorf("a state that is not one: %d %s", code, body)
+	}
+	if code, body := asKey(t, "PATCH", base+one, worker, map[string]any{"note": "Rang them", "state": "waiting"}); code != http.StatusOK || !strings.Contains(body, `"note":"Rang them"`) || !strings.Contains(body, `"state":"waiting"`) {
+		t.Errorf("tracking an enquiry: %d %s", code, body)
+	}
+	if code, body := asKey(t, "PATCH", theirs+one, stranger, map[string]any{"state": "closed"}); code != http.StatusNotFound {
+		t.Errorf("another organisation closing our enquiry by number: %d %s", code, body)
+	}
+	if code, body := asKey(t, "POST", theirs+one+"/conversation", stranger, nil); code != http.StatusNotFound {
+		t.Errorf("another organisation conversing with our enquiry by number: %d %s", code, body)
+	}
+	if code, body := asKey(t, "POST", base+one+"/conversation", worker, nil); code != http.StatusCreated || !strings.Contains(body, `"contact":`) {
+		t.Errorf("starting a conversation from an enquiry: %d %s", code, body)
+	}
+
+	member := must(s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
+	if err := s.AddMember(o.ID, member.ID, "member", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	notOwner := newMailClient()
+	if !signIn(t, notOwner, srv, "grace@example.com", "correct horse battery") {
+		t.Fatal("Grace cannot sign in")
+	}
+	for who, refused := range map[string]func() (int, string){
+		"a key without enquiries:delete": func() (int, string) { return asKey(t, "DELETE", base+"enquiries/"+itoa(spam.ID), worker, nil) },
+		"a member who is not an owner":   func() (int, string) { return call(t, notOwner, "DELETE", base+"enquiries/"+itoa(spam.ID), "", nil) },
+		"another organisation's key":     func() (int, string) { return asKey(t, "DELETE", theirs+"enquiries/"+itoa(spam.ID), stranger, nil) },
+	} {
+		if code, body := refused(); code < 400 {
+			t.Errorf("%s deleted an enquiry: %d %s", who, code, body)
+		}
+	}
+	if code, body := asKey(t, "DELETE", base+"enquiries/"+itoa(spam.ID), deleter, nil); code != http.StatusNoContent {
+		t.Errorf("a key with enquiries:delete deleting: %d %s", code, body)
+	}
+	if code, body := call(t, owner, "DELETE", base+one, "", nil); code != http.StatusNoContent {
+		t.Errorf("an owner deleting: %d %s", code, body)
 	}
 }
