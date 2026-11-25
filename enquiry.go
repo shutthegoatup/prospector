@@ -228,18 +228,35 @@ type EnquiryFilter struct {
 	State string
 }
 
-const enquiryPageSize = 200
+// enquirySpamParam is the filter's spam choice as the page's link carries it.
+func enquirySpamParam(f EnquiryFilter) string {
+	if f.Spam {
+		return "1"
+	}
+	return ""
+}
 
-func (s *Store) Enquiries(org int64, f EnquiryFilter) ([]Enquiry, error) {
-	q := s.in(org).Where("spam = ?", f.Spam)
-	if f.Kind != "" {
-		q = q.Where("kind = ?", f.Kind)
+const enquiryPageSize = 50
+
+// Enquiries lists one page of the enquiries a filter matches, newest first.
+func (s *Store) Enquiries(org int64, f EnquiryFilter, page int) ([]Enquiry, Page, error) {
+	matching := func() *gorm.DB {
+		q := s.in(org).Model(&Enquiry{}).Where("spam = ?", f.Spam)
+		if f.Kind != "" {
+			q = q.Where("kind = ?", f.Kind)
+		}
+		if f.State != "" {
+			q = q.Where("state = ?", f.State)
+		}
+		return q
 	}
-	if f.State != "" {
-		q = q.Where("state = ?", f.State)
+	var total int64
+	if err := matching().Count(&total).Error; err != nil {
+		return nil, Page{}, err
 	}
+	pg := pageOf(page, enquiryPageSize, int(total))
 	var rows []Enquiry
-	return rows, q.Order("created_at desc, id desc").Limit(enquiryPageSize).Find(&rows).Error
+	return rows, pg, matching().Order("created_at desc, id desc").Limit(pg.Size).Offset(pg.offset()).Find(&rows).Error
 }
 
 // EnquiryCounts is how many enquiries there are of each kind, with spam under "spam"
@@ -417,6 +434,7 @@ func (a *App) uiDeleteEnquiry(w http.ResponseWriter, r *http.Request) {
 type EnquiriesData struct {
 	Filter    EnquiryFilter
 	Rows      []Enquiry
+	Page      Page
 	Counts    map[string]int
 	Companies map[int64]string
 	Members   []Member
@@ -425,7 +443,7 @@ type EnquiriesData struct {
 func (a *App) enquiriesPage(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	f := EnquiryFilter{Kind: r.URL.Query().Get("kind"), Spam: r.URL.Query().Get("spam") != "", State: r.URL.Query().Get("state")}
-	rows, err := a.s.Enquiries(q.Org.ID, f)
+	rows, pg, err := a.s.Enquiries(q.Org.ID, f, pageParam(r))
 	if err != nil {
 		fail(w, err, http.StatusInternalServerError)
 		return
@@ -449,5 +467,5 @@ func (a *App) enquiriesPage(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, http.StatusInternalServerError)
 		return
 	}
-	a.page(w, r, "enquiries", EnquiriesView(q, EnquiriesData{Filter: f, Rows: rows, Counts: a.s.EnquiryCounts(q.Org.ID), Companies: names, Members: members}))
+	a.page(w, r, "enquiries", EnquiriesView(q, EnquiriesData{Filter: f, Rows: rows, Page: pg, Counts: a.s.EnquiryCounts(q.Org.ID), Companies: names, Members: members}))
 }

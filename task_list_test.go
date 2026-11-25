@@ -39,11 +39,11 @@ func TestTheTaskListTakesNoMoreQueriesForMoreTasks(t *testing.T) {
 	work(0)
 	now := time.Now()
 	var one, many []TaskView
-	forOne := queries(t, s, func() { one = must(s.Tasks(o.ID, true, now)) })
+	forOne := queries(t, s, func() { one = must(firstOf(s.Tasks(o.ID, true, 1, now))) })
 	for i := 1; i < 12; i++ {
 		work(i)
 	}
-	forMany := queries(t, s, func() { many = must(s.Tasks(o.ID, true, now)) })
+	forMany := queries(t, s, func() { many = must(firstOf(s.Tasks(o.ID, true, 1, now))) })
 	if len(one) != 1 || len(many) != 12 {
 		t.Fatalf("listed %d and %d tasks", len(one), len(many))
 	}

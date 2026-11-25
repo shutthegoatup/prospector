@@ -559,24 +559,34 @@ func (s *Store) Task(org, id int64, now time.Time) (*TaskView, error) {
 	return &views[0], nil
 }
 
-// Tasks lists an organisation's tasks, open ones first, newest first.
-func (s *Store) Tasks(org int64, closed bool, now time.Time) ([]TaskView, error) {
-	q := s.in(org).Order("closed_at is not null, id desc").Limit(tasksShown)
-	if !closed {
-		q = q.Where("closed_at is null")
+const taskPageSize = 30
+
+// Tasks lists one page of an organisation's tasks, open ones first, newest first.
+func (s *Store) Tasks(org int64, closed bool, page int, now time.Time) ([]TaskView, Page, error) {
+	matching := func() *gorm.DB {
+		q := s.in(org).Model(&Task{})
+		if !closed {
+			q = q.Where("closed_at is null")
+		}
+		return q
 	}
+	var total int64
+	if err := matching().Count(&total).Error; err != nil {
+		return nil, Page{}, err
+	}
+	pg := pageOf(page, taskPageSize, int(total))
 	var tasks []Task
-	if err := q.Find(&tasks).Error; err != nil {
-		return nil, err
+	if err := matching().Order("closed_at is not null, id desc").Limit(pg.Size).Offset(pg.offset()).Find(&tasks).Error; err != nil {
+		return nil, Page{}, err
 	}
 	out, err := s.taskViews(s.db, org, tasks, now)
 	if err != nil {
-		return nil, err
+		return nil, Page{}, err
 	}
 	if out == nil {
 		out = []TaskView{}
 	}
-	return out, nil
+	return out, pg, nil
 }
 
 // What agents see and do.
@@ -682,9 +692,6 @@ func (s *Store) AgentTasks(org int64, who Actor, page PageIn) (briefs []TaskBrie
 	}
 	return briefs, next, nil
 }
-
-// tasksShown is how many tasks a list holds, newest first.
-const tasksShown = 200
 
 // AgentTask is everything an agent needs to carry a task on. Fetching it is
 // recorded, so people see the task was picked up before anything is added, and keeps
