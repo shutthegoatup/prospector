@@ -647,9 +647,9 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var26 string
-		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(touches(p.History)))
+		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(p.Touches))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 165, Col: 127}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 165, Col: 118}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 		if templ_7745c5c3_Err != nil {
@@ -917,6 +917,12 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+			templ_7745c5c3_Err = Pager(p.NotesPage, func(n int) string {
+				return panelLink(string(companyHref(q, p.Company.ID)), "notes", n, "history", p.HistoryPage)
+			}).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -944,7 +950,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 			var templ_7745c5c3_Var33 string
 			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(h.At.Format("2 Jan 15:04"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 253, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 254, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 			if templ_7745c5c3_Err != nil {
@@ -997,7 +1003,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 			var templ_7745c5c3_Var36 string
 			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(actorLabel(h.Actor))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 254, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 255, Col: 89}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 			if templ_7745c5c3_Err != nil {
@@ -1010,7 +1016,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 			var templ_7745c5c3_Var37 string
 			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(historyText(h))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 254, Col: 115}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 255, Col: 115}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 			if templ_7745c5c3_Err != nil {
@@ -1020,6 +1026,12 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+		}
+		templ_7745c5c3_Err = Pager(p.HistoryPage, func(n int) string {
+			return panelLink(string(companyHref(q, p.Company.ID)), "history", n, "notes", p.NotesPage)
+		}).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
 		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "</div></div>")
 		if templ_7745c5c3_Err != nil {
@@ -1041,17 +1053,6 @@ func fitText(f string) string {
 		return ""
 	}
 	return "fit " + f
-}
-
-func touches(h []HistoryItem) int {
-	n := 0
-	for _, e := range h {
-		switch e.Action {
-		case "mark:linkedin", "mark:email", "mark:followup", "mark:call":
-			n++
-		}
-	}
-	return n
 }
 
 func FactRow(f Fact) templ.Component {
@@ -1078,7 +1079,7 @@ func FactRow(f Fact) templ.Component {
 		var templ_7745c5c3_Var39 string
 		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(f.Field)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 288, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 279, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 		if templ_7745c5c3_Err != nil {
@@ -1091,7 +1092,7 @@ func FactRow(f Fact) templ.Component {
 		var templ_7745c5c3_Var40 string
 		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(f.Value)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 289, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 280, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 		if templ_7745c5c3_Err != nil {
@@ -1109,7 +1110,7 @@ func FactRow(f Fact) templ.Component {
 			var templ_7745c5c3_Var41 string
 			templ_7745c5c3_Var41, templ_7745c5c3_Err = templruntime.NewAttributeExpression(safeHref(f.SourceURL)).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 291, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 282, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var41)
 			if templ_7745c5c3_Err != nil {

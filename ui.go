@@ -245,6 +245,25 @@ func pageParam(r *http.Request) int {
 	return n
 }
 
+// panelPage is which page of one list a page shows, where it shows several: each has
+// its own name in the address.
+func panelPage(r *http.Request, name string) int {
+	n, _ := strconv.Atoi(r.URL.Query().Get(name))
+	return n
+}
+
+// panelLink is the address for page n of the list called name, keeping the page's
+// other list, if it has one, where it is.
+func panelLink(path, name string, n int, otherName string, other Page) string {
+	past := func(n int) string {
+		if n > 1 {
+			return strconv.Itoa(n)
+		}
+		return ""
+	}
+	return pageLink(path, 0, name, past(n), otherName, past(other.N))
+}
+
 func pageLink(path string, page int, filters ...string) string {
 	v := url.Values{}
 	for i := 0; i+1 < len(filters); i += 2 {
@@ -279,10 +298,14 @@ type CompanyPage struct {
 	Pending map[int64][]PendingDetail
 	History []HistoryItem
 	Notes   []NoteView
-	Subs    []SubscriptionRow
-	Onboard []OnboardingRow
-	Planned int
-	Day     string
+	// HistoryPage and NotesPage are where each of those two lists is, and Touches counts
+	// the whole history, not the page of it on show.
+	HistoryPage, NotesPage Page
+	Touches                int
+	Subs                   []SubscriptionRow
+	Onboard                []OnboardingRow
+	Planned                int
+	Day                    string
 }
 
 func (a *App) company(w http.ResponseWriter, r *http.Request) {
@@ -294,7 +317,7 @@ func (a *App) company(w http.ResponseWriter, r *http.Request) {
 	}
 	p := CompanyPage{Company: *c}
 	// Half a company's page would read as the whole of it, so any part failing fails the page.
-	var failed [7]error
+	var failed [8]error
 	p.Onboard, failed[6] = a.s.Onboardings(q.Org.ID, c.ID, today())
 	if plan, err := q.Org.Settings.Onboarding(); err == nil {
 		p.Planned = len(plan)
@@ -304,9 +327,10 @@ func (a *App) company(w http.ResponseWriter, r *http.Request) {
 	p.Facts, failed[0] = a.s.Facts(q.Org.ID, c.ID)
 	p.People, failed[1] = a.s.People(q.Org.ID, c.ID)
 	p.Pending, failed[2] = a.s.Pending(q.Org.ID, p.People)
-	p.History, failed[3] = a.s.History(q.Org.ID, c.ID, 50)
-	notes, err := a.s.CompanyNotes(q.Org.ID, c.ID, 20)
-	failed[4] = err
+	p.History, p.HistoryPage, failed[3] = a.s.History(q.Org.ID, c.ID, panelPage(r, "history"))
+	p.Touches, failed[7] = a.s.Touches(q.Org.ID, c.ID)
+	notes, notesPage, err := a.s.CompanyNotesPage(q.Org.ID, c.ID, panelPage(r, "notes"))
+	p.NotesPage, failed[4] = notesPage, err
 	if err := errors.Join(failed[:]...); err != nil {
 		log.Printf("company %d: %v", c.ID, err)
 		http.Error(w, "the company couldn't be read", http.StatusInternalServerError)
@@ -387,17 +411,20 @@ type AgentsData struct {
 	Base     string
 	Keys     []APIKey
 	Activity []AgentEvent
-	Runs     []Run
-	Tasks    map[int64]string
-	Now      time.Time
-	Scores   []AgentScore
+	// ActivityPage is where the list of activity is.
+	ActivityPage Page
+	Runs         []Run
+	Tasks        map[int64]string
+	Now          time.Time
+	Scores       []AgentScore
 }
 
 func (a *App) agents(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	keys, _ := a.s.Keys(q.Org.ID)
 	runs, tasks := a.s.Runs(q.Org.ID, 12)
-	a.page(w, r, "agents", AgentsView(q, AgentsData{Base: a.baseURL(r) + q.Base(), Keys: keys, Activity: a.s.AgentActivity(q.Org.ID, 20),
+	activity, activityPage := a.s.AgentActivity(q.Org.ID, panelPage(r, "activity"))
+	a.page(w, r, "agents", AgentsView(q, AgentsData{Base: a.baseURL(r) + q.Base(), Keys: keys, Activity: activity, ActivityPage: activityPage,
 		Scores: a.s.AgentScores(q.Org.ID), Runs: runs, Tasks: tasks, Now: time.Now()}))
 }
 

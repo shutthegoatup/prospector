@@ -162,7 +162,7 @@ templ CompanyView(q *Req, p CompanyPage) {
 				}
 			</div>
 			<div class="rounded-lg bg-muted p-3">@Label("Found by")<div class="mt-1 text-sm">{ actorLabel(p.Company.FoundBy) }</div></div>
-			<div class="rounded-lg bg-muted p-3">@Label("Touches")<div class="mt-1 font-mono text-lg">{ strconv.Itoa(touches(p.History)) }</div></div>
+			<div class="rounded-lg bg-muted p-3">@Label("Touches")<div class="mt-1 font-mono text-lg">{ strconv.Itoa(p.Touches) }</div></div>
 		</div>
 		<div>
 			<div class="flex items-center justify-between">
@@ -241,6 +241,7 @@ templ CompanyView(q *Req, p CompanyPage) {
 			<div>
 				@Label("Agents' notes, unchecked")
 				@Notes(q, p.Notes)
+				@Pager(p.NotesPage, func(n int) string { return panelLink(string(companyHref(q, p.Company.ID)), "notes", n, "history", p.HistoryPage) })
 			</div>
 		}
 		<div>
@@ -254,6 +255,7 @@ templ CompanyView(q *Req, p CompanyPage) {
 					<span><span class={ "font-mono text-xs", actorColor(h.Actor) }>{ actorLabel(h.Actor) }</span> { historyText(h) }</span>
 				</div>
 			}
+			@Pager(p.HistoryPage, func(n int) string { return panelLink(string(companyHref(q, p.Company.ID)), "history", n, "notes", p.NotesPage) })
 		</div>
 	</div>
 }
@@ -270,17 +272,6 @@ func fitText(f string) string {
 		return ""
 	}
 	return "fit " + f
-}
-
-func touches(h []HistoryItem) int {
-	n := 0
-	for _, e := range h {
-		switch e.Action {
-		case "mark:linkedin", "mark:email", "mark:followup", "mark:call":
-			n++
-		}
-	}
-	return n
 }
 
 templ FactRow(f Fact) {

@@ -506,7 +506,7 @@ func TestAgentMarks(t *testing.T) {
 		t.Fatalf("agent marks should keep the agent's decline and drop the accept Ada re-marked: %v", got)
 	}
 	var h []HistoryItem
-	for _, it := range must(s.History(o.ID, must(s.AgentCompany(o.ID, Actor{}, "Larkmoor Yachts", PageIn{})).Company.ID, 20)) {
+	for _, it := range must(firstOf(s.History(o.ID, must(s.AgentCompany(o.ID, Actor{}, "Larkmoor Yachts", PageIn{})).Company.ID, 1))) {
 		if it.Action == "mark:declined" {
 			h = append(h, it)
 		}

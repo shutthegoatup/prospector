@@ -63,7 +63,7 @@ func TestAFailedQueryIsntTakenForNothingThere(t *testing.T) {
 	if err := s.db.Migrator().DropTable(&Contact{}, &Membership{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.History(o.ID, co.ID, 10); err == nil {
+	if _, err := firstOf(s.History(o.ID, co.ID, 1)); err == nil {
 		t.Error("a company's history came back as if complete when its people couldn't be read")
 	}
 	a := &App{s: s}

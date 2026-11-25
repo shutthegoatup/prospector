@@ -331,7 +331,7 @@ func TestMCPSessionsBelongToOneKey(t *testing.T) {
 	if err != nil || !res.IsError {
 		t.Fatalf("an open session ignored a new never-contact entry: %v %+v", err, res)
 	}
-	if got := s.AgentActivity(o.ID, 20); len(got) != 1 || got[0].Actor != "claude" {
+	if got, _ := s.AgentActivity(o.ID, 1); len(got) != 1 || got[0].Actor != "claude" {
 		t.Fatalf("agent activity: %+v", got)
 	}
 }
@@ -784,14 +784,14 @@ func TestHistoryNamesPeopleInFull(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	history, err := s.History(o.ID, *c.CompanyID, 10)
+	history, _, err := s.History(o.ID, *c.CompanyID, 1)
 	if err != nil || len(history) != 1 || history[0].Actor != "Ada Lovelace" {
 		t.Fatalf("history: %+v %v", history, err)
 	}
 	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/companies/"+strconv.FormatInt(*c.CompanyID, 10), "", nil); !strings.Contains(body, "Ada Lovelace") {
 		t.Fatal("the company page doesn't name who added the person")
 	}
-	if got := s.AgentActivity(o.ID, 10); len(got) != 0 {
+	if got, _ := s.AgentActivity(o.ID, 1); len(got) != 0 {
 		t.Fatalf("a person's action is listed as an agent's: %+v", got)
 	}
 }
