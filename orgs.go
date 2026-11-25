@@ -417,7 +417,7 @@ func (s *Store) Logout(token string) error {
 
 // Scopes an API key can carry. None can change settings or reach another org; only enquiries:reply and customers:invite send mail, and only import skips review.
 var Scopes = []struct{ Name, What string }{
-	{"read", "search companies and people, read what's due and the tasks people wrote"},
+	{"read", "search companies and people, read what's due and the tasks people wrote, and read deals, subscriptions, onboardings and enquiries with what was said in answering them"},
 	{"research:write", "add companies, facts and suggested contacts (they wait in Research), and leave notes on tasks"},
 	{"drafts:write", "write draft notes and emails, marked as written by the agent"},
 	{"outcomes:write", "record what happened (added, accepted, sent, called, replied, declined, hold), shown as the agent's"},

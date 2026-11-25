@@ -553,7 +553,7 @@ paths:
               required: [contact]
               properties:
                 contact: { type: integer, format: int64 }
-                kind: { type: string, description: "`new`, `renewal` or `expansion`." }
+                kind: { type: string, description: "`new`, `renewal` or `expansion`; empty is `new`." }
       responses:
         "201":
           description: The deal as started.
@@ -636,7 +636,7 @@ paths:
       parameters:
         - { name: kind, in: query, schema: { type: string }, description: Only this kind. }
         - { name: state, in: query, schema: { type: string }, description: "Only those `open`, `waiting` or `closed`." }
-        - { name: spam, in: query, schema: { type: boolean }, description: "Those marked as spam, which are otherwise left out." }
+        - { name: spam, in: query, schema: { type: boolean }, description: "Only those marked as spam, which are otherwise left out." }
         - { name: page, in: query, schema: { type: integer }, description: "Which page, from 1." }
       security:
         - session: []
@@ -666,7 +666,7 @@ paths:
       operationId: changeEnquiry
       tags: [enquiries]
       summary: Say where answering an enquiry stands, who has it, or note something on it
-      description: Send only what changes; they are saved together or not at all. The note is never sent, but it is in the sender's export.
+      description: Send only what changes; they are saved together or not at all. The note is never sent, but it is in the sender's export. Refused for spam.
       security:
         - session: []
         - bearer: ["pipeline:write"]
@@ -707,7 +707,7 @@ paths:
       operationId: converseEnquiry
       tags: [enquiries]
       summary: Put whoever sent an enquiry on the Conversations board
-      description: Someone not held yet is added first, under the never-contact and erasure rules that adding anyone goes through.
+      description: Someone not held yet is added first, under the never-contact and erasure rules that adding anyone goes through. Answers 201 whether or not they were already there. Refused for spam.
       security:
         - session: []
         - bearer: ["pipeline:write"]

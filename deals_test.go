@@ -589,6 +589,19 @@ func TestARobotWorksDealsAndEnquiriesAsItsScopesAllow(t *testing.T) {
 		t.Errorf("removing the deal: %d %s", code, body)
 	}
 
+	// With no kind given a deal is new business, and someone who replied and then declined
+	// still has their own deal changed and read back, though the board no longer shows it.
+	if code, body := asKey(t, "POST", base+"deals", worker, map[string]any{"contact": c.ID}); code != http.StatusCreated || !strings.Contains(body, `"kind":"new"`) {
+		t.Errorf("starting a deal with no kind: %d %s", code, body)
+	}
+	gone := repliedPerson(t, s, o, "Tom Ellery")
+	if err := s.Mark(o.ID, gone.ID, "declined", today(), "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if code, body := asKey(t, "PATCH", base+"contacts/"+itoa(gone.ID)+"/deal", worker, map[string]any{"amount": "5,000"}); code != http.StatusOK || !strings.Contains(body, `"value":"£5,000"`) {
+		t.Errorf("valuing the deal of someone who has since declined: %d %s", code, body)
+	}
+
 	// Enquiries: listed, tracked, and deleted only by a key given that, or an owner.
 	e := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Tom Ellery", Email: "tom@larkmoor.example", Message: "Do you cover Leith?"}))
 	spam := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Bot", Email: "bot@spam.example", Message: "hello", Trap: "caught"}))

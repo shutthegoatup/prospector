@@ -88,7 +88,11 @@ func (s apiServer) StartDeal(ctx context.Context, in api.StartDealRequestObject)
 		return nil, errors.New("say who it is with: {\"contact\": id}")
 	}
 	q := reqFrom(ctx)
-	d, err := s.a.s.StartDeal(q.Org.ID, in.Body.Contact, in.Body.Kind, q.Actor())
+	kind := in.Body.Kind
+	if kind == "" {
+		kind = DealNew
+	}
+	d, err := s.a.s.StartDeal(q.Org.ID, in.Body.Contact, kind, q.Actor())
 	if err != nil {
 		return nil, err
 	}
@@ -133,11 +137,17 @@ func (s apiServer) ChangeOwnDeal(ctx context.Context, in api.ChangeOwnDealReques
 	if err := s.a.s.SetDealFields(q.Org.ID, in.Id, dealChanges(in.Body), q.Actor()); err != nil {
 		return nil, err
 	}
-	out, err := s.deal(q.Org.ID, true, in.Id)
-	if err != nil {
+	// Read back by itself, not off the board: someone who replied and then declined has
+	// a deal that the board no longer shows.
+	var c Contact
+	if err := s.a.s.in(q.Org.ID).Where("id = ?", in.Id).First(&c).Error; err != nil {
+		return nil, missing(err, "no contact %d", in.Id)
+	}
+	var d Deal
+	if err := s.a.s.in(q.Org.ID).Where("contact_id = ? and seq = 0", in.Id).Limit(1).Find(&d).Error; err != nil {
 		return nil, err
 	}
-	return api.ChangeOwnDeal200JSONResponse(out), nil
+	return api.ChangeOwnDeal200JSONResponse(dealOut(d, c, true)), nil
 }
 
 func enquiryOut(e Enquiry) api.Enquiry {
