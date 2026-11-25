@@ -739,6 +739,55 @@ func (a *App) uiSSOVerify(w http.ResponseWriter, r *http.Request) {
 }
 
 // ssoCommand is the way back in when a required provider has broken and no owner can sign in.
+// agentCommand sets an organisation's agent from the shell. The key comes from the
+// environment, so it never sits in shell history or a process listing.
+func agentCommand(s *Store, rest []string) error {
+	usage := fmt.Errorf("usage: prospector agent set <org> <endpoint> <model> [<tools-url> [<tool>…]], or prospector agent show <org>")
+	if len(rest) < 2 {
+		return usage
+	}
+	o, err := s.OrgBySlug(rest[1])
+	if err != nil {
+		return fmt.Errorf("no organisation %q", rest[1])
+	}
+	switch rest[0] {
+	case "set":
+		if len(rest) < 4 {
+			return usage
+		}
+		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
+			return err
+		}
+		in := AgentSettingsIn{BaseURL: rest[2], Model: rest[3], APIKey: os.Getenv("PROSPECTOR_AGENT_API_KEY"), Tools: []string{}}
+		if len(rest) > 4 {
+			in.ToolsURL, in.Tools = rest[4], rest[5:]
+		}
+		c, err := (&App{s: s}).saveAgentConfig(context.Background(), o.ID, in, "cli")
+		if err != nil {
+			return err
+		}
+		if c.Problem != "" {
+			fmt.Fprintln(os.Stderr, "saved, but", c.Problem)
+		}
+	case "show":
+	default:
+		return usage
+	}
+	c, err := s.AgentConfigOf(o.ID)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("endpoint: %s\nmodel: %s\nkey: %v\ntools: %s\nmodels listed: %d\n", c.BaseURL, c.Model, c.APIKey != "", c.ToolsURL, len(c.ModelList()))
+	for _, t := range c.ToolList() {
+		mark := " "
+		if c.Allows(t.Name) {
+			mark = "✓"
+		}
+		fmt.Printf("  %s %s\n", mark, t.Name)
+	}
+	return nil
+}
+
 func ssoCommand(s *Store, rest []string) error {
 	if arg(rest, 0, "") != "off" || len(rest) < 2 {
 		return fmt.Errorf("usage: prospector sso off <org>")

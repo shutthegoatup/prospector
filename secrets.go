@@ -240,6 +240,7 @@ type sealedColumn struct {
 var sealedColumns = []sealedColumn{
 	{"sso_connections", "client_secret", "single sign-on secret"},
 	{"org_mails", "password", "mail password"},
+	{"agent_configs", "api_key", "agent endpoint key"},
 }
 
 type storedSecret struct {

@@ -9,6 +9,8 @@
 //	prospector key add <org> <name> <scope>…   prints the key once
 //	prospector mail test <address>           send a test through SMTP_ADDR
 //	prospector sso off <org>                 stop requiring single sign-on, when its provider has broken
+//	prospector agent set <org> <endpoint> <model> [<tools-url> [<tool>…]]   key from $PROSPECTOR_AGENT_API_KEY
+//	prospector agent show <org>              the agent's endpoint, model and tools, never its key
 //	prospector secret-key [version]          print a new entry for PROSPECTOR_SECRET_KEYS
 //	prospector version
 //
@@ -219,6 +221,8 @@ func run(args []string) error {
 		return serve(&App{s: s, base: base, frontOrg: frontOrgSlug, social: social, mail: via}, arg(rest, 0, addr))
 	case "sso":
 		return ssoCommand(s, rest)
+	case "agent":
+		return agentCommand(s, rest)
 	case "mail":
 		if arg(rest, 0, "") != "test" || len(rest) < 2 {
 			return fmt.Errorf("usage: prospector mail test <address>")
