@@ -662,7 +662,8 @@ func serve(a *App, addr string) error {
 	log.Printf("listening on http://%s", addr)
 	// A release is installed by stopping this process, so every merge sends one of these.
 	asked, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	// Asked once, it stops listening for signals, so asking again stops it at once.
+	context.AfterFunc(asked, stop)
 	return a.serveUntil(asked, ln, stopWithin)
 }
 
