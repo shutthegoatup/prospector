@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,7 +22,34 @@ const snapshotSchema = `create table if not exists contacts (
   linkedin_added text, email_sent text, followup_sent text, replied text, declined text, hold text
 );`
 
-var snapshotExtraColumns = Columns[21:]
+var snapshotColumns = append(Columns[:len(Columns):len(Columns)], laterColumns...)
+
+var snapshotExtraColumns = snapshotColumns[21:]
+
+// laterColumns are what Prospector added to a contact after the Python tracker. A
+// snapshot carries them too: without status a restore would turn everyone an agent
+// suggested into someone a person picked.
+var laterColumns = []string{"status", "title", "email_status", "stage", "next_step", "next_date", "lost_reason", "draft_by"}
+
+// later points at laterColumns' fields, in that order.
+func (c *Contact) later() []any {
+	return []any{&c.Status, &c.Title, &c.EmailStatus, &c.Stage, &c.NextStep, &c.NextDate, &c.LostReason, &c.DraftBy}
+}
+
+func laterValue(field any) *string {
+	if p, ok := field.(**string); ok {
+		return *p
+	}
+	return field.(*string)
+}
+
+func setLater(field any, v *string) {
+	if p, ok := field.(**string); ok {
+		*p = v
+		return
+	}
+	*field.(*string) = deref(v)
+}
 
 func sqlQuote(p *string) string {
 	if p == nil {
@@ -54,9 +82,12 @@ func (s *Store) SnapshotText(org int64) (string, error) {
 	for _, c := range snapshotExtraColumns {
 		fmt.Fprintf(&b, "alter table contacts add column %s text;\n", c)
 	}
-	cols := strings.Join(Columns, ", ")
+	cols := strings.Join(snapshotColumns, ", ")
 	for _, r := range rows {
 		vals := r.values()
+		for _, f := range r.later() {
+			vals = append(vals, laterValue(f))
+		}
 		out := make([]string, len(vals))
 		out[0] = strconv.FormatInt(r.ID, 10)
 		for i, v := range vals[1:] {
@@ -67,99 +98,119 @@ func (s *Store) SnapshotText(org int64) (string, error) {
 	return b.String(), nil
 }
 
-// parseInserts reads the snapshot's insert statements, whose quoted values may span lines.
-func parseInserts(text string) ([]Contact, error) {
-	var out []Contact
+// parseInserts reads the snapshot's insert statements, whose quoted values may span
+// lines, and says which of laterColumns no statement named: a snapshot written before
+// they were carried.
+func parseInserts(text string) (out []Contact, absent []string, err error) {
+	named := map[string]bool{}
+	for text != "" {
+		var c *Contact
+		if c, text, err = parseInsert(text, named); err != nil {
+			return nil, nil, err
+		}
+		if c != nil {
+			out = append(out, *c)
+		}
+	}
+	for _, name := range laterColumns {
+		if !named[name] {
+			absent = append(absent, name)
+		}
+	}
+	return out, absent, nil
+}
+
+// parseInsert reads the next insert statement, if there is one, and returns what follows it.
+func parseInsert(text string, named map[string]bool) (*Contact, string, error) {
 	const marker = " values ("
+	start := strings.Index(text, "insert into contacts (")
+	if start < 0 {
+		return nil, "", nil
+	}
+	text = text[start:]
+	open := strings.Index(text, marker)
+	if open < 0 {
+		return nil, "", fmt.Errorf("insert without values")
+	}
+	colList := text[len("insert into contacts ("):strings.Index(text, ")")]
+	cols := strings.Split(colList, ", ")
+	text = text[open+len(marker):]
+	var vals []*string
 	for {
-		start := strings.Index(text, "insert into contacts (")
-		if start < 0 {
-			return out, nil
-		}
-		text = text[start:]
-		open := strings.Index(text, marker)
-		if open < 0 {
-			return nil, fmt.Errorf("insert without values")
-		}
-		colList := text[len("insert into contacts ("):strings.Index(text, ")")]
-		cols := strings.Split(colList, ", ")
-		text = text[open+len(marker):]
-		var vals []*string
-		for {
-			text = strings.TrimLeft(text, " ")
-			switch {
-			case strings.HasPrefix(text, "NULL"):
-				vals, text = append(vals, nil), text[4:]
-			case strings.HasPrefix(text, "'"):
-				var b strings.Builder
-				i := 1
-				for {
-					j := strings.IndexByte(text[i:], '\'')
-					if j < 0 {
-						return nil, fmt.Errorf("unterminated string")
-					}
-					b.WriteString(text[i : i+j])
-					i += j + 1
-					if i < len(text) && text[i] == '\'' {
-						b.WriteByte('\'')
-						i++
-						continue
-					}
-					break
+		text = strings.TrimLeft(text, " ")
+		switch {
+		case strings.HasPrefix(text, "NULL"):
+			vals, text = append(vals, nil), text[4:]
+		case strings.HasPrefix(text, "'"):
+			var b strings.Builder
+			i := 1
+			for {
+				j := strings.IndexByte(text[i:], '\'')
+				if j < 0 {
+					return nil, "", fmt.Errorf("unterminated string")
 				}
-				v := b.String()
-				vals, text = append(vals, &v), text[i:]
-			default:
-				end := strings.IndexAny(text, ",)")
-				v := strings.TrimSpace(text[:end])
-				vals, text = append(vals, &v), text[end:]
-			}
-			if text[0] == ')' {
+				b.WriteString(text[i : i+j])
+				i += j + 1
+				if i < len(text) && text[i] == '\'' {
+					b.WriteByte('\'')
+					i++
+					continue
+				}
 				break
 			}
-			text = text[1:]
+			v := b.String()
+			vals, text = append(vals, &v), text[i:]
+		default:
+			end := strings.IndexAny(text, ",)")
+			v := strings.TrimSpace(text[:end])
+			vals, text = append(vals, &v), text[end:]
 		}
-		if len(vals) != len(cols) {
-			return nil, fmt.Errorf("%d values for %d columns", len(vals), len(cols))
+		if text[0] == ')' {
+			break
 		}
-		c := Contact{}
-		byName := map[string]int{}
-		for i, name := range Columns {
-			byName[name] = i
-		}
-		f := c.fields()
-		for i, name := range cols {
-			idx, ok := byName[name]
-			if !ok {
-				return nil, fmt.Errorf("unknown column %q", name)
-			}
-			switch name {
-			case "id":
-				id, err := strconv.ParseInt(*vals[i], 10, 64)
-				if err != nil {
-					return nil, err
-				}
-				c.ID = id
-			case "key":
-				c.Key = *vals[i]
-			case "file":
-				c.File = *vals[i]
-			default:
-				*f[idx] = vals[i]
-			}
-		}
-		out = append(out, c)
+		text = text[1:]
 	}
+	if len(vals) != len(cols) {
+		return nil, "", fmt.Errorf("%d values for %d columns", len(vals), len(cols))
+	}
+	c := Contact{}
+	f, later := c.fields(), c.later()
+	for i, name := range cols {
+		if at := slices.Index(laterColumns, name); at >= 0 {
+			named[name] = true
+			setLater(later[at], vals[i])
+			continue
+		}
+		idx := slices.Index(Columns, name)
+		if idx < 0 {
+			return nil, "", fmt.Errorf("unknown column %q", name)
+		}
+		switch name {
+		case "id":
+			id, err := strconv.ParseInt(*vals[i], 10, 64)
+			if err != nil {
+				return nil, "", err
+			}
+			c.ID = id
+		case "key":
+			c.Key = *vals[i]
+		case "file":
+			c.File = *vals[i]
+		default:
+			*f[idx] = vals[i]
+		}
+	}
+	return &c, text, nil
 }
 
 // Restore replaces an organisation's contacts with the snapshot's. Ids are kept so the
 // snapshot round-trips; it fails if another organisation already holds one of them.
 func (s *Store) Restore(org int64, text string) (int, error) {
-	rows, err := parseInserts(text)
+	rows, absent, err := parseInserts(text)
 	if err != nil {
 		return 0, err
 	}
-	return s.replaceContacts(org, rows)
+	return s.replaceContacts(org, rows, absent)
 }
 
 // ImportLegacy copies the Python tracker's live database, opened read-only, into an
@@ -212,10 +263,13 @@ func (s *Store) ImportLegacy(org int64, path string) (int, error) {
 			}
 		}
 	}
-	return s.replaceContacts(org, rows)
+	return s.replaceContacts(org, rows, laterColumns)
 }
 
-func (s *Store) replaceContacts(org int64, rows []Contact) (int, error) {
+// replaceContacts swaps an organisation's contacts for rows. absent names the
+// laterColumns the rows' source doesn't hold: someone already here under the same key
+// keeps what they have in those, since the source says nothing about them.
+func (s *Store) replaceContacts(org int64, rows []Contact, absent []string) (int, error) {
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		kept := rows[:0]
 		for _, r := range rows {
@@ -237,8 +291,21 @@ func (s *Store) replaceContacts(org int64, rows []Contact) (int, error) {
 			return err
 		}
 		var before []Contact
-		if err := tx.Select("id", "key").Where("org_id = ?", org).Find(&before).Error; err != nil {
+		if err := tx.Where("org_id = ?", org).Find(&before).Error; err != nil {
 			return err
+		}
+		have := map[string]*Contact{}
+		for i := range before {
+			have[before[i].Key] = &before[i]
+		}
+		for i := range rows {
+			if was := have[rows[i].Key]; was != nil {
+				from, to := was.later(), rows[i].later()
+				for _, name := range absent {
+					at := slices.Index(laterColumns, name)
+					setLater(to[at], laterValue(from[at]))
+				}
+			}
 		}
 		if err := tx.Where("org_id = ?", org).Delete(&Contact{}).Error; err != nil {
 			return err
