@@ -229,7 +229,7 @@ type Store struct {
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
 	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &Suggestion{},
-	&Task{}, &TaskRequest{}, &TaskNote{}}
+	&Task{}, &TaskRequest{}, &TaskNote{}, &PasswordToken{}, &OrgMail{}}
 
 // Open takes a postgres:// URL or a SQLite file path.
 func Open(dsn string) (*Store, error) {

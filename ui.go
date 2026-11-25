@@ -199,6 +199,7 @@ type SettingsData struct {
 	Members []Member
 	Me      Membership
 	Covered []string
+	Mail    MailView
 	SSO     *SSO
 	// Callback is where a provider sends people back; empty until PROSPECTOR_URL is set.
 	Callback string
@@ -210,7 +211,8 @@ type SettingsData struct {
 func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	members, _ := a.s.Members(q.Org.ID)
-	d := SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org), Intake: a.baseURL(r) + q.Base() + "intake"}
+	d := SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org), Intake: a.baseURL(r) + q.Base() + "intake",
+		Mail: a.mailView(q.Org.ID)}
 	d.Sealing = a.s.keys != nil
 	if d.SSO, _ = a.s.SSO(q.Org.ID); d.SSO == nil {
 		d.SSO = &SSO{}
@@ -393,7 +395,19 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	msg := u.Email + " added to " + q.Org.Name + "."
-	if !u.HasPassword() {
+	// Someone who never chose a password is sent the link again, so a lost one isn't the end.
+	if password != "" || u.MustChangePassword {
+		sent, err := a.invite(r.Context(), q, u, password != "")
+		if sent {
+			writeJSON(w, map[string]string{"message": msg + " They've been emailed a link to choose their password; it lasts 7 days."})
+			return
+		}
+		if errors.Is(err, errTooSoon) {
+			msg += " They were emailed a link to choose their password a moment ago, so no other was sent."
+		} else if err != nil {
+			msg += " The invitation couldn't be emailed (" + err.Error() + ")."
+		}
+	} else if !u.HasPassword() {
 		msg += " They have no password: they sign in through a provider, so they can open this organisation only by one it accepts."
 	}
 	if password != "" {
