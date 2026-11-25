@@ -15,10 +15,14 @@ import (
 // Deal is what a conversation is worth, when it should close and whose it is. Where
 // it stands (stage, next step, why it was lost) is still the contact's.
 type Deal struct {
-	ID        int64  `gorm:"primaryKey" json:"id"`
-	OrgID     int64  `gorm:"uniqueIndex:idx_deal_contact;not null" json:"-"`
-	ContactID int64  `gorm:"uniqueIndex:idx_deal_contact;not null" json:"contact_id"`
-	Kind      string `gorm:"not null;default:'new'" json:"kind"`
+	ID        int64 `gorm:"primaryKey" json:"id"`
+	OrgID     int64 `gorm:"uniqueIndex:idx_deal_seq,priority:1;not null" json:"-"`
+	ContactID int64 `gorm:"uniqueIndex:idx_deal_seq,priority:2;not null" json:"contact_id"`
+	// Seq tells one contact's deals apart; 0 is the conversation's own. A database from
+	// before it also has an index allowing each contact one deal, which nothing here
+	// relies on.
+	Seq  int    `gorm:"uniqueIndex:idx_deal_seq,priority:3;not null;default:0" json:"seq"`
+	Kind string `gorm:"not null;default:'new'" json:"kind"`
 	// Amount is in the currency's hundredths, so sums don't drift.
 	Amount    int64     `gorm:"not null;default:0" json:"amount"`
 	Currency  string    `gorm:"not null;default:''" json:"currency"`
@@ -83,7 +87,7 @@ func (d Deal) Value() string {
 // Deals are an organisation's deals by the contact each belongs to.
 func (s *Store) Deals(org int64) (map[int64]Deal, error) {
 	var rows []Deal
-	if err := s.in(org).Find(&rows).Error; err != nil {
+	if err := s.in(org).Where("seq = 0").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make(map[int64]Deal, len(rows))
@@ -107,7 +111,7 @@ func (s *Store) setDeal(tx *gorm.DB, org, contact int64, field, value, actor str
 		return err
 	}
 	var d Deal
-	if err := tx.Where("org_id = ? and contact_id = ?", org, contact).Limit(1).Find(&d).Error; err != nil {
+	if err := tx.Where("org_id = ? and contact_id = ? and seq = 0", org, contact).Limit(1).Find(&d).Error; err != nil {
 		return err
 	}
 	// A deal already valued keeps its currency: the setting changing mustn't turn
@@ -166,7 +170,7 @@ func (s *Store) setDeal(tx *gorm.DB, org, contact int64, field, value, actor str
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&first).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("org_id = ? and contact_id = ?", org, contact).First(&d).Error; err != nil {
+		if err := tx.Where("org_id = ? and contact_id = ? and seq = 0", org, contact).First(&d).Error; err != nil {
 			return err
 		}
 	}
