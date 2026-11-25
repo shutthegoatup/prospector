@@ -19,12 +19,18 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"gorm.io/gorm"
 )
 
-// AgentConfig is how an organisation's own agent reaches a model and its tools:
-// an OpenAI-compatible endpoint, and an MCP server whose tools it may use.
-type AgentConfig struct {
-	OrgID   int64  `gorm:"primaryKey;autoIncrement:false"`
+// Agent is one of an organisation's own agents: what it is called, how it reaches a
+// model (an OpenAI-compatible endpoint), and an MCP server whose tools it may use.
+type Agent struct {
+	ID    int64  `gorm:"primaryKey"`
+	OrgID int64  `gorm:"uniqueIndex:idx_agents_org_name;not null"`
+	Name  string `gorm:"uniqueIndex:idx_agents_org_name;not null"`
+	Kind  string `gorm:"not null;default:'openai'"`
+	// KeyID is its built-in API key, which everything it does is recorded under.
+	KeyID   int64  `gorm:"not null;default:0"`
 	BaseURL string `gorm:"not null;default:''"`
 	// APIKey is sealed under the server's key, never kept or shown in clear.
 	APIKey   string `gorm:"not null;default:''"`
@@ -66,16 +72,77 @@ func encodeList(v any) string {
 	return string(raw)
 }
 
-func (c AgentConfig) ModelList() []string     { return decodeList[string](c.Models) }
-func (c AgentConfig) ToolList() []AgentTool   { return decodeList[AgentTool](c.Tools) }
-func (c AgentConfig) AllowedTools() []string  { return decodeList[string](c.Allowed) }
-func (c AgentConfig) Ready() bool             { return c.BaseURL != "" && c.APIKey != "" && c.Model != "" }
-func (c AgentConfig) Allows(tool string) bool { return slices.Contains(c.AllowedTools(), tool) }
+func (c Agent) ModelList() []string     { return decodeList[string](c.Models) }
+func (c Agent) ToolList() []AgentTool   { return decodeList[AgentTool](c.Tools) }
+func (c Agent) AllowedTools() []string  { return decodeList[string](c.Allowed) }
+func (c Agent) Ready() bool             { return c.BaseURL != "" && c.APIKey != "" && c.Model != "" }
+func (c Agent) Allows(tool string) bool { return slices.Contains(c.AllowedTools(), tool) }
 
-func (s *Store) AgentConfigOf(org int64) (*AgentConfig, error) {
-	c := AgentConfig{OrgID: org, Models: "[]", Tools: "[]", Allowed: "[]"}
-	err := s.db.Where("org_id = ?", org).Limit(1).Find(&c).Error
-	return &c, err
+// Agents are an organisation's own agents, by name.
+func (s *Store) Agents(org int64) ([]Agent, error) {
+	var out []Agent
+	return out, s.db.Where("org_id = ?", org).Order("name, id").Find(&out).Error
+}
+
+func (s *Store) AgentByID(org, id int64) (*Agent, error) {
+	var c Agent
+	if err := s.db.Where("org_id = ? and id = ?", org, id).Limit(1).Find(&c).Error; err != nil || c.ID == 0 {
+		return nil, errors.Join(err, fmt.Errorf("no agent %d in this organisation", id))
+	}
+	return &c, nil
+}
+
+func (s *Store) agentNamed(org int64, name string) (*Agent, error) {
+	var c Agent
+	if err := s.db.Where("org_id = ? and name = ?", org, name).Limit(1).Find(&c).Error; err != nil || c.ID == 0 {
+		return nil, errors.Join(err, fmt.Errorf("no agent called %q in this organisation", name))
+	}
+	return &c, nil
+}
+
+// migrateAgentConfigs moves each organisation's single agent from before there could
+// be several into the agents table, as one called "Prospector" with the built-in key
+// its work is already recorded under, and points its runs at it. The old row is
+// deleted in the same transaction, so an agent its owner later deletes doesn't return.
+func migrateAgentConfigs(db *gorm.DB) error {
+	if !db.Migrator().HasTable("agent_configs") {
+		return nil
+	}
+	var old []struct {
+		OrgID                                           int64
+		BaseURL, APIKey, Model, ToolsURL, Models, Tools string
+		Allowed, Problem, UpdatedBy                     string
+		CheckedAt                                       *time.Time
+		UpdatedAt                                       time.Time
+	}
+	if err := db.Table("agent_configs").Find(&old).Error; err != nil {
+		return err
+	}
+	for _, c := range old {
+		err := db.Transaction(func(tx *gorm.DB) error {
+			var key APIKey
+			if err := tx.Where("org_id = ? and prefix = ? and revoked_at is null", c.OrgID, builtinPrefix).Order("id").Limit(1).Find(&key).Error; err != nil {
+				return err
+			}
+			if c.BaseURL != "" {
+				a := Agent{OrgID: c.OrgID, Name: "Prospector", Kind: "openai", KeyID: key.ID, BaseURL: c.BaseURL, APIKey: c.APIKey, Model: c.Model,
+					ToolsURL: c.ToolsURL, Models: c.Models, Tools: c.Tools, Allowed: c.Allowed, Problem: c.Problem, CheckedAt: c.CheckedAt,
+					UpdatedBy: c.UpdatedBy, UpdatedAt: c.UpdatedAt}
+				if err := tx.Create(&a).Error; err != nil {
+					return err
+				}
+				if err := tx.Model(&AgentRun{}).Where("org_id = ? and agent_id = 0", c.OrgID).
+					Updates(map[string]any{"agent_id": a.ID, "agent_name": a.Name}).Error; err != nil {
+					return err
+				}
+			}
+			return tx.Exec("delete from agent_configs where org_id = ?", c.OrgID).Error
+		})
+		if err != nil {
+			return fmt.Errorf("moving organisation %d's agent: %w", c.OrgID, err)
+		}
+	}
+	return nil
 }
 
 // endpointError is an endpoint's refusal, kept apart so a run can wait out a limit.
@@ -253,9 +320,12 @@ func (a *App) listTools(ctx context.Context, endpoint, key string) ([]AgentTool,
 	return out, nil
 }
 
-// AgentSettingsIn is what an owner saves. An empty key keeps the one saved, but
-// only for the same endpoint: a key isn't sent to an address it wasn't given for.
+// AgentSettingsIn is what an owner saves: a new agent when ID is 0. An empty key
+// keeps the one saved, but only for the same endpoint: a key isn't sent to an address
+// it wasn't given for.
 type AgentSettingsIn struct {
+	ID       int64    `json:"id"`
+	Name     string   `json:"name"`
 	BaseURL  string   `json:"base_url"`
 	APIKey   string   `json:"api_key"`
 	Model    string   `json:"model"`
@@ -264,32 +334,57 @@ type AgentSettingsIn struct {
 }
 
 // toolsKey is the key the tools URL may be sent: the endpoint's, on the same origin only.
-func (c AgentConfig) toolsKey(key string) string {
+func (c Agent) toolsKey(key string) string {
 	if sameOrigin(c.BaseURL, c.ToolsURL) {
 		return key
 	}
 	return ""
 }
 
-// saveAgentConfig stores the settings, then checks them. A check that fails, as when
+const maxAgentName = 40
+
+func agentName(raw string) (string, error) {
+	name := strings.Join(strings.Fields(raw), " ")
+	if name == "" {
+		return "", errors.New("give the agent a name, such as the model it uses")
+	}
+	if len([]rune(name)) > maxAgentName {
+		return "", fmt.Errorf("an agent's name is %d characters at most", maxAgentName)
+	}
+	return name, nil
+}
+
+// saveAgent stores an agent's settings, then checks them. A check that fails, as when
 // the endpoint's daily limit is spent, is reported but doesn't stop the save.
-func (a *App) saveAgentConfig(ctx context.Context, org int64, in AgentSettingsIn, by string) (*AgentConfig, error) {
+func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by string) (*Agent, error) {
+	name, err := agentName(in.Name)
+	if err != nil {
+		return nil, err
+	}
 	base, err := endpointURL(in.BaseURL)
 	if err != nil {
 		return nil, err
+	}
+	if base == "" {
+		return nil, errors.New("enter the endpoint's address")
 	}
 	tools, err := endpointURL(in.ToolsURL)
 	if err != nil {
 		return nil, fmt.Errorf("tools: %w", err)
 	}
-	c, err := a.s.AgentConfigOf(org)
-	if err != nil {
-		return nil, err
+	c := &Agent{OrgID: org, Kind: "openai", Models: "[]", Tools: "[]", Allowed: "[]"}
+	if in.ID != 0 {
+		if c, err = a.s.AgentByID(org, in.ID); err != nil {
+			return nil, err
+		}
 	}
-	if base == "" {
-		*c = AgentConfig{OrgID: org, Models: "[]", Tools: "[]", Allowed: "[]", UpdatedBy: by}
-		return c, a.s.db.Save(c).Error
+	var taken int64
+	a.s.db.Model(&Agent{}).Where("org_id = ? and name = ? and id <> ?", org, name, c.ID).Count(&taken)
+	if taken > 0 {
+		return nil, fmt.Errorf("there is already an agent called %q", name)
 	}
+	renamed := c.ID != 0 && c.Name != name
+	c.Name = name
 	key := strings.TrimSpace(in.APIKey)
 	if key == "" && c.APIKey != "" && c.BaseURL == base {
 		if key, err = a.s.keys.open(c.APIKey); err != nil {
@@ -354,7 +449,42 @@ func (a *App) saveAgentConfig(ctx context.Context, org int64, in AgentSettingsIn
 	c.Allowed = encodeList(allowed)
 	now := time.Now()
 	c.Problem, c.CheckedAt = strings.Join(problems, " "), &now
-	return c, a.s.db.Save(c).Error
+	if err := a.s.db.Save(c).Error; err != nil {
+		return nil, err
+	}
+	if renamed && c.KeyID != 0 {
+		// Its key carries its name into the record; MCP servers built for it hold the old one.
+		if err := a.s.db.Model(&APIKey{}).Where("id = ?", c.KeyID).Update("name", builtinKeyName(c.Name)).Error; err != nil {
+			return nil, err
+		}
+		a.mu.Lock()
+		a.mcp = nil
+		a.mu.Unlock()
+	}
+	return c, nil
+}
+
+// deleteAgent stops what the agent is doing, revokes its key so nothing more is done
+// in its name, and forgets its settings. What it found stays, as any agent's does.
+func (a *App) deleteAgent(org, id int64) error {
+	c, err := a.s.AgentByID(org, id)
+	if err != nil {
+		return err
+	}
+	var going []AgentRun
+	a.s.db.Where("org_id = ? and agent_id = ? and status in ?", org, c.ID, []string{RunWorking, RunWaiting}).Find(&going)
+	for _, run := range going {
+		a.StopRun(org, run.ID)
+	}
+	now := time.Now()
+	return a.s.db.Transaction(func(tx *gorm.DB) error {
+		if c.KeyID != 0 {
+			if err := tx.Model(&APIKey{}).Where("id = ? and revoked_at is null", c.KeyID).Update("revoked_at", &now).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Delete(c).Error
+	})
 }
 
 func (a *App) uiAgent(w http.ResponseWriter, r *http.Request) {
@@ -363,34 +493,49 @@ func (a *App) uiAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := reqOf(r)
-	c, err := a.saveAgentConfig(r.Context(), q.Org.ID, in, q.Actor())
+	c, err := a.saveAgent(r.Context(), q.Org.ID, in, q.Actor())
 	if err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
-	msg := "Saved."
+	msg := c.Name + " saved."
 	switch {
-	case c.BaseURL == "":
-		msg = "Prospector's agent is off: no model endpoint."
 	case c.Problem != "":
-		msg = "Saved, but " + c.Problem
+		msg = c.Name + " saved, but " + c.Problem
 	case !c.Ready():
-		msg = "Saved. Pick a model to finish."
+		msg = c.Name + " saved. Pick a model to finish."
 	}
 	writeJSON(w, map[string]string{"message": msg})
 }
 
-// AgentView is what Settings shows of the agent: never the key.
+func (a *App) uiAgentDelete(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID int64 `json:"id"`
+	}
+	if decode(w, r, &in) {
+		done(w, a.deleteAgent(reqOf(r).Org.ID, in.ID))
+	}
+}
+
+// AgentView is what Settings shows of an agent: never the key.
 type AgentView struct {
-	AgentConfig
+	Agent
 	HasKey bool
+}
+
+type OwnAgentsView struct {
+	Agents []AgentView
 	// Sealing is whether the server can keep a key at all.
 	Sealing bool
 }
 
-func (a *App) agentView(org int64) AgentView {
-	c, _ := a.s.AgentConfigOf(org)
-	v := AgentView{AgentConfig: *c, HasKey: c.APIKey != "", Sealing: a.s.keys != nil}
-	v.APIKey = ""
+func (a *App) ownAgents(org int64) OwnAgentsView {
+	list, _ := a.s.Agents(org)
+	v := OwnAgentsView{Sealing: a.s.keys != nil}
+	for _, c := range list {
+		view := AgentView{Agent: c, HasKey: c.APIKey != ""}
+		view.APIKey = ""
+		v.Agents = append(v.Agents, view)
+	}
 	return v
 }

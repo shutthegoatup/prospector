@@ -232,24 +232,27 @@ func (k *keyring) verify(p purpose, message, signature string) bool {
 }
 
 // sealedColumn is where one kind of sealed secret is stored, a row to an organisation.
+// sealedColumn is where one kind of sealed secret is stored, and the column that tells
+// its rows apart: an organisation's, where it has one, or each row's own id.
 type sealedColumn struct {
-	table        string
-	column, what string
+	table             string
+	column, what, row string
 }
 
 var sealedColumns = []sealedColumn{
-	{"sso_connections", "client_secret", "single sign-on secret"},
-	{"org_mails", "password", "mail password"},
-	{"agent_configs", "api_key", "agent endpoint key"},
+	{"sso_connections", "client_secret", "single sign-on secret", "org_id"},
+	{"org_mails", "password", "mail password", "org_id"},
+	{"agents", "api_key", "agent endpoint key", "id"},
 }
 
 type storedSecret struct {
+	RowID  int64
 	OrgID  int64
 	Secret string
 }
 
 func (s *Store) stored(in sealedColumn) *gorm.DB {
-	return s.db.Table(in.table).Select("org_id, " + in.column + " as secret").Where(in.column + " <> ''")
+	return s.db.Table(in.table).Select(in.row + " as row_id, org_id, " + in.column + " as secret").Where(in.column + " <> ''")
 }
 
 // Reseal moves every stored secret onto the current key, sealing for the first time any
@@ -270,7 +273,7 @@ func (s *Store) Reseal() (moved int, err error) {
 			// What is there now is what counts.
 			if err == nil && raced {
 				var now []storedSecret
-				if err = s.stored(in).Where("org_id = ?", row.OrgID).Scan(&now).Error; err == nil && len(now) > 0 {
+				if err = s.stored(in).Where(in.row+" = ?", row.RowID).Scan(&now).Error; err == nil && len(now) > 0 {
 					if _, err = s.keys.open(now[0].Secret); err == nil && s.keys.behind(now[0].Secret) {
 						err = errors.New("changed while it was being sealed again, and is still under an older key: restart to move it")
 					}
@@ -300,7 +303,7 @@ func (s *Store) resealOne(in sealedColumn, row storedSecret) (moved, raced bool,
 		return false, false, err
 	}
 	// Only the value that was read is replaced, so an owner's change made meanwhile wins.
-	res := s.db.Table(in.table).Where("org_id = ? and "+in.column+" = ?", row.OrgID, row.Secret).Update(in.column, again)
+	res := s.db.Table(in.table).Where(in.row+" = ? and "+in.column+" = ?", row.RowID, row.Secret).Update(in.column, again)
 	return res.RowsAffected > 0, res.RowsAffected == 0, res.Error
 }
 

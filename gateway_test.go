@@ -150,7 +150,7 @@ func TestARunWaitsOutAGatewaysLimitOnItsTools(t *testing.T) {
 			gateway.mu.Lock()
 			gateway.limited[method] = 0
 			gateway.mu.Unlock()
-			if _, err := r.a.saveAgentConfig(context.Background(), r.o.ID, AgentSettingsIn{BaseURL: fake.srv.URL + "/v1", APIKey: agentTestKey,
+			if _, err := r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{ID: r.agent, Name: "Prospector", BaseURL: fake.srv.URL + "/v1", APIKey: agentTestKey,
 				Model: "router/auto", ToolsURL: tools.URL + "/mcp", Tools: []string{"brave-search_brave_web_search"}}, "Ada Lovelace"); err != nil {
 				t.Fatal(err)
 			}
@@ -163,7 +163,7 @@ func TestARunWaitsOutAGatewaysLimitOnItsTools(t *testing.T) {
 				}
 				return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 			}
-			got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+			got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 			gateway.mu.Lock()
 			refused, calls := gateway.refused, slices.Clone(gateway.calls)
 			gateway.mu.Unlock()
@@ -190,7 +190,7 @@ func TestTheAgentWorksThroughAGatewaysFederatedTools(t *testing.T) {
 	if err != nil || len(found) != 2 || found[0].Name != "brave-search_brave_web_search" {
 		t.Fatalf("listing a gateway's federated tools: %v %+v", err, found)
 	}
-	if _, err := r.a.saveAgentConfig(context.Background(), r.o.ID, AgentSettingsIn{BaseURL: fake.srv.URL + "/v1", APIKey: agentTestKey,
+	if _, err := r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{ID: r.agent, Name: "Prospector", BaseURL: fake.srv.URL + "/v1", APIKey: agentTestKey,
 		Model: "router/auto", ToolsURL: tools.URL + "/mcp", Tools: []string{"brave-search_brave_web_search", "fetch_fetch"}}, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestTheAgentWorksThroughAGatewaysFederatedTools(t *testing.T) {
 		}
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
-	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	if got.Status != RunFinished || got.Added != 1 {
 		t.Fatalf("a run through a gateway's tools: %+v", got)
 	}

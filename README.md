@@ -39,7 +39,7 @@ Companies found by agents, imports and people wait here to be qualified or rejec
 
 Write what you want found. An agent picks the task up and what it finds waits in Research, tied to the task. Anyone can ask for more later, and a different agent can carry on: it is shown the brief, every request, what has already been found and what a person rejected, and the notes earlier agents left on what they skipped.
 
-Your own agent starts on a task from the prompt on its page (clients that show MCP prompts as commands have it as `work_task`). Or Prospector works it with its own agent: see [Prospector's own agent](#prospectors-own-agent).
+Your own agent starts on a task from the prompt on its page (clients that show MCP prompts as commands have it as `work_task`). Or Prospector works it with its own agents: see [Prospector's own agents](#prospectors-own-agents).
 
 A task shows as waiting, being worked on, or done. Nothing an agent says while working is stored: its status and results are read from what it added. Agents often stop without saying so, so each request shows what has been added since it was asked, and you can mark one done or reopen it yourself.
 
@@ -195,18 +195,19 @@ Each organisation has an MCP endpoint at `/o/<slug>/mcp` (streamable HTTP) and a
 claude mcp add --transport http prospector https://<host>/o/<slug>/mcp --header "Authorization: Bearer $PROSPECTOR_KEY"
 ```
 
-## Prospector's own agent
+## Prospector's own agents
 
-An organisation can have Prospector work its tasks with a model of its choosing. An owner sets it up in Settings → Prospector's agent:
+An organisation can have Prospector work its tasks with models of its choosing: Claude, ChatGPT and open models side by side. An owner adds each as an agent in Settings → Prospector's agents, with a name and:
 
-- **Endpoint:** any OpenAI-compatible endpoint: its base URL (the one `/models` and `/chat/completions` are under), an API key and a model. Saving reads the endpoint's model list to choose from, and a router model that picks one per request works as well as a single model. OpenRouter's base URL is `https://openrouter.ai/api/v1`; an LLM gateway of your own works the same way.
+- **Endpoint:** any OpenAI-compatible endpoint: its base URL (the one `/models` and `/chat/completions` are under), an API key and a model. Saving reads the endpoint's model list to choose from, and a router model that picks one per request works as well as a single model. OpenAI's is `https://api.openai.com/v1` and OpenRouter's `https://openrouter.ai/api/v1`; an LLM gateway of your own works the same way.
 - **Tools:** an MCP server whose tools the agent may use, such as a gateway's federated `/mcp` with web search and page fetching. Saving lists its tools; the agent uses only the ones ticked, and a tool that appears later starts unticked. The server is sent the endpoint's key only when it is on the same address. LinkedIn's terms forbid automated access, logged-in browsers included, so prefer search and fetch tools to browser and captcha ones.
-- **Keys:** sealed under the server's [secret key](#secret-keys), never shown again, and left out of exports. Changing the endpoint needs the key entered again. `prospector agent set <org> <endpoint> <model> [<tools-url> [<tool>…]]` does the same from the shell, with the key in `PROSPECTOR_AGENT_API_KEY`.
+- **Keys:** sealed under the server's [secret key](#secret-keys), never shown again, and left out of exports. Changing the endpoint needs the key entered again. `prospector agent set <org> <name> <endpoint> <model> [<tools-url> [<tool>…]]` does the same from the shell, adding the agent or changing the one with that name, with the key in `PROSPECTOR_AGENT_API_KEY`.
+- **Deleting** an agent stops its runs and revokes its key. What it found stays, as any agent's does.
 - **Addresses:** the endpoint and tool server must be `https` at public addresses. An operator whose gateway sits on a private network sets `PROSPECTOR_AGENT_ALLOW_PRIVATE=1`.
 
-Any member can then press "Run Prospector's agent" on a task. The run:
+Any member can then press "Run" with an agent's name on a task. Several agents can work one task at once, each on a different open request; one agent works a task once at a time. A run:
 
-- works the open request the task keeps for it, like any agent, under a built-in key named `prospector`, so its history, claims and scorecard read as any agent's;
+- works the open request the task keeps for it, like any agent, under its agent's built-in key (named after the agent, marked "built in"), so its history, claims and scorecard read as any agent's;
 - gets Prospector's research tools (`get_task`, `search`, `get_company`, `add_company`, `add_fact`, `add_contact`, `task_note`, `finish_request`) and the allowed MCP tools. It can't draft, mark or send anything, and what it finds waits in Research;
 - has every fact and contact checked against the pages its tools showed it in that run: a source it wasn't shown is refused, and it is told why;
 - treats what tools return as content from the web, never as instructions;
@@ -214,7 +215,9 @@ Any member can then press "Run Prospector's agent" on a task. The run:
 - starts its conversation afresh from `get_task` every 30 turns, or once the conversation grows long, so it can run for as long as there is work with a bounded context;
 - is carried on after a restart or deploy, by whichever server sees its hold lapse first, unless someone stopped it.
 
-A run stores counts (turns, tool calls, tokens, what it added) and why it ended, never what was said. One run works a task at a time, and a server runs at most two at once. There are no spending caps yet: use an endpoint whose costs you control, or set a limit on its key.
+A run stores counts (turns, tool calls, tokens, what it added) and why it ended, never what was said. A server runs at most 8 at once, or `PROSPECTOR_AGENT_MAX_RUNS`.
+
+Before there could be several agents, an organisation had one. On the first start of this release it becomes an agent called "Prospector", keeping its key, its record and any run it had going. Going back to an earlier release afterwards means entering its settings again. There are no spending caps yet: use an endpoint whose costs you control, or set a limit on its key.
 
 What leaves the server: the task's brief and requests, and what Prospector's tools return, which includes companies' facts and people's names, titles, email addresses, profile links and the next step planned with them, go to the endpoint and on to whoever serves the model.
 

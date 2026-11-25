@@ -43,26 +43,32 @@ func (a *App) taskPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := TaskPage{TaskView: *t, Prompt: taskPrompt(q.Org, t.Task), Now: now}
-	if cfg, err := a.s.AgentConfigOf(q.Org.ID); err == nil {
-		d.AgentReady = cfg.Ready()
+	if agents, err := a.s.Agents(q.Org.ID); err == nil {
+		for _, c := range agents {
+			if c.Ready() {
+				d.Agents = append(d.Agents, c)
+			}
+		}
 	}
-	d.AgentRuns, _ = a.s.AgentRuns(q.Org.ID, t.ID, 5)
+	d.AgentRuns, _ = a.s.AgentRuns(q.Org.ID, t.ID, 10)
 	a.page(w, r, "tasks", TaskDetailView(q, d))
 }
 
 func (a *App) uiRunStart(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Task int64 `json:"task"`
+		Task  int64 `json:"task"`
+		Agent int64 `json:"agent"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
 	q := reqOf(r)
-	if _, err := a.StartRun(q.Org.ID, in.Task, q.Actor()); err != nil {
+	run, err := a.StartRun(q.Org.ID, in.Task, in.Agent, q.Actor())
+	if err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, map[string]string{"message": "Prospector's agent is on it."})
+	writeJSON(w, map[string]string{"message": run.AgentName + " is on it."})
 }
 
 func (a *App) uiRunStop(w http.ResponseWriter, r *http.Request) {

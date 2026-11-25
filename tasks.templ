@@ -16,17 +16,20 @@ type TasksData struct {
 
 type TaskPage struct {
 	TaskView
-	Prompt     string
-	Now        time.Time
-	AgentReady bool
-	AgentRuns  []AgentRun
+	Prompt string
+	Now    time.Time
+	// Agents are the organisation's own agents that are set up to run.
+	Agents    []Agent
+	AgentRuns []AgentRun
 }
 
-func runGoing(runs []AgentRun) *AgentRun {
-	if len(runs) > 0 && runs[0].Going() {
-		return &runs[0]
+func agentGoing(runs []AgentRun, agent int64) bool {
+	for _, r := range runs {
+		if r.AgentID == agent && r.Going() {
+			return true
+		}
 	}
-	return nil
+	return false
 }
 
 func agentRunText(r AgentRun) string {
@@ -269,27 +272,36 @@ templ TaskDetailView(q *Req, d TaskPage) {
 			}
 		</div>
 		<aside class="flex min-w-0 flex-[1_1_280px] flex-col gap-5">
-			if d.AgentReady || len(d.AgentRuns) > 0 {
-				@Section("Prospector's agent", "Works the task here, with the model and tools set in Settings. What it finds waits in Research.") {
-					if run := runGoing(d.AgentRuns); run != nil {
-						<p class="text-sm"><b>{ agentRunState(*run) }</b></p>
-						@Meta(agentRunText(*run))
-						<div>
-							@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/task/agent/stop", "data-body": jsonBody("id", run.ID)}}) {
-								Stop
-							}
-						</div>
-					} else if d.ClosedAt == nil && d.AgentReady {
-						<div>
-							@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "ui/task/agent/start", "data-body": jsonBody("task", d.ID)}}) {
-								Run Prospector's agent
+			if len(d.Agents) > 0 || len(d.AgentRuns) > 0 {
+				@Section("Prospector's agents", "Work the task here, each with the model and tools set in Settings, each on its own request. What they find waits in Research.") {
+					for _, run := range d.AgentRuns {
+						if run.Going() {
+							<div class="flex flex-col gap-1.5 border-b border-dashed border-border py-2 text-sm">
+								<span><b>{ run.AgentName }</b> · { agentRunState(run) }</span>
+								@Meta(agentRunText(run))
+								<div>
+									@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/task/agent/stop", "data-body": jsonBody("id", run.ID)}}) {
+										{ "Stop " + run.AgentName }
+									}
+								</div>
+							</div>
+						}
+					}
+					if d.ClosedAt == nil {
+						<div class="flex flex-wrap gap-2">
+							for _, agent := range d.Agents {
+								if !agentGoing(d.AgentRuns, agent.ID) {
+									@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "ui/task/agent/start", "data-body": jsonBody("task", d.ID, "agent", agent.ID)}}) {
+										{ "Run " + agent.Name }
+									}
+								}
 							}
 						</div>
 					}
 					for _, r := range d.AgentRuns {
 						if !r.Going() {
 							<div class="border-b border-dashed border-border py-2 text-sm last:border-0">
-								<span class="block">{ agentRunState(r) }</span>
+								<span class="block"><b>{ r.AgentName }</b> · { agentRunState(r) }</span>
 								@Meta(r.StartedBy + " · " + r.StartedAt.Format("2 Jan 15:04") + " · " + agentRunText(r))
 							</div>
 						}
