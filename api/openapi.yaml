@@ -8,7 +8,8 @@ info:
     (`Authorization: Bearer pk_…`) whose scopes say what it may do.
 
     Scopes: `read` to read; `agents:run` to start and stop agent runs;
-    `agents:configure` to add, change and delete the organisation's agents. A signed-in
+    `agents:configure` to add, change and delete the organisation's agents;
+    `enquiries:reply` to email a reply to an enquiry and record its answer. A signed-in
     member may read and run; configuring needs an owner.
 servers:
   - url: /
@@ -20,6 +21,8 @@ tags:
     description: Prospector's own agents, each a model behind an endpoint with tools from an MCP server.
   - name: runs
     description: An agent working a task.
+  - name: enquiries
+    description: What people sent in through a site's form or a product, and answering them.
 
 paths:
   /o/{org}/api/v1/agents:
@@ -180,6 +183,84 @@ paths:
         "204": { description: Asked to stop. }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/enquiries/{id}/messages:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listEnquiryMessages
+      tags: [enquiries]
+      summary: What has been said in answering an enquiry
+      description: Replies sent from here and what was recorded of their answers, oldest first. The enquiry's own message is on the enquiry.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The thread.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/EnquiryMessage" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/enquiries/{id}/replies:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: replyToEnquiry
+      tags: [enquiries]
+      summary: Email a reply to whoever wrote in
+      description: |
+        Sends `text`, and only that, to the address the enquiry gave, through the
+        organisation's mail server. Nothing from the enquiry is quoted in the mail. Their
+        answer goes to the member who sent it; a key's reply is answered to the mail
+        server's own address. Refused for spam, for an address on the never-contact list,
+        and for the same words twice within two minutes. Afterwards the enquiry is
+        `waiting`. If the mail server refuses it the answer is 502 and nothing is recorded.
+      security:
+        - session: []
+        - bearer: ["enquiries:reply"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EnquiryText" }
+      responses:
+        "201":
+          description: The reply as sent.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnquiryMessage" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/enquiries/{id}/answers:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: recordEnquiryAnswer
+      tags: [enquiries]
+      summary: Record what they said back
+      description: Their answer arrives in a mailbox, not here, so whoever reads it records it. Nothing is sent. Afterwards the enquiry is `open` again.
+      security:
+        - session: []
+        - bearer: ["enquiries:reply"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EnquiryText" }
+      responses:
+        "201":
+          description: The answer as recorded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnquiryMessage" }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -328,3 +409,21 @@ components:
         tokens_in: { type: integer, format: int64 }
         tokens_out: { type: integer, format: int64 }
         stop_reason: { type: string }
+
+    EnquiryText:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string, maxLength: 10000 }
+
+    EnquiryMessage:
+      type: object
+      required: [id, enquiry_id, ours, text, by, sent_at, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        enquiry_id: { type: integer, format: int64 }
+        ours: { type: boolean, description: "True for a reply sent from here, false for what they said back." }
+        text: { type: string }
+        by: { type: string, description: "Who sent the reply, or recorded their answer." }
+        sent_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false, description: When a reply of ours left. }
+        created_at: { type: string, format: date-time }

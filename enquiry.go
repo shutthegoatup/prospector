@@ -214,11 +214,16 @@ func (s *Store) AddEnquiry(org int64, via string, in EnquiryIn) (*Enquiry, error
 
 // DeleteEnquiry removes one for good: spam, or a person asking for what they sent to go.
 func (s *Store) DeleteEnquiry(org, id int64) error {
-	res := s.in(org).Where("id = ?", id).Delete(&Enquiry{})
-	if res.Error == nil && res.RowsAffected == 0 {
-		return noSuch("no enquiry %d", id)
-	}
-	return res.Error
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		res := tx.Where("org_id = ? and id = ?", org, id).Delete(&Enquiry{})
+		if res.Error == nil && res.RowsAffected == 0 {
+			return noSuch("no enquiry %d", id)
+		}
+		if res.Error != nil {
+			return res.Error
+		}
+		return tx.Where("org_id = ? and enquiry_id = ?", org, id).Delete(&EnquiryMessage{}).Error
+	})
 }
 
 type EnquiryFilter struct {
@@ -440,6 +445,9 @@ type EnquiriesData struct {
 	Members   []Member
 	// Talking are the contacts, among those who sent these, already on the Conversations board.
 	Talking map[int64]bool
+	// Threads is what has been said in answering each, and MailOn whether a reply can be sent from here.
+	Threads map[int64][]EnquiryMessage
+	MailOn  bool
 }
 
 func (a *App) enquiriesPage(w http.ResponseWriter, r *http.Request) {
@@ -486,7 +494,13 @@ func (a *App) enquiriesPage(w http.ResponseWriter, r *http.Request) {
 			talking[id] = true
 		}
 	}
-	a.page(w, r, "enquiries", EnquiriesView(q, EnquiriesData{Filter: f, Rows: rows, Page: pg, Counts: a.s.EnquiryCounts(q.Org.ID), Companies: names, Members: members, Talking: talking}))
+	threads, err := a.s.EnquiryThreads(q.Org.ID, enquiryIDs(rows))
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	via, _ := a.mailFor(q.Org.ID)
+	a.page(w, r, "enquiries", EnquiriesView(q, EnquiriesData{Filter: f, Rows: rows, Page: pg, Counts: a.s.EnquiryCounts(q.Org.ID), Companies: names, Members: members, Talking: talking, Threads: threads, MailOn: via != nil}))
 }
 
 // ConverseEnquiry puts whoever sent an enquiry on the Conversations board: writing in is
