@@ -317,7 +317,7 @@ var saysNothingBack = map[string]bool{
 	"AgentDraft": true, "AgentMark": true, "AgentFinish": true, "AgentAddFact": true, "AgentAddContact": true,
 	"AskTask": true, "SetRequestDone": true, "SetTaskClosed": true, "DeleteNote": true, "DeleteEnquiry": true,
 	"StartDeal": true, "ChangeDeal": true, "RemoveDeal": true,
-	"AddSubscription": true, "ChangeSubscription": true, "RemoveSubscription": true,
+	"AddSubscription": true, "ChangeSubscription": true, "RemoveSubscription": true, "SetEnquiry": true,
 	"ErasePerson": true, "Import": true, "ImportLegacy": true, "Restore": true,
 	"ResearchCount": true, "ResearchCounts": true, "EnquiryCounts": true, "Week": true, "AgentMarks": true,
 	"AddEnquiry": true, "AgentNote": true, "CreateKey": true, "CreateTask": true, "QuickAddPerson": true,

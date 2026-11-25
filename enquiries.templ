@@ -2,8 +2,14 @@ package main
 
 import (
 	"github.com/shutthegoatup/prospector/components/button"
+	"github.com/shutthegoatup/prospector/components/input"
+	"github.com/shutthegoatup/prospector/components/nativeselect"
 	"strconv"
 )
+
+func enquiryField(e Enquiry, field, label string) templ.Attributes {
+	return templ.Attributes{"data-field": field, "data-enquiry": strconv.FormatInt(e.ID, 10), "data-refresh": "true", "aria-label": label}
+}
 
 func enquiryState(kind string) string {
 	switch kind {
@@ -27,9 +33,14 @@ func enquiryFrom(e Enquiry) string {
 
 templ EnquiriesView(q *Req, d EnquiriesData) {
 	@PageHead("Enquiries")
-	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">What people sent through your sites' forms and your products, newest first. The words are theirs, exactly as sent.</p>
+	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">What people sent through your sites' forms and your products, newest first. The words are theirs, exactly as sent. Each new one waits to be answered: give it an owner, and say when you're waiting on them or it's closed. You answer from your own mail; nothing is sent from here.</p>
 	<div class="mb-5 flex flex-wrap gap-2">
-		@Chip(q.Base()+"enquiries", "All", d.Counts[""], d.Filter.Kind == "" && !d.Filter.Spam)
+		for _, st := range EnquiryStates {
+			if st.Key != EnquiryClosed && d.Counts["state:"+st.Key] > 0 {
+				@Chip(q.Base()+"enquiries?state="+st.Key, st.Label, d.Counts["state:"+st.Key], d.Filter.State == st.Key)
+			}
+		}
+		@Chip(q.Base()+"enquiries", "All", d.Counts[""], d.Filter.Kind == "" && d.Filter.State == "" && !d.Filter.Spam)
 		for _, k := range EnquiryKinds {
 			if d.Counts[k.Key] > 0 {
 				@Chip(q.Base()+"enquiries?kind="+k.Key, k.Label, d.Counts[k.Key], d.Filter.Kind == k.Key && !d.Filter.Spam)
@@ -53,7 +64,14 @@ templ EnquiriesView(q *Req, d EnquiriesData) {
 							<span class="text-muted-foreground">{ " · " + e.Company }</span>
 						}
 					</span>
-					@Pill(kindLabel(e.Kind), enquiryState(e.Kind))
+					<span class="flex items-center gap-2">
+						if e.State == EnquiryOpen {
+							@Pill(enquiryStateLabel(e.State), "warn")
+						} else if e.State != "" {
+							@Pill(enquiryStateLabel(e.State), "")
+						}
+						@Pill(kindLabel(e.Kind), enquiryState(e.Kind))
+					</span>
 				</div>
 				if e.Message != "" {
 					@Quote(e.Message)
@@ -64,6 +82,39 @@ templ EnquiriesView(q *Req, d EnquiriesData) {
 						<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(*e.CompanyID, 10)) } class="font-mono text-xs text-mark underline">{ d.Companies[*e.CompanyID] }</a>
 					}
 				</div>
+				if !e.Spam {
+					<div class="flex flex-wrap items-center gap-2 border-t border-border pt-2">
+						@Label("Answering")
+						@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: enquiryField(e, "state", "Where answering it stands")}) {
+							if e.State == "" {
+								@nativeselect.Option(nativeselect.OptionProps{Value: "", Selected: true}) {
+									Not tracked
+								}
+							}
+							for _, st := range EnquiryStates {
+								@nativeselect.Option(nativeselect.OptionProps{Value: st.Key, Selected: st.Key == e.State}) {
+									{ st.Label }
+								}
+							}
+						}
+						@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: enquiryField(e, "owner", "Who is answering it")}) {
+							@nativeselect.Option(nativeselect.OptionProps{Value: "", Selected: e.Owner == ""}) {
+								Nobody yet
+							}
+							if ownerLeft(Deal{Owner: e.Owner}, d.Members) {
+								@nativeselect.Option(nativeselect.OptionProps{Value: e.Owner, Selected: true}) {
+									{ e.Owner + " (left)" }
+								}
+							}
+							for _, m := range d.Members {
+								@nativeselect.Option(nativeselect.OptionProps{Value: m.Name, Selected: m.Name == e.Owner}) {
+									{ m.Name }
+								}
+							}
+						}
+						@input.Input(input.Props{Value: e.Note, Placeholder: "Our note: not emailed, but theirs to see if they ask", Class: "h-8 min-w-[220px] flex-1 bg-muted", Attributes: enquiryField(e, "note", "Our note")})
+					</div>
+				}
 				<div class="flex flex-wrap items-center justify-between gap-2">
 					@Meta(e.Page)
 					if q.Owner() {

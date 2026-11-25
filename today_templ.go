@@ -1446,6 +1446,7 @@ func doNow(q *Req, d TodayData) []Todo {
 			out = append(out, Todo{label, q.Base() + href, n})
 		}
 	}
+	add("Answer enquiries", "enquiries?state="+EnquiryOpen, d.Enquiries)
 	add("Set next steps", "today?step=next", d.Counts["next"])
 	add("Move renewals and other deals on", "conversations", d.Deals)
 	add("Look at subscriptions coming due", "subscriptions", d.Subs)

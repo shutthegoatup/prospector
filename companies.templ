@@ -90,6 +90,8 @@ func historyText(h HistoryItem) string {
 	if verb == "" {
 		if f, ok := strings.CutPrefix(h.Action, "set:"); ok {
 			verb = "set " + strings.ReplaceAll(f, "_", " ")
+		} else if f, ok := strings.CutPrefix(h.Action, "enquiry:"); ok {
+			verb = "set an enquiry's " + f
 		} else if f, ok := strings.CutPrefix(h.Action, "deal:"); ok {
 			verb = "set the deal's " + strings.ReplaceAll(f, "_", " ")
 		} else if f, ok := strings.CutPrefix(h.Action, "sub:"); ok {

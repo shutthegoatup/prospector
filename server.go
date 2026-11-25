@@ -394,6 +394,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/export-org", a.owner(a.uiExportOrg))
 	mux.HandleFunc("POST /o/{org}/ui/erase", a.owner(a.uiErase))
 	mux.HandleFunc("POST /o/{org}/ui/enquiry/delete", a.owner(a.uiDeleteEnquiry))
+	mux.HandleFunc("POST /o/{org}/ui/enquiry/update", a.member(a.uiSetEnquiry))
 	mux.HandleFunc("POST /o/{org}/ui/keys", a.owner(a.uiKey))
 	mux.HandleFunc("POST /o/{org}/ui/keys/revoke", a.owner(a.uiRevoke))
 
