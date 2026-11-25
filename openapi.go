@@ -46,7 +46,7 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 		w.Write(doc)
 	})
 
-	strict := api.NewStrictHandlerWithOptions(apiServer{a}, []api.StrictMiddlewareFunc{a.apiScope(scopes)}, api.StrictHTTPServerOptions{
+	strict := api.NewStrictHandlerWithOptions(apiServer{a}, []api.StrictMiddlewareFunc{a.apiScope(scopes), func(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc { return listURL(f) }}, api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeProblem(w, http.StatusBadRequest, err.Error())
 		},
@@ -54,7 +54,7 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 	})
 	api.HandlerWithOptions(strict, api.StdHTTPServerOptions{
 		BaseRouter:  mux,
-		Middlewares: []api.MiddlewareFunc{a.apiCaller},
+		Middlewares: []api.MiddlewareFunc{a.apiCaller, noEmptyLink},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeProblem(w, http.StatusBadRequest, err.Error())
 		},
@@ -141,14 +141,19 @@ func savedMessage(c *Agent) string {
 	return c.Name + " saved."
 }
 
-func (s apiServer) ListAgents(ctx context.Context, _ api.ListAgentsRequestObject) (api.ListAgentsResponseObject, error) {
+func (s apiServer) ListAgents(ctx context.Context, in api.ListAgentsRequestObject) (api.ListAgentsResponseObject, error) {
 	list, err := s.a.s.Agents(reqFrom(ctx).Org.ID)
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListAgents200JSONResponse{}
+	list, next, err := listPage(list, in.Params.Limit, in.Params.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListAgents200JSONResponse{Headers: api.ListAgents200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out.Body.Items, out.Body.NextCursor = []api.Agent{}, next
 	for _, c := range list {
-		out = append(out, agentOut(c))
+		out.Body.Items = append(out.Body.Items, agentOut(c))
 	}
 	return out, nil
 }
@@ -199,13 +204,18 @@ func (s apiServer) ListRuns(ctx context.Context, in api.ListRunsRequestObject) (
 	if err := s.a.s.db.Where("org_id = ? and id = ?", org, in.Task).First(&Task{}).Error; err != nil {
 		return nil, err
 	}
-	runs, err := s.a.s.AgentRuns(org, in.Task, 20)
+	runs, err := s.a.s.AgentRuns(org, in.Task, 0)
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListRuns200JSONResponse{}
+	runs, next, err := listPage(runs, in.Params.Limit, in.Params.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListRuns200JSONResponse{Headers: api.ListRuns200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out.Body.Items, out.Body.NextCursor = []api.Run{}, next
 	for _, r := range runs {
-		out = append(out, runOut(r))
+		out.Body.Items = append(out.Body.Items, runOut(r))
 	}
 	return out, nil
 }
