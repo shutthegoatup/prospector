@@ -29,6 +29,11 @@ type Deal struct {
 	CloseDate *string   `json:"close_date"`
 	Owner     string    `gorm:"not null;default:''" json:"owner"`
 	UpdatedAt time.Time `json:"updated_at"`
+	// A deal after the conversation's own says where it stands itself.
+	Stage      string  `gorm:"not null;default:''" json:"stage"`
+	NextStep   string  `gorm:"not null;default:''" json:"next_step"`
+	NextDate   *string `json:"next_date"`
+	LostReason string  `gorm:"not null;default:''" json:"lost_reason"`
 }
 
 const DealNew = "new"
@@ -120,49 +125,9 @@ func (s *Store) setDeal(tx *gorm.DB, org, contact int64, field, value, actor str
 	if d.Amount != 0 && d.Currency != "" {
 		currency = d.Currency
 	}
-	updates := map[string]any{}
-	logged := value
-	switch field {
-	case "amount":
-		amount, err := parseMoney(value)
-		if err != nil {
-			return err
-		}
-		updates["amount"], updates["currency"] = amount, currency
-		logged = ""
-		if amount != 0 {
-			logged = formatMoney(amount, currency)
-		}
-	case "close_date":
-		if value != "" {
-			if _, err := time.Parse("2006-01-02", value); err != nil {
-				return fmt.Errorf("%q isn't a date", value)
-			}
-		}
-		updates["close_date"] = nonEmpty(value)
-	case "kind":
-		known := false
-		for _, k := range DealKinds {
-			known = known || k.Key == value
-		}
-		if !known {
-			return fmt.Errorf("unknown kind of deal %q", value)
-		}
-		updates["kind"] = value
-	case "owner":
-		if value != "" && value != d.Owner {
-			var n int64
-			if err := tx.Table("memberships").Joins("join users on users.id = memberships.user_id").
-				Where("memberships.org_id = ? and users.name = ?", org, value).Count(&n).Error; err != nil {
-				return err
-			}
-			if n == 0 {
-				return fmt.Errorf("%q isn't a member of this organisation", value)
-			}
-		}
-		updates["owner"] = value
-	default:
-		return fmt.Errorf("a deal has no %q", field)
+	updates, logged, err := dealChange(tx, org, d, currency, field, value)
+	if err != nil {
+		return err
 	}
 	if d.ID == 0 {
 		// Two fields changed at once are two requests; whichever comes second finds the row.
@@ -178,4 +143,209 @@ func (s *Store) setDeal(tx *gorm.DB, org, contact int64, field, value, actor str
 		return err
 	}
 	return s.log(tx, org, contact, c.CompanyID, actor, "deal:"+field, nonEmpty(logged))
+}
+
+func kindOfDeal(kind string) bool {
+	for _, k := range DealKinds {
+		if k.Key == kind {
+			return true
+		}
+	}
+	return false
+}
+
+// dealChange is what setting one of a deal's fields writes, and what the history says
+// of it. Free text about the deal stays out of the history, as a contact's does.
+func dealChange(tx *gorm.DB, org int64, d Deal, currency, field, value string) (map[string]any, string, error) {
+	switch field {
+	case "amount":
+		amount, err := parseMoney(value)
+		if err != nil {
+			return nil, "", err
+		}
+		logged := ""
+		if amount != 0 {
+			logged = formatMoney(amount, currency)
+		}
+		return map[string]any{"amount": amount, "currency": currency}, logged, nil
+	case "close_date", "next_date":
+		if field == "next_date" && d.Seq == 0 {
+			break
+		}
+		if value != "" {
+			if _, err := time.Parse("2006-01-02", value); err != nil {
+				return nil, "", fmt.Errorf("%q isn't a date", value)
+			}
+		}
+		return map[string]any{field: nonEmpty(value)}, value, nil
+	case "kind":
+		if !kindOfDeal(value) {
+			return nil, "", fmt.Errorf("unknown kind of deal %q", value)
+		}
+		return map[string]any{"kind": value}, value, nil
+	case "owner":
+		if value != "" && value != d.Owner {
+			var n int64
+			if err := tx.Table("memberships").Joins("join users on users.id = memberships.user_id").
+				Where("memberships.org_id = ? and users.name = ?", org, value).Count(&n).Error; err != nil {
+				return nil, "", err
+			}
+			if n == 0 {
+				return nil, "", fmt.Errorf("%q isn't a member of this organisation", value)
+			}
+		}
+		return map[string]any{"owner": value}, value, nil
+	}
+	if d.Seq > 0 {
+		switch field {
+		case "stage":
+			if !validStage(value) {
+				return nil, "", fmt.Errorf("unknown stage %q", value)
+			}
+			return map[string]any{"stage": value}, value, nil
+		case "next_step", "lost_reason":
+			return map[string]any{field: value}, "", nil
+		}
+	}
+	return nil, "", fmt.Errorf("a deal has no %q", field)
+}
+
+// OtherDeal is a deal after the conversation's own, with the person it is with.
+type OtherDeal struct {
+	Deal
+	With Contact
+}
+
+func (d Deal) needsNextStep(day string) bool {
+	if d.Stage == "won" || d.Stage == "lost" {
+		return false
+	}
+	return d.NextStep == "" || (d.NextDate != nil && *d.NextDate <= day)
+}
+
+// OtherDeals are the renewals, expansions and further deals with people in conversation,
+// by the stage each stands at.
+func (s *Store) OtherDeals(org int64) (map[string][]OtherDeal, error) {
+	var deals []Deal
+	if err := s.in(org).Where("seq > 0").Order("next_date nulls first, id").Find(&deals).Error; err != nil {
+		return nil, err
+	}
+	if len(deals) == 0 {
+		return map[string][]OtherDeal{}, nil
+	}
+	var people []Contact
+	if err := s.in(org).Where(inConversation).Find(&people).Error; err != nil {
+		return nil, err
+	}
+	with := make(map[int64]Contact, len(people))
+	for _, c := range people {
+		with[c.ID] = c
+	}
+	out := map[string][]OtherDeal{}
+	for _, d := range deals {
+		if c, ok := with[d.ContactID]; ok {
+			out[d.Stage] = append(out[d.Stage], OtherDeal{d, c})
+		}
+	}
+	return out, nil
+}
+
+// StartDeal opens another deal with someone already in conversation: a renewal, an
+// expansion or a second piece of new business. It starts at the first stage.
+func (s *Store) StartDeal(org, contact int64, kind, actor string) (*Deal, error) {
+	if !kindOfDeal(kind) {
+		return nil, fmt.Errorf("unknown kind of deal %q", kind)
+	}
+	var d Deal
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var c Contact
+		if err := tx.Where("org_id = ? and id = ?", org, contact).First(&c).Error; err != nil {
+			return missing(err, "no contact %d", contact)
+		}
+		if c.Replied == nil || c.Declined != nil {
+			return errors.New("another deal is for someone you are in conversation with")
+		}
+		var o Org
+		if err := tx.First(&o, org).Error; err != nil {
+			return err
+		}
+		var last int
+		if err := tx.Model(&Deal{}).Where("org_id = ? and contact_id = ?", org, contact).
+			Select("coalesce(max(seq), 0)").Scan(&last).Error; err != nil {
+			return err
+		}
+		d = Deal{OrgID: org, ContactID: contact, Seq: last + 1, Kind: kind, Stage: Stages[0].Key, Currency: o.Settings.withDefaults().Currency}
+		if err := tx.Create(&d).Error; err != nil {
+			return err
+		}
+		return s.log(tx, org, contact, c.CompanyID, actor, "deal:start", &kind)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func (s *Store) otherDeal(tx *gorm.DB, org, id int64) (Deal, Contact, error) {
+	var d Deal
+	if err := tx.Where("org_id = ? and id = ? and seq > 0", org, id).First(&d).Error; err != nil {
+		return d, Contact{}, missing(err, "no deal %d", id)
+	}
+	var c Contact
+	if err := tx.Where("org_id = ? and id = ?", org, d.ContactID).First(&c).Error; err != nil {
+		return d, c, missing(err, "no contact %d", d.ContactID)
+	}
+	return d, c, nil
+}
+
+// ChangeDeal sets one field of a deal after the conversation's own. Those hold their
+// stage and next step themselves; the conversation's own are still its contact's.
+func (s *Store) ChangeDeal(org, id int64, field, value, actor string) error {
+	value = strings.TrimSpace(value)
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		d, c, err := s.otherDeal(tx, org, id)
+		if err != nil {
+			return err
+		}
+		currency := d.Currency
+		if d.Amount == 0 || currency == "" {
+			var o Org
+			if err := tx.First(&o, org).Error; err != nil {
+				return err
+			}
+			currency = o.Settings.withDefaults().Currency
+		}
+		updates, logged, err := dealChange(tx, org, d, currency, field, value)
+		if err != nil {
+			return err
+		}
+		if err := tx.Model(&d).Updates(updates).Error; err != nil {
+			return err
+		}
+		return s.log(tx, org, c.ID, c.CompanyID, actor, "deal:"+field, nonEmpty(logged))
+	})
+}
+
+// RemoveDeal takes back a deal that was started by mistake. One that ran its course is
+// marked won or lost instead, and the conversation's own can't be removed.
+func (s *Store) RemoveDeal(org, id int64, actor string) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		d, c, err := s.otherDeal(tx, org, id)
+		if err != nil {
+			return err
+		}
+		if err := tx.Delete(&d).Error; err != nil {
+			return err
+		}
+		return s.log(tx, org, c.ID, c.CompanyID, actor, "deal:remove", &d.Kind)
+	})
+}
+
+// allowSeveralDeals drops the index that held a contact to one deal. The release before
+// this one stopped declaring it, so going back to that one doesn't bring it back.
+func allowSeveralDeals(db *gorm.DB) error {
+	if !db.Migrator().HasIndex(&Deal{}, "idx_deal_contact") {
+		return nil
+	}
+	return db.Migrator().DropIndex(&Deal{}, "idx_deal_contact")
 }

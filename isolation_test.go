@@ -247,6 +247,9 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			return s.db.Create(&Deal{OrgID: first.ID, ContactID: 1, Kind: DealNew, Owner: theirs + " owner"}).Error
 		},
 		func() error {
+			return s.db.Create(&Deal{OrgID: first.ID, ContactID: 1, Seq: 1, Kind: "renewal", Stage: "replied", Owner: theirs + " owner"}).Error
+		},
+		func() error {
 			_, err := s.CreateTask(first.ID, theirs+" task", theirs+" brief", "Owner One")
 			return err
 		},
@@ -309,6 +312,7 @@ var saysNothingBack = map[string]bool{
 	"Mark": true, "Update": true, "SetCompanyStage": true, "PickContact": true, "DecideSuggestion": true,
 	"AgentDraft": true, "AgentMark": true, "AgentFinish": true, "AgentAddFact": true, "AgentAddContact": true,
 	"AskTask": true, "SetRequestDone": true, "SetTaskClosed": true, "DeleteNote": true, "DeleteEnquiry": true,
+	"StartDeal": true, "ChangeDeal": true, "RemoveDeal": true,
 	"ErasePerson": true, "Import": true, "ImportLegacy": true, "Restore": true,
 	"ResearchCount": true, "ResearchCounts": true, "EnquiryCounts": true, "Week": true, "AgentMarks": true,
 	"AddEnquiry": true, "AgentNote": true, "CreateKey": true, "CreateTask": true, "QuickAddPerson": true,
