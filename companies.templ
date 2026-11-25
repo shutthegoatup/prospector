@@ -89,7 +89,7 @@ func historyText(h HistoryItem) string {
 		"onboard:start": "started an onboarding", "onboard:remove": "removed an onboarding",
 		"onboard:invite": "emailed a link to their onboarding page", "onboard:revoke": "withdrew access to their onboarding page",
 		"onboard:done": "finished an onboarding step", "onboard:undone": "reopened an onboarding step",
-		"onboard:due": "moved an onboarding step's date",
+		"onboard:due":   "moved an onboarding step's date",
 		"enquiry:reply": "emailed a reply to their enquiry", "enquiry:heard": "recorded their answer to an enquiry",
 	}[h.Action]
 	if verb == "" {
@@ -138,7 +138,7 @@ templ CompanyView(q *Req, p CompanyPage) {
 			</div>
 			<div class="flex items-center gap-2">
 				@StageTag(pipeline(p.Company, p.People))
-				if p.Company.Stage != CompanyQualified {
+				if p.Company.Stage != CompanyQualified && canDo(ctx, areaSales) {
 					@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "ui/company", "data-body": jsonBody("id", p.Company.ID, "stage", CompanyQualified)}}) {
 						Qualify
 					}
@@ -169,7 +169,9 @@ templ CompanyView(q *Req, p CompanyPage) {
 		<div>
 			<div class="flex items-center justify-between">
 				@Label("People")
-				<a href={ templ.SafeURL(q.Base() + "add?company=" + p.Company.Name) } class="font-mono text-xs">+ add</a>
+				if canDo(ctx, areaSales) {
+					<a href={ templ.SafeURL(q.Base() + "add?company=" + p.Company.Name) } class="font-mono text-xs">+ add</a>
+				}
 			</div>
 			if len(p.People) == 0 {
 				<p class="py-2 text-sm text-muted-foreground">No one yet.</p>
@@ -206,19 +208,23 @@ templ CompanyView(q *Req, p CompanyPage) {
 					}
 				</div>
 			}
-			if p.Planned > 0 {
+			if p.Planned > 0 && canDo(ctx, areaAny) {
 				<details class="mt-2 text-sm">
 					<summary class="cursor-pointer font-mono text-xs text-muted-foreground">Start an onboarding</summary>
 					@OnboardingStart(p.Company.ID, p.Day)
 				</details>
-			} else {
+			} else if p.Planned == 0 {
 				@Meta("An owner writes the onboarding steps under Settings; then one can be started here.")
 			}
 		</div>
 		<div>
 			@Label("Subscriptions")
 			if len(p.Subs) == 0 {
-				<p class="py-2 text-sm text-muted-foreground">Nothing recorded. Once they are a customer, record what they are on.</p>
+				if canDo(ctx, areaSupport) {
+					<p class="py-2 text-sm text-muted-foreground">Nothing recorded. Once they are a customer, record what they are on.</p>
+				} else {
+					<p class="py-2 text-sm text-muted-foreground">Nothing recorded.</p>
+				}
 			} else {
 				<div class="mt-1 overflow-hidden rounded-lg border border-border">
 					for _, r := range p.Subs {
@@ -226,10 +232,12 @@ templ CompanyView(q *Req, p CompanyPage) {
 					}
 				</div>
 			}
-			<details class="mt-2 text-sm">
-				<summary class="cursor-pointer font-mono text-xs text-muted-foreground">Record a subscription</summary>
-				@SubscriptionForm(p.Company.ID, p.Day)
-			</details>
+			if canDo(ctx, areaSupport) {
+				<details class="mt-2 text-sm">
+					<summary class="cursor-pointer font-mono text-xs text-muted-foreground">Record a subscription</summary>
+					@SubscriptionForm(p.Company.ID, p.Day)
+				</details>
+			}
 		</div>
 		@AgreementsBlock(q, p.Company.ID, p.Agreements)
 		if len(p.Facts) > 0 {
@@ -244,7 +252,9 @@ templ CompanyView(q *Req, p CompanyPage) {
 			<div>
 				@Label("Agents' notes, unchecked")
 				@Notes(q, p.Notes)
-				@Pager(p.NotesPage, func(n int) string { return panelLink(string(companyHref(q, p.Company.ID)), "notes", n, "history", p.HistoryPage) })
+				@Pager(p.NotesPage, func(n int) string {
+					return panelLink(string(companyHref(q, p.Company.ID)), "notes", n, "history", p.HistoryPage)
+				})
 			</div>
 		}
 		<div>
@@ -258,7 +268,9 @@ templ CompanyView(q *Req, p CompanyPage) {
 					<span><span class={ "font-mono text-xs", actorColor(h.Actor) }>{ actorLabel(h.Actor) }</span> { historyText(h) }</span>
 				</div>
 			}
-			@Pager(p.HistoryPage, func(n int) string { return panelLink(string(companyHref(q, p.Company.ID)), "history", n, "notes", p.NotesPage) })
+			@Pager(p.HistoryPage, func(n int) string {
+				return panelLink(string(companyHref(q, p.Company.ID)), "history", n, "notes", p.NotesPage)
+			})
 		</div>
 	</div>
 }

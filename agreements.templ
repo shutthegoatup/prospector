@@ -31,31 +31,35 @@ templ AgreementsBlock(q *Req, company int64, list []Agreement) {
 					if a.FileHash != "" {
 						<a href={ templ.SafeURL(q.Base() + "api/v1/agreements/" + strconv.FormatInt(a.ID, 10) + "/document") } class="font-mono text-xs text-mark underline">Download</a>
 					}
-					<label class="font-mono text-xs text-muted-foreground">
-						if a.FileHash == "" {
-							Upload the PDF
-						} else {
-							Replace the PDF
+					if canDo(ctx, areaSales) {
+						<label class="font-mono text-xs text-muted-foreground">
+							if a.FileHash == "" {
+								Upload the PDF
+							} else {
+								Replace the PDF
+							}
+							<input type="file" accept="application/pdf,.pdf" class="text-xs" data-upload={ strconv.FormatInt(a.ID, 10) }/>
+						</label>
+						@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/agreements/" + strconv.FormatInt(a.ID, 10), "data-method": "DELETE", "data-confirm": "Remove the draft " + a.Name + " and its document?"}}) {
+							Remove
 						}
-						<input type="file" accept="application/pdf,.pdf" class="text-xs" data-upload={ strconv.FormatInt(a.ID, 10) }/>
-					</label>
-					@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/agreements/" + strconv.FormatInt(a.ID, 10), "data-method": "DELETE", "data-confirm": "Remove the draft " + a.Name + " and its document?"}}) {
-						Remove
 					}
 				</div>
 			</div>
 		}
-		<details class="mt-2 text-sm">
-			<summary class="cursor-pointer font-mono text-xs text-muted-foreground">Start an agreement</summary>
-			<form data-form="api/v1/agreements" data-refresh="true" data-reset="true" class="mt-2 flex flex-wrap items-center gap-2">
-				<input type="number" name="company" value={ strconv.FormatInt(company, 10) } hidden/>
-				<input name="name" required maxlength="120" placeholder="e.g. Annual service agreement 2027" aria-label="Name of the agreement" class="h-9 min-w-[220px] flex-1 rounded-lg border border-input bg-muted px-3 text-sm"/>
-				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantOutline}) {
-					Start
-				}
-				<span data-result class="font-mono text-xs text-muted-foreground"></span>
-			</form>
-			@Meta("Prospector keeps the PDF as uploaded, with its SHA-256, and doesn't read what it says. It is not for deeds, or anything that must be witnessed or notarised. Sending it for signature comes later.")
-		</details>
+		if canDo(ctx, areaSales) {
+			<details class="mt-2 text-sm">
+				<summary class="cursor-pointer font-mono text-xs text-muted-foreground">Start an agreement</summary>
+				<form data-form="api/v1/agreements" data-refresh="true" data-reset="true" class="mt-2 flex flex-wrap items-center gap-2">
+					<input type="number" name="company" value={ strconv.FormatInt(company, 10) } hidden/>
+					<input name="name" required maxlength="120" placeholder="e.g. Annual service agreement 2027" aria-label="Name of the agreement" class="h-9 min-w-[220px] flex-1 rounded-lg border border-input bg-muted px-3 text-sm"/>
+					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantOutline}) {
+						Start
+					}
+					<span data-result class="font-mono text-xs text-muted-foreground"></span>
+				</form>
+				@Meta("Prospector keeps the PDF as uploaded, with its SHA-256, and doesn't read what it says. It is not for deeds, or anything that must be witnessed or notarised. Sending it for signature comes later.")
+			</details>
+		}
 	</div>
 }

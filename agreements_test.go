@@ -196,3 +196,29 @@ func must2[A, B any](a A, b B, err error) (A, B) {
 	}
 	return a, b
 }
+
+// Someone who works only in support sees a company's agreements, and none of the controls
+// that change them, which are sales work.
+func TestOnlySalesWorksAgreements(t *testing.T) {
+	s, o, srv, _ := signedIn(t)
+	company := *must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace")).CompanyID
+	a := must(s.AddAgreement(o.ID, company, "Service agreement", "Ada Lovelace"))
+	grace := must(s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
+	if err := s.AddMember(o.ID, grace.ID, "member", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetAreas(o.ID, grace.ID, []string{"support"}); err != nil {
+		t.Fatal(err)
+	}
+	support := newMailClient()
+	if !signIn(t, support, srv, "grace@example.com", "correct horse battery") {
+		t.Fatal("Grace cannot sign in")
+	}
+	_, page := call(t, support, "GET", srv.URL+"/o/alpha/companies/"+itoa(company), "", nil)
+	if !strings.Contains(page, "Service agreement") || strings.Contains(page, `data-upload=`) || strings.Contains(page, `data-form="api/v1/agreements"`) {
+		t.Error("someone in support sees an agreement's controls, or not the agreement")
+	}
+	if code, _, _ := upload(t, support, srv.URL+"/o/alpha/api/v1/agreements/"+itoa(a.ID)+"/document", "", "application/pdf", samplePDF); code != http.StatusForbidden {
+		t.Errorf("someone in support uploading: %d", code)
+	}
+}

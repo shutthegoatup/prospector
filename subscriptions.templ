@@ -56,6 +56,7 @@ templ SubscriptionsView(q *Req, rows []SubscriptionRow, day string) {
 		}
 	}
 	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">What each customer is on, and until when. The one that needs someone soonest comes first: a day to cancel by, a renewal or an end. Record one from a company's page. Prospector notes what was agreed and when it's due; it takes no payment and sends no invoice.</p>
+	@Whose(areaSupport, "Subscriptions are")
 	if len(rows) == 0 {
 		@Empty("No subscriptions yet", "Open a company and record what they are on.")
 	} else {
@@ -87,68 +88,74 @@ templ SubscriptionLine(q *Req, r SubscriptionRow, day string, named bool) {
 				@Pill(r.Status, subscriptionState(r))
 			</span>
 		</div>
-		<details class="mt-1 text-sm">
-			<summary class="cursor-pointer font-mono text-xs text-muted-foreground">Update</summary>
-			<div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[170px_1fr]">
-				@Label("What they're on")
-				@input.Input(input.Props{Value: r.Name, Class: "h-8 bg-muted", Attributes: subField(r.Subscription, "name")})
-				@Label("Price")
-				<span class="flex items-center gap-2">
-					@input.Input(input.Props{Value: r.Figure(), Placeholder: "e.g. 14,000", Class: "h-8 w-44 bg-muted", Attributes: subField(r.Subscription, "amount")})
-					@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: subField(r.Subscription, "per")}) {
-						@nativeselect.Option(nativeselect.OptionProps{Value: PerYear, Selected: r.Per != PerMonth}) {
-							a year
-						}
-						@nativeselect.Option(nativeselect.OptionProps{Value: PerMonth, Selected: r.Per == PerMonth}) {
-							a month
-						}
+		if canDo(ctx, areaSupport) {
+			@subscriptionUpdate(q, r)
+		}
+	</div>
+}
+
+templ subscriptionUpdate(q *Req, r SubscriptionRow) {
+	<details class="mt-1 text-sm">
+		<summary class="cursor-pointer font-mono text-xs text-muted-foreground">Update</summary>
+		<div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[170px_1fr]">
+			@Label("What they're on")
+			@input.Input(input.Props{Value: r.Name, Class: "h-8 bg-muted", Attributes: subField(r.Subscription, "name")})
+			@Label("Price")
+			<span class="flex items-center gap-2">
+				@input.Input(input.Props{Value: r.Figure(), Placeholder: "e.g. 14,000", Class: "h-8 w-44 bg-muted", Attributes: subField(r.Subscription, "amount")})
+				@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: subField(r.Subscription, "per")}) {
+					@nativeselect.Option(nativeselect.OptionProps{Value: PerYear, Selected: r.Per != PerMonth}) {
+						a year
 					}
-				</span>
-				@Label("Started")
-				@input.Input(input.Props{Type: "date", Value: r.Start, Class: "h-8 w-44 bg-muted", Attributes: subField(r.Subscription, "start")})
-				@Label("Committed for, months")
-				@input.Input(input.Props{Type: "number", Value: strconv.Itoa(r.TermMonths), Class: "h-8 w-24 bg-muted", Attributes: subField(r.Subscription, "term_months")})
-				@Label("At the end of the term")
-				@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: subField(r.Subscription, "then")}) {
-					for _, t := range SubscriptionThens {
-						@nativeselect.Option(nativeselect.OptionProps{Value: t.Key, Selected: t.Key == r.Then}) {
-							{ t.Label }
-						}
+					@nativeselect.Option(nativeselect.OptionProps{Value: PerMonth, Selected: r.Per == PerMonth}) {
+						a month
 					}
 				}
-				@Label("Notice to end, days")
-				@input.Input(input.Props{Type: "number", Value: strconv.Itoa(r.NoticeDays), Class: "h-8 w-24 bg-muted", Attributes: subField(r.Subscription, "notice_days")})
-				@Label("Notice given on")
-				@input.Input(input.Props{Type: "date", Value: deref(r.NoticeOn), Class: "h-8 w-44 bg-muted", Attributes: subField(r.Subscription, "notice_on")})
-				@Label("Ended early on")
-				@input.Input(input.Props{Type: "date", Value: deref(r.EndedOn), Class: "h-8 w-44 bg-muted", Attributes: subField(r.Subscription, "ended_on")})
-			</div>
-			if r.Renewing {
-				<p class="mt-2 border-t border-border pt-2"><a href={ templ.SafeURL(q.Base() + "conversations") } class="font-mono text-xs text-mark underline">Renewal under way in Conversations</a></p>
-			} else if r.Status != SubEnded && len(r.People) > 0 {
-				<form data-form={ "api/v1/subscriptions/" + strconv.FormatInt(r.ID, 10) + "/renewals" } data-refresh="true" class="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
-					@Label("Renewal with")
-					<select name="contact" data-number="true" aria-label="Who the renewal is with" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
-						for _, p := range r.People {
-							<option value={ strconv.FormatInt(p.ID, 10) }>{ displayName(p) }</option>
-						}
-					</select>
-					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Type: button.TypeSubmit}) {
-						Start the renewal deal
+			</span>
+			@Label("Started")
+			@input.Input(input.Props{Type: "date", Value: r.Start, Class: "h-8 w-44 bg-muted", Attributes: subField(r.Subscription, "start")})
+			@Label("Committed for, months")
+			@input.Input(input.Props{Type: "number", Value: strconv.Itoa(r.TermMonths), Class: "h-8 w-24 bg-muted", Attributes: subField(r.Subscription, "term_months")})
+			@Label("At the end of the term")
+			@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: subField(r.Subscription, "then")}) {
+				for _, t := range SubscriptionThens {
+					@nativeselect.Option(nativeselect.OptionProps{Value: t.Key, Selected: t.Key == r.Then}) {
+						{ t.Label }
 					}
-					<span class="font-mono text-xs text-muted-foreground" data-result></span>
-				</form>
-			} else if r.Status != SubEnded {
-				<p class="mt-2 border-t border-border pt-2 font-mono text-xs text-muted-foreground">To start a renewal deal, someone at this company needs to be on the Conversations board first.</p>
+				}
 			}
-			<form data-form={ "api/v1/subscriptions/" + strconv.FormatInt(r.ID, 10) } data-method="DELETE" data-refresh="true" class="mt-2 flex items-center gap-2 border-t border-border pt-2">
+			@Label("Notice to end, days")
+			@input.Input(input.Props{Type: "number", Value: strconv.Itoa(r.NoticeDays), Class: "h-8 w-24 bg-muted", Attributes: subField(r.Subscription, "notice_days")})
+			@Label("Notice given on")
+			@input.Input(input.Props{Type: "date", Value: deref(r.NoticeOn), Class: "h-8 w-44 bg-muted", Attributes: subField(r.Subscription, "notice_on")})
+			@Label("Ended early on")
+			@input.Input(input.Props{Type: "date", Value: deref(r.EndedOn), Class: "h-8 w-44 bg-muted", Attributes: subField(r.Subscription, "ended_on")})
+		</div>
+		if r.Renewing {
+			<p class="mt-2 border-t border-border pt-2"><a href={ templ.SafeURL(q.Base() + "conversations") } class="font-mono text-xs text-mark underline">Renewal under way in Conversations</a></p>
+		} else if r.Status != SubEnded && len(r.People) > 0 {
+			<form data-form={ "api/v1/subscriptions/" + strconv.FormatInt(r.ID, 10) + "/renewals" } data-refresh="true" class="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
+				@Label("Renewal with")
+				<select name="contact" data-number="true" aria-label="Who the renewal is with" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
+					for _, p := range r.People {
+						<option value={ strconv.FormatInt(p.ID, 10) }>{ displayName(p) }</option>
+					}
+				</select>
 				@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Type: button.TypeSubmit}) {
-					Remove: recorded by mistake
+					Start the renewal deal
 				}
 				<span class="font-mono text-xs text-muted-foreground" data-result></span>
 			</form>
-		</details>
-	</div>
+		} else if r.Status != SubEnded {
+			<p class="mt-2 border-t border-border pt-2 font-mono text-xs text-muted-foreground">To start a renewal deal, someone at this company needs to be on the Conversations board first.</p>
+		}
+		<form data-form={ "api/v1/subscriptions/" + strconv.FormatInt(r.ID, 10) } data-method="DELETE" data-refresh="true" class="mt-2 flex items-center gap-2 border-t border-border pt-2">
+			@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Type: button.TypeSubmit}) {
+				Remove: recorded by mistake
+			}
+			<span class="font-mono text-xs text-muted-foreground" data-result></span>
+		</form>
+	</details>
 }
 
 // SubscriptionForm records a new subscription for a company.

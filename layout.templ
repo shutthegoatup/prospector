@@ -42,7 +42,9 @@ templ OrgMark(name, color string, size string) {
 templ NavItem(n Nav, key, label string, count int) {
 	<a href={ templ.SafeURL(n.Base() + key) } class={ navLink(n, key) }>
 		<span>{ label }</span>
-		if count > 0 {
+		if area, ok := pageArea[key]; ok && !canDo(ctx, area) {
+			<span class="rounded border border-border px-1 font-mono text-[11px] uppercase tracking-wider opacity-70" title="You can read this page, not change it">view</span>
+		} else if count > 0 {
 			<span class="font-mono text-xs opacity-70">{ strconv.Itoa(count) }</span>
 		}
 	</a>
@@ -87,8 +89,10 @@ templ Layout(n Nav, content templ.Component) {
 							</form>
 						</div>
 					</details>
-					@button.Button(button.Props{Href: n.Base() + "add", Class: "w-full"}) {
-						+ Add person
+					if canDo(ctx, areaSales) {
+						@button.Button(button.Props{Href: n.Base() + "add", Class: "w-full"}) {
+							+ Add person
+						}
 					}
 					<nav class="flex flex-col gap-0.5" aria-label="Main">
 						@NavItem(n, "today", "Today", n.Today)
@@ -105,7 +109,12 @@ templ Layout(n Nav, content templ.Component) {
 					</nav>
 					<form method="post" action="/logout" class="mt-auto flex items-center gap-2.5 px-2.5 text-sm text-muted-foreground">
 						<span class="grid size-6 place-items-center rounded-full bg-secondary text-xs text-foreground">{ initial(n.User.Name + n.User.Email) }</span>
-						<span class="flex-1 truncate">{ n.User.Name }</span>
+						<span class="flex-1 truncate">
+							{ n.User.Name }
+							if n.Member != nil && n.Member.Role != "owner" {
+								<span class="block font-mono text-[11px]">{ memberWork(*n.Member) }</span>
+							}
+						</span>
 						<button type="submit" class="text-xs hover:text-foreground">Sign out</button>
 					</form>
 				</aside>
@@ -386,6 +395,22 @@ templ Meta(s string) {
 
 templ Label(text string) {
 	<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">{ text }</span>
+}
+
+// Whose says, on a page someone only reads, whose work it is and how to get it.
+templ Whose(area, work string) {
+	if !canDo(ctx, area) {
+		<p class="mb-5 max-w-[70ch] border-t border-dashed border-border pt-2 font-mono text-xs text-mark">{ work + " " + area + " work, so here you read it. An owner can add " + area + " to you on the Team list in Settings." }</p>
+	}
+}
+
+// Shown is a value someone may read but not change.
+templ Shown(value, none string) {
+	if value == "" {
+		<span class="text-sm text-muted-foreground">{ none }</span>
+	} else {
+		<span class="whitespace-pre-wrap text-sm">{ value }</span>
+	}
 }
 
 templ Quote(s string) {
