@@ -361,7 +361,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /password", a.member(a.changePassword))
 
 	mux.HandleFunc("GET /o/{org}/{$}", a.member(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, reqOf(r).Base()+"today", http.StatusSeeOther)
+		q := reqOf(r)
+		http.Redirect(w, r, q.Base()+landing(q.Member), http.StatusSeeOther)
 	}))
 	mux.HandleFunc("GET /o/{org}/today", a.member(a.today))
 	mux.HandleFunc("GET /o/{org}/research", a.member(a.research))
@@ -423,6 +424,10 @@ func (a *App) Routes() http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a.setDeadlines(w, r)
+		if !cleanRequest(r) {
+			http.NotFound(w, r)
+			return
+		}
 		if wantsPage(r) {
 			page := &problemPage{ResponseWriter: w, r: r}
 			defer page.finish()
@@ -484,8 +489,7 @@ func safeNext(next string) string {
 }
 
 func (a *App) login(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
-	if err := r.ParseForm(); err != nil {
+	if err := parseForm(w, r, 64<<10); err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
@@ -586,7 +590,8 @@ func browserOrigin(address string) string {
 func (a *App) home(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	if len(q.Orgs) > 0 {
-		http.Redirect(w, r, "/o/"+q.Orgs[0].Slug+"/today", http.StatusSeeOther)
+		m, _ := a.s.Membership(q.Orgs[0].ID, q.User.ID)
+		http.Redirect(w, r, "/o/"+q.Orgs[0].Slug+"/"+landing(m), http.StatusSeeOther)
 		return
 	}
 	// A session an organisation's provider began, whose day has run out, opens nothing.
@@ -698,6 +703,8 @@ func serve(a *App, addr string) error {
 	}
 	// Runs a stopped server left going are carried on, here or by another server.
 	go a.keepRunsGoing(context.Background(), 30*time.Second)
+	// Campaigns being sent go on being sent, here or by another server.
+	go a.keepSending(context.Background(), sendEvery)
 	log.Printf("listening on http://%s", addr)
 	// A release is installed by stopping this process, so every merge sends one of these.
 	asked, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

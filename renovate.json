@@ -2,5 +2,13 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "packageRules": [
+    {
+      "description": "openapi-typescript, which makes the page script's API types, needs TypeScript 5: hold TypeScript there until it takes a newer one.",
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<6"
+    }
   ]
 }

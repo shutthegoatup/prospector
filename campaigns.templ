@@ -10,11 +10,11 @@ func campaignInput(c Campaign, field string) templ.Attributes {
 }
 
 // CampaignsView lists the drafts, each with who it would go to now and who is left out.
-templ CampaignsView(q *Req, cards []CampaignCard, postal string) {
+templ CampaignsView(q *Req, cards []CampaignCard, unsendable error) {
 	@PageHead("Campaigns")
-	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">A marketing mail written once, for everyone in conversation or everyone at a company that is a customer now. Never for prospects who haven't replied: that stays one person writing to one person. Anyone on the list not to be mailed, on the never-contact list or erased is left out, and each draft shows who that leaves. Nothing is sent from here yet.</p>
-	if postal == "" {
-		<p class="mb-5 max-w-[70ch] rounded-lg border border-border bg-muted px-3 py-2 text-sm">A campaign will need your postal address at its foot. An owner sets it in Settings.</p>
+	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">A marketing mail written once, for everyone in conversation or everyone at a company that is a customer now. Never for prospects who haven't replied: that stays one person writing to one person. Anyone on the list not to be mailed, on the never-contact list or erased is left out, and each draft shows who that leaves. It goes through your own mail server a few dozen a minute, each with your postal address and a link to unsubscribe, and nobody is mailed twice.</p>
+	if unsendable != nil {
+		<p class="mb-5 max-w-[70ch] rounded-lg border border-border bg-muted px-3 py-2 text-sm">{ "Not yet ready to send: " + unsendable.Error() + "." }</p>
 	}
 	@Whose(areaSales, "Campaigns are")
 	if canDo(ctx, areaSales) {
@@ -24,7 +24,11 @@ templ CampaignsView(q *Req, cards []CampaignCard, postal string) {
 		@Empty("No campaigns yet", "Start a draft above, then see who it would go to.")
 	}
 	for _, c := range cards {
-		@CampaignDraftCard(c)
+		if c.Status == CampaignDraft {
+			@CampaignDraftCard(c, unsendable == nil)
+		} else {
+			@CampaignSentCard(c)
+		}
 	}
 }
 
@@ -43,7 +47,55 @@ templ campaignStart() {
 	</form>
 }
 
-templ CampaignDraftCard(c CampaignCard) {
+func mailLine(m map[string]int) string {
+	var parts []string
+	for _, s := range []struct{ key, label string }{{MailSent, "sent"}, {MailQueued, "waiting"}, {MailSending, "going now"}, {MailSkipped, "skipped"},
+		{MailFailed, "refused"}, {MailUnknown, "unknown"}, {MailCancelled, "cancelled"}} {
+		if m[s.key] > 0 {
+			parts = append(parts, strconv.Itoa(m[s.key])+" "+s.label)
+		}
+	}
+	return joinNonEmpty(" · ", parts...)
+}
+
+func campaignState(c CampaignCard) string {
+	switch c.Status {
+	case CampaignSending:
+		return "Sending"
+	case CampaignPaused:
+		return "Paused: " + c.Paused
+	case CampaignSent:
+		return "Sent"
+	}
+	return "Cancelled"
+}
+
+// CampaignSentCard is a campaign once sent: what it said and how its mail went.
+templ CampaignSentCard(c CampaignCard) {
+	<article class="mb-4 flex flex-col gap-2 panel p-4 text-sm" data-campaign-card={ strconv.FormatInt(c.ID, 10) }>
+		<div class="flex flex-wrap items-center justify-between gap-2">
+			<b>{ c.Name }</b>
+			<span class="font-mono text-xs text-muted-foreground">{ campaignState(c) }</span>
+		</div>
+		@Meta(joinNonEmpty(" · ", audienceLabel(c.Audience), "sent by "+actorLabel(c.QueuedBy), mailLine(c.Mail)))
+		<p class="font-bold">{ c.Subject }</p>
+		<p class="whitespace-pre-wrap text-muted-foreground">{ c.Body }</p>
+		if (c.Status == CampaignSending || c.Status == CampaignPaused) && canDo(ctx, areaSales) {
+			<div class="flex justify-end gap-2">
+				if c.Status == CampaignPaused {
+					@button.Button(button.Props{Size: button.SizeXs, Attributes: templ.Attributes{"data-post": "api/v1/campaigns/" + strconv.FormatInt(c.ID, 10) + "/resume", "data-body": "{}"}}) {
+						Resume
+					}
+				}
+				@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/campaigns/" + strconv.FormatInt(c.ID, 10) + "/cancel", "data-body": "{}", "data-confirm": "Stop sending " + c.Name + "? What went stays sent."}}) {
+					Cancel the rest
+				}
+			</div>
+		}
+	</article>
+}
+
+templ CampaignDraftCard(c CampaignCard, ready bool) {
 	<article class="mb-4 flex flex-col gap-3 panel p-4 text-sm" data-campaign-card={ strconv.FormatInt(c.ID, 10) }>
 		if canDo(ctx, areaSales) {
 			<div class="flex flex-wrap items-center justify-between gap-2">
@@ -83,9 +135,14 @@ templ CampaignDraftCard(c CampaignCard) {
 			</div>
 		</details>
 		if canDo(ctx, areaSales) {
-			<div class="flex justify-end">
+			<div class="flex justify-end gap-2">
 				@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/campaigns/" + strconv.FormatInt(c.ID, 10), "data-method": "DELETE", "data-confirm": "Remove the draft " + c.Name + "?"}}) {
 					Remove draft
+				}
+				if ready && c.Going > 0 && c.Subject != "" && c.Body != "" {
+					@button.Button(button.Props{Size: button.SizeXs, Attributes: templ.Attributes{"data-post": "api/v1/campaigns/" + strconv.FormatInt(c.ID, 10) + "/send", "data-body": "{}", "data-confirm": "Send " + c.Name + " to " + plural(c.Going, "person") + " now?"}}) {
+						{ "Send to " + plural(c.Going, "person") }
+					}
 				}
 			</div>
 		}

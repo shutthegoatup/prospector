@@ -742,7 +742,8 @@ func (t *turnState) requestDone() bool {
 func (t *turnState) call(ctx context.Context, name, rawArgs string) (string, error) {
 	args := map[string]any{}
 	if strings.TrimSpace(rawArgs) != "" {
-		if err := json.Unmarshal([]byte(rawArgs), &args); err != nil {
+		clean, _ := dropNULEscapes([]byte(rawArgs), true)
+		if err := json.Unmarshal(clean, &args); err != nil {
 			return "", fmt.Errorf("the arguments for %s weren't a JSON object", name)
 		}
 	}

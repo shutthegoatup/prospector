@@ -34,8 +34,10 @@ var opArea = map[string]string{
 	"StartDeal": areaSales, "ChangeDeal": areaSales, "RemoveDeal": areaSales, "ChangeOwnDeal": areaSales,
 	"StartRun": areaSales, "StopRun": areaSales,
 	"CreateTask": areaSales, "ChangeTask": areaSales, "AskTask": areaSales, "ChangeTaskRequest": areaSales,
+	"AddNote": areaSales, "FinishRequest": areaSales,
 	"ConverseEnquiry": areaAny, "AddSuppression": areaAny, "RemoveSuppression": areaSales,
 	"CreateCampaign": areaSales, "ChangeCampaign": areaSales, "RemoveCampaign": areaSales,
+	"SendCampaign": areaSales, "CancelCampaign": areaSales, "ResumeCampaign": areaSales,
 	"CreateAgent": "", "UpdateAgent": "", "DeleteAgent": "", "DeleteEnquiry": "",
 }
 
@@ -60,6 +62,15 @@ func canDo(ctx context.Context, area string) bool {
 var pageArea = map[string]string{
 	"today": areaSales, "research": areaSales, "conversations": areaSales, "campaigns": areaSales, "tasks": areaSales,
 	"enquiries": areaSupport, "onboarding": areaSupport, "subscriptions": areaSupport,
+}
+
+// landing is the page someone starts on: Today is outreach, so someone who works only
+// in support starts on what is theirs to answer.
+func landing(m *Membership) string {
+	if !m.Works(areaSales) && m.Works(areaSupport) {
+		return "enquiries"
+	}
+	return "today"
 }
 
 func areaRefusal(area string) string {

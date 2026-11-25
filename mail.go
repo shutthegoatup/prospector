@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/mail"
 	"net/smtp"
+	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
@@ -87,23 +88,36 @@ func mailFromEnv(env func(string) string) (*MailServer, error) {
 	return m, m.check()
 }
 
+var (
+	// errUnsent is a failure before the message was handed over: it certainly didn't go,
+	// and can be tried again.
+	errUnsent = errors.New("not sent")
+	// errRefusedRecipient is the server refusing the one address: nothing went, and
+	// trying again won't change that.
+	errRefusedRecipient = errors.New("the mail server refused the address")
+)
+
+func unsent(err error) error { return fmt.Errorf("%w: %w", errUnsent, err) }
+
 // smtpSend never sends a password or a message in the clear, except to this machine:
-// net/smtp's own SendMail only uses TLS when offered, and waits forever.
+// net/smtp's own SendMail only uses TLS when offered, and waits forever. A failure
+// before the message is handed over wraps errUnsent, or errRefusedRecipient; any other
+// leaves it unknown whether the mail went.
 func smtpSend(ctx context.Context, via MailServer, m Message) error {
 	if err := via.check(); err != nil {
-		return err
+		return unsent(err)
 	}
 	from, _ := mail.ParseAddress(via.From)
 	to, err := mail.ParseAddress(m.To)
 	if err != nil || strings.ContainsAny(m.To, "\r\n") {
-		return fmt.Errorf("%q isn't an email address", m.To)
+		return fmt.Errorf("%w: %q isn't an email address", errRefusedRecipient, m.To)
 	}
 	ctx, cancel := context.WithTimeout(ctx, sendLimit)
 	defer cancel()
 	addr := net.JoinHostPort(via.Host, strconv.Itoa(via.Port))
 	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", addr)
 	if err != nil {
-		return fmt.Errorf("reach %s: %w", addr, err)
+		return unsent(fmt.Errorf("reach %s: %w", addr, err))
 	}
 	defer conn.Close()
 	deadline, _ := ctx.Deadline()
@@ -121,33 +135,40 @@ func submit(conn net.Conn, via MailServer, from, to *mail.Address, m Message, se
 	}
 	c, err := smtp.NewClient(conn, via.Host)
 	if err != nil {
-		return fmt.Errorf("%s: %w", addr, err)
+		return unsent(fmt.Errorf("%s: %w", addr, err))
 	}
 	defer c.Close()
 	// A server on this machine is spoken to in the clear even when it offers TLS: its
 	// certificate is usually self-signed, and nothing leaves the machine.
 	if via.Port != 465 && needTLS {
 		if ok, _ := c.Extension("STARTTLS"); !ok {
-			return fmt.Errorf("%s doesn't offer TLS, so nothing was sent", addr)
+			return unsent(fmt.Errorf("%s doesn't offer TLS, so nothing was sent", addr))
 		}
 		if err := c.StartTLS(secure); err != nil {
-			return fmt.Errorf("%s: %w", addr, err)
+			return unsent(fmt.Errorf("%s: %w", addr, err))
 		}
 	}
 	if via.Username != "" {
 		if err := c.Auth(smtp.PlainAuth("", via.Username, via.Password, via.Host)); err != nil {
-			return fmt.Errorf("%s refused the username and password: %w", addr, err)
+			return unsent(fmt.Errorf("%s refused the username and password: %w", addr, err))
 		}
 	}
 	if err := c.Mail(from.Address); err != nil {
-		return fmt.Errorf("%s refused mail from %s: %w", addr, from.Address, err)
+		return unsent(fmt.Errorf("%s refused mail from %s: %w", addr, from.Address, err))
 	}
 	if err := c.Rcpt(to.Address); err != nil {
-		return fmt.Errorf("%s refused mail to %s: %w", addr, to.Address, err)
+		// A 4xx is "not now" (a rate limit, greylisting): it can be tried again. Only a
+		// 5xx is the address refused for good.
+		var reply *textproto.Error
+		if errors.As(err, &reply) && reply.Code >= 400 && reply.Code < 500 {
+			return unsent(fmt.Errorf("%s put off mail to %s: %w", addr, to.Address, err))
+		}
+		return fmt.Errorf("%w: %s refused mail to %s: %w", errRefusedRecipient, addr, to.Address, err)
 	}
+	// Refused before any of the message is written, it didn't go.
 	w, err := c.Data()
 	if err != nil {
-		return err
+		return unsent(err)
 	}
 	if _, err := w.Write(compose(from, to, m, time.Now())); err != nil {
 		return err

@@ -52,45 +52,6 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 		linkNext(w, r, due.NextCursor)
 		writeJSON(w, due)
 	}))
-	mux.HandleFunc("GET "+v1+"tasks", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
-		page, err := pageFrom(r)
-		if err != nil {
-			apiFail(w, r, err)
-			return
-		}
-		tasks, next, err := a.s.AgentTasks(reqOf(r).Org.ID, reqOf(r).Agent(), page)
-		linkNext(w, r, next)
-		respond(w, r, tasksOut{tasks, next}, err)
-	}))
-	mux.HandleFunc("GET "+v1+"tasks/{id}", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
-		page, err := pageFrom(r)
-		if err != nil {
-			apiFail(w, r, err)
-			return
-		}
-		t, err := a.s.AgentTask(reqOf(r).Org.ID, reqOf(r).Agent(), idParam(r, "id"), page)
-		if err != nil {
-			apiFail(w, r, err)
-			return
-		}
-		linkNext(w, r, t.NextCursor)
-		writeJSON(w, t)
-	}))
-	mux.HandleFunc("POST "+v1+"notes", a.agent("research:write", func(w http.ResponseWriter, r *http.Request) {
-		var in NoteIn
-		if decode(w, r, &in) {
-			q := reqOf(r)
-			out, err := a.s.AgentNote(q.Org.ID, q.Agent(), in)
-			respond(w, r, out, err)
-		}
-	}))
-	mux.HandleFunc("POST "+v1+"requests/finish", a.agent("research:write", func(w http.ResponseWriter, r *http.Request) {
-		var in FinishIn
-		if decode(w, r, &in) {
-			q := reqOf(r)
-			respond(w, r, map[string]bool{"ok": true}, a.s.AgentFinish(q.Org.ID, q.Agent(), in))
-		}
-	}))
 	mux.HandleFunc("POST "+v1+"companies", a.agent("research:write", func(w http.ResponseWriter, r *http.Request) {
 		var in AddCompanyIn
 		if decode(w, r, &in) {

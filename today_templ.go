@@ -126,7 +126,7 @@ func TodayView(q *Req, d TodayData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if d.Filter == "linkedin" {
+		if d.Filter == "linkedin" && canDo(ctx, areaSales) {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<p class=\"font-mono text-xs text-muted-foreground\">Keys: <kbd class=\"text-foreground\">o</kbd> open profile and copy the note · <kbd class=\"text-foreground\">a</kbd> added · <kbd class=\"text-foreground\">s</kbd> skip</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

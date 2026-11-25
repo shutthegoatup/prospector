@@ -427,9 +427,9 @@ func Layout(n Nav, content templ.Component) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var23 string
-			templ_7745c5c3_Var23, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/o/" + o.Slug + "/today")).ResolveURL(ctx)
+			templ_7745c5c3_Var23, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/o/" + o.Slug + "/")).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `layout.templ`, Line: 75, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `layout.templ`, Line: 75, Col: 53}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 			if templ_7745c5c3_Err != nil {
@@ -1710,9 +1710,9 @@ func Whose(area, work string) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var78 string
-			templ_7745c5c3_Var78, templ_7745c5c3_Err = templ.JoinStringErrs(work + " " + area + " work, so you can read it here but not change it. An owner can add " + area + " to you on the Team list in Settings.")
+			templ_7745c5c3_Var78, templ_7745c5c3_Err = templ.JoinStringErrs(work + " " + area + " work, so here you read it. An owner can add " + area + " to you on the Team list in Settings.")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `layout.templ`, Line: 403, Col: 241}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `layout.templ`, Line: 403, Col: 219}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var78))
 			if templ_7745c5c3_Err != nil {

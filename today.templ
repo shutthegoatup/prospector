@@ -47,7 +47,7 @@ templ TodayView(q *Req, d TodayData) {
 					}
 				}
 			</nav>
-			if d.Filter == "linkedin" {
+			if d.Filter == "linkedin" && canDo(ctx, areaSales) {
 				<p class="font-mono text-xs text-muted-foreground">Keys: <kbd class="text-foreground">o</kbd> open profile and copy the note · <kbd class="text-foreground">a</kbd> added · <kbd class="text-foreground">s</kbd> skip</p>
 			}
 			if len(d.Cards) == 0 {

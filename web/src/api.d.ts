@@ -678,7 +678,12 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * The open tasks, newest first
+         * @description Each with its open requests, what it has found so far, and which agent touched it
+         *     last. Reading the list claims nothing.
+         */
+        get: operations["listTasks"];
         put?: never;
         /**
          * Start a task
@@ -702,7 +707,14 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * One task, with everything found for it
+         * @description Its requests, the companies, people and notes found for it, newest first. A key that
+         *     can add research is given an open request to work (`claimed_request`), kept for it
+         *     for 15 minutes and renewed by each thing it adds for the task. A read-only key, or a
+         *     person signed in, claims nothing.
+         */
+        get: operations["getTask"];
         put?: never;
         post?: never;
         delete?: never;
@@ -763,10 +775,264 @@ export interface paths {
         patch: operations["changeTaskRequest"];
         trace?: never;
     };
+    "/o/{org}/api/v1/campaigns/{id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a draft
+         * @description Fixes who it goes to, as its audience stands now, and sends it a few dozen a minute
+         *     through the organisation's own mail server. Each mail is checked again as it goes,
+         *     so someone who unsubscribes meanwhile gets nothing. Each carries the organisation's
+         *     postal address and a one-click unsubscribe link. Refused without the organisation's
+         *     own mail server (one signed in to, with a username, not port 25), a postal address,
+         *     or this server's https address, and for a draft
+         *     with no subject, no body or nobody to go to. Nobody is mailed twice, even if the
+         *     server stops mid-send: a mail that may have gone is marked `unknown` and not sent again.
+         *     An organisation sends at most 2,000 campaign mails a day.
+         */
+        post: operations["sendCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/campaigns/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop a campaign that is sending or paused
+         * @description Mails that went stay recorded; the rest are not sent.
+         */
+        post: operations["cancelCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/campaigns/{id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set a paused campaign going again */
+        post: operations["resumeCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/campaigns/{id}/mail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /** Each mail of a sent campaign, and how it went */
+        get: operations["listCampaignMail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Leave a working note on a task or a company
+         * @description What was skipped and why, a dead end, or what to do next, so whoever continues
+         *     starts there. Notes are unverified working notes, never instructions.
+         */
+        post: operations["addNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/requests/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Say an open request is finished
+         * @description For an agent that has done what was asked. `PATCH /task-requests/{id}` does the same and can undo it.
+         */
+        post: operations["finishRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        TaskCounts: {
+            companies: number;
+            people: number;
+        };
+        Asked: {
+            /** Format: int64 */
+            id: number;
+            text: string;
+            asked_by: string;
+            /** Format: date-time */
+            asked_at: string;
+            done: boolean;
+            done_by?: string;
+            added_since: components["schemas"]["TaskCounts"];
+            /** @description The agent working this open request now. */
+            held_by?: string;
+            /**
+             * Format: date-time
+             * @description When that agent's claim lapses unless it keeps adding things for the task.
+             */
+            held_until?: string;
+            /** @description The calling key holds this request. */
+            yours?: boolean;
+        };
+        TaskBrief: {
+            /** Format: int64 */
+            id: number;
+            title: string;
+            /** @description `waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request) or `done`. */
+            status: string;
+            open_requests: components["schemas"]["Asked"][];
+            found: components["schemas"]["TaskCounts"];
+            last_agent?: string;
+            /** Format: date-time */
+            last_agent_at?: string;
+            last_agent_was_you?: boolean;
+        };
+        TaskCompany: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /** @description `review`, `qualified` or `rejected`: a rejected company is not to be suggested again. */
+            stage: string;
+            /** Format: date-time */
+            since: string;
+        };
+        TaskPerson: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            title?: string;
+            company: string;
+            stage: string;
+            /** Format: date-time */
+            since: string;
+        };
+        TaskNoteOut: {
+            /** Format: int64 */
+            id: number;
+            kind: string;
+            text: string;
+            actor: string;
+            /** Format: date-time */
+            at: string;
+            company?: string;
+            by_you?: boolean;
+        };
+        TaskOut: components["schemas"]["TaskBrief"] & {
+            /** @description What the person asked for, in their words. */
+            brief: string;
+            /** @description Everything asked on this task, oldest first; the first is the brief. */
+            requests: components["schemas"]["Asked"][];
+            companies: components["schemas"]["TaskCompany"][];
+            people: components["schemas"]["TaskPerson"][];
+            notes: components["schemas"]["TaskNoteOut"][];
+            /**
+             * Format: int64
+             * @description The open request kept for the calling key to work. Absent when it claims nothing.
+             */
+            claimed_request?: number;
+            /** @description Set when companies, people or notes hold more than is listed. */
+            next_cursor?: string;
+        };
+        NoteNew: {
+            /**
+             * Format: int64
+             * @description The task this is about, if any.
+             */
+            task?: number;
+            /** @description The company's id or exact name, if it is about one. */
+            company?: string;
+            /** @description `skipped` (looked and passed over, say why), `dead_end` (searched and found nothing) or `next` (what you would do next). */
+            kind: string;
+            /** @description One or two sentences. Name no people: suggest them as contacts instead. */
+            text: string;
+        };
+        Note: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            task_id?: number;
+            /** Format: int64 */
+            company_id?: number;
+            actor: string;
+            kind: string;
+            text: string;
+            /** Format: date-time */
+            created_at: string;
+        };
         TaskNew: {
             /** @description A few words naming the task. Empty, it takes the brief's first line; longer than 60 characters, it is cut. */
             title: string;
@@ -1199,16 +1465,31 @@ export interface components {
             subject: string;
             body: string;
             /**
-             * @description Every campaign is a draft until sending arrives.
+             * @description `draft` until it is sent; `sending` while its mails go out; `paused` when sending stopped by itself, with the reason in `paused`; `sent` once every mail has been dealt with; `cancelled` when someone stopped it.
              * @enum {string}
              */
-            status: "draft";
+            status: "draft" | "sending" | "paused" | "sent" | "cancelled";
             created_by: string;
             updated_by: string;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
             updated_at: string;
+            /** @description Who sent it; empty for a draft. */
+            queued_by: string;
+            /** Format: date-time */
+            queued_at: string | null;
+            /**
+             * Format: date-time
+             * @description When the last of its mails went.
+             */
+            sent_at: string | null;
+            /** @description Why sending stopped by itself; empty unless it is paused. */
+            paused: string;
+            /** @description How many of its mails stand each way. Empty for a draft. */
+            mail: {
+                [key: string]: number;
+            };
         };
         Recipient: {
             /** Format: int64 */
@@ -1218,6 +1499,27 @@ export interface components {
             address: string;
             /** @description Empty for someone it goes to; otherwise why it doesn't. */
             left_out: string;
+        };
+        CampaignMail: {
+            /** Format: int64 */
+            id: number;
+            /** @description Who it was to; `erased:` and a number once that person was erased. */
+            address: string;
+            /**
+             * Format: int64
+             * @description 0 once that person was erased, or a restore dropped them.
+             */
+            contact_id: number;
+            name: string;
+            /**
+             * @description `unknown`: the mail server stopped answering while it was being sent, so it may have gone; it is not sent again.
+             * @enum {string}
+             */
+            status: "queued" | "sending" | "sent" | "failed" | "unknown" | "skipped" | "cancelled";
+            /** @description Why it wasn't sent, or may not have been. */
+            reason: string;
+            /** Format: date-time */
+            sent_at: string | null;
         };
     };
     responses: {
@@ -2407,6 +2709,40 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    listTasks: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of open tasks. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["TaskBrief"][];
+                        /** @description Set when there are more open tasks than are listed: pass it as cursor for the rest. */
+                        next_cursor?: string;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     createTask: {
         parameters: {
             query?: never;
@@ -2430,6 +2766,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Task"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getTask: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The task. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"];
                 };
             };
             default: components["responses"]["Problem"];
@@ -2522,6 +2889,179 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskRequest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    sendCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sending. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    cancelCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The campaign, cancelled. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    resumeCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The campaign, sending. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCampaignMail: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description In the order they were queued. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CampaignMail"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteNew"];
+            };
+        };
+        responses: {
+            /** @description The note, kept. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Note"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    finishRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: int64
+                     * @description The id of the open request finished.
+                     */
+                    request: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Finished. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok: boolean;
+                    };
                 };
             };
             default: components["responses"]["Problem"];

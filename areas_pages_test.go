@@ -80,6 +80,20 @@ func TestNoPageOffersWorkItsViewerWouldBeRefused(t *testing.T) {
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders with a configurator.", "Ada Lovelace"))
 	must(s.AddCampaign(o.ID, CampaignIn{Name: "Spring price list", Audience: AudienceConversations}, "Ada Lovelace"))
 	must(s.Suppress(o.ID, "nobody@quillon.example", "Ada Lovelace"))
+	must(s.AgentAddContact(o, Actor{Name: "agent:scout"}, AddContactIn{Company: "Corvane Boats", Name: "Iris Vane", Title: "Head of Digital", SourceURL: "https://corvane.example/team"}))
+	must(s.AgentNote(o.ID, Actor{Name: "agent:scout"}, NoteIn{Task: task.ID, Kind: "next", Text: "Boat shows list more builders."}))
+	must(s.StartDeal(o.ID, c.ID, "renewal", "Ada Lovelace"))
+	won := must(s.QuickAddPerson(o, QuickAdd{Name: "Ines Moreau", Company: "Belair Kitchens"}, "Ada Lovelace"))
+	if err := s.Mark(o.ID, won.ID, "replied", today, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Update(o.ID, won.ID, "stage", "won", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	runs := must(s.Onboardings(o.ID, *c.CompanyID, today))
+	if err := s.SetOnboardingStep(o.ID, runs[0].Steps[0].ID, "done", "yes", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
 
 	pages := []string{"today", "research", "conversations", "companies/" + itoa(*c.CompanyID), "add", "enquiries", "subscriptions", "onboarding", "campaigns", "tasks", "tasks/" + itoa(task.ID), "settings"}
 	base := srv.URL + "/o/alpha/"
@@ -94,18 +108,25 @@ func TestNoPageOffersWorkItsViewerWouldBeRefused(t *testing.T) {
 		}
 		return all
 	}
-	has := func(all []control, path string) bool {
+	// has matches a control exactly, as "METHOD path" with ids written as N, so one
+	// control can't stand in for another that shares its prefix.
+	has := func(all []control, want string) bool {
 		for _, c := range all {
-			if strings.HasPrefix(c.path, path) {
+			if c.method+" "+numbers.ReplaceAllString(c.path, "N") == want {
 				return true
 			}
 		}
 		return false
 	}
 
-	// Collected before anything is pressed, so what the owner sees is the whole set.
 	everything := offered(owner)
-	for _, want := range []string{"ui/mark", "ui/update", "ui/company", "api/v1/deals", "api/v1/enquiries", "api/v1/subscriptions", "api/v1/onboarding-steps", "api/v1/campaigns", "api/v1/tasks", "api/v1/suppressions"} {
+	for _, want := range []string{
+		"POST ui/mark", "POST ui/update", "POST ui/company", "POST ui/pick", "POST ui/note/delete",
+		"PATCH api/v1/deals/N", "DELETE api/v1/deals/N", "POST api/v1/deals", "POST api/v1/onboardings",
+		"PATCH api/v1/enquiries/N", "POST api/v1/enquiries/N/answers", "POST api/v1/enquiries/N/conversation",
+		"PATCH api/v1/subscriptions/N", "PATCH api/v1/onboarding-steps/N", "PATCH api/v1/campaigns/N",
+		"POST api/v1/tasks/N/requests", "POST api/v1/suppressions", "DELETE api/v1/suppressions/N",
+	} {
 		if !has(everything, want) {
 			t.Fatalf("the seeded pages offer an owner no %s control, so the test proves nothing about it", want)
 		}
@@ -117,9 +138,14 @@ func TestNoPageOffersWorkItsViewerWouldBeRefused(t *testing.T) {
 		sees  []string
 		not   []string
 	}{
-		{"grace@example.com", []string{areaSupport}, []string{"api/v1/enquiries", "api/v1/subscriptions", "api/v1/onboarding-steps"}, []string{"ui/mark", "api/v1/deals", "ui/company", "api/v1/tasks"}},
-		{"alan@example.com", []string{areaSales}, []string{"ui/mark", "api/v1/deals", "ui/company", "api/v1/tasks"}, []string{"api/v1/subscriptions", "api/v1/onboarding-steps"}},
-		{"carol@example.com", nil, nil, []string{"ui/mark", "api/v1/enquiries", "api/v1/suppressions"}},
+		{"grace@example.com", []string{areaSupport},
+			[]string{"PATCH api/v1/enquiries/N", "POST api/v1/enquiries/N/answers", "PATCH api/v1/subscriptions/N", "PATCH api/v1/onboarding-steps/N", "POST api/v1/onboardings", "POST api/v1/enquiries/N/conversation", "POST api/v1/suppressions"},
+			[]string{"POST ui/mark", "PATCH api/v1/deals/N", "POST ui/company", "POST ui/pick", "POST ui/note/delete", "POST api/v1/tasks/N/requests", "DELETE api/v1/suppressions/N"}},
+		{"alan@example.com", []string{areaSales},
+			[]string{"POST ui/mark", "PATCH api/v1/deals/N", "POST ui/company", "POST ui/pick", "POST ui/note/delete", "POST api/v1/tasks/N/requests", "POST api/v1/onboardings", "POST api/v1/suppressions"},
+			[]string{"PATCH api/v1/enquiries/N", "POST api/v1/enquiries/N/answers", "PATCH api/v1/subscriptions/N", "PATCH api/v1/onboarding-steps/N"}},
+		{"carol@example.com", nil, nil,
+			[]string{"POST ui/mark", "PATCH api/v1/enquiries/N", "POST api/v1/enquiries/N/conversation", "POST api/v1/onboardings", "POST api/v1/suppressions"}},
 	} {
 		u := mustUser(t, s, o, who.email, who.email, "member")
 		if err := s.SetAreas(o.ID, u.ID, who.areas); err != nil {
