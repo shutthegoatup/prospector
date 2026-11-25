@@ -104,7 +104,8 @@ func pointingAt(t *testing.T, s *Store, org, contact int64) func() map[string]in
 		left := map[string]int64{}
 		for _, sch := range tables {
 			var n int64
-			if err := s.db.Table(sch.Table).Where("org_id = ? and contact_id = ?", org, contact).Count(&n).Error; err != nil {
+			// Under the id negated too, where a restore parks rows while it renumbers people.
+			if err := s.db.Table(sch.Table).Where("org_id = ? and contact_id in ?", org, []int64{contact, -contact}).Count(&n).Error; err != nil {
 				t.Fatal(err)
 			}
 			if n > 0 {
