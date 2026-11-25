@@ -533,6 +533,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/suppressions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Addresses marketing mail never goes to
+         * @description One list for every mailing: those who unsubscribed by a link in a mail, and those
+         *     a member or key added. Someone erased on request, and anyone on the never-contact
+         *     list, isn't mailed either, though they aren't listed here.
+         */
+        get: operations["listSuppressions"];
+        put?: never;
+        /**
+         * Stop marketing mail to an address
+         * @description Adding one already there changes nothing.
+         */
+        post: operations["addSuppression"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/suppressions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Take an added address off the list
+         * @description Only one a member or key added. One the person unsubscribed themselves stays.
+         */
+        delete: operations["removeSuppression"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -895,6 +948,20 @@ export interface components {
             state: string;
             owner: string;
             note: string;
+        };
+        Suppression: {
+            /** Format: int64 */
+            id: number;
+            address: string;
+            /**
+             * @description `unsubscribed` when they asked, by a link in a mail; `added` when a member or key put them here.
+             * @enum {string}
+             */
+            reason: "unsubscribed" | "added";
+            /** @description Who added it; empty when they unsubscribed themselves. */
+            by: string;
+            /** Format: date-time */
+            created_at: string;
         };
     };
     responses: {
@@ -1842,6 +1909,93 @@ export interface operations {
                         contact: number;
                     };
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listSuppressions: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest first. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Suppression"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addSuppression: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description One email address. */
+                    address: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The address as listed. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Suppression"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeSuppression: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Taken off. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };

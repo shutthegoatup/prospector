@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/mail"
 	"net/smtp"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,9 @@ type Message struct {
 	To, Subject, Body string
 	// ReplyTo is where an answer should go when that isn't the sender; empty for none.
 	ReplyTo string
+	// Unsubscribe is the link that stops marketing mail to this address, for mail providers'
+	// one-click button; empty for mail that isn't marketing.
+	Unsubscribe string
 }
 
 // sendFunc is how mail leaves; tests put a recorder in its place.
@@ -166,10 +170,26 @@ func compose(from, to *mail.Address, m Message, now time.Time) []byte {
 	if answer, err := mail.ParseAddress(m.ReplyTo); err == nil {
 		fmt.Fprintf(&b, "Reply-To: %s\r\n", (&mail.Address{Address: answer.Address}).String())
 	}
+	// RFC 8058 one-click: only over HTTPS, and only a link we made, never one with room
+	// in it to start a header of its own.
+	if u, err := url.Parse(m.Unsubscribe); err == nil && u.Scheme == "https" && printableASCII(m.Unsubscribe) && !strings.ContainsAny(m.Unsubscribe, "<> ,") {
+		fmt.Fprintf(&b, "List-Unsubscribe: <%s>\r\nList-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n", m.Unsubscribe)
+	}
 	fmt.Fprintf(&b, "Date: %s\r\nMessage-ID: <%s@%s>\r\n", now.Format(time.RFC1123Z), randomToken(16), domain)
 	b.WriteString("MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n")
 	body := quotedprintable.NewWriter(&b)
 	body.Write([]byte(strings.ReplaceAll(strings.ReplaceAll(m.Body, "\r\n", "\n"), "\n", "\r\n")))
 	body.Close()
 	return b.Bytes()
+}
+
+// printableASCII is text a header can carry as it is: no control characters, nothing
+// outside ASCII.
+func printableASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] < 0x21 || s[i] > 0x7e {
+			return false
+		}
+	}
+	return true
 }
