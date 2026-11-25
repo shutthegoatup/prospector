@@ -46,6 +46,7 @@ var orgExportHolds = map[string]string{
 	"customer_links":    "not exported: the hash of a link mailed to a customer, which opens their page once and expires",
 	"customer_sessions": "not exported: the hash of a cookie in a customer's browser, which expires",
 	"enquiries":         "enquiries",
+	"enquiry_messages":  "enquiry_messages",
 	"suggestions":       "suggested_details",
 	"tasks":             "tasks",
 	"task_requests":     "task_requests",

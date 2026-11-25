@@ -33,7 +33,7 @@ func enquiryFrom(e Enquiry) string {
 
 templ EnquiriesView(q *Req, d EnquiriesData) {
 	@PageHead("Enquiries")
-	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">What people sent through your sites' forms and your products, newest first. The words are theirs, exactly as sent. Each new one waits to be answered: give it an owner, and say when you're waiting on them or it's closed. You answer from your own mail; nothing is sent from here.</p>
+	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">What people sent through your sites' forms and your products, newest first. The words are theirs, exactly as sent. Each new one waits to be answered: give it an owner, and say when you're waiting on them or it's closed. Reply from here and it is emailed to them; their answer comes to your own mailbox, and you record it here.</p>
 	<div class="mb-5 flex flex-wrap gap-2">
 		for _, st := range EnquiryStates {
 			if st.Key != EnquiryClosed && d.Counts["state:"+st.Key] > 0 {
@@ -132,10 +132,60 @@ templ EnquiriesView(q *Req, d EnquiriesData) {
 						}
 					}
 				</div>
+				if !e.Spam {
+					@EnquiryThreadView(e, d.Threads[e.ID], d.MailOn)
+				}
 			</article>
 		}
 	</div>
 	@Pager(d.Page, func(n int) string {
 		return pageLink(q.Base()+"enquiries", n, "kind", d.Filter.Kind, "state", d.Filter.State, "spam", enquirySpamParam(d.Filter))
 	})
+}
+
+func threadMeta(m EnquiryMessage) string {
+	if m.Ours {
+		return actorLabel(m.By) + " replied · " + m.CreatedAt.Format("2 Jan 15:04")
+	}
+	return "they said · recorded by " + actorLabel(m.By) + " · " + m.CreatedAt.Format("2 Jan 15:04")
+}
+
+// EnquiryThreadView is what has been said since an enquiry arrived, and the two ways to
+// add to it: a reply that is emailed, and their answer, pasted in from wherever it came.
+templ EnquiryThreadView(e Enquiry, thread []EnquiryMessage, mailOn bool) {
+	<div class="flex flex-col gap-2 border-t border-border pt-2">
+		for _, m := range thread {
+			<div class="rounded-lg bg-muted p-3">
+				@Meta(threadMeta(m))
+				<p class="mt-1 whitespace-pre-wrap text-sm">{ m.Text }</p>
+			</div>
+		}
+		<details>
+			<summary class="cursor-pointer font-mono text-xs text-muted-foreground">Reply, or record their answer</summary>
+			<div class="mt-2 flex flex-col gap-3">
+				if mailOn {
+					<form data-form={ "api/v1/enquiries/" + strconv.FormatInt(e.ID, 10) + "/replies" } data-reset="true" data-refresh="true" class="flex flex-col gap-2">
+						<textarea name="text" rows="4" required maxlength="10000" placeholder={ "Your reply to " + e.Email + ". Only what you write here is sent; their answer comes to your own mailbox." } class="rounded-lg border border-input bg-muted px-3 py-2 text-sm leading-relaxed"></textarea>
+						<div class="flex items-center gap-3">
+							@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+								Email this reply
+							}
+							<span data-result class="font-mono text-xs text-muted-foreground"></span>
+						</div>
+					</form>
+				} else {
+					@Meta("To reply from here an owner sets a mail server in Settings. Until then, answer from your own mail.")
+				}
+				<form data-form={ "api/v1/enquiries/" + strconv.FormatInt(e.ID, 10) + "/answers" } data-reset="true" data-refresh="true" class="flex flex-col gap-2">
+					<textarea name="text" rows="3" required maxlength="10000" placeholder="What they said back, pasted from your mail. Nothing is sent." class="rounded-lg border border-input bg-muted px-3 py-2 text-sm leading-relaxed"></textarea>
+					<div class="flex items-center gap-3">
+						@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantOutline}) {
+							Record their answer
+						}
+						<span data-result class="font-mono text-xs text-muted-foreground"></span>
+					</div>
+				</form>
+			</div>
+		</details>
+	</div>
 }
