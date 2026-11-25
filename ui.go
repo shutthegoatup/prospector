@@ -135,7 +135,9 @@ type CompanyPage struct {
 	Company Company
 	Facts   []Fact
 	People  []Contact
+	Pending map[int64][]PendingDetail
 	History []HistoryItem
+	Notes   []NoteView
 }
 
 func (a *App) company(w http.ResponseWriter, r *http.Request) {
@@ -148,7 +150,12 @@ func (a *App) company(w http.ResponseWriter, r *http.Request) {
 	p := CompanyPage{Company: *c}
 	p.Facts, _ = a.s.Facts(q.Org.ID, c.ID)
 	p.People, _ = a.s.People(q.Org.ID, c.ID)
+	p.Pending, _ = a.s.Pending(q.Org.ID, p.People)
 	p.History, _ = a.s.History(q.Org.ID, c.ID, 50)
+	notes, _ := a.s.CompanyNotes(q.Org.ID, c.ID, 20)
+	for _, n := range notes {
+		p.Notes = append(p.Notes, NoteView{TaskNote: n})
+	}
 	a.page(w, r, "companies", CompanyView(q, p))
 }
 
@@ -192,6 +199,7 @@ type SettingsData struct {
 	Members []Member
 	Me      Membership
 	Covered []string
+	Mail    MailView
 	SSO     *SSO
 	// Callback is where a provider sends people back; empty until PROSPECTOR_URL is set.
 	Callback string
@@ -203,7 +211,8 @@ type SettingsData struct {
 func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	members, _ := a.s.Members(q.Org.ID)
-	d := SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org), Intake: a.baseURL(r) + q.Base() + "intake"}
+	d := SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org), Intake: a.baseURL(r) + q.Base() + "intake",
+		Mail: a.mailView(q.Org.ID)}
 	d.Sealing = a.s.keys != nil
 	if d.SSO, _ = a.s.SSO(q.Org.ID); d.SSO == nil {
 		d.SSO = &SSO{}
@@ -218,13 +227,18 @@ type AgentsData struct {
 	Base     string
 	Keys     []APIKey
 	Activity []AgentEvent
+	Runs     []Run
+	Tasks    map[int64]string
+	Now      time.Time
 	Scores   []AgentScore
 }
 
 func (a *App) agents(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	keys, _ := a.s.Keys(q.Org.ID)
-	a.page(w, r, "agents", AgentsView(q, AgentsData{Base: a.baseURL(r) + q.Base(), Keys: keys, Activity: a.s.AgentActivity(q.Org.ID, 20), Scores: a.s.AgentScores(q.Org.ID)}))
+	runs, tasks := a.s.Runs(q.Org.ID, 12)
+	a.page(w, r, "agents", AgentsView(q, AgentsData{Base: a.baseURL(r) + q.Base(), Keys: keys, Activity: a.s.AgentActivity(q.Org.ID, 20),
+		Scores: a.s.AgentScores(q.Org.ID), Runs: runs, Tasks: tasks, Now: time.Now()}))
 }
 
 func done(w http.ResponseWriter, err error) {
@@ -277,6 +291,17 @@ func (a *App) uiPick(w http.ResponseWriter, r *http.Request) {
 	if decode(w, r, &in) {
 		q := reqOf(r)
 		done(w, a.s.PickContact(q.Org.ID, q.Org, in.ID, q.Actor()))
+	}
+}
+
+func (a *App) uiSuggestion(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID       int64  `json:"id"`
+		Decision string `json:"decision"`
+	}
+	if decode(w, r, &in) {
+		q := reqOf(r)
+		done(w, a.s.DecideSuggestion(q.Org.ID, in.ID, in.Decision, q.Actor()))
 	}
 }
 
@@ -370,7 +395,19 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	msg := u.Email + " added to " + q.Org.Name + "."
-	if !u.HasPassword() {
+	// Someone who never chose a password is sent the link again, so a lost one isn't the end.
+	if password != "" || u.MustChangePassword {
+		sent, err := a.invite(r.Context(), q, u, password != "")
+		if sent {
+			writeJSON(w, map[string]string{"message": msg + " They've been emailed a link to choose their password; it lasts 7 days."})
+			return
+		}
+		if errors.Is(err, errTooSoon) {
+			msg += " They were emailed a link to choose their password a moment ago, so no other was sent."
+		} else if err != nil {
+			msg += " The invitation couldn't be emailed (" + err.Error() + ")."
+		}
+	} else if !u.HasPassword() {
 		msg += " They have no password: they sign in through a provider, so they can open this organisation only by one it accepts."
 	}
 	if password != "" {

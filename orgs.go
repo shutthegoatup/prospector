@@ -110,13 +110,19 @@ func (s *Store) ChangePassword(u *User, current, password, keepToken string) err
 
 // savePassword also signs the user out everywhere except the session in keepToken.
 func (s *Store) savePassword(user int64, hash, keepToken string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		set := map[string]any{"password_hash": hash, "must_change_password": false}
-		if err := tx.Model(&User{}).Where("id = ?", user).Updates(set).Error; err != nil {
-			return err
-		}
-		return tx.Where("user_id = ? and token_hash not in ?", user, s.keys.lookups(sessions, keepToken)).Delete(&Session{}).Error
-	})
+	return s.db.Transaction(func(tx *gorm.DB) error { return s.savePasswordIn(tx, user, hash, keepToken) })
+}
+
+// A new password also ends any emailed link that could still have set one.
+func (s *Store) savePasswordIn(tx *gorm.DB, user int64, hash, keepToken string) error {
+	set := map[string]any{"password_hash": hash, "must_change_password": false}
+	if err := tx.Model(&User{}).Where("id = ?", user).Updates(set).Error; err != nil {
+		return err
+	}
+	if err := tx.Where("user_id = ?", user).Delete(&PasswordToken{}).Error; err != nil {
+		return err
+	}
+	return tx.Where("user_id = ? and token_hash not in ?", user, s.keys.lookups(sessions, keepToken)).Delete(&Session{}).Error
 }
 
 func (s *Store) UserByEmail(email string) (*User, error) {
@@ -364,8 +370,8 @@ func (s *Store) Logout(token string) error {
 
 // Scopes an API key can carry. None of them can send, change settings or reach another org; only import skips review.
 var Scopes = []struct{ Name, What string }{
-	{"read", "search companies and people, read what's due"},
-	{"research:write", "add companies, facts and suggested contacts (they wait in Research)"},
+	{"read", "search companies and people, read what's due and the tasks people wrote"},
+	{"research:write", "add companies, facts and suggested contacts (they wait in Research), and leave notes on tasks"},
 	{"drafts:write", "write draft notes and emails, marked as written by the agent"},
 	{"outcomes:write", "record what happened (added, accepted, sent, called, replied, declined, hold), shown as the agent's"},
 	{"import", "push the repo's markdown and pull the snapshot"},

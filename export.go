@@ -18,6 +18,7 @@ type PersonExport struct {
 	Person     Contact       `json:"person"`
 	Facts      []Fact        `json:"facts"`
 	Enquiries  []Enquiry     `json:"enquiries"`
+	Suggested  []Suggestion  `json:"suggested_details"`
 	History    []ExportEvent `json:"history"`
 }
 
@@ -29,7 +30,7 @@ type ExportEvent struct {
 }
 
 func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error) {
-	out := &PersonExport{ExportedAt: time.Now().UTC(), Facts: []Fact{}, Enquiries: []Enquiry{}, History: []ExportEvent{}}
+	out := &PersonExport{ExportedAt: time.Now().UTC(), Facts: []Fact{}, Enquiries: []Enquiry{}, Suggested: []Suggestion{}, History: []ExportEvent{}}
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		c := &out.Person
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(c).Error; err != nil {
@@ -59,6 +60,9 @@ func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error)
 		if err := wrote.Order("id").Find(&out.Enquiries).Error; err != nil {
 			return err
 		}
+		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("id").Find(&out.Suggested).Error; err != nil {
+			return err
+		}
 		var events []Event
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("at, id").Find(&events).Error; err != nil {
 			return err
@@ -83,10 +87,15 @@ type OrgExport struct {
 	Members      []ExportMember `json:"members"`
 	Keys         []ExportKey    `json:"api_keys"`
 	SignOn       *ExportSignOn  `json:"single_sign_on,omitempty"`
+	Mail         *ExportMail    `json:"mail_server,omitempty"`
 	Companies    []Company      `json:"companies"`
 	Facts        []Fact         `json:"facts"`
 	Contacts     []Contact      `json:"contacts"`
 	Enquiries    []Enquiry      `json:"enquiries"`
+	Suggested    []Suggestion   `json:"suggested_details"`
+	Tasks        []Task         `json:"tasks"`
+	TaskRequests []TaskRequest  `json:"task_requests"`
+	TaskNotes    []TaskNote     `json:"task_notes"`
 	History      []ExportRecord `json:"history"`
 	Erased       int64          `json:"people_erased"`
 }
@@ -124,6 +133,13 @@ type ExportSignOn struct {
 	Domains  []ExportDomain `json:"domains"`
 }
 
+type ExportMail struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username,omitempty"`
+	Sender   string `json:"sender"`
+}
+
 type ExportDomain struct {
 	Domain     string     `json:"domain"`
 	VerifiedAt *time.Time `json:"verified_at,omitempty"`
@@ -133,6 +149,7 @@ type ExportRecord struct {
 	ExportEvent
 	ContactID int64  `json:"contact_id,omitempty"`
 	CompanyID *int64 `json:"company_id,omitempty"`
+	TaskID    int64  `json:"task_id,omitempty"`
 }
 
 func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
@@ -165,8 +182,14 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
+		var mail OrgMail
+		if err := tx.Where("org_id = ?", org).First(&mail).Error; err == nil {
+			out.Mail = &ExportMail{Host: mail.Host, Port: mail.Port, Username: mail.Username, Sender: mail.Sender}
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
 		mine := func() *gorm.DB { return tx.Where("org_id = ?", org).Order("id") }
-		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Enquiries} {
+		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Enquiries, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
 			if err := mine().Find(rows).Error; err != nil {
 				return err
 			}
@@ -179,7 +202,7 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			if e.Action == "erase" {
 				out.Erased++
 			}
-			out.History = append(out.History, ExportRecord{ExportEvent{At: e.At, By: e.User, Action: e.Action, Value: deref(e.Value)}, e.ContactID, e.CompanyID})
+			out.History = append(out.History, ExportRecord{ExportEvent{At: e.At, By: e.User, Action: e.Action, Value: deref(e.Value)}, e.ContactID, e.CompanyID, e.TaskID})
 		}
 		return nil
 	})

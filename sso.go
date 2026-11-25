@@ -191,6 +191,10 @@ func claim(tx *gorm.DB, u *User) error {
 	if err := tx.Model(u).Select("password_hash", "must_change_password").Updates(u).Error; err != nil {
 		return err
 	}
+	// An emailed invitation could still set a password; it ends with the first password.
+	if err := tx.Where("user_id = ?", u.ID).Delete(&PasswordToken{}).Error; err != nil {
+		return err
+	}
 	return tx.Where("user_id = ?", u.ID).Delete(&Session{}).Error
 }
 
@@ -282,13 +286,15 @@ func socialFromEnv(getenv func(string) string) ([]socialWay, error) {
 func (a *App) callbackURL() string { return a.base + "/login/callback" }
 
 type LoginView struct {
-	Next, Problem string
-	Ways          []socialWay
-	SSO           bool
+	Next, Problem, Notice string
+	Ways                  []socialWay
+	SSO                   bool
+	// Forgot offers the reset link, which needs mail.
+	Forgot bool
 }
 
 func (a *App) loginView(next, problem string) LoginView {
-	return LoginView{Next: next, Problem: problem, Ways: a.social, SSO: a.base != ""}
+	return LoginView{Next: next, Problem: problem, Ways: a.social, SSO: a.base != "", Forgot: a.mailOn()}
 }
 
 func (a *App) signInProblem(w http.ResponseWriter, r *http.Request, next string, code int, problem string) {

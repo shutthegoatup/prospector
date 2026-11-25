@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -148,11 +149,12 @@ type ResearchRow struct {
 	Company
 	Facts      []Fact
 	People     []Contact
+	Pending    map[int64][]PendingDetail
 	Incomplete bool
 }
 
 var ResearchFilters = []struct{ Key, Label string }{
-	{"review", "To review"}, {"contact", "Needs a contact"}, {"verify", "Needs verifying"}, {"rejected", "Rejected"},
+	{"review", "To review"}, {"contact", "Needs a contact"}, {"verify", "Needs verifying"}, {"details", "Details to check"}, {"rejected", "Rejected"},
 }
 
 func (s *Store) Research(org int64, filter string) ([]ResearchRow, error) {
@@ -169,6 +171,11 @@ func (s *Store) Research(org int64, filter string) ([]ResearchRow, error) {
 		guess := s.db.Model(&Contact{}).Select("company_id").
 			Where("org_id = ? and company_id is not null and (email_status = 'guess' or flags like '%INFERRED%') and email_sent is null and hold is null", org)
 		q = q.Where("id in (?)", guess).Order("name")
+	case "details":
+		waiting := s.db.Model(&Contact{}).Select("company_id").
+			Where("org_id = ? and company_id is not null and id in (?)", org,
+				s.db.Model(&Suggestion{}).Select("contact_id").Where("org_id = ? and decision = ''", org))
+		q = q.Where("id in (?)", waiting).Order("name")
 	case "rejected":
 		q = q.Where("stage = ?", CompanyRejected).Order("updated_at desc")
 	default:
@@ -182,6 +189,11 @@ func (s *Store) Research(org int64, filter string) ([]ResearchRow, error) {
 		rows[i].Company = c
 		rows[i].Facts, _ = s.Facts(org, c.ID)
 		rows[i].People, _ = s.People(org, c.ID)
+		rows[i].Pending, _ = s.Pending(org, rows[i].People)
+	}
+	if filter == "details" {
+		// A suggestion the person was since given some other way leaves nothing to check.
+		rows = slices.DeleteFunc(rows, func(r ResearchRow) bool { return len(r.Pending) == 0 })
 	}
 	return rows, nil
 }

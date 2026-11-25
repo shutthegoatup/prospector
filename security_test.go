@@ -628,6 +628,11 @@ func TestContentPolicy(t *testing.T) {
 	if err := s.in(o.ID).First(&company).Error; err != nil {
 		t.Fatal(err)
 	}
+	// A task with work and a note on it, so those parts of the pages are rendered.
+	task := must(s.CreateTask(o.ID, "", `Makers with a "configurator" <script>alert(1)</script>`, "Ada Lovelace"))
+	bot := Actor{Name: "agent:bot", KeyID: 1}
+	must(s.AgentAddCompany(o.ID, bot, AddCompanyIn{Name: company.Name, Task: task.ID}))
+	must(s.AgentNote(o.ID, bot, NoteIn{Task: task.ID, Company: company.Name, Kind: "skipped", Text: `No builder, only a <img src=x onerror=alert(1)> brochure.`}))
 	res, err := http.Get(srv.URL + "/login")
 	if err != nil {
 		t.Fatal(err)
@@ -646,9 +651,10 @@ func TestContentPolicy(t *testing.T) {
 	// The policy blocks inline scripts and handlers, so no page may depend on one.
 	tag := regexp.MustCompile(`(?i)<script[^>]*>`)
 	handler := regexp.MustCompile(`(?i)<[^>]*\son[a-z]+\s*=`)
-	pages := []string{"/login", "/o/alpha/today", "/o/alpha/today?step=linkedin", "/o/alpha/research", "/o/alpha/research?f=rejected",
+	pages := []string{"/login", "/o/alpha/today", "/o/alpha/today?step=linkedin", "/o/alpha/research", "/o/alpha/research?f=rejected", "/o/alpha/research?f=details",
 		"/o/alpha/conversations", "/o/alpha/companies", "/o/alpha/companies/" + strconv.FormatInt(company.ID, 10),
-		"/o/alpha/add", "/o/alpha/add?popup=1&name=Hannah", "/o/alpha/settings", "/o/alpha/agents", "/o/alpha/enquiries"}
+		"/o/alpha/add", "/o/alpha/add?popup=1&name=Hannah", "/o/alpha/settings", "/o/alpha/agents", "/o/alpha/enquiries",
+		"/o/alpha/tasks", "/o/alpha/tasks?closed=1", "/o/alpha/tasks/" + strconv.FormatInt(task.ID, 10)}
 	check := func(page, marker string) {
 		t.Helper()
 		code, body := call(t, client, "GET", srv.URL+page, "", nil)

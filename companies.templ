@@ -75,7 +75,12 @@ func historyText(h HistoryItem) string {
 		"add:person": "added", "pick": "picked for outreach", "company:qualified": "qualified the company",
 		"company:rejected": "rejected the company", "company:review": "sent back to review",
 		"erase": "erased a person on request", "enquiry": "sent an enquiry",
-		"export": "exported what is held on them",
+		"suggest:email": "suggested an email", "suggest:phone": "suggested a phone number", "suggest:linkedin": "suggested a LinkedIn profile",
+		"dismiss:email": "dismissed a suggested email", "dismiss:phone": "dismissed a suggested phone number", "dismiss:linkedin": "dismissed a suggested LinkedIn profile",
+		"export": "exported what is held on them", "task:match": "matched to a task",
+		"note:skipped": "left a note: skipped", "note:dead_end": "left a note: found nothing", "note:next": "left a note: what to do next",
+		"task:new": "wrote a task", "task:ask": "asked for more on a task", "task:pickup": "picked up a task",
+		"task:done": "finished a request", "task:reopen": "reopened a request", "task:close": "closed a task", "task:open": "reopened a task",
 	}[h.Action]
 	if verb == "" {
 		if f, ok := strings.CutPrefix(h.Action, "set:"); ok {
@@ -104,7 +109,7 @@ func eraseConfirm(c Contact) string {
 	if len(alternates(deref(c.Person))) > 1 {
 		who = "everyone on this row (" + deref(c.Person) + ")"
 	}
-	return "Erase " + who + "? Their details, drafts and notes are deleted for good, and they can't be added again. Facts and notes about the company that mention them aren't found for you, and nor are your own lead files: take them out there too."
+	return "Erase " + who + "? Their details, drafts and notes are deleted for good, along with agents' notes about this company and its tasks, and they can't be added again. Facts about the company, and the briefs and requests on tasks, that mention them aren't found for you, and nor are your own lead files: take them out there too."
 }
 
 templ CompanyView(q *Req, p CompanyPage) {
@@ -171,6 +176,7 @@ templ CompanyView(q *Req, p CompanyPage) {
 						}
 					</span>
 				</div>
+				@SuggestedDetails(p.Pending[c.ID])
 			}
 		</div>
 		if len(p.Facts) > 0 {
@@ -179,6 +185,12 @@ templ CompanyView(q *Req, p CompanyPage) {
 				for _, f := range p.Facts {
 					@FactRow(f)
 				}
+			</div>
+		}
+		if len(p.Notes) > 0 {
+			<div>
+				@Label("Agents' notes, unchecked")
+				@Notes(q, p.Notes)
 			</div>
 		}
 		<div>

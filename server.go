@@ -32,6 +32,11 @@ type App struct {
 	// base is the address people reach the app at, when the operator has said: then
 	// links and the cookie's Secure mark don't depend on what a proxy forwards.
 	base string
+	// mail is the app's own server, for password resets and invitations; nil is none.
+	mail *MailServer
+	// send and later stand in for SMTP and for a goroutine in tests.
+	send  sendFunc
+	later func(func())
 	// How long a request's body may take to arrive, and its answer to be written;
 	// zero means bodyLimit and answerLimit.
 	readLimit, writeLimit time.Duration
@@ -109,7 +114,7 @@ func (q *Req) Actor() string {
 }
 
 func (q *Req) Agent() Actor {
-	return Actor{Name: q.Actor(), KeyID: q.Key.ID}
+	return Actor{Name: q.Actor(), KeyID: q.Key.ID, ReadOnly: !q.Key.Has("research:write")}
 }
 
 func (q *Req) Voice() Voice {
@@ -311,6 +316,10 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /login", a.loginPage)
 	mux.HandleFunc("POST /login", a.login)
 	mux.HandleFunc("POST /logout", a.logout)
+	mux.HandleFunc("GET /forgot", a.forgotPage)
+	mux.HandleFunc("POST /forgot", a.forgot)
+	mux.HandleFunc("GET /reset/{token}", a.resetPage)
+	mux.HandleFunc("POST /reset/{token}", a.reset)
 	mux.HandleFunc("GET /login/with/{way}", a.loginWith)
 	mux.HandleFunc("GET /login/sso", a.ssoPage)
 	mux.HandleFunc("GET /login/sso/start", a.ssoStart)
@@ -332,6 +341,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /o/{org}/settings", a.member(a.settings))
 	mux.HandleFunc("GET /o/{org}/agents", a.member(a.agents))
 	mux.HandleFunc("GET /o/{org}/enquiries", a.member(a.enquiriesPage))
+	a.taskRoutes(mux)
 	mux.HandleFunc("OPTIONS "+intakePattern, a.intakePreflight)
 	mux.HandleFunc("POST "+intakePattern, a.intake)
 
@@ -339,11 +349,14 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/update", a.member(a.uiUpdate))
 	mux.HandleFunc("POST /o/{org}/ui/company", a.member(a.uiCompany))
 	mux.HandleFunc("POST /o/{org}/ui/pick", a.member(a.uiPick))
+	mux.HandleFunc("POST /o/{org}/ui/suggestion", a.member(a.uiSuggestion))
 	mux.HandleFunc("POST /o/{org}/ui/add", a.member(a.uiAdd))
 	mux.HandleFunc("POST /o/{org}/ui/voice", a.member(a.uiVoice))
 	mux.HandleFunc("POST /o/{org}/ui/settings", a.owner(a.uiSettings))
 	mux.HandleFunc("POST /o/{org}/ui/member", a.owner(a.uiMember))
 	mux.HandleFunc("POST /o/{org}/ui/member/remove", a.owner(a.uiRemoveMember))
+	mux.HandleFunc("POST /o/{org}/ui/mail", a.owner(a.uiMail))
+	mux.HandleFunc("POST /o/{org}/ui/mail/test", a.owner(a.uiMailTest))
 	mux.HandleFunc("POST /o/{org}/ui/sso", a.owner(a.uiSSO))
 	mux.HandleFunc("POST /o/{org}/ui/sso/domain", a.owner(a.uiSSODomain))
 	mux.HandleFunc("POST /o/{org}/ui/sso/domain/remove", a.owner(a.uiSSODomainRemove))
@@ -392,8 +405,8 @@ func (a *App) Routes() http.Handler {
 		}
 		// Signed-in browsers send cookies; a cross-site form can't send JSON without a
 		// CORS preflight, which only the enquiry route answers, and only for the sites an
-		// organisation lists. Login and the API key routes are exempt.
-		if r.Method == http.MethodPost && r.URL.Path != "/login" && r.URL.Path != "/logout" &&
+		// organisation lists. The signed-out forms and the API key routes are exempt.
+		if r.Method == http.MethodPost && !signedOutForm(r.URL.Path) &&
 			!hasKey(r) && !strings.HasPrefix(r.Header.Get("content-type"), "application/json") {
 			http.Error(w, "POST bodies must be application/json", http.StatusUnsupportedMediaType)
 			return
@@ -402,9 +415,18 @@ func (a *App) Routes() http.Handler {
 	})
 }
 
+// signedOutForm is a plain HTML form somebody with no session posts.
+func signedOutForm(path string) bool {
+	return path == "/login" || path == "/logout" || path == "/forgot" || strings.HasPrefix(path, "/reset/")
+}
+
 func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
+	v := a.loginView(r.URL.Query().Get("next"), "")
+	if r.URL.Query().Has("reset") {
+		v.Notice = "Password saved. Sign in with it."
+	}
 	w.Header().Set("content-type", "text/html; charset=utf-8")
-	LoginPage(a.loginView(r.URL.Query().Get("next"), "")).Render(r.Context(), w)
+	LoginPage(v).Render(r.Context(), w)
 }
 
 // safeNext keeps a post-login redirect on this site. Browsers drop tabs and newlines
@@ -590,6 +612,9 @@ func serve(a *App, addr string) error {
 	}
 	if a.base == "" && !strings.HasPrefix(addr, "127.0.0.1:") && !strings.HasPrefix(addr, "localhost:") {
 		log.Print("PROSPECTOR_URL isn't set: the session cookie is marked Secure only when a proxy sends X-Forwarded-Proto: https")
+	}
+	if a.mail != nil && a.base == "" {
+		log.Print("PROSPECTOR_URL isn't set: mail is off, because an emailed link needs the address to point at")
 	}
 	srv := &http.Server{Addr: addr, Handler: a.Routes(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
 	log.Printf("listening on http://%s", addr)
