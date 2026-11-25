@@ -32,6 +32,8 @@ type App struct {
 	// base is the address people reach the app at, when the operator has said: then
 	// links and the cookie's Secure mark don't depend on what a proxy forwards.
 	base string
+	// frontOrg is the organisation the front page's form sends enquiries to; empty is no form.
+	frontOrg string
 	// mail is the app's own server, for password resets and invitations; nil is none.
 	mail *MailServer
 	// send and later stand in for SMTP and for a goroutine in tests.
@@ -502,9 +504,38 @@ func (a *App) front(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("content-type", "text/html; charset=utf-8")
-	if err := LandingPage().Render(r.Context(), w); err != nil {
+	if err := LandingPage(a.frontIntake(r)).Render(r.Context(), w); err != nil {
 		log.Print(err)
 	}
+}
+
+// frontIntake is where the front page's form posts, and the origin a browser must be
+// on for it. The intake route answers only the sites an organisation lists, so until
+// this address is among them there is no form.
+func (a *App) frontIntake(r *http.Request) (intake, origin string) {
+	if a.frontOrg == "" {
+		return "", ""
+	}
+	origin = browserOrigin(a.baseURL(r))
+	org, err := a.s.OrgBySlug(a.frontOrg)
+	if err != nil || !org.Settings.takesEnquiriesFrom(origin) {
+		return "", ""
+	}
+	return "/o/" + org.Slug + "/intake", origin
+}
+
+// browserOrigin is an address as a browser names it in Origin: lower case, and
+// without the port when it is the scheme's own.
+func browserOrigin(address string) string {
+	u, err := url.Parse(address)
+	if err != nil {
+		return address
+	}
+	host := u.Host
+	if (u.Scheme == "https" && u.Port() == "443") || (u.Scheme == "http" && u.Port() == "80") {
+		host = strings.TrimSuffix(host, ":"+u.Port())
+	}
+	return strings.ToLower(u.Scheme + "://" + host)
 }
 
 func (a *App) home(w http.ResponseWriter, r *http.Request) {
