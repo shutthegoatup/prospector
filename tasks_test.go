@@ -302,8 +302,8 @@ func TestTasksOverMCPAndThePages(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	code, body := call(t, client, "POST", srv.URL+"/o/alpha/ui/task", "application/json", map[string]any{"title": "", "brief": "Yacht builders with a <b>configurator</b>."})
-	if code != http.StatusOK || !strings.Contains(body, `"go":"/o/alpha/tasks/1"`) {
+	code, body := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/tasks", "application/json", map[string]any{"title": "", "brief": "Yacht builders with a <b>configurator</b>."})
+	if code != http.StatusCreated || !strings.Contains(body, `"id":1,`) || !strings.Contains(body, `"created_by":"Ada Lovelace"`) {
 		t.Fatalf("create a task from the page: %d %s", code, body)
 	}
 	session := connect(key)
@@ -361,7 +361,7 @@ func TestTasksOverMCPAndThePages(t *testing.T) {
 			t.Fatalf("the task page is missing %q", want)
 		}
 	}
-	if code, _ := call(t, client, "POST", srv.URL+"/o/alpha/ui/task/ask", "application/json", map[string]any{"task": 1, "text": "Now some in Switzerland."}); code != http.StatusOK {
+	if code, _ := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/tasks/1/requests", "application/json", map[string]any{"text": "Now some in Switzerland."}); code != http.StatusCreated {
 		t.Fatalf("ask for more: %d", code)
 	}
 	if got := tool("get_task", map[string]any{"id": 1}); !strings.Contains(got, "Now some in Switzerland.") || !strings.Contains(got, "asked_by:Ada Lovelace") {
@@ -371,7 +371,7 @@ func TestTasksOverMCPAndThePages(t *testing.T) {
 	if _, page = call(t, client, "GET", srv.URL+"/o/alpha/tasks/1", "", nil); !strings.Contains(page, "done, says agent · claude") {
 		t.Fatal("the task page should say which agent finished the request")
 	}
-	if code, _ := call(t, client, "POST", srv.URL+"/o/alpha/ui/task/request/reopen", "application/json", map[string]any{"id": 2}); code != http.StatusOK {
+	if code, _ := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/task-requests/2", "application/json", map[string]any{"done": false}); code != http.StatusOK {
 		t.Fatalf("reopen a request: %d", code)
 	}
 	if code, _ := call(t, client, "POST", srv.URL+"/o/alpha/ui/note/delete", "application/json", map[string]any{"id": 1}); code != http.StatusOK {
@@ -384,7 +384,7 @@ func TestTasksOverMCPAndThePages(t *testing.T) {
 	if !strings.Contains(agents, "Recent agent work") || !strings.Contains(agents, `href="/o/alpha/tasks/1"`) {
 		t.Fatal("the Agents page should show the run and the task it was for")
 	}
-	if code, _ := call(t, client, "POST", srv.URL+"/o/alpha/ui/task/close", "application/json", map[string]any{"id": 1}); code != http.StatusOK {
+	if code, _ := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/tasks/1", "application/json", map[string]any{"closed": true}); code != http.StatusOK {
 		t.Fatalf("close the task: %d", code)
 	}
 	if _, list = call(t, client, "GET", srv.URL+"/o/alpha/tasks", "", nil); strings.Contains(list, `href="/o/alpha/tasks/1"`) {

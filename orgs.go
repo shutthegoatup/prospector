@@ -458,6 +458,7 @@ var Scopes = []struct{ Name, What string }{
 	{"enquiries:delete", "delete an enquiry for good, with what was said in answering it"},
 	{"campaigns:write", "keep the list of addresses marketing mail never goes to"},
 	{"customers:invite", "email a customer a link to their onboarding steps, through your mail server, and withdraw it"},
+	{"tasks:write", "start tasks, ask them for more, mark their requests done or not, and close and reopen them"},
 	{"agents:run", "start and stop Prospector's own agents on tasks"},
 	{"agents:configure", "add, change and delete Prospector's own agents, their endpoints, keys and tools"},
 }
