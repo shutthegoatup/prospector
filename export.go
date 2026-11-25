@@ -88,6 +88,7 @@ type OrgExport struct {
 	Keys         []ExportKey    `json:"api_keys"`
 	SignOn       *ExportSignOn  `json:"single_sign_on,omitempty"`
 	Mail         *ExportMail    `json:"mail_server,omitempty"`
+	Agent        *ExportAgent   `json:"agent,omitempty"`
 	Companies    []Company      `json:"companies"`
 	Facts        []Fact         `json:"facts"`
 	Contacts     []Contact      `json:"contacts"`
@@ -131,6 +132,14 @@ type ExportSignOn struct {
 	Required bool           `json:"required"`
 	AutoJoin bool           `json:"auto_join"`
 	Domains  []ExportDomain `json:"domains"`
+}
+
+// ExportAgent is the organisation's agent set-up, without its key.
+type ExportAgent struct {
+	Endpoint string   `json:"endpoint"`
+	Model    string   `json:"model"`
+	ToolsURL string   `json:"tools_url,omitempty"`
+	Tools    []string `json:"allowed_tools"`
 }
 
 type ExportMail struct {
@@ -187,6 +196,12 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			out.Mail = &ExportMail{Host: mail.Host, Port: mail.Port, Username: mail.Username, Sender: mail.Sender}
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
+		}
+		var agent AgentConfig
+		if err := tx.Where("org_id = ? and base_url <> ''", org).Limit(1).Find(&agent).Error; err != nil {
+			return err
+		} else if agent.OrgID != 0 {
+			out.Agent = &ExportAgent{Endpoint: agent.BaseURL, Model: agent.Model, ToolsURL: agent.ToolsURL, Tools: agent.AllowedTools()}
 		}
 		mine := func() *gorm.DB { return tx.Where("org_id = ?", org).Order("id") }
 		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Enquiries, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {

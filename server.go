@@ -49,6 +49,9 @@ type App struct {
 	// guarded client and the system resolver.
 	outbound *http.Client
 	txt      func(ctx context.Context, name string) ([]string, error)
+	// agentClient reaches an organisation's model endpoint and tool server; nil means
+	// one that refuses private addresses unless the operator allows them.
+	agentClient *http.Client
 }
 
 const (
@@ -361,6 +364,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/member/remove", a.owner(a.uiRemoveMember))
 	mux.HandleFunc("POST /o/{org}/ui/mail", a.owner(a.uiMail))
 	mux.HandleFunc("POST /o/{org}/ui/mail/test", a.owner(a.uiMailTest))
+	mux.HandleFunc("POST /o/{org}/ui/agent", a.owner(a.uiAgent))
 	mux.HandleFunc("POST /o/{org}/ui/sso", a.owner(a.uiSSO))
 	mux.HandleFunc("POST /o/{org}/ui/sso/domain", a.owner(a.uiSSODomain))
 	mux.HandleFunc("POST /o/{org}/ui/sso/domain/remove", a.owner(a.uiSSODomainRemove))
