@@ -70,14 +70,25 @@ func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error)
 				return err
 			}
 		}
+		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("id").Find(&out.Suggested).Error; err != nil {
+			return err
+		}
+		// Every address that is theirs, as erasure counts them: their own and any suggested
+		// for them that nobody dismissed.
+		addresses := deref(c.Email)
+		for _, sg := range out.Suggested {
+			if sg.Field == "email" && sg.Decision != SuggestionDismissed {
+				addresses += " " + sg.Value
+			}
+		}
 		out.Suppressed = []Suppression{}
-		if emails := emailRe.FindAllString(strings.ToLower(deref(c.Email)), -1); len(emails) > 0 {
+		if emails := emailRe.FindAllString(strings.ToLower(addresses), -1); len(emails) > 0 {
+			for _, e := range emails {
+				emails = append(emails, strings.Trim(e, "."))
+			}
 			if err := tx.Where("org_id = ? and address in ?", org, emails).Order("id").Find(&out.Suppressed).Error; err != nil {
 				return err
 			}
-		}
-		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("id").Find(&out.Suggested).Error; err != nil {
-			return err
 		}
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("id").Find(&out.Deals).Error; err != nil {
 			return err

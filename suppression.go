@@ -61,22 +61,35 @@ func (s *Store) Suppress(org int64, address, actor string) (*Suppression, error)
 }
 
 func (s *Store) suppress(tx *gorm.DB, org int64, addr, reason, actor string) (*Suppression, error) {
-	row := Suppression{OrgID: org, Address: addr, Reason: reason, By: actor, CreatedAt: time.Now()}
-	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
-		return nil, err
-	}
-	var kept Suppression
-	if err := tx.Where("org_id = ? and address = ?", org, addr).First(&kept).Error; err != nil {
-		return nil, err
-	}
-	// Their own word outranks a member's: once they unsubscribe, it is theirs.
-	if reason == SuppressUnsubscribed && kept.Reason != SuppressUnsubscribed {
-		if err := tx.Model(&kept).Updates(map[string]any{"reason": reason, "by": actor}).Error; err != nil {
+	// Their own word outranks a member's: once they unsubscribe, it is theirs. A row a
+	// member is taking off at the same moment is put back, not lost: each round either
+	// finds the row and makes it theirs, or creates it.
+	for range 3 {
+		row := Suppression{OrgID: org, Address: addr, Reason: reason, By: actor, CreatedAt: time.Now()}
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
 			return nil, err
 		}
-		kept.Reason, kept.By = reason, actor
+		var kept Suppression
+		found := tx.Where("org_id = ? and address = ?", org, addr).Limit(1).Find(&kept)
+		if found.Error != nil {
+			return nil, found.Error
+		}
+		if found.RowsAffected == 0 {
+			continue
+		}
+		if reason != SuppressUnsubscribed || kept.Reason == SuppressUnsubscribed {
+			return &kept, nil
+		}
+		made := tx.Model(&Suppression{}).Where("id = ?", kept.ID).Updates(map[string]any{"reason": reason, "by": actor})
+		if made.Error != nil {
+			return nil, made.Error
+		}
+		if made.RowsAffected == 1 {
+			kept.Reason, kept.By = reason, actor
+			return &kept, nil
+		}
 	}
-	return &kept, nil
+	return nil, errors.New("the list was changing too fast to record that; try again")
 }
 
 // Unsuppress takes off an address a member or key added. One that was unsubscribed by
@@ -86,10 +99,15 @@ func (s *Store) Unsuppress(org, id int64, actor string) error {
 	if err := s.in(org).Where("id = ?", id).First(&row).Error; err != nil {
 		return missing(err, "no suppression %d", id)
 	}
-	if row.Reason == SuppressUnsubscribed {
+	// Checked again in the delete itself: they may have unsubscribed since it was read.
+	gone := s.in(org).Where("id = ? and reason = ?", id, SuppressAdded).Delete(&Suppression{})
+	if gone.Error != nil {
+		return gone.Error
+	}
+	if row.Reason == SuppressUnsubscribed || gone.RowsAffected == 0 {
 		return errors.New("they unsubscribed themselves, so only they can be mailed again by signing up again")
 	}
-	return s.in(org).Where("id = ?", id).Delete(&Suppression{}).Error
+	return nil
 }
 
 // Suppressions are the list, newest first, a page at a time.
@@ -173,6 +191,10 @@ func forgetAddresses(tx *gorm.DB, org int64, addresses []string) error {
 	if len(addresses) == 0 {
 		return nil
 	}
+	// As the erasure's own hash does: a dot at either end is the sentence's, not the address's.
+	for _, a := range addresses {
+		addresses = append(addresses, strings.Trim(a, "."))
+	}
 	if err := tx.Where("org_id = ? and address in ?", org, addresses).Delete(&Suppression{}).Error; err != nil {
 		return err
 	}
@@ -187,7 +209,26 @@ type UnsubscribeView struct {
 }
 
 func (a *App) unsubscribePage(w http.ResponseWriter, r *http.Request) {
-	a.unsubscribeRender(w, r, UnsubscribeView{Token: r.PathValue("token")})
+	token := r.PathValue("token")
+	// Only something shaped like a link we make goes back into the page's form: the path
+	// arrives decoded, so "..%2Flogout" would otherwise aim the button at another route.
+	if !linkToken(token) {
+		token = ""
+	}
+	a.unsubscribeRender(w, r, UnsubscribeView{Token: token})
+}
+
+// linkToken is whether a path segment has the shape randomToken(32) gives.
+func linkToken(t string) bool {
+	if len(t) != 43 {
+		return false
+	}
+	for _, c := range t {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 // unsubscribe takes the button on that page, and the one-click request a mail provider

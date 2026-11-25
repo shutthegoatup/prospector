@@ -172,7 +172,7 @@ func compose(from, to *mail.Address, m Message, now time.Time) []byte {
 	}
 	// RFC 8058 one-click: only over HTTPS, and only a link we made, never one with room
 	// in it to start a header of its own.
-	if u, err := url.Parse(m.Unsubscribe); err == nil && u.Scheme == "https" && !strings.ContainsAny(m.Unsubscribe, "\r\n<> ") {
+	if u, err := url.Parse(m.Unsubscribe); err == nil && u.Scheme == "https" && printableASCII(m.Unsubscribe) && !strings.ContainsAny(m.Unsubscribe, "<> ,") {
 		fmt.Fprintf(&b, "List-Unsubscribe: <%s>\r\nList-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n", m.Unsubscribe)
 	}
 	fmt.Fprintf(&b, "Date: %s\r\nMessage-ID: <%s@%s>\r\n", now.Format(time.RFC1123Z), randomToken(16), domain)
@@ -181,4 +181,15 @@ func compose(from, to *mail.Address, m Message, now time.Time) []byte {
 	body.Write([]byte(strings.ReplaceAll(strings.ReplaceAll(m.Body, "\r\n", "\n"), "\n", "\r\n")))
 	body.Close()
 	return b.Bytes()
+}
+
+// printableASCII is text a header can carry as it is: no control characters, nothing
+// outside ASCII.
+func printableASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] < 0x21 || s[i] > 0x7e {
+			return false
+		}
+	}
+	return true
 }

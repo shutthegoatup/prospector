@@ -231,3 +231,69 @@ func TestAMarketingMailCarriesItsOneClickHeaders(t *testing.T) {
 		}
 	}
 }
+
+// What the review of the list found: a path aimed at another route, a delete racing an
+// unsubscribe, an address ending in a dot, and an address suggested for someone.
+func TestTheListHoldsAtItsEdges(t *testing.T) {
+	s, o, srv, _ := signedIn(t)
+	visitor := &http.Client{}
+	for _, aimed := range []string{"/u/..%2Flogout", "/u/..%2F..%2Fc%2Fsteps%2F1%2Fdone", "/u/short", "/u/" + strings.Repeat("a", 42) + "%2F"} {
+		_, page := call(t, visitor, "GET", srv.URL+aimed, "", nil)
+		if strings.Contains(page, "<form") || strings.Contains(page, "..") {
+			t.Errorf("%s gave a page with a form, or kept the path: %.300s", aimed, page)
+		}
+	}
+	good := link(t, s, o.ID, "hannah@larkmoor.example")
+	if _, page := call(t, visitor, "GET", srv.URL+good, "", nil); !strings.Contains(page, `action="`+good+`"`) {
+		t.Errorf("a real link lost its form: %.300s", page)
+	}
+
+	// A member takes an address off just as the person unsubscribes: theirs stays.
+	added := must(s.Suppress(o.ID, "tom@larkmoor.example", "Ada Lovelace"))
+	if err := s.db.Model(&Suppression{}).Where("id = ?", added.ID).Update("reason", SuppressUnsubscribed).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Unsuppress(o.ID, added.ID, "Ada Lovelace"); err == nil {
+		t.Error("a member took off someone who had unsubscribed")
+	}
+	// And an unsubscribe arriving after a member took the row off is still kept.
+	sven := must(s.Suppress(o.ID, "sven@nordkap.example", "Ada Lovelace"))
+	token := strings.TrimPrefix(link(t, s, o.ID, "sven@nordkap.example"), "/u/")
+	if err := s.Unsuppress(o.ID, sven.ID, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UnsubscribeByToken(token); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.marketable(s.db, o, "sven@nordkap.example"); err != errSuppressed {
+		t.Errorf("an unsubscribe after the row was taken off was lost: %v", err)
+	}
+
+	// Erasure and the person's export count the addresses erasure does.
+	jo := must(s.QuickAddPerson(o, QuickAdd{Name: "Jo Marsh", Company: "Larkmoor Yachts", Email: "jo@larkmoor.example."}, "Ada Lovelace"))
+	if err := s.db.Create(&Suggestion{OrgID: o.ID, ContactID: jo.ID, Field: "email", Value: "jo.marsh@larkmoor.example", SourceURL: "https://larkmoor.example/team"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, address := range []string{"jo@larkmoor.example", "jo.marsh@larkmoor.example"} {
+		if err := s.UnsubscribeByToken(strings.TrimPrefix(link(t, s, o.ID, address), "/u/")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if export := must(s.ExportPerson(o.ID, jo.ID, "Ada Lovelace")); len(export.Suppressed) != 2 {
+		t.Errorf("her export has %d of her 2 addresses on the list: %+v", len(export.Suppressed), export.Suppressed)
+	}
+	if err := s.ErasePerson(o.ID, jo.ID, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	var left int64
+	if err := s.db.Model(&Suppression{}).Where("address like ?", "jo%").Count(&left).Error; err != nil || left != 0 {
+		t.Errorf("erasing her left %d of her addresses on the list (%v)", left, err)
+	}
+
+	from, to := &mail.Address{Address: "news@alpha.example"}, &mail.Address{Address: "hannah@larkmoor.example"}
+	for _, odd := range []string{"https://prospector.example/u/a\tb", "https://prospector.example/u/a\x00b", "https://prospector.example/u/é"} {
+		if wire := string(compose(from, to, Message{Subject: "News", Body: "Hello", Unsubscribe: odd}, time.Now())); strings.Contains(wire, "List-Unsubscribe") {
+			t.Errorf("an unsubscribe link of %q made it into a header", odd)
+		}
+	}
+}
