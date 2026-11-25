@@ -226,8 +226,12 @@ func refusal(res *http.Response, now time.Time) error {
 // allows private addresses, each connection is checked as it is made, and a
 // redirect, being a second destination, isn't followed. Contexts bound each call.
 func agentClient() *http.Client {
+	return publicClient(os.Getenv("PROSPECTOR_AGENT_ALLOW_PRIVATE") == "1")
+}
+
+func publicClient(allowPrivate bool) *http.Client {
 	dialer := &net.Dialer{Timeout: 10 * time.Second}
-	if os.Getenv("PROSPECTOR_AGENT_ALLOW_PRIVATE") != "1" {
+	if !allowPrivate {
 		dialer.Control = func(_, address string, _ syscall.RawConn) error {
 			ap, err := netip.ParseAddrPort(address)
 			if err != nil || !publicAddr(ap.Addr()) {

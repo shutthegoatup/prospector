@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"golang.org/x/net/html"
+	"golang.org/x/net/html/charset"
 )
 
 // Prospector's own agents search and read the web without a paid search service:
@@ -26,8 +28,6 @@ const (
 	// maxPage is how much of a page is read; the text given the model is cut shorter.
 	maxPage = 2 << 20
 )
-
-func builtinWeb(name string) bool { return name == webSearchTool || name == fetchPageTool }
 
 // webTools are the built-in tools an agent has: reading pages always, searching when
 // it has a SearXNG instance to ask.
@@ -48,11 +48,20 @@ func webTools(c *Agent) []toolDef {
 	return out
 }
 
-// errWebBusy is a search or page that asked to be left alone for a while; the run
-// waits it out as it does a model's limit.
+// errWebBusy is the organisation's own search asking to be left alone for a while; the
+// run waits it out as it does a model's limit.
 type errWebBusy struct{ what string }
 
 func (e errWebBusy) Error() string { return e.what + " is busy: Too Many Requests" }
+
+// pageHTTP reads pages the model names, which may be anywhere a page sent it: never
+// this machine's network, whatever the operator allows for addresses an owner typed.
+func (a *App) pageHTTP() *http.Client {
+	if a.pageClient != nil {
+		return a.pageClient
+	}
+	return publicClient(false)
+}
 
 // webCall runs a built-in web tool.
 func (a *App) webCall(ctx context.Context, c *Agent, name string, args map[string]any) (string, error) {
@@ -111,7 +120,8 @@ func (a *App) webSearch(ctx context.Context, base, query string, page int) (stri
 		return "", errors.New("the search didn't answer with SearXNG's JSON")
 	}
 	if len(found.Results) == 0 {
-		return "No results for " + strconv.Quote(query) + ".", nil
+		// Not echoing the query, which would vouch for an address typed into it.
+		return "No results.", nil
 	}
 	var b strings.Builder
 	for i, r := range found.Results {
@@ -135,7 +145,7 @@ func (a *App) fetchPage(ctx context.Context, raw string) (string, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	client := *a.agentHTTP()
+	client := *a.pageHTTP()
 	client.CheckRedirect = func(_ *http.Request, via []*http.Request) error {
 		if len(via) >= 5 {
 			return errors.New("too many redirects")
@@ -153,14 +163,15 @@ func (a *App) fetchPage(ctx context.Context, raw string) (string, error) {
 		return "", fmt.Errorf("the page couldn't be read: %w", err)
 	}
 	defer res.Body.Close()
-	if res.StatusCode == http.StatusTooManyRequests {
-		return "", errWebBusy{"that site"}
-	}
+	// A site that limits robots is the model's to work round, not the run's to wait on.
 	if res.StatusCode >= 400 {
 		return "", fmt.Errorf("the page answered %d", res.StatusCode)
 	}
 	kind, _, _ := mime.ParseMediaType(res.Header.Get("Content-Type"))
 	body, err := io.ReadAll(io.LimitReader(res.Body, maxPage))
+	if err == nil && (kind == "" || strings.HasPrefix(kind, "text/") || strings.HasSuffix(kind, "xml")) {
+		body, err = utf8Body(body, res.Header.Get("Content-Type"))
+	}
 	if err != nil {
 		return "", fmt.Errorf("the page couldn't be read: %w", err)
 	}
@@ -196,13 +207,15 @@ func pageText(body []byte, base *url.URL) (string, string, [][2]string) {
 	hidden := map[string]bool{"script": true, "style": true, "noscript": true, "svg": true, "template": true}
 	block := map[string]bool{"p": true, "div": true, "br": true, "li": true, "tr": true, "h1": true, "h2": true, "h3": true, "h4": true, "section": true, "article": true, "header": true, "footer": true, "address": true}
 	for {
-		switch z.Next() {
+		switch tt := z.Next(); tt {
 		case html.ErrorToken:
-			return oneLine(title.String()), tidyText(text.String()), links
+			return cut(oneLine(title.String()), 300), tidyText(text.String()), links
 		case html.StartTagToken, html.SelfClosingTagToken:
+			self := tt == html.SelfClosingTagToken
 			name, hasAttr := z.TagName()
 			tag := string(name)
-			if hidden[tag] {
+			// <svg/> has no end tag to close what it would hide.
+			if hidden[tag] && !self {
 				skip++
 			}
 			if tag == "title" {
@@ -287,4 +300,13 @@ func cut(s string, n int) string {
 		return string(r[:n]) + "…"
 	}
 	return s
+}
+
+// utf8Body is a page's text in UTF-8, from whatever its header or markup says it is.
+func utf8Body(body []byte, contentType string) ([]byte, error) {
+	r, err := charset.NewReader(bytes.NewReader(body), contentType)
+	if err != nil {
+		return body, nil
+	}
+	return io.ReadAll(r)
 }

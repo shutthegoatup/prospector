@@ -380,7 +380,10 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 	if ext != nil {
 		defer ext.Close()
 	}
-	t := &turnState{app: a, run: run, agent: cfg, own: own, ext: ext, seen: map[string]bool{}, offered: map[string]bool{}}
+	t := &turnState{app: a, run: run, agent: cfg, own: own, ext: ext, seen: map[string]bool{}, offered: map[string]bool{}, builtin: map[string]bool{}}
+	for _, d := range webTools(cfg) {
+		t.builtin[d.Function.Name] = true
+	}
 	for _, d := range tools {
 		t.offered[d.Function.Name] = true
 	}
@@ -665,9 +668,11 @@ type turnState struct {
 	agent *Agent
 	own   *mcp.ClientSession
 	ext   *mcp.ClientSession
-	// seen are the pages tools showed the model in this run; offered, the tools it has.
+	// seen are the pages tools showed the model in this run; offered, the tools it has;
+	// builtin, those of them Prospector runs itself rather than a tool server.
 	seen    map[string]bool
 	offered map[string]bool
+	builtin map[string]bool
 }
 
 var urlPattern = regexp.MustCompile(`https?://[^\s"'<>\[\]{}\\]+`)
@@ -764,7 +769,7 @@ func (t *turnState) call(ctx context.Context, name, rawArgs string) (string, err
 			args["task"] = t.run.TaskID
 		}
 	}
-	web := builtinWeb(name)
+	web := t.builtin[name]
 	if session == nil && !web {
 		return "", fmt.Errorf("there is no tool called %s", name)
 	}
@@ -772,22 +777,25 @@ func (t *turnState) call(ctx context.Context, name, rawArgs string) (string, err
 	for failures := 0; ; failures++ {
 		callCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 		var err error
+		var refused bool
 		if web {
 			text, err = t.app.webCall(callCtx, t.agent, name, args)
 		} else {
 			var res *mcp.CallToolResult
 			if res, err = session.CallTool(callCtx, &mcp.CallToolParams{Name: name, Arguments: args}); err == nil {
 				text = toolText(res)
-				if res.IsError {
-					err = errors.New(text)
-				}
+				refused = res.IsError
 			}
 		}
 		cancel()
+		if refused {
+			return "", errors.New(text)
+		}
 		if err == nil {
 			break
 		}
-		// A search or tool server behind limits is waited out as the model is.
+		// The organisation's own search, or a tool server, behind limits is waited out as
+		// the model is.
 		if ctx.Err() != nil || !strings.Contains(err.Error(), "Too Many Requests") {
 			return "", err
 		}
@@ -798,12 +806,15 @@ func (t *turnState) call(ctx context.Context, name, rawArgs string) (string, err
 	t.see(text)
 	if !isOwn {
 		// The page a fetch tool read counts as shown, though its text may not repeat its
-		// address. Only the address it was asked to read: a search's query, or any other
-		// argument, would otherwise vouch for whatever URL was typed into it.
-		if !strings.Contains(strings.ToLower(name), "search") && len(strings.TrimSpace(text)) >= 200 {
+		// address. Only the address it was asked to read, whole: a search's query, or any
+		// other argument, would otherwise vouch for whatever URL was typed into it. The
+		// built-in fetch_page names the address it read in its text already.
+		if !web && !strings.Contains(strings.ToLower(name), "search") && len(strings.TrimSpace(text)) >= 200 {
 			for _, key := range []string{"url", "uri"} {
 				if u, ok := args[key].(string); ok {
-					t.see(u)
+					if n := normalURL(strings.TrimSpace(u)); n != "" {
+						t.seen[n] = true
+					}
 				}
 			}
 		}

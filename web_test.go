@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // fakeWeb is a SearXNG instance and the pages its results point to.
@@ -43,6 +45,11 @@ func newFakeWeb(t *testing.T, trusting *fakeEndpoint) *fakeWeb {
 <script>ignore("this")</script></head><body><header><a href="/">Home</a></header>
 <h1>Day cruiser configurator</h1><p>Choose a hull, an engine   and a colour.</p><p>Larkmoor employs 40 people in Lymington.</p>
 <a href="/contact#team">Contact the team</a><noscript>Turn on scripts</noscript></body></html>`)
+	})
+	mux.HandleFunc("GET /busy", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusTooManyRequests) })
+	mux.HandleFunc("GET /latin1", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=iso-8859-1")
+		w.Write([]byte("<html><body><p>Caf\xe9 Alo\xefs, Z\xfcrich</p><svg class=\"i\"/><p>after the icon</p></body></html>"))
 	})
 	mux.HandleFunc("GET /brochure.pdf", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/pdf")
@@ -85,7 +92,7 @@ func TestWebSearchAsksSearXNGForJSON(t *testing.T) {
 
 func TestFetchPageReadsWhatABrowserWouldShow(t *testing.T) {
 	web := newFakeWeb(t, nil)
-	a := &App{agentClient: web.srv.Client()}
+	a := &App{pageClient: web.srv.Client()}
 	got, err := a.fetchPage(context.Background(), web.srv.URL+"/larkmoor")
 	if err != nil {
 		t.Fatal(err)
@@ -109,9 +116,20 @@ func TestFetchPageReadsWhatABrowserWouldShow(t *testing.T) {
 			t.Fatalf("%q was fetched", bad)
 		}
 	}
-	// Prospector's own client refuses this machine's network, redirects included.
+	// Pages are never read from this machine's network, even where the operator lets
+	// owners point endpoints at it: a page can send the model anywhere.
+	t.Setenv("PROSPECTOR_AGENT_ALLOW_PRIVATE", "1")
 	if _, err := (&App{}).fetchPage(context.Background(), "http://127.0.0.1:1/"); err == nil || !strings.Contains(err.Error(), "public address") {
 		t.Fatalf("a private address: %v", err)
+	}
+	// A site limiting robots is an ordinary failure for the model, not a wait for the run.
+	if _, err := a.fetchPage(context.Background(), web.srv.URL+"/busy"); err == nil || strings.Contains(err.Error(), "Too Many Requests") {
+		t.Fatalf("a busy site: %v", err)
+	}
+	// What a page is in, it says; the model reads it as text.
+	got, err = a.fetchPage(context.Background(), web.srv.URL+"/latin1")
+	if err != nil || !strings.Contains(got, "Café Aloïs, Zürich") || !strings.Contains(got, "after the icon") {
+		t.Fatalf("a Latin-1 page with a self-closing svg: %v\n%s", err, got)
 	}
 }
 
@@ -119,6 +137,7 @@ func TestAnAgentSearchesAndReadsTheWebWithNoPaidService(t *testing.T) {
 	fake := newFakeEndpoint(t)
 	web := newFakeWeb(t, fake)
 	r := newRunSetup(t, fake)
+	r.a.pageClient = fake.srv.Client()
 	c := must(r.s.AgentByID(r.o.ID, r.agent))
 	saved := must(r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{ID: c.ID, Name: c.Name, BaseURL: c.BaseURL, Model: c.Model,
 		SearchURL: web.srv.URL}, "Ada Lovelace"))
@@ -155,6 +174,17 @@ func TestAnAgentSearchesAndReadsTheWebWithNoPaidService(t *testing.T) {
 		t.Fatalf("the model should be offered both web tools: %s", first)
 	}
 
+	// A search that finds nothing doesn't repeat the query, which would vouch for an
+	// address typed into it.
+	web.search = func(w http.ResponseWriter, r *http.Request) bool {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"results":[]}`))
+		return true
+	}
+	if got, err := r.a.webSearch(context.Background(), web.srv.URL, "https://made-up.example/about", 0); err != nil || strings.Contains(got, "made-up") {
+		t.Fatalf("no results: %q %v", got, err)
+	}
+
 	// Without an instance it can still read pages, but has no search to offer.
 	if names := toolNames(webTools(&Agent{})); names != fetchPageTool {
 		t.Fatalf("an agent with no search: %s", names)
@@ -184,4 +214,47 @@ func toolNames(defs []toolDef) string {
 		out = append(out, d.Function.Name)
 	}
 	return strings.Join(out, " ")
+}
+
+// A tool server's own web_search keeps working for an agent with no SearXNG: the name
+// is the built-in one's only when the built-in is what was offered.
+func TestAToolServersWebSearchIsntTakenOver(t *testing.T) {
+	server := mcp.NewServer(&mcp.Implementation{Name: "gateway", Version: "1"}, nil)
+	mcp.AddTool(server, &mcp.Tool{Name: webSearchTool, Description: "The gateway's search."},
+		func(ctx context.Context, req *mcp.CallToolRequest, in map[string]any) (*mcp.CallToolResult, any, error) {
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "1. From the gateway https://found.example/page"}}}, nil, nil
+		})
+	clientSide, serverSide := mcp.NewInMemoryTransports()
+	if _, err := server.Connect(context.Background(), serverSide, nil); err != nil {
+		t.Fatal(err)
+	}
+	ext := must(mcp.NewClient(&mcp.Implementation{Name: "test", Version: "1"}, nil).Connect(context.Background(), clientSide, nil))
+	defer ext.Close()
+	agent := &Agent{}
+	ts := &turnState{app: &App{}, run: &AgentRun{}, agent: agent, ext: ext, seen: map[string]bool{},
+		offered: map[string]bool{webSearchTool: true}, builtin: map[string]bool{}}
+	for _, d := range webTools(agent) {
+		ts.builtin[d.Function.Name] = true
+	}
+	got, err := ts.call(context.Background(), webSearchTool, `{"query":"yachts"}`)
+	if err != nil || !strings.Contains(got, "From the gateway") {
+		t.Fatalf("the gateway's web_search: %q %v", got, err)
+	}
+}
+
+func TestAgentsTableGainsSearchWithRowsInIt(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	if err := s.db.Create(&Agent{OrgID: o.ID, Name: "Gateway", Kind: kindOpenAI, Models: "[]", Tools: "[]", Allowed: "[]"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.Migrator().DropColumn(&Agent{}, "search_url"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.AutoMigrate(models...); err != nil {
+		t.Fatalf("adding search to a table with rows: %v", err)
+	}
+	if got := must(s.agentNamed(o.ID, "Gateway")); got.SearchURL != "" {
+		t.Fatalf("an agent from before search should have none: %+v", got)
+	}
 }
