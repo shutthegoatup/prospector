@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -215,5 +216,62 @@ func TestStatusOf(t *testing.T) {
 		if got := statusOf(c.err); got != c.code {
 			t.Errorf("%v: %d, want %d", c.err, got, c.code)
 		}
+	}
+}
+
+// A database that can't be asked says nothing about a password or a domain, so neither
+// failure reads as the person's: not a wrong password, and not a domain already listed.
+func TestAnOutageDoesNotReadAsThePersonsMistake(t *testing.T) {
+	s, _, srv, client := signedIn(t)
+	// Postgres hands back a connection lost part-way through a query as the network's
+	// own error, addresses and all, which nothing tells from any other.
+	lost := &net.OpError{Op: "read", Net: "tcp", Addr: &net.TCPAddr{IP: net.IPv4(10, 0, 0, 9), Port: 5432}, Err: errors.New("connection reset by peer")}
+	down, domainsDown := false, false
+	s.db.Callback().Query().Before("gorm:query").Register("no-users", func(tx *gorm.DB) {
+		if down && tx.Statement.Table == "users" {
+			tx.AddError(lost)
+		}
+	})
+	s.db.Callback().Create().Before("gorm:create").Register("no-domains", func(tx *gorm.DB) {
+		if domainsDown && tx.Statement.Table == "sso_domains" {
+			tx.AddError(lost)
+		}
+	})
+	signIn := func() (int, string) {
+		t.Helper()
+		res, err := http.PostForm(srv.URL+"/login", url.Values{"email": {"ada@example.com"}, "password": {"correct horse battery"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		said, _ := io.ReadAll(res.Body)
+		return res.StatusCode, string(said)
+	}
+	domain := func(name string) (int, string) {
+		return call(t, client, "POST", srv.URL+"/o/alpha/ui/sso/domain", "application/json", map[string]string{"domain": name})
+	}
+
+	if code, body := domain("alpha.example"); code != http.StatusOK {
+		t.Fatalf("listing a domain: %d %s", code, body)
+	}
+	if code, body := domain("alpha.example"); code != http.StatusConflict || !strings.Contains(body, "alpha.example is already listed") {
+		t.Errorf("listing a domain twice: %d %s", code, body)
+	}
+
+	down = true
+	// More tries than the throttle lets a wrong password have at once.
+	for range 8 {
+		if code, body := signIn(); code != http.StatusInternalServerError || !strings.Contains(body, "try again in a moment") || strings.Contains(body, "wrong email or password") || strings.Contains(body, "10.0.0.9") {
+			t.Fatalf("signing in while the database can't be asked: %d, saying a wrong password or nothing of the server", code)
+		}
+	}
+	down = false
+	if code, body := signIn(); code != http.StatusOK || strings.Contains(body, "Too many attempts") {
+		t.Errorf("the outage counted against the person signing in: %d", code)
+	}
+
+	domainsDown = true
+	if code, body := domain("beta.example"); code != http.StatusInternalServerError || strings.Contains(body, "already listed") || strings.Contains(body, "10.0.0.9") {
+		t.Errorf("listing a domain while the database can't be asked: %d %s", code, body)
 	}
 }

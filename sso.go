@@ -674,7 +674,10 @@ func (a *App) uiSSODomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.s.db.Create(&SSODomain{OrgID: q.Org.ID, Domain: domain, Token: randomToken(20)}).Error; err != nil {
-		fail(w, fmt.Errorf("%s is already listed", domain), http.StatusBadRequest)
+		if breaksRule(err) {
+			err = conflict(domain + " is already listed")
+		}
+		fail(w, err, http.StatusInternalServerError)
 		return
 	}
 	done(w, nil)
