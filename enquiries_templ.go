@@ -469,6 +469,12 @@ func EnquiriesView(q *Req, d EnquiriesData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
+		templ_7745c5c3_Err = Pager(d.Page, func(n int) string {
+			return pageLink(q.Base()+"enquiries", n, "kind", d.Filter.Kind, "state", d.Filter.State, "spam", enquirySpamParam(d.Filter))
+		}).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
 		return nil
 	})
 }

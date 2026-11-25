@@ -596,9 +596,9 @@ func TestNeverContactLeavesTheQueue(t *testing.T) {
 	do(s.db.Model(&back).Updates(map[string]any{"replied": nil, "stage": ""}).Error)
 	fresh, err := s.OrgByID(o.ID)
 	do(err)
-	due, err := s.AgentDue(fresh)
+	due, err := s.AgentDue(fresh, PageIn{Limit: pageMost})
 	do(err)
-	for _, item := range due {
+	for _, item := range due.Items {
 		if item.ContactID == c.ID {
 			t.Fatalf("an agent is told a listed person is due: %+v", item)
 		}
@@ -686,7 +686,7 @@ func TestContentPolicy(t *testing.T) {
 	handler := regexp.MustCompile(`(?i)<[^>]*\son[a-z]+\s*=`)
 	pages := []string{"/login", "/o/alpha/today", "/o/alpha/today?step=linkedin", "/o/alpha/research", "/o/alpha/research?f=rejected", "/o/alpha/research?f=details",
 		"/o/alpha/conversations", "/o/alpha/companies", "/o/alpha/companies/" + strconv.FormatInt(company.ID, 10),
-		"/o/alpha/add", "/o/alpha/add?popup=1&name=Hannah", "/o/alpha/settings", "/o/alpha/agents", "/o/alpha/enquiries", "/o/alpha/subscriptions",
+		"/o/alpha/add", "/o/alpha/add?popup=1&name=Hannah", "/o/alpha/settings", "/o/alpha/agents", "/o/alpha/enquiries", "/o/alpha/subscriptions", "/o/alpha/onboarding",
 		"/o/alpha/tasks", "/o/alpha/tasks?closed=1", "/o/alpha/tasks/" + strconv.FormatInt(task.ID, 10)}
 	check := func(page, marker string) {
 		t.Helper()

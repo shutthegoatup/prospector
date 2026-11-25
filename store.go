@@ -35,6 +35,8 @@ type OrgSettings struct {
 	// LookFor is what this organisation looks for at a company, one "field: hint"
 	// per line; see Assets.
 	LookFor string `json:"look_for"`
+	// OnboardingSteps is what a new customer goes through, one step a line; see Onboarding.
+	OnboardingSteps string `json:"onboarding_steps"`
 	// Currency is the three-letter code deals are valued in.
 	Currency string `json:"currency"`
 }
@@ -244,7 +246,7 @@ type Store struct {
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
 	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &Suggestion{},
-	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}, &Agent{}, &AgentRun{}, &Deal{}, &Subscription{}}
+	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}, &Agent{}, &AgentRun{}, &Deal{}, &Subscription{}, &Onboarding{}, &OnboardingStep{}}
 
 // Open takes a postgres:// URL or a SQLite file path.
 func Open(dsn string) (*Store, error) {

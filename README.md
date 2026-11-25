@@ -61,6 +61,14 @@ Each organisation has an MCP endpoint and a REST API, with scoped keys. Agents c
 
 ![Agents & API: the MCP endpoint, REST calls and the tools each key gets](docs/images/agents.png)
 
+### Onboarding: the steps to a live customer
+
+An owner writes the steps a new customer goes through under Settings, one a line, in order: who does it (`them:` or `us:`), what it is, and how many days after the start it is due, such as `them: Send your product files, 7 days`.
+
+Start an onboarding from a company's page and it gets its own copy of those steps, dated from the day it starts. Tick each off as it is done, or move its date; the page says who finished it and when. A company can have several, one a site or a product. Onboarding lists everyone being set up, the ones running late first, and Today points at steps that are late or due. A customer is live once every step is done. Changing the steps in Settings later leaves the ones already running as they are.
+
+The customer has no page of their own here yet: you tick their steps off for them.
+
 ### Subscriptions: what a customer is on
 
 Once a company is a customer, record what they are on from its page: what it is, the price for a month or a year, when it starts, how many months they committed for, what happens when that is up (it renews, rolls on a period at a time, or ends) and how many days' notice ends it. A company can have several, each with its own dates.
@@ -200,6 +208,7 @@ Each organisation has an MCP endpoint at `/o/<slug>/mcp` (streamable HTTP) and a
 | `outcomes:write` | `mark`: record an outcome (sent, accepted, called, replied, declined, hold), shown as the agent's |
 | `enquiries:write` | `POST /api/v1/enquiries`: record an enquiry or sign-up from your own product or site backend |
 
+- **Lists come a page at a time.** `search`, `tasks` and `due` take `limit` (50 if left out, 200 at most) and `cursor`. When there is more, the answer has `next_cursor` to pass back as `cursor`, and the HTTP response names the next page in a `Link` header with `rel="next"` ([RFC 8288](https://www.rfc-editor.org/rfc/rfc8288)). A cursor is only good for the list that gave it out. The MCP tools take and return the same two fields.
 - **Errors from the JSON API** come as `application/problem+json` ([RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)), with what went wrong in `detail`. `400` is something to fix in the request, `404` a company, contact or task that isn't in this organisation, `409` a person who was erased on request, and `500` the server's own failure, which is worth retrying. A `401` or `403` about the key says which in `WWW-Authenticate`: `invalid_token` for a key to replace, `insufficient_scope` for one that can't do this.
 - **What no key can do:** send anything, change settings, or see another organisation. A key with `outcomes:write` can record what happened (sent, accepted, replied, declined…); each mark shows as the agent's, with its note, on Today and in the company's history. `import` is the one scope that skips review: it puts people from your own files straight into outreach and marks those in `sent-log.md` as added.
 - **Writes are checked:** every fact and contact an agent adds needs a source URL. The never-contact list applies to agents, imports and edits alike: an import that would bring in an address on it is refused whole, though people already stored stay as they are. Someone already stored who falls under the list drops out of the outreach queues on Today and the agents' due list until the entry is removed, and Settings names them; a person who has already replied stays in Conversations. An entry is a domain, an email address or a LinkedIn profile link, matched whole: a company name or a loose word matches nobody.

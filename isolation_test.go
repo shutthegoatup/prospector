@@ -254,6 +254,14 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			return err
 		},
 		func() error {
+			first.Settings.OnboardingSteps = "them: " + theirs + " step, 3 days"
+			if err := s.SaveOrg(first); err != nil {
+				return err
+			}
+			_, err := s.StartOnboarding(first.ID, OnboardingIn{Company: 1, Name: theirs + " site", Start: "2020-01-02"}, "Owner One")
+			return err
+		},
+		func() error {
 			_, err := s.CreateTask(first.ID, theirs+" task", theirs+" brief", "Owner One")
 			return err
 		},
@@ -318,6 +326,7 @@ var saysNothingBack = map[string]bool{
 	"AskTask": true, "SetRequestDone": true, "SetTaskClosed": true, "DeleteNote": true, "DeleteEnquiry": true,
 	"StartDeal": true, "ChangeDeal": true, "RemoveDeal": true,
 	"AddSubscription": true, "ChangeSubscription": true, "RemoveSubscription": true, "SetEnquiry": true,
+	"StartOnboarding": true, "SetOnboardingStep": true, "RemoveOnboarding": true,
 	"ErasePerson": true, "Import": true, "ImportLegacy": true, "Restore": true,
 	"ResearchCount": true, "ResearchCounts": true, "EnquiryCounts": true, "Week": true, "AgentMarks": true,
 	"AddEnquiry": true, "AgentNote": true, "CreateKey": true, "CreateTask": true, "QuickAddPerson": true,

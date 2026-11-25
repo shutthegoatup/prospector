@@ -109,6 +109,10 @@ templ SettingsView(q *Req, d SettingsData) {
 						<textarea name="enquiry_sites" rows="2" placeholder="https://www.example.com" class={ areaClass }>{ set.EnquirySites }</textarea>
 						@Meta("One per line. A form on these sites can POST an enquiry as JSON to " + d.Intake + " and it shows under Enquiries. Leave empty to accept none.")
 					}
+					@Row("Onboarding steps") {
+						<textarea name="onboarding_steps" rows="6" placeholder={ "them: Name a project lead, 2 days\nthem: Send your product files, 7 days\nus: Kick-off call, 10 days\nus: Go live, 30 days" } class={ areaClass }>{ set.OnboardingSteps }</textarea>
+						@Meta("What a new customer goes through, one step a line, in order. Start a line with them: or us: for who does it (us when left out), and end it with a number of days after the start when it is due. A customer counts as live once every step is done. Changing these leaves onboardings already running as they are.")
+					}
 					@Row("Currency") {
 						<input name="currency" value={ set.Currency } maxlength="3" class={ fieldClass + " w-24" }/>
 						@Meta("The three-letter code deals are valued in, such as GBP, EUR or USD. Changing it leaves the deals you already valued as they are.")

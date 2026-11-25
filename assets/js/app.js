@@ -108,6 +108,7 @@ document.addEventListener("change", async (e) => {
     if (f.dataset.deal) await post("ui/deal", { id: +f.dataset.deal, field: f.dataset.field, value: f.value });
     else if (f.dataset.sub) await post("ui/subscription/change", { id: +f.dataset.sub, field: f.dataset.field, value: f.value });
     else if (f.dataset.enquiry) await post("ui/enquiry/update", { id: +f.dataset.enquiry, field: f.dataset.field, value: f.value });
+    else if (f.dataset.step) await post("ui/onboarding/step", { id: +f.dataset.step, field: f.dataset.field, value: f.value });
     else await post("ui/update", { id: +f.dataset.id, field: f.dataset.field, value: f.value });
     if (f.dataset.refresh || f.dataset.field === "phone") refresh();
   } catch (err) {

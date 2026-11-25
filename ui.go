@@ -85,8 +85,10 @@ type TodayData struct {
 	Subs int
 	// Enquiries are the ones nobody has answered yet.
 	Enquiries int
-	Week      Stats
-	Now       string
+	// Steps are the onboarding steps late or due today, ours and the customers alike.
+	Steps int
+	Week  Stats
+	Now   string
 }
 
 func (a *App) today(w http.ResponseWriter, r *http.Request) {
@@ -113,6 +115,14 @@ func (a *App) today(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d.Enquiries = a.s.EnquiryCounts(q.Org.ID)["state:"+EnquiryOpen]
+	onboard, err := a.s.Onboardings(q.Org.ID, 0, now.Format(dayLayout))
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	for _, ob := range onboard {
+		d.Steps += ob.Late + ob.DueToday
+	}
 	for _, sub := range subs {
 		if sub.Soon(now.Format(dayLayout)) {
 			d.Subs++
@@ -255,6 +265,8 @@ type CompanyPage struct {
 	History []HistoryItem
 	Notes   []NoteView
 	Subs    []SubscriptionRow
+	Onboard []OnboardingRow
+	Planned int
 	Day     string
 }
 
@@ -267,7 +279,11 @@ func (a *App) company(w http.ResponseWriter, r *http.Request) {
 	}
 	p := CompanyPage{Company: *c}
 	// Half a company's page would read as the whole of it, so any part failing fails the page.
-	var failed [6]error
+	var failed [7]error
+	p.Onboard, failed[6] = a.s.Onboardings(q.Org.ID, c.ID, today())
+	if plan, err := q.Org.Settings.Onboarding(); err == nil {
+		p.Planned = len(plan)
+	}
 	p.Day = today()
 	p.Subs, failed[5] = a.s.Subscriptions(q.Org.ID, c.ID, p.Day)
 	p.Facts, failed[0] = a.s.Facts(q.Org.ID, c.ID)
@@ -485,6 +501,10 @@ func (a *App) uiSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := in.Assets(); err != nil {
+		fail(w, err, http.StatusBadRequest)
+		return
+	}
+	if _, err := in.Onboarding(); err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}

@@ -86,7 +86,7 @@ func TestFormEnquiryIsKept(t *testing.T) {
 			t.Fatalf("an enquiry from a listed site: %d", res.StatusCode)
 		}
 	}
-	rows, err := s.Enquiries(o.ID, EnquiryFilter{})
+	rows, err := firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1))
 	if err != nil || len(rows) != 1 {
 		t.Fatalf("stored %d enquiries, %v", len(rows), err)
 	}
@@ -120,11 +120,11 @@ func TestEnquiryOddities(t *testing.T) {
 	if res, _ := fromSite(t, "POST", intake, formSite, EnquiryIn{Kind: "sales", Email: "bot@spam.example", Message: "buy", Trap: "https://spam.example"}); res.StatusCode != http.StatusOK {
 		t.Fatalf("a filled trap field: %d", res.StatusCode)
 	}
-	rows, _ := s.Enquiries(o.ID, EnquiryFilter{})
+	rows, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1))
 	if len(rows) != 1 || rows[0].Kind != "other" || len([]rune(rows[0].Message)) != 10000 {
 		t.Fatalf("kept %d, first %q with %d characters", len(rows), rows[0].Kind, len([]rune(rows[0].Message)))
 	}
-	spam, _ := s.Enquiries(o.ID, EnquiryFilter{Spam: true})
+	spam, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{Spam: true}, 1))
 	if len(spam) != 1 || spam[0].Email != "bot@spam.example" {
 		t.Fatalf("spam kept apart: %+v", spam)
 	}
@@ -176,7 +176,7 @@ func TestEnquiryFindsWhoSentIt(t *testing.T) {
 		}
 	}
 	by := map[string]Enquiry{}
-	rows, _ := s.Enquiries(o.ID, EnquiryFilter{})
+	rows, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1))
 	for _, e := range rows {
 		by[e.Email] = e
 	}
@@ -193,7 +193,7 @@ func TestEnquiryFindsWhoSentIt(t *testing.T) {
 	if !strings.Contains(page, "sent an enquiry · Hannah Pryce: Sales") {
 		t.Error("the company's history doesn't mention the enquiry")
 	}
-	if kinds, _ := s.Enquiries(o.ID, EnquiryFilter{Kind: "support"}); len(kinds) != 1 {
+	if kinds, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{Kind: "support"}, 1)); len(kinds) != 1 {
 		t.Errorf("filtering by kind found %d", len(kinds))
 	}
 
@@ -207,7 +207,7 @@ func TestEnquiryFindsWhoSentIt(t *testing.T) {
 	if err := s.ErasePerson(o.ID, known.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	left, _ := s.Enquiries(o.ID, EnquiryFilter{})
+	left, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1))
 	for _, e := range left {
 		if e.Email == "hannah@quay.example" {
 			t.Errorf("an erased person's enquiry is still here: %q", e.Message)
@@ -245,11 +245,11 @@ func TestEnquiryFromAProduct(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, `"kind":"signup"`) {
 		t.Fatalf("a key with the scope: %d %s", code, body)
 	}
-	rows, _ := s.Enquiries(o.ID, EnquiryFilter{})
+	rows, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1))
 	if len(rows) != 1 || rows[0].Via != "agent:back office" || rows[0].Site != "app" || rows[0].Spam {
 		t.Fatalf("stored as %+v", rows)
 	}
-	if theirs, _ := s.Enquiries(other.ID, EnquiryFilter{}); len(theirs) != 0 {
+	if theirs, _ := firstOf(s.Enquiries(other.ID, EnquiryFilter{}, 1)); len(theirs) != 0 {
 		t.Error("another organisation sees it")
 	}
 	if err := s.DeleteEnquiry(other.ID, rows[0].ID); err == nil {
@@ -261,7 +261,7 @@ func TestEnquiryFromAProduct(t *testing.T) {
 	if code, body := call(t, client, "POST", srv.URL+"/o/alpha/ui/enquiry/delete", "application/json", map[string]int64{"id": rows[0].ID}); code != http.StatusOK {
 		t.Fatalf("an owner deleting an enquiry: %d %s", code, body)
 	}
-	if left, _ := s.Enquiries(o.ID, EnquiryFilter{}); len(left) != 0 {
+	if left, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1)); len(left) != 0 {
 		t.Error("a deleted enquiry is still here")
 	}
 }
