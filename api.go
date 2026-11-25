@@ -14,8 +14,8 @@ import (
 func (a *App) apiRoutes(mux *http.ServeMux) {
 	v1 := "/o/{org}/api/v1/"
 	mux.HandleFunc("GET "+v1+"search", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
-		hits, err := a.s.AgentSearch(reqOf(r).Org.ID, reqOf(r).Agent(), r.URL.Query().Get("q"))
-		respond(w, r, hits, err)
+		hits, more, err := a.s.AgentSearch(reqOf(r).Org.ID, reqOf(r).Agent(), r.URL.Query().Get("q"))
+		respond(w, r, SearchOut{hits, more}, err)
 	}))
 	mux.HandleFunc("GET "+v1+"companies/{ref}", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
 		c, err := a.s.AgentCompany(reqOf(r).Org.ID, reqOf(r).Agent(), r.PathValue("ref"))
@@ -30,8 +30,8 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 		respond(w, r, items, err)
 	}))
 	mux.HandleFunc("GET "+v1+"tasks", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
-		tasks, err := a.s.AgentTasks(reqOf(r).Org.ID, reqOf(r).Agent())
-		respond(w, r, tasksOut{tasks}, err)
+		tasks, more, err := a.s.AgentTasks(reqOf(r).Org.ID, reqOf(r).Agent())
+		respond(w, r, tasksOut{tasks, more}, err)
 	}))
 	mux.HandleFunc("GET "+v1+"tasks/{id}", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
 		t, err := a.s.AgentTask(reqOf(r).Org.ID, reqOf(r).Agent(), idParam(r, "id"))
@@ -144,6 +144,7 @@ type ok struct {
 
 type tasksOut struct {
 	Tasks []TaskBrief `json:"tasks"`
+	More  bool        `json:"more" jsonschema:"true if there are more open tasks than are listed here"`
 }
 
 type taskRef struct {
@@ -183,9 +184,9 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 				return nil, &GuidanceOut{Guidance: agentInstructions(org, k)}, nil
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "search", Description: "Find companies and contacts by name, domain, email or notes. Each company says which agent last changed it."},
-			func(_ context.Context, req *mcp.CallToolRequest, in SearchIn) (*mcp.CallToolResult, []SearchHit, error) {
-				hits, err := a.s.AgentSearch(org.ID, sessionOf(req), in.Query)
-				return nil, hits, err
+			func(_ context.Context, req *mcp.CallToolRequest, in SearchIn) (*mcp.CallToolResult, SearchOut, error) {
+				hits, more, err := a.s.AgentSearch(org.ID, sessionOf(req), in.Query)
+				return nil, SearchOut{hits, more}, err
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "get_company", Description: "A company's details, facts with sources, people, and its history: what people and agents did here, newest first. Read the history before researching, so you don't redo work or suggest what a person rejected."},
 			func(_ context.Context, req *mcp.CallToolRequest, in struct {
@@ -205,8 +206,8 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "list_tasks", Description: "The open tasks people have written for agents: what each asks for, what is still unfinished, and whether another agent is on it now."},
 			func(_ context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, tasksOut, error) {
-				tasks, err := a.s.AgentTasks(org.ID, sessionOf(req))
-				return nil, tasksOut{tasks}, err
+				tasks, more, err := a.s.AgentTasks(org.ID, sessionOf(req))
+				return nil, tasksOut{tasks, more}, err
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "get_task", Description: "Everything needed to carry a task on: the brief in the person's words, what has been asked since, the companies and people already found, and the notes other agents left. Read it before working a task; people see that you picked it up. With a key that can add research, it also keeps an open request for you (claimed_request): work that one. If other agents hold every open request, leave the task to them."},
 			func(_ context.Context, req *mcp.CallToolRequest, in taskRef) (*mcp.CallToolResult, *TaskOut, error) {

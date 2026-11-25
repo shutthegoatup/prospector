@@ -188,7 +188,7 @@ func TestOrganisationsAreIsolated(t *testing.T) {
 	if err := s.Update(b.ID, ca.ID, "email", "x@y.z", "test"); err == nil {
 		t.Fatal("org beta edited org alpha's contact")
 	}
-	if hits, _ := s.AgentSearch(b.ID, Actor{}, "analytical"); len(hits) != 2 {
+	if hits, _, _ := s.AgentSearch(b.ID, Actor{}, "analytical"); len(hits) != 2 {
 		t.Fatalf("beta's search should see only its own company and person, got %+v", hits)
 	}
 	for _, h := range mustSearch(t, s, b.ID, "ada") {
@@ -199,7 +199,7 @@ func TestOrganisationsAreIsolated(t *testing.T) {
 }
 
 func mustSearch(t *testing.T, s *Store, org int64, q string) []SearchHit {
-	hits, err := s.AgentSearch(org, Actor{}, q)
+	hits, _, err := s.AgentSearch(org, Actor{}, q)
 	if err != nil {
 		t.Fatal(err)
 	}

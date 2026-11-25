@@ -408,15 +408,23 @@ func (s *Store) lastAgents(org int64, who Actor, companies []int64) (map[int64]*
 	return out, nil
 }
 
-func (s *Store) AgentSearch(org int64, who Actor, q string) ([]SearchHit, error) {
+// searchShows is how many companies, and how many people, a search lists.
+const searchShows = 25
+
+// AgentSearch lists the first matches of each kind, and says in more when there were
+// others: without that, a cut list reads as "nothing else matches".
+func (s *Store) AgentSearch(org int64, who Actor, q string) (hits []SearchHit, more bool, err error) {
 	q = strings.ToLower(strings.TrimSpace(q))
 	if len(q) < 2 {
-		return nil, errors.New("search for at least two characters")
+		return nil, false, errors.New("search for at least two characters")
 	}
 	var companies []Company
 	cond, args := s.companyMatch(q)
-	if err := s.in(org).Where(cond, args...).Order("id").Limit(25).Find(&companies).Error; err != nil {
-		return nil, err
+	if err := s.in(org).Where(cond, args...).Order("id").Limit(searchShows + 1).Find(&companies).Error; err != nil {
+		return nil, false, err
+	}
+	if len(companies) > searchShows {
+		companies, more = companies[:searchShows], true
 	}
 	ids := make([]int64, len(companies))
 	for i, c := range companies {
@@ -424,21 +432,30 @@ func (s *Store) AgentSearch(org int64, who Actor, q string) ([]SearchHit, error)
 	}
 	last, err := s.lastAgents(org, who, ids)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	hits := []SearchHit{}
+	hits = []SearchHit{}
 	for _, c := range companies {
 		hits = append(hits, SearchHit{Kind: "company", ID: c.ID, Name: c.Name, Stage: c.Stage, LastAgent: last[c.ID]})
 	}
 	var people []Contact
 	cond, args = s.contactMatch(q, true)
-	if err := s.in(org).Where("key not like 'org:%'").Where(cond, args...).Order("id").Limit(25).Find(&people).Error; err != nil {
-		return nil, err
+	if err := s.in(org).Where("key not like 'org:%'").Where(cond, args...).Order("id").Limit(searchShows + 1).Find(&people).Error; err != nil {
+		return nil, false, err
+	}
+	if len(people) > searchShows {
+		people, more = people[:searchShows], true
 	}
 	for _, p := range people {
 		hits = append(hits, SearchHit{Kind: "contact", ID: p.ID, Name: displayName(p), Company: deref(p.Maker), Stage: contactStage(p)})
 	}
-	return hits, nil
+	return hits, more, nil
+}
+
+// SearchOut is what a search answers with.
+type SearchOut struct {
+	Hits []SearchHit `json:"hits"`
+	More bool        `json:"more" jsonschema:"true if more matched than are listed: search for something narrower before concluding a company or person isn't here"`
 }
 
 func contactStage(c Contact) string {
