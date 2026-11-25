@@ -49,7 +49,30 @@ func (a *App) taskPage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	d.AgentRuns, _ = a.s.AgentRuns(q.Org.ID, t.ID, 10)
+	d.Query = r.URL.Query()
+	notes, notesPage, err := a.s.TaskNotesPage(q.Org.ID, t.ID, panelPage(r, "notes"))
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	d.Notes, d.NotesPage = notes, notesPage
+	runs, err := a.s.AgentRuns(q.Org.ID, t.ID, 0)
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	// Runs still going are all shown, with what stops them; those that ended come a page at a time.
+	var going, ended []AgentRun
+	for _, run := range runs {
+		if run.Going() {
+			going = append(going, run)
+		} else {
+			ended = append(ended, run)
+		}
+	}
+	ended, d.EndedPage = pageSlice(ended, panelPage(r, "runs"), taskRunsPageSize)
+	d.AgentRuns = append(going, ended...)
+	d.Runs, d.WorkPage = pageSlice(d.Runs, panelPage(r, "work"), taskRunsPageSize)
 	a.page(w, r, "tasks", TaskDetailView(q, d))
 }
 

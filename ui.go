@@ -230,6 +230,30 @@ func panelLink(path, name string, n int, otherName string, other Page) string {
 	return pageLink(path, 0, name, past(n), otherName, past(other.N))
 }
 
+// pageHref is the address of page n of the list called name, keeping everything else
+// the address says: where the page's other lists are, and its filters.
+func pageHref(path string, query url.Values, name string, n int) string {
+	v := url.Values{}
+	for key, values := range query {
+		v[key] = values
+	}
+	v.Del(name)
+	if n > 1 {
+		v.Set(name, strconv.Itoa(n))
+	}
+	if len(v) == 0 {
+		return path
+	}
+	return path + "?" + v.Encode()
+}
+
+// pageSlice is page n of a list already read whole.
+func pageSlice[T any](all []T, n, size int) ([]T, Page) {
+	pg := pageOf(n, size, len(all))
+	from := min(pg.offset(), len(all))
+	return all[from:min(from+size, len(all))], pg
+}
+
 func pageLink(path string, page int, filters ...string) string {
 	v := url.Values{}
 	for i := 0; i+1 < len(filters); i += 2 {
