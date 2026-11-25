@@ -242,10 +242,10 @@ func TestAnOrganisationHasSeveralAgents(t *testing.T) {
 	beta := mustOrg(t, s, "beta")
 	theirs := must((&App{s: s, agentClient: fake.srv.Client()}).saveAgent(context.Background(), beta.ID,
 		AgentSettingsIn{Name: "Theirs", BaseURL: fake.srv.URL + "/v1", APIKey: agentTestKey, Model: "router/auto"}, "Grace Hopper"))
-	if code, _ := add(map[string]any{"id": theirs.ID, "name": "Mine now", "model": "router/auto"}); code != http.StatusBadRequest {
-		t.Fatal("an owner saved over another organisation's agent")
+	if code, body := add(map[string]any{"id": theirs.ID, "name": "Mine now", "model": "router/auto"}); code != http.StatusNotFound {
+		t.Fatalf("an owner saved over another organisation's agent: %d %s", code, body)
 	}
-	if code, _ := call(t, ada, "DELETE", fmt.Sprintf("%s/o/alpha/api/v1/agents/%d", srv.URL, theirs.ID), "", nil); code == http.StatusOK {
+	if code, _ := call(t, ada, "DELETE", fmt.Sprintf("%s/o/alpha/api/v1/agents/%d", srv.URL, theirs.ID), "", nil); code != http.StatusNotFound {
 		t.Fatal("an owner deleted another organisation's agent")
 	}
 	if must(s.agentNamed(beta.ID, "Theirs")).Name != "Theirs" {

@@ -319,7 +319,7 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 	start := func(c *http.Client, agent int64) (int, string) {
 		return call(t, c, "POST", fmt.Sprintf("%s/o/alpha/api/v1/tasks/%d/runs", srv.URL, task.ID), "application/json", map[string]any{"agent": agent})
 	}
-	if code, body := start(ada, 99); code != http.StatusBadRequest || !strings.Contains(body, "no agent") {
+	if code, body := start(ada, 99); code != http.StatusNotFound || !strings.Contains(body, "no agent") {
 		t.Fatalf("starting an agent that isn't there: %d %s", code, body)
 	}
 	page := fmt.Sprintf("%s/o/alpha/tasks/%d", srv.URL, task.ID)

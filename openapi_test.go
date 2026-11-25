@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/shutthegoatup/prospector/api"
 )
@@ -89,6 +90,24 @@ func TestARobotWorksAgentsThroughTheAPIAsItsScopesAllow(t *testing.T) {
 	}
 	if code, body := asKey(t, "POST", fmt.Sprintf("%s/o/alpha/api/v1/runs/%d/stop", srv.URL, run.Id), runner, nil); code != http.StatusNoContent {
 		t.Fatalf("stopping the run: %d %s", code, body)
+	}
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		var ended AgentRun
+		if err := s.db.First(&ended, run.Id).Error; err == nil && ended.Status != RunWorking && ended.Status != RunWaiting {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the stopped run never ended")
+		}
+	}
+	if code, body := asKey(t, "POST", fmt.Sprintf("%s/o/alpha/api/v1/runs/%d/stop", srv.URL, run.Id), runner, nil); code != http.StatusNoContent {
+		t.Fatalf("stopping a run that has ended, as the contract says, is accepted: %d %s", code, body)
+	}
+	if code, _ := asKey(t, "POST", srv.URL+"/o/alpha/api/v1/runs/999/stop", runner, nil); code != http.StatusNotFound {
+		t.Fatalf("stopping a run that isn't there: %d", code)
+	}
+	if code, _ := asKey(t, "GET", fmt.Sprintf("%s/o/alpha/api/v1/agents/%d", srv.URL, 999), reader, nil); code != http.StatusNotFound {
+		t.Fatalf("an agent that isn't there: %d", code)
 	}
 	if code, _ := asKey(t, "GET", fmt.Sprintf("%s/o/alpha/api/v1/tasks/%d/runs", srv.URL, 999), reader, nil); code != http.StatusNotFound {
 		t.Fatalf("another task's runs: %d", code)

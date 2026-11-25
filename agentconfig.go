@@ -93,7 +93,7 @@ func (s *Store) Agents(org int64) ([]Agent, error) {
 func (s *Store) AgentByID(org, id int64) (*Agent, error) {
 	var c Agent
 	if err := s.db.Where("org_id = ? and id = ?", org, id).Limit(1).Find(&c).Error; err != nil || c.ID == 0 {
-		return nil, errors.Join(err, fmt.Errorf("no agent %d in this organisation", id))
+		return nil, missing(err, "no agent %d in this organisation", id)
 	}
 	return &c, nil
 }
