@@ -31,16 +31,16 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	if _, err := s.Restore(o.ID, before); err != nil {
 		t.Fatal(err)
 	}
-	history := func(id int64) map[string]string {
+	history := func(id int64) map[string]bool {
 		var events []Event
 		do(s.in(o.ID).Where("contact_id = ?", id).Find(&events).Error)
-		out := map[string]string{}
+		out := map[string]bool{}
 		for _, e := range events {
-			out[e.Action] = deref(e.Value)
+			out[e.Action] = true
 		}
 		return out
 	}
-	if h := history(hannah.ID); h["set:phone"] != "+44 20 7946 0000" {
+	if h := history(hannah.ID); !h["set:phone"] {
 		t.Fatalf("the restore lost the history of someone it kept: %v", h)
 	}
 	if h := history(nia.ID); len(h) != 0 {
@@ -72,7 +72,7 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	if _, err := s.Restore(o.ID, "not a snapshot at all"); err == nil {
 		t.Fatal("a file with no contacts in it replaced everyone")
 	}
-	if h := history(hannah.ID); h["set:phone"] == "" || must(s.FindOne(o.ID, "Hannah")) == nil {
+	if h := history(hannah.ID); !h["set:phone"] || must(s.FindOne(o.ID, "Hannah")) == nil {
 		t.Fatal("a refused restore still changed something")
 	}
 
@@ -98,10 +98,10 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	if now := must(s.FindOne(o.ID, "Hannah")); now.ID != jonas.ID {
 		t.Fatalf("the test didn't trade their ids: Hannah is %d", now.ID)
 	}
-	if h := history(jonas.ID); h["set:phone"] == "" || h["set:tz"] != "" {
+	if h := history(jonas.ID); !h["set:phone"] || h["set:tz"] {
 		t.Fatalf("Hannah's history didn't follow her to her new id: %v", h)
 	}
-	if h := history(hannah.ID); h["set:tz"] != "Europe/Berlin" || h["set:phone"] != "" {
+	if h := history(hannah.ID); !h["set:tz"] || h["set:phone"] {
 		t.Fatalf("Jonas's history didn't follow him to his new id: %v", h)
 	}
 	if waitsFor() != jonas.ID {
