@@ -25,7 +25,7 @@ templ LandingPage(intake, origin string) {
 			<meta name="color-scheme" content="light"/>
 			<meta name="theme-color" content="#ffc233"/>
 			<title>Prospector · A few hundred accounts, one queue a day</title>
-			<meta name="description" content="A prospecting workbench for small teams selling to named accounts. Agents research companies and draft messages; people qualify, decide and send."/>
+			<meta name="description" content="A prospecting and customer workbench for small teams selling to named accounts: research, deals, subscriptions and onboarding on one company record. Agents research and draft; you decide what they may send."/>
 			<link rel="icon" type="image/svg+xml" href={ asset("img/mark.svg") }/>
 			<link rel="stylesheet" href={ asset("css/fonts.css") }/>
 			<link rel="stylesheet" href={ asset("css/landing.css") }/>
@@ -41,6 +41,7 @@ templ LandingPage(intake, origin string) {
 						@Brand()
 						<div class="lp-links">
 							<a href="#loop">How it works</a>
+							<a href="#customers">Customers</a>
 							<a href="#agents">Agents</a>
 							<a href="#start">Get started</a>
 							if intake != "" {
@@ -123,11 +124,28 @@ templ LandingPage(intake, origin string) {
 					</div>
 				</div>
 			</section>
+			<section class="lp-section" id="customers">
+				<div class="lp-wrap">
+					<div class="lp-section-head">
+						<p class="lp-label">After it's won</p>
+						<h2>The customer stays on the same record.</h2>
+						<p>Deals, what they're on, getting them live and what they write in about, on the company you prospected.</p>
+					</div>
+					<div class="lp-grid">
+						<div class="lp-cell is-coral"><h3>Deals with a value</h3><p>Each conversation carries what it's worth, who has it and when it should close. Start a second one for a renewal or an expansion.</p></div>
+						<div class="lp-cell is-gold"><h3>Subscriptions and their notice</h3><p>What each customer is on, for how long, and the notice it needs. Today flags one a month before its date to give notice or renew, and a renewal deal starts from it.</p></div>
+						<div class="lp-cell is-green"><h3>Onboarding to go-live</h3><p>Your steps and theirs, dated from the start. A won deal offers to start one, and late steps come back to Today.</p></div>
+						<div class="lp-cell is-violet"><h3>A page for the customer</h3><p>Invite someone at the company to a page of their own steps, opened from an emailed link with no password. They mark theirs done.</p></div>
+						<div class="lp-cell is-coral"><h3>Enquiries answered</h3><p>Site forms and your product's sign-ups arrive with an owner and a state. Reply by email from the card, and keep their answer in the thread.</p></div>
+						<div class="lp-cell is-gold"><h3>All of it in the API</h3><p>Deals, subscriptions, onboarding and enquiries are in the published API, so a script or an agent with the right key can do with them what a person can.</p></div>
+					</div>
+				</div>
+			</section>
 			<section class="lp-night" id="agents">
 				<div class="lp-wrap">
 					<div class="lp-section-head">
 						<span class="lp-tag is-violet">Agents and API</span>
-						<h2>Agents do the reading. People do the sending.</h2>
+						<h2>Agents do the reading. You decide what they may send.</h2>
 						<p>Each organisation has an MCP endpoint and a REST API with scoped keys. Connect Claude or your own agent in one command, and decide what each key may do.</p>
 					</div>
 					<div class="lp-agents">
@@ -150,13 +168,17 @@ templ LandingPage(intake, origin string) {
 									<li>Add companies, facts and suggested contacts, each with a source URL<code>research:write</code></li>
 									<li>Draft notes, emails and follow-ups, shown as the agent's<code>drafts:write</code></li>
 									<li>Record an outcome, shown as the agent's in the history<code>outcomes:write</code></li>
+									<li>Value and move deals, and say where answering an enquiry stands<code>pipeline:write</code></li>
+									<li>Record subscriptions and work customers' onboarding<code>customers:write</code></li>
+									<li>Email a reply to someone who wrote in<code>enquiries:reply</code></li>
+									<li>Email a customer the link to their onboarding steps<code>customers:invite</code></li>
 								</ul>
 							</div>
 							<div>
 								<h3 class="lp-tag is-coral">No key can</h3>
 								<ul>
-									<li>Send anything</li>
-									<li>Change settings</li>
+									<li>Send mail without a scope that says so, or to anyone who wasn't already writing to you or being onboarded</li>
+									<li>Change your organisation's settings or members, or make or revoke API keys</li>
 									<li>See another organisation</li>
 									<li>Add anyone on your never-contact list</li>
 								</ul>
