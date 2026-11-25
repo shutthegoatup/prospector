@@ -1445,8 +1445,10 @@ export interface components {
         CampaignAudience: "conversations" | "customers";
         CampaignNew: {
             name: string;
-            /** @description `conversations` or `customers`; empty is `conversations`. */
+            /** @description `conversations` or `customers`; empty is `conversations`, or `customers` for a service notice. */
             audience?: string;
+            /** @description `marketing`, or `service` for a notice to current customers about what they have; empty is `marketing`. */
+            kind?: string;
             subject?: string;
             /** @description Plain text. The postal address and the unsubscribe link are added when it is sent. */
             body?: string;
@@ -1454,6 +1456,8 @@ export interface components {
         CampaignChange: {
             name?: string | null;
             audience?: string | null;
+            /** @description `marketing` or `service`; making a draft a service notice takes it to customers. */
+            kind?: string | null;
             subject?: string | null;
             body?: string | null;
         };
@@ -1462,6 +1466,7 @@ export interface components {
             id: number;
             name: string;
             audience: components["schemas"]["CampaignAudience"];
+            kind: components["schemas"]["CampaignKind"];
             subject: string;
             body: string;
             /**
@@ -1521,6 +1526,15 @@ export interface components {
             /** Format: date-time */
             sent_at: string | null;
         };
+        /**
+         * @description `marketing` honours the list not to be mailed and carries an unsubscribe link.
+         *     `service` is a notice to current customers about what they have, such as a price
+         *     or terms change: it goes only to customers, reaches people who unsubscribed from
+         *     marketing, and carries no unsubscribe link. Never anyone on the never-contact list
+         *     or erased. Anything promotional in it makes it marketing, whatever it is called.
+         * @enum {string}
+         */
+        CampaignKind: "marketing" | "service";
     };
     responses: {
         /** @description What went wrong (RFC 9457). */

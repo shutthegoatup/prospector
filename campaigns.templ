@@ -18,10 +18,9 @@ templ CampaignsView(q *Req, cards []CampaignCard, unsendable error) {
 	}
 	<form data-form="api/v1/campaigns" data-refresh="true" data-reset="true" class="mb-5 flex flex-wrap items-center gap-2">
 		<input name="name" required maxlength="120" placeholder="e.g. Spring price list" aria-label="Name of the campaign" class="h-9 min-w-[220px] flex-1 rounded-lg border border-input bg-muted px-3 text-sm"/>
-		<select name="audience" aria-label="Who it is for" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
-			for _, a := range CampaignAudiences {
-				<option value={ a.Key }>{ a.Label }</option>
-			}
+		<select name="kind" aria-label="What kind of mail" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
+			<option value={ KindMarketing }>Marketing</option>
+			<option value={ KindService }>Service notice to customers</option>
 		</select>
 		@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
 			Start a draft
@@ -70,7 +69,7 @@ templ CampaignSentCard(c CampaignCard) {
 			<b>{ c.Name }</b>
 			<span class="font-mono text-xs text-muted-foreground">{ campaignState(c) }</span>
 		</div>
-		@Meta(joinNonEmpty(" · ", audienceLabel(c.Audience), "sent by "+actorLabel(c.QueuedBy), mailLine(c.Mail)))
+		@Meta(joinNonEmpty(" · ", campaignKindLabel(c.Kind), audienceLabel(c.Audience), "sent by "+actorLabel(c.QueuedBy), mailLine(c.Mail)))
 		<p class="font-bold">{ c.Subject }</p>
 		<p class="whitespace-pre-wrap text-muted-foreground">{ c.Body }</p>
 		if c.Status == CampaignSending || c.Status == CampaignPaused {
@@ -92,12 +91,21 @@ templ CampaignDraftCard(c CampaignCard, ready bool) {
 	<article class="mb-4 flex flex-col gap-3 panel p-4 text-sm" data-campaign-card={ strconv.FormatInt(c.ID, 10) }>
 		<div class="flex flex-wrap items-center justify-between gap-2">
 			<input value={ c.Name } maxlength="120" aria-label="Name" class="h-9 min-w-[220px] flex-1 rounded-lg border border-input bg-muted px-3 font-bold" { campaignInput(c.Campaign, "name")... }/>
-			<select aria-label="Who it is for" class="h-9 rounded-lg border border-input bg-muted px-2" { campaignInput(c.Campaign, "audience")... }>
-				for _, a := range CampaignAudiences {
-					<option value={ a.Key } selected?={ a.Key == c.Audience }>{ a.Label }</option>
-				}
+			<select aria-label="What kind of mail" class="h-9 rounded-lg border border-input bg-muted px-2" { campaignInput(c.Campaign, "kind")... }>
+				<option value={ KindMarketing } selected?={ c.Kind != KindService }>Marketing</option>
+				<option value={ KindService } selected?={ c.Kind == KindService }>Service notice</option>
 			</select>
+			if c.Kind != KindService {
+				<select aria-label="Who it is for" class="h-9 rounded-lg border border-input bg-muted px-2" { campaignInput(c.Campaign, "audience")... }>
+					for _, a := range CampaignAudiences {
+						<option value={ a.Key } selected?={ a.Key == c.Audience }>{ a.Label }</option>
+					}
+				</select>
+			}
 		</div>
+		if c.Kind == KindService {
+			<p class="rounded-lg border border-border bg-muted px-3 py-2">A service notice goes to everyone at a current customer, including anyone who unsubscribed from your marketing, because it is about what they already have: a price or terms change, an outage, a date that matters. Keep it to that. Anything promotional in it makes it marketing, whatever it is called. It never goes to anyone on the never-contact list or erased, and carries no unsubscribe link.</p>
+		}
 		<input value={ c.Subject } maxlength="200" placeholder="Subject" aria-label="Subject" class="h-9 rounded-lg border border-input bg-muted px-3" { campaignInput(c.Campaign, "subject")... }/>
 		<textarea rows="8" maxlength="20000" placeholder="What it says, as plain text. Your postal address and an unsubscribe link are added at the foot." aria-label="What it says" class="rounded-lg border border-input bg-muted px-3 py-2 leading-relaxed" { campaignInput(c.Campaign, "body")... }>{ c.Body }</textarea>
 		<details>
@@ -127,4 +135,11 @@ templ CampaignDraftCard(c CampaignCard, ready bool) {
 			}
 		</div>
 	</article>
+}
+
+func campaignKindLabel(kind string) string {
+	if kind == KindService {
+		return "Service notice"
+	}
+	return "Marketing"
 }

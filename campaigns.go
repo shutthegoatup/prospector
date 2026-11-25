@@ -20,8 +20,11 @@ type Campaign struct {
 	OrgID    int64  `gorm:"index;not null" json:"-"`
 	Name     string `gorm:"not null;default:''" json:"name"`
 	Audience string `gorm:"not null;default:'conversations'" json:"audience"`
-	Subject  string `gorm:"not null;default:''" json:"subject"`
-	Body     string `gorm:"not null;default:''" json:"body"`
+	// Kind is "marketing", or "service": a notice to current customers about what they have
+	// (a price or terms change), which reaches them even if they unsubscribed from marketing.
+	Kind    string `gorm:"not null;default:'marketing'" json:"kind"`
+	Subject string `gorm:"not null;default:''" json:"subject"`
+	Body    string `gorm:"not null;default:''" json:"body"`
 	// Status is "draft" until it is sent; only a draft can be changed.
 	Status    string    `gorm:"not null;default:'draft'" json:"status"`
 	CreatedBy string    `gorm:"not null;default:''" json:"created_by"`
@@ -41,6 +44,8 @@ type Campaign struct {
 const (
 	AudienceConversations = "conversations"
 	AudienceCustomers     = "customers"
+	KindMarketing         = "marketing"
+	KindService           = "service"
 	CampaignDraft         = "draft"
 	CampaignSending       = "sending"
 	CampaignPaused        = "paused"
@@ -68,6 +73,7 @@ func audienceLabel(key string) string {
 type CampaignIn struct {
 	Name     string `json:"name"`
 	Audience string `json:"audience"`
+	Kind     string `json:"kind"`
 	Subject  string `json:"subject"`
 	Body     string `json:"body"`
 }
@@ -86,6 +92,10 @@ func campaignField(field, value string) (string, error) {
 	case "audience":
 		if audienceLabel(value) == "" {
 			return "", fmt.Errorf("a campaign goes to %q or %q", AudienceConversations, AudienceCustomers)
+		}
+	case "kind":
+		if value != KindMarketing && value != KindService {
+			return "", fmt.Errorf("a campaign is %q or %q", KindMarketing, KindService)
 		}
 	case "subject":
 		// One line: a subject is a header.
@@ -106,20 +116,29 @@ func campaignField(field, value string) (string, error) {
 }
 
 func (s *Store) AddCampaign(org int64, in CampaignIn, actor string) (*Campaign, error) {
+	if in.Kind == "" {
+		in.Kind = KindMarketing
+	}
 	if in.Audience == "" {
 		in.Audience = AudienceConversations
+		if in.Kind == KindService {
+			in.Audience = AudienceCustomers
+		}
 	}
 	c := Campaign{OrgID: org, Status: CampaignDraft, CreatedBy: actor, UpdatedBy: actor}
 	for _, f := range []struct {
 		field string
 		value string
 		into  *string
-	}{{"name", in.Name, &c.Name}, {"audience", in.Audience, &c.Audience}, {"subject", in.Subject, &c.Subject}, {"body", in.Body, &c.Body}} {
+	}{{"name", in.Name, &c.Name}, {"kind", in.Kind, &c.Kind}, {"audience", in.Audience, &c.Audience}, {"subject", in.Subject, &c.Subject}, {"body", in.Body, &c.Body}} {
 		v, err := campaignField(f.field, f.value)
 		if err != nil {
 			return nil, err
 		}
 		*f.into = v
+	}
+	if err := c.fits(); err != nil {
+		return nil, err
 	}
 	return &c, s.db.Create(&c).Error
 }
@@ -135,12 +154,26 @@ func (s *Store) ChangeCampaign(org, id int64, changes []Change, actor string) (*
 			return errors.New("only a draft can be changed")
 		}
 		updates := map[string]any{"updated_by": actor}
+		after := c
 		for _, ch := range changes {
 			v, err := campaignField(ch.Field, ch.Value)
 			if err != nil {
 				return err
 			}
 			updates[ch.Field] = v
+			switch ch.Field {
+			case "kind":
+				after.Kind = v
+			case "audience":
+				after.Audience = v
+			}
+		}
+		// Turning a draft into a service notice takes it to customers, unless asked otherwise.
+		if after.Kind == KindService && c.Kind != KindService && updates["audience"] == nil {
+			after.Audience, updates["audience"] = AudienceCustomers, AudienceCustomers
+		}
+		if err := after.fits(); err != nil {
+			return err
 		}
 		// Held to the draft it was read as: one sent in the meantime is left as it went.
 		res := tx.Model(&Campaign{}).Where("org_id = ? and id = ? and status = ?", org, id, CampaignDraft).Updates(updates)
@@ -267,7 +300,7 @@ func (s *Store) audience(o *Org, c Campaign, w *audienceWork) ([]Recipient, erro
 			r.Address = addr
 			if first, twice := seen[addr]; twice {
 				r.LeftOut = "same address as " + first
-			} else if why := w.gate.why(addr, deref(p.Linkedin)); why != nil {
+			} else if why := w.gate.whyFor(c.Kind, addr, deref(p.Linkedin)); why != nil {
 				because, known := leftOutBecause(why)
 				if !known {
 					return nil, why
@@ -390,4 +423,13 @@ func (a *App) campaignsPage(w http.ResponseWriter, r *http.Request) {
 		cards = append(cards, card)
 	}
 	a.page(w, r, "campaigns", CampaignsView(q, cards, a.sendable(q.Org)))
+}
+
+// fits is whether a campaign's kind and audience go together: a service notice is for
+// current customers only, or it is marketing by another name.
+func (c Campaign) fits() error {
+	if c.Kind == KindService && c.Audience != AudienceCustomers {
+		return errors.New("a service notice goes to current customers only: one to people in conversation is marketing")
+	}
+	return nil
 }

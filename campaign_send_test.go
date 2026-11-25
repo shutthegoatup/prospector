@@ -419,3 +419,77 @@ func TestCampaignSendingHoldsAtItsEdges(t *testing.T) {
 	}
 	box.answer = nil
 }
+
+func TestAServiceNoticeReachesCustomersWhoUnsubscribedButNobodyElse(t *testing.T) {
+	a, s, o, list, member, box := campaignSite(t)
+	// Everyone made by campaignSite is at Larkmoor Yachts; make it a current customer.
+	var hannah Contact
+	if err := s.db.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddSubscription(o.ID, SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	never := person(t, s, o, "Never Mail", "Larkmoor Yachts", "never@larkmoor.example", false)
+	_ = never
+	o.Settings.NeverContact = "never@larkmoor.example"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	cold := person(t, s, o, "Not A Customer", "Quayside Ltd", "cold@quayside.example", true)
+	_ = cold
+	must(s.Suppress(o.ID, "tom@larkmoor.example", "Ada Lovelace"))
+
+	// A service notice is for customers only.
+	if code, body := call(t, member, "POST", list, "application/json", map[string]any{"name": "Prices", "kind": "service", "audience": "conversations"}); code != http.StatusBadRequest || !strings.Contains(body, "customers only") {
+		t.Errorf("a service notice to people in conversation: %d %s", code, body)
+	}
+	code, body := call(t, member, "POST", list, "application/json", map[string]any{"name": "Price change", "kind": "service", "subject": "Your price from March", "body": "Your price changes on 1 March."})
+	if code != http.StatusCreated || !strings.Contains(body, `"kind":"service"`) || !strings.Contains(body, `"audience":"customers"`) {
+		t.Fatalf("starting a service notice: %d %s", code, body)
+	}
+	c := must(s.Campaigns(o.ID))[0]
+	if code, _ := call(t, member, "PATCH", list+"/"+itoa(c.ID), "application/json", map[string]any{"audience": "conversations"}); code != http.StatusBadRequest {
+		t.Errorf("moving a service notice to people in conversation: %d", code)
+	}
+
+	got := leftOut(must(s.Audience(o, c)))
+	if got["Tom Ellery"] != "" || got["Never Mail"] != "on the never-contact list" {
+		t.Errorf("its audience: unsubscribed %q, never-contact %q", got["Tom Ellery"], got["Never Mail"])
+	}
+	if _, there := got["Not A Customer"]; there {
+		t.Error("someone at no current customer is in a service notice's audience")
+	}
+
+	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
+	a.sendRound(context.Background(), time.Now())
+	sent := map[string]Message{}
+	for _, m := range box.sent {
+		sent[m.To] = m
+	}
+	if _, ok := sent["tom@larkmoor.example"]; !ok {
+		t.Error("a customer who unsubscribed from marketing did not get the service notice")
+	}
+	for _, nobody := range []string{"never@larkmoor.example", "cold@quayside.example"} {
+		if _, ok := sent[nobody]; ok {
+			t.Errorf("a service notice went to %s", nobody)
+		}
+	}
+	m := sent["hannah@larkmoor.example"]
+	if m.Unsubscribe != "" || strings.Contains(m.Body, "/u/") || !strings.Contains(m.Body, "as a customer of") || !strings.Contains(m.Body, "1 Example Street") {
+		t.Errorf("a service notice's mail:\n%s\nunsubscribe %q", m.Body, m.Unsubscribe)
+	}
+
+	// A marketing campaign to the same people still leaves out who unsubscribed.
+	box.mu.Lock()
+	box.sent = nil
+	box.mu.Unlock()
+	marketing := must(s.AddCampaign(o.ID, CampaignIn{Name: "Offer", Audience: AudienceCustomers, Subject: "An offer", Body: "Buy more."}, "Ada Lovelace"))
+	must(s.SendCampaign(o, marketing.ID, "Ada Lovelace"))
+	a.sendRound(context.Background(), time.Now())
+	for _, to := range box.to() {
+		if to == "tom@larkmoor.example" {
+			t.Error("a marketing campaign went to someone who unsubscribed")
+		}
+	}
+}

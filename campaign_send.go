@@ -342,7 +342,7 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 	if _, err := bareAddress(r.Address); err != nil {
 		return settle(MailSkipped, "no longer one email address")
 	}
-	if why := gate.why(r.Address, link); why != nil {
+	if why := gate.whyFor(c.Kind, r.Address, link); why != nil {
 		because, known := leftOutBecause(why)
 		if !known {
 			log.Printf("campaign %d: checking a mail: %v", c.ID, why)
@@ -351,15 +351,21 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 		}
 		return settle(MailSkipped, because)
 	}
-	token, err := a.s.unsubscribeLink(a.s.db, o.ID, r.Address)
-	if err != nil {
-		log.Printf("campaign %d: %v", c.ID, err)
-		settle(MailQueued, "")
-		return false
+	foot := c.Body + "\n\n-- \n" + o.Name + "\n" + strings.TrimSpace(o.Settings.PostalAddress) + "\n\n"
+	var token, unsubscribe, body string
+	if c.Kind == KindService {
+		// About what they have, so not something to unsubscribe from: the foot says why it came.
+		body = foot + "You are getting this as a customer of " + o.Name + ": it is about the service you have with them, so it reaches you even if you unsubscribed from their marketing.\n"
+	} else {
+		var err error
+		if token, err = a.s.unsubscribeLink(a.s.db, o.ID, r.Address); err != nil {
+			log.Printf("campaign %d: %v", c.ID, err)
+			settle(MailQueued, "")
+			return false
+		}
+		unsubscribe = a.base + "/u/" + token
+		body = foot + "You are getting this because you are in touch with " + o.Name + ". To stop these mails: " + unsubscribe + "\n"
 	}
-	unsubscribe := a.base + "/u/" + token
-	body := c.Body + "\n\n-- \n" + o.Name + "\n" + strings.TrimSpace(o.Settings.PostalAddress) +
-		"\n\nYou are getting this because you are in touch with " + o.Name + ". To stop these mails: " + unsubscribe + "\n"
 	sendCtx, cancel := context.WithTimeout(ctx, sendLimit)
 	defer cancel()
 	sendErr := a.deliver(sendCtx, *via, Message{To: r.Address, Subject: c.Subject, Body: body, Unsubscribe: unsubscribe})
@@ -416,5 +422,7 @@ func (a *App) finishIfDone(c Campaign) {
 }
 
 func (s *Store) dropUnsubscribeLink(token string) {
-	stored(s.db.Where("token_hash = ?", hashToken(token)).Delete(&UnsubscribeLink{}))
+	if token != "" {
+		stored(s.db.Where("token_hash = ?", hashToken(token)).Delete(&UnsubscribeLink{}))
+	}
 }
