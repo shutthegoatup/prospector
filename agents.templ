@@ -124,6 +124,24 @@ templ AgentsView(q *Req, d AgentsData) {
 						<span class="block text-muted-foreground">{ runText(r, d.Now) }</span>
 					</div>
 				}
+				if d.RunsPaged || d.OlderRuns != "" {
+					<nav class="mt-3 flex flex-wrap items-center justify-between gap-3" aria-label="Runs">
+						<span>
+							if d.RunsPaged {
+								@button.Button(button.Props{Href: q.Base() + "agents", Variant: button.VariantOutline, Size: button.SizeSm}) {
+									← Latest
+								}
+							}
+						</span>
+						<span>
+							if d.OlderRuns != "" {
+								@button.Button(button.Props{Href: d.OlderRuns, Variant: button.VariantOutline, Size: button.SizeSm}) {
+									Older →
+								}
+							}
+						</span>
+					</nav>
+				}
 			}
 			@Section("Recent agent activity", "") {
 				if len(d.Activity) == 0 {

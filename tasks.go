@@ -316,22 +316,68 @@ func runsOf(events []Event) []Run {
 	return done
 }
 
-// Runs is the organisation's recent agent work, newest first.
-func (s *Store) Runs(org int64, limit int) ([]Run, map[int64]string) {
+// runsRead is how many of agents' events a page of runs is worked out from.
+const runsRead = 2000
+
+// Runs is a page of the organisation's agent work, newest first: the limit runs that
+// ended before before, or the latest when before is zero. Runs aren't stored; they are
+// read from events, so the page after is the one before the last run on this one, and
+// next is zero when there are no more.
+func (s *Store) Runs(org int64, before time.Time, limit int) (runs []Run, titles map[int64]string, next time.Time) {
+	agents := func() *gorm.DB {
+		q := s.in(org).Model(&Event{}).Where(`"user" like 'agent:%'`)
+		if !before.IsZero() {
+			q = q.Where("at < ?", before)
+		}
+		return q
+	}
 	var events []Event
-	logged(s.in(org).Where(`"user" like 'agent:%'`).Order("at desc, id desc").Limit(1000).Find(&events))
+	logged(agents().Order("at desc, id desc").Limit(runsRead).Find(&events))
+	full := len(events) == runsRead
 	for i, j := 0, len(events)-1; i < j; i, j = i+1, j-1 {
 		events[i], events[j] = events[j], events[i]
 	}
-	runs := runsOf(events)
+	runs = runsOf(events)
+	if !before.IsZero() {
+		// A run the page before showed began before it, and its start is here too: it is
+		// left out, by how soon after it that agent did something on the page before.
+		// Read as rows, one an agent: SQLite answers min() of a time as text.
+		cut := map[string]time.Time{}
+		for _, r := range runs {
+			key := fmt.Sprintf("%d\x00%s", r.KeyID, r.Actor)
+			if _, asked := cut[key]; asked {
+				continue
+			}
+			var first Event
+			logged(s.in(org).Where(`key_id = ? and "user" = ? and at >= ?`, r.KeyID, r.Actor, before).Order("at, id").Limit(1).Find(&first))
+			cut[key] = first.At
+		}
+		runs = slices.DeleteFunc(runs, func(r Run) bool {
+			first := cut[fmt.Sprintf("%d\x00%s", r.KeyID, r.Actor)]
+			return !first.IsZero() && first.Sub(r.End) < runGap
+		})
+	}
+	more := len(runs) > limit
+	if full && len(events) > 0 {
+		// The oldest of these may have begun earlier than was read; they wait for the next page.
+		oldest := events[0].At
+		whole := slices.DeleteFunc(slices.Clone(runs), func(r Run) bool { return r.Start.Sub(oldest) < runGap })
+		if len(whole) > 0 {
+			runs = whole
+		}
+		more = true
+	}
 	if len(runs) > limit {
 		runs = runs[:limit]
+	}
+	if more && len(runs) > 0 {
+		next = runs[len(runs)-1].End
 	}
 	var ids []int64
 	for _, r := range runs {
 		ids = append(ids, r.Tasks...)
 	}
-	titles := map[int64]string{}
+	titles = map[int64]string{}
 	if len(ids) > 0 {
 		var tasks []Task
 		logged(s.in(org).Where("id in ?", ids).Find(&tasks))
@@ -339,7 +385,7 @@ func (s *Store) Runs(org int64, limit int) ([]Run, map[int64]string) {
 			titles[t.ID] = t.Title
 		}
 	}
-	return runs, titles
+	return runs, titles, next
 }
 
 const (
