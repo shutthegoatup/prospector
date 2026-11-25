@@ -589,23 +589,30 @@
     name.value = words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   });
   var subscriptionFields = ["name", "amount", "per", "start", "term_months", "then", "notice_days", "notice_on", "ended_on"];
-  function isSubscriptionField(f) {
-    return subscriptionFields.includes(f);
+  var dealFields = ["kind", "amount", "close_date", "owner", "stage", "next_step", "next_date", "lost_reason"];
+  var enquiryFields = ["state", "owner", "note"];
+  function oneOf(list, f, what) {
+    if (!list.includes(f)) throw new Error(`${what} has no ${f}.`);
+    return f;
   }
   document.addEventListener("change", async (e) => {
     const f = e.target.closest("[data-field]");
     if (!f) return;
     const field = f.dataset.field || "";
     try {
-      if (f.dataset.deal) await send("ui/deal", { id: +f.dataset.deal, field, value: f.value });
-      else if (f.dataset.sub) {
-        if (!isSubscriptionField(field)) throw new Error(`A subscription has no ${field}.`);
+      if (f.dataset.deal) {
+        const change = { [oneOf(dealFields, field, "A deal")]: f.value };
+        answered(await api.PATCH("/o/{org}/api/v1/deals/{id}", { params: { path: { org, id: +f.dataset.deal } }, body: change }));
+      } else if (f.dataset.sub) {
+        const key = oneOf(subscriptionFields, field, "A subscription");
         const number = f.type === "number" || !!f.dataset.number;
         if (number && f.value.trim() === "") throw new Error("Enter a number, or 0 for none.");
-        const change = { [field]: number ? +f.value : f.value };
+        const change = { [key]: number ? +f.value : f.value };
         answered(await api.PATCH("/o/{org}/api/v1/subscriptions/{id}", { params: { path: { org, id: +f.dataset.sub } }, body: change }));
-      } else if (f.dataset.enquiry) await send("ui/enquiry/update", { id: +f.dataset.enquiry, field, value: f.value });
-      else if (f.dataset.step) {
+      } else if (f.dataset.enquiry) {
+        const change = { [oneOf(enquiryFields, field, "An enquiry")]: f.value };
+        answered(await api.PATCH("/o/{org}/api/v1/enquiries/{id}", { params: { path: { org, id: +f.dataset.enquiry } }, body: change }));
+      } else if (f.dataset.step) {
         if (field !== "due") throw new Error(`A step's ${field} is changed another way.`);
         answered(await api.PATCH("/o/{org}/api/v1/onboarding-steps/{id}", { params: { path: { org, id: +f.dataset.step } }, body: { due: f.value } }));
       } else await send("ui/update", { id: +(f.dataset.id || 0), field, value: f.value });

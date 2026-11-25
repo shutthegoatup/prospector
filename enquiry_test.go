@@ -258,7 +258,7 @@ func TestEnquiryFromAProduct(t *testing.T) {
 	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/enquiries", "", nil); !strings.Contains(page, "agent · back office") {
 		t.Error("the page doesn't say which key sent it")
 	}
-	if code, body := call(t, client, "POST", srv.URL+"/o/alpha/ui/enquiry/delete", "application/json", map[string]int64{"id": rows[0].ID}); code != http.StatusOK {
+	if code, body := call(t, client, "DELETE", srv.URL+"/o/alpha/api/v1/enquiries/"+itoa(rows[0].ID), "", nil); code != http.StatusNoContent {
 		t.Fatalf("an owner deleting an enquiry: %d %s", code, body)
 	}
 	if left, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1)); len(left) != 0 {

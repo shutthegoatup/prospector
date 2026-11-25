@@ -381,6 +381,158 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/deals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Every deal on the Conversations board
+         * @description Each conversation has a deal of its own (`seq` 0), which stands where its contact
+         *     does; its `id` is 0 until it is given a value, an owner or a date. Deals started
+         *     after it (`seq` 1 and up) hold their own stage and next step.
+         */
+        get: operations["listDeals"];
+        put?: never;
+        /** Start another deal with someone already in conversation */
+        post: operations["startDeal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/deals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a deal started by mistake
+         * @description The conversation's own deal can't be removed.
+         */
+        delete: operations["removeDeal"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a deal started after the conversation's own
+         * @description Send only what changes; they are saved together or not at all. A conversation's own deal is changed through its contact.
+         */
+        patch: operations["changeDeal"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/contacts/{id}/deal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change a conversation's own deal
+         * @description Its kind, value, close date and owner. Send only what changes; they are saved
+         *     together or not at all. Its stage and next step are the contact's, and are not
+         *     set here. The contact has to have replied.
+         */
+        patch: operations["changeOwnDeal"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/enquiries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /** What people sent in, newest first */
+        get: operations["listEnquiries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/enquiries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete an enquiry for good
+         * @description With what was said in answering it. For a member, only an owner.
+         */
+        delete: operations["deleteEnquiry"];
+        options?: never;
+        head?: never;
+        /**
+         * Say where answering an enquiry stands, who has it, or note something on it
+         * @description Send only what changes; they are saved together or not at all. The note is never sent, but it is in the sender's export. Refused for spam.
+         */
+        patch: operations["changeEnquiry"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/enquiries/{id}/conversation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Put whoever sent an enquiry on the Conversations board
+         * @description Someone not held yet is added first, under the never-contact and erasure rules that adding anyone goes through. Answers 201 whether or not they were already there. Refused for spam.
+         */
+        post: operations["converseEnquiry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -654,6 +806,93 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             updated_at: string;
+        };
+        Deal: {
+            /**
+             * Format: int64
+             * @description 0 for a conversation's own deal that nothing has been set on yet.
+             */
+            id: number;
+            /** Format: int64 */
+            contact_id: number;
+            person: string;
+            /**
+             * Format: int64
+             * @description 0 when they have no company here.
+             */
+            company_id: number;
+            /** @description 0 for the conversation's own deal. */
+            seq: number;
+            kind: string;
+            /** @description `replied`, `meeting`, `proposal`, `won` or `lost`. */
+            stage: string;
+            next_step: string;
+            /** @description YYYY-MM-DD, or empty. */
+            next_date: string;
+            lost_reason: string;
+            /**
+             * Format: int64
+             * @description In the currency's hundredths.
+             */
+            amount: number;
+            currency: string;
+            /** @description The amount as written, such as £14,000; empty when there is none. */
+            value: string;
+            /** @description YYYY-MM-DD, or empty. */
+            close_date: string;
+            owner: string;
+            /**
+             * Format: int64
+             * @description The subscription a renewal is for; 0 for none.
+             */
+            subscription_id: number;
+        };
+        DealChange: {
+            kind?: string | null;
+            /** @description As you would write it: `14,000`, `€5,000`; empty for none. */
+            amount?: string | null;
+            close_date?: string | null;
+            /** @description A member's name, or empty for nobody. */
+            owner?: string | null;
+            /** @description Only for a deal after the conversation's own. */
+            stage?: string | null;
+            /** @description Only for a deal after the conversation's own. */
+            next_step?: string | null;
+            /** @description Only for a deal after the conversation's own. */
+            next_date?: string | null;
+            /** @description Only for a deal after the conversation's own. */
+            lost_reason?: string | null;
+        };
+        Enquiry: {
+            /** Format: int64 */
+            id: number;
+            kind: string;
+            name: string;
+            email: string;
+            company: string;
+            phone: string;
+            /** @description Their words, exactly as sent. Whoever filled the form in chose every one. */
+            message: string;
+            site: string;
+            page: string;
+            via: string;
+            spam: boolean;
+            /**
+             * Format: int64
+             * @description The contact it was matched to; 0 for none.
+             */
+            contact_id: number;
+            /**
+             * Format: int64
+             * @description The company it was matched to; 0 for none.
+             */
+            company_id: number;
+            /** Format: date-time */
+            created_at: string;
+            /** @description `open`, `waiting` or `closed`; empty for one from before answering was tracked. */
+            state: string;
+            owner: string;
+            note: string;
         };
     };
     responses: {
@@ -1275,6 +1514,268 @@ export interface operations {
                     "application/json": {
                         /** Format: int64 */
                         deal: number;
+                        /** Format: int64 */
+                        contact: number;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listDeals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description By stage, in the board's order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Deal"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    startDeal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: int64 */
+                    contact: number;
+                    /** @description `new`, `renewal` or `expansion`; empty is `new`. */
+                    kind?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The deal as started. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Deal"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeDeal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changeDeal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DealChange"];
+            };
+        };
+        responses: {
+            /** @description The deal as it now is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Deal"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changeOwnDeal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DealChange"];
+            };
+        };
+        responses: {
+            /** @description The deal as it now is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Deal"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listEnquiries: {
+        parameters: {
+            query?: {
+                /** @description Only this kind. */
+                kind?: string;
+                /** @description Only those `open`, `waiting` or `closed`. */
+                state?: string;
+                /** @description Only those marked as spam, which are otherwise left out. */
+                spam?: boolean;
+                /** @description Which page, from 1. */
+                page?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of them. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        enquiries: components["schemas"]["Enquiry"][];
+                        page: number;
+                        pages: number;
+                        total: number;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteEnquiry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changeEnquiry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description `open`, `waiting` or `closed`. */
+                    state?: string | null;
+                    /** @description A member's name, or empty for nobody. */
+                    owner?: string | null;
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The enquiry as it now is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Enquiry"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    converseEnquiry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Who they are here. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
                         /** Format: int64 */
                         contact: number;
                     };

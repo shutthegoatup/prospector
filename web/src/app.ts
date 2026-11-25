@@ -140,12 +140,19 @@ document.addEventListener("input", (e) => {
   name.value = words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 });
 
-// The subscription fields a page may change one at a time, checked against the spec.
-const subscriptionFields = ["name", "amount", "per", "start", "term_months", "then", "notice_days", "notice_on", "ended_on"] as const satisfies readonly (keyof Schemas["SubscriptionChange"])[];
-type SubscriptionField = (typeof subscriptionFields)[number];
+// The body a PATCH operation takes, from the spec.
+type PatchBody<P extends keyof paths> = paths[P] extends { patch: { requestBody: { content: { "application/json": infer B } } } } ? B : never;
+type EnquiryChange = PatchBody<"/o/{org}/api/v1/enquiries/{id}">;
 
-function isSubscriptionField(f: string): f is SubscriptionField {
-  return (subscriptionFields as readonly string[]).includes(f);
+// The fields a page may change one at a time, checked against the spec: a field the spec
+// drops or renames fails the build.
+const subscriptionFields = ["name", "amount", "per", "start", "term_months", "then", "notice_days", "notice_on", "ended_on"] as const satisfies readonly (keyof Schemas["SubscriptionChange"])[];
+const dealFields = ["kind", "amount", "close_date", "owner", "stage", "next_step", "next_date", "lost_reason"] as const satisfies readonly (keyof Schemas["DealChange"])[];
+const enquiryFields = ["state", "owner", "note"] as const satisfies readonly (keyof EnquiryChange)[];
+
+function oneOf<T extends string>(list: readonly T[], f: string, what: string): T {
+  if (!(list as readonly string[]).includes(f)) throw new Error(`${what} has no ${f}.`);
+  return f as T;
 }
 
 document.addEventListener("change", async (e) => {
@@ -154,16 +161,20 @@ document.addEventListener("change", async (e) => {
   const field = f.dataset.field || "";
   try {
     // A deal after the conversation's own is changed by its own id, not its person's.
-    if (f.dataset.deal) await send("ui/deal", { id: +f.dataset.deal, field, value: f.value });
-    else if (f.dataset.sub) {
-      if (!isSubscriptionField(field)) throw new Error(`A subscription has no ${field}.`);
+    if (f.dataset.deal) {
+      const change: Schemas["DealChange"] = { [oneOf(dealFields, field, "A deal")]: f.value };
+      answered(await api.PATCH("/o/{org}/api/v1/deals/{id}", { params: { path: { org, id: +f.dataset.deal } }, body: change }));
+    } else if (f.dataset.sub) {
+      const key = oneOf(subscriptionFields, field, "A subscription");
       const number = f.type === "number" || !!f.dataset.number;
       // An emptied number box is not a nought: saving one would end a commitment.
       if (number && f.value.trim() === "") throw new Error("Enter a number, or 0 for none.");
-      const change: Schemas["SubscriptionChange"] = { [field]: number ? +f.value : f.value };
+      const change: Schemas["SubscriptionChange"] = { [key]: number ? +f.value : f.value };
       answered(await api.PATCH("/o/{org}/api/v1/subscriptions/{id}", { params: { path: { org, id: +f.dataset.sub } }, body: change }));
-    } else if (f.dataset.enquiry) await send("ui/enquiry/update", { id: +f.dataset.enquiry, field, value: f.value });
-    else if (f.dataset.step) {
+    } else if (f.dataset.enquiry) {
+      const change: EnquiryChange = { [oneOf(enquiryFields, field, "An enquiry")]: f.value };
+      answered(await api.PATCH("/o/{org}/api/v1/enquiries/{id}", { params: { path: { org, id: +f.dataset.enquiry } }, body: change }));
+    } else if (f.dataset.step) {
       if (field !== "due") throw new Error(`A step's ${field} is changed another way.`);
       answered(await api.PATCH("/o/{org}/api/v1/onboarding-steps/{id}", { params: { path: { org, id: +f.dataset.step } }, body: { due: f.value } }));
     } else await send("ui/update", { id: +(f.dataset.id || 0), field, value: f.value });
