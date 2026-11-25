@@ -15,6 +15,7 @@ Several sessions may be working on this machine at once. These are the commands 
 ## Before a change is done
 
 - After editing a `*.templ` file run `go tool templ generate` and commit the regenerated `*_templ.go`. CI fails if they differ.
+- The page script is TypeScript in `web/src/app.ts`, with types generated from the spec. After changing it, or the spec, run `npm ci && npm run build` in `web/` and commit `web/src/api.d.ts` and the built `assets/js/app.js`; CI fails if they differ. A call to the API made from code, rather than a path named in markup, goes through the typed client so a spec change breaks the build.
 - The API is spec-first. Change `api/openapi.yaml`, run `go generate ./api`, and commit the regenerated `api/api.gen.go`; CI fails if they differ. A page or form does what it does through the API, never through a route of its own, and each operation names the key scope it needs.
 - `assets/css/output.css` is a committed Tailwind build. A utility class that isn't already in it renders unstyled until the CSS is rebuilt (`node build-css.mjs <node_modules with tailwindcss v4>`), so prefer classes already in use.
 - Pages are served under a Content-Security-Policy that allows only the app's own scripts: no inline `<script>`, no `on…=` attributes. `TestContentPolicy` checks every page.
