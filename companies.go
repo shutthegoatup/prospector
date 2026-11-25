@@ -128,16 +128,24 @@ type HistoryItem struct {
 	Person string
 }
 
-func (s *Store) History(org, company int64, limit int) ([]HistoryItem, error) {
+const historyPageSize = 50
+
+// History is one page of what happened at a company, newest first.
+func (s *Store) History(org, company int64, page int) ([]HistoryItem, Page, error) {
+	theirs := func() *gorm.DB { return s.in(org).Model(&Event{}).Where("company_id = ?", company) }
+	var total int64
+	if err := theirs().Count(&total).Error; err != nil {
+		return nil, Page{}, err
+	}
+	pg := pageOf(page, historyPageSize, int(total))
 	var events []Event
-	err := s.in(org).Where("company_id = ?", company).Order("at desc").Limit(limit).Find(&events).Error
-	if err != nil {
-		return nil, err
+	if err := theirs().Order("at desc, id desc").Limit(pg.Size).Offset(pg.offset()).Find(&events).Error; err != nil {
+		return nil, Page{}, err
 	}
 	names := map[int64]string{}
 	var people []Contact
 	if err := s.in(org).Where("company_id = ?", company).Find(&people).Error; err != nil {
-		return nil, err
+		return nil, Page{}, err
 	}
 	for _, p := range people {
 		names[p.ID] = displayName(p)
@@ -146,7 +154,16 @@ func (s *Store) History(org, company int64, limit int) ([]HistoryItem, error) {
 	for i, e := range events {
 		out[i] = HistoryItem{At: e.At, Actor: e.User, Action: e.Action, Value: deref(e.Value), Person: names[e.ContactID]}
 	}
-	return out, nil
+	return out, pg, nil
+}
+
+// Touches counts every time someone at a company was reached out to, whichever page
+// of its history is on show.
+func (s *Store) Touches(org, company int64) (int, error) {
+	var n int64
+	err := s.in(org).Model(&Event{}).Where("company_id = ? and action in ?", company,
+		[]string{"mark:linkedin", "mark:email", "mark:followup", "mark:call"}).Count(&n).Error
+	return int(n), err
 }
 
 // ResearchRow is one company in the Research tab with what's known about it.
@@ -534,14 +551,21 @@ type AgentEvent struct {
 	Value  string
 }
 
-func (s *Store) AgentActivity(org int64, limit int) []AgentEvent {
+const activityPageSize = 20
+
+// AgentActivity is one page of what agents did, newest first.
+func (s *Store) AgentActivity(org int64, page int) ([]AgentEvent, Page) {
+	agents := func() *gorm.DB { return s.in(org).Model(&Event{}).Where(`"user" like 'agent:%'`) }
+	var total int64
+	logged(agents().Count(&total))
+	pg := pageOf(page, activityPageSize, int(total))
 	var events []Event
-	logged(s.in(org).Where(`"user" like 'agent:%'`).Order("at desc").Limit(limit).Find(&events))
+	logged(agents().Order("at desc, id desc").Limit(pg.Size).Offset(pg.offset()).Find(&events))
 	out := make([]AgentEvent, len(events))
 	for i, e := range events {
 		out[i] = AgentEvent{e.At, strings.TrimPrefix(e.User, "agent:"), e.Action, deref(e.Value)}
 	}
-	return out
+	return out, pg
 }
 
 // QuickAdd is the "Add person" form and the LinkedIn bookmarklet: one person straight into the LinkedIn queue.

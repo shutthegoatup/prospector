@@ -235,6 +235,20 @@ func (s *Store) CompanyNotes(org, company int64, limit int) ([]TaskNote, error) 
 	return notes, s.in(org).Where("company_id = ?", company).Order("id desc").Limit(limit).Find(&notes).Error
 }
 
+const companyNotesPageSize = 20
+
+// CompanyNotesPage is one page of the notes agents left about a company, newest first.
+func (s *Store) CompanyNotesPage(org, company int64, page int) ([]TaskNote, Page, error) {
+	theirs := func() *gorm.DB { return s.in(org).Model(&TaskNote{}).Where("company_id = ?", company) }
+	var total int64
+	if err := theirs().Count(&total).Error; err != nil {
+		return nil, Page{}, err
+	}
+	pg := pageOf(page, companyNotesPageSize, int(total))
+	var notes []TaskNote
+	return notes, pg, theirs().Order("id desc").Limit(pg.Size).Offset(pg.offset()).Find(&notes).Error
+}
+
 // Run is one stretch of an agent's work, read from its events: a key's changes with
 // no gap longer than runGap between them.
 type Run struct {
