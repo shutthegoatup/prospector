@@ -332,12 +332,15 @@ func TestUI(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, "LinkedIn queue") {
 		t.Fatalf("quick add: %d %s", code, body)
 	}
-	if _, body := call(t, client, "GET", base+"today?step=linkedin", "", nil); !strings.Contains(body, "Hannah Pryce") || !strings.Contains(body, `data-key="o"`) {
+	if _, body := call(t, client, "GET", base+"today?step=linkedin", "", nil); !strings.Contains(body, "Hannah Pryce") || !strings.Contains(body, `data-key="o"`) || !strings.Contains(body, "Open + copy") {
 		t.Fatal("quick-added person missing from the LinkedIn queue")
 	}
 	c, _ := s.FindOne(o.ID, "Hannah")
 	if err := s.Update(o.ID, c.ID, "linkedin", "javascript:alert(1)", "test"); err != nil {
 		t.Fatal(err)
+	}
+	if _, body := call(t, client, "GET", base+"today?step=linkedin", "", nil); !strings.Contains(body, `data-open="https://www.linkedin.com/search/results/people/?keywords=Hannah%20Pryce%20Larkmoor%20Yachts"`) || !strings.Contains(body, "Search + copy") || strings.Contains(body, "Open + copy") {
+		t.Fatal("someone without a usable profile link should open a people search")
 	}
 	for _, page := range []string{"companies/" + strconv.FormatInt(*c.CompanyID, 10), "today?step=linkedin"} {
 		if _, body := call(t, client, "GET", base+page, "", nil); strings.Contains(body, `href="javascript:`) || strings.Contains(body, `data-open="javascript:`) {

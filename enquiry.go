@@ -96,6 +96,9 @@ func (s *Store) AddEnquiry(org int64, via string, in EnquiryIn) (*Enquiry, error
 		return nil, errEnquiryEmail
 	}
 	return &e, s.db.Transaction(func(tx *gorm.DB) error {
+		if err := holdOrg(tx, org); err != nil {
+			return err
+		}
 		var same Enquiry
 		err := tx.Where("org_id = ? and email = ? and kind = ? and message = ? and created_at > ?",
 			org, e.Email, e.Kind, e.Message, time.Now().Add(-enquiryRepeat)).First(&same).Error

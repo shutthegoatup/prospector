@@ -143,6 +143,46 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 	}
 }
 
+func TestFrontOrgIsMadeOnce(t *testing.T) {
+	s := tempStore(t)
+	mustOrg(t, s, "alpha")
+	const address = "https://crm.alpha.example"
+	if err := s.EnsureFrontOrg(address + ":443"); err != nil {
+		t.Fatal(err)
+	}
+	o, err := s.OrgBySlug(frontOrgSlug)
+	if err != nil || o.Settings.EnquirySites != address {
+		t.Fatalf("the front organisation: %+v, %v", o, err)
+	}
+	srv := httptest.NewServer((&App{s: s, frontOrg: frontOrgSlug, base: address}).Routes())
+	t.Cleanup(srv.Close)
+	if _, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil); !strings.Contains(body, `data-intake="/o/prospector/intake" data-origin="`+address+`"`) {
+		t.Error("a server told its address starts without the front page's form")
+	}
+
+	// What its owners change afterwards isn't put back at the next start.
+	takeEnquiriesFrom(t, s, o, "")
+	if err := s.EnsureFrontOrg(address); err != nil {
+		t.Fatal(err)
+	}
+	if o, _ := s.OrgBySlug(frontOrgSlug); o.Settings.EnquirySites != "" {
+		t.Errorf("a restart listed %q again", o.Settings.EnquirySites)
+	}
+	var orgs int64
+	if s.db.Model(&Org{}).Count(&orgs); orgs != 2 {
+		t.Errorf("%d organisations after two starts", orgs)
+	}
+
+	// A server that doesn't know its address has the organisation and no form.
+	bare := tempStore(t)
+	if err := bare.EnsureFrontOrg(""); err != nil {
+		t.Fatal(err)
+	}
+	if o, err := bare.OrgBySlug(frontOrgSlug); err != nil || o.Settings.EnquirySites != "" {
+		t.Errorf("without an address: %+v, %v", o, err)
+	}
+}
+
 // The app shares the front page's light palette: a page left on the old dark class
 // would turn the components' dark variants back on.
 func TestAppUsesTheLightPalette(t *testing.T) {

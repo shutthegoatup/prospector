@@ -38,6 +38,9 @@ func ensureCompany(tx *gorm.DB, org int64, c Company) (*Company, bool, error) {
 	if c.Name == "" {
 		return nil, false, errors.New("company name is required")
 	}
+	if err := holdOrg(tx, org); err != nil {
+		return nil, false, err
+	}
 	var found Company
 	err := tx.Where("org_id = ? and lower(name) = ?", org, strings.ToLower(c.Name)).First(&found).Error
 	if err == nil {
@@ -55,8 +58,8 @@ func ensureCompany(tx *gorm.DB, org int64, c Company) (*Company, bool, error) {
 		return nil, false, res.Error
 	}
 	if res.RowsAffected == 0 {
-		// Someone added it between the look-up and the insert.
-		err := tx.Where("org_id = ? and name = ?", org, c.Name).First(&found).Error
+		// The index found one the look-up didn't: the two fold capitals differently outside ASCII.
+		err := tx.Where("org_id = ? and (name = ? or lower(name) = lower(?))", org, c.Name, c.Name).First(&found).Error
 		return &found, false, err
 	}
 	return &c, true, nil
@@ -567,6 +570,9 @@ func (s *Store) QuickAddPerson(o *Org, in QuickAdd, actor string) (*Contact, err
 	}
 	var out Contact
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := holdOrg(tx, o.ID); err != nil {
+			return err
+		}
 		var companyID *int64
 		maker := strings.TrimSpace(in.Company)
 		if maker != "" {
