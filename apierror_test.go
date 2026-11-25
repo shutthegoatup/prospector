@@ -7,12 +7,72 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
+
+// Nobody is shown the database's own words: not a page's script, not an API caller.
+func TestNoRawDatabaseErrorsGoOut(t *testing.T) {
+	s := tempStore(t)
+	mustOrg(t, s, "alpha")
+	clash := s.db.Create(&Org{Slug: "alpha", Name: "Alpha", Color: "#56c5f4"}).Error
+	if clash == nil {
+		t.Fatal("a second organisation took a slug already in use")
+	}
+	raw := regexp.MustCompile(`(?i)unique|constraint|duplicate|orgs|sqlstate|context|/var/lib`)
+	for name, c := range map[string]struct {
+		err         error
+		given, code int
+		text        string
+	}{
+		"a row the database turns down":        {fmt.Errorf("saving it: %w", clash), 400, 400, sayUnstorable},
+		"the same, from a handler calling 500": {clash, 500, 400, sayUnstorable},
+		"a database that has gone away":        {fmt.Errorf("query: %w", &pgconn.PgError{Code: "08006", Message: "connection failure"}), 400, 500, sayOurs},
+		"a failure a handler calls its own":    {errors.New("open /var/lib/prospector/x: permission denied"), 500, 500, sayOurs},
+		"what the caller got wrong":            {errors.New("a fact needs a field and a value"), 400, 400, "a fact needs a field and a value"},
+		"what another server said":             {errors.New("the mail server refused the password"), 502, 502, "the mail server refused the password"},
+	} {
+		page := httptest.NewRecorder()
+		fail(page, c.err, c.given)
+		body := strings.TrimSpace(page.Body.String())
+		if page.Code != c.code || body != c.text || raw.MatchString(body) {
+			t.Errorf("%s, to a page: %d %q, want %d %q", name, page.Code, body, c.code, c.text)
+		}
+	}
+
+	if !fromDatabase(&pgconn.ConnectError{}) {
+		t.Error("a failure to connect to Postgres, which names its user and host, would go out as it is")
+	}
+
+	// The sign-in page says as little when the right password can't be given a session.
+	app, _, down, _ := signedIn(t)
+	app.db.Callback().Create().Before("gorm:create").Register("no-sessions", func(tx *gorm.DB) {
+		if tx.Statement.Table == "sessions" {
+			tx.AddError(&pgconn.PgError{Code: "08006", Message: "connection to db.internal:5432 lost"})
+		}
+	})
+	res, err := http.PostForm(down.URL+"/login", url.Values{"email": {"ada@example.com"}, "password": {"correct horse battery"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	said, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != http.StatusInternalServerError || !strings.Contains(string(said), "try again in a moment") || strings.Contains(string(said), "db.internal") {
+		t.Errorf("signing in when no session can be kept: %d %s", res.StatusCode, said)
+	}
+
+	api := httptest.NewRecorder()
+	apiFail(api, httptest.NewRequest("POST", "/o/alpha/api/v1/companies", nil), clash)
+	if api.Code != http.StatusBadRequest || !strings.Contains(api.Body.String(), sayUnstorable) || raw.MatchString(api.Body.String()) {
+		t.Errorf("to an API caller: %d %s", api.Code, api.Body)
+	}
+}
 
 func TestAnAPIErrorSaysWhoseFaultItIs(t *testing.T) {
 	s, o, srv, _ := signedIn(t)

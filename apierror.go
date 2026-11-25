@@ -40,15 +40,66 @@ func ours(err error) bool {
 	var pg *pgconn.PgError
 	var lite *sqlite.Error
 	var network net.Error
-	if errors.As(err, &pg) {
-		// Classes 22 and 23 are the data's fault: a character Postgres won't store, or a
-		// row that breaks a rule. Trying again with the same request can't help.
-		return !strings.HasPrefix(pg.Code, "22") && !strings.HasPrefix(pg.Code, "23")
+	if errors.As(err, &pg) || unstorable(err) {
+		return !unstorable(err)
 	}
 	return errors.As(err, &lite) || errors.As(err, &network) ||
 		errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
 		errors.Is(err, sql.ErrConnDone) || errors.Is(err, sql.ErrTxDone) || errors.Is(err, driver.ErrBadConn) ||
 		errors.Is(err, gorm.ErrInvalidTransaction) || errors.Is(err, gorm.ErrInvalidDB)
+}
+
+// unstorable is the database turning the data down: a row that breaks one of its rules,
+// such as a name already taken, or a character Postgres won't store (classes 22 and
+// 23). Trying again with the same request can't help.
+func unstorable(err error) bool {
+	var pg *pgconn.PgError
+	var lite *sqlite.Error
+	if errors.As(err, &pg) {
+		return strings.HasPrefix(pg.Code, "22") || strings.HasPrefix(pg.Code, "23")
+	}
+	const sqliteConstraint = 19
+	return errors.As(err, &lite) && lite.Code()&0xff == sqliteConstraint
+}
+
+const (
+	sayOurs       = "the server couldn't finish that; try again in a moment"
+	sayUnstorable = "that couldn't be saved: it clashes with something already here, or holds a character that can't be stored"
+)
+
+// fromDatabase is an error in the database's or its driver's own words.
+func fromDatabase(err error) bool {
+	var pg *pgconn.PgError
+	var lite *sqlite.Error
+	// A failure to connect names the database's user and host.
+	var dial *pgconn.ConnectError
+	if errors.As(err, &pg) || errors.As(err, &lite) || errors.As(err, &dial) {
+		return true
+	}
+	// database/sql keeps some of its errors to itself, such as a pool that has closed.
+	return strings.Contains(err.Error(), "sql: ") ||
+		errors.Is(err, sql.ErrConnDone) || errors.Is(err, sql.ErrTxDone) || errors.Is(err, driver.ErrBadConn) ||
+		errors.Is(err, gorm.ErrInvalidTransaction) || errors.Is(err, gorm.ErrInvalidDB)
+}
+
+// telling is what a caller is told about err when a handler would answer with code. A
+// database's own words never go out, nor what a handler calls a failure of the
+// server's: they carry internals and mean nothing to a reader, so they are logged and
+// the caller gets ours instead. Any other answer is the handler's to word, such as a
+// 502 passing on what another server said.
+func telling(where string, err error, code int) (int, string) {
+	switch {
+	case unstorable(err):
+		if code >= 500 {
+			code = http.StatusBadRequest
+		}
+		log.Printf("%s: %v", where, err)
+		return code, sayUnstorable
+	case code == http.StatusInternalServerError, code < 500 && fromDatabase(err):
+		log.Printf("%s: %v", where, err)
+		return http.StatusInternalServerError, sayOurs
+	}
+	return code, err.Error()
 }
 
 func statusOf(err error) int {
@@ -83,12 +134,7 @@ func writeProblem(w http.ResponseWriter, code int, detail string) {
 // apiFail answers an API caller with what went wrong. A failure of the server's own is
 // logged and not described: its text can carry internals.
 func apiFail(w http.ResponseWriter, r *http.Request, err error) {
-	code := statusOf(err)
-	detail := err.Error()
-	if code >= 500 {
-		log.Printf("%s %s: %v", r.Method, r.URL.Path, err)
-		detail = "the server couldn't finish that; try again in a moment"
-	}
+	code, detail := telling(r.Method+" "+r.URL.Path, err, statusOf(err))
 	writeProblem(w, code, detail)
 }
 

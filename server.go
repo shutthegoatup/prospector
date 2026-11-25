@@ -153,7 +153,8 @@ func writeJSON(w http.ResponseWriter, v any) {
 }
 
 func fail(w http.ResponseWriter, err error, code int) {
-	http.Error(w, err.Error(), code)
+	code, text := telling("a browser's request", err, code)
+	http.Error(w, text, code)
 }
 
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
@@ -499,7 +500,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		a.logins.record(who, err == nil)
 	}
 	if err != nil {
-		refuse(http.StatusUnauthorized, err.Error())
+		refuse(telling("sign-in", err, http.StatusUnauthorized))
 		return
 	}
 	if !known {

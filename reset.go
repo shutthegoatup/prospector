@@ -265,8 +265,9 @@ func (a *App) reset(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if err != nil {
 		w.Header().Set("content-type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusBadRequest)
-		ResetPage(token, u.Email, err.Error()).Render(r.Context(), w)
+		code, text := telling("password reset", err, http.StatusBadRequest)
+		w.WriteHeader(code)
+		ResetPage(token, u.Email, text).Render(r.Context(), w)
 		return
 	}
 	http.Redirect(w, r, "/login?reset=1", http.StatusSeeOther)
