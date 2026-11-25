@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -22,12 +23,13 @@ var Areas = []struct{ Name, What string }{
 }
 
 // opArea is the area whose people may make each API write. Keys go by their scopes
-// alone. Putting an enquiry's sender on the board hands them from support to sales, so
-// either may; "" is anyone, for the owners-only operations, which are held already.
+// alone. Putting an enquiry's sender on the board hands them from support to sales, and
+// starting a won customer's onboarding hands them back, so either may; "" is anyone, for
+// the owners-only operations, which are held already.
 var opArea = map[string]string{
 	"ChangeEnquiry": areaSupport, "ReplyToEnquiry": areaSupport, "RecordEnquiryAnswer": areaSupport,
 	"AddSubscription": areaSupport, "ChangeSubscription": areaSupport, "RemoveSubscription": areaSupport, "StartRenewal": areaSupport,
-	"StartOnboarding": areaSupport, "RemoveOnboarding": areaSupport, "ChangeOnboardingStep": areaSupport,
+	"StartOnboarding": areaAny, "RemoveOnboarding": areaSupport, "ChangeOnboardingStep": areaSupport,
 	"InviteCustomer": areaSupport, "WithdrawCustomerInvite": areaSupport,
 	"StartDeal": areaSales, "ChangeDeal": areaSales, "RemoveDeal": areaSales, "ChangeOwnDeal": areaSales,
 	"StartRun": areaSales, "StopRun": areaSales,
@@ -47,6 +49,19 @@ func (m *Membership) Works(area string) bool {
 		return m.Role == "owner" || strings.TrimSpace(m.Areas) != ""
 	}
 	return area == "" || m.Role == "owner" || slices.Contains(strings.Fields(m.Areas), area)
+}
+
+// canDo says whether whoever a page is rendered for may change an area's work, so the
+// page offers only what they can use. The routes hold it either way.
+func canDo(ctx context.Context, area string) bool {
+	q, _ := ctx.Value(reqKey{}).(*Req)
+	return q != nil && q.Member.Works(area)
+}
+
+// pageArea is the area whose work a page in the sidebar is.
+var pageArea = map[string]string{
+	"today": areaSales, "research": areaSales, "conversations": areaSales, "campaigns": areaSales, "tasks": areaSales,
+	"enquiries": areaSupport, "onboarding": areaSupport, "subscriptions": areaSupport,
 }
 
 // landing is the page someone starts on: Today is outreach, so someone who works only

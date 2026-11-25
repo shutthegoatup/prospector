@@ -16,6 +16,23 @@ templ CampaignsView(q *Req, cards []CampaignCard, unsendable error) {
 	if unsendable != nil {
 		<p class="mb-5 max-w-[70ch] rounded-lg border border-border bg-muted px-3 py-2 text-sm">{ "Not yet ready to send: " + unsendable.Error() + "." }</p>
 	}
+	@Whose(areaSales, "Campaigns are")
+	if canDo(ctx, areaSales) {
+		@campaignStart()
+	}
+	if len(cards) == 0 {
+		@Empty("No campaigns yet", "Start a draft above, then see who it would go to.")
+	}
+	for _, c := range cards {
+		if c.Status == CampaignDraft {
+			@CampaignDraftCard(c, unsendable == nil)
+		} else {
+			@CampaignSentCard(c)
+		}
+	}
+}
+
+templ campaignStart() {
 	<form data-form="api/v1/campaigns" data-refresh="true" data-reset="true" class="mb-5 flex flex-wrap items-center gap-2">
 		<input name="name" required maxlength="120" placeholder="e.g. Spring price list" aria-label="Name of the campaign" class="h-9 min-w-[220px] flex-1 rounded-lg border border-input bg-muted px-3 text-sm"/>
 		<select name="kind" aria-label="What kind of mail" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
@@ -27,16 +44,6 @@ templ CampaignsView(q *Req, cards []CampaignCard, unsendable error) {
 		}
 		<span data-result class="font-mono text-xs text-muted-foreground"></span>
 	</form>
-	if len(cards) == 0 {
-		@Empty("No campaigns yet", "Start a draft above, then see who it would go to.")
-	}
-	for _, c := range cards {
-		if c.Status == CampaignDraft {
-			@CampaignDraftCard(c, unsendable == nil)
-		} else {
-			@CampaignSentCard(c)
-		}
-	}
 }
 
 func mailLine(m map[string]int) string {
@@ -72,7 +79,7 @@ templ CampaignSentCard(c CampaignCard) {
 		@Meta(joinNonEmpty(" · ", campaignKindLabel(c.Kind), audienceLabel(c.Audience), "sent by "+actorLabel(c.QueuedBy), mailLine(c.Mail)))
 		<p class="font-bold">{ c.Subject }</p>
 		<p class="whitespace-pre-wrap text-muted-foreground">{ c.Body }</p>
-		if c.Status == CampaignSending || c.Status == CampaignPaused {
+		if (c.Status == CampaignSending || c.Status == CampaignPaused) && canDo(ctx, areaSales) {
 			<div class="flex justify-end gap-2">
 				if c.Status == CampaignPaused {
 					@button.Button(button.Props{Size: button.SizeXs, Attributes: templ.Attributes{"data-post": "api/v1/campaigns/" + strconv.FormatInt(c.ID, 10) + "/resume", "data-body": "{}"}}) {
@@ -89,25 +96,36 @@ templ CampaignSentCard(c CampaignCard) {
 
 templ CampaignDraftCard(c CampaignCard, ready bool) {
 	<article class="mb-4 flex flex-col gap-3 panel p-4 text-sm" data-campaign-card={ strconv.FormatInt(c.ID, 10) }>
-		<div class="flex flex-wrap items-center justify-between gap-2">
-			<input value={ c.Name } maxlength="120" aria-label="Name" class="h-9 min-w-[220px] flex-1 rounded-lg border border-input bg-muted px-3 font-bold" { campaignInput(c.Campaign, "name")... }/>
-			<select aria-label="What kind of mail" class="h-9 rounded-lg border border-input bg-muted px-2" { campaignInput(c.Campaign, "kind")... }>
-				<option value={ KindMarketing } selected?={ c.Kind != KindService }>Marketing</option>
-				<option value={ KindService } selected?={ c.Kind == KindService }>Service notice</option>
-			</select>
-			if c.Kind != KindService {
-				<select aria-label="Who it is for" class="h-9 rounded-lg border border-input bg-muted px-2" { campaignInput(c.Campaign, "audience")... }>
-					for _, a := range CampaignAudiences {
-						<option value={ a.Key } selected?={ a.Key == c.Audience }>{ a.Label }</option>
-					}
+		if canDo(ctx, areaSales) {
+			<div class="flex flex-wrap items-center justify-between gap-2">
+				<input value={ c.Name } maxlength="120" aria-label="Name" class="h-9 min-w-[220px] flex-1 rounded-lg border border-input bg-muted px-3 font-bold" { campaignInput(c.Campaign, "name")... }/>
+				<select aria-label="What kind of mail" class="h-9 rounded-lg border border-input bg-muted px-2" { campaignInput(c.Campaign, "kind")... }>
+					<option value={ KindMarketing } selected?={ c.Kind != KindService }>Marketing</option>
+					<option value={ KindService } selected?={ c.Kind == KindService }>Service notice</option>
 				</select>
+				if c.Kind != KindService {
+					<select aria-label="Who it is for" class="h-9 rounded-lg border border-input bg-muted px-2" { campaignInput(c.Campaign, "audience")... }>
+						for _, a := range CampaignAudiences {
+							<option value={ a.Key } selected?={ a.Key == c.Audience }>{ a.Label }</option>
+						}
+					</select>
+				}
+			</div>
+			if c.Kind == KindService {
+				<p class="rounded-lg border border-border bg-muted px-3 py-2">A service notice goes to everyone at a current customer, including anyone who unsubscribed from your marketing, because it is about what they already have: a price or terms change, an outage, a date that matters. Keep it to that. Anything promotional in it makes it marketing, whatever it is called. It never goes to anyone on the never-contact list or erased, and carries no unsubscribe link.</p>
 			}
-		</div>
-		if c.Kind == KindService {
-			<p class="rounded-lg border border-border bg-muted px-3 py-2">A service notice goes to everyone at a current customer, including anyone who unsubscribed from your marketing, because it is about what they already have: a price or terms change, an outage, a date that matters. Keep it to that. Anything promotional in it makes it marketing, whatever it is called. It never goes to anyone on the never-contact list or erased, and carries no unsubscribe link.</p>
+			<input value={ c.Subject } maxlength="200" placeholder="Subject" aria-label="Subject" class="h-9 rounded-lg border border-input bg-muted px-3" { campaignInput(c.Campaign, "subject")... }/>
+			<textarea rows="8" maxlength="20000" placeholder="What it says, as plain text. Your postal address is added at the foot, and for marketing an unsubscribe link." aria-label="What it says" class="rounded-lg border border-input bg-muted px-3 py-2 leading-relaxed" { campaignInput(c.Campaign, "body")... }>{ c.Body }</textarea>
+		} else {
+			<div class="flex flex-wrap items-baseline justify-between gap-2">
+				<b class="text-base">{ c.Name }</b>
+				@Meta(campaignKindLabel(c.Kind) + " · " + audienceLabel(c.Audience))
+			</div>
+			@Shown(c.Subject, "No subject yet")
+			if c.Body != "" {
+				@Quote(c.Body)
+			}
 		}
-		<input value={ c.Subject } maxlength="200" placeholder="Subject" aria-label="Subject" class="h-9 rounded-lg border border-input bg-muted px-3" { campaignInput(c.Campaign, "subject")... }/>
-		<textarea rows="8" maxlength="20000" placeholder="What it says, as plain text. Your postal address is added at the foot, and for marketing an unsubscribe link." aria-label="What it says" class="rounded-lg border border-input bg-muted px-3 py-2 leading-relaxed" { campaignInput(c.Campaign, "body")... }>{ c.Body }</textarea>
 		<details>
 			<summary class="cursor-pointer font-mono text-xs text-muted-foreground">{ "Would go to " + plural(c.Going, "person") + "; " + strconv.Itoa(c.LeftOut) + " left out" }</summary>
 			<div class="mt-2 flex flex-col">
@@ -124,16 +142,18 @@ templ CampaignDraftCard(c CampaignCard, ready bool) {
 				}
 			</div>
 		</details>
-		<div class="flex justify-end gap-2">
-			@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/campaigns/" + strconv.FormatInt(c.ID, 10), "data-method": "DELETE", "data-confirm": "Remove the draft " + c.Name + "?"}}) {
-				Remove draft
-			}
-			if ready && c.Going > 0 && c.Subject != "" && c.Body != "" {
-				@button.Button(button.Props{Size: button.SizeXs, Attributes: templ.Attributes{"data-post": "api/v1/campaigns/" + strconv.FormatInt(c.ID, 10) + "/send", "data-body": "{}", "data-confirm": "Send " + c.Name + " to " + plural(c.Going, "person") + " now?"}}) {
-					{ "Send to " + plural(c.Going, "person") }
+		if canDo(ctx, areaSales) {
+			<div class="flex justify-end gap-2">
+				@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/campaigns/" + strconv.FormatInt(c.ID, 10), "data-method": "DELETE", "data-confirm": "Remove the draft " + c.Name + "?"}}) {
+					Remove draft
 				}
-			}
-		</div>
+				if ready && c.Going > 0 && c.Subject != "" && c.Body != "" {
+					@button.Button(button.Props{Size: button.SizeXs, Attributes: templ.Attributes{"data-post": "api/v1/campaigns/" + strconv.FormatInt(c.ID, 10) + "/send", "data-body": "{}", "data-confirm": "Send " + c.Name + " to " + plural(c.Going, "person") + " now?"}}) {
+						{ "Send to " + plural(c.Going, "person") }
+					}
+				}
+			</div>
+		}
 	</article>
 }
 
