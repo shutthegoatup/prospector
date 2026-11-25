@@ -75,6 +75,55 @@ func TestTheSpecsTaskReadsSayEverythingTheStoreDoes(t *testing.T) {
 	}
 }
 
+// A person adds notes and finishes requests through the same operations agents use, as
+// sales work; a read-only key can do neither.
+func TestPeopleInSalesLeaveNotesAndFinishRequests(t *testing.T) {
+	s, o, srv, ada := signedIn(t)
+	grace := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
+	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")
+	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders with a configurator.", "Ada Lovelace"))
+	first := must(s.askTask(o.ID, task.ID, "Now some in Dorset.", "Ada Lovelace"))
+	second := must(s.askTask(o.ID, task.ID, "And one in Kent.", "Ada Lovelace"))
+	base := srv.URL + "/o/alpha/api/v1/"
+	note := map[string]any{"task": task.ID, "kind": "next", "text": "Look at their dealer list."}
+	finish := func(id int64) map[string]any { return map[string]any{"request": id} }
+	areas := func(to ...string) {
+		t.Helper()
+		if code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/member/areas", "application/json", map[string]any{"user_id": grace.ID, "areas": to}); code != http.StatusOK {
+			t.Fatalf("set areas %v: %d %s", to, code, body)
+		}
+	}
+
+	areas("support")
+	for what, body := range map[string]any{"notes": note, "requests/finish": finish(first.ID)} {
+		if code, out := call(t, asGrace, "POST", base+what, "application/json", body); code != http.StatusForbidden || !strings.Contains(out, "Team list") {
+			t.Errorf("support-only %s: %d %s", what, code, out)
+		}
+	}
+
+	areas("sales")
+	code, out := call(t, asGrace, "POST", base+"notes", "application/json", note)
+	if code != http.StatusOK || !strings.Contains(out, `"actor":"Grace Hopper"`) {
+		t.Fatalf("a person in sales leaving a note: %d %s", code, out)
+	}
+	if code, out := call(t, asGrace, "POST", base+"requests/finish", "application/json", finish(first.ID)); code != http.StatusOK || !strings.Contains(out, `"ok":true`) {
+		t.Fatalf("a person in sales finishing a request: %d %s", code, out)
+	}
+	if r := must(s.requestRow(o.ID, first.ID)); r.DoneAt == nil || r.DoneBy != "Grace Hopper" {
+		t.Fatalf("the request should be done, by Grace: %+v", r)
+	}
+
+	reader, _, err := s.CreateKey(o.ID, "reader", []string{"read"}, "Ada Lovelace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for what, body := range map[string]any{"notes": note, "requests/finish": finish(second.ID)} {
+		if code, out := asKey(t, "POST", base+what, reader, body); code != http.StatusForbidden || !strings.Contains(out, "research:write") {
+			t.Errorf("a read-only key on %s: %d %s", what, code, out)
+		}
+	}
+}
+
 // sameJSON fails unless body is what v marshals to, field for field.
 func sameJSON(t *testing.T, what, body string, v any) {
 	t.Helper()
