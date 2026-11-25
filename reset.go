@@ -143,7 +143,9 @@ func (a *App) background(f func()) {
 	}
 	select {
 	case mailSlots <- struct{}{}:
+		a.sending.Add(1)
 		go func() {
+			defer a.sending.Done()
 			defer func() { <-mailSlots }()
 			f()
 		}()

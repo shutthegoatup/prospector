@@ -6,11 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/a-h/templ"
@@ -39,6 +43,8 @@ type App struct {
 	// send and later stand in for SMTP and for a goroutine in tests.
 	send  sendFunc
 	later func(func())
+	// sending counts the mail still on its way out, which stopping waits for.
+	sending sync.WaitGroup
 	// How long a request's body may take to arrive, and its answer to be written;
 	// zero means bodyLimit and answerLimit.
 	readLimit, writeLimit time.Duration
@@ -659,9 +665,47 @@ func serve(a *App, addr string) error {
 	if a.mail != nil && a.base == "" {
 		log.Print("PROSPECTOR_URL isn't set: mail is off, because an emailed link needs the address to point at")
 	}
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
 	// Runs a stopped server left going are carried on, here or by another server.
 	go a.keepRunsGoing(context.Background(), 30*time.Second)
-	srv := &http.Server{Addr: addr, Handler: a.Routes(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
 	log.Printf("listening on http://%s", addr)
-	return srv.ListenAndServe()
+	// A release is installed by stopping this process, so every merge sends one of these.
+	asked, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	// Asked once, it stops listening for signals, so asking again stops it at once.
+	context.AfterFunc(asked, stop)
+	return a.serveUntil(asked, ln, stopWithin)
+}
+
+// stopWithin is how long requests in hand and mail on its way out are given to
+// finish. An agent's MCP stream never finishes by itself, so it is cut when this runs out.
+const stopWithin = 10 * time.Second
+
+// serveUntil answers requests until asked is done, then takes no new ones and lets
+// those in hand finish.
+func (a *App) serveUntil(asked context.Context, ln net.Listener, within time.Duration) error {
+	srv := &http.Server{Handler: a.Routes(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
+	failed := make(chan error, 1)
+	go func() { failed <- srv.Serve(ln) }()
+	select {
+	case err := <-failed:
+		return err
+	case <-asked.Done():
+	}
+	log.Print("stopping: finishing the requests in hand")
+	grace, cancel := context.WithTimeout(context.Background(), within)
+	defer cancel()
+	if err := srv.Shutdown(grace); err != nil {
+		srv.Close()
+	}
+	sent := make(chan struct{})
+	go func() { a.sending.Wait(); close(sent) }()
+	select {
+	case <-sent:
+	case <-grace.Done():
+		log.Print("stopped with mail still on its way out")
+	}
+	return nil
 }
