@@ -27,7 +27,7 @@ func TestTheTaskListTakesNoMoreQueriesForMoreTasks(t *testing.T) {
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
 	work := func(i int) {
 		task := must(s.CreateTask(o.ID, "", fmt.Sprint("Find makers of garden rooms, part ", i), "Nia"))
-		must(s.AgentTask(o.ID, scout, task.ID))
+		must(s.AgentTask(o.ID, scout, task.ID, PageIn{}))
 		co := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: fmt.Sprint("Larkmoor ", i), Task: task.ID}))
 		must(s.AgentAddContact(o, scout, AddContactIn{Company: co.Name, Name: fmt.Sprintf("Ada V%cle", rune(0x61+i)),
 			SourceURL: "https://larkmoor.example/team", Task: task.ID}))

@@ -93,7 +93,7 @@ func TestAgentsSeeWhatHappenedAtACompany(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	theirs, err := s.AgentCompany(o.ID, second, "Larkmoor Yachts")
+	theirs, err := s.AgentCompany(o.ID, second, "Larkmoor Yachts", PageIn{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,12 +120,12 @@ func TestAgentsSeeWhatHappenedAtACompany(t *testing.T) {
 		t.Fatalf("free text from the history reached an agent: %s", shown)
 	}
 
-	mine, err := s.AgentCompany(o.ID, scout, "Larkmoor Yachts")
+	mine, err := s.AgentCompany(o.ID, scout, "Larkmoor Yachts", PageIn{})
 	if err != nil || !mine.LastAgent.ByYou || !mine.History[len(mine.History)-1].ByYou || mine.History[0].ByYou {
 		t.Fatalf("the first agent should recognise its own work and not Ada's: %+v %v", mine, err)
 	}
 	// A key recreated under the same name is a different agent.
-	if again, _ := s.AgentCompany(o.ID, Actor{Name: "agent:scout", KeyID: 9}, "Larkmoor Yachts"); again.LastAgent.ByYou {
+	if again, _ := s.AgentCompany(o.ID, Actor{Name: "agent:scout", KeyID: 9}, "Larkmoor Yachts", PageIn{}); again.LastAgent.ByYou {
 		t.Fatal("a new key took an old key's work for its own because they share a name")
 	}
 
@@ -140,7 +140,7 @@ func TestAgentsSeeWhatHappenedAtACompany(t *testing.T) {
 	if err := s.SetCompanyStage(o.ID, added.ID, CompanyRejected, "", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	after := must(s.AgentCompany(o.ID, second, "Larkmoor Yachts"))
+	after := must(s.AgentCompany(o.ID, second, "Larkmoor Yachts", PageIn{}))
 	if after.LastAgent.Actor != "agent:scout" || after.History[0].Action != "company:rejected" {
 		t.Fatalf("a person's decision belongs in the history but isn't an agent's visit: %+v", after)
 	}
@@ -148,14 +148,14 @@ func TestAgentsSeeWhatHappenedAtACompany(t *testing.T) {
 	if _, err := s.QuickAddPerson(beta, QuickAdd{Linkedin: "https://www.linkedin.com/in/jonas-weber", Name: "Jonas Weber", Company: "Larkmoor Yachts"}, "Grace Hopper"); err != nil {
 		t.Fatal(err)
 	}
-	if other := must(s.AgentCompany(beta.ID, second, "Larkmoor Yachts")); other.LastAgent != nil || len(other.History) != 1 {
+	if other := must(s.AgentCompany(beta.ID, second, "Larkmoor Yachts", PageIn{})); other.LastAgent != nil || len(other.History) != 1 {
 		t.Fatalf("another organisation's namesake shows this one's agents: %+v", other)
 	}
 
 	if err := s.ErasePerson(o.ID, hannah.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	gone, _ := json.Marshal(must(s.AgentCompany(o.ID, second, "Larkmoor Yachts")))
+	gone, _ := json.Marshal(must(s.AgentCompany(o.ID, second, "Larkmoor Yachts", PageIn{})))
 	if strings.Contains(string(gone), "Hannah") || strings.Contains(string(gone), "Pryce") || strings.Contains(string(gone), "brochure") {
 		t.Fatalf("an erased person is still in what agents are shown: %s", gone)
 	}
