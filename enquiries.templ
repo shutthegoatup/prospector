@@ -117,6 +117,15 @@ templ EnquiriesView(q *Req, d EnquiriesData) {
 				}
 				<div class="flex flex-wrap items-center justify-between gap-2">
 					@Meta(e.Page)
+					if !e.Spam {
+						if e.ContactID != nil && d.Talking[*e.ContactID] {
+							<a href={ templ.SafeURL(q.Base() + "conversations") } class="font-mono text-xs text-mark underline">In Conversations</a>
+						} else {
+							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/enquiry/converse", "data-body": jsonBody("id", e.ID)}}) {
+								Start a conversation
+							}
+						}
+					}
 					if q.Owner() {
 						@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/enquiry/delete", "data-body": jsonBody("id", e.ID), "data-confirm": "Delete this enquiry from " + e.Email + " for good?"}}) {
 							Delete
