@@ -172,3 +172,78 @@ func TestEnquiriesFromBeforeTheyWereTrackedStayAsTheyWere(t *testing.T) {
 		t.Errorf("the first enquiry after the upgrade starts as %q", next.State)
 	}
 }
+
+func TestAnEnquiryBecomesAConversation(t *testing.T) {
+	s, o, srv, client := signedIn(t)
+	converse := func(id int64) (int, string) {
+		return call(t, client, "POST", srv.URL+"/o/alpha/ui/enquiry/converse", "application/json", map[string]any{"id": id})
+	}
+	// From someone not held yet, with no name: they are added under their address.
+	stranger := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "sales", Email: "sven@nordkap.example", Company: "Nordkap Boats", Message: "What does it cost for two sites?"}))
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/enquiries", "", nil); !strings.Contains(page, "Start a conversation") {
+		t.Fatal("the enquiry has no way onto the board")
+	}
+	if code, body := converse(stranger.ID); code != http.StatusOK {
+		t.Fatalf("starting a conversation: %d %s", code, body)
+	}
+	board := must(s.Conversations(o.ID))
+	if len(board["replied"]) != 1 {
+		t.Fatalf("the board after starting a conversation: %+v", board)
+	}
+	added := board["replied"][0]
+	if deref(added.Email) != "sven@nordkap.example" || deref(added.Maker) != "Nordkap Boats" || added.CompanyID == nil || !strings.Contains(deref(added.CallNotes), "two sites") {
+		t.Errorf("the person added from the enquiry: %+v", added)
+	}
+	linked, _, err := s.Enquiries(o.ID, EnquiryFilter{}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(linked) != 1 || linked[0].ContactID == nil || *linked[0].ContactID != added.ID || linked[0].CompanyID == nil {
+		t.Errorf("the enquiry after its sender was added: %+v", linked)
+	}
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/enquiries", "", nil); !strings.Contains(page, "In Conversations") || strings.Contains(page, "Start a conversation") {
+		t.Error("the enquiry still offers to start a conversation that is under way")
+	}
+	// Pressed again, or sent from a page that had not caught up, it adds nobody.
+	if code, body := converse(stranger.ID); code != http.StatusOK {
+		t.Fatalf("starting it twice: %d %s", code, body)
+	}
+	if again := must(s.Conversations(o.ID)); len(again["replied"]) != 1 {
+		t.Errorf("starting it twice made %d conversations", len(again["replied"]))
+	}
+
+	// From someone already here and in outreach: they move onto the board as they are.
+	known := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	demo := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "demo", Name: "H Pryce", Email: "hannah@larkmoor.example", Message: "Can we see it?"}))
+	if code, body := converse(demo.ID); code != http.StatusOK {
+		t.Fatalf("a conversation with someone already here: %d %s", code, body)
+	}
+	var people int64
+	if err := s.db.Model(&Contact{}).Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").Count(&people).Error; err != nil || people != 1 {
+		t.Errorf("%d people hold that address after the conversation started (%v)", people, err)
+	}
+	if board := must(s.Conversations(o.ID)); len(board["replied"]) != 2 {
+		t.Errorf("the board with both: %+v", board)
+	}
+	_ = known
+
+	// Never-contact and spam keep people off, as they do everywhere else.
+	o.Settings.NeverContact = "blocked.example"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	blocked := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "sales", Email: "eve@blocked.example", Message: "Hello"}))
+	spam := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Email: "bot@spam.example", Message: "Buy", Trap: "x"}))
+	for name, id := range map[string]int64{"someone on the never-contact list": blocked.ID, "spam": spam.ID, "nothing": 99999} {
+		if code, _ := converse(id); code == http.StatusOK {
+			t.Errorf("a conversation was started from %s", name)
+		}
+	}
+	other := mustOrg(t, s, "beta")
+	if _, err := s.ConverseEnquiry(other, stranger.ID, "Eve"); err == nil {
+		t.Error("another organisation started a conversation from the enquiry")
+	}
+	if board := must(s.Conversations(o.ID)); len(board["replied"]) != 2 {
+		t.Errorf("the refused ones changed the board: %+v", board)
+	}
+}

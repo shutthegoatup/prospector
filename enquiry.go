@@ -438,6 +438,8 @@ type EnquiriesData struct {
 	Counts    map[string]int
 	Companies map[int64]string
 	Members   []Member
+	// Talking are the contacts, among those who sent these, already on the Conversations board.
+	Talking map[int64]bool
 }
 
 func (a *App) enquiriesPage(w http.ResponseWriter, r *http.Request) {
@@ -467,5 +469,91 @@ func (a *App) enquiriesPage(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, http.StatusInternalServerError)
 		return
 	}
-	a.page(w, r, "enquiries", EnquiriesView(q, EnquiriesData{Filter: f, Rows: rows, Page: pg, Counts: a.s.EnquiryCounts(q.Org.ID), Companies: names, Members: members}))
+	talking := map[int64]bool{}
+	var senders []int64
+	for _, e := range rows {
+		if e.ContactID != nil {
+			senders = append(senders, *e.ContactID)
+		}
+	}
+	if len(senders) > 0 {
+		var on []int64
+		if err := a.s.in(q.Org.ID).Model(&Contact{}).Where("id in ?", senders).Where(inConversation).Pluck("id", &on).Error; err != nil {
+			fail(w, err, http.StatusInternalServerError)
+			return
+		}
+		for _, id := range on {
+			talking[id] = true
+		}
+	}
+	a.page(w, r, "enquiries", EnquiriesView(q, EnquiriesData{Filter: f, Rows: rows, Page: pg, Counts: a.s.EnquiryCounts(q.Org.ID), Companies: names, Members: members, Talking: talking}))
+}
+
+// ConverseEnquiry puts whoever sent an enquiry on the Conversations board: writing in is
+// a reply to nothing we sent, but it is them talking to us, which is what the board is
+// for. Someone not held yet is added first, under the never-contact and erasure rules
+// that adding anyone by hand goes through.
+func (s *Store) ConverseEnquiry(o *Org, id int64, actor string) (*Contact, error) {
+	var e Enquiry
+	if err := s.in(o.ID).Where("id = ?", id).First(&e).Error; err != nil {
+		return nil, missing(err, "no enquiry %d", id)
+	}
+	if e.Spam {
+		return nil, errors.New("that was marked as spam, so there is nobody to talk to")
+	}
+	var c Contact
+	if e.ContactID != nil {
+		if err := s.in(o.ID).Where("id = ?", *e.ContactID).First(&c).Error; err != nil {
+			return nil, missing(err, "no contact %d", *e.ContactID)
+		}
+	} else {
+		name := strings.TrimSpace(e.Name)
+		if name == "" {
+			name, _, _ = strings.Cut(e.Email, "@")
+		}
+		company := strings.TrimSpace(e.Company)
+		if company == "" && e.CompanyID != nil {
+			var co Company
+			if err := s.in(o.ID).Where("id = ?", *e.CompanyID).First(&co).Error; err != nil {
+				return nil, missing(err, "no company %d", *e.CompanyID)
+			}
+			company = co.Name
+		}
+		added, err := s.QuickAddPerson(o, QuickAdd{Name: name, Company: company, Email: e.Email}, actor)
+		if err != nil {
+			return nil, err
+		}
+		c = *added
+		// Matched now, so their export and erasure take this enquiry with them.
+		if err := s.in(o.ID).Model(&Enquiry{}).Where("id = ?", e.ID).
+			Updates(map[string]any{"contact_id": c.ID, "company_id": c.CompanyID}).Error; err != nil {
+			return nil, err
+		}
+	}
+	if c.Declined != nil {
+		return nil, errors.New("they are marked as not interested, which keeps them off the board")
+	}
+	if c.Replied == nil {
+		if err := s.Mark(o.ID, c.ID, "replied", today(), actor); err != nil {
+			return nil, err
+		}
+	}
+	if deref(c.CallNotes) == "" && e.Message != "" {
+		// What they asked, on the card. It is their own text, shown as text like the rest.
+		if err := s.Update(o.ID, c.ID, "call_notes", "Wrote in: "+clip(e.Message, 500), actor); err != nil {
+			return nil, err
+		}
+	}
+	return &c, nil
+}
+
+func (a *App) uiConverseEnquiry(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID int64 `json:"id"`
+	}
+	if decode(w, r, &in) {
+		q := reqOf(r)
+		_, err := a.s.ConverseEnquiry(q.Org, in.ID, q.Actor())
+		done(w, err)
+	}
 }
