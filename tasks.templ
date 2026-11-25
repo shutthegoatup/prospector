@@ -174,7 +174,7 @@ templ TasksView(q *Req, d TasksData) {
 			@Pager(d.Page, func(n int) string { return pageLink(q.Base()+"tasks", n, "closed", taskClosedParam(d.Closed)) })
 		</div>
 		<aside class="flex min-w-0 flex-[1_1_280px] flex-col gap-3 panel p-5 text-sm">
-			<form data-form="ui/task" class="flex flex-col gap-4">
+			<form data-form="api/v1/tasks" data-go="tasks/{id}" class="flex flex-col gap-4">
 				<label class="flex flex-col gap-1.5">
 					@Label("What should be found?")
 					<textarea name="brief" rows="7" required maxlength="4000" placeholder="Heads of procurement at UK kitchen makers with their own showrooms. About twenty, with the page that shows each one's role." class="rounded-lg border border-input bg-muted px-3 py-2 text-sm leading-relaxed"></textarea>
@@ -215,11 +215,11 @@ templ TaskDetailView(q *Req, d TaskPage) {
 							}
 							if d.ClosedAt == nil {
 								if r.DoneAt != nil {
-									@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/task/request/reopen", "data-body": jsonBody("id", r.ID)}}) {
+									@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/task-requests/" + strconv.FormatInt(r.ID, 10), "data-method": "PATCH", "data-body": jsonBody("done", false)}}) {
 										Reopen
 									}
 								} else {
-									@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/task/request/done", "data-body": jsonBody("id", r.ID)}}) {
+									@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/task-requests/" + strconv.FormatInt(r.ID, 10), "data-method": "PATCH", "data-body": jsonBody("done", true)}}) {
 										Mark done
 									}
 								}
@@ -228,8 +228,7 @@ templ TaskDetailView(q *Req, d TaskPage) {
 					</div>
 				}
 				if d.ClosedAt == nil {
-					<form data-form="ui/task/ask" data-reset="true" data-refresh="true" class="flex flex-col gap-3">
-						<input type="number" name="task" value={ strconv.FormatInt(d.ID, 10) } hidden/>
+					<form data-form={ "api/v1/tasks/" + strconv.FormatInt(d.ID, 10) + "/requests" } data-reset="true" data-refresh="true" class="flex flex-col gap-3">
 						<label class="flex flex-col gap-1.5">
 							@Label("Ask for more")
 							<textarea name="text" rows="3" required maxlength="2000" placeholder="Find twenty more, in Scotland this time." class="rounded-lg border border-input bg-muted px-3 py-2 text-sm leading-relaxed"></textarea>
@@ -324,11 +323,11 @@ templ TaskDetailView(q *Req, d TaskPage) {
 			}
 			<div>
 				if d.ClosedAt == nil {
-					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/task/close", "data-body": jsonBody("id", d.ID), "data-confirm": "Close this task? Agents stop seeing it; what was found stays."}}) {
+					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/tasks/" + strconv.FormatInt(d.ID, 10), "data-method": "PATCH", "data-body": jsonBody("closed", true), "data-confirm": "Close this task? Agents stop seeing it; what was found stays."}}) {
 						Close task
 					}
 				} else {
-					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/task/reopen", "data-body": jsonBody("id", d.ID)}}) {
+					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/tasks/" + strconv.FormatInt(d.ID, 10), "data-method": "PATCH", "data-body": jsonBody("closed", false)}}) {
 						Reopen task
 					}
 				}

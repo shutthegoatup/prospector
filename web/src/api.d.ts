@@ -586,10 +586,137 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a task
+         * @description A task is a brief for agents and people to work together; its brief becomes its first request.
+         */
+        post: operations["createTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/tasks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Close a task, or open it again
+         * @description Agents stop seeing a closed task; what was found stays. Closing one already closed changes nothing.
+         */
+        patch: operations["changeTask"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/tasks/{id}/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask an open task for more
+         * @description The request joins the task's list; whoever works the task next takes it up.
+         */
+        post: operations["askTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/task-requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Mark a request done, or not done
+         * @description Marking one done frees it from whichever agent held it. A request on a closed task can't be changed.
+         */
+        patch: operations["changeTaskRequest"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        TaskNew: {
+            /** @description A few words naming the task. */
+            title: string;
+            /** @description What is wanted: the task's first request. */
+            brief: string;
+        };
+        TaskChange: {
+            closed: boolean;
+        };
+        Task: {
+            /** Format: int64 */
+            id: number;
+            title: string;
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            closed_at: string | null;
+        };
+        TaskRequest: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            task_id: number;
+            text: string;
+            asked_by: string;
+            /** Format: date-time */
+            asked_at: string;
+            /** Format: date-time */
+            done_at: string | null;
+            done_by: string;
+        };
         /** @description There is more. Pass this back as `cursor` for the next page; it is left out on the last one. */
         NextCursor: string;
         Problem: {
@@ -1996,6 +2123,126 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskNew"];
+            };
+        };
+        responses: {
+            /** @description The task, started. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changeTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskChange"];
+            };
+        };
+        responses: {
+            /** @description The task as it now is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    askTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description What is wanted, in a sentence or two. */
+                    text: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The request, added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRequest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changeTaskRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    done: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The request as it now is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRequest"];
+                };
             };
             default: components["responses"]["Problem"];
         };

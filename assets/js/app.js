@@ -653,6 +653,7 @@
     try {
       const res = await send(form.dataset.form || "", formJSON(form), form.dataset.method);
       if (typeof res.go === "string") return void (location.href = res.go);
+      if (form.dataset.go && (typeof res.id === "number" || typeof res.id === "string")) return void (location.href = url(form.dataset.go.replace("{id}", String(res.id))));
       if (result) result.textContent = typeof res.message === "string" ? res.message : "Saved \u2713";
       if (form.dataset.reset) {
         for (const el of Array.from(form.elements)) {
