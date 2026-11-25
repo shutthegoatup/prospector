@@ -472,6 +472,17 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 		if next.ID == c.ID && c.ID != 0 {
 			return nil, errors.New("an agent can't be its own fallback")
 		}
+		// Agents falling back to each other would hand a task round without ever waiting.
+		for id, seen := next.FallbackID, 0; id != 0 && c.ID != 0 && seen < 100; seen++ {
+			if id == c.ID {
+				return nil, fmt.Errorf("%s's fallbacks lead back to %s, which would hand a task round without waiting", next.Name, c.Name)
+			}
+			later, err := a.s.AgentByID(org, id)
+			if err != nil {
+				break
+			}
+			id = later.FallbackID
+		}
 	}
 	switch {
 	case in.FallbackMinutes == 0:

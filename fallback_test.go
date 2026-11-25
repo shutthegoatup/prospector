@@ -30,6 +30,10 @@ func TestAWaitingAgentHandsItsTaskToItsFallback(t *testing.T) {
 	claude.reply = func(int) (int, string) {
 		return 200, claudeTurn("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
+	// A full server still lets a run hand over: its own place goes to the fallback.
+	was := maxRunning
+	maxRunning = 1
+	t.Cleanup(func() { maxRunning = was })
 	run := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, first.ID, "Ada Lovelace")).ID)
 	if run.Status != RunStopped || !strings.Contains(run.StopReason, "handed the task to Claude") || len(r.sleeps) != 0 {
 		t.Fatalf("a run facing an hour's wait should hand over at once: %+v, waited %v", run, r.sleeps)
@@ -38,8 +42,16 @@ func TestAWaitingAgentHandsItsTaskToItsFallback(t *testing.T) {
 	if err := r.s.db.Where("task_id = ? and agent_id = ?", r.task.ID, claudeID).First(&next).Error; err != nil {
 		t.Fatalf("the fallback should have been started: %v", err)
 	}
-	if next = r.finished(t, next.ID); next.Status != RunFinished || next.StartedBy != "Prospector (fallback)" {
+	if next = r.finished(t, next.ID); next.Status != RunFinished || next.StopReason != "the request is done" || next.StartedBy != "Prospector (fallback)" {
 		t.Fatalf("the fallback's run: %+v", next)
+	}
+
+	maxRunning = was
+	export := must(r.s.ExportOrg(r.o.ID, "Ada Lovelace"))
+	for _, e := range export.Agents {
+		if e.Name == "Prospector" && (e.FallsBackTo != "Claude" || e.FallbackMinutes != 15) {
+			t.Fatalf("an export should say which agent takes over: %+v", e)
+		}
 	}
 
 	// An hour's wait inside a two-hour allowance is waited out.
@@ -93,11 +105,14 @@ func TestExistingAgentsSurviveTheFallbackColumns(t *testing.T) {
 func TestAFallbackIsAnotherOfTheOrganisationsAgents(t *testing.T) {
 	r, _, _ := claudeSetup(t)
 	c := must(r.s.AgentByID(r.o.ID, r.agent))
+	first := must(r.s.agentNamed(r.o.ID, "Prospector"))
+	must(r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{ID: first.ID, Name: first.Name, BaseURL: first.BaseURL, Model: first.Model,
+		ToolsURL: first.ToolsURL, Tools: first.AllowedTools(), Fallback: strconv.FormatInt(c.ID, 10)}, "Ada Lovelace"))
 	base := AgentSettingsIn{ID: c.ID, Name: c.Name, BaseURL: c.BaseURL, Model: c.Model, ToolsURL: c.ToolsURL, Tools: []string{searchTool}}
 	for _, bad := range []struct {
 		fallback string
 		minutes  int
-	}{{strconv.FormatInt(c.ID, 10), 0}, {"999", 0}, {"Claude", 0}, {"0", -5}, {"", 7*24*60 + 1}} {
+	}{{strconv.FormatInt(c.ID, 10), 0}, {strconv.FormatInt(first.ID, 10), 0}, {"999", 0}, {"Claude", 0}, {"0", -5}, {"", 7*24*60 + 1}} {
 		in := base
 		in.Fallback, in.FallbackMinutes = bad.fallback, bad.minutes
 		if _, err := r.a.saveAgent(context.Background(), r.o.ID, in, "Ada Lovelace"); err == nil {

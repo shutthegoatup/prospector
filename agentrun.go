@@ -161,6 +161,12 @@ func (s *Store) AgentRuns(org, task int64, limit int) ([]AgentRun, error) {
 
 // StartRun sets the organisation's agent going on a task.
 func (a *App) StartRun(org, task, agent int64, by string) (*AgentRun, error) {
+	return a.startRun(org, task, agent, by, 0)
+}
+
+// startRun starts an agent on a task. A run handing over passes its own id, as the
+// place it is about to give up counts for the run it starts.
+func (a *App) startRun(org, task, agent int64, by string, replacing int64) (*AgentRun, error) {
 	cfg, err := a.s.AgentByID(org, agent)
 	if err != nil {
 		return nil, err
@@ -184,6 +190,9 @@ func (a *App) StartRun(org, task, agent int64, by string) (*AgentRun, error) {
 	}
 	a.runs.mu.Lock()
 	busy := len(a.runs.cancel)
+	if _, ok := a.runs.cancel[replacing]; ok {
+		busy--
+	}
 	a.runs.mu.Unlock()
 	if busy >= maxRunning {
 		return nil, fmt.Errorf("this server is already running %d agents: try again when one finishes", busy)
@@ -410,7 +419,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 				if waitingSince.IsZero() {
 					waitingSince = time.Now()
 				}
-				if reason, handed := a.handOver(run, cfg, time.Since(waitingSince)+time.Until(until)); handed {
+				if reason, handed := a.handOver(run, cfg, bk, time.Since(waitingSince)+time.Until(until)); handed {
 					return RunStopped, reason
 				}
 				if err := a.wait(ctx, run, until); err != nil {
@@ -539,24 +548,31 @@ func (a *App) wait(ctx context.Context, run *AgentRun, until time.Time) error {
 // handOver starts the agent's fallback on the task once its own endpoint would have
 // kept it waiting longer than it is set to wait. A fallback that can't start, as when
 // it isn't set up, leaves the run waiting as before.
-func (a *App) handOver(run *AgentRun, c *Agent, waited time.Duration) (string, bool) {
+func (a *App) handOver(run *AgentRun, c *Agent, bk *APIKey, waited time.Duration) (string, bool) {
 	if c.FallbackID == 0 || c.FallbackID == c.ID || waited < time.Duration(c.FallbackMinutes)*time.Minute {
 		return "", false
 	}
 	next, err := a.s.AgentByID(run.OrgID, c.FallbackID)
-	if err != nil {
+	if err != nil || !next.Ready() {
 		return "", false
 	}
 	why := fmt.Sprintf("its endpoint stayed limited or away for over %d minutes", c.FallbackMinutes)
-	if _, err := a.StartRun(run.OrgID, run.TaskID, next.ID, c.Name+" (fallback)"); err != nil {
-		var going int64
-		logged(a.s.db.Model(&AgentRun{}).Where("org_id = ? and task_id = ? and agent_id = ? and status in ?",
-			run.OrgID, run.TaskID, next.ID, []string{RunWorking, RunWaiting}).Count(&going))
-		if going == 0 {
-			log.Printf("agent run %d: its fallback, agent %d, didn't start: %v", run.ID, next.ID, err)
-			return "", false
-		}
+	var going int64
+	logged(a.s.db.Model(&AgentRun{}).Where("org_id = ? and task_id = ? and agent_id = ? and status in ?",
+		run.OrgID, run.TaskID, next.ID, []string{RunWorking, RunWaiting}).Count(&going))
+	if going > 0 {
 		return fmt.Sprintf("left the task to %s, already working it: %s", next.Name, why), true
+	}
+	// The request this run holds goes with the task, or the fallback would find
+	// nothing it may work until the claim lapsed.
+	mine := fmt.Sprintf("key:%d", bk.ID)
+	if err := a.s.db.Where("org_id = ? and task_id = ? and (holder = ? or holder like ?)", run.OrgID, run.TaskID, mine, mine+" %").
+		Delete(&RequestClaim{}).Error; err != nil {
+		return "", false
+	}
+	if _, err := a.startRun(run.OrgID, run.TaskID, next.ID, c.Name+" (fallback)", run.ID); err != nil {
+		log.Printf("agent run %d: its fallback, agent %d, didn't start: %v", run.ID, next.ID, err)
+		return "", false
 	}
 	return fmt.Sprintf("handed the task to %s: %s", next.Name, why), true
 }
