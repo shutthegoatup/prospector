@@ -76,6 +76,7 @@ type TodayData struct {
 	Review    int
 	LaterCall int
 	// Deals are the renewals and other further deals with no next step, or one that's due.
+	// Like companies to review, they are worked elsewhere, so they aren't in Total.
 	Deals int
 	Week  Stats
 	Now   string

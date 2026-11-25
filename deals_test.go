@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -480,12 +481,30 @@ func TestTodayPointsAtDealsThatNeedANextStep(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	c := repliedPerson(t, s, o, "Hannah Pryce")
 	const prompt = "Move renewals and other deals on"
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(page, prompt) {
-		t.Fatal("Today points at deals when there are none")
+	// The sidebar's count of open conversations, which a renewal adds to.
+	sidebar := regexp.MustCompile(`Conversations</span>\s*<span[^>]*>(\d+)</span>`)
+	open := func(page string) string {
+		if m := sidebar.FindStringSubmatch(page); m != nil {
+			return m[1]
+		}
+		return "none"
+	}
+	_, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil)
+	if strings.Contains(page, prompt) || open(page) != "1" {
+		t.Fatalf("before any renewal: prompt shown %v, sidebar counts %s", strings.Contains(page, prompt), open(page))
 	}
 	renewal := must(s.StartDeal(o.ID, c.ID, "renewal", "Ada Lovelace"))
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); !strings.Contains(page, prompt) || !strings.Contains(page, "/o/alpha/conversations") {
-		t.Error("Today says nothing of a renewal with no next step")
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); !strings.Contains(page, prompt) || open(page) != "2" {
+		t.Errorf("with a renewal that has no next step: prompt shown %v, sidebar counts %s", strings.Contains(page, prompt), open(page))
+	}
+	if err := s.ChangeDeal(o.ID, renewal.ID, "stage", "won", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(page, prompt) || open(page) != "1" {
+		t.Errorf("once the renewal is won: prompt shown %v, sidebar counts %s", strings.Contains(page, prompt), open(page))
+	}
+	if err := s.ChangeDeal(o.ID, renewal.ID, "stage", "proposal", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
 	}
 	for field, value := range map[string]string{"next_step": "Send renewal terms", "next_date": "2999-01-01"} {
 		if err := s.ChangeDeal(o.ID, renewal.ID, field, value, "Ada Lovelace"); err != nil {
