@@ -63,7 +63,7 @@ templ CustomerPage(v CustomerView) {
 						if len(v.Steps) == 0 {
 							<p class="text-sm text-muted-foreground">There is nothing for you to do at the moment.</p>
 						} else {
-							<p class="text-sm text-muted-foreground">{ strconv.Itoa(v.Done) + " of " + strconv.Itoa(len(v.Steps)) + " of your steps are done. When you have done one, tell your contact and they will mark it." }</p>
+							<p class="text-sm text-muted-foreground">{ strconv.Itoa(v.Done) + " of " + strconv.Itoa(len(v.Steps)) + " of your steps are done. Mark each one when you have done it." }</p>
 							<div class="overflow-hidden panel">
 								for _, st := range v.Steps {
 									<div class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 text-sm last:border-0">
@@ -72,7 +72,22 @@ templ CustomerPage(v CustomerView) {
 										} else {
 											<b>{ st.Name }</b>
 										}
-										<span class="font-mono text-xs text-muted-foreground">{ customerStepMeta(st, v.Day) }</span>
+										<span class="flex flex-wrap items-center gap-3">
+											<span class="font-mono text-xs text-muted-foreground">{ customerStepMeta(st, v.Day) }</span>
+											if st.DoneOn == nil {
+												<form method="post" action={ templ.SafeURL("/c/steps/" + strconv.FormatInt(st.ID, 10) + "/done") }>
+													@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+														Mark done
+													}
+												</form>
+											} else if st.DoneBy == customerActor {
+												<form method="post" action={ templ.SafeURL("/c/steps/" + strconv.FormatInt(st.ID, 10) + "/undone") }>
+													@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantOutline}) {
+														Not done yet
+													}
+												</form>
+											}
+										</span>
 									</div>
 								}
 							</div>

@@ -554,3 +554,69 @@ func (a *App) customerControls(org int64, rows []OnboardingRow) error {
 	}
 	return nil
 }
+
+// customerActor is who a step says finished it when the customer marked it themselves.
+// A fixed word, not their name: the person is on the history entry, which erasure removes.
+const customerActor = "customer"
+
+// customerSetStep marks one of the customer's own steps done, or takes back a mark they
+// made. A step a member marked stays as the member left it, and so does a step that
+// isn't theirs or belongs to another onboarding.
+func (s *Store) customerSetStep(a *CustomerAccess, step int64, done bool) error {
+	org := a.Grant.OrgID
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		// Held and read again inside, so access withdrawn or a person erased a moment ago marks nothing.
+		if err := hold(tx, &CustomerGrant{}, org, a.Grant.ID); err != nil {
+			return err
+		}
+		if err := tx.Where("id = ? and org_id = ? and revoked_at is null", a.Grant.ID, org).First(&CustomerGrant{}).Error; err != nil {
+			return errNoCustomer
+		}
+		var st OnboardingStep
+		if err := tx.Where("org_id = ? and onboarding_id = ? and id = ? and who = ?", org, a.Onboarding.ID, step, StepTheirs).First(&st).Error; err != nil {
+			return errNoCustomer
+		}
+		updates, action := map[string]any{"done_on": today(), "done_by": customerActor}, "onboard:done"
+		switch {
+		case done && st.DoneOn != nil, !done && (st.DoneOn == nil || st.DoneBy != customerActor):
+			return nil
+		case !done:
+			updates = map[string]any{"done_on": nil, "done_by": ""}
+		}
+		marked := tx.Model(&OnboardingStep{}).Where("id = ? and org_id = ? and done_by = ?", st.ID, org, st.DoneBy).Updates(updates)
+		if marked.Error != nil || marked.RowsAffected == 0 {
+			return marked.Error
+		}
+		if done {
+			return s.log(tx, org, a.Contact.ID, &a.Onboarding.CompanyID, customerActor, action, nonEmpty(st.Name))
+		}
+		// Taking a mark back removes its entry, not adds one: someone outside pressing the
+		// two buttons in turn can't fill the company's history.
+		var entry Event
+		err := tx.Where("org_id = ? and company_id = ? and \"user\" = ? and action = ? and value = ?", org, a.Onboarding.CompanyID, customerActor, "onboard:done", st.Name).Order("id desc").First(&entry).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return tx.Delete(&entry).Error
+	})
+}
+
+func (a *App) customerStep(done bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		customerHeaders(w)
+		acc, _ := a.customerSession(r)
+		if acc != nil {
+			id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+			if err := a.s.customerSetStep(acc, id, done); err != nil && !errors.Is(err, errNoCustomer) {
+				log.Print(err)
+				http.Error(w, "that couldn't be saved", http.StatusInternalServerError)
+				return
+			}
+		}
+		// The same answer whether or not anything changed: the page shows what is so.
+		http.Redirect(w, r, "/c", http.StatusSeeOther)
+	}
+}

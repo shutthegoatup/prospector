@@ -442,6 +442,9 @@ func actorState(actor string) string {
 }
 
 func actorLabel(actor string) string {
+	if actor == customerActor {
+		return "the customer"
+	}
 	if a, ok := strings.CutPrefix(actor, "agent:"); ok {
 		return "agent · " + a
 	}
