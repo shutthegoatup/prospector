@@ -38,6 +38,7 @@ var orgExportHolds = map[string]string{
 	"companies":       "companies",
 	"facts":           "facts",
 	"contacts":        "contacts",
+	"deals":           "deals",
 	"enquiries":       "enquiries",
 	"suggestions":     "suggested_details",
 	"tasks":           "tasks",
@@ -55,6 +56,7 @@ var personExportHolds = map[string]string{
 	"facts":       "facts",
 	"enquiries":   "enquiries",
 	"suggestions": "suggested_details",
+	"deals":       "deals",
 	"events":      "history",
 }
 

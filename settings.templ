@@ -109,6 +109,10 @@ templ SettingsView(q *Req, d SettingsData) {
 						<textarea name="enquiry_sites" rows="2" placeholder="https://www.example.com" class={ areaClass }>{ set.EnquirySites }</textarea>
 						@Meta("One per line. A form on these sites can POST an enquiry as JSON to " + d.Intake + " and it shows under Enquiries. Leave empty to accept none.")
 					}
+					@Row("Currency") {
+						<input name="currency" value={ set.Currency } maxlength="3" class={ fieldClass + " w-24" }/>
+						@Meta("The three-letter code deals are valued in, such as GBP, EUR or USD. Changing it leaves the deals you already valued as they are.")
+					}
 					@Row("Cold email") {
 						<span class="flex items-center gap-2.5 pt-2 text-sm"><input type="checkbox" name="incorporated_only" checked?={ set.IncorporatedOnly } class="size-4 accent-[var(--primary)]"/> Only email incorporated companies (UK PECR)</span>
 					}
