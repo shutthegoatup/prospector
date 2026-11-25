@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -411,110 +413,146 @@ func taskStatus(t Task, open []RequestView, last *Event, now time.Time) string {
 	return TaskWaiting
 }
 
-func (s *Store) taskView(tx *gorm.DB, t Task, now time.Time) (*TaskView, error) {
-	v := &TaskView{Task: t}
+// taskNotesShown is how many of a task's notes its view holds, newest first.
+const taskNotesShown = 100
+
+// taskViews reads what has come of several tasks of one organisation together: the
+// same half-dozen queries for two hundred tasks as for one.
+func (s *Store) taskViews(tx *gorm.DB, org int64, tasks []Task, now time.Time) ([]TaskView, error) {
+	if len(tasks) == 0 {
+		return nil, nil
+	}
+	ids := make([]int64, len(tasks))
+	for i, t := range tasks {
+		ids[i] = t.ID
+	}
+	theirs := func() *gorm.DB { return tx.Where("org_id = ? and task_id in ?", org, ids) }
 	var requests []TaskRequest
-	if err := tx.Where("org_id = ? and task_id = ?", t.OrgID, t.ID).Order("id").Find(&requests).Error; err != nil {
+	if err := theirs().Order("id").Find(&requests).Error; err != nil {
 		return nil, err
 	}
 	var events []Event
-	if err := tx.Where("org_id = ? and task_id = ?", t.OrgID, t.ID).Order("at, id").Find(&events).Error; err != nil {
+	if err := theirs().Order("at, id").Find(&events).Error; err != nil {
 		return nil, err
 	}
-	companySince, personSince := map[int64]time.Time{}, map[int64]time.Time{}
+	var notes []TaskNote
+	if err := theirs().Order("id desc").Find(&notes).Error; err != nil {
+		return nil, err
+	}
+	var held []RequestClaim
+	if err := theirs().Where("expires_at > ?", now.UnixMilli()).Find(&held).Error; err != nil {
+		return nil, err
+	}
+	claims := map[int64]RequestClaim{}
+	for _, c := range held {
+		claims[c.RequestID] = c
+	}
+	requestsOf, eventsOf, notesOf := map[int64][]TaskRequest{}, map[int64][]Event{}, map[int64][]TaskNote{}
 	var companyIDs, personIDs []int64
-	for i, e := range events {
-		if strings.HasPrefix(e.User, "agent:") {
-			v.Last = &events[i]
-		}
-		// A note about a company isn't a find: it is often why the company was passed over.
-		if strings.HasPrefix(e.Action, "note:") {
-			continue
-		}
+	for _, r := range requests {
+		requestsOf[r.TaskID] = append(requestsOf[r.TaskID], r)
+	}
+	for _, e := range events {
+		eventsOf[e.TaskID] = append(eventsOf[e.TaskID], e)
 		if e.CompanyID != nil {
-			if _, seen := companySince[*e.CompanyID]; !seen {
-				companySince[*e.CompanyID] = e.At
-				companyIDs = append(companyIDs, *e.CompanyID)
-			}
+			companyIDs = append(companyIDs, *e.CompanyID)
 		}
 		if e.ContactID != 0 {
-			if _, seen := personSince[e.ContactID]; !seen {
-				personSince[e.ContactID] = e.At
-				personIDs = append(personIDs, e.ContactID)
+			personIDs = append(personIDs, e.ContactID)
+		}
+	}
+	for _, n := range notes {
+		if len(notesOf[n.TaskID]) < taskNotesShown {
+			notesOf[n.TaskID] = append(notesOf[n.TaskID], n)
+			if n.CompanyID != 0 {
+				companyIDs = append(companyIDs, n.CompanyID)
 			}
 		}
 	}
-	names := map[int64]string{}
+	companies, people := map[int64]Company{}, map[int64]Contact{}
 	if len(companyIDs) > 0 {
-		var companies []Company
-		if err := tx.Where("org_id = ? and id in ?", t.OrgID, companyIDs).Order("id").Find(&companies).Error; err != nil {
+		var rows []Company
+		if err := tx.Where("org_id = ? and id in ?", org, companyIDs).Find(&rows).Error; err != nil {
 			return nil, err
 		}
-		for _, c := range companies {
-			names[c.ID] = c.Name
-			v.Companies = append(v.Companies, TaskCompany{ID: c.ID, Name: c.Name, Stage: c.Stage, Since: companySince[c.ID]})
+		for _, c := range rows {
+			companies[c.ID] = c
 		}
 	}
 	if len(personIDs) > 0 {
-		var people []Contact
-		if err := tx.Where("org_id = ? and id in ? and key not like 'org:%'", t.OrgID, personIDs).Order("id").Find(&people).Error; err != nil {
+		var rows []Contact
+		if err := tx.Where("org_id = ? and id in ? and key not like 'org:%'", org, personIDs).Find(&rows).Error; err != nil {
 			return nil, err
 		}
-		for _, p := range people {
-			v.People = append(v.People, TaskPerson{ID: p.ID, Name: displayName(p), Title: p.Title, Company: companyName(deref(p.Maker)),
-				Stage: contactStage(p), Since: personSince[p.ID]})
+		for _, p := range rows {
+			people[p.ID] = p
 		}
 	}
-	claims, err := liveClaims(tx, t.OrgID, t.ID, now)
-	if err != nil {
-		return nil, err
-	}
-	for i, r := range requests {
-		rv := RequestView{TaskRequest: r}
-		if c, held := claims[r.ID]; held && r.DoneAt == nil && t.ClosedAt == nil {
-			// In the zone the other times on the page come in.
-			rv.Holder, rv.HeldBy, rv.HeldUntil = c.Holder, c.Actor, time.UnixMilli(c.ExpiresAt).In(r.AskedAt.Location())
-		}
-		if i == 0 {
-			v.Brief = r.Text
-		}
-		for _, c := range v.Companies {
-			if !c.Since.Before(r.AskedAt) {
-				rv.Companies++
+
+	out := make([]TaskView, len(tasks))
+	for i, t := range tasks {
+		v := &out[i]
+		v.Task = t
+		events := eventsOf[t.ID]
+		companySince, personSince := map[int64]time.Time{}, map[int64]time.Time{}
+		for j, e := range events {
+			if strings.HasPrefix(e.User, "agent:") {
+				v.Last = &events[j]
+			}
+			// A note about a company isn't a find: it is often why the company was passed over.
+			if strings.HasPrefix(e.Action, "note:") {
+				continue
+			}
+			if e.CompanyID != nil {
+				if _, seen := companySince[*e.CompanyID]; !seen {
+					companySince[*e.CompanyID] = e.At
+				}
+			}
+			if e.ContactID != 0 {
+				if _, seen := personSince[e.ContactID]; !seen {
+					personSince[e.ContactID] = e.At
+				}
 			}
 		}
-		for _, p := range v.People {
-			if !p.Since.Before(r.AskedAt) {
-				rv.People++
+		for _, id := range slices.Sorted(maps.Keys(companySince)) {
+			if c, here := companies[id]; here {
+				v.Companies = append(v.Companies, TaskCompany{ID: c.ID, Name: c.Name, Stage: c.Stage, Since: companySince[id]})
 			}
 		}
-		v.Requests = append(v.Requests, rv)
-	}
-	var notes []TaskNote
-	if err := tx.Where("org_id = ? and task_id = ?", t.OrgID, t.ID).Order("id desc").Limit(100).Find(&notes).Error; err != nil {
-		return nil, err
-	}
-	var missing []int64
-	for _, n := range notes {
-		if n.CompanyID != 0 && names[n.CompanyID] == "" {
-			missing = append(missing, n.CompanyID)
+		for _, id := range slices.Sorted(maps.Keys(personSince)) {
+			if p, here := people[id]; here {
+				v.People = append(v.People, TaskPerson{ID: p.ID, Name: displayName(p), Title: p.Title, Company: companyName(deref(p.Maker)),
+					Stage: contactStage(p), Since: personSince[id]})
+			}
 		}
-	}
-	if len(missing) > 0 {
-		var companies []Company
-		if err := tx.Where("org_id = ? and id in ?", t.OrgID, missing).Find(&companies).Error; err != nil {
-			return nil, err
+		for j, r := range requestsOf[t.ID] {
+			rv := RequestView{TaskRequest: r}
+			if c, held := claims[r.ID]; held && r.DoneAt == nil && t.ClosedAt == nil {
+				// In the zone the other times on the page come in.
+				rv.Holder, rv.HeldBy, rv.HeldUntil = c.Holder, c.Actor, time.UnixMilli(c.ExpiresAt).In(r.AskedAt.Location())
+			}
+			if j == 0 {
+				v.Brief = r.Text
+			}
+			for _, c := range v.Companies {
+				if !c.Since.Before(r.AskedAt) {
+					rv.Companies++
+				}
+			}
+			for _, p := range v.People {
+				if !p.Since.Before(r.AskedAt) {
+					rv.People++
+				}
+			}
+			v.Requests = append(v.Requests, rv)
 		}
-		for _, c := range companies {
-			names[c.ID] = c.Name
+		for _, n := range notesOf[t.ID] {
+			v.Notes = append(v.Notes, NoteView{TaskNote: n, Company: companies[n.CompanyID].Name})
 		}
+		v.Runs = runsOf(events)
+		v.Status = taskStatus(t, v.Open(), v.Last, now)
 	}
-	for _, n := range notes {
-		v.Notes = append(v.Notes, NoteView{TaskNote: n, Company: names[n.CompanyID]})
-	}
-	v.Runs = runsOf(events)
-	v.Status = taskStatus(t, v.Open(), v.Last, now)
-	return v, nil
+	return out, nil
 }
 
 func (s *Store) Task(org, id int64, now time.Time) (*TaskView, error) {
@@ -522,7 +560,11 @@ func (s *Store) Task(org, id int64, now time.Time) (*TaskView, error) {
 	if err := s.in(org).First(&t, id).Error; err != nil {
 		return nil, missing(err, "no task %d in this organisation", id)
 	}
-	return s.taskView(s.db, t, now)
+	views, err := s.taskViews(s.db, org, []Task{t}, now)
+	if err != nil {
+		return nil, err
+	}
+	return &views[0], nil
 }
 
 // Tasks lists an organisation's tasks, open ones first, newest first.
@@ -535,13 +577,12 @@ func (s *Store) Tasks(org int64, closed bool, now time.Time) ([]TaskView, error)
 	if err := q.Find(&tasks).Error; err != nil {
 		return nil, err
 	}
-	out := make([]TaskView, 0, len(tasks))
-	for _, t := range tasks {
-		v, err := s.taskView(s.db, t, now)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, *v)
+	out, err := s.taskViews(s.db, org, tasks, now)
+	if err != nil {
+		return nil, err
+	}
+	if out == nil {
+		out = []TaskView{}
 	}
 	return out, nil
 }
