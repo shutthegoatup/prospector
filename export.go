@@ -149,6 +149,9 @@ type ExportAgent struct {
 	Model    string   `json:"model"`
 	ToolsURL string   `json:"tools_url,omitempty"`
 	Tools    []string `json:"allowed_tools"`
+	// FallsBackTo is the agent that takes over after FallbackMinutes of waiting.
+	FallsBackTo     string `json:"falls_back_to,omitempty"`
+	FallbackMinutes int    `json:"fallback_minutes,omitempty"`
 }
 
 type ExportMail struct {
@@ -211,8 +214,16 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			return err
 		}
 		out.Agents = []ExportAgent{}
+		names := map[int64]string{}
 		for _, a := range agents {
-			out.Agents = append(out.Agents, ExportAgent{Name: a.Name, Kind: a.Kind, Endpoint: a.BaseURL, Model: a.Model, ToolsURL: a.ToolsURL, Tools: a.AllowedTools()})
+			names[a.ID] = a.Name
+		}
+		for _, a := range agents {
+			e := ExportAgent{Name: a.Name, Kind: a.Kind, Endpoint: a.BaseURL, Model: a.Model, ToolsURL: a.ToolsURL, Tools: a.AllowedTools()}
+			if next, ok := names[a.FallbackID]; ok {
+				e.FallsBackTo, e.FallbackMinutes = next, a.FallbackMinutes
+			}
+			out.Agents = append(out.Agents, e)
 		}
 		mine := func() *gorm.DB { return tx.Where("org_id = ?", org).Order("id") }
 		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Onboardings, &out.OnboardSteps, &out.Enquiries, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {

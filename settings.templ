@@ -271,9 +271,16 @@ templ OwnAgents(v OwnAgentsView) {
 		}
 		<details class="rounded-lg border border-dashed border-border p-3" open?={ len(v.Agents) == 0 }>
 			<summary class="cursor-pointer text-sm font-medium">Add an agent</summary>
-			@AgentForm(AgentView{})
+			@AgentForm(v.New)
 		</details>
 	}
+}
+
+func agentFallbackMinutes(v AgentView) int {
+	if v.FallbackMinutes == 0 {
+		return 15
+	}
+	return v.FallbackMinutes
 }
 
 func agentModelsID(v AgentView) string {
@@ -318,6 +325,22 @@ templ AgentForm(v AgentView) {
 		@Row("Tools") {
 			<input name="tools_url" value={ v.ToolsURL } placeholder="https://mcp.example.com/mcp" autocomplete="off" class={ fieldClass }/>
 			@Meta("An MCP server, such as a gateway's federated /mcp. It's sent the endpoint's key only when it's on the same address.")
+		}
+		if len(v.Others) > 0 {
+			@Row("Fallback") {
+				<div class="flex flex-wrap items-center gap-2">
+					<select name="fallback" class={ fieldClass }>
+						<option value="0">None: wait however long it takes</option>
+						for _, o := range v.Others {
+							<option value={ strconv.FormatInt(o.ID, 10) } selected?={ o.ID == v.FallbackID }>{ o.Name }</option>
+						}
+					</select>
+					<span class="text-sm text-muted-foreground">after</span>
+					<input type="number" name="fallback_minutes" min="1" value={ strconv.Itoa(agentFallbackMinutes(v)) } class={ fieldClass }/>
+					<span class="text-sm text-muted-foreground">minutes</span>
+				</div>
+				@Meta("When its endpoint stays limited or away this long, the agent hands its task to the one chosen here, which carries on from the task's notes.")
+			}
 		}
 		if tools := v.ToolList(); len(tools) > 0 {
 			@Row("Allowed tools") {
