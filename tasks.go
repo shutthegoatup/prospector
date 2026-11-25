@@ -471,8 +471,9 @@ func (s *Store) taskView(tx *gorm.DB, t Task, now time.Time) (*TaskView, error) 
 	}
 	for i, r := range requests {
 		rv := RequestView{TaskRequest: r}
-		if c, held := claims[r.ID]; held && r.DoneAt == nil {
-			rv.Holder, rv.HeldBy, rv.HeldUntil = c.Holder, c.Actor, time.UnixMilli(c.ExpiresAt)
+		if c, held := claims[r.ID]; held && r.DoneAt == nil && t.ClosedAt == nil {
+			// In the zone the other times on the page come in.
+			rv.Holder, rv.HeldBy, rv.HeldUntil = c.Holder, c.Actor, time.UnixMilli(c.ExpiresAt).In(r.AskedAt.Location())
 		}
 		if i == 0 {
 			v.Brief = r.Text

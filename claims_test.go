@@ -1,10 +1,15 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
@@ -140,5 +145,93 @@ func TestOnlyOneOfManyAgentsWinsARequest(t *testing.T) {
 	var n int64
 	if s.db.Model(&RequestClaim{}).Count(&n); n != 1 {
 		t.Fatalf("%d claim rows", n)
+	}
+}
+
+func mcpSession(t *testing.T, site, secret string) *mcp.ClientSession {
+	t.Helper()
+	transport := &mcp.StreamableClientTransport{Endpoint: site + "/o/alpha/mcp", HTTPClient: &http.Client{
+		Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
+			r.Header.Set("Authorization", "Bearer "+secret)
+			return http.DefaultTransport.RoundTrip(r)
+		})}}
+	session, err := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "1"}, nil).Connect(context.Background(), transport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { session.Close() })
+	return session
+}
+
+func TestTwoClientsOnOneKeyTakeDifferentRequests(t *testing.T) {
+	s, o, srv, _ := signedIn(t)
+	key, _, _ := s.CreateKey(o.ID, "claude", []string{"read", "research:write"}, "test")
+	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
+	if err := s.AskTask(o.ID, task.ID, "And Italy.", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	claimed := func(session *mcp.ClientSession) int64 {
+		t.Helper()
+		res, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "get_task", Arguments: map[string]any{"id": task.ID}})
+		if err != nil || res.IsError {
+			t.Fatalf("get_task: %v %+v", err, res)
+		}
+		var out TaskOut
+		raw, _ := json.Marshal(res.StructuredContent)
+		if err := json.Unmarshal(raw, &out); err != nil {
+			t.Fatal(err)
+		}
+		return out.Claimed
+	}
+	one, two := mcpSession(t, srv.URL, key), mcpSession(t, srv.URL, key)
+	first, second := claimed(one), claimed(two)
+	if first == 0 || second == 0 || first == second {
+		t.Fatalf("two clients on one key should take different requests: %d and %d", first, second)
+	}
+	if again := claimed(one); again != first {
+		t.Fatalf("a client reading the task again should keep its request: %d, then %d", first, again)
+	}
+}
+
+func TestAClaimIsntTakenOnAFinishedRequestOrShownOnAClosedTask(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
+	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
+	now := time.Now()
+	stale := must(s.Task(o.ID, task.ID, now))
+	request := stale.Requests[0].ID
+
+	// Finished between the agent reading the task and claiming it.
+	if err := s.SetRequestDone(o.ID, request, true, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if got := must(s.claimNext(stale, scout, now)); got != 0 {
+		t.Fatalf("a finished request was claimed: %d", got)
+	}
+	var n int64
+	if s.db.Model(&RequestClaim{}).Count(&n); n != 0 {
+		t.Fatalf("%d claims on a finished request", n)
+	}
+
+	// The holder's claim lapsed and went to another since the holder read the task.
+	if err := s.SetRequestDone(o.ID, request, false, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	must(s.agentTask(o.ID, scout, task.ID, now))
+	held := must(s.Task(o.ID, task.ID, now))
+	later := now.Add(claimFor + time.Minute)
+	if won := must(s.claim(o.ID, task.ID, request, second, later)); !won {
+		t.Fatal("a lapsed claim should pass to another agent")
+	}
+	if got := must(s.claimNext(held, scout, later)); got != 0 {
+		t.Fatalf("an agent was told it kept a request another had taken: %d", got)
+	}
+
+	if err := s.SetTaskClosed(o.ID, task.ID, true, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if v := must(s.Task(o.ID, task.ID, later)); v.Requests[0].HeldBy != "" {
+		t.Fatalf("a closed task still shows an agent on a request: %+v", v.Requests[0])
 	}
 }
