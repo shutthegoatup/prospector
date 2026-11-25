@@ -146,7 +146,11 @@ func fail(w http.ResponseWriter, err error, code int) {
 
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<20)).Decode(v); err != nil {
-		fail(w, fmt.Errorf("bad request body: %w", err), http.StatusBadRequest)
+		if hasKey(r) {
+			writeProblem(w, http.StatusBadRequest, "bad request body: "+err.Error())
+		} else {
+			fail(w, fmt.Errorf("bad request body: %w", err), http.StatusBadRequest)
+		}
 		return false
 	}
 	// The answer's clock starts once the body is in, so a slow upload doesn't use it up.
@@ -268,22 +272,21 @@ func (a *App) agent(scope string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		secret, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if !ok {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="prospector"`)
-			http.Error(w, "an API key is needed: Authorization: Bearer pk_…", http.StatusUnauthorized)
+			challenge(w, http.StatusUnauthorized, "", "", "an API key is needed: Authorization: Bearer pk_…")
 			return
 		}
 		k, err := a.s.KeyFor(strings.TrimSpace(secret))
 		if err != nil {
-			http.Error(w, "unknown or revoked API key", http.StatusUnauthorized)
+			challenge(w, http.StatusUnauthorized, "invalid_token", "", "unknown or revoked API key")
 			return
 		}
 		org, err := a.s.OrgBySlug(r.PathValue("org"))
 		if err != nil || org.ID != k.OrgID {
-			http.Error(w, "this key belongs to another organisation", http.StatusForbidden)
+			writeProblem(w, http.StatusForbidden, "this key belongs to another organisation")
 			return
 		}
 		if scope != "" && !k.Has(scope) {
-			http.Error(w, "this key lacks the "+scope+" scope", http.StatusForbidden)
+			challenge(w, http.StatusForbidden, "insufficient_scope", scope, "this key lacks the "+scope+" scope")
 			return
 		}
 		next(w, r.WithContext(context.WithValue(r.Context(), reqKey{}, &Req{Org: org, Key: k})))

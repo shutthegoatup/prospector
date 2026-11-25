@@ -378,7 +378,7 @@ func (s *Store) mark(org, id int64, step, date string, who Actor, note string) e
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		var c Contact
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
-			return fmt.Errorf("no contact %d", id)
+			return missing(err, "no contact %d", id)
 		}
 		if err := c.canMark(); err != nil {
 			return err
@@ -415,7 +415,7 @@ func (s *Store) set(tx *gorm.DB, org, id int64, field, value, actor string) erro
 	}
 	var c Contact
 	if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
-		return fmt.Errorf("no contact %d", id)
+		return missing(err, "no contact %d", id)
 	}
 	if field == "stage" {
 		if err := c.canEnterStage(value); err != nil {

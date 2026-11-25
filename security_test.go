@@ -1128,7 +1128,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, ctype, body := get(http.DefaultClient, "GET", "/o/alpha/api/v1/companies/nope", map[string]string{"Accept": "text/html", "Authorization": "Bearer " + key})
-	if code != http.StatusNotFound || !strings.HasPrefix(ctype, "text/plain") || styled(body) {
+	if code != http.StatusNotFound || ctype != "application/problem+json" || styled(body) {
 		t.Fatalf("an agent's error: %d %s, styled=%v", code, ctype, styled(body))
 	}
 
