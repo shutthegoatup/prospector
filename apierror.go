@@ -14,6 +14,7 @@ import (
 
 	sqlite "github.com/glebarez/go-sqlite"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"gorm.io/gorm"
 )
 
@@ -54,9 +55,16 @@ func ours(err error) bool {
 // 23). Trying again with the same request can't help.
 func unstorable(err error) bool {
 	var pg *pgconn.PgError
+	return breaksRule(err) || errors.As(err, &pg) && strings.HasPrefix(pg.Code, "22")
+}
+
+// breaksRule is the part of unstorable that is a row against one of the database's
+// rules, a unique index among them, and not a character it won't store.
+func breaksRule(err error) bool {
+	var pg *pgconn.PgError
 	var lite *sqlite.Error
 	if errors.As(err, &pg) {
-		return strings.HasPrefix(pg.Code, "22") || strings.HasPrefix(pg.Code, "23")
+		return strings.HasPrefix(pg.Code, "23")
 	}
 	const sqliteConstraint = 19
 	return errors.As(err, &lite) && lite.Code()&0xff == sqliteConstraint
@@ -100,6 +108,19 @@ func telling(where string, err error, code int) (int, string) {
 		return http.StatusInternalServerError, sayOurs
 	}
 	return code, err.Error()
+}
+
+// addTool registers a tool whose errors an agent reads through telling, as a page or
+// an API caller would: the database's own words are of no use to it either.
+func addTool[In, Out any](s *mcp.Server, t *mcp.Tool, h mcp.ToolHandlerFor[In, Out]) {
+	mcp.AddTool(s, t, func(ctx context.Context, req *mcp.CallToolRequest, in In) (*mcp.CallToolResult, Out, error) {
+		res, out, err := h(ctx, req, in)
+		if err != nil {
+			_, text := telling("tool "+t.Name, err, statusOf(err))
+			err = errors.New(text)
+		}
+		return res, out, err
+	})
 }
 
 func statusOf(err error) int {

@@ -14,8 +14,61 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"gorm.io/gorm"
 )
+
+// An agent is told what it got wrong in the store's words, and nothing of the database's.
+func TestAgentToolsDontPassDatabaseErrorsOn(t *testing.T) {
+	s, o, srv, _ := signedIn(t)
+	key, _, _ := s.CreateKey(o.ID, "claude", []string{"read", "research:write"}, "test")
+	session := mcpSession(t, srv.URL, key)
+	said := func(name string, args map[string]any) string {
+		t.Helper()
+		res, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: name, Arguments: args})
+		if err != nil || !res.IsError {
+			t.Fatalf("%s should have been refused: %v %+v", name, err, res)
+		}
+		text, _ := json.Marshal(res.Content)
+		return string(text)
+	}
+	if got := said("add_fact", map[string]any{"company": "Nobody Ltd", "field": "configurator", "value": "x", "source_url": "https://nobody.example"}); !strings.Contains(got, "Nobody Ltd") {
+		t.Errorf("an agent naming a company that isn't here is told: %s", got)
+	}
+	s.db.Callback().Query().Before("gorm:query").Register("lost", func(tx *gorm.DB) {
+		if tx.Statement.Table == "companies" || tx.Statement.Table == "contacts" || tx.Statement.Table == "tasks" {
+			tx.AddError(&pgconn.PgError{Code: "08006", Message: "connection to db.internal:5432 lost"})
+		}
+	})
+	_, err := session.GetPrompt(context.Background(), &mcp.GetPromptParams{Name: "work_task", Arguments: map[string]string{"id": "1"}})
+	if err == nil || !strings.Contains(err.Error(), "try again in a moment") || strings.Contains(err.Error(), "db.internal") {
+		t.Errorf("an agent asking for a task's prompt with the database gone is told: %v", err)
+	}
+	if got := said("search", map[string]any{"query": "yachts"}); !strings.Contains(got, "try again in a moment") || strings.Contains(got, "db.internal") {
+		t.Errorf("an agent searching with the database gone is told: %s", got)
+	}
+}
+
+// Two people asking for the same new address at once both find it free; the one the
+// database stops is told the same as if they had come second.
+func TestALostRaceForAnAddressReadsAsTaken(t *testing.T) {
+	s := tempStore(t)
+	mustOrg(t, s, "alpha")
+	clash := s.db.Create(&Org{Slug: "alpha", Name: "Alpha", Color: "#56c5f4"}).Error
+	if !unstorable(clash) {
+		t.Fatalf("the index on an organisation's slug answered: %v", clash)
+	}
+	// The look-up finds /o/beta free, and the index then answers as it just did.
+	s.db.Callback().Create().Before("gorm:create").Register("beaten", func(tx *gorm.DB) {
+		if tx.Statement.Table == "orgs" {
+			tx.AddError(clash)
+		}
+	})
+	_, err := s.CreateOrg("beta", "Beta")
+	if err == nil || !strings.Contains(err.Error(), "already has the address /o/beta") || statusOf(err) != http.StatusBadRequest {
+		t.Errorf("the second of two taking /o/beta at once: %v", err)
+	}
+}
 
 // Nobody is shown the database's own words: not a page's script, not an API caller.
 func TestNoRawDatabaseErrorsGoOut(t *testing.T) {
