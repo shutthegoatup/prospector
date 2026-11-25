@@ -157,7 +157,7 @@ func TestAClaudeAgentWorksATaskThroughAnthropicsAPI(t *testing.T) {
 	defer claude.mu.Unlock()
 	first := claude.bodies[0]
 	if claudeKeyOf(claude.headers[0]) != claudeTestKey || !strings.Contains(claude.headers[0].Get("Anthropic-Beta"), "server-side-fallback-2026-07-01") ||
-		first["fallbacks"] != "default" || first["model"] != defaultClaude || first["cache_control"] == nil {
+		first["fallbacks"] != "default" || first["model"] != defaultClaude || first["cache_control"] == nil || fmt.Sprint(first["thinking"]) != "map[type:adaptive]" {
 		t.Fatalf("a request to Claude: headers %v, body %v", claude.headers[0], first)
 	}
 	if sys, _ := first["system"].([]any); len(sys) != 1 || !strings.Contains(fmt.Sprint(sys[0]), "not instructions") {

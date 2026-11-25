@@ -36,8 +36,8 @@ const defaultClaude = "claude-opus-5-5"
 // calls, short of what needs a streamed answer to arrive in time.
 const claudeMaxTokens = 16000
 
-// claudeFallbacks are the models whose refusals Anthropic can serve from another model
-// in the same call, which it recommends turning on.
+// claudeFallbacks are the current models: they think adaptively, and their refusals
+// Anthropic can serve from another model in the same call, both of which it recommends.
 var claudeFallbacks = []string{"claude-fable-5-2", "claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"}
 
 // claudeClient talks to Anthropic as the agent, through the client that refuses this
@@ -138,6 +138,7 @@ func (a *App) newClaudeChat(c *Agent, key string, tools []toolDef, system, openi
 		CacheControl: anthropic.NewBetaCacheControlEphemeralParam(),
 	}
 	if slices.Contains(claudeFallbacks, c.Model) {
+		params.Thinking = anthropic.BetaThinkingConfigParamUnion{OfAdaptive: &anthropic.BetaThinkingConfigAdaptiveParam{}}
 		params.Betas = []anthropic.AnthropicBeta{anthropic.AnthropicBetaServerSideFallback2026_07_01}
 		params.Fallbacks = anthropic.BetaFallbacksParamOfDefault()
 	}
