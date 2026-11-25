@@ -43,6 +43,8 @@ Your own agent starts on a task from the prompt on its page (clients that show M
 
 A task shows as waiting, being worked on, or done. Nothing an agent says while working is stored: its status and results are read from what it added. Agents often stop without saying so, so each request shows what has been added since it was asked, and you can mark one done or reopen it yourself.
 
+An agent that picks a task up is kept the oldest open request no other agent has, so two agents started on the same task take different requests. The claim lasts 15 minutes, is renewed by everything the agent adds for the task, and ends when the request is done. It lapses by itself if the agent stops. It is advice to other agents: what anyone adds is still accepted.
+
 ### Conversations: replies to deals
 
 Replies move across a board: replied, meeting, proposal, won, lost. Each needs a next step with a date. Ones without, or due today, come back on Today.

@@ -56,6 +56,13 @@ func taskLast(v TaskView, now time.Time) string {
 	return actorLabel(v.Last.User) + " · " + did + " " + ago(v.Last.At, now)
 }
 
+func heldText(r RequestView) string {
+	if r.HeldBy == "" {
+		return ""
+	}
+	return " · " + actorLabel(r.HeldBy) + " is on it until " + r.HeldUntil.Format("15:04")
+}
+
 func taskFound(companies, people int) string {
 	return plural(companies, "company") + ", " + plural(people, "person")
 }
@@ -176,9 +183,9 @@ templ TaskDetailView(q *Req, d TaskPage) {
 							if r.DoneAt != nil {
 								@Meta(r.AskedBy + " · " + r.AskedAt.Format("2 Jan 15:04") + " · done, says " + actorLabel(r.DoneBy))
 							} else if i == 0 {
-								@Meta(r.AskedBy + " · " + r.AskedAt.Format("2 Jan 15:04") + " · found so far: " + taskFound(r.Companies, r.People))
+								@Meta(r.AskedBy + " · " + r.AskedAt.Format("2 Jan 15:04") + " · found so far: " + taskFound(r.Companies, r.People) + heldText(r))
 							} else {
-								@Meta(r.AskedBy + " · " + r.AskedAt.Format("2 Jan 15:04") + " · added since: " + taskFound(r.Companies, r.People))
+								@Meta(r.AskedBy + " · " + r.AskedAt.Format("2 Jan 15:04") + " · added since: " + taskFound(r.Companies, r.People) + heldText(r))
 							}
 							if d.ClosedAt == nil {
 								if r.DoneAt != nil {

@@ -200,7 +200,7 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 				tasks, err := a.s.AgentTasks(org.ID, actor)
 				return nil, tasksOut{tasks}, err
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "get_task", Description: "Everything needed to carry a task on: the brief in the person's words, what has been asked since, the companies and people already found, and the notes other agents left. Read it before working a task; people see that you picked it up."},
+		mcp.AddTool(s, &mcp.Tool{Name: "get_task", Description: "Everything needed to carry a task on: the brief in the person's words, what has been asked since, the companies and people already found, and the notes other agents left. Read it before working a task; people see that you picked it up. With a key that can add research, it also keeps an open request for you (claimed_request): work that one. If other agents hold every open request, leave the task to them."},
 			func(_ context.Context, _ *mcp.CallToolRequest, in taskRef) (*mcp.CallToolResult, *TaskOut, error) {
 				out, err := a.s.AgentTask(org.ID, actor, in.ID)
 				return nil, out, err
