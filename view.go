@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/a-h/templ"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -394,4 +395,18 @@ func safeHref(u string) templ.SafeURL {
 		return templ.SafeURL(strings.TrimSpace(u))
 	}
 	return "#"
+}
+
+// profileHref is where "Open + copy" goes: the stored profile, or a people search for
+// someone added without one.
+func profileHref(c Contact) string {
+	if u := safeHref(deref(c.Linkedin)); u != "#" {
+		return string(u)
+	}
+	name := strings.SplitN(deref(c.Person), ",", 2)[0]
+	words := strings.Join(strings.Fields(name+" "+deref(c.Maker)), " ")
+	if words == "" {
+		return "#"
+	}
+	return "https://www.linkedin.com/search/results/people/?keywords=" + strings.ReplaceAll(url.QueryEscape(words), "+", "%20")
 }

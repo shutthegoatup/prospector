@@ -339,6 +339,9 @@ func TestUI(t *testing.T) {
 	if err := s.Update(o.ID, c.ID, "linkedin", "javascript:alert(1)", "test"); err != nil {
 		t.Fatal(err)
 	}
+	if _, body := call(t, client, "GET", base+"today?step=linkedin", "", nil); !strings.Contains(body, `data-open="https://www.linkedin.com/search/results/people/?keywords=Hannah%20Pryce%20Larkmoor%20Yachts"`) {
+		t.Fatal("someone without a usable profile link should open a people search")
+	}
 	for _, page := range []string{"companies/" + strconv.FormatInt(*c.CompanyID, 10), "today?step=linkedin"} {
 		if _, body := call(t, client, "GET", base+page, "", nil); strings.Contains(body, `href="javascript:`) || strings.Contains(body, `data-open="javascript:`) {
 			t.Fatalf("%s renders a javascript: link", page)

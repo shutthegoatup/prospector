@@ -270,7 +270,7 @@ templ StepBody(c Card) {
 			@textarea.Textarea(textarea.Props{ID: "note-" + id(c), Value: c.Text, Rows: 5, Class: "bg-muted text-[15px] leading-relaxed",
 				Attributes: templ.Attributes{"data-field": "note", "data-id": id(c)}})
 			@Actions() {
-				@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-copy-from": "note-" + id(c), "data-open": string(safeHref(deref(c.Linkedin))), "data-key": "o"}}) {
+				@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-copy-from": "note-" + id(c), "data-open": profileHref(c.Contact), "data-key": "o"}}) {
 					Open + copy
 				}
 				@Mark(c, "linkedin", "Added", false)
@@ -284,7 +284,7 @@ templ StepBody(c Card) {
 			@textarea.Textarea(textarea.Props{ID: "message-" + id(c), Value: c.Text, Rows: 10, Class: "bg-muted text-[15px] leading-relaxed",
 				Attributes: templ.Attributes{"data-field": "message", "data-id": id(c)}})
 			@Actions() {
-				@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-copy-from": "message-" + id(c), "data-open": string(safeHref(deref(c.Linkedin)))}}) {
+				@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-copy-from": "message-" + id(c), "data-open": profileHref(c.Contact)}}) {
 					Open + copy
 				}
 				@Mark(c, "email", "Sent", false)
