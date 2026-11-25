@@ -266,6 +266,16 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			return err
 		},
 		func() error {
+			// A real draft with a real document, so the calls on agreements made as another
+			// organisation are refused for being theirs, not for not being drafts.
+			a, err := s.AddAgreement(first.ID, 1, theirs+" agreement", "Owner One")
+			if err != nil {
+				return err
+			}
+			_, err = s.PutAgreementFile(first.ID, a.ID, theirs+".pdf", []byte("%PDF-1.7 "+theirs), "Owner One")
+			return err
+		},
+		func() error {
 			_, err := s.CreateTask(first.ID, theirs+" task", theirs+" brief", "Owner One")
 			return err
 		},
@@ -330,7 +340,7 @@ var saysNothingBack = map[string]bool{
 	"AskTask": true, "SetRequestDone": true, "SetTaskClosed": true, "DeleteNote": true, "DeleteEnquiry": true,
 	"StartDeal": true, "ChangeDeal": true, "RemoveDeal": true,
 	"AddSubscription": true, "ChangeSubscription": true, "ChangeSubscriptionFields": true, "RemoveSubscription": true, "StartRenewal": true, "SetEnquiry": true, "ConverseEnquiry": true, "SetEnquiryFields": true, "ChangeDealFields": true, "SetDealFields": true, "HearEnquiry": true,
-	"StartOnboarding": true, "SetOnboardingStep": true, "RemoveOnboarding": true, "InviteCustomer": true, "RevokeCustomer": true, "Suppress": true, "Unsuppress": true, "AddCampaign": true, "Audience": true, "RemoveCampaign": true, "ResumeCampaign": true, "AddAgreement": true, "AgreementDocument": true, "PutAgreementFile": true, "RemoveAgreement": true, "RenameAgreement": true,
+	"StartOnboarding": true, "SetOnboardingStep": true, "RemoveOnboarding": true, "InviteCustomer": true, "RevokeCustomer": true, "Suppress": true, "Unsuppress": true, "AddCampaign": true, "Audience": true, "RemoveCampaign": true, "ResumeCampaign": true, "AddAgreement": true, "PutAgreementFile": true, "RemoveAgreement": true,
 	"ErasePerson": true, "Import": true, "ImportLegacy": true, "Restore": true,
 	"ResearchCount": true, "ResearchCounts": true, "EnquiryCounts": true, "Week": true, "AgentMarks": true, "Touches": true,
 	"AddEnquiry": true, "AgentNote": true, "CreateKey": true, "CreateTask": true, "QuickAddPerson": true,

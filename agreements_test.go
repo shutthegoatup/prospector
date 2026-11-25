@@ -62,7 +62,7 @@ func TestAnAgreementKeepsItsDocumentAsUploaded(t *testing.T) {
 	if code, _, _ := upload(t, http.DefaultClient, doc+"?name=a.pdf", writer, "application/pdf", []byte("<html><script>alert(1)</script>")); code != http.StatusBadRequest {
 		t.Errorf("something that isn't a PDF: %d", code)
 	}
-	if code, _, _ := upload(t, http.DefaultClient, doc, writer, "application/pdf", append([]byte("%PDF-"), make([]byte, agreementFileLimit)...)); code != http.StatusBadRequest {
+	if code, _, _ := upload(t, http.DefaultClient, doc, writer, "application/pdf", append([]byte("%PDF-"), make([]byte, agreementFileLimit)...)); code != http.StatusRequestEntityTooLarge {
 		t.Errorf("a document past the limit: %d", code)
 	}
 	if code, _, _ := upload(t, http.DefaultClient, doc, reader, "application/pdf", samplePDF); code != http.StatusForbidden {
@@ -161,4 +161,38 @@ func TestAnAgreementIsWorkedFromItsCompanysPage(t *testing.T) {
 	if res.StatusCode != http.StatusForbidden {
 		t.Errorf("a cross-site upload with a member's session: %d", res.StatusCode)
 	}
+}
+
+// What the review of documents found: a body cleaned of what looked like a NUL, a type
+// not checked, and names that hide what they are.
+func TestADocumentIsKeptByteForByte(t *testing.T) {
+	s, o, srv, member := signedIn(t)
+	company := *must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace")).CompanyID
+	a := must(s.AddAgreement(o.ID, company, "API agreement", "Ada Lovelace"))
+	doc := srv.URL + "/o/alpha/api/v1/agreements/" + itoa(a.ID) + "/document"
+	quoting := []byte("%PDF-1.7\n(the API sends \\u0000 for a NUL) Tj\n%%EOF\n")
+	if code, body, _ := upload(t, member, doc, "", "application/pdf", quoting); code != http.StatusOK {
+		t.Fatalf("uploading: %d %s", code, body)
+	}
+	_, data := must2(s.AgreementDocument(o.ID, a.ID))
+	if !bytes.Equal(data, quoting) {
+		t.Errorf("the document was changed on the way in:\n%q\n%q", quoting, data)
+	}
+	for _, kind := range []string{"application/json", "text/html", ""} {
+		if code, _, _ := upload(t, member, doc, "", kind, samplePDF); code != http.StatusUnsupportedMediaType {
+			t.Errorf("a document sent as %q: %d", kind, code)
+		}
+	}
+	for given, want := range map[string]string{"..": "agreement.pdf", "evil‮fdp.exe": "evilfdp.exe.pdf", "Contract.PDF": "Contract.PDF"} {
+		if got := fileName(given); got != want {
+			t.Errorf("a file named %q is kept as %q, want %q", given, got, want)
+		}
+	}
+}
+
+func must2[A, B any](a A, b B, err error) (A, B) {
+	if err != nil {
+		panic(err)
+	}
+	return a, b
 }

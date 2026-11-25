@@ -69,12 +69,12 @@ func agreementName(name string) (string, error) {
 func fileName(name string) string {
 	name = path.Base(strings.ReplaceAll(strings.TrimSpace(name), `\`, "/"))
 	name = strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) || r == '"' {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r == '"' {
 			return -1
 		}
 		return r
 	}, name)
-	if name == "." || name == "/" || name == "" {
+	if strings.Trim(name, "./ ") == "" {
 		name = "agreement"
 	}
 	if utf8.RuneCountInString(name) > 120 {
@@ -191,10 +191,22 @@ func (s *Store) AgreementDocument(org, id int64) (*Agreement, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	var f AgreementFile
-	if err := s.in(org).Where("agreement_id = ?", id).First(&f).Error; err != nil {
-		return nil, nil, missing(err, "agreement %d has no document yet", id)
+	// The record and its file in one statement, so a replacement committing between two
+	// reads can't pass for tampering.
+	var both struct {
+		Agreement
+		Data []byte
 	}
+	read := s.db.Model(&Agreement{}).Select("agreements.*, agreement_files.data as data").
+		Joins("join agreement_files on agreement_files.agreement_id = agreements.id and agreement_files.org_id = agreements.org_id").
+		Where("agreements.org_id = ? and agreements.id = ?", org, id).Limit(1).Scan(&both)
+	if read.Error != nil {
+		return nil, nil, read.Error
+	}
+	if read.RowsAffected == 0 {
+		return nil, nil, noSuch("agreement %d has no document yet", id)
+	}
+	a, f := &both.Agreement, AgreementFile{Data: both.Data}
 	if sum := sha256.Sum256(f.Data); hex.EncodeToString(sum[:]) != a.FileHash {
 		return nil, nil, fmt.Errorf("agreement %d: %w", id, errTampered)
 	}

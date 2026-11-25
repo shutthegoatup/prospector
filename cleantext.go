@@ -50,7 +50,8 @@ func cleanRequest(r *http.Request) (ok bool) {
 		}
 	}
 	kind, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	if r.Body != nil && r.Body != http.NoBody && kind != "application/x-www-form-urlencoded" && !strings.HasPrefix(kind, "multipart/") {
+	// A document is kept byte for byte, so its body is left exactly as it came.
+	if r.Body != nil && r.Body != http.NoBody && kind != "application/x-www-form-urlencoded" && kind != "application/pdf" && !strings.HasPrefix(kind, "multipart/") {
 		r.Body = &withoutNUL{src: r.Body}
 	}
 	return true
