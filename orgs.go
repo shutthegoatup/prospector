@@ -181,7 +181,8 @@ func (s *Store) frontFormOff(base string) string {
 		return "" // Whether a request's own address is among them is only known as it arrives.
 	}
 	if base == "" {
-		return fmt.Sprintf("PROSPECTOR_URL isn't set, so the form shows only at an address the %q organisation lists, and it %s; set PROSPECTOR_URL, or %s",
+		// Setting PROSPECTOR_URL now wouldn't list it: the organisation is already made.
+		return fmt.Sprintf("PROSPECTOR_URL isn't set, so the form shows only at an address the %q organisation lists, and it %s; %s",
 			frontOrgSlug, listed, fix)
 	}
 	if !o.Settings.takesEnquiriesFrom(browserOrigin(base)) {
