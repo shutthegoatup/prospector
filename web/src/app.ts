@@ -217,6 +217,8 @@ document.addEventListener("submit", async (e) => {
   try {
     const res = await send(form.dataset.form || "", formJSON(form), form.dataset.method);
     if (typeof res.go === "string") return void (location.href = res.go);
+    // An API answer is the thing made; data-go is where its page is, by its id.
+    if (form.dataset.go && (typeof res.id === "number" || typeof res.id === "string")) return void (location.href = url(form.dataset.go.replace("{id}", String(res.id))));
     if (result) result.textContent = typeof res.message === "string" ? res.message : "Saved ✓";
     if (form.dataset.reset) {
       for (const el of Array.from(form.elements) as Field[]) {

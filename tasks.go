@@ -147,19 +147,42 @@ func (s *Store) matched(tx *gorm.DB, org int64, who Actor, contact int64, compan
 }
 
 func (s *Store) AskTask(org, task int64, text, by string) error {
+	_, err := s.askTask(org, task, text, by)
+	return err
+}
+
+func (s *Store) askTask(org, task int64, text, by string) (*TaskRequest, error) {
 	text, err := words(text, maxRequest, "the request")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	r := &TaskRequest{OrgID: org, TaskID: task, Text: text, AskedBy: by, AskedAt: time.Now()}
+	return r, s.db.Transaction(func(tx *gorm.DB) error {
 		if _, err := openTask(tx, org, task); err != nil {
 			return err
 		}
-		if err := tx.Create(&TaskRequest{OrgID: org, TaskID: task, Text: text, AskedBy: by, AskedAt: time.Now()}).Error; err != nil {
+		if err := tx.Create(r).Error; err != nil {
 			return err
 		}
 		return s.logAs(tx, org, 0, nil, Actor{Name: by, Task: task}, "task:ask", nil)
 	})
+}
+
+// taskRow and requestRow are one task, or one request, of the organisation's.
+func (s *Store) taskRow(org, id int64) (*Task, error) {
+	var t Task
+	if err := s.db.Where("org_id = ? and id = ?", org, id).First(&t).Error; err != nil {
+		return nil, missing(err, "no task %d in this organisation", id)
+	}
+	return &t, nil
+}
+
+func (s *Store) requestRow(org, id int64) (*TaskRequest, error) {
+	var r TaskRequest
+	if err := s.db.Where("org_id = ? and id = ?", org, id).First(&r).Error; err != nil {
+		return nil, missing(err, "no request %d in this organisation", id)
+	}
+	return &r, nil
 }
 
 func (s *Store) setRequestDone(org, request int64, done bool, who Actor) error {

@@ -32,6 +32,8 @@ func jsonBody(pairs ...any) string {
 			s += strconv.FormatInt(v, 10)
 		case string:
 			s += strconv.Quote(v)
+		case bool:
+			s += strconv.FormatBool(v)
 		}
 	}
 	return s + "}"

@@ -230,6 +230,7 @@ The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml),
 | `campaigns:write` | write campaign drafts and see their audience (`/api/v1/campaigns`); add an address to the list marketing mail never goes to, or take off one that was added (`/api/v1/suppressions`) |
 | `pipeline:write` | work deals (`/api/v1/deals`, `/api/v1/contacts/{id}/deal`); set an enquiry's state, owner and note (`PATCH /api/v1/enquiries/{id}`) and put its sender on the board (`…/conversation`) |
 | `enquiries:delete` | `DELETE /api/v1/enquiries/{id}`: delete an enquiry for good |
+| `tasks:write` | Start tasks, ask them for more, mark their requests done or not, and close and reopen them, through `/api/v1/tasks` and `/api/v1/task-requests` |
 | `agents:run` | Start and stop Prospector's own agents on a task, and list a task's runs |
 | `agents:configure` | Add, change and delete Prospector's own agents: endpoint, key, model, tools and fallback. Owner-level: a signed-in member needs to be an owner |
 
