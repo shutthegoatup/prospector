@@ -33,10 +33,15 @@ func cleanValues(v url.Values) {
 	}
 }
 
-// cleanRequest cleans the query, and a JSON body as it is read. A JSON decoder already
-// turns bytes that aren't UTF-8 into U+FFFD, and a NUL can only reach it written as
-// \u0000. A form is left to parseForm, since each handler bounds its own.
-func cleanRequest(r *http.Request) {
+// cleanRequest cleans the query, and any body but a form's as it is read: the JSON
+// decoders read a body whatever it says it is. A JSON decoder already turns bytes that
+// aren't UTF-8 into U+FFFD, and a NUL can only reach it written as \u0000. A form is
+// left to parseForm, since each handler bounds its own. A path holding either names
+// nothing here, so it is refused.
+func cleanRequest(r *http.Request) (ok bool) {
+	if cleanText(r.URL.Path) != r.URL.Path {
+		return false
+	}
 	if q := r.URL.Query(); r.URL.RawQuery != "" {
 		before := q.Encode()
 		cleanValues(q)
@@ -45,9 +50,10 @@ func cleanRequest(r *http.Request) {
 		}
 	}
 	kind, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	if kind == "application/json" || strings.HasSuffix(kind, "+json") {
+	if r.Body != nil && r.Body != http.NoBody && kind != "application/x-www-form-urlencoded" && !strings.HasPrefix(kind, "multipart/") {
 		r.Body = &withoutNUL{src: r.Body}
 	}
+	return true
 }
 
 // parseForm parses a form body of at most limit bytes and cleans what it holds.

@@ -48,8 +48,29 @@ func TestTextArrivesWithoutWhatPostgresWontKeep(t *testing.T) {
 		t.Errorf("a search holding a byte that isn't UTF-8: %d", code)
 	}
 
+	// A key holder's body is read as JSON whatever it says it is, so it is cleaned too.
+	key, _, _ := s.CreateKey(o.ID, "bot", []string{"read", "research:write"}, "test")
+	req, _ := http.NewRequest("POST", srv.URL+"/o/alpha/api/v1/companies", strings.NewReader(`{"name":"Quay\u0000 Marine"}`))
+	req.Header.Set("Authorization", "Bearer "+key)
+	req.Header.Set("Content-Type", "application/x-json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	var named int64
+	s.in(o.ID).Model(&Company{}).Where("name = ?", "Quay Marine").Count(&named)
+	if res.StatusCode >= 300 || named != 1 {
+		t.Errorf("a key holder's company with a NUL, sent as application/x-json: %d, kept as named %d", res.StatusCode, named)
+	}
+
+	// A path holding a NUL names nothing here.
+	if code, _ := call(t, client, "GET", srv.URL+"/o/alp%00ha/today", "", nil); code != http.StatusNotFound {
+		t.Errorf("a path holding a NUL: %d", code)
+	}
+
 	// A form post: the sign-in page, with a NUL in the address.
-	res, err := http.PostForm(srv.URL+"/login", url.Values{"email": {"ada@example.com\x00"}, "password": {"correct horse battery"}})
+	res, err = http.PostForm(srv.URL+"/login", url.Values{"email": {"ada@example.com\x00"}, "password": {"correct horse battery"}})
 	if err != nil {
 		t.Fatal(err)
 	}

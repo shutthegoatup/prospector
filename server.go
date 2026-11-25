@@ -422,7 +422,10 @@ func (a *App) Routes() http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a.setDeadlines(w, r)
-		cleanRequest(r)
+		if !cleanRequest(r) {
+			http.NotFound(w, r)
+			return
+		}
 		if wantsPage(r) {
 			page := &problemPage{ResponseWriter: w, r: r}
 			defer page.finish()
