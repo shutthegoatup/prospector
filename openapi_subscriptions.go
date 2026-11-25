@@ -70,22 +70,30 @@ func (s apiServer) ChangeSubscription(ctx context.Context, in api.ChangeSubscrip
 		text := strconv.Itoa(*n)
 		return &text
 	}
-	changed := false
+	// Dates being cleared go first, since a start is checked against them; those being
+	// set go last, since they are checked against the start.
+	var cleared, changes, dated []SubscriptionChange
 	for _, set := range []struct {
 		field string
 		value *string
 	}{{"name", b.Name}, {"amount", b.Amount}, {"per", b.Per}, {"start", b.Start}, {"term_months", number(b.TermMonths)}, {"then", b.Then},
 		{"notice_days", number(b.NoticeDays)}, {"notice_on", b.NoticeOn}, {"ended_on", b.EndedOn}} {
-		if set.value == nil {
-			continue
+		switch c := (SubscriptionChange{set.field, deref(set.value)}); {
+		case set.value == nil:
+		case set.field != "notice_on" && set.field != "ended_on":
+			changes = append(changes, c)
+		case c.Value == "":
+			cleared = append(cleared, c)
+		default:
+			dated = append(dated, c)
 		}
-		if err := s.a.s.ChangeSubscription(q.Org.ID, in.Id, set.field, *set.value, q.Actor()); err != nil {
-			return nil, err
-		}
-		changed = true
 	}
-	if !changed {
+	changes = append(append(cleared, changes...), dated...)
+	if len(changes) == 0 {
 		return nil, errors.New("send what to change")
+	}
+	if err := s.a.s.ChangeSubscriptionFields(q.Org.ID, in.Id, changes, q.Actor()); err != nil {
+		return nil, err
 	}
 	out, err := s.subscription(q.Org.ID, 0, in.Id)
 	if err != nil {

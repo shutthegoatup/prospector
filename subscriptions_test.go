@@ -476,6 +476,18 @@ func TestARobotWorksSubscriptionsAsItsScopesAllow(t *testing.T) {
 	if code, body := asKey(t, "PATCH", one, writer, map[string]any{"term_months": 24, "amount": "18,000", "then": "ends"}); code != http.StatusOK || !strings.Contains(body, `"term_months":24`) || !strings.Contains(body, `"amount":1800000`) || !strings.Contains(body, `"then":"ends"`) {
 		t.Errorf("changing a subscription: %d %s", code, body)
 	}
+	// Saved together or not at all, and a date cleared in the same change counts as cleared.
+	if code, body := asKey(t, "PATCH", one, writer, map[string]any{"name": "Renamed", "per": "fortnight"}); code != http.StatusBadRequest {
+		t.Errorf("a change with one part refused: %d %s", code, body)
+	} else if now := must(s.Subscriptions(o.ID, 0, today()))[0]; now.Name != "Standard plan" {
+		t.Errorf("the part before the refused one was saved: %q", now.Name)
+	}
+	if code, body := asKey(t, "PATCH", one, writer, map[string]any{"notice_on": "2026-03-01"}); code != http.StatusOK {
+		t.Fatalf("giving notice: %d %s", code, body)
+	}
+	if code, body := asKey(t, "PATCH", one, writer, map[string]any{"start": "2026-04-01", "notice_on": ""}); code != http.StatusOK || !strings.Contains(body, `"start":"2026-04-01"`) || !strings.Contains(body, `"notice_on":""`) {
+		t.Errorf("moving the start and taking back notice together: %d %s", code, body)
+	}
 	if code, body := asKey(t, "PATCH", one, writer, map[string]any{"per": "fortnight"}); code != http.StatusBadRequest {
 		t.Errorf("a period that is not one: %d %s", code, body)
 	}

@@ -450,7 +450,7 @@ paths:
       operationId: changeSubscription
       tags: [subscriptions]
       summary: Change a subscription
-      description: Send only what changes. Each is checked as it would be when recording one; the first that is refused stops the rest.
+      description: Send only what changes. Each is checked as it would be when recording one, and they are saved together or not at all.
       security:
         - session: []
         - bearer: ["customers:write"]
@@ -753,7 +753,7 @@ components:
         per: { type: string, description: "`year` or `month`; empty is `year`." }
         start: { type: string, description: "YYYY-MM-DD." }
         term_months: { type: integer, description: "Months committed for; 0 is no commitment." }
-        then: { type: string, description: "What happens when the term is up: `renews` for the same term, `rolls` on a period at a time, or `ends`; empty is `renews`." }
+        then: { type: string, description: "What happens when the term is up: `renews` for the same term, `rolls` on a period at a time, or `ends`; empty is `renews`. With no months committed it is always `rolls`, whatever is sent." }
         notice_days: { type: integer, description: Days of notice needed to stop it renewing. }
 
     SubscriptionChange:
@@ -787,7 +787,7 @@ components:
         notice_on: { type: string, description: Empty when no notice has been given. }
         ended_on: { type: string, description: Empty unless an end was recorded. }
         status: { type: string, enum: [scheduled, active, notice given, ending, ended], description: Where it stands today. }
-        term_end: { type: string, description: "The last day of the term in hand; empty before it starts." }
+        term_end: { type: string, description: "The last day of the term in hand, or of its first term when it has yet to start." }
         cancel_by: { type: string, description: "The next day by which notice can still be given; empty when it ends anyway or notice was given." }
         cancel_ends: { type: string, description: The last day of the term that notice by `cancel_by` would end it at. }
         ends: { type: string, description: "The last day, once that is settled." }
