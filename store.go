@@ -78,6 +78,7 @@ type Membership struct {
 	Role       string
 	CallerName string
 	Signature  string
+	Areas      string `gorm:"not null;default:'sales support'"`
 }
 
 type Session struct {

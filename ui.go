@@ -231,6 +231,30 @@ func panelLink(path, name string, n int, otherName string, other Page) string {
 	return pageLink(path, 0, name, past(n), otherName, past(other.N))
 }
 
+// pageHref is the address of page n of the list called name, keeping everything else
+// the address says: where the page's other lists are, and its filters.
+func pageHref(path string, query url.Values, name string, n int) string {
+	v := url.Values{}
+	for key, values := range query {
+		v[key] = values
+	}
+	v.Del(name)
+	if n > 1 {
+		v.Set(name, strconv.Itoa(n))
+	}
+	if len(v) == 0 {
+		return path
+	}
+	return path + "?" + v.Encode()
+}
+
+// pageSlice is page n of a list already read whole.
+func pageSlice[T any](all []T, n, size int) ([]T, Page) {
+	pg := pageOf(n, size, len(all))
+	from := min(pg.offset(), len(all))
+	return all[from:min(from+size, len(all))], pg
+}
+
 func pageLink(path string, page int, filters ...string) string {
 	v := url.Values{}
 	for i := 0; i+1 < len(filters); i += 2 {
@@ -395,18 +419,37 @@ type AgentsData struct {
 	// ActivityPage is where the list of activity is.
 	ActivityPage Page
 	Runs         []Run
-	Tasks        map[int64]string
-	Now          time.Time
-	Scores       []AgentScore
+	// RunsPaged is a page of runs other than the latest; OlderRuns links the page after
+	// it, and is empty on the last.
+	RunsPaged bool
+	OlderRuns string
+	Tasks     map[int64]string
+	Now       time.Time
+	Scores    []AgentScore
+}
+
+const runsShown = 12
+
+// olderRuns is the address of the runs before the last on this page, keeping the
+// page of activity.
+func olderRuns(q *Req, before time.Time, r *http.Request) string {
+	if before.IsZero() {
+		return ""
+	}
+	return pageLink(q.Base()+"agents", 0, "activity", r.URL.Query().Get("activity"), "runs_before", strconv.FormatInt(before.UnixNano(), 10))
 }
 
 func (a *App) agents(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	keys, _ := a.s.Keys(q.Org.ID)
-	runs, tasks := a.s.Runs(q.Org.ID, 12)
+	var before time.Time
+	if n, err := strconv.ParseInt(r.URL.Query().Get("runs_before"), 10, 64); err == nil && n > 0 {
+		before = time.Unix(0, n)
+	}
+	runs, tasks, older := a.s.Runs(q.Org.ID, before, runsShown)
 	activity, activityPage := a.s.AgentActivity(q.Org.ID, panelPage(r, "activity"))
 	a.page(w, r, "agents", AgentsView(q, AgentsData{Base: a.baseURL(r) + q.Base(), Keys: keys, Activity: activity, ActivityPage: activityPage,
-		Scores: a.s.AgentScores(q.Org.ID), Runs: runs, Tasks: tasks, Now: time.Now()}))
+		Scores: a.s.AgentScores(q.Org.ID), Runs: runs, Tasks: tasks, Now: time.Now(), RunsPaged: !before.IsZero(), OlderRuns: olderRuns(q, older, r)}))
 }
 
 func done(w http.ResponseWriter, err error) {

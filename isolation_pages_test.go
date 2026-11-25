@@ -106,7 +106,7 @@ func bodyFields(t *testing.T) (numbers, texts, flags, lists map[string]bool) {
 }
 
 // formWords are tryWords and the choices a form checks before it looks anything up.
-var formWords = append([]string{"new", "renewal", "month", "year", "openai", "anthropic", "read", "owner", "https://intruder.example"}, tryWords...)
+var formWords = append([]string{"new", "renewal", "month", "year", "openai", "anthropic", "read", "owner", "sales", "https://intruder.example"}, tryWords...)
 
 // stopsShort are the forms that never answer yes to these bodies, and why: each is
 // refused for what it was sent before or after it looked for a row, which the test
