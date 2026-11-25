@@ -7,7 +7,7 @@ import (
 )
 
 templ Section(title, hint string) {
-	<section class="flex flex-col gap-4 rounded-xl border border-border bg-card p-6">
+	<section class="flex flex-col gap-4 panel p-6">
 		<div>
 			<h2 class="font-heading text-lg font-semibold">{ title }</h2>
 			if hint != "" {
@@ -50,22 +50,26 @@ templ SettingsView(q *Req, d SettingsData) {
 				</div>
 			}
 		</form>
-		<form data-form="/password" data-reset="true">
-			@Section("Your password", "For your sign-in across every organisation. Changing it signs out your other sessions.") {
-				@Row("Current") {
-					<input name="current" type="password" required autocomplete="current-password" class={ fieldClass }/>
-				}
-				@Row("New") {
-					<input name="new" type="password" required minlength="10" autocomplete="new-password" class={ fieldClass }/>
-				}
-				<div class="flex items-center gap-3">
-					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-						Change
+		if q.User.HasPassword() {
+			<form data-form="/password" data-reset="true">
+				@Section("Your password", "For your sign-in across every organisation. Changing it signs out your other sessions.") {
+					@Row("Current") {
+						<input name="current" type="password" required autocomplete="current-password" class={ fieldClass }/>
 					}
-					<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
-				</div>
-			}
-		</form>
+					@Row("New") {
+						<input name="new" type="password" required minlength="10" autocomplete="new-password" class={ fieldClass }/>
+					}
+					<div class="flex items-center gap-3">
+						@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+							Change
+						}
+						<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
+					</div>
+				}
+			</form>
+		} else {
+			@Section("Your sign-in", "You sign in through a provider, so there is no password here to change. Whoever runs this server can give you one.")
+		}
 		<form data-form="ui/settings" data-refresh="true">
 			@Section("Organisation", ownerHint(q)) {
 				<fieldset disabled?={ !q.Owner() } class="flex flex-col gap-4">
@@ -93,9 +97,17 @@ templ SettingsView(q *Req, d SettingsData) {
 						<textarea name="never_contact" rows="3" placeholder="domains, emails or LinkedIn links, one per line" class={ areaClass }>{ set.NeverContact }</textarea>
 						@Meta(neverContactHint(d.Covered))
 					}
+					@Row("What you look for") {
+						<textarea name="look_for" rows="4" placeholder={ "careers_page: a careers or jobs page on their site\nats: the applicant tracking system they use" } class={ areaClass }>{ set.LookFor }</textarea>
+						@Meta("One per line, a name and what counts. Agents record each as a fact under that name, and Research shows which a company has.")
+					}
 					@Row("Agent guidance") {
 						<textarea name="agent_guidance" rows="8" placeholder="Who you sell to, who's off-limits, how to judge fit" class={ areaClass }>{ set.AgentGuidance }</textarea>
 						@Meta("Sent to every agent when it connects, after the built-in task guidance, and returned by the guidance tool.")
+					}
+					@Row("Enquiry form sites") {
+						<textarea name="enquiry_sites" rows="2" placeholder="https://www.example.com" class={ areaClass }>{ set.EnquirySites }</textarea>
+						@Meta("One per line. A form on these sites can POST an enquiry as JSON to " + d.Intake + " and it shows under Enquiries. Leave empty to accept none.")
 					}
 					@Row("Cold email") {
 						<span class="flex items-center gap-2.5 pt-2 text-sm"><input type="checkbox" name="incorporated_only" checked?={ set.IncorporatedOnly } class="size-4 accent-[var(--primary)]"/> Only email incorporated companies (UK PECR)</span>
@@ -109,16 +121,53 @@ templ SettingsView(q *Req, d SettingsData) {
 				</fieldset>
 			}
 		</form>
+		if q.Owner() {
+			<form data-form="ui/mail" data-refresh="true">
+				@Section("Outgoing mail", mailHint(d.Mail)) {
+					@Row("Server") {
+						<span class="flex items-center gap-2"><input name="host" value={ d.Mail.Host } placeholder="smtp.example.com" class={ fieldClass + " min-w-[200px] flex-1" }/><input name="port" type="number" min="1" max="65535" value={ strconv.Itoa(d.Mail.Port) } aria-label="Port" class={ fieldClass + " w-24" }/></span>
+						@Meta("SMTP over TLS, on port 587, 465, 2525 or 25. Clear the server to stop using it.")
+					}
+					@Row("Username") {
+						<input name="username" value={ d.Mail.Username } autocomplete="off" class={ fieldClass }/>
+					}
+					@Row("Password") {
+						<input name="password" type="password" autocomplete="new-password" placeholder={ passwordHint(d.Mail) } class={ fieldClass }/>
+						@Meta("Never shown again. Changing the server or username needs it entered again.")
+					}
+					@Row("From") {
+						<input name="sender" value={ d.Mail.Sender } placeholder={ q.Org.Name + " <hello@example.com>" } class={ fieldClass }/>
+					}
+					<div class="flex items-center gap-3">
+						@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+							Save
+						}
+						<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
+					</div>
+				}
+			</form>
+			if d.Mail.Host != "" || d.Mail.SiteMail {
+				<form data-form="ui/mail/test" class="flex items-center gap-3">
+					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantOutline}) {
+						Send me a test email
+					}
+					<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
+				</form>
+			}
+		}
 		@Section("Sequence", "Every contact goes through these steps; the waits come from above.") {
 			<ol class="flex max-w-lg flex-col gap-1 text-sm">
 				<li class="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3 py-2.5"><span class="grid size-5 place-items-center rounded-full bg-secondary font-mono text-xs">1</span>LinkedIn connection request</li>
-				<li class="pl-8 font-mono text-xs text-primary">{ "↓ on accept, or after " + plural(set.EmailAfterDays, "day") }</li>
+				<li class="pl-8 font-mono text-xs text-mark">{ "↓ on accept, or after " + plural(set.EmailAfterDays, "day") }</li>
 				<li class="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3 py-2.5"><span class="grid size-5 place-items-center rounded-full bg-secondary font-mono text-xs">2</span>LinkedIn message if accepted, else email</li>
-				<li class="pl-8 font-mono text-xs text-primary">{ "↓ " + plural(set.FollowupAfterDays, "day") + " without a reply" }</li>
+				<li class="pl-8 font-mono text-xs text-mark">{ "↓ " + plural(set.FollowupAfterDays, "day") + " without a reply" }</li>
 				<li class="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3 py-2.5"><span class="grid size-5 place-items-center rounded-full bg-secondary font-mono text-xs">3</span>Follow-up email</li>
-				<li class="pl-8 font-mono text-xs text-primary">↓ whenever a number is known, in office hours</li>
+				<li class="pl-8 font-mono text-xs text-mark">↓ whenever a number is known, in office hours</li>
 				<li class="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3 py-2.5"><span class="grid size-5 place-items-center rounded-full bg-secondary font-mono text-xs">4</span>Call</li>
 			</ol>
+		}
+		if q.Owner() {
+			@SSOSettings(q, d)
 		}
 		@Section("Team", "") {
 			for _, m := range d.Members {
@@ -149,6 +198,16 @@ templ SettingsView(q *Req, d SettingsData) {
 				</form>
 			}
 		}
+		if q.Owner() {
+			@Section("Your data", "") {
+				<p class="text-sm text-muted-foreground">Everything this organisation holds here, in one file: companies, people, facts, enquiries, history, settings and who has access. It holds no passwords, keys or sign-on secrets.</p>
+				<div>
+					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-download": "ui/export-org", "data-file": q.Org.Slug + ".json"}}) {
+						Download everything
+					}
+				</div>
+			}
+		}
 	</div>
 }
 
@@ -172,6 +231,24 @@ func neverContactHint(covered []string) string {
 		hint += " and " + strconv.Itoa(more) + " more"
 	}
 	return hint + "."
+}
+
+func mailHint(m MailView) string {
+	hint := "This organisation's own mail server. Invitations to new members leave through it"
+	switch {
+	case m.Host != "":
+		return hint + "."
+	case m.SiteMail:
+		return hint + "; without one, they come from this site's address."
+	}
+	return hint + "; without one, a new member's first password is shown to you instead."
+}
+
+func passwordHint(m MailView) string {
+	if m.HasPassword {
+		return "saved: leave empty to keep it"
+	}
+	return ""
 }
 
 func ownerHint(q *Req) string {

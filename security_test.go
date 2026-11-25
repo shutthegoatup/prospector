@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -623,6 +628,11 @@ func TestContentPolicy(t *testing.T) {
 	if err := s.in(o.ID).First(&company).Error; err != nil {
 		t.Fatal(err)
 	}
+	// A task with work and a note on it, so those parts of the pages are rendered.
+	task := must(s.CreateTask(o.ID, "", `Makers with a "configurator" <script>alert(1)</script>`, "Ada Lovelace"))
+	bot := Actor{Name: "agent:bot", KeyID: 1}
+	must(s.AgentAddCompany(o.ID, bot, AddCompanyIn{Name: company.Name, Task: task.ID}))
+	must(s.AgentNote(o.ID, bot, NoteIn{Task: task.ID, Company: company.Name, Kind: "skipped", Text: `No builder, only a <img src=x onerror=alert(1)> brochure.`}))
 	res, err := http.Get(srv.URL + "/login")
 	if err != nil {
 		t.Fatal(err)
@@ -641,9 +651,10 @@ func TestContentPolicy(t *testing.T) {
 	// The policy blocks inline scripts and handlers, so no page may depend on one.
 	tag := regexp.MustCompile(`(?i)<script[^>]*>`)
 	handler := regexp.MustCompile(`(?i)<[^>]*\son[a-z]+\s*=`)
-	pages := []string{"/login", "/o/alpha/today", "/o/alpha/today?step=linkedin", "/o/alpha/research", "/o/alpha/research?f=rejected",
+	pages := []string{"/login", "/o/alpha/today", "/o/alpha/today?step=linkedin", "/o/alpha/research", "/o/alpha/research?f=rejected", "/o/alpha/research?f=details",
 		"/o/alpha/conversations", "/o/alpha/companies", "/o/alpha/companies/" + strconv.FormatInt(company.ID, 10),
-		"/o/alpha/add", "/o/alpha/add?popup=1&name=Hannah", "/o/alpha/settings", "/o/alpha/agents"}
+		"/o/alpha/add", "/o/alpha/add?popup=1&name=Hannah", "/o/alpha/settings", "/o/alpha/agents", "/o/alpha/enquiries",
+		"/o/alpha/tasks", "/o/alpha/tasks?closed=1", "/o/alpha/tasks/" + strconv.FormatInt(task.ID, 10)}
 	check := func(page, marker string) {
 		t.Helper()
 		code, body := call(t, client, "GET", srv.URL+page, "", nil)
@@ -1167,5 +1178,314 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	}
 	if title, message := problemText(http.StatusInternalServerError, "pq: relation \"contacts\" does not exist"); title != "Something went wrong" || strings.Contains(message, "contacts") {
 		t.Fatalf("a server fault shows %q %q", title, message)
+	}
+}
+
+func TestRequestsHaveDeadlines(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	key, _, err := s.CreateKey(o.ID, "bot", []string{"read", "research:write"}, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const limit = 300 * time.Millisecond
+	var host string
+	serve := func(app *App) {
+		srv := httptest.NewServer(app.Routes())
+		t.Cleanup(srv.Close)
+		host = strings.TrimPrefix(srv.URL, "http://")
+	}
+	dial := func() (net.Conn, *bufio.Reader) {
+		t.Helper()
+		conn, err := net.Dial("tcp", host)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { conn.Close() })
+		return conn, bufio.NewReader(conn)
+	}
+	answer := func(conn net.Conn, r *bufio.Reader, within time.Duration) (*http.Response, error) {
+		conn.SetReadDeadline(time.Now().Add(within))
+		res, err := http.ReadResponse(r, nil)
+		if err != nil {
+			return nil, err
+		}
+		io.Copy(io.Discard, io.LimitReader(res.Body, 1<<16))
+		return res, nil
+	}
+	head := func(method, path, extra string, length int) string {
+		return fmt.Sprintf("%s %s HTTP/1.1\r\nHost: %s\r\n%sContent-Type: application/json\r\nAccept: application/json, text/event-stream\r\nContent-Length: %d\r\n\r\n", method, path, host, extra, length)
+	}
+	bearer := "Authorization: Bearer " + key + "\r\n"
+
+	// A body that stops arriving is given up on, wherever it is sent: a page's form, a
+	// path that doesn't exist, and the agents' route before any key has been accepted.
+	serve(&App{s: s, readLimit: limit})
+	for _, path := range []string{"/login", "/nope/mcp", "/o/alpha/mcp", "/o/alpha/api/v1/companies"} {
+		conn, r := dial()
+		fmt.Fprint(conn, head("POST", path, "", 200)+`{"name":`)
+		began := time.Now()
+		if res, err := answer(conn, r, 5*time.Second); err == nil && res.StatusCode < 400 {
+			t.Fatalf("a stalled body to %s got %d", path, res.StatusCode)
+		}
+		if waited := time.Since(began); waited > 3*time.Second {
+			t.Fatalf("a stalled body to %s was waited on for %v", path, waited)
+		}
+	}
+
+	// A body that arrives slowly but in time is still answered: the answer's clock
+	// starts when the body is in, and an agent's answer has none.
+	serve(&App{s: s, writeLimit: limit})
+	slowly := func(path, body string) (*http.Response, error) {
+		conn, r := dial()
+		fmt.Fprint(conn, head("POST", path, bearer, len(body))+body[:10])
+		time.Sleep(3 * limit)
+		fmt.Fprint(conn, body[10:])
+		return answer(conn, r, 3*time.Second)
+	}
+	if res, err := slowly("/o/alpha/api/v1/companies", `{"name":"Quay Marine"}`); err != nil || res.StatusCode != http.StatusOK {
+		t.Fatalf("a slow upload to the API: %v %v", res, err)
+	}
+	initialize := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}`
+	res, err := slowly("/o/alpha/mcp", initialize)
+	if err != nil || res.StatusCode != http.StatusOK || res.Header.Get("Mcp-Session-Id") == "" {
+		t.Fatalf("a slow request from an agent: %v %v", res, err)
+	}
+
+	// An agent's listening stream stays open well past both limits.
+	serve(&App{s: s, readLimit: limit, writeLimit: limit})
+	conn, r := dial()
+	fmt.Fprint(conn, head("POST", "/o/alpha/mcp", bearer, len(initialize))+initialize)
+	if res, err = answer(conn, r, 3*time.Second); err != nil || res.StatusCode != http.StatusOK {
+		t.Fatalf("an agent's first request: %v %v", res, err)
+	}
+	agent := bearer + "Mcp-Session-Id: " + res.Header.Get("Mcp-Session-Id") + "\r\n"
+	ready := `{"jsonrpc":"2.0","method":"notifications/initialized"}`
+	fmt.Fprint(conn, head("POST", "/o/alpha/mcp", agent, len(ready))+ready)
+	if res, err := answer(conn, r, 3*time.Second); err != nil || res.StatusCode >= 300 {
+		t.Fatalf("finishing the agent's handshake: %v %v", res, err)
+	}
+	stream, sr := dial()
+	fmt.Fprintf(stream, "GET /o/alpha/mcp HTTP/1.1\r\nHost: %s\r\n%sAccept: text/event-stream\r\n\r\n", host, agent)
+	stream.SetReadDeadline(time.Now().Add(3 * time.Second))
+	opened, err := http.ReadResponse(sr, nil)
+	if err != nil || opened.StatusCode != http.StatusOK {
+		t.Fatalf("opening the agent's stream: %v %v", opened, err)
+	}
+	time.Sleep(4 * limit)
+	stream.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+	// Whatever the server has already sent is read off; what matters is that the
+	// read then waits rather than finding the stream closed.
+	for err = error(nil); err == nil; {
+		_, err = sr.ReadByte()
+	}
+	var timeout net.Error
+	if !errors.As(err, &timeout) || !timeout.Timeout() {
+		t.Fatalf("the agent's stream was closed: %v", err)
+	}
+
+	// A page with no body isn't cut short by the limit on bodies.
+	if a := (&App{}); a.readLimit != 0 || bodyLimit < answerLimit {
+		t.Fatal("the defaults changed without this test")
+	}
+}
+
+func TestFontsAreServedFromHere(t *testing.T) {
+	_, _, srv, client := signedIn(t)
+	fetch := func(path string) (http.Header, []byte) {
+		t.Helper()
+		res, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		body, _ := io.ReadAll(res.Body)
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("GET %s: %d", path, res.StatusCode)
+		}
+		return res.Header, body
+	}
+	h, css := fetch("/assets/css/fonts.css?v=" + assetVersion)
+	if !strings.HasPrefix(h.Get("Content-Type"), "text/css") || !strings.Contains(h.Get("Cache-Control"), "immutable") {
+		t.Fatalf("the font stylesheet: %v", h)
+	}
+	files := regexp.MustCompile(`url\((/assets/fonts/[a-z0-9-]+\.woff2)\)`).FindAllStringSubmatch(string(css), -1)
+	if len(files) < 6 || strings.Contains(string(css), "http") {
+		t.Fatalf("the font stylesheet names %d local files; it must name no other site", len(files))
+	}
+	for _, f := range files {
+		h, font := fetch(f[1])
+		if h.Get("Content-Type") != "font/woff2" || !strings.Contains(h.Get("Cache-Control"), "immutable") || !bytes.HasPrefix(font, []byte("wOF2")) {
+			t.Errorf("%s: %s, %q, %d bytes", f[1], h.Get("Content-Type"), h.Get("Cache-Control"), len(font))
+		}
+	}
+	for _, family := range []string{"Bricolage Grotesque", "IBM Plex Sans", "IBM Plex Mono"} {
+		if !strings.Contains(string(css), "font-family: '"+family+"'") {
+			t.Errorf("the font stylesheet lacks %s", family)
+		}
+	}
+	if _, licence := fetch("/assets/fonts/OFL.txt"); !strings.Contains(string(licence), "SIL OPEN FONT LICENSE Version 1.1") {
+		t.Fatal("the fonts' licence isn't served with them")
+	}
+
+	// Nothing a page loads, and nothing the policy allows, is on another site.
+	for _, page := range []string{"/login", "/o/alpha/today", "/o/alpha/settings"} {
+		_, body := call(t, client, "GET", srv.URL+page, "", nil)
+		if !strings.Contains(body, "/assets/css/fonts.css?v=") {
+			t.Errorf("%s doesn't load the fonts", page)
+		}
+		for _, outside := range regexp.MustCompile(`(?:href|src)="(https?:)?//[^"]+"`).FindAllString(body, -1) {
+			if !strings.Contains(outside, "linkedin.com") {
+				t.Errorf("%s loads from another site: %s", page, outside)
+			}
+		}
+	}
+	if strings.Contains(contentPolicy, "http") {
+		t.Fatalf("the policy allows another site: %s", contentPolicy)
+	}
+}
+
+func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
+	s := tempStore(t)
+	for _, email := range []string{"ada@example.com", "bob@example.com"} {
+		if _, err := s.CreateUser(email, "Someone", "correct horse battery"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	now := time.Now()
+	app := &App{s: s}
+	app.logins.now = func() time.Time { return now }
+	srv := httptest.NewServer(app.Routes())
+	t.Cleanup(srv.Close)
+	try := func(email, password, device string) (int, *http.Cookie) {
+		t.Helper()
+		req, _ := http.NewRequest("POST", srv.URL+"/login", strings.NewReader(url.Values{"email": {email}, "password": {password}}.Encode()))
+		req.Header.Set("content-type", "application/x-www-form-urlencoded")
+		if device != "" {
+			req.AddCookie(&http.Cookie{Name: deviceCookie, Value: device})
+		}
+		res, err := (&http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}).Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		for _, c := range res.Cookies() {
+			if c.Name == deviceCookie {
+				return res.StatusCode, c
+			}
+		}
+		return res.StatusCode, nil
+	}
+	const right, wrong = "correct horse battery", "a wrong guess"
+
+	code, issued := try("ada@example.com", right, "")
+	if code != http.StatusSeeOther || issued == nil || !issued.HttpOnly || issued.Path != "/login" || strings.Contains(issued.Value, "example") {
+		t.Fatalf("first sign-in: %d, device cookie %+v", code, issued)
+	}
+	_, bobs := try("bob@example.com", right, "")
+	if code, again := try("ada@example.com", right, issued.Value); code != http.StatusSeeOther || again != nil {
+		t.Fatalf("a known browser signing in again: %d, reissued %v", code, again != nil)
+	}
+
+	// Someone guesses at Ada's address until it is being held.
+	for range freeAttempts + 3 {
+		try("ada@example.com", wrong, "")
+	}
+	if code, _ := try("ada@example.com", right, ""); code != http.StatusTooManyRequests {
+		t.Fatalf("an unknown browser while the address is held: %d", code)
+	}
+	for name, device := range map[string]string{
+		"made up":             "bm90IGEgcmVhbCBub25jZQ." + strings.Repeat("0", 64),
+		"issued to Bob":       bobs.Value,
+		"Ada's with a new id": "x" + issued.Value,
+		"no separator":        strings.ReplaceAll(issued.Value, ".", ""),
+	} {
+		if code, _ := try("ada@example.com", right, device); code != http.StatusTooManyRequests {
+			t.Errorf("a device cookie that is %s got past the hold: %d", name, code)
+		}
+	}
+	if code, _ := try("ada@example.com", right, issued.Value); code != http.StatusSeeOther {
+		t.Fatalf("Ada's own browser while her address is held: %d", code)
+	}
+	if code, _ := try("ada@example.com", right, ""); code != http.StatusTooManyRequests {
+		t.Fatal("her signing in lifted the hold for everyone else")
+	}
+
+	// Her browser's own wrong guesses are still slowed.
+	for i := range freeAttempts {
+		if code, _ := try("ada@example.com", wrong, issued.Value); code != http.StatusUnauthorized {
+			t.Fatalf("wrong password %d from a known browser: %d", i+1, code)
+		}
+	}
+	if code, _ := try("ada@example.com", right, issued.Value); code != http.StatusTooManyRequests {
+		t.Fatalf("a known browser after %d wrong passwords: %d", freeAttempts, code)
+	}
+
+	// However the address is typed, and whatever else is typed with it, a guess
+	// lands in the one count for that address.
+	now = now.Add(maxLoginWait + time.Second)
+	for _, typed := range []string{" bob@example.com", "BOB@example.com ", "bob@example.com", "\tbob@example.com", "Bob@Example.com"} {
+		if code, _ := try(typed, wrong, ""); code != http.StatusUnauthorized {
+			t.Fatalf("a wrong password for %q: %d", typed, code)
+		}
+	}
+	if code, _ := try("bob@example.com", right, ""); code != http.StatusTooManyRequests {
+		t.Fatalf("spelling the address differently got fresh guesses: %d", code)
+	}
+
+	// Guessing at the sign-in form doesn't hold up a signed-in person changing their
+	// password, and the change leaves their browser known under the new one.
+	bob, err := s.UserByEmail("bob@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, _, err := s.Login("bob@example.com", right)
+	if err != nil {
+		t.Fatal(err)
+	}
+	change, _ := http.NewRequest("POST", srv.URL+"/password", strings.NewReader(`{"current":"correct horse battery","new":"bob's new password"}`))
+	change.Header.Set("content-type", "application/json")
+	change.AddCookie(&http.Cookie{Name: sessionCookie, Value: session})
+	changed, err := http.DefaultClient.Do(change)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed.Body.Close()
+	var renewed *http.Cookie
+	for _, c := range changed.Cookies() {
+		if c.Name == deviceCookie {
+			renewed = c
+		}
+	}
+	if changed.StatusCode != http.StatusOK || renewed == nil || renewed.Path != "/login" {
+		t.Fatalf("changing a password while the address is held: %d, device cookie %+v", changed.StatusCode, renewed)
+	}
+	if _, ok := s.knownDevice("bob@example.com", bobs.Value); ok {
+		t.Fatal("the device cookie from before the change still verifies")
+	}
+	if code, _ := try("bob@example.com", "bob's new password", renewed.Value); code != http.StatusSeeOther {
+		t.Fatalf("signing in with the renewed device cookie while the address is held: %d", code)
+	}
+	if code, _ := try("bob@example.com\x00"+strings.Split(renewed.Value, ".")[0], wrong, ""); code != http.StatusUnauthorized {
+		t.Fatalf("an address with a NUL in it: %d", code)
+	}
+	if got := app.logins.wait(changeBucket(bob)); got != 0 {
+		t.Fatalf("sign-in guesses reached the password-change count: %v", got)
+	}
+
+	// Changing the password ends what the old one vouched for.
+	now = now.Add(maxLoginWait + time.Second)
+	if err := s.SetPassword("ada@example.com", "a different password"); err != nil {
+		t.Fatal(err)
+	}
+	for range freeAttempts + 1 {
+		try("ada@example.com", wrong, "")
+	}
+	if code, _ := try("ada@example.com", "a different password", issued.Value); code != http.StatusTooManyRequests {
+		t.Fatalf("a device cookie from before a password change still counts: %d", code)
+	}
+	now = now.Add(maxLoginWait + time.Second)
+	if code, fresh := try("ada@example.com", "a different password", issued.Value); code != http.StatusSeeOther || fresh == nil {
+		t.Fatalf("signing in after a password change: %d, new device cookie: %v", code, fresh != nil)
 	}
 }

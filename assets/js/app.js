@@ -12,6 +12,14 @@ async function post(path, data) {
   return res.headers.get("content-type")?.includes("json") ? res.json() : {};
 }
 
+function save(data, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 function report(err) {
   alert(err.message || err);
 }
@@ -66,6 +74,9 @@ document.addEventListener("click", async (e) => {
       copy(b, b.dataset.copy, b.dataset.open);
     } else if (b.dataset.copyFrom) {
       copy(b, document.getElementById(b.dataset.copyFrom).value, b.dataset.open);
+    } else if (b.dataset.download) {
+      save(await post(b.dataset.download, JSON.parse(b.dataset.body || "{}")), b.dataset.file);
+      refresh();
     } else if (b.dataset.post) {
       if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
       const body = JSON.parse(b.dataset.body || "{}");
@@ -132,7 +143,7 @@ document.addEventListener("submit", async (e) => {
     if (res.go) return void (location.href = res.go);
     if (result) result.textContent = res.message || "Saved ✓";
     if (form.dataset.reset) {
-      for (const el of form.elements) if (el.type !== "checkbox" && el.type !== "submit" && el.tagName !== "SELECT" && !el.closest("fieldset[data-keep]")) el.value = "";
+      for (const el of form.elements) if (el.type !== "checkbox" && el.type !== "submit" && el.tagName !== "SELECT" && !el.hidden && !el.closest("fieldset[data-keep]")) el.value = "";
       form.querySelector("input:not([type=hidden])")?.focus();
     }
     if (form.dataset.close) setTimeout(() => window.close(), 1200);

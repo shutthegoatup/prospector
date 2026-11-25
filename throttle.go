@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/hmac"
 	"strings"
 	"sync"
 	"time"
@@ -18,8 +19,9 @@ const (
 )
 
 // loginGuard slows repeated failed sign-ins to one email. It is keyed on the email
-// alone, known or not, because behind a proxy every request shares an address. The
-// cost: someone who keeps guessing at an address keeps its owner waiting too.
+// alone, known or not, because behind a proxy every request shares an address. That
+// would let someone guessing at an address keep its owner waiting too, so a browser
+// that has signed in before is counted on its own (see deviceCookie).
 type loginGuard struct {
 	mu    sync.Mutex
 	fails map[string]*failure
@@ -115,3 +117,46 @@ func (g *loginGuard) dropIdle(now time.Time) {
 		}
 	}
 }
+
+const (
+	deviceCookie = "device"
+	deviceLife   = 365 * 24 * time.Hour
+)
+
+// A device token is what a browser keeps after signing in: a random value and its
+// MAC under the account's password hash. Only this server can make one, it names
+// nobody, and it stops working when the password changes. It isn't signed under the
+// server's secret key: whoever can read the password hash could make one, but all it
+// buys is being counted apart from other guessers, and a year of browsers would
+// otherwise be forgotten the day a key is set.
+func newDeviceToken(u *User) string {
+	nonce := randomToken(16)
+	return nonce + "." + deviceMAC(u, nonce)
+}
+
+func deviceMAC(u *User, nonce string) string {
+	return mac([]byte(u.PasswordHash), "device\x00"+nonce)
+}
+
+// knownDevice reports whether token was issued to this email's account, and if so
+// the name its attempts are counted under: the email and the device together, so
+// guesses made elsewhere don't hold this browser up, and its own are still slowed.
+func (s *Store) knownDevice(email, token string) (who string, ok bool) {
+	nonce, signature, found := strings.Cut(token, ".")
+	if !found || len(token) > 200 {
+		return "", false
+	}
+	u, err := s.UserByEmail(email)
+	if err != nil || !hmac.Equal([]byte(signature), []byte(deviceMAC(u, nonce))) {
+		return "", false
+	}
+	return signInBucket(u.Email) + "\x00" + nonce, true
+}
+
+// The guard counts under names that say what is being guessed at, so the sign-in
+// form, whatever is typed into it, can't reach the count for anything else.
+func signInBucket(email string) string {
+	return "sign-in\x00" + strings.ToLower(strings.TrimSpace(email))
+}
+
+func changeBucket(u *User) string { return "change\x00" + u.Email }

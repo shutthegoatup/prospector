@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -109,13 +110,19 @@ func (s *Store) ChangePassword(u *User, current, password, keepToken string) err
 
 // savePassword also signs the user out everywhere except the session in keepToken.
 func (s *Store) savePassword(user int64, hash, keepToken string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		set := map[string]any{"password_hash": hash, "must_change_password": false}
-		if err := tx.Model(&User{}).Where("id = ?", user).Updates(set).Error; err != nil {
-			return err
-		}
-		return tx.Where("user_id = ? and token_hash <> ?", user, hashToken(keepToken)).Delete(&Session{}).Error
-	})
+	return s.db.Transaction(func(tx *gorm.DB) error { return s.savePasswordIn(tx, user, hash, keepToken) })
+}
+
+// A new password also ends any emailed link that could still have set one.
+func (s *Store) savePasswordIn(tx *gorm.DB, user int64, hash, keepToken string) error {
+	set := map[string]any{"password_hash": hash, "must_change_password": false}
+	if err := tx.Model(&User{}).Where("id = ?", user).Updates(set).Error; err != nil {
+		return err
+	}
+	if err := tx.Where("user_id = ?", user).Delete(&PasswordToken{}).Error; err != nil {
+		return err
+	}
+	return tx.Where("user_id = ? and token_hash not in ?", user, s.keys.lookups(sessions, keepToken)).Delete(&Session{}).Error
 }
 
 func (s *Store) UserByEmail(email string) (*User, error) {
@@ -272,34 +279,103 @@ func (s *Store) Login(email, password string) (string, *User, error) {
 		bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
 		return "", nil, errWrongLogin
 	}
+	// An account with no password takes as long to refuse as any other.
+	if !u.HasPassword() {
+		bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
+		return "", nil, errWrongLogin
+	}
 	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
 		return "", nil, errWrongLogin
 	}
-	token := randomToken(32)
-	err = s.db.Create(&Session{TokenHash: hashToken(token), UserID: u.ID, ExpiresAt: time.Now().Add(sessionLife)}).Error
+	token, err := s.NewSession(u.ID, 0)
 	return token, u, err
 }
 
-func (s *Store) SessionUser(token string) (*User, error) {
+// NewSession signs a user in. One that began at an organisation's own sign-in is
+// limited to that organisation: its provider vouches for nothing else.
+func (s *Store) NewSession(user, ssoOrg int64) (string, error) {
+	token := randomToken(32)
+	sess := &Session{TokenHash: s.keys.lookup(sessions, token), UserID: user, ExpiresAt: time.Now().Add(sessionLife)}
+	if ssoOrg != 0 {
+		sess.Limited = true
+		sess.prove(ssoOrg, time.Now())
+	}
+	return token, s.db.Create(sess).Error
+}
+
+// proofLife is how long going through an organisation's provider counts for. After it
+// the provider is asked again, so somebody it has since turned away is out within a day.
+const proofLife = 24 * time.Hour
+
+// proofs reads SSOOrgs: each organisation with when its proof runs out, as ",3:1795600000,".
+func (sess *Session) proofs() map[int64]int64 {
+	out := map[int64]int64{}
+	for _, part := range strings.Split(sess.SSOOrgs, ",") {
+		org, until, ok := strings.Cut(part, ":")
+		o, err1 := strconv.ParseInt(org, 10, 64)
+		u, err2 := strconv.ParseInt(until, 10, 64)
+		if ok && err1 == nil && err2 == nil {
+			out[o] = u
+		}
+	}
+	return out
+}
+
+func (sess *Session) prove(org int64, now time.Time) {
+	proofs := sess.proofs()
+	proofs[org] = now.Add(proofLife).Unix()
+	sess.SSOOrgs = ","
+	for o, until := range proofs {
+		if until > now.Unix() {
+			sess.SSOOrgs += fmt.Sprintf("%d:%d,", o, until)
+		}
+	}
+}
+
+func (sess *Session) Proves(org int64) bool { return sess.proofs()[org] > time.Now().Unix() }
+
+func (sess *Session) Opens(org int64) bool { return !sess.Limited || sess.Proves(org) }
+
+// AddProof records that a session already open has now been through org's own sign-in too.
+func (s *Store) AddProof(sess *Session, org int64) error {
+	sess.prove(org, time.Now())
+	return s.db.Model(sess).Update("sso_orgs", sess.SSOOrgs).Error
+}
+
+func (s *Store) SessionFor(token string) (*Session, *User, error) {
 	var sess Session
-	if err := s.db.Where("token_hash = ? and expires_at > ?", hashToken(token), time.Now()).First(&sess).Error; err != nil {
-		return nil, err
+	if err := s.db.Where("token_hash in ? and expires_at > ?", s.keys.lookups(sessions, token), time.Now()).First(&sess).Error; err != nil {
+		return nil, nil, err
+	}
+	// Found by an older key: moved to the current one, so that key can be removed. One
+	// under a newer key is another server's doing and is left alone.
+	if s.keys.lookupBehind(sess.TokenHash) {
+		current := s.keys.lookup(sessions, token)
+		if s.db.Model(&sess).Update("token_hash", current).Error == nil {
+			sess.TokenHash = current
+		}
 	}
 	var u User
-	return &u, s.db.First(&u, sess.UserID).Error
+	return &sess, &u, s.db.First(&u, sess.UserID).Error
+}
+
+func (s *Store) SessionUser(token string) (*User, error) {
+	_, u, err := s.SessionFor(token)
+	return u, err
 }
 
 func (s *Store) Logout(token string) error {
-	return s.db.Where("token_hash = ?", hashToken(token)).Delete(&Session{}).Error
+	return s.db.Where("token_hash in ?", s.keys.lookups(sessions, token)).Delete(&Session{}).Error
 }
 
 // Scopes an API key can carry. None of them can send, change settings or reach another org; only import skips review.
 var Scopes = []struct{ Name, What string }{
-	{"read", "search companies and people, read what's due"},
-	{"research:write", "add companies, facts and suggested contacts (they wait in Research)"},
+	{"read", "search companies and people, read what's due and the tasks people wrote"},
+	{"research:write", "add companies, facts and suggested contacts (they wait in Research), and leave notes on tasks"},
 	{"drafts:write", "write draft notes and emails, marked as written by the agent"},
 	{"outcomes:write", "record what happened (added, accepted, sent, called, replied, declined, hold), shown as the agent's"},
 	{"import", "push the repo's markdown and pull the snapshot"},
+	{"enquiries:write", "record an enquiry or sign-up from your own product or site backend"},
 }
 
 func validScope(s string) bool {
@@ -335,17 +411,26 @@ func (s *Store) CreateKey(org int64, name string, scopes []string, by string) (s
 		return "", nil, errors.New("pick at least one scope")
 	}
 	secret := "pk_" + randomToken(24)
-	k := &APIKey{OrgID: org, Name: name, Prefix: secret[:7], Hash: hashToken(secret), Scopes: strings.Join(scopes, " "), CreatedBy: by}
+	k := &APIKey{OrgID: org, Name: name, Prefix: secret[:7], Hash: s.keys.lookup(apiKeys, secret), Scopes: strings.Join(scopes, " "), CreatedBy: by}
 	return secret, k, s.db.Create(k).Error
 }
 
 func (s *Store) KeyFor(secret string) (*APIKey, error) {
 	var k APIKey
-	if err := s.db.Where("hash = ? and revoked_at is null", hashToken(secret)).First(&k).Error; err != nil {
+	// A key made before there was a secret key is still found by its plain hash: an
+	// agent can't be asked to sign in again the way a person can. It moves on first
+	// use. The cost is that a row written straight into the database with a plain hash
+	// is taken for one of those, so the keyed lookup guards sessions and not API keys.
+	found := append(s.keys.lookups(apiKeys, secret), hashToken(secret))
+	if err := s.db.Where("hash in ? and revoked_at is null", found).First(&k).Error; err != nil {
 		return nil, err
 	}
 	now := time.Now()
-	s.db.Model(&k).Update("last_used_at", now)
+	set := map[string]any{"last_used_at": now}
+	if s.keys.lookupBehind(k.Hash) {
+		set["hash"] = s.keys.lookup(apiKeys, secret)
+	}
+	s.db.Model(&k).Updates(set)
 	return &k, nil
 }
 

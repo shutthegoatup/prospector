@@ -24,23 +24,77 @@ var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("unused"), bcrypt.DefaultC
 const sessionCookie = "session"
 
 type App struct {
-	s      *Store
-	mu     sync.Mutex
-	mcp    map[int64]*mcp.Server
-	logins loginGuard
+	s         *Store
+	mu        sync.Mutex
+	mcp       map[int64]*mcp.Server
+	logins    loginGuard
+	enquiries enquiryGuard
 	// base is the address people reach the app at, when the operator has said: then
 	// links and the cookie's Secure mark don't depend on what a proxy forwards.
 	base string
+	// mail is the app's own server, for password resets and invitations; nil is none.
+	mail *MailServer
+	// send and later stand in for SMTP and for a goroutine in tests.
+	send  sendFunc
+	later func(func())
+	// How long a request's body may take to arrive, and its answer to be written;
+	// zero means bodyLimit and answerLimit.
+	readLimit, writeLimit time.Duration
+
+	social []socialWay
+	idps   idpCache
+	// outbound reaches sign-in providers, and txt reads a domain's DNS; nil means the
+	// guarded client and the system resolver.
+	outbound *http.Client
+	txt      func(ctx context.Context, name string) ([]string, error)
+}
+
+const (
+	// bodyLimit lets the largest import through on a slow link and drops a client
+	// that trickles a body in.
+	bodyLimit = 5 * time.Minute
+	// answerLimit drops a client that never reads its answer.
+	answerLimit = 2 * time.Minute
+)
+
+// setDeadlines bounds this request alone. The server has no read or write timeout of
+// its own, because those would also cut an agent's MCP stream, which stays open. A
+// request with no body gets no read deadline: there is nothing to wait for, and on
+// an idle connection an expired one would be taken for the client hanging up.
+func (a *App) setDeadlines(w http.ResponseWriter, r *http.Request) {
+	rc := http.NewResponseController(w)
+	read, write := a.readLimit, a.writeLimit
+	if read == 0 {
+		read = bodyLimit
+	}
+	if write == 0 {
+		write = answerLimit
+	}
+	if r.ContentLength != 0 {
+		rc.SetReadDeadline(time.Now().Add(read))
+	}
+	rc.SetWriteDeadline(time.Now().Add(write))
+}
+
+// streaming lifts the answer deadline for a route whose answer stays open. It sits
+// behind the key check, so only a request that has shown a key is left unbounded.
+func streaming(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.NewResponseController(w).SetWriteDeadline(time.Time{})
+		next.ServeHTTP(w, r)
+	}
 }
 
 // Req is who is asking and in which organisation: a signed-in member, or an API key.
 type Req struct {
-	User   *User
-	Org    *Org
-	Member *Membership
-	Orgs   []OrgMembership
-	Key    *APIKey
-	due    map[string][]Contact
+	User    *User
+	Session *Session
+	Org     *Org
+	Member  *Membership
+	Orgs    []OrgMembership
+	Key     *APIKey
+	// due is worked out once a request, for the page and the navigation both.
+	due map[string][]Contact
 }
 
 type reqKey struct{}
@@ -59,6 +113,10 @@ func (q *Req) Actor() string {
 		return q.User.Email
 	}
 	return name
+}
+
+func (q *Req) Agent() Actor {
+	return Actor{Name: q.Actor(), KeyID: q.Key.ID, ReadOnly: !q.Key.Has("research:write")}
 }
 
 func (q *Req) Voice() Voice {
@@ -89,6 +147,8 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 		fail(w, fmt.Errorf("bad request body: %w", err), http.StatusBadRequest)
 		return false
 	}
+	// The answer's clock starts once the body is in, so a slow upload doesn't use it up.
+	http.NewResponseController(w).SetWriteDeadline(time.Now().Add(answerLimit))
 	return true
 }
 
@@ -109,28 +169,41 @@ func publicURL(raw string) (string, error) {
 	return u.Scheme + "://" + u.Host, nil
 }
 
-func (a *App) sessionUser(r *http.Request) *User {
+func (a *App) session(r *http.Request) (*Session, *User) {
 	c, err := r.Cookie(sessionCookie)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
-	u, err := a.s.SessionUser(c.Value)
+	sess, u, err := a.s.SessionFor(c.Value)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
+	return sess, u
+}
+
+func (a *App) sessionUser(r *http.Request) *User {
+	_, u := a.session(r)
 	return u
+}
+
+func (a *App) setSession(w http.ResponseWriter, r *http.Request, token string) {
+	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: token, Path: "/", HttpOnly: true, Secure: a.secure(r),
+		SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(sessionLife)})
 }
 
 // member resolves the signed-in user and, for /o/{org}/ routes, their membership.
 func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		u := a.sessionUser(r)
-		if u == nil {
+		signedOut := func() {
 			if r.Method == http.MethodGet && r.Header.Get("X-Fragment") == "" {
 				http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusSeeOther)
 			} else {
 				http.Error(w, "signed out", http.StatusUnauthorized)
 			}
+		}
+		sess, u := a.session(r)
+		if u == nil {
+			signedOut()
 			return
 		}
 		// Someone still on a password their inviter saw can only go and choose their own.
@@ -142,8 +215,13 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 			}
 			return
 		}
-		q := &Req{User: u}
-		q.Orgs, _ = a.s.OrgsFor(u.ID)
+		q := &Req{User: u, Session: sess}
+		orgs, _ := a.s.OrgsFor(u.ID)
+		for _, o := range orgs {
+			if sess.Opens(o.ID) {
+				q.Orgs = append(q.Orgs, o)
+			}
+		}
 		if slug := r.PathValue("org"); slug != "" {
 			org, err := a.s.OrgBySlug(slug)
 			var m *Membership
@@ -152,6 +230,19 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 			}
 			if err != nil {
 				http.NotFound(w, r)
+				return
+			}
+			// A session another organisation's provider began is no sign-in here.
+			if !sess.Opens(org.ID) {
+				signedOut()
+				return
+			}
+			if a.ssoRequired(org, u, m, sess) {
+				if r.Method == http.MethodGet && r.Header.Get("X-Fragment") == "" {
+					http.Redirect(w, r, ssoPageURL(org, u.Email, r.URL.RequestURI()), http.StatusSeeOther)
+				} else {
+					http.Error(w, org.Name+" requires its single sign-on: reload the page to go through it", http.StatusForbidden)
+				}
 				return
 			}
 			q.Org, q.Member = org, m
@@ -214,11 +305,11 @@ func (a *App) page(w http.ResponseWriter, r *http.Request, active string, conten
 	}
 }
 
-// contentPolicy lets pages load only this app's own scripts, so text that slipped past
-// escaping still couldn't run. Styles are looser: templ writes style attributes, and the
-// fonts come from Google.
-const contentPolicy = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-	"font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+// contentPolicy lets pages load only what this app serves, so text that slipped past
+// escaping still couldn't run and nothing is fetched from anywhere else. Styles also
+// allow inline attributes, which templ writes.
+const contentPolicy = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+	"font-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
 
 func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
@@ -227,7 +318,15 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /login", a.loginPage)
 	mux.HandleFunc("POST /login", a.login)
 	mux.HandleFunc("POST /logout", a.logout)
-	mux.HandleFunc("GET /{$}", a.member(a.home))
+	mux.HandleFunc("GET /forgot", a.forgotPage)
+	mux.HandleFunc("POST /forgot", a.forgot)
+	mux.HandleFunc("GET /reset/{token}", a.resetPage)
+	mux.HandleFunc("POST /reset/{token}", a.reset)
+	mux.HandleFunc("GET /login/with/{way}", a.loginWith)
+	mux.HandleFunc("GET /login/sso", a.ssoPage)
+	mux.HandleFunc("GET /login/sso/start", a.ssoStart)
+	mux.HandleFunc("GET /login/callback", a.loginCallback)
+	mux.HandleFunc("GET /{$}", a.front)
 	mux.HandleFunc("POST /orgs", a.member(a.newOrg))
 	mux.HandleFunc("GET /password", a.member(a.passwordPage))
 	mux.HandleFunc("POST /password", a.member(a.changePassword))
@@ -243,22 +342,40 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /o/{org}/add", a.member(a.addPage))
 	mux.HandleFunc("GET /o/{org}/settings", a.member(a.settings))
 	mux.HandleFunc("GET /o/{org}/agents", a.member(a.agents))
+	mux.HandleFunc("GET /o/{org}/enquiries", a.member(a.enquiriesPage))
+	a.taskRoutes(mux)
+	mux.HandleFunc("OPTIONS "+intakePattern, a.intakePreflight)
+	mux.HandleFunc("POST "+intakePattern, a.intake)
 
 	mux.HandleFunc("POST /o/{org}/ui/mark", a.member(a.uiMark))
 	mux.HandleFunc("POST /o/{org}/ui/update", a.member(a.uiUpdate))
 	mux.HandleFunc("POST /o/{org}/ui/company", a.member(a.uiCompany))
 	mux.HandleFunc("POST /o/{org}/ui/pick", a.member(a.uiPick))
+	mux.HandleFunc("POST /o/{org}/ui/suggestion", a.member(a.uiSuggestion))
 	mux.HandleFunc("POST /o/{org}/ui/add", a.member(a.uiAdd))
 	mux.HandleFunc("POST /o/{org}/ui/voice", a.member(a.uiVoice))
 	mux.HandleFunc("POST /o/{org}/ui/settings", a.owner(a.uiSettings))
 	mux.HandleFunc("POST /o/{org}/ui/member", a.owner(a.uiMember))
 	mux.HandleFunc("POST /o/{org}/ui/member/remove", a.owner(a.uiRemoveMember))
+	mux.HandleFunc("POST /o/{org}/ui/mail", a.owner(a.uiMail))
+	mux.HandleFunc("POST /o/{org}/ui/mail/test", a.owner(a.uiMailTest))
+	mux.HandleFunc("POST /o/{org}/ui/sso", a.owner(a.uiSSO))
+	mux.HandleFunc("POST /o/{org}/ui/sso/domain", a.owner(a.uiSSODomain))
+	mux.HandleFunc("POST /o/{org}/ui/sso/domain/remove", a.owner(a.uiSSODomainRemove))
+	mux.HandleFunc("POST /o/{org}/ui/sso/verify", a.owner(a.uiSSOVerify))
+	mux.HandleFunc("POST /o/{org}/ui/export", a.owner(a.uiExport))
+	mux.HandleFunc("POST /o/{org}/ui/export-org", a.owner(a.uiExportOrg))
+	mux.HandleFunc("POST /o/{org}/ui/erase", a.owner(a.uiErase))
+	mux.HandleFunc("POST /o/{org}/ui/enquiry/delete", a.owner(a.uiDeleteEnquiry))
 	mux.HandleFunc("POST /o/{org}/ui/keys", a.owner(a.uiKey))
 	mux.HandleFunc("POST /o/{org}/ui/keys/revoke", a.owner(a.uiRevoke))
 
 	a.apiRoutes(mux)
 
 	sameOrigin := http.NewCrossOriginProtection()
+	// Enquiry forms live on other sites. The route checks the origin against the
+	// organisation's own list, and reads no session.
+	sameOrigin.AddInsecureBypassPattern("POST " + intakePattern)
 	if a.base != "" {
 		// Behind a proxy that rewrites Host, an older browser's Origin wouldn't match it.
 		if err := sameOrigin.AddTrustedOrigin(a.base); err != nil {
@@ -266,6 +383,7 @@ func (a *App) Routes() http.Handler {
 		}
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		a.setDeadlines(w, r)
 		if wantsPage(r) {
 			page := &problemPage{ResponseWriter: w, r: r}
 			defer page.finish()
@@ -288,8 +406,9 @@ func (a *App) Routes() http.Handler {
 			}
 		}
 		// Signed-in browsers send cookies; a cross-site form can't send JSON without a
-		// CORS preflight, which is never answered. Login and the API key routes are exempt.
-		if r.Method == http.MethodPost && r.URL.Path != "/login" && r.URL.Path != "/logout" &&
+		// CORS preflight, which only the enquiry route answers, and only for the sites an
+		// organisation lists. The signed-out forms and the API key routes are exempt.
+		if r.Method == http.MethodPost && !signedOutForm(r.URL.Path) &&
 			!hasKey(r) && !strings.HasPrefix(r.Header.Get("content-type"), "application/json") {
 			http.Error(w, "POST bodies must be application/json", http.StatusUnsupportedMediaType)
 			return
@@ -298,9 +417,18 @@ func (a *App) Routes() http.Handler {
 	})
 }
 
+// signedOutForm is a plain HTML form somebody with no session posts.
+func signedOutForm(path string) bool {
+	return path == "/login" || path == "/logout" || path == "/forgot" || strings.HasPrefix(path, "/reset/")
+}
+
 func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
+	v := a.loginView(r.URL.Query().Get("next"), "")
+	if r.URL.Query().Has("reset") {
+		v.Notice = "Password saved. Sign in with it."
+	}
 	w.Header().Set("content-type", "text/html; charset=utf-8")
-	LoginPage(r.URL.Query().Get("next"), "").Render(r.Context(), w)
+	LoginPage(v).Render(r.Context(), w)
 }
 
 // safeNext keeps a post-login redirect on this site. Browsers drop tabs and newlines
@@ -323,7 +451,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	refuse := func(code int, problem string) {
 		w.Header().Set("content-type", "text/html; charset=utf-8")
 		w.WriteHeader(code)
-		LoginPage(r.PostForm.Get("next"), problem).Render(r.Context(), w)
+		LoginPage(a.loginView(r.PostForm.Get("next"), problem)).Render(r.Context(), w)
 	}
 	select {
 	case hashSlots <- struct{}{}:
@@ -331,23 +459,33 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	case <-r.Context().Done():
 		return
 	}
-	if wait := a.logins.begin(email); wait > 0 {
+	// A browser that has signed in to this account before is counted by itself.
+	who, known := signInBucket(email), false
+	if c, err := r.Cookie(deviceCookie); err == nil {
+		if device, ok := a.s.knownDevice(email, c.Value); ok {
+			who, known = device, true
+		}
+	}
+	if wait := a.logins.begin(who); wait > 0 {
 		seconds := int(wait.Seconds()) + 1
 		w.Header().Set("Retry-After", strconv.Itoa(seconds))
 		refuse(http.StatusTooManyRequests, "Too many attempts. Try again in "+plural(seconds, "second")+".")
 		return
 	}
-	token, _, err := a.s.Login(email, r.PostForm.Get("password"))
+	token, u, err := a.s.Login(email, r.PostForm.Get("password"))
 	// A failure that isn't a wrong password (the database, say) doesn't count against anyone.
 	if err == nil || errors.Is(err, errWrongLogin) {
-		a.logins.record(email, err == nil)
+		a.logins.record(who, err == nil)
 	}
 	if err != nil {
 		refuse(http.StatusUnauthorized, err.Error())
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: token, Path: "/", HttpOnly: true, Secure: a.secure(r),
-		SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(sessionLife)})
+	if !known {
+		http.SetCookie(w, &http.Cookie{Name: deviceCookie, Value: newDeviceToken(u), Path: "/login", HttpOnly: true, Secure: a.secure(r),
+			SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(deviceLife)})
+	}
+	a.setSession(w, r, token)
 	http.Redirect(w, r, safeNext(r.PostForm.Get("next")), http.StatusSeeOther)
 }
 
@@ -359,10 +497,27 @@ func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
+// front is the one page a signed-out visitor sees besides the sign-in form.
+func (a *App) front(w http.ResponseWriter, r *http.Request) {
+	if a.sessionUser(r) != nil {
+		a.member(a.home)(w, r)
+		return
+	}
+	w.Header().Set("content-type", "text/html; charset=utf-8")
+	if err := LandingPage().Render(r.Context(), w); err != nil {
+		log.Print(err)
+	}
+}
+
 func (a *App) home(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	if len(q.Orgs) > 0 {
 		http.Redirect(w, r, "/o/"+q.Orgs[0].Slug+"/today", http.StatusSeeOther)
+		return
+	}
+	// A session an organisation's provider began, whose day has run out, opens nothing.
+	if q.Session.Limited {
+		http.Redirect(w, r, "/login/sso?"+url.Values{"email": {q.User.Email}}.Encode(), http.StatusSeeOther)
 		return
 	}
 	w.Header().Set("content-type", "text/html; charset=utf-8")
@@ -401,7 +556,8 @@ func (a *App) changePassword(w http.ResponseWriter, r *http.Request) {
 	case <-r.Context().Done():
 		return
 	}
-	if wait := a.logins.begin(u.Email); wait > 0 {
+	// Counted apart from sign-in, so guesses made there by someone else don't hold this up.
+	if wait := a.logins.begin(changeBucket(u)); wait > 0 {
 		seconds := int(wait.Seconds()) + 1
 		w.Header().Set("Retry-After", strconv.Itoa(seconds))
 		http.Error(w, "too many attempts: try again in "+plural(seconds, "second"), http.StatusTooManyRequests)
@@ -409,11 +565,16 @@ func (a *App) changePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	err := a.s.ChangePassword(u, in.Current, in.New, keep)
 	if err == nil || errors.Is(err, errWrongCurrent) {
-		a.logins.record(u.Email, err == nil)
+		a.logins.record(changeBucket(u), err == nil)
 	}
 	if err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return
+	}
+	// The old password vouched for this browser's device cookie; the new one does now.
+	if changed, err := a.s.UserByEmail(u.Email); err == nil {
+		http.SetCookie(w, &http.Cookie{Name: deviceCookie, Value: newDeviceToken(changed), Path: "/login", HttpOnly: true, Secure: a.secure(r),
+			SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(deviceLife)})
 	}
 	if u.MustChangePassword {
 		writeJSON(w, map[string]string{"go": "/"})
@@ -428,6 +589,10 @@ func (a *App) newOrg(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := reqOf(r)
+	if q.Session.Limited {
+		fail(w, errors.New("you're signed in through one organisation's single sign-on, which opens only that organisation: sign in with a password to start another"), http.StatusForbidden)
+		return
+	}
 	o, err := a.s.CreateOrgWithOwner("", in.Name, q.User)
 	if err != nil {
 		fail(w, err, http.StatusBadRequest)
@@ -444,8 +609,14 @@ func serve(a *App, addr string) error {
 	if users == 0 {
 		log.Print("no users yet: create one with `prospector user add <email> <name>`")
 	}
+	if a.base == "" && len(a.social) > 0 {
+		return errors.New("signing in with Google, Microsoft or LinkedIn needs PROSPECTOR_URL: it is where the provider sends people back")
+	}
 	if a.base == "" && !strings.HasPrefix(addr, "127.0.0.1:") && !strings.HasPrefix(addr, "localhost:") {
 		log.Print("PROSPECTOR_URL isn't set: the session cookie is marked Secure only when a proxy sends X-Forwarded-Proto: https")
+	}
+	if a.mail != nil && a.base == "" {
+		log.Print("PROSPECTOR_URL isn't set: mail is off, because an emailed link needs the address to point at")
 	}
 	srv := &http.Server{Addr: addr, Handler: a.Routes(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
 	log.Printf("listening on http://%s", addr)

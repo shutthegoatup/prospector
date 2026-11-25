@@ -78,11 +78,17 @@ func TestPipelineInSQL(t *testing.T) {
 		"Won":                {{Replied: day, Stage: "won"}, {Replied: day, Stage: "proposal"}},
 		"Lost":               {{Replied: day, Stage: "lost"}, {}},
 		"Lost one, one live": {{Replied: day, Stage: "lost"}, {EmailSent: day}},
+		// Someone who declined before anyone reached them was never in the pipeline.
+		"Declined unreached":     {{Declined: day}},
+		"Declined after a touch": {{Declined: day, EmailSent: day}},
+		"Declined after a reply": {{Declined: day, Replied: day, Stage: "meeting"}},
+		"Declined, one in talks": {{Declined: day, EmailSent: day}, {Replied: day, Stage: "proposal"}},
 	}
 	want := map[string]string{"Nobody yet": "research", "Untouched": "research", "Turned down": "rejected",
 		"Turned down, later": "outreach", "Added": "outreach", "Emailed": "outreach", "Called": "outreach",
 		"Replied": "replied", "Meeting": "meeting", "Proposal": "proposal", "Won": "won", "Lost": "lost",
-		"Lost one, one live": "outreach"}
+		"Lost one, one live": "outreach", "Declined unreached": "research", "Declined after a touch": "outreach",
+		"Declined after a reply": "outreach", "Declined, one in talks": "proposal"}
 	for name, list := range people {
 		c := Company{OrgID: o.ID, Name: name, Stage: CompanyQualified}
 		if strings.HasPrefix(name, "Turned down") {

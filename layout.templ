@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/shutthegoatup/prospector/components"
 	"github.com/shutthegoatup/prospector/components/button"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -11,11 +12,10 @@ import (
 templ Head(title string) {
 	<meta charset="utf-8"/>
 	<meta name="viewport" content="width=device-width, initial-scale=1"/>
-	<meta name="color-scheme" content="dark"/>
+	<meta name="color-scheme" content="light"/>
 	<title>{ title }</title>
-	<link rel="preconnect" href="https://fonts.googleapis.com"/>
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"/>
+	<link rel="icon" type="image/svg+xml" href={ "/assets/img/mark.svg?v=" + assetVersion }/>
+	<link rel="stylesheet" href={ "/assets/css/fonts.css?v=" + assetVersion }/>
 	<link rel="stylesheet" href={ "/assets/css/output.css?v=" + assetVersion }/>
 	@components.Scripts()
 	<script src={ "/assets/js/app.js?v=" + assetVersion } defer></script>
@@ -23,7 +23,7 @@ templ Head(title string) {
 
 func navLink(n Nav, key string) string {
 	if n.Active == key {
-		return "flex items-center justify-between rounded-lg bg-card px-3 py-2 text-sm text-foreground shadow-[inset_2px_0_0_var(--primary)]"
+		return "flex items-center justify-between rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
 	}
 	return "flex items-center justify-between rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-card hover:text-foreground"
 }
@@ -43,22 +43,23 @@ templ NavItem(n Nav, key, label string, count int) {
 	<a href={ templ.SafeURL(n.Base() + key) } class={ navLink(n, key) }>
 		<span>{ label }</span>
 		if count > 0 {
-			<span class="font-mono text-xs text-muted-foreground">{ strconv.Itoa(count) }</span>
+			<span class="font-mono text-xs opacity-70">{ strconv.Itoa(count) }</span>
 		}
 	</a>
 }
 
 templ Layout(n Nav, content templ.Component) {
 	<!DOCTYPE html>
-	<html lang="en" class="dark">
+	<html lang="en">
 		<head>
 			@Head(n.Org.Name + " · Prospector")
 		</head>
 		<body class="queue-backdrop min-h-svh font-sans text-[15px] leading-relaxed antialiased" data-base={ n.Base() }>
 			<div class="flex min-h-svh flex-wrap">
-				<aside class="flex max-w-full flex-[1_1_240px] flex-col gap-4 border-r border-border bg-[#151515] px-3.5 py-5 md:sticky md:top-0 md:h-svh md:max-w-[260px]">
+				<aside class="flex max-w-full flex-[1_1_240px] flex-col gap-4 night bg-background px-3.5 py-5 text-foreground md:sticky md:top-0 md:h-svh md:max-w-[260px]">
+					<a href="/" class="flex items-center gap-2.5 px-1.5 font-heading text-lg font-bold tracking-tight"><img src={ "/assets/img/mark.svg?v=" + assetVersion } width="26" height="26" alt=""/>Prospector.</a>
 					<details class="group relative">
-						<summary class="flex cursor-pointer list-none items-center gap-2.5 rounded-xl border border-border bg-[#1d1d1d] px-2.5 py-2">
+						<summary class="flex cursor-pointer list-none items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2">
 							@OrgMark(n.Org.Name, n.Org.Color, "size-7 text-sm")
 							<span class="flex min-w-0 flex-1 flex-col leading-tight">
 								<span class="truncate text-sm font-semibold">{ n.Org.Name }</span>
@@ -66,18 +67,18 @@ templ Layout(n Nav, content templ.Component) {
 							</span>
 							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground" aria-hidden="true"><path d="M7 10l5-5 5 5M7 14l5 5 5-5"></path></svg>
 						</summary>
-						<div class="absolute inset-x-0 top-full z-20 mt-2 flex flex-col gap-0.5 rounded-xl border border-[#333] bg-card p-2 shadow-2xl">
+						<div class="absolute inset-x-0 top-full z-20 mt-2 flex flex-col gap-0.5 rounded-xl border border-border bg-card p-2 shadow-2xl">
 							<p class="px-2 py-1 font-mono text-xs text-muted-foreground">{ n.User.Email }</p>
 							for _, o := range n.Orgs {
-								<a href={ templ.SafeURL("/o/" + o.Slug + "/today") } class="flex items-center gap-3 rounded-lg px-2 py-2 text-sm text-foreground hover:bg-[#2a2a2a]">
+								<a href={ templ.SafeURL("/o/" + o.Slug + "/today") } class="flex items-center gap-3 rounded-lg px-2 py-2 text-sm text-foreground hover:bg-secondary">
 									@OrgMark(o.Name, o.Color, "size-7 text-sm")
 									<span class="flex-1">{ o.Name }<span class="block font-mono text-xs text-muted-foreground">{ o.Role }</span></span>
 									if o.ID == n.Org.ID {
-										<span class="text-primary" aria-label="current">✓</span>
+										<span class="text-mark" aria-label="current">✓</span>
 									}
 								</a>
 							}
-							<form data-form="/orgs" class="mt-1 flex gap-2 border-t border-[#333] px-1 pt-2">
+							<form data-form="/orgs" class="mt-1 flex gap-2 border-t border-border px-1 pt-2">
 								<label class="sr-only" for="new-org">New organisation</label>
 								<input id="new-org" name="name" required placeholder="New organisation" class="h-8 min-w-0 flex-1 rounded-md border border-input bg-muted px-2 text-sm"/>
 								@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Type: button.TypeSubmit}) {
@@ -93,6 +94,8 @@ templ Layout(n Nav, content templ.Component) {
 						@NavItem(n, "today", "Today", n.Today)
 						@NavItem(n, "research", "Research", n.Research)
 						@NavItem(n, "conversations", "Conversations", n.Conversations)
+						@NavItem(n, "enquiries", "Enquiries", 0)
+						@NavItem(n, "tasks", "Tasks", 0)
 						@NavItem(n, "companies", "Companies", n.Companies)
 						@NavItem(n, "settings", "Settings", 0)
 						@NavItem(n, "agents", "Agents & API", 0)
@@ -113,50 +116,169 @@ templ Layout(n Nav, content templ.Component) {
 
 templ PageHead(title string) {
 	<header class="mb-5 flex flex-wrap items-baseline justify-between gap-3">
-		<h1 class="font-heading text-3xl font-bold tracking-tight">{ title }<span class="text-primary">.</span></h1>
+		<h1 class="font-heading text-4xl font-bold tracking-tight">{ title }<span class="text-coral">.</span></h1>
 		{ children... }
 	</header>
 }
 
-templ LoginPage(next, problem string) {
+templ LoginPage(v LoginView) {
 	<!DOCTYPE html>
-	<html lang="en" class="dark">
+	<html lang="en">
 		<head>
 			@Head("Sign in · Prospector")
 		</head>
-		<body class="queue-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased">
-			<form method="post" action="/login" class="flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-card p-7">
-				<h1 class="font-heading text-2xl font-bold">Prospector<span class="text-primary">.</span></h1>
-				if problem != "" {
-					<p class="text-sm text-[var(--stop)]" role="alert">{ problem }</p>
+		<body class="front-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased">
+			<main class="flex w-full max-w-sm flex-col gap-4 panel panel-lift p-7">
+				<h1 class="flex items-center gap-2.5 font-heading text-2xl font-bold"><img src={ "/assets/img/mark.svg?v=" + assetVersion } width="30" height="30" alt=""/>Prospector.</h1>
+				if v.Problem != "" {
+					<p class="text-sm text-[var(--stop)]" role="alert">{ v.Problem }</p>
 				}
-				<input type="hidden" name="next" value={ next }/>
+				if v.Notice != "" {
+					<p class="text-sm text-[var(--ok)]" role="status">{ v.Notice }</p>
+				}
+				<form method="post" action="/login" class="flex flex-col gap-4">
+					<input type="hidden" name="next" value={ v.Next }/>
+					<label class="flex flex-col gap-1.5 text-sm">
+						<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Email</span>
+						<input name="email" type="email" required autocomplete="username" class="h-10 rounded-lg border border-input bg-muted px-3"/>
+					</label>
+					<label class="flex flex-col gap-1.5 text-sm">
+						<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Password</span>
+						<input name="password" type="password" required autocomplete="current-password" class="h-10 rounded-lg border border-input bg-muted px-3"/>
+					</label>
+					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg}) {
+						Sign in
+					}
+					if v.Forgot {
+						<a href="/forgot" class="text-sm text-muted-foreground hover:text-foreground">Forgot your password?</a>
+					}
+				</form>
+				if len(v.Ways) > 0 || v.SSO {
+					<nav class="flex flex-col gap-2 border-t border-dashed border-border pt-2" aria-label="Other ways to sign in">
+						<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Or</span>
+						for _, way := range v.Ways {
+							@button.Button(button.Props{Href: "/login/with/" + way.Key + nextQuery(v.Next), Variant: button.VariantOutline}) {
+								Continue with { way.Label }
+							}
+						}
+						if v.SSO {
+							@button.Button(button.Props{Href: "/login/sso" + nextQuery(v.Next), Variant: button.VariantOutline}) {
+								Use your organisation's single sign-on
+							}
+						}
+					</nav>
+				}
+			</main>
+		</body>
+	</html>
+}
+
+templ ForgotPage(sent bool) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			@Head("Reset your password · Prospector")
+		</head>
+		<body class="front-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased">
+			<form method="post" action="/forgot" class="flex w-full max-w-sm flex-col gap-4 panel panel-lift p-7">
+				<h1 class="font-heading text-2xl font-bold">Reset your password</h1>
+				if sent {
+					<p class="text-sm text-[var(--ok)]" role="status">If that address has an account, a link is on its way. It lasts an hour.</p>
+				} else {
+					<p class="text-sm text-muted-foreground">We'll email you a link to choose a new one.</p>
+				}
 				<label class="flex flex-col gap-1.5 text-sm">
 					<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Email</span>
 					<input name="email" type="email" required autocomplete="username" class="h-10 rounded-lg border border-input bg-muted px-3"/>
 				</label>
+				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg}) {
+					Email me a link
+				}
+				<a href="/login" class="text-sm text-muted-foreground hover:text-foreground">Back to sign in</a>
+			</form>
+		</body>
+	</html>
+}
+
+templ ResetPage(token, email, problem string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			@Head("Choose a password · Prospector")
+		</head>
+		<body class="front-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased">
+			<form method="post" action={ templ.SafeURL("/reset/" + token) } class="flex w-full max-w-sm flex-col gap-4 panel panel-lift p-7">
+				<h1 class="font-heading text-2xl font-bold">Choose a password</h1>
+				<p class="text-sm text-muted-foreground">For { email }. 10 characters or more.</p>
+				if problem != "" {
+					<p class="text-sm text-[var(--stop)]" role="alert">{ problem }</p>
+				}
 				<label class="flex flex-col gap-1.5 text-sm">
-					<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Password</span>
-					<input name="password" type="password" required autocomplete="current-password" class="h-10 rounded-lg border border-input bg-muted px-3"/>
+					<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">New password</span>
+					<input name="password" type="password" required minlength="10" autocomplete="new-password" class="h-10 rounded-lg border border-input bg-muted px-3"/>
 				</label>
 				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg}) {
-					Sign in
+					Save password
 				}
 			</form>
 		</body>
 	</html>
 }
 
+func nextQuery(next string) string {
+	if next == "" {
+		return ""
+	}
+	return "?next=" + url.QueryEscape(next)
+}
+
+// SSOPage answers with links and never a redirect: a form here may only end on this site.
+templ SSOPage(v SSOView) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			@Head("Single sign-on · Prospector")
+		</head>
+		<body class="front-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased">
+			<main class="flex w-full max-w-sm flex-col gap-4 panel panel-lift p-7">
+				<h1 class="font-heading text-2xl font-bold">Single sign-on<span class="text-coral">.</span></h1>
+				if v.Problem != "" {
+					<p class="text-sm text-[var(--stop)]" role="alert">{ v.Problem }</p>
+				}
+				if v.Asked != "" {
+					<p class="text-sm text-muted-foreground">{ v.Asked } asks its people to sign in through its own provider.</p>
+				}
+				for _, o := range v.Orgs {
+					@button.Button(button.Props{Href: ssoStartURL(&o, v.Email, v.Next), Size: button.SizeLg}) {
+						Continue to { o.Name }
+					}
+				}
+				<form method="get" action="/login/sso" class="flex flex-col gap-4">
+					<input type="hidden" name="next" value={ v.Next }/>
+					<label class="flex flex-col gap-1.5 text-sm">
+						<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Work email</span>
+						<input name="email" type="email" required autocomplete="username" value={ v.Email } class="h-10 rounded-lg border border-input bg-muted px-3"/>
+					</label>
+					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline}) {
+						Find my organisation
+					}
+				</form>
+				<a href={ templ.SafeURL("/login" + nextQuery(v.Next)) } class="text-sm text-muted-foreground hover:text-foreground">Sign in with a password instead</a>
+			</main>
+		</body>
+	</html>
+}
+
 templ ProblemPage(code int, title, message string) {
 	<!DOCTYPE html>
-	<html lang="en" class="dark">
+	<html lang="en">
 		<head>
 			@Head(title + " · Prospector")
 		</head>
-		<body class="queue-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased" data-base="/">
-			<main class="flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-card p-7">
+		<body class="front-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased" data-base="/">
+			<main class="flex w-full max-w-sm flex-col gap-4 panel panel-lift p-7">
 				<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">{ strconv.Itoa(code) }</span>
-				<h1 class="font-heading text-2xl font-bold">{ title }<span class="text-primary">.</span></h1>
+				<h1 class="font-heading text-2xl font-bold">{ title }<span class="text-coral">.</span></h1>
 				<p class="text-sm text-muted-foreground" role="alert">{ message }</p>
 				@button.Button(button.Props{Href: "/", Size: button.SizeLg}) {
 					Back to Prospector
@@ -168,13 +290,13 @@ templ ProblemPage(code int, title, message string) {
 
 templ ChoosePassword(u *User) {
 	<!DOCTYPE html>
-	<html lang="en" class="dark">
+	<html lang="en">
 		<head>
 			@Head("Choose a password · Prospector")
 		</head>
-		<body class="queue-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased" data-base="/">
+		<body class="front-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased" data-base="/">
 			<div class="flex w-full max-w-sm flex-col gap-4">
-				<form data-form="/password" class="flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-card p-7">
+				<form data-form="/password" class="flex w-full max-w-sm flex-col gap-4 panel panel-lift p-7">
 					<h1 class="font-heading text-2xl font-bold">Choose your own password</h1>
 					<p class="text-sm text-muted-foreground">The one you signed in with was shown to whoever added you. Choose one only you know, 10 characters or more.</p>
 					<label class="flex flex-col gap-1.5 text-sm">
@@ -201,12 +323,12 @@ templ ChoosePassword(u *User) {
 
 templ NoOrgs(u *User) {
 	<!DOCTYPE html>
-	<html lang="en" class="dark">
+	<html lang="en">
 		<head>
 			@Head("Prospector")
 		</head>
-		<body class="queue-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased" data-base="/">
-			<form data-form="/orgs" class="flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-card p-7">
+		<body class="front-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased" data-base="/">
+			<form data-form="/orgs" class="flex w-full max-w-sm flex-col gap-4 panel panel-lift p-7">
 				<h1 class="font-heading text-2xl font-bold">Your first organisation</h1>
 				<p class="text-sm text-muted-foreground">The company you're prospecting for. You can add more later and switch between them.</p>
 				<input name="name" required placeholder="Organisation name" class="h-10 rounded-lg border border-input bg-muted px-3"/>
@@ -243,7 +365,7 @@ func badgeClass(state string) string {
 	case "stop":
 		return "text-[var(--stop)] bg-[color-mix(in_oklab,var(--stop)_12%,transparent)]"
 	case "agent":
-		return "text-primary bg-[color-mix(in_oklab,var(--primary)_12%,transparent)]"
+		return "text-[var(--agent)] bg-[color-mix(in_oklab,var(--agent)_12%,transparent)]"
 	}
 	return "text-muted-foreground bg-secondary"
 }
@@ -264,7 +386,7 @@ templ Label(text string) {
 }
 
 templ Quote(s string) {
-	<div class="whitespace-pre-wrap rounded-lg border-l-2 border-primary/50 bg-muted px-4 py-3 text-[15px] leading-relaxed">{ s }</div>
+	<div class="whitespace-pre-wrap rounded-lg border-l-2 border-primary bg-muted px-4 py-3 text-[15px] leading-relaxed">{ s }</div>
 }
 
 templ Empty(title, text string) {
@@ -297,7 +419,7 @@ templ Pager(pg Page, href func(int) string) {
 }
 
 templ Chip(href, label string, count int, on bool) {
-	<a href={ templ.SafeURL(href) } class={ "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors", chipClass(on) }>
+	<a href={ templ.SafeURL(href) } class={ "inline-flex min-h-8 items-center gap-1.5 rounded-full border-2 px-3 text-sm font-medium transition-colors", chipClass(on) }>
 		{ label }
 		<span class="font-mono text-xs opacity-80">{ strconv.Itoa(count) }</span>
 	</a>
@@ -305,9 +427,9 @@ templ Chip(href, label string, count int, on bool) {
 
 func chipClass(on bool) string {
 	if on {
-		return "border-primary bg-primary text-primary-foreground"
+		return "border-foreground bg-primary text-primary-foreground shadow-[2px_2px_0_var(--foreground)]"
 	}
-	return "border-input text-muted-foreground hover:text-foreground"
+	return "border-input bg-card text-muted-foreground hover:border-foreground hover:text-foreground"
 }
 
 func actorState(actor string) string {

@@ -38,6 +38,9 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --color-mark: var(--mark);
+  --color-ink: var(--ink);
+  --color-coral: var(--coral);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -48,77 +51,68 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* Paper, ink and gold, the same palette as the front page (landing.css). Gold is for
+   fills with ink text on them; --mark is the gold that is dark enough to read as text. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --ink: #1c1810;
+  --mark: #8a5600;
+  --coral: #ff7452;
+  --agent: #5b45d6;
+  --edge: #d6cab2;
+  --background: #fbf6ec;
+  --foreground: var(--ink);
+  --card: #fffdf8;
+  --card-foreground: var(--ink);
+  --popover: #fffdf8;
+  --popover-foreground: var(--ink);
+  --primary: #ffc233;
+  --primary-foreground: var(--ink);
+  --secondary: #f1e8d5;
+  --secondary-foreground: var(--ink);
+  --muted: #f6efdf;
+  --muted-foreground: #6b6252;
+  --accent: #f1e8d5;
+  --accent-foreground: var(--ink);
+  --destructive: #c2361a;
+  --border: #e2d8c3;
+  --input: #b3a78e;
+  --ring: #8f7bff;
+  --chart-1: #ffc233;
+  --chart-2: #35c58a;
+  --chart-3: #ff7452;
+  --chart-4: #8f7bff;
+  --chart-5: #6b6252;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #17130c;
+  --sidebar-foreground: #fbf6ec;
+  --sidebar-primary: #ffc233;
+  --sidebar-primary-foreground: var(--ink);
+  --sidebar-accent: #2b241a;
+  --sidebar-accent-foreground: #fbf6ec;
+  --sidebar-border: #3b3324;
+  --sidebar-ring: #8f7bff;
+  --ok: #0f7a50;
+  --warn: #a85d00;
+  --stop: #c2361a;
+  --ok-fill: #35c58a;
+  --warn-fill: #ff9f43;
+  --stop-fill: #ff7452;
 }
 
-/* The old Python tracker's palette: #181818 page, #232323 cards, #56c5f4 accent. */
-.dark {
-  --background: #181818;
-  --foreground: #f2f2f2;
-  --card: #232323;
-  --card-foreground: #f2f2f2;
-  --popover: #232323;
-  --popover-foreground: #f2f2f2;
-  --primary: #56c5f4;
-  --primary-foreground: #0d1a21;
-  --secondary: #2d2d2d;
-  --secondary-foreground: #f2f2f2;
-  --muted: #1b1b1b;
-  --muted-foreground: #9a9a9a;
-  --accent: #2d2d2d;
-  --accent-foreground: #f2f2f2;
-  --destructive: #ff8a8a;
-  --border: #2e2e2e;
-  --input: #3a3a3a;
-  --ring: #56c5f4;
-  --chart-1: #56c5f4;
-  --chart-2: #7fe0a8;
-  --chart-3: #f5c66b;
-  --chart-4: #ff9a9a;
-  --chart-5: #9a9a9a;
-  --sidebar: #1e1e1e;
-  --sidebar-foreground: #f2f2f2;
-  --sidebar-primary: #56c5f4;
-  --sidebar-primary-foreground: #0d1a21;
-  --sidebar-accent: #2d2d2d;
-  --sidebar-accent-foreground: #f2f2f2;
-  --sidebar-border: #2e2e2e;
-  --sidebar-ring: #56c5f4;
-  --ok: #7fe0a8;
-  --warn: #f5c66b;
-  --stop: #ff9a9a;
+/* A dark band on the paper page: the sidebar and code blocks. Redefining the tokens
+   here lets everything inside keep its ordinary classes. */
+.night {
+  --background: #17130c;
+  --foreground: #fbf6ec;
+  --card: #241d13;
+  --card-foreground: #fbf6ec;
+  --secondary: #2f271b;
+  --secondary-foreground: #fbf6ec;
+  --muted: #100d08;
+  --muted-foreground: #b9b0a0;
+  --border: #3b3324;
+  --input: #5a4f3c;
+  color: var(--foreground);
 }
 
 @layer base {
@@ -129,14 +123,15 @@
     @apply bg-background text-foreground;
   }
   ::selection {
-    background: color-mix(in oklab, var(--primary) 35%, transparent);
+    background: var(--primary);
+    color: var(--ink);
   }
 }
 
-/* A faint accent glow at the top and a grain over the flat #181818. */
+/* A gold glow at the top and a grain over the paper. */
 .queue-backdrop {
   background:
-    radial-gradient(60rem 28rem at 50% -12rem, color-mix(in oklab, var(--primary) 9%, transparent), transparent 70%),
+    radial-gradient(60rem 26rem at 50% -12rem, color-mix(in oklab, var(--primary) 34%, transparent), transparent 70%),
     var(--background);
 }
 .queue-backdrop::after {
@@ -144,8 +139,32 @@
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.035;
+  opacity: 0.05;
+  mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Sign-in and the other one-card pages stand on the front page's gold. */
+.front-backdrop {
+  background: radial-gradient(70rem 40rem at 12% 0, #ffd970, transparent 65%), var(--primary);
+}
+
+/* The ink edge everything boxed shares with the front page. */
+.panel, [data-slot="card"] {
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: none;
+}
+.panel-lift { box-shadow: 8px 8px 0 var(--ink); }
+.tag {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--primary);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 500;
 }
 
 /* Cards rise in one after another on load, capped so a 300-card tab doesn't crawl. */
@@ -161,15 +180,8 @@
 }
 .settled .rise { animation: none; }
 
-/* The rail down a card's left edge shows its call-time state at a glance. */
-.rail { position: relative; overflow: hidden; }
-.rail::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: var(--rail, var(--border));
-}
-.rail[data-state="ok"] { --rail: var(--ok); }
-.rail[data-state="warn"] { --rail: var(--warn); }
-.rail[data-state="stop"] { --rail: var(--stop); }
+/* A card's offset shadow shows its call-time state at a glance. */
+.rail { box-shadow: 5px 5px 0 var(--rail, var(--edge)); }
+.rail[data-state="ok"] { --rail: var(--ok-fill); }
+.rail[data-state="warn"] { --rail: var(--warn-fill); }
+.rail[data-state="stop"] { --rail: var(--stop-fill); }

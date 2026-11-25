@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/shutthegoatup/prospector/components/button"
 	"strconv"
+	"strings"
 )
 
 func researchEmpty(f string) (string, string) {
@@ -13,6 +14,8 @@ func researchEmpty(f string) (string, string) {
 		return "Every qualified company has a contact", "Add someone with + Add person, or let an agent suggest people."
 	case "verify":
 		return "No emails to verify", "Contacts whose email is a pattern guess show up here."
+	case "details":
+		return "No details to check", "An email, phone or profile an agent finds for someone already here waits for you to accept it."
 	}
 	return "Nothing here", ""
 }
@@ -32,25 +35,6 @@ func jsonBody(pairs ...any) string {
 		}
 	}
 	return s + "}"
-}
-
-func platformText(c Company) string {
-	switch {
-	case c.Platform != "" && c.BuiltBy != "":
-		return c.Platform + ", by " + c.BuiltBy
-	case c.Platform != "":
-		return c.Platform
-	case c.ConfiguratorURL != "":
-		return "has one, platform unknown"
-	}
-	return "none found"
-}
-
-func platformState(c Company) string {
-	if c.Platform != "" || c.ConfiguratorURL != "" {
-		return "ok"
-	}
-	return ""
 }
 
 templ ResearchView(q *Req, f string, rows []ResearchRow, pg Page, counts map[string]int) {
@@ -83,18 +67,20 @@ templ ResearchView(q *Req, f string, rows []ResearchRow, pg Page, counts map[str
 }
 
 templ ResearchItem(q *Req, r ResearchRow, i int) {
-	<article class="rise rounded-xl border border-border bg-card" style={ itemStyle(i) }>
+	<article class="rise panel" style={ itemStyle(i) }>
 		<div class="flex flex-wrap items-start gap-x-6 gap-y-3 px-5 py-4">
 			<div class="min-w-[200px] flex-[2_1_220px]">
-				<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(r.ID, 10)) } class="font-heading text-lg font-semibold text-foreground hover:text-primary">{ r.Name }</a>
+				<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(r.ID, 10)) } class="font-heading text-lg font-semibold text-foreground hover:text-mark">{ r.Name }</a>
 				<p class="font-mono text-xs text-muted-foreground">
 					{ joinNonEmpty(" · ", r.Country, r.Segment, r.Domain) }
 				</p>
 			</div>
-			<div class="flex flex-[1_1_180px] flex-col gap-1">
-				@Label("Configurator")
-				<div>@Pill(platformText(r.Company), platformState(r.Company))</div>
-			</div>
+			if found := assetsFound(q.Org.Settings, r.Facts); len(found) > 0 {
+				<div class="flex flex-[1_1_180px] flex-col gap-1">
+					@Label("Looking for")
+					@AssetPills(found)
+				</div>
+			}
 			<div class="flex flex-[1_1_150px] flex-col gap-1">
 				@Label("Found by")
 				<div>@Pill(actorLabel(r.FoundBy), actorState(r.FoundBy))</div>
@@ -114,7 +100,7 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 				}
 			</div>
 		</div>
-		<details class="group border-t border-border/70 bg-black/10" open?={ i == 0 }>
+		<details class="group border-t border-border/70 bg-muted" open?={ i == 0 }>
 			<summary class="flex cursor-pointer list-none items-center gap-2 px-5 py-2.5 font-mono text-xs text-muted-foreground hover:text-foreground">
 				<span class="transition-transform group-open:rotate-90">›</span>
 				{ plural(len(r.Facts), "fact") + " · " + plural(len(r.People), "person") }
@@ -126,14 +112,7 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 						<div class="grid grid-cols-[130px_1fr] gap-3 border-b border-dashed border-border py-2 text-sm"><span class="font-mono text-xs text-muted-foreground">why it fits</span><span>{ r.Why }</span></div>
 					}
 					for _, f := range r.Facts {
-						<div class="grid grid-cols-[130px_1fr_auto] items-baseline gap-3 border-b border-dashed border-border py-2 text-sm">
-							<span class="font-mono text-xs text-muted-foreground">{ f.Field }</span>
-							<span>{ f.Value }</span>
-							<a href={ safeHref(f.SourceURL) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
-						</div>
-					}
-					if r.ConfiguratorURL != "" {
-						<div class="grid grid-cols-[130px_1fr] gap-3 py-2 text-sm"><span class="font-mono text-xs text-muted-foreground">configurator</span><a href={ safeHref(r.ConfiguratorURL) } target="_blank" rel="noopener" class="break-all">{ r.ConfiguratorURL }</a></div>
+						@FactRow(f)
 					}
 				</div>
 				<div class="min-w-0 flex-[1_1_260px]">
@@ -167,6 +146,7 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 							} else {
 								@Meta(contactStage(p))
 							}
+							@SuggestedDetails(r.Pending[p.ID])
 						</div>
 					}
 				</div>
@@ -182,4 +162,63 @@ templ FitPicker(c Company) {
 			<option value={ g } selected?={ g == c.Fit || (c.Fit == "" && g == "B") }>{ "Fit " + g }</option>
 		}
 	</select>
+}
+
+templ AssetPills(found []AssetFound) {
+	<div class="flex flex-wrap gap-1.5">
+		for _, a := range found {
+			if a.Has {
+				@Pill(strings.ReplaceAll(a.Field, "_", " "), "ok")
+			} else {
+				@Pill("no "+strings.ReplaceAll(a.Field, "_", " ")+" found", "")
+			}
+		}
+	</div>
+}
+
+func detailLabel(field string) string {
+	switch field {
+	case "linkedin":
+		return "LinkedIn profile"
+	case "phone":
+		return "phone number"
+	}
+	return field
+}
+
+func suggestedNote(d PendingDetail) string {
+	var notes []string
+	if d.EmailStatus == "guess" {
+		notes = append(notes, "a guess")
+	}
+	if d.Current != "" {
+		notes = append(notes, "in place of "+d.Current)
+	}
+	return strings.Join(notes, ", ")
+}
+
+templ SuggestedDetails(list []PendingDetail) {
+	for _, d := range list {
+		<div class="flex flex-wrap items-center gap-2 rounded-lg bg-muted p-3 text-sm">
+			<span class="min-w-0 flex-[1_1_220px]">
+				<span class="font-mono text-xs text-muted-foreground">{ "suggested " + detailLabel(d.Field) }</span>
+				<span class="block break-all">{ d.Value }</span>
+				if note := suggestedNote(d); note != "" {
+					<span class="block text-muted-foreground">{ note }</span>
+				}
+				<span class="flex flex-wrap items-center gap-2">
+					<span class="font-mono text-xs text-mark">{ actorLabel(d.By) }</span>
+					if d.SourceURL != "" {
+						<a href={ safeHref(d.SourceURL) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
+					}
+				</span>
+			</span>
+			@button.Button(button.Props{Size: button.SizeXs, Attributes: templ.Attributes{"data-post": "ui/suggestion", "data-body": jsonBody("id", d.ID, "decision", SuggestionAccepted)}}) {
+				Accept
+			}
+			@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/suggestion", "data-body": jsonBody("id", d.ID, "decision", SuggestionDismissed)}}) {
+				Dismiss
+			}
+		</div>
+	}
 }

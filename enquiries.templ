@@ -1,0 +1,78 @@
+package main
+
+import (
+	"github.com/shutthegoatup/prospector/components/button"
+	"strconv"
+)
+
+func enquiryState(kind string) string {
+	switch kind {
+	case "sales", "demo", "signup":
+		return "ok"
+	case "support":
+		return "warn"
+	case "feature":
+		return "agent"
+	}
+	return ""
+}
+
+func enquiryFrom(e Enquiry) string {
+	from := joinNonEmpty(" · ", e.Site, e.Phone)
+	if e.Via != "form" {
+		from = joinNonEmpty(" · ", actorLabel(e.Via), from)
+	}
+	return joinNonEmpty(" · ", e.CreatedAt.Format("2 Jan 2006 15:04"), from)
+}
+
+templ EnquiriesView(q *Req, d EnquiriesData) {
+	@PageHead("Enquiries")
+	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">What people sent through your sites' forms and your products, newest first. The words are theirs, exactly as sent.</p>
+	<div class="mb-5 flex flex-wrap gap-2">
+		@Chip(q.Base()+"enquiries", "All", d.Counts[""], d.Filter.Kind == "" && !d.Filter.Spam)
+		for _, k := range EnquiryKinds {
+			if d.Counts[k.Key] > 0 {
+				@Chip(q.Base()+"enquiries?kind="+k.Key, k.Label, d.Counts[k.Key], d.Filter.Kind == k.Key && !d.Filter.Spam)
+			}
+		}
+		if d.Counts["spam"] > 0 {
+			@Chip(q.Base()+"enquiries?spam=1", "Spam", d.Counts["spam"], d.Filter.Spam)
+		}
+	</div>
+	if len(d.Rows) == 0 {
+		@Empty("Nothing yet", "Enquiries appear here once a site listed in Settings posts one, or a key with the enquiries:write scope does.")
+	}
+	<div class="flex max-w-3xl flex-col gap-3">
+		for _, e := range d.Rows {
+			<article class="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 text-sm">
+				<div class="flex flex-wrap items-center justify-between gap-2">
+					<span>
+						<b>{ e.Name }</b>
+						<a href={ templ.SafeURL("mailto:" + e.Email) } class="text-muted-foreground underline">{ e.Email }</a>
+						if e.Company != "" {
+							<span class="text-muted-foreground">{ " · " + e.Company }</span>
+						}
+					</span>
+					@Pill(kindLabel(e.Kind), enquiryState(e.Kind))
+				</div>
+				if e.Message != "" {
+					@Quote(e.Message)
+				}
+				<div class="flex flex-wrap items-center justify-between gap-2">
+					@Meta(enquiryFrom(e))
+					if e.CompanyID != nil {
+						<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(*e.CompanyID, 10)) } class="font-mono text-xs text-mark underline">{ d.Companies[*e.CompanyID] }</a>
+					}
+				</div>
+				<div class="flex flex-wrap items-center justify-between gap-2">
+					@Meta(e.Page)
+					if q.Owner() {
+						@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/enquiry/delete", "data-body": jsonBody("id", e.ID), "data-confirm": "Delete this enquiry from " + e.Email + " for good?"}}) {
+							Delete
+						}
+					}
+				</div>
+			</article>
+		}
+	</div>
+}

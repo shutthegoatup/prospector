@@ -11,7 +11,7 @@ var pipelineStages = []string{"research", "outreach", "replied", "meeting", "pro
 func stageClass(st string) string {
 	switch st {
 	case "replied", "meeting", "proposal", "won":
-		return "bg-[color-mix(in_oklab,var(--primary)_14%,transparent)] text-primary"
+		return "bg-[color-mix(in_oklab,var(--primary)_14%,transparent)] text-mark"
 	}
 	return "bg-secondary text-muted-foreground"
 }
@@ -48,16 +48,16 @@ templ CompaniesView(q *Req, f CompanyFilter, rows []CompanyListRow, pg Page, seg
 	if len(rows) == 0 {
 		@Empty("No companies match", "Clear the filters, or add companies through Research or an agent.")
 	}
-	<div class="overflow-hidden rounded-xl border border-border bg-card">
+	<div class="overflow-hidden panel">
 		for _, r := range rows {
-			<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(r.ID, 10)) } class="flex items-center justify-between gap-3 border-b border-[#2a2a2a] px-4 py-3 text-sm text-foreground last:border-0 hover:bg-[#262626] hover:text-foreground">
+			<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(r.ID, 10)) } class="flex items-center justify-between gap-3 border-b border-border px-4 py-3 text-sm text-foreground last:border-0 hover:bg-secondary hover:text-foreground">
 				<span class="min-w-0">
 					<b>{ r.Name }</b>
 					<span class="block truncate font-mono text-xs text-muted-foreground">{ joinNonEmpty(" · ", r.Country, r.Segment, plural(r.People, "person")) }</span>
 				</span>
 				<span class="flex items-center gap-2">
 					if r.Fit != "" {
-						<span class="font-mono text-xs text-primary">{ r.Fit }</span>
+						<span class="font-mono text-xs text-mark">{ r.Fit }</span>
 					}
 					@StageTag(r.Pipeline)
 				</span>
@@ -77,6 +77,13 @@ func historyText(h HistoryItem) string {
 		"add:facts": "added facts", "add:fact": "added a fact", "add:contact": "suggested a contact",
 		"add:person": "added", "pick": "picked for outreach", "company:qualified": "qualified the company",
 		"company:rejected": "rejected the company", "company:review": "sent back to review",
+		"erase": "erased a person on request", "enquiry": "sent an enquiry",
+		"suggest:email": "suggested an email", "suggest:phone": "suggested a phone number", "suggest:linkedin": "suggested a LinkedIn profile",
+		"dismiss:email": "dismissed a suggested email", "dismiss:phone": "dismissed a suggested phone number", "dismiss:linkedin": "dismissed a suggested LinkedIn profile",
+		"export": "exported what is held on them", "task:match": "matched to a task",
+		"note:skipped": "left a note: skipped", "note:dead_end": "left a note: found nothing", "note:next": "left a note: what to do next",
+		"task:new": "wrote a task", "task:ask": "asked for more on a task", "task:pickup": "picked up a task",
+		"task:done": "finished a request", "task:reopen": "reopened a request", "task:close": "closed a task", "task:open": "reopened a task",
 	}[h.Action]
 	if verb == "" {
 		if f, ok := strings.CutPrefix(h.Action, "set:"); ok {
@@ -100,9 +107,17 @@ func historyText(h HistoryItem) string {
 	return s
 }
 
+func eraseConfirm(c Contact) string {
+	who := displayName(c)
+	if len(alternates(deref(c.Person))) > 1 {
+		who = "everyone on this row (" + deref(c.Person) + ")"
+	}
+	return "Erase " + who + "? Their details, drafts and notes are deleted for good, along with agents' notes about this company and its tasks, and they can't be added again. Facts about the company, and the briefs and requests on tasks, that mention them aren't found for you, and nor are your own lead files: take them out there too."
+}
+
 templ CompanyView(q *Req, p CompanyPage) {
 	<a href={ templ.SafeURL(q.Base() + "companies") } class="font-mono text-xs">← Companies</a>
-	<div class="mt-3 flex flex-col gap-5 rounded-xl border border-border bg-card p-6">
+	<div class="mt-3 flex flex-col gap-5 panel p-6">
 		<div class="flex flex-wrap items-start justify-between gap-3">
 			<div>
 				<h1 class="font-heading text-3xl font-bold tracking-tight">{ p.Company.Name }</h1>
@@ -121,7 +136,20 @@ templ CompanyView(q *Req, p CompanyPage) {
 			<p class="text-sm text-muted-foreground">{ p.Company.Why }</p>
 		}
 		<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-			<div class="rounded-lg bg-muted p-3">@Label("Configurator")<div class="mt-1 text-sm">{ platformText(p.Company) }</div></div>
+			<div class="rounded-lg bg-muted p-3">
+				@Label("Looking for")
+				if found := assetsFound(q.Org.Settings, p.Facts); len(found) > 0 {
+					<div class="mt-1">@AssetPills(found)</div>
+				} else {
+					<div class="mt-1 text-sm text-muted-foreground">
+						if q.Owner() {
+							<a href={ templ.SafeURL(q.Base() + "settings") }>Name what you look for</a>
+						} else {
+							Nothing named yet
+						}
+					</div>
+				}
+			</div>
 			<div class="rounded-lg bg-muted p-3">@Label("Found by")<div class="mt-1 text-sm">{ actorLabel(p.Company.FoundBy) }</div></div>
 			<div class="rounded-lg bg-muted p-3">@Label("Touches")<div class="mt-1 font-mono text-lg">{ strconv.Itoa(touches(p.History)) }</div></div>
 		</div>
@@ -141,23 +169,31 @@ templ CompanyView(q *Req, p CompanyPage) {
 							<a href={ safeHref(deref(c.Linkedin)) } target="_blank" rel="noopener" class="font-mono text-xs">LinkedIn ↗</a>
 						}
 						@Meta(contactStage(c))
+						if q.Owner() {
+							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-download": "ui/export", "data-body": jsonBody("id", c.ID), "data-file": "person-" + strconv.FormatInt(c.ID, 10) + ".json"}}) {
+								Export
+							}
+							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/erase", "data-body": jsonBody("id", c.ID), "data-confirm": eraseConfirm(c)}}) {
+								Erase
+							}
+						}
 					</span>
 				</div>
+				@SuggestedDetails(p.Pending[c.ID])
 			}
 		</div>
-		if len(p.Facts) > 0 || p.Company.ConfiguratorURL != "" {
+		if len(p.Facts) > 0 {
 			<div>
 				@Label("Facts")
 				for _, f := range p.Facts {
-					<div class="grid grid-cols-[130px_1fr_auto] items-baseline gap-3 border-b border-dashed border-border py-2 text-sm">
-						<span class="font-mono text-xs text-muted-foreground">{ f.Field }</span>
-						<span>{ f.Value }</span>
-						<a href={ safeHref(f.SourceURL) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
-					</div>
+					@FactRow(f)
 				}
-				if p.Company.ConfiguratorURL != "" {
-					<div class="grid grid-cols-[130px_1fr] gap-3 py-2 text-sm"><span class="font-mono text-xs text-muted-foreground">configurator</span><a href={ safeHref(p.Company.ConfiguratorURL) } target="_blank" rel="noopener" class="break-all">{ p.Company.ConfiguratorURL }</a></div>
-				}
+			</div>
+		}
+		if len(p.Notes) > 0 {
+			<div>
+				@Label("Agents' notes, unchecked")
+				@Notes(q, p.Notes)
 			</div>
 		}
 		<div>
@@ -177,7 +213,7 @@ templ CompanyView(q *Req, p CompanyPage) {
 
 func actorColor(actor string) string {
 	if strings.HasPrefix(actor, "agent:") {
-		return "text-primary"
+		return "text-mark"
 	}
 	return "text-muted-foreground"
 }
@@ -198,4 +234,16 @@ func touches(h []HistoryItem) int {
 		}
 	}
 	return n
+}
+
+templ FactRow(f Fact) {
+	<div class="grid grid-cols-[130px_1fr_auto] items-baseline gap-3 border-b border-dashed border-border py-2 text-sm">
+		<span class="font-mono text-xs text-muted-foreground">{ f.Field }</span>
+		<span>{ f.Value }</span>
+		if f.SourceURL != "" {
+			<a href={ safeHref(f.SourceURL) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
+		} else {
+			<span></span>
+		}
+	</div>
 }

@@ -30,6 +30,10 @@ type OrgSettings struct {
 	NeverContact      string `json:"never_contact"`
 	IncorporatedOnly  bool   `json:"incorporated_only"`
 	AgentGuidance     string `json:"agent_guidance"`
+	EnquirySites      string `json:"enquiry_sites"`
+	// LookFor is what this organisation looks for at a company, one "field: hint"
+	// per line; see Assets.
+	LookFor string `json:"look_for"`
 }
 
 func (s OrgSettings) withDefaults() OrgSettings {
@@ -71,6 +75,10 @@ type Session struct {
 	TokenHash string `gorm:"uniqueIndex;not null"`
 	UserID    int64  `gorm:"index"`
 	ExpiresAt time.Time
+	// SSOOrgs are the organisations whose own sign-in this session has been through
+	// (see proofs). A Limited session began at one and opens nothing else.
+	SSOOrgs string `gorm:"not null;default:''"`
+	Limited bool   `gorm:"not null;default:false"`
 }
 
 type APIKey struct {
@@ -87,23 +95,20 @@ type APIKey struct {
 }
 
 type Company struct {
-	ID              int64     `gorm:"primaryKey" json:"id"`
-	OrgID           int64     `gorm:"uniqueIndex:idx_org_company;not null" json:"-"`
-	Name            string    `gorm:"uniqueIndex:idx_org_company;not null" json:"name"`
-	Domain          string    `json:"domain"`
-	Country         string    `json:"country"`
-	Segment         string    `json:"segment"`
-	Fit             string    `json:"fit"`
-	Stage           string    `gorm:"index" json:"stage"`
-	ConfiguratorURL string    `json:"configurator_url"`
-	Platform        string    `json:"platform"`
-	BuiltBy         string    `json:"built_by"`
-	Why             string    `json:"why"`
-	FoundBy         string    `json:"found_by"`
-	Incorporated    *bool     `json:"incorporated"`
-	Hold            *string   `json:"hold"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID           int64     `gorm:"primaryKey" json:"id"`
+	OrgID        int64     `gorm:"uniqueIndex:idx_org_company;not null" json:"-"`
+	Name         string    `gorm:"uniqueIndex:idx_org_company;not null" json:"name"`
+	Domain       string    `json:"domain"`
+	Country      string    `json:"country"`
+	Segment      string    `json:"segment"`
+	Fit          string    `json:"fit"`
+	Stage        string    `gorm:"index" json:"stage"`
+	Why          string    `json:"why"`
+	FoundBy      string    `json:"found_by"`
+	Incorporated *bool     `json:"incorporated"`
+	Hold         *string   `json:"hold"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 const (
@@ -185,15 +190,34 @@ type Event struct {
 	ContactID int64  `gorm:"index"`
 	CompanyID *int64 `gorm:"index"`
 	User      string
-	Action    string
-	Value     *string
-	At        time.Time `gorm:"index"`
+	// KeyID is the API key behind an agent's action, since key names can repeat; 0 for people.
+	KeyID int64 `gorm:"not null;default:0"`
+	// TaskID is the task an action was done for, 0 when for none.
+	TaskID int64 `gorm:"index;not null;default:0"`
+	Action string
+	Value  *string
+	At     time.Time `gorm:"index"`
+}
+
+// Actor is who an operation is recorded against: a name ("agent:<key name>" for an
+// agent), the key behind it, and the task it is working on, if any.
+type Actor struct {
+	Task  int64
+	Name  string
+	KeyID int64
+	// ReadOnly is a key that can add nothing, so its reading a task isn't work on it.
+	ReadOnly bool
 }
 
 var Editable = map[string]bool{"phone": true, "email": true, "linkedin": true, "sources": true,
 	"call_notes": true, "tz": true, "person": true, "send_to": true, "message": true, "note": true,
 	"body": true, "followup": true, "subject": true,
 	"stage": true, "next_step": true, "next_date": true, "lost_reason": true, "title": true}
+
+// loggedValue are the fields whose new value goes into the history: where a conversation
+// stands and when it is due. The rest are a person's details or free text about them,
+// which their own row already holds, so the history keeps only that they changed.
+var loggedValue = map[string]bool{"stage": true, "next_date": true}
 
 // stringFields are the newer non-pointer columns, which store "" rather than NULL.
 var stringFields = map[string]bool{"stage": true, "next_step": true, "lost_reason": true, "title": true}
@@ -202,9 +226,17 @@ var Marks = map[string]string{"linkedin": "linkedin_added", "email": "email_sent
 	"call": "called", "replied": "replied", "declined": "declined", "hold": "hold", "accepted": "accepted"}
 
 type Store struct {
-	db  *gorm.DB
+	db *gorm.DB
+	// keys seal what is stored but mustn't be readable from the database alone; nil
+	// when the server was given none.
+	keys *keyring
+	// fts is whether SQLite has its search tables; Postgres searches through an index of its own.
 	fts bool
 }
+
+var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
+	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &Suggestion{},
+	&Task{}, &TaskRequest{}, &TaskNote{}, &PasswordToken{}, &OrgMail{}}
 
 // Open takes a postgres:// URL or a SQLite file path.
 func Open(dsn string) (*Store, error) {
@@ -218,8 +250,10 @@ func Open(dsn string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := db.AutoMigrate(&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
-		&Company{}, &Fact{}, &Contact{}, &Event{}); err != nil {
+	if err := db.AutoMigrate(models...); err != nil {
+		return nil, err
+	}
+	if err := moveAssetColumns(db); err != nil {
 		return nil, err
 	}
 	s := &Store{db: db}
@@ -251,29 +285,27 @@ func deref(p *string) string {
 	return *p
 }
 
-const open_ = "hold is null and replied is null and declined is null and status <> 'suggested' and key not like 'org:%'"
-
 // Due returns one outreach step's queue for an organisation. NULLS FIRST keeps SQLite's ordering on Postgres.
 // People on the never-contact list are left out here rather than marked, so the list
 // and the queue can't drift apart: listing someone hides them, unlisting brings them back.
 func (s *Store) Due(org int64, step string, now time.Time, set OrgSettings) ([]Contact, error) {
 	set = set.withDefaults()
 	var rows []Contact
-	q := s.in(org).Model(&Contact{})
+	q := s.in(org).Model(&Contact{}).Where(companyNotRejected)
 	switch step {
 	case "linkedin":
-		q = q.Where(open_ + " and linkedin_added is null and note is not null and note <> ''").Order("fit nulls first, file")
+		q = q.Where(openContacts + " and linkedin_added is null and note is not null and note <> ''").Order("fit nulls first, file")
 	case "accepted":
-		q = q.Where(open_ + " and accepted is not null and email_sent is null").Order("accepted")
+		q = q.Where(openContacts + " and accepted is not null and email_sent is null").Order("accepted")
 	case "call":
-		q = q.Where(open_ + " and phone is not null and phone != '' and called is null").
+		q = q.Where(openContacts + " and phone is not null and phone != '' and called is null").
 			Order("linkedin_added is null, linkedin_added nulls first, fit nulls first")
 	case "email":
 		cutoff := now.AddDate(0, 0, -set.EmailAfterDays).Format("2006-01-02")
-		q = q.Where(open_+" and email_sent is null and accepted is null and linkedin_added <= ?", cutoff).Order("linkedin_added")
+		q = q.Where(openContacts+" and email_sent is null and accepted is null and linkedin_added <= ?", cutoff).Order("linkedin_added")
 	case "followup":
 		cutoff := now.AddDate(0, 0, -set.FollowupAfterDays).Format("2006-01-02")
-		q = q.Where(open_+" and followup_sent is null and email_sent <= ?", cutoff).Order("email_sent")
+		q = q.Where(openContacts+" and followup_sent is null and email_sent <= ?", cutoff).Order("email_sent")
 	default:
 		return nil, fmt.Errorf("unknown step %q", step)
 	}
@@ -293,26 +325,36 @@ func (s *Store) Due(org int64, step string, now time.Time, set OrgSettings) ([]C
 }
 
 func (s *Store) log(tx *gorm.DB, org, contact int64, company *int64, actor, action string, value *string) error {
-	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: actor, Action: action, Value: value, At: time.Now()}).Error
+	return s.logAs(tx, org, contact, company, Actor{Name: actor}, action, value)
+}
+
+func (s *Store) logAs(tx *gorm.DB, org, contact int64, company *int64, who Actor, action string, value *string) error {
+	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: who.Name, KeyID: who.KeyID, TaskID: who.Task, Action: action, Value: value, At: time.Now()}).Error
 }
 
 func (s *Store) Mark(org, id int64, step, date, actor string) error {
-	return s.mark(org, id, step, date, actor, "")
+	return s.mark(org, id, step, date, Actor{Name: actor}, "")
 }
 
-func (s *Store) mark(org, id int64, step, date, actor, note string) error {
+func (s *Store) mark(org, id int64, step, date string, who Actor, note string) error {
 	column, ok := Marks[step]
 	if !ok {
 		return fmt.Errorf("unknown step %q", step)
+	}
+	if err := markDate(date, time.Now()); err != nil {
+		return err
 	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		var c Contact
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
 			return fmt.Errorf("no contact %d", id)
 		}
+		if err := c.canMark(); err != nil {
+			return err
+		}
 		updates := map[string]any{column: date}
 		if step == "replied" && c.Stage == "" {
-			updates["stage"] = "replied"
+			updates["stage"] = Stages[0].Key
 		}
 		if err := tx.Model(&c).Updates(updates).Error; err != nil {
 			return err
@@ -321,11 +363,17 @@ func (s *Store) mark(org, id int64, step, date, actor, note string) error {
 		if note != "" {
 			value += " · " + note
 		}
-		return s.log(tx, org, id, c.CompanyID, actor, "mark:"+step, &value)
+		return s.logAs(tx, org, id, c.CompanyID, who, "mark:"+step, &value)
 	})
 }
 
 func (s *Store) Update(org, id int64, field, value, actor string) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		return s.set(tx, org, id, field, value, actor)
+	})
+}
+
+func (s *Store) set(tx *gorm.DB, org, id int64, field, value, actor string) error {
 	if !Editable[field] {
 		return fmt.Errorf("%q can't be edited", field)
 	}
@@ -334,34 +382,44 @@ func (s *Store) Update(org, id int64, field, value, actor string) error {
 	if stringFields[field] {
 		v = value
 	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		var c Contact
-		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
-			return fmt.Errorf("no contact %d", id)
-		}
-		if field == "email" || field == "linkedin" {
-			var o Org
-			if err := tx.First(&o, org).Error; err != nil {
-				return err
-			}
-			email, link := value, ""
-			if field == "linkedin" {
-				email, link = "", value
-			}
-			if err := s.allowed(&o, email, link); err != nil {
-				return err
-			}
-		}
-		if err := tx.Model(&c).Update(field, v).Error; err != nil {
+	var c Contact
+	if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
+		return fmt.Errorf("no contact %d", id)
+	}
+	if field == "stage" {
+		if err := c.canEnterStage(value); err != nil {
 			return err
 		}
-		if field == "phone" {
-			if err := tx.Model(&c).Update("tz", GuessTZ(value, deref(c.Maker))).Error; err != nil {
-				return err
-			}
+	}
+	if field == "email" || field == "linkedin" {
+		var o Org
+		if err := tx.First(&o, org).Error; err != nil {
+			return err
 		}
-		return s.log(tx, org, id, c.CompanyID, actor, "set:"+field, nonEmpty(value))
-	})
+		email, link := value, ""
+		if field == "linkedin" {
+			email, link = "", value
+		}
+		if err := s.allowed(&o, email, link); err != nil {
+			return err
+		}
+		if err := erased(tx, org, "", "", email, link); err != nil {
+			return err
+		}
+	}
+	if err := tx.Model(&c).Update(field, v).Error; err != nil {
+		return err
+	}
+	if field == "phone" {
+		if err := tx.Model(&c).Update("tz", GuessTZ(value, deref(c.Maker))).Error; err != nil {
+			return err
+		}
+	}
+	var logged *string
+	if loggedValue[field] {
+		logged = nonEmpty(value)
+	}
+	return s.log(tx, org, id, c.CompanyID, actor, "set:"+field, logged)
 }
 
 // Find matches the CLI's name argument against person, maker or first name.

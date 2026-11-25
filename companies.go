@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var (
@@ -49,7 +50,40 @@ func ensureCompany(tx *gorm.DB, org int64, c Company) (*Company, bool, error) {
 	if c.Stage == "" {
 		c.Stage = CompanyReview
 	}
-	return &c, true, tx.Create(&c).Error
+	res := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&c)
+	if res.Error != nil {
+		return nil, false, res.Error
+	}
+	if res.RowsAffected == 0 {
+		// Someone added it between the look-up and the insert.
+		err := tx.Where("org_id = ? and name = ?", org, c.Name).First(&found).Error
+		return &found, false, err
+	}
+	return &c, true, nil
+}
+
+// companyAt finds the company an agent means by its website when the name is new,
+// so one company found under two spellings stays one row. A site that several
+// companies share (a group's brands, a marketplace) identifies none of them.
+func companyAt(tx *gorm.DB, org int64, domain string) (*Company, error) {
+	if domain == "" {
+		return nil, nil
+	}
+	var found []Company
+	if err := tx.Where("org_id = ? and lower(domain) = ?", org, domain).Limit(2).Find(&found).Error; err != nil || len(found) != 1 {
+		return nil, err
+	}
+	return &found[0], nil
+}
+
+// bareDomain reads "https://www.Example.com/about" and "example.com" alike.
+func bareDomain(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	if d := domainOf(v); d != "" {
+		return d
+	}
+	v, _, _ = strings.Cut(v, "/")
+	return strings.TrimPrefix(v, "www.")
 }
 
 func (s *Store) CompanyByID(org, id int64) (*Company, error) {
@@ -115,11 +149,12 @@ type ResearchRow struct {
 	Company
 	Facts      []Fact
 	People     []Contact
+	Pending    map[int64][]PendingDetail
 	Incomplete bool
 }
 
 var ResearchFilters = []struct{ Key, Label string }{
-	{"review", "To review"}, {"contact", "Needs a contact"}, {"verify", "Needs verifying"}, {"rejected", "Rejected"},
+	{"review", "To review"}, {"contact", "Needs a contact"}, {"verify", "Needs verifying"}, {"details", "Details to check"}, {"rejected", "Rejected"},
 }
 
 // N counts from 1.
@@ -150,13 +185,81 @@ func (s *Store) researchQuery(org int64, filter string) (*gorm.DB, string, error
 		guess := s.db.Model(&Contact{}).Select("company_id").
 			Where("org_id = ? and company_id is not null and (email_status = 'guess' or flags like '%INFERRED%') and email_sent is null and hold is null", org)
 		return q.Where("id in (?)", guess), "name, id", nil
+	case "details":
+		waiting := s.db.Model(&Contact{}).Select("company_id").
+			Where("org_id = ? and company_id is not null and id in (?)", org,
+				s.db.Model(&Suggestion{}).Select("contact_id").Where("org_id = ? and decision = ''", org))
+		return q.Where("id in (?)", waiting), "name, id", nil
 	case "rejected":
 		return q.Where("stage = ?", CompanyRejected), "updated_at desc, id desc", nil
 	}
 	return nil, "", fmt.Errorf("unknown filter %q", filter)
 }
 
+// researchRows fills in what is known about each company, in a query a table rather
+// than a few a company.
+func (s *Store) researchRows(org int64, companies []Company) ([]ResearchRow, error) {
+	rows := make([]ResearchRow, len(companies))
+	if len(companies) == 0 {
+		return rows, nil
+	}
+	at := map[int64]int{}
+	ids := make([]int64, len(companies))
+	for i, c := range companies {
+		rows[i].Company, rows[i].Pending = c, map[int64][]PendingDetail{}
+		at[c.ID], ids[i] = i, c.ID
+	}
+	var facts []Fact
+	if err := s.in(org).Where("company_id in ?", ids).Order("id").Find(&facts).Error; err != nil {
+		return nil, err
+	}
+	var people []Contact
+	if err := s.in(org).Where("company_id in ? and key not like 'org:%'", ids).Order("status desc, id").Find(&people).Error; err != nil {
+		return nil, err
+	}
+	pending, err := s.Pending(org, people)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range facts {
+		r := &rows[at[f.CompanyID]]
+		r.Facts = append(r.Facts, f)
+	}
+	for _, p := range people {
+		r := &rows[at[*p.CompanyID]]
+		r.People = append(r.People, p)
+		if waiting := pending[p.ID]; len(waiting) > 0 {
+			r.Pending[p.ID] = waiting
+		}
+	}
+	return rows, nil
+}
+
+// detailsToCheck can't be paged in SQL: whether a suggestion still needs checking
+// depends on comparing it with what the person holds now, the way a person would.
+func (s *Store) detailsToCheck(org int64) ([]ResearchRow, error) {
+	q, order, err := s.researchQuery(org, "details")
+	if err != nil {
+		return nil, err
+	}
+	var companies []Company
+	if err := q.Order(order).Limit(500).Find(&companies).Error; err != nil {
+		return nil, err
+	}
+	rows, err := s.researchRows(org, companies)
+	// A suggestion the person was since given some other way leaves nothing to check.
+	return slices.DeleteFunc(rows, func(r ResearchRow) bool { return len(r.Pending) == 0 }), err
+}
+
 func (s *Store) Research(org int64, filter string, page int) ([]ResearchRow, Page, error) {
+	if filter == "details" {
+		rows, err := s.detailsToCheck(org)
+		if err != nil {
+			return nil, Page{}, err
+		}
+		pg := pageOf(page, researchPageSize, len(rows))
+		return rows[pg.offset():min(len(rows), pg.offset()+pg.Size)], pg, nil
+	}
 	q, order, err := s.researchQuery(org, filter)
 	if err != nil {
 		return nil, Page{}, err
@@ -170,38 +273,15 @@ func (s *Store) Research(org int64, filter string, page int) ([]ResearchRow, Pag
 	if err := q.Order(order).Limit(pg.Size).Offset(pg.offset()).Find(&companies).Error; err != nil {
 		return nil, pg, err
 	}
-	ids := make([]int64, len(companies))
-	for i, c := range companies {
-		ids[i] = c.ID
-	}
-	var facts []Fact
-	var people []Contact
-	if len(ids) > 0 {
-		if err := s.in(org).Where("company_id in ?", ids).Order("id").Find(&facts).Error; err != nil {
-			return nil, pg, err
-		}
-		if err := s.in(org).Where("company_id in ? and key not like 'org:%'", ids).Order("status desc, id").Find(&people).Error; err != nil {
-			return nil, pg, err
-		}
-	}
-	at := map[int64]int{}
-	rows := make([]ResearchRow, len(companies))
-	for i, c := range companies {
-		rows[i].Company = c
-		at[c.ID] = i
-	}
-	for _, f := range facts {
-		r := &rows[at[f.CompanyID]]
-		r.Facts = append(r.Facts, f)
-	}
-	for _, p := range people {
-		r := &rows[at[*p.CompanyID]]
-		r.People = append(r.People, p)
-	}
-	return rows, pg, nil
+	rows, err := s.researchRows(org, companies)
+	return rows, pg, err
 }
 
 func (s *Store) ResearchCount(org int64, filter string) int {
+	if filter == "details" {
+		rows, _ := s.detailsToCheck(org)
+		return len(rows)
+	}
 	q, _, err := s.researchQuery(org, filter)
 	if err != nil {
 		return 0
@@ -251,7 +331,15 @@ func (s *Store) PickContact(org int64, o *Org, id int64, actor string) error {
 			return err
 		}
 		if c.CompanyID != nil {
-			tx.Model(&Company{}).Where("org_id = ? and id = ? and stage = ?", org, *c.CompanyID, CompanyReview).Update("stage", CompanyQualified)
+			res := tx.Model(&Company{}).Where("org_id = ? and id = ? and stage = ?", org, *c.CompanyID, CompanyReview).Update("stage", CompanyQualified)
+			if res.Error != nil {
+				return res.Error
+			}
+			if res.RowsAffected > 0 {
+				if err := s.log(tx, org, 0, c.CompanyID, actor, "company:"+CompanyQualified, nil); err != nil {
+					return err
+				}
+			}
 		}
 		return s.log(tx, org, id, c.CompanyID, actor, "pick", nil)
 	})
@@ -268,16 +356,12 @@ var Stages = []struct{ Key, Label string }{
 
 func (s *Store) Conversations(org int64) (map[string][]Contact, error) {
 	var rows []Contact
-	if err := s.in(org).Where("replied is not null and declined is null").Order("next_date nulls first, id").Find(&rows).Error; err != nil {
+	if err := s.in(org).Where(inConversation).Order("next_date nulls first, id").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := map[string][]Contact{}
 	for _, c := range rows {
-		st := c.Stage
-		if st == "" {
-			st = "replied"
-		}
-		out[st] = append(out[st], c)
+		out[c.ConversationStage()] = append(out[c.ConversationStage()], c)
 	}
 	return out, nil
 }
@@ -304,12 +388,19 @@ var pipelineOrder = []string{"research", "lost", "outreach", "replied", "meeting
 
 // furthestSQL must agree with furthest; TestPipelineInSQL holds them together.
 const furthestSQL = `max(case
+	when declined is not null then case when replied is not null or linkedin_added is not null or email_sent is not null or called is not null then 2 else 0 end
 	when replied is not null then case stage when 'lost' then 1 when 'meeting' then 4 when 'proposal' then 5 when 'won' then 6 else 3 end
 	when linkedin_added is not null or email_sent is not null or called is not null then 2
 	else 0 end)`
 
 func furthest(p Contact) int {
 	switch {
+	case p.Declined != nil:
+		// Someone who declined before anyone reached them was never in the pipeline.
+		if p.Touched() || p.Replied != nil {
+			return 2
+		}
+		return 0
 	case p.Replied != nil:
 		switch p.Stage {
 		case "lost":
@@ -322,7 +413,7 @@ func furthest(p Contact) int {
 			return 6
 		}
 		return 3
-	case p.LinkedinAdded != nil || p.EmailSent != nil || p.Called != nil:
+	case p.Touched():
 		return 2
 	}
 	return 0
@@ -471,6 +562,9 @@ func (s *Store) QuickAddPerson(o *Org, in QuickAdd, actor string) (*Contact, err
 	if err := s.allowed(o, in.Email, in.Linkedin); err != nil {
 		return nil, err
 	}
+	if err := erased(s.db, o.ID, in.Name, in.Company, in.Email, in.Linkedin); err != nil {
+		return nil, err
+	}
 	var out Contact
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		var companyID *int64
@@ -500,7 +594,14 @@ func (s *Store) QuickAddPerson(o *Org, in QuickAdd, actor string) (*Contact, err
 		if err := tx.Create(&out).Error; err != nil {
 			return err
 		}
-		return s.log(tx, o.ID, out.ID, companyID, actor, "add:person", nonEmpty(in.Linkedin))
+		if err := s.log(tx, o.ID, out.ID, companyID, actor, "add:person", nil); err != nil {
+			return err
+		}
+		if strings.TrimSpace(in.Note) != "" {
+			// Recorded as an edit so an agent's draft doesn't replace a note the person wrote.
+			return s.log(tx, o.ID, out.ID, companyID, actor, "set:note", nil)
+		}
+		return nil
 	})
 	return &out, err
 }
@@ -571,7 +672,7 @@ func (s *Store) NeverContactCovers(o *Org) []string {
 		return nil
 	}
 	var people []Contact
-	s.in(o.ID).Where(open_).Order("id").Find(&people)
+	s.in(o.ID).Where(openContacts).Where(companyNotRejected).Order("id").Find(&people)
 	var names []string
 	for _, p := range people {
 		if o.Settings.listed(deref(p.Email), deref(p.Linkedin)) != nil {

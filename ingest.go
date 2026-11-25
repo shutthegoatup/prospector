@@ -22,6 +22,12 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 		return strings.EqualFold(strings.TrimSpace(fresh), strings.TrimSpace(deref(have)))
 	}
 	for _, d := range p.Drafts {
+		if err := erased(s.db, org, d.Person, d.Maker, d.Email, d.Linkedin); err != nil {
+			if !errors.Is(err, errErased) {
+				return 0, err
+			}
+			blocked = append(blocked, fmt.Sprintf("%s in %s was erased on request; take them out of the file", d.Key, d.File))
+		}
 		email, link := s.allowed(o, d.Email, ""), s.allowed(o, "", d.Linkedin)
 		if email == nil && link == nil {
 			continue
@@ -216,9 +222,12 @@ func linkCompanies(tx *gorm.DB, org int64, rows []CompanyRow) error {
 	byStem := map[string]int64{}
 	for _, r := range rows {
 		c, created, err := ensureCompany(tx, org, Company{Name: r["name"], Country: r["country"], Segment: r["segment"],
-			Fit: r["priority"], Stage: CompanyQualified, ConfiguratorURL: r["configurator_url"], BuiltBy: r["configurator_built_by"],
+			Fit: r["priority"], Stage: CompanyQualified,
 			Why: r["fit_reason"], Domain: domainOf(r["website"]), FoundBy: "import", Hold: competitorHold(r)})
 		if err != nil {
+			return err
+		}
+		if _, err := addConfiguratorFacts(tx, org, c.ID, r["configurator_url"], "", r["configurator_built_by"], "import"); err != nil {
 			return err
 		}
 		if !created {

@@ -162,7 +162,9 @@ type CompanyPage struct {
 	Company Company
 	Facts   []Fact
 	People  []Contact
+	Pending map[int64][]PendingDetail
 	History []HistoryItem
+	Notes   []NoteView
 }
 
 func (a *App) company(w http.ResponseWriter, r *http.Request) {
@@ -175,7 +177,12 @@ func (a *App) company(w http.ResponseWriter, r *http.Request) {
 	p := CompanyPage{Company: *c}
 	p.Facts, _ = a.s.Facts(q.Org.ID, c.ID)
 	p.People, _ = a.s.People(q.Org.ID, c.ID)
+	p.Pending, _ = a.s.Pending(q.Org.ID, p.People)
 	p.History, _ = a.s.History(q.Org.ID, c.ID, 50)
+	notes, _ := a.s.CompanyNotes(q.Org.ID, c.ID, 20)
+	for _, n := range notes {
+		p.Notes = append(p.Notes, NoteView{TaskNote: n})
+	}
 	a.page(w, r, "companies", CompanyView(q, p))
 }
 
@@ -219,25 +226,46 @@ type SettingsData struct {
 	Members []Member
 	Me      Membership
 	Covered []string
+	Mail    MailView
+	SSO     *SSO
+	// Callback is where a provider sends people back; empty until PROSPECTOR_URL is set.
+	Callback string
+	// Sealing is whether the server has a key to keep a client secret under.
+	Sealing bool
+	Intake  string
 }
 
 func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	members, _ := a.s.Members(q.Org.ID)
-	a.page(w, r, "settings", SettingsView(q, SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org)}))
+	d := SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org), Intake: a.baseURL(r) + q.Base() + "intake",
+		Mail: a.mailView(q.Org.ID)}
+	d.Sealing = a.s.keys != nil
+	if d.SSO, _ = a.s.SSO(q.Org.ID); d.SSO == nil {
+		d.SSO = &SSO{}
+	}
+	if a.base != "" {
+		d.Callback = a.callbackURL()
+	}
+	a.page(w, r, "settings", SettingsView(q, d))
 }
 
 type AgentsData struct {
 	Base     string
 	Keys     []APIKey
 	Activity []AgentEvent
+	Runs     []Run
+	Tasks    map[int64]string
+	Now      time.Time
 	Scores   []AgentScore
 }
 
 func (a *App) agents(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	keys, _ := a.s.Keys(q.Org.ID)
-	a.page(w, r, "agents", AgentsView(q, AgentsData{Base: a.baseURL(r) + q.Base(), Keys: keys, Activity: a.s.AgentActivity(q.Org.ID, 20), Scores: a.s.AgentScores(q.Org.ID)}))
+	runs, tasks := a.s.Runs(q.Org.ID, 12)
+	a.page(w, r, "agents", AgentsView(q, AgentsData{Base: a.baseURL(r) + q.Base(), Keys: keys, Activity: a.s.AgentActivity(q.Org.ID, 20),
+		Scores: a.s.AgentScores(q.Org.ID), Runs: runs, Tasks: tasks, Now: time.Now()}))
 }
 
 func done(w http.ResponseWriter, err error) {
@@ -293,6 +321,17 @@ func (a *App) uiPick(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (a *App) uiSuggestion(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID       int64  `json:"id"`
+		Decision string `json:"decision"`
+	}
+	if decode(w, r, &in) {
+		q := reqOf(r)
+		done(w, a.s.DecideSuggestion(q.Org.ID, in.ID, in.Decision, q.Actor()))
+	}
+}
+
 func (a *App) uiAdd(w http.ResponseWriter, r *http.Request) {
 	var in QuickAdd
 	if !decode(w, r, &in) {
@@ -339,6 +378,14 @@ func (a *App) uiSettings(w http.ResponseWriter, r *http.Request) {
 		fail(w, errors.New("waits are between 0 and 60 days"), http.StatusBadRequest)
 		return
 	}
+	if _, err := enquiryOrigins(in.EnquirySites); err != nil {
+		fail(w, err, http.StatusBadRequest)
+		return
+	}
+	if _, err := in.Assets(); err != nil {
+		fail(w, err, http.StatusBadRequest)
+		return
+	}
 	o := reqOf(r).Org
 	o.Name, o.Color, o.Settings = strings.TrimSpace(in.Name), in.Color, in.OrgSettings
 	err := a.s.SaveOrg(o)
@@ -375,6 +422,21 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	msg := u.Email + " added to " + q.Org.Name + "."
+	// Someone who never chose a password is sent the link again, so a lost one isn't the end.
+	if password != "" || u.MustChangePassword {
+		sent, err := a.invite(r.Context(), q, u, password != "")
+		if sent {
+			writeJSON(w, map[string]string{"message": msg + " They've been emailed a link to choose their password; it lasts 7 days."})
+			return
+		}
+		if errors.Is(err, errTooSoon) {
+			msg += " They were emailed a link to choose their password a moment ago, so no other was sent."
+		} else if err != nil {
+			msg += " The invitation couldn't be emailed (" + err.Error() + ")."
+		}
+	} else if !u.HasPassword() {
+		msg += " They have no password: they sign in through a provider, so they can open this organisation only by one it accepts."
+	}
 	if password != "" {
 		msg += " Their first password, shown once: " + password + " (they choose their own when they first sign in)"
 	}
@@ -398,6 +460,48 @@ func (a *App) uiRemoveMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+func (a *App) uiExport(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID int64 `json:"id"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	q := reqOf(r)
+	out, err := a.s.ExportPerson(q.Org.ID, in.ID, q.Actor())
+	if err != nil {
+		fail(w, err, http.StatusNotFound)
+		return
+	}
+	w.Header().Set("cache-control", "no-store")
+	writeJSON(w, out)
+}
+
+func (a *App) uiExportOrg(w http.ResponseWriter, r *http.Request) {
+	var in struct{}
+	if !decode(w, r, &in) {
+		return
+	}
+	q := reqOf(r)
+	out, err := a.s.ExportOrg(q.Org.ID, q.Actor())
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("cache-control", "no-store")
+	writeJSON(w, out)
+}
+
+func (a *App) uiErase(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID int64 `json:"id"`
+	}
+	if decode(w, r, &in) {
+		q := reqOf(r)
+		done(w, a.s.ErasePerson(q.Org.ID, in.ID, q.Actor()))
+	}
 }
 
 func (a *App) uiKey(w http.ResponseWriter, r *http.Request) {
