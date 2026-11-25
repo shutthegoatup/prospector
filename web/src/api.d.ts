@@ -920,6 +920,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/agreements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /** Agreements, newest first */
+        get: operations["listAgreements"];
+        put?: never;
+        /**
+         * Start an agreement for a company
+         * @description A draft, to which a PDF of the agreement is then uploaded. Signing comes in a later release.
+         */
+        post: operations["createAgreement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/agreements/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a draft agreement and its document */
+        delete: operations["removeAgreement"];
+        options?: never;
+        head?: never;
+        /** Rename a draft agreement */
+        patch: operations["renameAgreement"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/agreements/{id}/document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Download a draft's document
+         * @description Always as a download, never shown in the page.
+         */
+        get: operations["getAgreementDocument"];
+        /**
+         * Upload a draft's document
+         * @description The agreement as a PDF, 10 MB at most, replacing any uploaded before. Its SHA-256 is
+         *     kept with it, and checked whenever it is read back. Prospector doesn't read what it
+         *     says, and it is not for deeds or anything that must be witnessed or notarised.
+         */
+        put: operations["putAgreementDocument"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1520,6 +1596,33 @@ export interface components {
             reason: string;
             /** Format: date-time */
             sent_at: string | null;
+        };
+        Agreement: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            company_id: number;
+            name: string;
+            /**
+             * @description Every agreement is a draft until signing arrives.
+             * @enum {string}
+             */
+            status: "draft";
+            /** @description Empty until a document is uploaded. */
+            file_name: string;
+            /**
+             * Format: int64
+             * @description In bytes.
+             */
+            file_size: number;
+            /** @description The document's SHA-256, in hex; empty until one is uploaded. */
+            file_hash: string;
+            created_by: string;
+            updated_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
         };
     };
     responses: {
@@ -3062,6 +3165,185 @@ export interface operations {
                     "application/json": {
                         ok: boolean;
                     };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listAgreements: {
+        parameters: {
+            query?: {
+                /** @description Only this company's. */
+                company?: number;
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest first. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Agreement"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createAgreement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: int64 */
+                    company: number;
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The draft. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Agreement"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeAgreement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    renameAgreement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The draft as it now is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Agreement"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getAgreementDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF, exactly as uploaded. */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    putAgreementDocument: {
+        parameters: {
+            query?: {
+                /** @description The file's name, to give it back by. */
+                name?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/pdf": string;
+            };
+        };
+        responses: {
+            /** @description The agreement with its document. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Agreement"];
                 };
             };
             default: components["responses"]["Problem"];

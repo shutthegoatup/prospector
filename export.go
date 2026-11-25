@@ -140,6 +140,7 @@ type OrgExport struct {
 	Suppressed    []Suppression       `json:"not_to_be_mailed"`
 	Campaigns     []Campaign          `json:"campaigns"`
 	CampaignMail  []CampaignRecipient `json:"campaign_mail"`
+	Agreements    []Agreement         `json:"agreements"`
 	Suggested     []Suggestion        `json:"suggested_details"`
 	Tasks         []Task              `json:"tasks"`
 	TaskRequests  []TaskRequest       `json:"task_requests"`
@@ -268,7 +269,7 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			out.Agents = append(out.Agents, e)
 		}
 		mine := func() *gorm.DB { return tx.Where("org_id = ?", org).Order("id") }
-		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Onboardings, &out.OnboardSteps, &out.Access, &out.Enquiries, &out.EnquiryThread, &out.Suppressed, &out.Campaigns, &out.CampaignMail, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
+		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Onboardings, &out.OnboardSteps, &out.Access, &out.Enquiries, &out.EnquiryThread, &out.Suppressed, &out.Campaigns, &out.Agreements, &out.CampaignMail, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
 			if err := mine().Find(rows).Error; err != nil {
 				return err
 			}

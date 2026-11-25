@@ -164,6 +164,8 @@ func statusOf(err error) int {
 		return http.StatusBadGateway
 	case errors.As(err, &missing), errors.Is(err, gorm.ErrRecordNotFound):
 		return http.StatusNotFound
+	case errors.Is(err, errTampered):
+		return http.StatusInternalServerError
 	case errors.Is(err, errErased), errors.As(err, &clash), breaksRule(err):
 		return http.StatusConflict
 	case ours(err):

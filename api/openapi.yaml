@@ -15,7 +15,8 @@ info:
     and say where answering an enquiry stands; `enquiries:triage` to say where answering an
     enquiry stands and put its sender on the board, without deals; `enquiries:delete` to delete an enquiry;
     `campaigns:write` to write campaigns and keep the list of addresses marketing mail
-    never goes to; `campaigns:send` to send, cancel and resume a campaign. A
+    never goes to; `campaigns:send` to send, cancel and resume a campaign;
+    `agreements:write` to start agreements and upload their documents. A
     signed-in member may do all of these except configuring agents and deleting enquiries,
     which need an owner.
 
@@ -42,6 +43,8 @@ tags:
     description: What a customer is on, its term and notice, and its renewal.
   - name: deals
     description: What each conversation is worth, who has it and when it should close.
+  - name: agreements
+    description: Contracts a company is to sign, each a PDF frozen by its hash.
   - name: mail
     description: Marketing mail, and the one list of addresses it never goes to.
 
@@ -1316,6 +1319,153 @@ paths:
                   ok: { type: boolean }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/agreements:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listAgreements
+      tags: [agreements]
+      summary: Agreements, newest first
+      parameters:
+        - name: company
+          in: query
+          description: Only this company's.
+          schema: { type: integer, format: int64 }
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: Newest first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Agreement" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: createAgreement
+      tags: [agreements]
+      summary: Start an agreement for a company
+      description: A draft, to which a PDF of the agreement is then uploaded. Signing comes in a later release.
+      security:
+        - session: []
+        - bearer: ["agreements:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [company, name]
+              properties:
+                company: { type: integer, format: int64 }
+                name: { type: string, maxLength: 120 }
+      responses:
+        "201":
+          description: The draft.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Agreement" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agreements/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: renameAgreement
+      tags: [agreements]
+      summary: Rename a draft agreement
+      security:
+        - session: []
+        - bearer: ["agreements:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 120 }
+      responses:
+        "200":
+          description: The draft as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Agreement" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: removeAgreement
+      tags: [agreements]
+      summary: Remove a draft agreement and its document
+      security:
+        - session: []
+        - bearer: ["agreements:write"]
+      responses:
+        "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agreements/{id}/document:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    put:
+      operationId: putAgreementDocument
+      tags: [agreements]
+      summary: Upload a draft's document
+      description: |
+        The agreement as a PDF, 10 MB at most, replacing any uploaded before. Its SHA-256 is
+        kept with it, and checked whenever it is read back. Prospector doesn't read what it
+        says, and it is not for deeds or anything that must be witnessed or notarised.
+      parameters:
+        - name: name
+          in: query
+          description: The file's name, to give it back by.
+          schema: { type: string }
+      security:
+        - session: []
+        - bearer: ["agreements:write"]
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: The agreement with its document.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Agreement" }
+        default: { $ref: "#/components/responses/Problem" }
+    get:
+      operationId: getAgreementDocument
+      tags: [agreements]
+      summary: Download a draft's document
+      description: Always as a download, never shown in the page.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The PDF, exactly as uploaded.
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -1896,3 +2046,19 @@ components:
         status: { type: string, enum: [queued, sending, sent, failed, unknown, skipped, cancelled], description: "`unknown`: the mail server stopped answering while it was being sent, so it may have gone; it is not sent again." }
         reason: { type: string, description: "Why it wasn't sent, or may not have been." }
         sent_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
+
+    Agreement:
+      type: object
+      required: [id, company_id, name, status, file_name, file_size, file_hash, created_by, updated_by, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        company_id: { type: integer, format: int64 }
+        name: { type: string }
+        status: { type: string, enum: [draft], description: "Every agreement is a draft until signing arrives." }
+        file_name: { type: string, description: "Empty until a document is uploaded." }
+        file_size: { type: integer, format: int64, description: In bytes. }
+        file_hash: { type: string, description: "The document's SHA-256, in hex; empty until one is uploaded." }
+        created_by: { type: string }
+        updated_by: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
