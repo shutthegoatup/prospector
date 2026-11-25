@@ -65,7 +65,7 @@ func TestALostRaceForAnAddressReadsAsTaken(t *testing.T) {
 		}
 	})
 	_, err := s.CreateOrg("beta", "Beta")
-	if err == nil || !strings.Contains(err.Error(), "already has the address /o/beta") || statusOf(err) != http.StatusBadRequest {
+	if err == nil || !strings.Contains(err.Error(), "already has the address /o/beta") || statusOf(err) != http.StatusConflict {
 		t.Errorf("the second of two taking /o/beta at once: %v", err)
 	}
 }
@@ -84,8 +84,8 @@ func TestNoRawDatabaseErrorsGoOut(t *testing.T) {
 		given, code int
 		text        string
 	}{
-		"a row the database turns down":        {fmt.Errorf("saving it: %w", clash), 400, 400, sayUnstorable},
-		"the same, from a handler calling 500": {clash, 500, 400, sayUnstorable},
+		"a row the database turns down":        {fmt.Errorf("saving it: %w", clash), 400, 409, sayTaken},
+		"the same, from a handler calling 500": {clash, 500, 409, sayTaken},
 		"a database that has gone away":        {fmt.Errorf("query: %w", &pgconn.PgError{Code: "08006", Message: "connection failure"}), 400, 500, sayOurs},
 		"a failure a handler calls its own":    {errors.New("open /var/lib/prospector/x: permission denied"), 500, 500, sayOurs},
 		"what the caller got wrong":            {errors.New("a fact needs a field and a value"), 400, 400, "a fact needs a field and a value"},
@@ -122,7 +122,7 @@ func TestNoRawDatabaseErrorsGoOut(t *testing.T) {
 
 	api := httptest.NewRecorder()
 	apiFail(api, httptest.NewRequest("POST", "/o/alpha/api/v1/companies", nil), clash)
-	if api.Code != http.StatusBadRequest || !strings.Contains(api.Body.String(), sayUnstorable) || raw.MatchString(api.Body.String()) {
+	if api.Code != http.StatusConflict || !strings.Contains(api.Body.String(), sayTaken) || raw.MatchString(api.Body.String()) {
 		t.Errorf("to an API caller: %d %s", api.Code, api.Body)
 	}
 }
@@ -210,7 +210,7 @@ func TestStatusOf(t *testing.T) {
 		{missing(&pgconn.PgError{Code: "08006"}, "no task %d", 3), 500},
 		// A character Postgres won't store is the caller's to take out.
 		{&pgconn.PgError{Code: "22021"}, 400},
-		{&pgconn.PgError{Code: "23505"}, 400},
+		{&pgconn.PgError{Code: "23505"}, 409},
 	} {
 		if got := statusOf(c.err); got != c.code {
 			t.Errorf("%v: %d, want %d", c.err, got, c.code)

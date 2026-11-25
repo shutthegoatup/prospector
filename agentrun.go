@@ -177,7 +177,7 @@ func (a *App) startRun(org, task, agent int64, by string, replacing int64) (*Age
 	if _, err := openTask(a.s.db, org, task); err != nil {
 		return nil, err
 	}
-	already := fmt.Errorf("%s is already working this task", cfg.Name)
+	already := conflict(cfg.Name + " is already working this task")
 	goingHere := func() *gorm.DB {
 		return a.s.db.Model(&AgentRun{}).Where("org_id = ? and task_id = ? and agent_id = ? and status in ?", org, task, cfg.ID, []string{RunWorking, RunWaiting})
 	}
