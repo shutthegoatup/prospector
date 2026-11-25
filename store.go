@@ -260,6 +260,10 @@ func Open(dsn string) (*Store, error) {
 	}
 	s := &Store{db: db}
 	s.indexSearch()
+	// One run at a time per task, held by the database however two starts interleave.
+	if err := db.Exec("create unique index if not exists idx_agent_runs_one_going on agent_runs (task_id) where status in ('running', 'waiting')").Error; err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 

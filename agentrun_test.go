@@ -215,7 +215,8 @@ func TestARunCarriesOnAfterItsServerStops(t *testing.T) {
 	stopped.StopAsked, stopped.TaskID = true, must(r.s.CreateTask(r.o.ID, "Kitchens", "Kitchen makers.", "Ada Lovelace")).ID
 	r.s.db.Create(&left)
 	r.s.db.Create(&stopped)
-	held := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, Status: RunWorking, Owner: "a live server", LeaseUntil: time.Now().Add(time.Minute).UnixMilli(), StartedAt: time.Now()}
+	held := AgentRun{OrgID: r.o.ID, TaskID: must(r.s.CreateTask(r.o.ID, "Boats", "Boat builders.", "Ada Lovelace")).ID, Status: RunWorking,
+		Owner: "a live server", LeaseUntil: time.Now().Add(time.Minute).UnixMilli(), StartedAt: time.Now()}
 	r.s.db.Create(&held)
 
 	r.a.resumeLapsed(time.Now())
@@ -295,4 +296,158 @@ func TestAnyMemberStartsTheAgentOnceATask(t *testing.T) {
 		t.Fatal("the task page doesn't show the run going")
 	}
 	close(release)
+}
+
+func TestAToolNobodyTickedIsntRun(t *testing.T) {
+	fake := newFakeEndpoint(t)
+	r := newRunSetup(t, fake)
+	fake.chat = func(n int, _ map[string]any) (int, string) {
+		if n == 0 {
+			return 200, chatTools("fetch_fetch", `{"query":"https://evil.example/x"}`, "draft_message", `{"contact_id":1,"kind":"email","text":"hi"}`)
+		}
+		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
+	}
+	r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	for _, used := range fake.toolUse {
+		if used == "fetch_fetch" {
+			t.Fatal("a tool on the server that nobody ticked was run because the model asked for it")
+		}
+	}
+	told := 0
+	for _, m := range messagesOf(fake.bodies[1]) {
+		if m["role"] == "tool" && strings.Contains(fmt.Sprint(m["content"]), "there is no tool called") {
+			told++
+		}
+	}
+	if told != 2 {
+		t.Fatalf("the model should be told neither tool exists, got %d", told)
+	}
+}
+
+func TestOneServerDoesntTakeOverARunItIsDriving(t *testing.T) {
+	fake := newFakeEndpoint(t)
+	r := newRunSetup(t, fake)
+	var once sync.Once
+	fake.chat = func(n int, _ map[string]any) (int, string) {
+		if n == 0 {
+			// A turn long enough for its lease to lapse, as the sweep sees it.
+			once.Do(func() { r.a.resumeLapsed(time.Now().Add(4 * time.Minute)) })
+		}
+		if n < 3 {
+			return 200, chatTools(searchTool, `{"query":"yachts"}`)
+		}
+		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
+	}
+	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	openings := 0
+	for _, b := range fake.bodies {
+		if len(messagesOf(b)) == 2 {
+			openings++
+		}
+	}
+	if openings != 1 || got.Resumes != 0 || got.Status != RunFinished || got.Turns != 4 {
+		t.Fatalf("one run should be driven once: %d openings, %+v", openings, got)
+	}
+}
+
+func TestOnlyOneRunStartsOnATask(t *testing.T) {
+	fake := newFakeEndpoint(t)
+	r := newRunSetup(t, fake)
+	release := make(chan struct{})
+	fake.chat = func(int, map[string]any) (int, string) {
+		<-release
+		return 200, chatText("done")
+	}
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	started := 0
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace"); err == nil {
+				mu.Lock()
+				started++
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	close(release)
+	if started != 1 {
+		t.Fatalf("%d runs started on one task", started)
+	}
+	bad := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, Status: RunWaiting, StartedAt: time.Now()}
+	if err := r.s.db.Create(&bad).Error; err == nil {
+		t.Fatal("the database let a second going run onto the task")
+	}
+}
+
+func TestARunCarriedOnKeepsItsOwnClaim(t *testing.T) {
+	fake := newFakeEndpoint(t)
+	r := newRunSetup(t, fake)
+	fake.chat = func(int, map[string]any) (int, string) {
+		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
+	}
+	bk := must(r.s.builtinKey(r.o.ID))
+	now := time.Now()
+	// The claim its run took before the server stopped, under a session that is gone.
+	r.s.db.Create(&RequestClaim{RequestID: r.brief, OrgID: r.o.ID, TaskID: r.task.ID, Holder: fmt.Sprintf("key:%d session:gone", bk.ID),
+		Actor: "agent:prospector", ClaimedAt: now.Add(-5 * time.Minute).UnixMilli(), ExpiresAt: now.Add(10 * time.Minute).UnixMilli()})
+	left := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, StartedBy: "Ada Lovelace", Model: "router/auto", Status: RunWorking,
+		Owner: "a server that stopped", LeaseUntil: now.Add(-time.Second).UnixMilli(), StartedAt: now}
+	r.s.db.Create(&left)
+	r.a.resumeLapsed(now)
+	if got := r.finished(t, left.ID); got.Status != RunFinished || got.StopReason != "the request is done" {
+		t.Fatalf("a run carried on should pick up its own request again: %+v", got)
+	}
+}
+
+func TestTheSourceGuardHoldsForEveryWayToCiteAPage(t *testing.T) {
+	ts := &turnState{seen: map[string]bool{}}
+	ts.see(`See https://en.wikipedia.org/wiki/Acme_(company). And (https://larkmoor.example/team) and {"u":"https://x.example/a?b=1&c=2"}`)
+	for _, u := range []string{"https://en.wikipedia.org/wiki/Acme_(company)", "https://larkmoor.example/team", "https://x.example/a?b=1&c=2"} {
+		if !ts.seen[normalURL(u)] {
+			t.Errorf("a page shown wasn't recognised: %s (seen %v)", u, ts.seen)
+		}
+	}
+
+	fake := newFakeEndpoint(t)
+	r := newRunSetup(t, fake)
+	fake.chat = func(n int, _ map[string]any) (int, string) {
+		switch n {
+		case 0:
+			// A URL typed into a search doesn't become a page the agent was shown.
+			return 200, chatTools(searchTool, `{"query":"https://made-up.example/about"}`)
+		case 1:
+			return 200, chatTools(
+				"add_company", `{"name":"Corvane","configurator_url":"https://made-up.example/build","platform":"Shopify"}`,
+				"add_company", `{"name":"Halvard","facts":[{"field":"size","value":"40 staff","source_url":"https://made-up.example/about"}]}`)
+		}
+		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
+	}
+	r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	for _, name := range []string{"Corvane", "Halvard"} {
+		if _, err := r.s.companyRef(r.o.ID, name); err == nil {
+			t.Errorf("%s was added with a source the agent was never shown", name)
+		}
+	}
+}
+
+func TestRevokingTheAgentsKeyStopsItsRun(t *testing.T) {
+	fake := newFakeEndpoint(t)
+	r := newRunSetup(t, fake)
+	fake.chat = func(n int, _ map[string]any) (int, string) {
+		if n == 1 {
+			bk := must(r.s.builtinKey(r.o.ID))
+			r.s.db.Model(&APIKey{}).Where("id = ?", bk.ID).Update("revoked_at", time.Now())
+		}
+		return 200, chatTools(searchTool, `{"query":"yachts"}`)
+	}
+	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	if got.Status != RunStopped || !strings.Contains(got.StopReason, "revoked") {
+		t.Fatalf("a run whose key was revoked: %+v", got)
+	}
 }
