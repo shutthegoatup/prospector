@@ -112,7 +112,7 @@ templ EnquiriesView(q *Req, d EnquiriesData) {
 								}
 							}
 						}
-						@input.Input(input.Props{Value: e.Note, Placeholder: "Our note: not sent to them", Class: "h-8 min-w-[220px] flex-1 bg-muted", Attributes: enquiryField(e, "note", "Our note")})
+						@input.Input(input.Props{Value: e.Note, Placeholder: "Our note: not emailed, but theirs to see if they ask", Class: "h-8 min-w-[220px] flex-1 bg-muted", Attributes: enquiryField(e, "note", "Our note")})
 					</div>
 				}
 				<div class="flex flex-wrap items-center justify-between gap-2">

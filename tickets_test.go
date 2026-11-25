@@ -48,6 +48,15 @@ func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
 		t.Fatalf("a note on an enquiry matched to no company: %v", err)
 	}
 
+	if err := set(spam.ID, "state", EnquiryOpen); err == nil {
+		t.Error("spam was put down as something to answer")
+	}
+	// A form that sends the same thing again gets the enquiry as it now stands, not a fresh one.
+	again := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "support", Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Message: "Colours look pale on phones"}))
+	if again.ID != help.ID || again.State != EnquiryWaiting {
+		t.Errorf("the same enquiry sent again: %+v", again)
+	}
+
 	counts := s.EnquiryCounts(o.ID)
 	if counts["state:"+EnquiryOpen] != 1 || counts["state:"+EnquiryWaiting] != 1 || counts[""] != 3 || counts["spam"] != 1 {
 		t.Errorf("the counts: %+v", counts)
@@ -107,7 +116,7 @@ func TestEnquiriesAreAnsweredFromTheirPage(t *testing.T) {
 		t.Error("an enquiry was put in a state there isn't")
 	}
 	_, page := call(t, client, "GET", srv.URL+"/o/alpha/enquiries?state=open", "", nil)
-	for _, want := range []string{"Colours look pale on phones", "To answer", `data-enquiry="` + itoa(help.ID) + `"`, "Ada Lovelace", "not sent to them"} {
+	for _, want := range []string{"Colours look pale on phones", "To answer", `data-enquiry="` + itoa(help.ID) + `"`, "Ada Lovelace", "theirs to see if they ask"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page of enquiries to answer doesn't show %q", want)
 		}

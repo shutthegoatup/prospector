@@ -419,7 +419,7 @@ func EnquiriesView(q *Req, d EnquiriesData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = input.Input(input.Props{Value: e.Note, Placeholder: "Our note: not sent to them", Class: "h-8 min-w-[220px] flex-1 bg-muted", Attributes: enquiryField(e, "note", "Our note")}).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = input.Input(input.Props{Value: e.Note, Placeholder: "Our note: not emailed, but theirs to see if they ask", Class: "h-8 min-w-[220px] flex-1 bg-muted", Attributes: enquiryField(e, "note", "Our note")}).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

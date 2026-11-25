@@ -38,7 +38,8 @@ type Enquiry struct {
 	State string `gorm:"not null;default:''" json:"state"`
 	// Owner is the teammate answering it.
 	Owner string `gorm:"not null;default:''" json:"owner"`
-	// Note is ours, about answering it: never shown to whoever sent the enquiry.
+	// Note is ours, about answering it. Nothing sends it, but it is held against whoever
+	// wrote in, so it is in their export when they ask what is held on them.
 	Note string `gorm:"not null;default:''" json:"note"`
 }
 
@@ -68,6 +69,9 @@ func (s *Store) SetEnquiry(org, id int64, field, value, actor string) error {
 		var e Enquiry
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&e).Error; err != nil {
 			return missing(err, "no enquiry %d", id)
+		}
+		if e.Spam {
+			return errors.New("that was marked as spam, so there is nothing to answer")
 		}
 		logged := value
 		switch field {
