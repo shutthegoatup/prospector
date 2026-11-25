@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -22,18 +23,27 @@ var acrossOrganisations = map[string]bool{
 	"SaveOrgMail": true, "SaveSSO": true,
 }
 
-// theirs marks everything the first organisation holds, so it shows if it turns up elsewhere.
-const theirs = "zzalpha"
+// theirs marks what the first organisation holds, so it shows if it turns up elsewhere.
+// findable is in the same rows and is searched for: a method that only says back what
+// it was asked then says findable, not theirs.
+const (
+	theirs      = "zzalpha"
+	findable    = "quillon"
+	theirEmail  = "vale@quillon.example"
+	theirDomain = "quillon.example"
+)
 
-// words are tried in every text argument: an id, and the names a method checks before
-// it looks anything up, so that some call gets as far as the look-up.
-var tryWords = []string{"1", "phone", "replied", "accepted", "note", "skipped", "qualified", "2020-01-02", "linkedin"}
+// tryWords go into every text argument: an id, the names a method checks before it
+// looks anything up, and what would find the first organisation's rows by search.
+var tryWords = []string{"1", "", findable, theirEmail, theirDomain, "phone", "replied", "accepted", "note", "skipped", "qualified", "review", "2020-01-02", "linkedin"}
 
 type intruder struct {
 	org  *Org
 	word string
 	// spoken are the words for a method's own text arguments, in order.
-	spoken []string
+	spoken  []string
+	yes     bool
+	sawBool bool
 }
 
 func (in *intruder) value(t reflect.Type, name string, own bool) reflect.Value {
@@ -51,7 +61,8 @@ func (in *intruder) value(t reflect.Type, name string, own bool) reflect.Value {
 	case reflect.Int64, reflect.Int:
 		v.SetInt(1)
 	case reflect.Bool:
-		v.SetBool(true)
+		in.sawBool = true
+		v.SetBool(in.yes)
 	case reflect.String:
 		word := in.word
 		if own {
@@ -60,7 +71,7 @@ func (in *intruder) value(t reflect.Type, name string, own bool) reflect.Value {
 		switch {
 		case strings.Contains(name, "URL") || name == "Linkedin":
 			word = "https://intruder.example/" + word
-		case name == "Email":
+		case name == "Email" && !strings.Contains(word, "@"):
 			word = "someone@intruder.example"
 		case name == "Date":
 			word = "2020-01-02"
@@ -84,10 +95,11 @@ func (in *intruder) value(t reflect.Type, name string, own bool) reflect.Value {
 	return v
 }
 
-func (in *intruder) call(s *Store, m reflect.Method) (said string) {
+func (in *intruder) call(s *Store, m reflect.Method) (said string, fell bool) {
 	defer func() {
-		// A method given nonsense may fall over; what matters is what it touched first.
-		recover()
+		if recover() != nil {
+			fell = true
+		}
 	}()
 	args := []reflect.Value{reflect.ValueOf(s)}
 	for i := 1; i < m.Type.NumIn(); i++ {
@@ -107,30 +119,76 @@ func (in *intruder) call(s *Store, m reflect.Method) (said string) {
 			said += fmt.Sprintf("%+v", out.Interface())
 		}
 	}
-	return said
+	return said, false
 }
 
-// each runs do for every way of filling a method's own text arguments from tryWords.
-func each(n int, do func(spoken []string)) {
-	spoken := make([]string, n)
-	var fill func(i int)
-	fill = func(i int) {
-		if i == n {
-			do(append([]string(nil), spoken...))
-			return
-		}
-		for _, w := range tryWords {
-			spoken[i] = w
-			fill(i + 1)
+// everyWay calls a method as org with each way of filling its text arguments from
+// tryWords and its yes-or-noes, until do says to stop.
+func everyWay(s *Store, undo bool, m reflect.Method, org *Org, do func(said string, fell bool) (stop bool)) {
+	own, nested := 0, false
+	for j := 1; j < m.Type.NumIn(); j++ {
+		switch k := m.Type.In(j); {
+		case k.Kind() == reflect.String:
+			own++
+		case k.Kind() == reflect.Struct || k.Kind() == reflect.Pointer && k != reflect.TypeOf(&Org{}):
+			nested = true
 		}
 	}
-	fill(0)
+	// The first two of a method's own are what it looks things up by; any after are who
+	// did it or a second filter, left empty to keep the number of calls down.
+	spoken := make([]string, own)
+	var fill func(i int, word string) bool
+	fill = func(i int, word string) bool {
+		if i < min(own, 2) {
+			for _, w := range tryWords {
+				spoken[i] = w
+				if fill(i+1, word) {
+					return true
+				}
+			}
+			return false
+		}
+		for _, yes := range []bool{true, false} {
+			in := &intruder{org: org, word: word, spoken: slices.Clone(spoken), yes: yes}
+			on := s
+			if undo {
+				on = &Store{db: s.db.Begin(), keys: s.keys, fts: s.fts}
+			}
+			said, fell := in.call(on, m)
+			if undo {
+				on.db.Rollback()
+			}
+			if do(said, fell) {
+				return true
+			}
+			if !in.sawBool {
+				break
+			}
+		}
+		return false
+	}
+	for _, word := range tryWords {
+		// The word only changes anything for a method that takes a struct of text.
+		if fill(0, word) || !nested {
+			return
+		}
+	}
+}
+
+func orgTables(t *testing.T, s *Store) (tables []string) {
+	t.Helper()
+	for _, m := range models {
+		if sch := tableOf(t, s, m); sch.LookUpField("org_id") != nil {
+			tables = append(tables, sch.Table)
+		}
+	}
+	return tables
 }
 
 // holdings is every row an organisation has, table by table.
-func holdings(t *testing.T, s *Store, org int64) string {
+func holdings(t *testing.T, s *Store, org int64) map[string]string {
 	t.Helper()
-	var out strings.Builder
+	out := map[string]string{}
 	for _, m := range models {
 		sch := tableOf(t, s, m)
 		if sch.LookUpField("org_id") == nil {
@@ -140,38 +198,47 @@ func holdings(t *testing.T, s *Store, org int64) string {
 		if err := s.db.Table(sch.Table).Where("org_id = ?", org).Order(sch.PrioritizedPrimaryField.DBName).Find(&rows).Error; err != nil {
 			t.Fatal(err)
 		}
-		text, _ := json.Marshal(rows)
-		fmt.Fprintf(&out, "%s %s\n", sch.Table, text)
+		if len(rows) > 0 {
+			text, _ := json.Marshal(rows)
+			out[sch.Table] = string(text)
+		}
 	}
-	return out.String()
+	return out
 }
 
-func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {
-	s := tempStore(t)
+// seedFirst gives the first organisation, in an empty database, a row in every table
+// an organisation has, each with id 1 where the table numbers its rows.
+func seedFirst(t *testing.T, s *Store) *Org {
+	t.Helper()
 	first := mustOrg(t, s, "alpha")
-	// Made first, in an empty database, so each of its rows has id 1 in its table.
 	owner := must(s.CreateUser("owner@alpha.example", "Owner One", "a long enough password"))
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := Actor{Name: "agent:" + theirs, KeyID: 1}
 	steps := []func() error{
 		func() error { return s.AddMember(first.ID, owner.ID, "owner", "") },
+		func() error { return s.SaveVoice(first.ID, owner.ID, theirs+" caller", theirs+" signature") },
 		func() error {
 			_, _, err := s.CreateKey(first.ID, theirs+" key", []string{"read"}, "Owner One")
 			return err
 		},
 		func() error {
-			_, err := s.AgentAddCompany(first.ID, scout, AddCompanyIn{Name: theirs + " Yachts", Domain: theirs + ".example", Why: theirs,
-				Facts: []FactIn{{Field: "press", Value: theirs + " won", SourceURL: "https://" + theirs + ".example/news"}}})
+			_, err := s.AgentAddCompany(first.ID, scout, AddCompanyIn{Name: theirs + " " + findable, Domain: theirDomain, Segment: theirs, Why: theirs,
+				Facts: []FactIn{{Field: "press", Value: theirs + " won", SourceURL: "https://" + theirDomain + "/news"}}})
 			return err
 		},
 		func() error {
-			_, err := s.AgentAddContact(first, scout, AddContactIn{Company: "1", Name: theirs + " Vale", Title: "Head of Digital",
-				Email: "vale@" + theirs + ".example", SourceURL: "https://" + theirs + ".example/team"})
+			_, err := s.AgentAddContact(first, scout, AddContactIn{Company: "1", Name: theirs + " " + findable, Title: "Head of Digital",
+				Email: theirEmail, SourceURL: "https://" + theirDomain + "/team"})
 			return err
 		},
 		func() error { return s.PickContact(first.ID, first, 1, "Owner One") },
 		func() error {
-			_, err := s.AgentAddContact(first, scout, AddContactIn{Company: "1", Name: theirs + " Vale", Phone: "+44 20 7946 0000",
-				SourceURL: "https://" + theirs + ".example/team"})
+			_, err := s.AgentAddContact(first, scout, AddContactIn{Company: "1", Name: theirs + " " + findable, Phone: "+44 20 7946 0000",
+				SourceURL: "https://" + theirDomain + "/team"})
+			return err
+		},
+		func() error {
+			// Someone still due, so the queues have one of theirs in them.
+			_, err := s.QuickAddPerson(first, QuickAdd{Name: theirs + " Due", Company: theirs + " " + findable, Note: theirs + " hello"}, "Owner One")
 			return err
 		},
 		func() error { return s.Mark(first.ID, 1, "replied", "2020-01-02", "Owner One") },
@@ -184,7 +251,12 @@ func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {
 			return err
 		},
 		func() error {
-			_, err := s.AddEnquiry(first.ID, "form", EnquiryIn{Name: theirs, Email: "vale@" + theirs + ".example", Message: theirs + " asks"})
+			_, err := s.AddEnquiry(first.ID, "form", EnquiryIn{Name: theirs, Email: theirEmail, Message: theirs + " asks"})
+			return err
+		},
+		func() error {
+			// One still waiting in Research, which the first is no longer.
+			_, err := s.AgentAddCompany(first.ID, scout, AddCompanyIn{Name: theirs + " waiting", Why: theirs})
 			return err
 		},
 	}
@@ -193,16 +265,66 @@ func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {
 			t.Fatalf("setting the first organisation up, step %d: %v", i, err)
 		}
 	}
+	// Whatever table the steps above left empty gets a row made directly, its text marked.
+	have := holdings(t, s, first.ID)
+	for _, m := range models {
+		sch := tableOf(t, s, m)
+		if sch.LookUpField("org_id") == nil || have[sch.Table] != "" {
+			continue
+		}
+		row := reflect.New(sch.ModelType)
+		for _, f := range sch.Fields {
+			var v any
+			switch f.FieldType.Kind() {
+			case reflect.String:
+				v = theirs + " " + f.DBName
+			case reflect.Int64, reflect.Int:
+				v = int64(1)
+				if strings.Contains(f.DBName, "until") || strings.Contains(f.DBName, "expires") {
+					v = time.Now().Add(time.Hour).UnixMilli()
+				}
+			default:
+				continue
+			}
+			if err := f.Set(s.db.Statement.Context, row, v); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := s.db.Create(row.Interface()).Error; err != nil {
+			t.Fatalf("a row for the first organisation in %s: %v", sch.Table, err)
+		}
+	}
+	return first
+}
+
+// Called as the organisation that owns them, these return nothing of its rows for the
+// test to see: they change something and answer with a yes, a count, a number or only
+// what they were given.
+var saysNothingBack = map[string]bool{
+	"AddMember": true, "RemoveMember": true, "SaveVoice": true, "SaveOrg": true, "RevokeKey": true, "DeleteOrgMail": true,
+	"Mark": true, "Update": true, "SetCompanyStage": true, "PickContact": true, "DecideSuggestion": true,
+	"AgentDraft": true, "AgentMark": true, "AgentFinish": true, "AgentAddFact": true, "AgentAddContact": true,
+	"AskTask": true, "SetRequestDone": true, "SetTaskClosed": true, "DeleteNote": true, "DeleteEnquiry": true,
+	"ErasePerson": true, "Import": true, "ImportLegacy": true, "Restore": true,
+	"ResearchCount": true, "ResearchCounts": true, "EnquiryCounts": true, "Week": true, "AgentMarks": true,
+	"AddEnquiry": true, "AgentNote": true, "CreateKey": true, "CreateTask": true, "QuickAddPerson": true,
+	// FindOne answers only when one person matches, and Find makes its query. NeverContactCovers reads the organisation it is handed.
+	"FindOne": true, "NeverContactCovers": true,
+}
+
+func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {
+	s := tempStore(t)
+	first := seedFirst(t, s)
 	before := holdings(t, s, first.ID)
-	for _, table := range []string{"companies", "facts", "contacts", "suggestions", "tasks", "task_requests", "task_notes", "enquiries", "events", "api_keys", "memberships"} {
-		if !strings.Contains(before, table+` [{`) {
+	for _, table := range orgTables(t, s) {
+		if before[table] == "" {
 			t.Fatalf("the first organisation has nothing in %s, so nothing there could be reached", table)
 		}
 	}
-
 	second := mustOrg(t, s, "beta")
+
 	store := reflect.TypeOf(s)
-	tried, leaked := 0, map[string]bool{}
+	var methods []reflect.Method
 	for i := range store.NumMethod() {
 		m := store.Method(i)
 		if acrossOrganisations[m.Name] {
@@ -212,48 +334,47 @@ func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {
 			t.Errorf("Store.%s doesn't take its organisation first: give it one, or name it in acrossOrganisations if it isn't about one", m.Name)
 			continue
 		}
-		own := 0
-		for j := 1; j < m.Type.NumIn(); j++ {
-			if m.Type.In(j).Kind() == reflect.String {
-				own++
-			}
-		}
-		for _, word := range tryWords {
-			each(own, func(spoken []string) {
-				tried++
-				in := &intruder{org: second, word: word, spoken: spoken}
-				if said := in.call(s, m); strings.Contains(said, theirs) && !leaked[m.Name] {
-					leaked[m.Name] = true
-					t.Errorf("Store.%s, called for another organisation, returned the first one's: %.300s", m.Name, said)
-				}
-			})
-			if own > 2 {
-				// The method's own arguments have been through every word already.
-				break
-			}
-		}
-		if after := holdings(t, s, first.ID); after != before {
-			t.Fatalf("Store.%s, called for another organisation, changed what the first one holds:\nbefore %s\nafter  %s", m.Name, before, after)
-		}
-	}
-	if tried < 500 {
-		t.Fatalf("only %d calls were tried", tried)
+		methods = append(methods, m)
 	}
 
-	// The same calls made as the first organisation do reach its rows, so the test above
-	// isn't passing for want of getting anywhere.
-	reached := map[string]bool{}
-	for i := range store.NumMethod() {
-		m := store.Method(i)
-		if acrossOrganisations[m.Name] || m.Type.NumIn() < 2 {
-			continue
+	for _, m := range methods {
+		calls, falls := 0, 0
+		everyWay(s, false, m, second, func(said string, fell bool) bool {
+			calls++
+			if fell {
+				falls++
+			}
+			if strings.Contains(said, theirs) {
+				t.Errorf("Store.%s, called for another organisation, returned the first one's: %.300s", m.Name, said)
+				return true
+			}
+			return false
+		})
+		if falls == calls {
+			t.Errorf("Store.%s fell over on every one of %d calls, so nothing was learnt about it", m.Name, calls)
 		}
-		in := &intruder{org: first, word: "1", spoken: []string{"1", "1", "1", "1", "1", "1"}}
-		if strings.Contains(in.call(s, m), theirs) {
-			reached[m.Name] = true
+		after := holdings(t, s, first.ID)
+		for table, was := range before {
+			if now := after[table]; now != was {
+				t.Fatalf("Store.%s, called for another organisation, changed the first one's %s:\nbefore %s\nafter  %s", m.Name, table, was, now)
+			}
 		}
 	}
-	if len(reached) < 10 {
-		t.Fatalf("called as the first organisation, only %d methods returned anything of its own: %v", len(reached), reached)
+
+	// The same calls made as the first organisation do return its rows, so nothing above
+	// passed for want of getting anywhere. Each is undone before the next.
+	for _, m := range methods {
+		if saysNothingBack[m.Name] {
+			continue
+		}
+		reached := false
+		everyWay(s, true, m, first, func(said string, _ bool) bool {
+			reached = strings.Contains(said, theirs)
+			return reached
+		})
+		if !reached {
+			t.Errorf("Store.%s, called as the first organisation, returned nothing of its own, so the calls made as another proved nothing: "+
+				"give the test's words or rows what it needs, or name it in saysNothingBack", m.Name)
+		}
 	}
 }
