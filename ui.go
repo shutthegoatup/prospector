@@ -359,6 +359,10 @@ type SettingsData struct {
 	// Sealing is whether the server has a key to keep a client secret under.
 	Sealing bool
 	Intake  string
+	// Suppressed are the newest addresses not to be mailed, and MoreSuppressed whether
+	// there are others.
+	Suppressed     []Suppression
+	MoreSuppressed bool
 }
 
 func (a *App) settings(w http.ResponseWriter, r *http.Request) {
@@ -367,6 +371,13 @@ func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 	d := SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org), Intake: a.baseURL(r) + q.Base() + "intake",
 		Mail: a.mailView(q.Org.ID), Agents: a.ownAgents(q.Org.ID)}
 	d.Sealing = a.s.keys != nil
+	var next string
+	var err error
+	if d.Suppressed, next, err = a.s.Suppressions(q.Org.ID, PageIn{}); err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	d.MoreSuppressed = next != ""
 	if d.SSO, _ = a.s.SSO(q.Org.ID); d.SSO == nil {
 		d.SSO = &SSO{}
 	}

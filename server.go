@@ -346,6 +346,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /login/sso", a.ssoPage)
 	mux.HandleFunc("GET /login/sso/start", a.ssoStart)
 	mux.HandleFunc("GET /login/callback", a.loginCallback)
+	mux.HandleFunc("GET /u/{token}", a.unsubscribePage)
+	mux.HandleFunc("POST /u/{token}", a.unsubscribe)
 	mux.HandleFunc("GET /c", a.customerPage)
 	mux.HandleFunc("POST /c/leave", a.customerLeave)
 	mux.HandleFunc("POST /c/steps/{id}/done", a.customerStep(true))
@@ -406,6 +408,10 @@ func (a *App) Routes() http.Handler {
 	// Enquiry forms live on other sites. The route checks the origin against the
 	// organisation's own list, and reads no session.
 	sameOrigin.AddInsecureBypassPattern("POST " + intakePattern)
+	// A mail provider asks to unsubscribe from its own servers, and a webmail page may
+	// ask from its own origin. The link's secret is what gives the right, and all it
+	// can do is stop mail.
+	sameOrigin.AddInsecureBypassPattern("POST /u/{token}")
 	if a.base != "" {
 		// Behind a proxy that rewrites Host, an older browser's Origin wouldn't match it.
 		if err := sameOrigin.AddTrustedOrigin(a.base); err != nil {
@@ -452,7 +458,7 @@ func (a *App) Routes() http.Handler {
 
 // signedOutForm is a plain HTML form somebody with no session posts.
 func signedOutForm(path string) bool {
-	return path == "/login" || path == "/logout" || path == "/forgot" || strings.HasPrefix(path, "/reset/") || strings.HasPrefix(path, "/c/")
+	return path == "/login" || path == "/logout" || path == "/forgot" || strings.HasPrefix(path, "/reset/") || strings.HasPrefix(path, "/c/") || strings.HasPrefix(path, "/u/")
 }
 
 func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {

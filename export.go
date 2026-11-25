@@ -19,6 +19,7 @@ type PersonExport struct {
 	Facts         []Fact           `json:"facts"`
 	Enquiries     []Enquiry        `json:"enquiries"`
 	EnquiryThread []EnquiryMessage `json:"enquiry_messages"`
+	Suppressed    []Suppression    `json:"not_to_be_mailed"`
 	Suggested     []Suggestion     `json:"suggested_details"`
 	Deals         []Deal           `json:"deals"`
 	Access        []CustomerGrant  `json:"onboarding_access"`
@@ -69,6 +70,12 @@ func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error)
 				return err
 			}
 		}
+		out.Suppressed = []Suppression{}
+		if emails := emailRe.FindAllString(strings.ToLower(deref(c.Email)), -1); len(emails) > 0 {
+			if err := tx.Where("org_id = ? and address in ?", org, emails).Order("id").Find(&out.Suppressed).Error; err != nil {
+				return err
+			}
+		}
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("id").Find(&out.Suggested).Error; err != nil {
 			return err
 		}
@@ -114,6 +121,7 @@ type OrgExport struct {
 	Access        []CustomerGrant  `json:"onboarding_access"`
 	Enquiries     []Enquiry        `json:"enquiries"`
 	EnquiryThread []EnquiryMessage `json:"enquiry_messages"`
+	Suppressed    []Suppression    `json:"not_to_be_mailed"`
 	Suggested     []Suggestion     `json:"suggested_details"`
 	Tasks         []Task           `json:"tasks"`
 	TaskRequests  []TaskRequest    `json:"task_requests"`
@@ -241,7 +249,7 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			out.Agents = append(out.Agents, e)
 		}
 		mine := func() *gorm.DB { return tx.Where("org_id = ?", org).Order("id") }
-		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Onboardings, &out.OnboardSteps, &out.Access, &out.Enquiries, &out.EnquiryThread, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
+		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Onboardings, &out.OnboardSteps, &out.Access, &out.Enquiries, &out.EnquiryThread, &out.Suppressed, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
 			if err := mine().Find(rows).Error; err != nil {
 				return err
 			}

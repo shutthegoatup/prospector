@@ -1,0 +1,31 @@
+package main
+
+import "github.com/shutthegoatup/prospector/components/button"
+
+// UnsubscribePage is what an unsubscribe link opens. Looking at it changes nothing:
+// mail scanners follow links.
+templ UnsubscribePage(v UnsubscribeView) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			@Head("Unsubscribe")
+			<meta name="robots" content="noindex, nofollow"/>
+		</head>
+		<body class="queue-backdrop min-h-svh font-sans text-[15px] leading-relaxed antialiased">
+			<main class="mx-auto flex max-w-3xl flex-col gap-5 px-4 pb-16 pt-10">
+				if v.Done {
+					<h1 class="font-heading text-3xl font-bold tracking-tight">You won't get these again<span class="text-coral">.</span></h1>
+					<p class="text-sm text-muted-foreground">Marketing mail from this sender won't go to the address this link was sent to. Mail about something you already have with them, such as a change to your contract, can still reach you.</p>
+				} else {
+					<h1 class="font-heading text-3xl font-bold tracking-tight">Unsubscribe<span class="text-coral">?</span></h1>
+					<p class="text-sm text-muted-foreground">Stop marketing mail from this sender to the address this link was sent to.</p>
+					<form method="post" action={ templ.SafeURL("/u/" + v.Token) }>
+						@button.Button(button.Props{Type: button.TypeSubmit}) {
+							Unsubscribe
+						}
+					</form>
+				}
+			</main>
+		</body>
+	</html>
+}
