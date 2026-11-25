@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/a-h/templ"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -30,7 +29,7 @@ const sessionCookie = "session"
 type App struct {
 	s         *Store
 	mu        sync.Mutex
-	mcp       map[int64]*mcp.Server
+	mcp       map[int64]builtMCP
 	logins    loginGuard
 	enquiries enquiryGuard
 	// base is the address people reach the app at, when the operator has said: then
@@ -398,6 +397,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/erase", a.owner(a.uiErase))
 	mux.HandleFunc("POST /o/{org}/ui/keys", a.owner(a.uiKey))
 	mux.HandleFunc("POST /o/{org}/ui/keys/revoke", a.owner(a.uiRevoke))
+	mux.HandleFunc("POST /o/{org}/ui/keys/scopes", a.owner(a.uiKeyScopes))
+	mux.HandleFunc("POST /o/{org}/ui/member/role", a.owner(a.uiMemberRole))
 
 	a.apiRoutes(mux)
 	a.routeAPI(mux)
