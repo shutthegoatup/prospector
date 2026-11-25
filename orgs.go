@@ -135,6 +135,31 @@ func (s *Store) CreateOrg(slug, name string) (*Org, error) {
 	return createOrg(s.db, slug, name)
 }
 
+// frontOrgSlug is the organisation the front page's contact form sends enquiries to.
+const frontOrgSlug = "prospector"
+
+// EnsureFrontOrg makes that organisation on a server that hasn't one. A new one takes
+// enquiries from the server's own address when that is known; from then on its sites
+// are its owners' to change, so an existing one is left as it is.
+func (s *Store) EnsureFrontOrg(base string) error {
+	if _, err := s.OrgBySlug(frontOrgSlug); !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	o, err := s.CreateOrg(frontOrgSlug, "Prospector")
+	if err != nil {
+		// Another server on the same database may have just made it.
+		if _, found := s.OrgBySlug(frontOrgSlug); found == nil {
+			return nil
+		}
+		return err
+	}
+	if base == "" {
+		return nil
+	}
+	o.Settings.EnquirySites = browserOrigin(base)
+	return s.SaveOrg(o)
+}
+
 // CreateOrgWithOwner makes the organisation and its first owner together, so a failure
 // can't leave one nobody can get into.
 func (s *Store) CreateOrgWithOwner(slug, name string, owner *User) (*Org, error) {
