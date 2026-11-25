@@ -186,6 +186,9 @@ templ SettingsView(q *Req, d SettingsData) {
 					<span class="flex items-center gap-3">
 						@Meta(m.Role)
 						if q.Owner() {
+							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/member/role", "data-body": jsonBody("user_id", m.UserID, "role", otherRole(m.Role)), "data-confirm": roleConfirm(q, m)}}) {
+								{ "Make " + otherRole(m.Role) }
+							}
 							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/member/remove", "data-body": jsonBody("user_id", m.UserID), "data-confirm": removeConfirm(q, m)}}) {
 								Remove
 							}
@@ -219,6 +222,23 @@ templ SettingsView(q *Req, d SettingsData) {
 			}
 		}
 	</div>
+}
+
+func otherRole(role string) string {
+	if role == "owner" {
+		return "member"
+	}
+	return "owner"
+}
+
+func roleConfirm(q *Req, m Member) string {
+	if m.Role != "owner" {
+		return "Make " + m.Email + " an owner of " + q.Org.Name + "? They can change settings, keys and the team, export and erase."
+	}
+	if m.UserID == q.User.ID {
+		return "Stop being an owner of " + q.Org.Name + "? Only another owner can make you one again."
+	}
+	return "Make " + m.Email + " a member? They stop being able to change settings, keys and the team."
 }
 
 func removeConfirm(q *Req, m Member) string {
