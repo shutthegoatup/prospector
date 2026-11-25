@@ -231,6 +231,7 @@ templ CompanyView(q *Req, p CompanyPage) {
 				@SubscriptionForm(p.Company.ID, p.Day)
 			</details>
 		</div>
+		@AgreementsBlock(q, p.Company.ID, p.Agreements)
 		if len(p.Facts) > 0 {
 			<div>
 				@Label("Facts")
