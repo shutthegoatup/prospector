@@ -533,10 +533,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/suppressions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Addresses marketing mail never goes to
+         * @description One list for every mailing: those who unsubscribed by a link in a mail, and those
+         *     a member or key added. Someone erased on request, and anyone on the never-contact
+         *     list, isn't mailed either, though they aren't listed here.
+         */
+        get: operations["listSuppressions"];
+        put?: never;
+        /**
+         * Stop marketing mail to an address
+         * @description Adding one already there changes nothing.
+         */
+        post: operations["addSuppression"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/suppressions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Take an added address off the list
+         * @description Only one a member or key added. One the person unsubscribed themselves stays.
+         */
+        delete: operations["removeSuppression"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description There is more. Pass this back as `cursor` for the next page; it is left out on the last one. */
+        NextCursor: string;
         Problem: {
             type?: string;
             title: string;
@@ -894,6 +949,20 @@ export interface components {
             owner: string;
             note: string;
         };
+        Suppression: {
+            /** Format: int64 */
+            id: number;
+            address: string;
+            /**
+             * @description `unsubscribed` when they asked, by a link in a mail; `added` when a member or key put them here.
+             * @enum {string}
+             */
+            reason: "unsubscribed" | "added";
+            /** @description Who added it; empty when they unsubscribed themselves. */
+            by: string;
+            /** Format: date-time */
+            created_at: string;
+        };
     };
     responses: {
         /** @description What went wrong (RFC 9457). */
@@ -910,16 +979,28 @@ export interface components {
         /** @description The organisation's slug. */
         org: string;
         id: number;
+        /** @description How many to return. 50 if left out; 200 at most. */
+        limit: number;
+        /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+        cursor: string;
     };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description The next page, as `<…>; rel="next"` (RFC 8288), when there is one. */
+        Link: string;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
     listAgents: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
             header?: never;
             path: {
                 /** @description The organisation's slug. */
@@ -932,10 +1013,14 @@ export interface operations {
             /** @description Every agent, by name. */
             200: {
                 headers: {
+                    Link: components["headers"]["Link"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Agent"][];
+                    "application/json": {
+                        items: components["schemas"]["Agent"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
                 };
             };
             default: components["responses"]["Problem"];
@@ -1048,7 +1133,12 @@ export interface operations {
     };
     listRuns: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
             header?: never;
             path: {
                 /** @description The organisation's slug. */
@@ -1062,10 +1152,14 @@ export interface operations {
             /** @description The runs, newest first. */
             200: {
                 headers: {
+                    Link: components["headers"]["Link"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Run"][];
+                    "application/json": {
+                        items: components["schemas"]["Run"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
                 };
             };
             default: components["responses"]["Problem"];
@@ -1131,7 +1225,12 @@ export interface operations {
     };
     listEnquiryMessages: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
             header?: never;
             path: {
                 /** @description The organisation's slug. */
@@ -1145,10 +1244,14 @@ export interface operations {
             /** @description The thread. */
             200: {
                 headers: {
+                    Link: components["headers"]["Link"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EnquiryMessage"][];
+                    "application/json": {
+                        items: components["schemas"]["EnquiryMessage"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
                 };
             };
             default: components["responses"]["Problem"];
@@ -1215,6 +1318,10 @@ export interface operations {
     listOnboardings: {
         parameters: {
             query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
                 /** @description Only this company's. */
                 company?: number;
             };
@@ -1230,10 +1337,14 @@ export interface operations {
             /** @description Late ones first, then the rest still going, then those that are live; newest start first within each. */
             200: {
                 headers: {
+                    Link: components["headers"]["Link"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Onboarding"][];
+                    "application/json": {
+                        items: components["schemas"]["Onboarding"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
                 };
             };
             default: components["responses"]["Problem"];
@@ -1378,6 +1489,10 @@ export interface operations {
     listSubscriptions: {
         parameters: {
             query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
                 /** @description Only this company's. */
                 company?: number;
             };
@@ -1393,10 +1508,14 @@ export interface operations {
             /** @description The one needing attention soonest first. */
             200: {
                 headers: {
+                    Link: components["headers"]["Link"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Subscription"][];
+                    "application/json": {
+                        items: components["schemas"]["Subscription"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
                 };
             };
             default: components["responses"]["Problem"];
@@ -1524,7 +1643,12 @@ export interface operations {
     };
     listDeals: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
             header?: never;
             path: {
                 /** @description The organisation's slug. */
@@ -1537,10 +1661,14 @@ export interface operations {
             /** @description By stage, in the board's order. */
             200: {
                 headers: {
+                    Link: components["headers"]["Link"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Deal"][];
+                    "application/json": {
+                        items: components["schemas"]["Deal"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
                 };
             };
             default: components["responses"]["Problem"];
@@ -1669,8 +1797,10 @@ export interface operations {
                 state?: string;
                 /** @description Only those marked as spam, which are otherwise left out. */
                 spam?: boolean;
-                /** @description Which page, from 1. */
-                page?: number;
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
             };
             header?: never;
             path: {
@@ -1681,17 +1811,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description One page of them. */
+            /** @description A page of them. */
             200: {
                 headers: {
+                    Link: components["headers"]["Link"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        enquiries: components["schemas"]["Enquiry"][];
-                        page: number;
-                        pages: number;
-                        total: number;
+                        items: components["schemas"]["Enquiry"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
                     };
                 };
             };
@@ -1780,6 +1909,93 @@ export interface operations {
                         contact: number;
                     };
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listSuppressions: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest first. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Suppression"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addSuppression: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description One email address. */
+                    address: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The address as listed. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Suppression"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeSuppression: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Taken off. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };

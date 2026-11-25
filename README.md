@@ -122,6 +122,7 @@ Search uses a trigram index. On Postgres that needs the `pg_trgm` extension, whi
 - A request's body has five minutes to arrive and its answer two minutes to be read, so a stalled client doesn't hold a connection open. An agent's MCP stream, once its key is accepted, stays open.
 - Repeated wrong passwords for one email are slowed, up to a minute between tries. A browser that has signed in to that account before is counted separately, so someone guessing elsewhere can't hold its owner up.
 - An owner adds and removes members in Settings. Removing someone ends their sign-in access to that organisation; their account, and other organisations, are untouched. API keys they created keep working until revoked on the Agents page. If the organisation lets people join through its single sign-on, someone removed here joins again while its provider still lets them in: remove them there too.
+- Everyone in an organisation reads all of it. A member changes only the work of their areas: **sales** (research, outreach, deals and tasks for agents) or **support** (enquiries and their replies, subscriptions and onboarding). An owner ticks a member's areas on the Team list, and a member with none reads only. Owners have every area, and API keys go by their scopes alone.
 - Someone added from Settings gets a first password that the person adding them sees; they are made to choose their own the first time they sign in.
 - With [mail](#mail) set up, whoever reads a member's mailbox can choose that member's password. Without it there is no reset but `prospector user password`.
 - Members change their own password in Settings, which signs out their other sessions. `prospector user password` signs them out everywhere.
@@ -138,10 +139,16 @@ There's a Dockerfile for container hosting.
 
 ## Mail
 
-The app sends two kinds of mail, both to its own members. It never sends outreach: people do that from their own mailbox.
+The app mails its own members, and people outside an organisation only when someone in it asks for that one mail. It never sends outreach: people do that from their own mailbox.
 
 - **Password resets.** The sign-in page offers "Forgot your password?", which emails a link that lasts an hour and works once.
 - **Invitations.** Someone an owner adds is emailed a link to choose their password, good for 7 days, instead of the owner being shown a first password to pass on.
+- **A customer's link to their onboarding steps**, when a member or a key with `customers:invite` asks. See [the customer's page](#onboarding-the-steps-to-a-live-customer).
+- **A reply to an enquiry**, when a member or a key with `enquiries:reply` writes one. See [replying](#enquiries-website-forms-and-sign-ups).
+
+**Not to be mailed.** Each organisation keeps one list of addresses its marketing mail never goes to, under Settings and at `/api/v1/suppressions`. Someone who unsubscribes by the link in a mail is put on it and stays there: no member or key can take them off. An address a member or key added can be taken off again. Marketing mail is also kept from anyone on the never-contact list and anyone erased: erasing someone deletes their address from the list, and the erasure's own record of it keeps them unmailed. Nothing sends marketing mail yet; the list comes first.
+
+The unsubscribe link, `/u/<token>`, is one per mail and never runs out. Opening it shows a button and changes nothing, since mail scanners follow links. Pressing it, or a mail provider's one-click request ([RFC 8058](https://www.rfc-editor.org/rfc/rfc8058): a form `POST` with no cookie, answered without a redirect), unsubscribes the address it was sent to from that organisation's marketing mail. The page never says whose link it is, because mail gets forwarded. The one-click headers go only into a mail whose link is `https`.
 
 Both need `SMTP_ADDR`, `MAIL_FROM` and `PROSPECTOR_URL`: a link is only ever built from the address you gave, never from what a request claims. With any of them missing there is no reset and first passwords are shown as before. `prospector mail test you@example.com` sends a message through the server you set.
 
@@ -218,6 +225,7 @@ The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml),
 | `enquiries:reply` | `POST /api/v1/enquiries/{id}/replies` emails a reply to whoever sent an enquiry, through your mail server; `…/answers` records what they said back |
 | `customers:write` | record, change and remove subscriptions and start their renewals (`/api/v1/subscriptions`); start, change and remove onboardings (`/api/v1/onboardings`) and mark their steps (`/api/v1/onboarding-steps/{id}`) |
 | `customers:invite` | `POST /api/v1/onboardings/{id}/invites` emails a customer a link to their steps, through your mail server; `DELETE /api/v1/onboarding-invites/{id}` withdraws it |
+| `campaigns:write` | add an address to the list marketing mail never goes to, or take off one that was added (`/api/v1/suppressions`) |
 | `pipeline:write` | work deals (`/api/v1/deals`, `/api/v1/contacts/{id}/deal`); set an enquiry's state, owner and note (`PATCH /api/v1/enquiries/{id}`) and put its sender on the board (`…/conversation`) |
 | `enquiries:delete` | `DELETE /api/v1/enquiries/{id}`: delete an enquiry for good |
 | `agents:run` | Start and stop Prospector's own agents on a task, and list a task's runs |

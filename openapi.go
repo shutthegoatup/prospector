@@ -89,6 +89,9 @@ func (a *App) apiScope(scopes map[string]string) api.StrictMiddlewareFunc {
 			case q.Key == nil && ownersOnly(need) && !q.Owner():
 				writeProblem(w, http.StatusForbidden, "only an owner of this organisation can change that")
 				return nil, nil
+			case q.Key == nil && !q.Member.Works(opArea[op]):
+				writeProblem(w, http.StatusForbidden, areaRefusal(opArea[op]))
+				return nil, nil
 			}
 			return f(ctx, w, r, in)
 		}
