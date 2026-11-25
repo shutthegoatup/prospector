@@ -114,6 +114,23 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 		t.Fatalf("the form's enquiry: %d, kept %+v, %v", sent.StatusCode, rows, err)
 	}
 
+	// A server told its address shows the form for that address alone, named as a browser
+	// names it, and the script shows it nowhere else: reached by another name, the
+	// route would refuse what it sent.
+	told := httptest.NewServer((&App{s: s, frontOrg: "alpha", base: "https://Crm.alpha.example:443"}).Routes())
+	t.Cleanup(told.Close)
+	if _, body := call(t, visitor, "GET", told.URL+"/", "", nil); strings.Contains(body, "data-intake") {
+		t.Error("the form shows for an address the organisation hasn't listed")
+	}
+	takeEnquiriesFrom(t, s, o, "https://crm.alpha.example")
+	if _, body := call(t, visitor, "GET", told.URL+"/", "", nil); !strings.Contains(body, form+` data-origin="https://crm.alpha.example"`) {
+		t.Error("the form doesn't name the origin it works on")
+	}
+	script2, _ := assetFS.ReadFile("assets/js/landing.js")
+	if !strings.Contains(string(script2), "form.dataset.origin === location.origin") {
+		t.Error("the script shows the form whatever address the page was reached at")
+	}
+
 	// A server that names no organisation, or one that isn't there, serves the page as before.
 	for _, slug := range []string{"", "nope"} {
 		plain := httptest.NewServer((&App{s: s, frontOrg: slug}).Routes())

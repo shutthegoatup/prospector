@@ -14,9 +14,9 @@ templ Shot(file, width, height, alt, tone string) {
 	<div class={ "lp-shot", tone }><img src={ asset("img/" + file) } width={ width } height={ height } loading="lazy" alt={ alt }/></div>
 }
 
-// LandingPage takes the address its enquiry form posts to; with none it has no form
-// and loads no script.
-templ LandingPage(intake string) {
+// LandingPage takes the address its enquiry form posts to, and the origin that address
+// answers; with none it has no form and loads no script.
+templ LandingPage(intake, origin string) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
@@ -205,7 +205,7 @@ templ LandingPage(intake string) {
 				</div>
 			</section>
 			if intake != "" {
-				@EnquiryForm(intake)
+				@EnquiryForm(intake, origin)
 			}
 			<footer class="lp-foot">
 				<div class="lp-wrap">
@@ -222,8 +222,9 @@ templ LandingPage(intake string) {
 	</html>
 }
 
-// EnquiryForm stays hidden until its script runs, since without one it can't send.
-templ EnquiryForm(intake string) {
+// EnquiryForm stays hidden until its script runs, since without one it can't send, and
+// the script shows it only on the origin the intake route will answer.
+templ EnquiryForm(intake, origin string) {
 	<section class="lp-contact" id="contact" hidden>
 		<div class="lp-wrap lp-contact-grid">
 			<div>
@@ -231,7 +232,7 @@ templ EnquiryForm(intake string) {
 				<h2>Ask us anything.</h2>
 				<p class="lp-lede">A question, a demo, or help getting it running. Someone will write back to the address you give.</p>
 			</div>
-			<form class="lp-form" data-intake={ intake }>
+			<form class="lp-form" data-intake={ intake } data-origin={ origin }>
 				<label>Your name<input name="name" autocomplete="name" maxlength="200"/></label>
 				<label>Email<input name="email" type="email" autocomplete="email" maxlength="200" required/></label>
 				<label>Company<input name="company" autocomplete="organization" maxlength="200"/></label>

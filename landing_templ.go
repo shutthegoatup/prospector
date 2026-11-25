@@ -166,9 +166,9 @@ func Shot(file, width, height, alt, tone string) templ.Component {
 	})
 }
 
-// LandingPage takes the address its enquiry form posts to; with none it has no form
-// and loads no script.
-func LandingPage(intake string) templ.Component {
+// LandingPage takes the address its enquiry form posts to, and the origin that address
+// answers; with none it has no form and loads no script.
+func LandingPage(intake, origin string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -354,7 +354,7 @@ func LandingPage(intake string) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if intake != "" {
-			templ_7745c5c3_Err = EnquiryForm(intake).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = EnquiryForm(intake, origin).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -401,8 +401,9 @@ func LandingPage(intake string) templ.Component {
 	})
 }
 
-// EnquiryForm stays hidden until its script runs, since without one it can't send.
-func EnquiryForm(intake string) templ.Component {
+// EnquiryForm stays hidden until its script runs, since without one it can't send, and
+// the script shows it only on the origin the intake route will answer.
+func EnquiryForm(intake, origin string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -426,13 +427,26 @@ func EnquiryForm(intake string) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templruntime.NewAttributeExpression(intake).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `landing.templ`, Line: 234, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `landing.templ`, Line: 235, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\"><label>Your name<input name=\"name\" autocomplete=\"name\" maxlength=\"200\"></label> <label>Email<input name=\"email\" type=\"email\" autocomplete=\"email\" maxlength=\"200\" required></label> <label>Company<input name=\"company\" autocomplete=\"organization\" maxlength=\"200\"></label> <label>What it's about <select name=\"kind\"><option value=\"sales\">A question</option> <option value=\"demo\">See it running</option> <option value=\"support\">Help running it</option> <option value=\"feature\">Something it should do</option></select></label> <label class=\"is-wide\">Message<textarea name=\"message\" rows=\"5\" maxlength=\"5000\" required></textarea></label> <label class=\"lp-trap\" aria-hidden=\"true\">Leave this empty<input name=\"ref_note\" tabindex=\"-1\" autocomplete=\"off\"></label><div class=\"lp-form-foot is-wide\"><button class=\"lp-btn is-primary\" type=\"submit\">Send</button><p class=\"lp-form-status\" role=\"status\"></p></div></form></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\" data-origin=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var23 string
+		templ_7745c5c3_Var23, templ_7745c5c3_Err = templruntime.NewAttributeExpression(origin).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `landing.templ`, Line: 235, Col: 68}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\"><label>Your name<input name=\"name\" autocomplete=\"name\" maxlength=\"200\"></label> <label>Email<input name=\"email\" type=\"email\" autocomplete=\"email\" maxlength=\"200\" required></label> <label>Company<input name=\"company\" autocomplete=\"organization\" maxlength=\"200\"></label> <label>What it's about <select name=\"kind\"><option value=\"sales\">A question</option> <option value=\"demo\">See it running</option> <option value=\"support\">Help running it</option> <option value=\"feature\">Something it should do</option></select></label> <label class=\"is-wide\">Message<textarea name=\"message\" rows=\"5\" maxlength=\"5000\" required></textarea></label> <label class=\"lp-trap\" aria-hidden=\"true\">Leave this empty<input name=\"ref_note\" tabindex=\"-1\" autocomplete=\"off\"></label><div class=\"lp-form-foot is-wide\"><button class=\"lp-btn is-primary\" type=\"submit\">Send</button><p class=\"lp-form-status\" role=\"status\"></p></div></form></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

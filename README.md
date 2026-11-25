@@ -217,7 +217,7 @@ curl https://<host>/o/<slug>/api/v1/enquiries -H "Authorization: Bearer $PROSPEC
   -d '{"kind":"signup","name":"Hannah Pryce","email":"hannah@quay.example","company":"Quay Marine","site":"app"}'
 ```
 
-**From this server's own front page.** Set `PROSPECTOR_FRONT_ORG` to an organisation's slug and, in that organisation's Settings, list the server's own address among the sites, exactly as people reach it (`PROSPECTOR_URL` when that is set). The front page then ends with a contact form that adds to that organisation's Enquiries. Until both are done the page has no form and loads no script. The form posts to the same server, so the page's Content-Security-Policy is unchanged.
+**From this server's own front page.** Set `PROSPECTOR_FRONT_ORG` to an organisation's slug and, in that organisation's Settings, list the server's own address among the sites, as a browser shows it (`https://prospector.example.com`, with no `:443`). Behind a proxy, set `PROSPECTOR_URL` to that address too, or the server may not know it is reached over `https`. The front page then ends with a contact form that adds to that organisation's Enquiries. Until both are done the page has no form and loads no script, and someone who reaches the server at any other address doesn't see the form. The form posts to the same server, so the page's Content-Security-Policy is unchanged.
 
 Erasing a person also deletes their enquiries, and an owner can delete any single enquiry from the Enquiries page.
 

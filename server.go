@@ -509,17 +509,33 @@ func (a *App) front(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// frontIntake is where the front page's form posts. The intake route answers only the
-// sites an organisation lists, so until this address is among them there is no form.
-func (a *App) frontIntake(r *http.Request) string {
+// frontIntake is where the front page's form posts, and the origin a browser must be
+// on for it. The intake route answers only the sites an organisation lists, so until
+// this address is among them there is no form.
+func (a *App) frontIntake(r *http.Request) (intake, origin string) {
 	if a.frontOrg == "" {
-		return ""
+		return "", ""
 	}
+	origin = browserOrigin(a.baseURL(r))
 	org, err := a.s.OrgBySlug(a.frontOrg)
-	if err != nil || !org.Settings.takesEnquiriesFrom(a.baseURL(r)) {
-		return ""
+	if err != nil || !org.Settings.takesEnquiriesFrom(origin) {
+		return "", ""
 	}
-	return "/o/" + org.Slug + "/intake"
+	return "/o/" + org.Slug + "/intake", origin
+}
+
+// browserOrigin is an address as a browser names it in Origin: lower case, and
+// without the port when it is the scheme's own.
+func browserOrigin(address string) string {
+	u, err := url.Parse(address)
+	if err != nil {
+		return address
+	}
+	host := u.Host
+	if (u.Scheme == "https" && u.Port() == "443") || (u.Scheme == "http" && u.Port() == "80") {
+		host = strings.TrimSuffix(host, ":"+u.Port())
+	}
+	return strings.ToLower(u.Scheme + "://" + host)
 }
 
 func (a *App) home(w http.ResponseWriter, r *http.Request) {
