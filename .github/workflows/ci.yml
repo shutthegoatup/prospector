@@ -27,10 +27,18 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Generated templates and API code are committed
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Generated templates, API code and page script are committed
         run: |
           go tool templ generate
           go generate ./api
+          npm ci --prefix web --no-audit --no-fund
+          npm run build --prefix web
           git diff --exit-code
 
       - run: go vet ./...
