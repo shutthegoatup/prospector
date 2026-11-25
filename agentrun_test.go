@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -190,7 +191,7 @@ func TestTheAgentWorksThroughOutagesButNotAWrongModel(t *testing.T) {
 		case 1:
 			return http.StatusBadGateway, `{"error":{"code":502,"message":"upstream away"}}`
 		case 2:
-			return 200, `not json at all`
+			return http.StatusGatewayTimeout, `<html>timed out</html>`
 		}
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
@@ -218,6 +219,17 @@ func TestTheAgentWorksThroughOutagesButNotAWrongModel(t *testing.T) {
 	got = r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
 	if got.Status != RunFailed || !strings.Contains(got.StopReason, "no such model") || fake.chats != 1 {
 		t.Fatalf("a refusal that waiting won't fix should end the run, saying why: %+v after %d calls", got, fake.chats)
+	}
+
+	// An address whose /chat/completions is some site's page answers 200, but not a completion.
+	fake.chat = func(int, map[string]any) (int, string) { return 200, `<html><body>Welcome</body></html>` }
+	got = r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	if got.Status != RunFailed || !strings.Contains(got.StopReason, "wasn't a chat completion") {
+		t.Fatalf("an answer that isn't a completion should end the run, not be waited on: %+v", got)
+	}
+	if !passing(&unreachable{errors.New("connection reset")}) || passing(errors.New("the endpoint said: unknown model")) ||
+		!passing(&endpointError{Status: 429}) || passing(&endpointError{Status: 401}) {
+		t.Fatal("what is waited out and what isn't")
 	}
 	if backoff(20) != 5*time.Minute {
 		t.Fatalf("the back-off should stop growing at 5 minutes, got %s", backoff(20))
@@ -477,6 +489,57 @@ func TestTheSourceGuardHoldsForEveryWayToCiteAPage(t *testing.T) {
 		if _, err := r.s.companyRef(r.o.ID, name); err == nil {
 			t.Errorf("%s was added with a source the agent was never shown", name)
 		}
+	}
+}
+
+func TestARunStartingLeavesOtherKeysClaimsAlone(t *testing.T) {
+	fake := newFakeEndpoint(t)
+	r := newRunSetup(t, fake)
+	bk := must(r.s.builtinKey(r.o.ID))
+	other := fmt.Sprintf("key:%d0 session:abc", bk.ID)
+	now := time.Now()
+	r.s.db.Create(&RequestClaim{RequestID: r.brief, OrgID: r.o.ID, TaskID: r.task.ID, Holder: other, Actor: "agent:claude",
+		ClaimedAt: now.UnixMilli(), ExpiresAt: now.Add(10 * time.Minute).UnixMilli()})
+	fake.chat = func(int, map[string]any) (int, string) { return 200, chatText("unused") }
+	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	if got.StopReason != "other agents hold every open request" {
+		t.Fatalf("another agent's claim, on a key whose id starts like the built-in one's, was dropped: %+v", got)
+	}
+	var c RequestClaim
+	if r.s.db.First(&c, "request_id = ?", r.brief); c.Holder != other {
+		t.Fatalf("the other agent's claim: %+v", c)
+	}
+}
+
+func TestTheAgentCantCiteAPageItWasntShownAnyOtherWay(t *testing.T) {
+	fake := newFakeEndpoint(t)
+	r := newRunSetup(t, fake)
+	fake.chat = func(n int, _ map[string]any) (int, string) {
+		switch n {
+		case 0:
+			return 200, chatTools("add_company", `{"name":"Ghost Yachts","platform":"Made-up Platform","built_by":"Invented Agency"}`)
+		}
+		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
+	}
+	r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	if _, err := r.s.companyRef(r.o.ID, "Ghost Yachts"); err == nil {
+		t.Fatal("a company was added with a platform and builder sourced from nowhere")
+	}
+}
+
+func TestNextToNoRetryAfterBacksOffAsAnOutageDoes(t *testing.T) {
+	fake := newFakeEndpoint(t)
+	r := newRunSetup(t, fake)
+	fake.chat = func(n int, _ map[string]any) (int, string) {
+		if n < 2 {
+			return http.StatusTooManyRequests, `{"error":{"code":429,"message":"slow down"}}`
+		}
+		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
+	}
+	fake.retryAfter = "0"
+	r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	if len(r.sleeps) != 2 || r.sleeps[0].Round(time.Second) != 10*time.Second || r.sleeps[1].Round(time.Second) != 20*time.Second {
+		t.Fatalf("a Retry-After of nothing should back off as an outage does: %v", r.sleeps)
 	}
 }
 

@@ -24,11 +24,13 @@ type fakeEndpoint struct {
 	modelAuth []string
 	toolAuth  []string
 	limited   bool
-	// chat answers the nth chat completion (from 0), given the request's body.
-	chat    func(n int, body map[string]any) (int, string)
-	chats   int
-	bodies  []map[string]any
-	toolUse []string
+	// chat answers the nth chat completion (from 0), given the request's body; a 429
+	// carries retryAfter, an hour unless set.
+	chat       func(n int, body map[string]any) (int, string)
+	retryAfter string
+	chats      int
+	bodies     []map[string]any
+	toolUse    []string
 }
 
 func newFakeEndpoint(t *testing.T) *fakeEndpoint {
@@ -80,7 +82,11 @@ func newFakeEndpoint(t *testing.T) *fakeEndpoint {
 		}
 		status, reply := chat(n, body)
 		if status == http.StatusTooManyRequests {
-			w.Header().Set("Retry-After", "3600")
+			after := "3600"
+			if f.retryAfter != "" {
+				after = f.retryAfter
+			}
+			w.Header().Set("Retry-After", after)
 		}
 		w.WriteHeader(status)
 		w.Write([]byte(reply))
