@@ -197,3 +197,27 @@ func TestAppUsesTheLightPalette(t *testing.T) {
 		}
 	}
 }
+
+// The front page says what a key may do. It names only scopes that exist, and every
+// scope that lets a key send mail is on it, so the page cannot promise no key sends.
+func TestTheFrontPageTellsTheTruthAboutKeys(t *testing.T) {
+	_, _, srv, _ := signedIn(t)
+	_, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil)
+	named := regexp.MustCompile(`<code>([a-z]+(?::[a-z]+)?)</code>`).FindAllStringSubmatch(body, -1)
+	if len(named) < 4 {
+		t.Fatalf("the front page names only %d scopes", len(named))
+	}
+	for _, m := range named {
+		if !validScope(m[1]) {
+			t.Errorf("the front page names a scope that does not exist: %s", m[1])
+		}
+	}
+	for _, sends := range []string{"enquiries:reply", "customers:invite"} {
+		if !strings.Contains(body, "<code>"+sends+"</code>") {
+			t.Errorf("the front page leaves out %s, which lets a key send mail", sends)
+		}
+	}
+	if strings.Contains(body, "Send anything") {
+		t.Error("the front page still says no key can send anything")
+	}
+}

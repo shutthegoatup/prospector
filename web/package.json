@@ -1,0 +1,19 @@
+{
+  "name": "prospector-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "types": "openapi-typescript ../api/openapi.yaml -o src/api.d.ts",
+    "check": "tsc --noEmit",
+    "build": "npm run types && npm run check && npm test && node build.mjs",
+    "test": "node --test src/*.test.ts"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "openapi-fetch": "0.17.0"
+  }
+}

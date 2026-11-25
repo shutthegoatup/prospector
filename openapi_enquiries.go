@@ -16,9 +16,14 @@ func (s apiServer) ListEnquiryMessages(ctx context.Context, in api.ListEnquiryMe
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListEnquiryMessages200JSONResponse{}
+	thread, next, err := listPage(thread, in.Params.Limit, in.Params.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListEnquiryMessages200JSONResponse{Headers: api.ListEnquiryMessages200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out.Body.Items, out.Body.NextCursor = []api.EnquiryMessage{}, next
 	for _, m := range thread {
-		out = append(out, messageOut(m))
+		out.Body.Items = append(out.Body.Items, messageOut(m))
 	}
 	return out, nil
 }
