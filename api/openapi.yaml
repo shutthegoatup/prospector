@@ -1026,7 +1026,7 @@ components:
       type: object
       required: [title, brief]
       properties:
-        title: { type: string, description: A few words naming the task. }
+        title: { type: string, description: "A few words naming the task. Empty, it takes the brief's first line; longer than 60 characters, it is cut." }
         brief: { type: string, maxLength: 4000, description: "What is wanted: the task's first request." }
 
     TaskChange:

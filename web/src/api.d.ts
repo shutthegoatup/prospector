@@ -686,7 +686,7 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         TaskNew: {
-            /** @description A few words naming the task. */
+            /** @description A few words naming the task. Empty, it takes the brief's first line; longer than 60 characters, it is cut. */
             title: string;
             /** @description What is wanted: the task's first request. */
             brief: string;
