@@ -136,8 +136,8 @@ templ LandingPage(intake, origin string) {
 						<div class="lp-cell is-gold"><h3>Subscriptions and their notice</h3><p>What each customer is on, for how long, and the notice it needs. Today flags one a month before its date to give notice or renew, and a renewal deal starts from it.</p></div>
 						<div class="lp-cell is-green"><h3>Onboarding to go-live</h3><p>Your steps and theirs, dated from the start. A won deal offers to start one, and late steps come back to Today.</p></div>
 						<div class="lp-cell is-violet"><h3>A page for the customer</h3><p>Invite someone at the company to a page of their own steps, opened from an emailed link with no password. They mark theirs done.</p></div>
-						<div class="lp-cell is-coral"><h3>Enquiries answered</h3><p>Site forms and your product's sign-ups arrive with an owner and a state. Reply by email from the card, and keep their answer in the thread.</p></div>
-						<div class="lp-cell is-gold"><h3>All of it in the API</h3><p>Deals, subscriptions, onboarding and enquiries are in the published API, so a script or an agent with the right key can do with them what a person can.</p></div>
+						<div class="lp-cell is-coral"><h3>Enquiries answered</h3><p>Site forms and your product's sign-ups arrive open on the card, to be given an owner. Reply by email from it, and paste their answer into the thread.</p></div>
+						<div class="lp-cell is-gold"><h3>All of it in the API</h3><p>Deals, subscriptions, onboarding and enquiries are in the published API, so a script or an agent with the right key can do nearly all of what a person can with them.</p></div>
 					</div>
 				</div>
 			</section>
@@ -168,7 +168,7 @@ templ LandingPage(intake, origin string) {
 									<li>Add companies, facts and suggested contacts, each with a source URL<code>research:write</code></li>
 									<li>Draft notes, emails and follow-ups, shown as the agent's<code>drafts:write</code></li>
 									<li>Record an outcome, shown as the agent's in the history<code>outcomes:write</code></li>
-									<li>Value and move deals, and say where answering an enquiry stands<code>pipeline:write</code></li>
+									<li>Value deals, work a renewal or expansion through its stages, and say where answering an enquiry stands<code>pipeline:write</code></li>
 									<li>Record subscriptions and work customers' onboarding<code>customers:write</code></li>
 									<li>Email a reply to someone who wrote in<code>enquiries:reply</code></li>
 									<li>Email a customer the link to their onboarding steps<code>customers:invite</code></li>
@@ -177,8 +177,8 @@ templ LandingPage(intake, origin string) {
 							<div>
 								<h3 class="lp-tag is-coral">No key can</h3>
 								<ul>
-									<li>Send mail without a scope that says so, or to anyone who wasn't already writing to you or being onboarded</li>
-									<li>Change your organisation's settings or members, or make or revoke API keys</li>
+									<li>Send mail without a scope that says so, or to anyone on your never-contact list or erased on request</li>
+									<li>Change your organisation's settings or members, or make or revoke API keys. Only <code>agents:configure</code> can change Prospector's own agents</li>
 									<li>See another organisation</li>
 									<li>Add anyone on your never-contact list</li>
 								</ul>
