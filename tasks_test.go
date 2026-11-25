@@ -331,9 +331,17 @@ func TestTasksOverMCPAndThePages(t *testing.T) {
 	if res, _ := session.CallTool(ctx, &mcp.CallToolParams{Name: "add_company", Arguments: map[string]any{"name": "Corvane", "task": 99}}); res == nil || !res.IsError {
 		t.Fatal("work for a task that doesn't exist should be a tool error")
 	}
-	tools, err := connect(reader).ListTools(ctx, nil)
+	reading := connect(reader)
+	tools, err := reading.ListTools(ctx, nil)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if res, err := reading.CallTool(ctx, &mcp.CallToolParams{Name: "get_task", Arguments: map[string]any{"id": 1}}); err != nil || res.IsError {
+		t.Fatalf("a read-only key reading a task: %v %+v", err, res)
+	}
+	var byReader int64
+	if s.in(o.ID).Model(&Event{}).Where(`"user" = ?`, "agent:reader").Count(&byReader); byReader != 0 {
+		t.Fatalf("a read-only key reading a task was recorded as picking it up: %d", byReader)
 	}
 	var names []string
 	for _, tl := range tools.Tools {

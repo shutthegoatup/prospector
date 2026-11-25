@@ -109,7 +109,7 @@ func (q *Req) Actor() string {
 }
 
 func (q *Req) Agent() Actor {
-	return Actor{Name: q.Actor(), KeyID: q.Key.ID}
+	return Actor{Name: q.Actor(), KeyID: q.Key.ID, ReadOnly: !q.Key.Has("research:write")}
 }
 
 func (q *Req) Voice() Voice {

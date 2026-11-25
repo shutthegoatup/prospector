@@ -4,7 +4,37 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestAKeyThatCanOnlyReadDoesNotPickATaskUp(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
+	reader := Actor{Name: "agent:reader", KeyID: 1, ReadOnly: true}
+	if got := must(s.AgentTask(o.ID, reader, task.ID)); got.Brief != "Yacht builders." {
+		t.Fatalf("a read-only key should still read the task: %+v", got)
+	}
+	var events int64
+	s.in(o.ID).Model(&Event{}).Where(`"user" = ?`, reader.Name).Count(&events)
+	if list := must(s.AgentTasks(o.ID, reader)); events != 0 || list[0].Status != TaskWaiting {
+		t.Fatalf("a key that can add nothing made the task look worked on: %d events, %s", events, list[0].Status)
+	}
+}
+
+func TestOpenTasksAreListedBeforeClosedOnes(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	older := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
+	newer := must(s.CreateTask(o.ID, "Kitchens", "Kitchen makers.", "Ada Lovelace"))
+	if err := s.SetTaskClosed(o.ID, newer.ID, true, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	all := must(s.Tasks(o.ID, true, time.Now()))
+	if len(all) != 2 || all[0].ID != older.ID || all[1].ID != newer.ID {
+		t.Fatalf("the open task should come first: %+v", all)
+	}
+}
 
 func TestPickingUpATaskIsRecordedOnceARun(t *testing.T) {
 	s := tempStore(t)

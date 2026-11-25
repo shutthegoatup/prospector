@@ -176,8 +176,14 @@ func (s *Store) setRequestDone(org, request int64, done bool, who Actor) error {
 		if done {
 			updates, action = map[string]any{"done_at": time.Now(), "done_by": who.Name}, "task:done"
 		}
-		if err := tx.Model(&r).Updates(updates).Error; err != nil {
-			return err
+		// Only a request still as it was read is changed, so two finishing it at once record it once.
+		was := "done_at is not null"
+		if done {
+			was = "done_at is null"
+		}
+		changed := tx.Model(&TaskRequest{}).Where("org_id = ? and id = ? and "+was, org, r.ID).Updates(updates)
+		if changed.Error != nil || changed.RowsAffected == 0 {
+			return changed.Error
 		}
 		who.Task = r.TaskID
 		return s.logAs(tx, org, 0, nil, who, action, nil)
@@ -499,7 +505,7 @@ func (s *Store) Task(org, id int64, now time.Time) (*TaskView, error) {
 
 // Tasks lists an organisation's tasks, open ones first, newest first.
 func (s *Store) Tasks(org int64, closed bool, now time.Time) ([]TaskView, error) {
-	q := s.in(org).Order("id desc").Limit(200)
+	q := s.in(org).Order("closed_at is not null, id desc").Limit(200)
 	if !closed {
 		q = q.Where("closed_at is null")
 	}
@@ -615,7 +621,7 @@ func (s *Store) AgentTask(org int64, who Actor, id int64) (*TaskOut, error) {
 	if out.People == nil {
 		out.People = []TaskPerson{}
 	}
-	if v.ClosedAt != nil {
+	if v.ClosedAt != nil || who.ReadOnly {
 		return &out, nil
 	}
 	// One pickup a run: an agent re-reading the task as it works isn't news. Written

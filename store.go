@@ -205,6 +205,8 @@ type Actor struct {
 	Task  int64
 	Name  string
 	KeyID int64
+	// ReadOnly is a key that can add nothing, so its reading a task isn't work on it.
+	ReadOnly bool
 }
 
 var Editable = map[string]bool{"phone": true, "email": true, "linkedin": true, "sources": true,
