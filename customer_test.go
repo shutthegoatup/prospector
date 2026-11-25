@@ -522,3 +522,75 @@ func TestACustomerMarksTheirOwnSteps(t *testing.T) {
 		t.Error("a member named as the customer acts under that name")
 	}
 }
+
+// What someone outside can do to the record is bounded: pressing the two buttons in turn
+// leaves the history as it was, a press that changes nothing writes nothing, and the
+// buttons answer only to the page's own forms.
+func TestACustomersMarksKeepTheHistoryHonest(t *testing.T) {
+	s, srv, member, box := mailSite(t, nil)
+	o := must(s.OrgBySlug("alpha"))
+	o.Settings.OnboardingSteps = "them: Send your product files\nus: Internal credit check"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	ob := must(s.StartOnboarding(o.ID, OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
+	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/ui/onboarding/invite", "application/json", map[string]any{"id": ob.ID, "contact": itoa(hannah.ID)}); code != http.StatusOK {
+		t.Fatalf("inviting: %d %s", code, body)
+	}
+	outsider := newMailClient()
+	as(t, outsider, "POST", srv.URL+customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1])
+	row := must(s.Onboardings(o.ID, 0, today()))[0]
+	files, credit := row.Steps[0], row.Steps[1]
+	events := func() int64 {
+		t.Helper()
+		var n int64
+		if err := s.db.Model(&Event{}).Where("org_id = ?", o.ID).Count(&n).Error; err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	done := func() bool {
+		t.Helper()
+		return must(s.Onboardings(o.ID, 0, today()))[0].Steps[0].DoneOn != nil
+	}
+	before := events()
+	press := srv.URL + "/c/steps/" + itoa(files.ID)
+
+	if res, _ := as(t, outsider, "GET", press+"/done"); res.StatusCode != http.StatusMethodNotAllowed || done() {
+		t.Errorf("looking at a button's address: %d, done %v", res.StatusCode, done())
+	}
+	elsewhere, _ := http.NewRequest("POST", press+"/done", nil)
+	elsewhere.Header.Set("Sec-Fetch-Site", "cross-site")
+	elsewhere.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if res, err := outsider.Do(elsewhere); err != nil || res.StatusCode != http.StatusForbidden || done() {
+		t.Errorf("another site pressing the button: %v %v, done %v", res, err, done())
+	}
+	as(t, outsider, "POST", srv.URL+"/c/steps/"+itoa(credit.ID)+"/done")
+	as(t, outsider, "POST", press+"/undone")
+	if events() != before {
+		t.Errorf("presses that changed nothing wrote %d history entries", events()-before)
+	}
+
+	for range 5 {
+		as(t, outsider, "POST", press+"/done")
+		as(t, outsider, "POST", press+"/done")
+		if events() != before+1 || !done() {
+			t.Fatalf("after marking: %d new entries, done %v", events()-before, done())
+		}
+		as(t, outsider, "POST", press+"/undone")
+		if events() != before || done() {
+			t.Fatalf("after taking it back: %d new entries, done %v", events()-before, done())
+		}
+	}
+
+	// Erasing them leaves the step done by "the customer" and nothing that says who.
+	as(t, outsider, "POST", press+"/done")
+	if err := s.ErasePerson(o.ID, hannah.ID, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	var theirs int64
+	if err := s.db.Model(&Event{}).Where("org_id = ? and contact_id = ?", o.ID, hannah.ID).Count(&theirs).Error; err != nil || theirs != 0 || !done() {
+		t.Errorf("after erasing them: %d entries still theirs (%v), done %v", theirs, err, done())
+	}
+}

@@ -565,7 +565,10 @@ const customerActor = "customer"
 func (s *Store) customerSetStep(a *CustomerAccess, step int64, done bool) error {
 	org := a.Grant.OrgID
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		// Read again inside, so access withdrawn a moment ago marks nothing.
+		// Held and read again inside, so access withdrawn or a person erased a moment ago marks nothing.
+		if err := hold(tx, &CustomerGrant{}, org, a.Grant.ID); err != nil {
+			return err
+		}
 		if err := tx.Where("id = ? and org_id = ? and revoked_at is null", a.Grant.ID, org).First(&CustomerGrant{}).Error; err != nil {
 			return errNoCustomer
 		}
@@ -578,13 +581,26 @@ func (s *Store) customerSetStep(a *CustomerAccess, step int64, done bool) error 
 		case done && st.DoneOn != nil, !done && (st.DoneOn == nil || st.DoneBy != customerActor):
 			return nil
 		case !done:
-			updates, action = map[string]any{"done_on": nil, "done_by": ""}, "onboard:undone"
+			updates = map[string]any{"done_on": nil, "done_by": ""}
 		}
 		marked := tx.Model(&OnboardingStep{}).Where("id = ? and org_id = ? and done_by = ?", st.ID, org, st.DoneBy).Updates(updates)
 		if marked.Error != nil || marked.RowsAffected == 0 {
 			return marked.Error
 		}
-		return s.log(tx, org, a.Contact.ID, &a.Onboarding.CompanyID, customerActor, action, nonEmpty(st.Name))
+		if done {
+			return s.log(tx, org, a.Contact.ID, &a.Onboarding.CompanyID, customerActor, action, nonEmpty(st.Name))
+		}
+		// Taking a mark back removes its entry, not adds one: someone outside pressing the
+		// two buttons in turn can't fill the company's history.
+		var entry Event
+		err := tx.Where("org_id = ? and company_id = ? and \"user\" = ? and action = ? and value = ?", org, a.Onboarding.CompanyID, customerActor, "onboard:done", st.Name).Order("id desc").First(&entry).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return tx.Delete(&entry).Error
 	})
 }
 
