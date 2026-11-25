@@ -16,6 +16,8 @@ type Board struct {
 	// Others are the deals after a conversation's own: renewals, expansions.
 	Others  map[string][]OtherDeal
 	Members []Member
+	// After is what a won deal leads to: onboarding, when the organisation has steps.
+	After AfterWin
 }
 
 func (b Board) count(stage string) int {
@@ -139,10 +141,10 @@ templ ConversationsView(q *Req, b Board, day string) {
 						<p class="rounded-xl border border-dashed border-border p-3.5 font-mono text-xs text-muted-foreground">None</p>
 					}
 					for _, c := range convs[st.Key] {
-						@DealCard(q, c, b.Deals[c.ID], b.Members, day)
+						@DealCard(q, c, b.Deals[c.ID], b.Members, b.After, day)
 					}
 					for _, o := range b.Others[st.Key] {
-						@OtherDealCard(q, o, b.Members, day)
+						@OtherDealCard(q, o, b.Members, b.After, day)
 					}
 				</section>
 			}
@@ -150,7 +152,7 @@ templ ConversationsView(q *Req, b Board, day string) {
 	</div>
 }
 
-templ DealCard(q *Req, c Contact, d Deal, members []Member, day string) {
+templ DealCard(q *Req, c Contact, d Deal, members []Member, after AfterWin, day string) {
 	<article class={ "flex flex-col gap-2.5 rounded-xl border bg-card p-3.5 text-sm", dealClass(c, day) } data-card={ strconv.FormatInt(c.ID, 10) }>
 		<div>
 			<b>{ displayName(c) }</b>
@@ -173,6 +175,9 @@ templ DealCard(q *Req, c Contact, d Deal, members []Member, day string) {
 		{{ text, state := nextText(c, day) }}
 		if text != "" {
 			<div>@Pill(text, state)</div>
+		}
+		if c.Stage == "won" {
+			@WonNext(q, c.CompanyID, after, day)
 		}
 		<details class="text-sm">
 			<summary class="cursor-pointer font-mono text-xs text-muted-foreground">Update</summary>
@@ -256,7 +261,7 @@ templ DealFields(d Deal, members []Member, at func(string) templ.Attributes) {
 }
 
 // OtherDealCard is a renewal, an expansion or a further deal with someone in conversation.
-templ OtherDealCard(q *Req, o OtherDeal, members []Member, day string) {
+templ OtherDealCard(q *Req, o OtherDeal, members []Member, after AfterWin, day string) {
 	{{ d := o.Deal }}
 	<article class={ "flex flex-col gap-2.5 rounded-xl border bg-card p-3.5 text-sm", dealClass(d.standing(), day) } data-deal-card={ strconv.FormatInt(d.ID, 10) }>
 		<div>
@@ -278,6 +283,9 @@ templ OtherDealCard(q *Req, o OtherDeal, members []Member, day string) {
 		{{ text, state := nextText(d.standing(), day) }}
 		if text != "" {
 			<div>@Pill(text, state)</div>
+		}
+		if d.Stage == "won" {
+			@WonNext(q, o.With.CompanyID, after, day)
 		}
 		<details class="text-sm">
 			<summary class="cursor-pointer font-mono text-xs text-muted-foreground">Update</summary>
@@ -317,4 +325,32 @@ templ OtherDealCard(q *Req, o OtherDeal, members []Member, day string) {
 			</div>
 		</details>
 	</article>
+}
+
+// AfterWin is what the board needs to offer onboarding on a won deal: whether the
+// organisation has written its steps, and which companies have an onboarding already.
+type AfterWin struct {
+	Planned int
+	// Started are the companies with an onboarding, and Running those with one not yet live.
+	Started, Running map[int64]bool
+}
+
+// WonNext offers to start onboarding the company a won deal is with, or says it has begun.
+templ WonNext(q *Req, company *int64, after AfterWin, day string) {
+	if company != nil && after.Started[*company] {
+		<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(*company, 10)) } class="font-mono text-xs text-mark underline">{ onboardingWord(after.Running[*company]) }</a>
+	} else if company != nil && after.Planned > 0 {
+		<div>
+			@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "ui/onboarding", "data-body": jsonBody("company", *company, "start", day)}}) {
+				Start onboarding
+			}
+		</div>
+	}
+}
+
+func onboardingWord(running bool) string {
+	if running {
+		return "Onboarding under way"
+	}
+	return "Onboarded"
 }
