@@ -37,7 +37,7 @@ func whoLabel(who string) string {
 func stepMeta(st OnboardingStep, day string) string {
 	switch {
 	case st.DoneOn != nil:
-		return joinNonEmpty(" · ", "done "+*st.DoneOn, st.DoneBy)
+		return joinNonEmpty(" · ", "done "+*st.DoneOn, actorLabel(st.DoneBy))
 	case st.Due != nil && *st.Due < day:
 		return "late, was due " + *st.Due
 	case st.Due != nil:
@@ -349,7 +349,7 @@ func OnboardingCard(q *Req, r OnboardingRow, day string, named bool) templ.Compo
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = Meta("Someone you invite is emailed a link to a page showing the steps that are theirs, and nothing else. It needs no password and opens in one browser at a time.").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Meta("Someone you invite is emailed a link to a page showing the steps that are theirs, which they can mark done, and nothing else. It needs no password and opens in one browser at a time.").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

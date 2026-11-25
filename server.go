@@ -123,7 +123,7 @@ func (q *Req) Actor() string {
 		return "agent:" + q.Key.Name
 	}
 	name := strings.TrimSpace(q.User.Name)
-	if name == "" || strings.HasPrefix(name, "agent:") || name == "cli" || name == "import" {
+	if name == "" || strings.HasPrefix(name, "agent:") || name == "cli" || name == "import" || name == customerActor {
 		return q.User.Email
 	}
 	return name
@@ -346,6 +346,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /login/callback", a.loginCallback)
 	mux.HandleFunc("GET /c", a.customerPage)
 	mux.HandleFunc("POST /c/leave", a.customerLeave)
+	mux.HandleFunc("POST /c/steps/{id}/done", a.customerStep(true))
+	mux.HandleFunc("POST /c/steps/{id}/undone", a.customerStep(false))
 	mux.HandleFunc("GET /c/{token}", a.customerLinkPage)
 	mux.HandleFunc("POST /c/{token}", a.customerOpen)
 	mux.HandleFunc("POST /c/{token}/again", a.customerAgain)
