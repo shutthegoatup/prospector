@@ -299,9 +299,40 @@ func TestTodayPointsAtSubscriptionsComingDue(t *testing.T) {
 		{Standing{Status: SubEnded, TermEnd: on(-5), Ends: on(-5)}, false},
 		{Standing{Status: SubScheduled, TermEnd: on(400), CancelBy: on(370), Out: on(400)}, false},
 	} {
-		if got := c.st.Soon(today()); got != c.want {
+		if got := c.st.within(today()); got != c.want {
 			t.Errorf("%+v counts as soon: %v, want %v", c.st, got, c.want)
 		}
 	}
 	_ = far
+
+	// A plan that turns over every month always has a term ending within the month:
+	// that is routine, until it has a day it stops.
+	monthly := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *person.CompanyID, Name: "Monthly", Per: PerMonth, Start: on(-100)}, "Ada Lovelace"))
+	rolled := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *person.CompanyID, Name: "Rolled", Per: PerMonth, Start: now.AddDate(0, -8, 0).Format(dayLayout), TermMonths: 6, Then: ThenRolls}, "Ada Lovelace"))
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(page, prompt) {
+		t.Error("Today points at plans that only turn over monthly")
+	}
+	if err := s.ChangeSubscription(o.ID, monthly.ID, "notice_on", today(), "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); !strings.Contains(page, prompt) {
+		t.Error("Today says nothing of a monthly plan that notice was given on")
+	}
+	for _, c := range []struct {
+		sub  Subscription
+		on   string
+		want int
+	}{
+		{Subscription{Start: "2026-01-01", Per: PerMonth}, "2026-06-15", 1},
+		{Subscription{Start: "2026-01-01", Per: PerYear}, "2026-06-15", 12},
+		{Subscription{Start: "2026-01-01", Per: PerMonth, TermMonths: 6, Then: ThenRolls}, "2026-06-30", 6},
+		{Subscription{Start: "2026-01-01", Per: PerMonth, TermMonths: 6, Then: ThenRolls}, "2026-07-01", 1},
+		{Subscription{Start: "2026-01-01", Per: PerYear, TermMonths: 6, Then: ThenRolls}, "2026-07-01", 12},
+		{Subscription{Start: "2026-01-01", Per: PerMonth, TermMonths: 6, Then: ThenRenews}, "2027-03-01", 6},
+	} {
+		if got := c.sub.monthsNow(c.on); got != c.want {
+			t.Errorf("%+v on %s is in a term of %d months, want %d", c.sub, c.on, got, c.want)
+		}
+	}
+	_ = rolled
 }
