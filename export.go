@@ -11,15 +11,16 @@ import (
 // PersonExport is everything held about one contact row, for answering a request
 // from that person to see it.
 type PersonExport struct {
-	ExportedAt time.Time     `json:"exported_at"`
-	Note       string        `json:"note,omitempty"`
-	Company    string        `json:"company,omitempty"`
-	Person     Contact       `json:"person"`
-	Facts      []Fact        `json:"facts"`
-	Enquiries  []Enquiry     `json:"enquiries"`
-	Suggested  []Suggestion  `json:"suggested_details"`
-	Deals      []Deal        `json:"deals"`
-	History    []ExportEvent `json:"history"`
+	ExportedAt time.Time       `json:"exported_at"`
+	Note       string          `json:"note,omitempty"`
+	Company    string          `json:"company,omitempty"`
+	Person     Contact         `json:"person"`
+	Facts      []Fact          `json:"facts"`
+	Enquiries  []Enquiry       `json:"enquiries"`
+	Suggested  []Suggestion    `json:"suggested_details"`
+	Deals      []Deal          `json:"deals"`
+	Access     []CustomerGrant `json:"onboarding_access"`
+	History    []ExportEvent   `json:"history"`
 }
 
 type ExportEvent struct {
@@ -30,7 +31,7 @@ type ExportEvent struct {
 }
 
 func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error) {
-	out := &PersonExport{ExportedAt: time.Now().UTC(), Facts: []Fact{}, Enquiries: []Enquiry{}, Suggested: []Suggestion{}, Deals: []Deal{}, History: []ExportEvent{}}
+	out := &PersonExport{ExportedAt: time.Now().UTC(), Facts: []Fact{}, Enquiries: []Enquiry{}, Suggested: []Suggestion{}, Deals: []Deal{}, Access: []CustomerGrant{}, History: []ExportEvent{}}
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		c := &out.Person
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(c).Error; err != nil {
@@ -66,6 +67,9 @@ func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error)
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("id").Find(&out.Deals).Error; err != nil {
 			return err
 		}
+		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("id").Find(&out.Access).Error; err != nil {
+			return err
+		}
 		var events []Event
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("at, id").Find(&events).Error; err != nil {
 			return err
@@ -99,6 +103,7 @@ type OrgExport struct {
 	Subs         []Subscription   `json:"subscriptions"`
 	Onboardings  []Onboarding     `json:"onboardings"`
 	OnboardSteps []OnboardingStep `json:"onboarding_steps"`
+	Access       []CustomerGrant  `json:"onboarding_access"`
 	Enquiries    []Enquiry        `json:"enquiries"`
 	Suggested    []Suggestion     `json:"suggested_details"`
 	Tasks        []Task           `json:"tasks"`
@@ -226,7 +231,7 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			out.Agents = append(out.Agents, e)
 		}
 		mine := func() *gorm.DB { return tx.Where("org_id = ?", org).Order("id") }
-		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Onboardings, &out.OnboardSteps, &out.Enquiries, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
+		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Onboardings, &out.OnboardSteps, &out.Access, &out.Enquiries, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
 			if err := mine().Find(rows).Error; err != nil {
 				return err
 			}
