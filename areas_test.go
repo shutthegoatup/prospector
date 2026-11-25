@@ -103,6 +103,16 @@ func TestEachAreaChangesOnlyItsOwnWork(t *testing.T) {
 		}
 	}
 	reads(asGrace, "someone with no area")
+	converse := func(cl *http.Client) (int, string) {
+		return call(t, cl, "POST", base+"api/v1/enquiries/"+itoa(help.ID)+"/conversation", "application/json", map[string]any{})
+	}
+	if code, _ := converse(asGrace); code != http.StatusForbidden {
+		t.Errorf("someone with no area put an enquiry's sender on the board: %d", code)
+	}
+	areas("support")
+	if code, body := converse(asGrace); code >= 300 {
+		t.Errorf("support can't hand an enquiry's sender to sales: %d %s", code, body)
+	}
 
 	if code, body := support(ada); code != http.StatusOK {
 		t.Errorf("an owner is held to an area: %d %s", code, body)

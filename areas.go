@@ -11,6 +11,7 @@ import (
 const (
 	areaSales   = "sales"
 	areaSupport = "support"
+	areaAny     = "any"
 )
 
 // Areas split a team's work. Everyone reads everything; changing something takes
@@ -21,8 +22,8 @@ var Areas = []struct{ Name, What string }{
 }
 
 // opArea is the area whose people may make each API write. Keys go by their scopes
-// alone. "" is anyone in the organisation: putting an enquiry's sender on the board
-// hands them from support to sales, and the owners-only operations are held already.
+// alone. Putting an enquiry's sender on the board hands them from support to sales, so
+// either may; "" is anyone, for the owners-only operations, which are held already.
 var opArea = map[string]string{
 	"ChangeEnquiry": areaSupport, "ReplyToEnquiry": areaSupport, "RecordEnquiryAnswer": areaSupport,
 	"AddSubscription": areaSupport, "ChangeSubscription": areaSupport, "RemoveSubscription": areaSupport, "StartRenewal": areaSupport,
@@ -30,7 +31,7 @@ var opArea = map[string]string{
 	"InviteCustomer": areaSupport, "WithdrawCustomerInvite": areaSupport,
 	"StartDeal": areaSales, "ChangeDeal": areaSales, "RemoveDeal": areaSales, "ChangeOwnDeal": areaSales,
 	"StartRun": areaSales, "StopRun": areaSales,
-	"ConverseEnquiry": "",
+	"ConverseEnquiry": areaAny,
 	"CreateAgent":     "", "UpdateAgent": "", "DeleteAgent": "", "DeleteEnquiry": "",
 }
 
@@ -38,10 +39,16 @@ func (m *Membership) Works(area string) bool {
 	if m == nil {
 		return false
 	}
+	if area == areaAny {
+		return m.Role == "owner" || strings.TrimSpace(m.Areas) != ""
+	}
 	return area == "" || m.Role == "owner" || slices.Contains(strings.Fields(m.Areas), area)
 }
 
 func areaRefusal(area string) string {
+	if area == areaAny {
+		return "you read only here: an owner can give you an area on the Team list in Settings"
+	}
 	return "that's " + area + " work, which you don't do here: an owner can add " + area + " to you on the Team list in Settings"
 }
 
