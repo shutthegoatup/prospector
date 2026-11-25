@@ -35,6 +35,14 @@ Companies found by agents, imports and people wait here to be qualified or rejec
 
 ![Research: two companies an agent found, with sourced facts and a suggested contact](docs/images/research.png)
 
+### Tasks: write a brief, hand it to an agent
+
+Write what you want found. An agent picks the task up and what it finds waits in Research, tied to the task. Anyone can ask for more later, and a different agent can carry on: it is shown the brief, every request, what has already been found and what a person rejected, and the notes earlier agents left on what they skipped.
+
+Your own agent starts on a task from the prompt on its page (clients that show MCP prompts as commands have it as `work_task`). Prospector doesn't run agents itself, and can't start one for you.
+
+A task shows as waiting, being worked on, or done. Nothing an agent says while working is stored: its status and results are read from what it added. Agents often stop without saying so, so each request shows what has been added since it was asked, and you can mark one done or reopen it yourself.
+
 ### Conversations: replies to deals
 
 Replies move across a board: replied, meeting, proposal, won, lost. Each needs a next step with a date. Ones without, or due today, come back on Today.
@@ -52,7 +60,7 @@ Each organisation has an MCP endpoint and a REST API, with scoped keys. Agents c
 - **Companies:** search, plus each company's people, facts and full history: who did what, people and agents alike.
 - **Take everything with you:** an owner can download all the organisation holds from Settings (or `prospector export-org <file>`): companies, people, facts, enquiries, history, settings and who has access, as one JSON file. It holds no passwords, API keys or sign-on secrets, and nothing that identifies people you erased.
 - **Export a person:** when someone asks what you hold on them, an owner can download it from their company's page (or `prospector export-person <name> <file>`): their details, drafts, notes, the facts recorded against them, what they wrote to you and their history. The history names the teammates and agents who acted, so read it through before you send it on. The export is itself noted in the history.
-- **Erase a person:** an owner can erase someone from their company's page (or `prospector erase <name>`) when they ask to be forgotten. Their details, drafts, notes and facts are deleted, the history keeps only that something happened and when, and an import, a restore or an agent can't add them again. A row that names several people goes whole. Company facts and other people's notes that mention them, your own lead files and database backups aren't touched: take them out there too.
+- **Erase a person:** an owner can erase someone from their company's page (or `prospector erase <name>`) when they ask to be forgotten. Their details, drafts, notes and facts are deleted, the history keeps only that something happened and when, and an import, a restore or an agent can't add them again. A row that names several people goes whole. Agents' notes about their company, and on any task that touched it, are deleted too, since free text can't be searched for a name. Company facts and other people's notes that mention them, the briefs and requests people wrote on tasks, your own lead files and database backups aren't touched: take them out there too.
 - **Add person:** paste a LinkedIn profile link and the name fills in. A bookmarklet opens the same form pre-filled from the profile you're viewing.
 - **Settings, per organisation:** waits between steps, connection-note template, call-script pitch, never-contact list, what you look for at a company and team. Each member sets their own caller name and signature.
 - **What you look for:** each organisation names the things that make a company a fit, one per line in Settings, such as `configurator: a product configurator on their site` or `careers_page: a jobs page`. Agents are told the list and record each as a fact under that name; Research and the company page show which ones a company has.
@@ -147,8 +155,8 @@ Each organisation has an MCP endpoint at `/o/<slug>/mcp` (streamable HTTP) and a
 
 | Scope | Allows |
 |---|---|
-| `read` | `search`, `get_company`, `list_due` |
-| `research:write` | `add_company`, `add_fact`, `add_contact`; these wait in Research for a person |
+| `read` | `search`, `get_company`, `list_due`, `list_tasks`, `get_task` |
+| `research:write` | `add_company`, `add_fact`, `add_contact`; these wait in Research for a person. `task_note` and `finish_request` on tasks |
 | `drafts:write` | `draft_message`, shown as written by the agent |
 | `import` | `push` and `pull`: a full sync, for a person's own files rather than an agent |
 | `outcomes:write` | `mark`: record an outcome (sent, accepted, called, replied, declined, hold), shown as the agent's |

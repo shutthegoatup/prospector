@@ -313,7 +313,7 @@ func call(t *testing.T, client *http.Client, method, u, ctype string, body any) 
 func TestUI(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	base := srv.URL + "/o/alpha/"
-	for _, page := range []string{"today", "research", "conversations", "companies", "add", "settings", "agents", "today?step=linkedin"} {
+	for _, page := range []string{"today", "research", "conversations", "companies", "add", "settings", "agents", "tasks", "today?step=linkedin"} {
 		if code, body := call(t, client, "GET", base+page, "", nil); code != http.StatusOK || !strings.Contains(body, "Alpha") {
 			t.Fatalf("GET %s: %d", page, code)
 		}
