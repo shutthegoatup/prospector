@@ -86,6 +86,7 @@ prospector serve                                          # http://127.0.0.1:876
 | `PROSPECTOR_SECRET_KEYS` | The server's secret keys, newest first: `2:<64 hex>,1:<64 hex>`. Needed for an organisation's single sign-on and for a mail server of its own (see [Secret keys](#secret-keys)) |
 | `PROSPECTOR_GOOGLE_CLIENT_ID`, `PROSPECTOR_GOOGLE_CLIENT_SECRET` | Offer "Continue with Google" on the sign-in page. The same pair exists for `MICROSOFT` and `LINKEDIN`. Each needs `PROSPECTOR_URL` (see [Signing in](#signing-in)) |
 | `TZ` | The time zone "today" is counted in |
+| `PROSPECTOR_FRONT_ORG` | The organisation whose Enquiries the front page's contact form adds to (see [Enquiries](#enquiries-website-forms-and-sign-ups)). Without it the front page has no form |
 | `PROSPECTOR_ORG` | Default organisation for CLI commands (`--org=` overrides it) |
 | `PROSPECTOR_KEY` | API key for `push` and `pull` |
 
@@ -99,7 +100,7 @@ prospector serve                                          # http://127.0.0.1:876
 - With [mail](#mail) set up, whoever reads a member's mailbox can choose that member's password. Without it there is no reset but `prospector user password`.
 - Members change their own password in Settings, which signs out their other sessions. `prospector user password` signs them out everywhere.
 - Every page needs a sign-in except the sign-in pages and the front page at `/`, which describes Prospector to a signed-out visitor and shows nothing from your data. The single sign-on page does name the organisations that have verified an email domain to anyone who types an address at it. Every browser POST must be JSON, which blocks cross-site form posts, and a request that a browser marks as coming from another site is refused, sign-in and sign-out included.
-- The one exception is the enquiry route, `/o/<slug>/intake`, which exists to be posted to from your own sites. It answers only the sites an owner lists in Settings, reads no session, and can add an enquiry and nothing else. With no sites listed it refuses everything.
+- The one exception is the enquiry route, `/o/<slug>/intake`, which exists to be posted to from your own sites. It answers only the sites an owner lists in Settings, reads no session, and can add an enquiry and nothing else. With no sites listed it refuses everything. The front page's own contact form, when `PROSPECTOR_FRONT_ORG` turns it on, posts there too, so that page then carries that organisation's slug.
 
 There's a Dockerfile for container hosting.
 
@@ -215,6 +216,8 @@ await fetch("https://<host>/o/<slug>/intake", {
 curl https://<host>/o/<slug>/api/v1/enquiries -H "Authorization: Bearer $PROSPECTOR_KEY" \
   -d '{"kind":"signup","name":"Hannah Pryce","email":"hannah@quay.example","company":"Quay Marine","site":"app"}'
 ```
+
+**From this server's own front page.** Set `PROSPECTOR_FRONT_ORG` to an organisation's slug and, in that organisation's Settings, list the server's own address among the sites, exactly as people reach it (`PROSPECTOR_URL` when that is set). The front page then ends with a contact form that adds to that organisation's Enquiries. Until both are done the page has no form and loads no script. The form posts to the same server, so the page's Content-Security-Policy is unchanged.
 
 Erasing a person also deletes their enquiries, and an owner can delete any single enquiry from the Enquiries page.
 

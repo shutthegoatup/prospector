@@ -14,7 +14,9 @@ templ Shot(file, width, height, alt, tone string) {
 	<div class={ "lp-shot", tone }><img src={ asset("img/" + file) } width={ width } height={ height } loading="lazy" alt={ alt }/></div>
 }
 
-templ LandingPage() {
+// LandingPage takes the address its enquiry form posts to; with none it has no form
+// and loads no script.
+templ LandingPage(intake string) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
@@ -27,6 +29,9 @@ templ LandingPage() {
 			<link rel="icon" type="image/svg+xml" href={ asset("img/mark.svg") }/>
 			<link rel="stylesheet" href={ asset("css/fonts.css") }/>
 			<link rel="stylesheet" href={ asset("css/landing.css") }/>
+			if intake != "" {
+				<script src={ asset("js/landing.js") } defer></script>
+			}
 		</head>
 		<body class="lp">
 			<header class="lp-hero">
@@ -38,6 +43,9 @@ templ LandingPage() {
 							<a href="#loop">How it works</a>
 							<a href="#agents">Agents</a>
 							<a href="#start">Get started</a>
+							if intake != "" {
+								<a href="#contact" data-needs-script hidden>Contact</a>
+							}
 						</div>
 						<a class="lp-btn is-small" href="/login">Sign in</a>
 					</nav>
@@ -196,6 +204,9 @@ templ LandingPage() {
 					</div>
 				</div>
 			</section>
+			if intake != "" {
+				@EnquiryForm(intake)
+			}
 			<footer class="lp-foot">
 				<div class="lp-wrap">
 					@Brand()
@@ -209,4 +220,37 @@ templ LandingPage() {
 			</footer>
 		</body>
 	</html>
+}
+
+// EnquiryForm stays hidden until its script runs, since without one it can't send.
+templ EnquiryForm(intake string) {
+	<section class="lp-contact" id="contact" hidden>
+		<div class="lp-wrap lp-contact-grid">
+			<div>
+				<p class="lp-label">Contact</p>
+				<h2>Ask us anything.</h2>
+				<p class="lp-lede">A question, a demo, or help getting it running. Someone will write back to the address you give.</p>
+			</div>
+			<form class="lp-form" data-intake={ intake }>
+				<label>Your name<input name="name" autocomplete="name" maxlength="200"/></label>
+				<label>Email<input name="email" type="email" autocomplete="email" maxlength="200" required/></label>
+				<label>Company<input name="company" autocomplete="organization" maxlength="200"/></label>
+				<label>
+					What it's about
+					<select name="kind">
+						<option value="sales">A question</option>
+						<option value="demo">See it running</option>
+						<option value="support">Help running it</option>
+						<option value="feature">Something it should do</option>
+					</select>
+				</label>
+				<label class="is-wide">Message<textarea name="message" rows="5" maxlength="5000" required></textarea></label>
+				<label class="lp-trap" aria-hidden="true">Leave this empty<input name="ref_note" tabindex="-1" autocomplete="off"/></label>
+				<div class="lp-form-foot is-wide">
+					<button class="lp-btn is-primary" type="submit">Send</button>
+					<p class="lp-form-status" role="status"></p>
+				</div>
+			</form>
+		</div>
+	</section>
 }

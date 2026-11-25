@@ -32,6 +32,8 @@ type App struct {
 	// base is the address people reach the app at, when the operator has said: then
 	// links and the cookie's Secure mark don't depend on what a proxy forwards.
 	base string
+	// frontOrg is the organisation the front page's form sends enquiries to; empty is no form.
+	frontOrg string
 	// mail is the app's own server, for password resets and invitations; nil is none.
 	mail *MailServer
 	// send and later stand in for SMTP and for a goroutine in tests.
@@ -502,9 +504,22 @@ func (a *App) front(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("content-type", "text/html; charset=utf-8")
-	if err := LandingPage().Render(r.Context(), w); err != nil {
+	if err := LandingPage(a.frontIntake(r)).Render(r.Context(), w); err != nil {
 		log.Print(err)
 	}
+}
+
+// frontIntake is where the front page's form posts. The intake route answers only the
+// sites an organisation lists, so until this address is among them there is no form.
+func (a *App) frontIntake(r *http.Request) string {
+	if a.frontOrg == "" {
+		return ""
+	}
+	org, err := a.s.OrgBySlug(a.frontOrg)
+	if err != nil || !org.Settings.takesEnquiriesFrom(a.baseURL(r)) {
+		return ""
+	}
+	return "/o/" + org.Slug + "/intake"
 }
 
 func (a *App) home(w http.ResponseWriter, r *http.Request) {

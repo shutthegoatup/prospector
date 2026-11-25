@@ -1,7 +1,9 @@
 package main
 
 import (
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"path"
 	"regexp"
 	"strings"
@@ -51,6 +53,76 @@ func TestFrontPage(t *testing.T) {
 	code, body = call(t, member, "GET", srv.URL+"/", "", nil)
 	if code != http.StatusOK || strings.Contains(body, "One queue a day.") || !strings.Contains(body, `data-base="/o/alpha/"`) {
 		t.Fatalf("a signed-in member at / didn't land on their organisation: %d", code)
+	}
+}
+
+func TestFrontPageEnquiryForm(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	srv := httptest.NewServer((&App{s: s, frontOrg: "alpha"}).Routes())
+	t.Cleanup(srv.Close)
+	visitor := &http.Client{}
+	const form = `data-intake="/o/alpha/intake"`
+
+	// Named, but the organisation hasn't listed this address: a form would only be refused.
+	if _, body := call(t, visitor, "GET", srv.URL+"/", "", nil); strings.Contains(body, "data-intake") || strings.Contains(body, "<script") {
+		t.Fatal("the front page has a form its organisation wouldn't take enquiries from")
+	}
+	takeEnquiriesFrom(t, s, o, "https://www.alpha.example\n"+srv.URL)
+
+	res, err := visitor.Get(srv.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	body := string(page)
+	if !strings.Contains(body, form) || !strings.Contains(body, `href="#contact"`) {
+		t.Fatal("the front page has no enquiry form")
+	}
+	if !strings.Contains(res.Header.Get("Content-Security-Policy"), "connect-src 'self'") {
+		t.Errorf("the form's page may post elsewhere: %q", res.Header.Get("Content-Security-Policy"))
+	}
+	if found := regexp.MustCompile(`(?i)<script(?: [^>]*)?>[^<]|<[^>]*\son[a-z]+\s*=`).FindString(body); found != "" {
+		t.Errorf("the front page has an inline script or handler: %s", found)
+	}
+	script := regexp.MustCompile(`<script src="(/assets/js/landing\.js[^"]*)"`).FindStringSubmatch(body)
+	if script == nil {
+		t.Fatal("the form's script isn't loaded")
+	}
+	got, err := visitor.Get(srv.URL + script[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	got.Body.Close()
+	if got.StatusCode != http.StatusOK || !strings.Contains(got.Header.Get("Content-Type"), "javascript") {
+		t.Errorf("GET %s: %d %q", script[1], got.StatusCode, got.Header.Get("Content-Type"))
+	}
+
+	// What the form's script sends, as the browser sends it from this same address.
+	req, _ := http.NewRequest("POST", srv.URL+"/o/alpha/intake", strings.NewReader(`{"kind":"demo","name":"Hannah Pryce","email":"hannah@quay.example","message":"Could we see it running?","trap":""}`))
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Origin", srv.URL)
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	sent, err := visitor.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sent.Body.Close()
+	rows, err := s.Enquiries(o.ID, EnquiryFilter{})
+	if sent.StatusCode != http.StatusOK || err != nil || len(rows) != 1 || rows[0].Kind != "demo" || rows[0].Site != srv.URL {
+		t.Fatalf("the form's enquiry: %d, kept %+v, %v", sent.StatusCode, rows, err)
+	}
+
+	// A server that names no organisation, or one that isn't there, serves the page as before.
+	for _, slug := range []string{"", "nope"} {
+		plain := httptest.NewServer((&App{s: s, frontOrg: slug}).Routes())
+		t.Cleanup(plain.Close)
+		takeEnquiriesFrom(t, s, o, plain.URL)
+		code, body := call(t, visitor, "GET", plain.URL+"/", "", nil)
+		if code != http.StatusOK || !strings.Contains(body, "One queue a day.") || strings.Contains(body, "data-intake") || strings.Contains(body, "<script") {
+			t.Errorf("a server whose front organisation is %q: %d, with a form or without the page", slug, code)
+		}
 	}
 }
 
