@@ -147,6 +147,7 @@ type EnquiryChange = PatchBody<"/o/{org}/api/v1/enquiries/{id}">;
 const subscriptionFields = ["name", "amount", "per", "start", "term_months", "then", "notice_days", "notice_on", "ended_on"] as const satisfies readonly (keyof Schemas["SubscriptionChange"])[];
 const dealFields = ["kind", "amount", "close_date", "owner", "stage", "next_step", "next_date", "lost_reason"] as const satisfies readonly (keyof Schemas["DealChange"])[];
 const enquiryFields = ["state", "owner", "note"] as const satisfies readonly (keyof EnquiryChange)[];
+const campaignFields = ["name", "audience", "subject", "body"] as const satisfies readonly (keyof Schemas["CampaignChange"])[];
 
 function oneOf<T extends string>(list: readonly T[], f: string, what: string): T {
   if (!(list as readonly string[]).includes(f)) throw new Error(`${what} has no ${f}.`);
@@ -172,6 +173,9 @@ document.addEventListener("change", async (e) => {
     } else if (f.dataset.enquiry) {
       const change: EnquiryChange = { [oneOf(enquiryFields, field, "An enquiry")]: f.value };
       answered(await api.PATCH("/o/{org}/api/v1/enquiries/{id}", { params: { path: { org, id: +f.dataset.enquiry } }, body: change }));
+    } else if (f.dataset.campaign) {
+      const change: Schemas["CampaignChange"] = { [oneOf(campaignFields, field, "A campaign")]: f.value };
+      answered(await api.PATCH("/o/{org}/api/v1/campaigns/{id}", { params: { path: { org, id: +f.dataset.campaign } }, body: change }));
     } else if (f.dataset.step) {
       if (field !== "due") throw new Error(`A step's ${field} is changed another way.`);
       answered(await api.PATCH("/o/{org}/api/v1/onboarding-steps/{id}", { params: { path: { org, id: +f.dataset.step } }, body: { due: f.value } }));

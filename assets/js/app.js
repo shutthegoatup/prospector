@@ -595,6 +595,7 @@
   var subscriptionFields = ["name", "amount", "per", "start", "term_months", "then", "notice_days", "notice_on", "ended_on"];
   var dealFields = ["kind", "amount", "close_date", "owner", "stage", "next_step", "next_date", "lost_reason"];
   var enquiryFields = ["state", "owner", "note"];
+  var campaignFields = ["name", "audience", "subject", "body"];
   function oneOf(list, f, what) {
     if (!list.includes(f)) throw new Error(`${what} has no ${f}.`);
     return f;
@@ -616,6 +617,9 @@
       } else if (f.dataset.enquiry) {
         const change = { [oneOf(enquiryFields, field, "An enquiry")]: f.value };
         answered(await api.PATCH("/o/{org}/api/v1/enquiries/{id}", { params: { path: { org, id: +f.dataset.enquiry } }, body: change }));
+      } else if (f.dataset.campaign) {
+        const change = { [oneOf(campaignFields, field, "A campaign")]: f.value };
+        answered(await api.PATCH("/o/{org}/api/v1/campaigns/{id}", { params: { path: { org, id: +f.dataset.campaign } }, body: change }));
       } else if (f.dataset.step) {
         if (field !== "due") throw new Error(`A step's ${field} is changed another way.`);
         answered(await api.PATCH("/o/{org}/api/v1/onboarding-steps/{id}", { params: { path: { org, id: +f.dataset.step } }, body: { due: f.value } }));

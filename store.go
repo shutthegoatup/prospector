@@ -39,6 +39,8 @@ type OrgSettings struct {
 	OnboardingSteps string `json:"onboarding_steps"`
 	// Currency is the three-letter code deals are valued in.
 	Currency string `json:"currency"`
+	// PostalAddress is where the organisation can be written to. Marketing mail has to say it.
+	PostalAddress string `json:"postal_address"`
 }
 
 func (s OrgSettings) withDefaults() OrgSettings {
@@ -245,7 +247,7 @@ type Store struct {
 }
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
-	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &EnquiryMessage{}, &Suppression{}, &UnsubscribeLink{}, &Suggestion{},
+	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &EnquiryMessage{}, &Suppression{}, &UnsubscribeLink{}, &Campaign{}, &Suggestion{},
 	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}, &Agent{}, &AgentRun{}, &Deal{}, &Subscription{}, &Onboarding{}, &OnboardingStep{}, &CustomerGrant{}, &CustomerLink{}, &CustomerSession{}}
 
 // Open takes a postgres:// URL or a SQLite file path.

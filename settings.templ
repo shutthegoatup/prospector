@@ -117,6 +117,10 @@ templ SettingsView(q *Req, d SettingsData) {
 						<input name="currency" value={ set.Currency } maxlength="3" class={ fieldClass + " w-24" }/>
 						@Meta("The three-letter code deals are valued in, such as GBP, EUR or USD. Changing it leaves the deals you already valued as they are.")
 					}
+					@Row("Postal address") {
+						<textarea name="postal_address" rows="3" maxlength="300" placeholder={ "Alpha Ltd\n1 Example Street\nLeith EH6 1AA" } class={ areaClass }>{ set.PostalAddress }</textarea>
+						@Meta("Where you can be written to. It goes at the foot of every campaign, as the law on marketing mail expects, and a campaign can't be sent without it.")
+					}
 					@Row("Cold email") {
 						<span class="flex items-center gap-2.5 pt-2 text-sm"><input type="checkbox" name="incorporated_only" checked?={ set.IncorporatedOnly } class="size-4 accent-[var(--primary)]"/> Only email incorporated companies (UK PECR)</span>
 					}
