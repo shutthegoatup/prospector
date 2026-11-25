@@ -438,6 +438,8 @@ type EnquiriesData struct {
 	Counts    map[string]int
 	Companies map[int64]string
 	Members   []Member
+	// Talking are the contacts, among those who sent these, already on the Conversations board.
+	Talking map[int64]bool
 }
 
 func (a *App) enquiriesPage(w http.ResponseWriter, r *http.Request) {
@@ -467,5 +469,132 @@ func (a *App) enquiriesPage(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, http.StatusInternalServerError)
 		return
 	}
-	a.page(w, r, "enquiries", EnquiriesView(q, EnquiriesData{Filter: f, Rows: rows, Page: pg, Counts: a.s.EnquiryCounts(q.Org.ID), Companies: names, Members: members}))
+	talking := map[int64]bool{}
+	var senders []int64
+	for _, e := range rows {
+		if e.ContactID != nil {
+			senders = append(senders, *e.ContactID)
+		}
+	}
+	if len(senders) > 0 {
+		var on []int64
+		if err := a.s.in(q.Org.ID).Model(&Contact{}).Where("id in ?", senders).Where(inConversation).Pluck("id", &on).Error; err != nil {
+			fail(w, err, http.StatusInternalServerError)
+			return
+		}
+		for _, id := range on {
+			talking[id] = true
+		}
+	}
+	a.page(w, r, "enquiries", EnquiriesView(q, EnquiriesData{Filter: f, Rows: rows, Page: pg, Counts: a.s.EnquiryCounts(q.Org.ID), Companies: names, Members: members, Talking: talking}))
+}
+
+// ConverseEnquiry puts whoever sent an enquiry on the Conversations board: writing in is
+// a reply to nothing we sent, but it is them talking to us, which is what the board is
+// for. Someone not held yet is added first, under the never-contact and erasure rules
+// that adding anyone by hand goes through.
+func (s *Store) ConverseEnquiry(o *Org, id int64, actor string) (*Contact, error) {
+	var e Enquiry
+	if err := s.in(o.ID).Where("id = ?", id).First(&e).Error; err != nil {
+		return nil, missing(err, "no enquiry %d", id)
+	}
+	if e.Spam {
+		return nil, errors.New("that was marked as spam, so there is nobody to talk to")
+	}
+	var c Contact
+	if e.ContactID != nil {
+		if err := s.in(o.ID).Where("id = ?", *e.ContactID).First(&c).Error; err != nil {
+			return nil, missing(err, "no contact %d", *e.ContactID)
+		}
+	} else {
+		// Whoever holds that address now: they may have been added since this arrived,
+		// by hand or from another of their enquiries.
+		found := s.in(o.ID).Where("lower(email) = ? and key not like 'org:%'", e.Email).Order("id").Limit(1).Find(&c)
+		if found.Error != nil {
+			return nil, found.Error
+		}
+		if found.RowsAffected == 0 {
+			company, err := s.enquiryCompany(o.ID, e)
+			if err != nil {
+				return nil, err
+			}
+			added, err := s.QuickAddPerson(o, QuickAdd{Name: senderName(e), Company: company, Email: e.Email}, actor)
+			if err != nil {
+				return nil, err
+			}
+			c = *added
+		}
+		// Matched now, so their export and erasure take this enquiry with them.
+		if err := s.in(o.ID).Model(&Enquiry{}).Where("id = ?", e.ID).
+			Updates(map[string]any{"contact_id": c.ID, "company_id": c.CompanyID}).Error; err != nil {
+			return nil, err
+		}
+	}
+	// Someone put on the never-contact list since they were matched stays off the board.
+	if err := s.allowed(o, deref(c.Email), deref(c.Linkedin)); err != nil {
+		return nil, err
+	}
+	if c.Declined != nil {
+		return nil, errors.New("they are marked as not interested, which keeps them off the board")
+	}
+	if c.Replied == nil {
+		if err := s.Mark(o.ID, c.ID, "replied", today(), actor); err != nil {
+			return nil, err
+		}
+	}
+	if deref(c.CallNotes) == "" && e.Message != "" {
+		// What they asked, on the card. It is their own text, shown as text like the rest.
+		if err := s.Update(o.ID, c.ID, "call_notes", "Wrote in: "+clip(e.Message, 500), actor); err != nil {
+			return nil, err
+		}
+	}
+	return &c, nil
+}
+
+// senderName is the name on an enquiry as a contact's: one line, short enough to be a
+// name. The form's sender chose every character, and a contact's name is read by
+// agents, so a paragraph of text isn't taken as one.
+func senderName(e Enquiry) string {
+	name := clip(strings.Join(strings.Fields(e.Name), " "), 80)
+	if name == "" {
+		name, _, _ = strings.Cut(e.Email, "@")
+	}
+	return name
+}
+
+// enquiryCompany is the company to put an enquiry's sender under. The one their
+// address matched is used. The name they typed is used only when no company here has
+// it: a form can claim to be from anyone, and that claim mustn't attach a stranger to
+// a company already held. Otherwise they are added with none.
+func (s *Store) enquiryCompany(org int64, e Enquiry) (string, error) {
+	if e.CompanyID != nil {
+		var co Company
+		if err := s.in(org).Where("id = ?", *e.CompanyID).First(&co).Error; err != nil {
+			return "", missing(err, "no company %d", *e.CompanyID)
+		}
+		return co.Name, nil
+	}
+	typed := clip(strings.Join(strings.Fields(e.Company), " "), 80)
+	if typed == "" {
+		return "", nil
+	}
+	var held int64
+	if err := s.in(org).Model(&Company{}).Where("lower(name) = ?", strings.ToLower(typed)).Count(&held).Error; err != nil {
+		return "", err
+	}
+	if held > 0 {
+		return "", nil
+	}
+	return typed, nil
+}
+
+func (a *App) uiConverseEnquiry(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID int64 `json:"id"`
+	}
+	if decode(w, r, &in) {
+		q := reqOf(r)
+		_, err := a.s.ConverseEnquiry(q.Org, in.ID, q.Actor())
+		done(w, err)
+	}
 }
