@@ -423,6 +423,10 @@ func (a *App) Routes() http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a.setDeadlines(w, r)
+		if !cleanRequest(r) {
+			http.NotFound(w, r)
+			return
+		}
 		if wantsPage(r) {
 			page := &problemPage{ResponseWriter: w, r: r}
 			defer page.finish()
@@ -484,8 +488,7 @@ func safeNext(next string) string {
 }
 
 func (a *App) login(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
-	if err := r.ParseForm(); err != nil {
+	if err := parseForm(w, r, 64<<10); err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
@@ -698,6 +701,8 @@ func serve(a *App, addr string) error {
 	}
 	// Runs a stopped server left going are carried on, here or by another server.
 	go a.keepRunsGoing(context.Background(), 30*time.Second)
+	// Campaigns being sent go on being sent, here or by another server.
+	go a.keepSending(context.Background(), sendEvery)
 	log.Printf("listening on http://%s", addr)
 	// A release is installed by stopping this process, so every merge sends one of these.
 	asked, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

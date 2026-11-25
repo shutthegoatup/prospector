@@ -39,7 +39,7 @@ type Agreement struct {
 type AgreementFile struct {
 	AgreementID int64  `gorm:"primaryKey;autoIncrement:false"`
 	OrgID       int64  `gorm:"index;not null"`
-	Data        []byte `gorm:"not null"`
+	Data        []byte `gorm:"not null;default:''"`
 }
 
 const (

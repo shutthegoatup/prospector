@@ -28,12 +28,24 @@ type Campaign struct {
 	UpdatedBy string    `gorm:"not null;default:''" json:"updated_by"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	// QueuedBy and QueuedAt say who sent it and when; SentAt is when the last mail went.
+	QueuedBy string     `gorm:"not null;default:''" json:"queued_by"`
+	QueuedAt *time.Time `json:"queued_at"`
+	SentAt   *time.Time `json:"sent_at"`
+	// Paused says why sending stopped by itself; Failures counts sends in a row that
+	// didn't reach the mail server.
+	Paused   string `gorm:"not null;default:''" json:"paused"`
+	Failures int    `gorm:"not null;default:0" json:"-"`
 }
 
 const (
 	AudienceConversations = "conversations"
 	AudienceCustomers     = "customers"
 	CampaignDraft         = "draft"
+	CampaignSending       = "sending"
+	CampaignPaused        = "paused"
+	CampaignSent          = "sent"
+	CampaignCancelled     = "cancelled"
 
 	campaignSubjectLimit = 200
 	campaignBodyLimit    = 20000
@@ -329,6 +341,8 @@ type CampaignCard struct {
 	Going, LeftOut int
 	// Shown is the start of the audience, those it goes to first.
 	Shown []Recipient
+	// Mail counts a sent campaign's mails by how they went.
+	Mail map[string]int
 }
 
 const campaignShown = 30
@@ -346,21 +360,34 @@ func (a *App) campaignsPage(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, http.StatusInternalServerError)
 		return
 	}
+	ids := make([]int64, 0, len(list))
 	for _, c := range list {
-		people, err := a.s.audience(q.Org, c, work)
-		if err != nil {
-			fail(w, err, http.StatusInternalServerError)
-			return
-		}
-		card := CampaignCard{Campaign: c, Shown: people[:min(len(people), campaignShown)]}
-		for _, p := range people {
-			if p.LeftOut == "" {
-				card.Going++
-			} else {
-				card.LeftOut++
+		ids = append(ids, c.ID)
+	}
+	tally, err := a.s.CampaignTally(q.Org.ID, ids)
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	for _, c := range list {
+		card := CampaignCard{Campaign: c, Mail: tally[c.ID]}
+		// Once sent, who it went to is in its mail, not in who it would go to now.
+		if c.Status == CampaignDraft {
+			people, err := a.s.audience(q.Org, c, work)
+			if err != nil {
+				fail(w, err, http.StatusInternalServerError)
+				return
+			}
+			card.Shown = people[:min(len(people), campaignShown)]
+			for _, p := range people {
+				if p.LeftOut == "" {
+					card.Going++
+				} else {
+					card.LeftOut++
+				}
 			}
 		}
 		cards = append(cards, card)
 	}
-	a.page(w, r, "campaigns", CampaignsView(q, cards, q.Org.Settings.PostalAddress))
+	a.page(w, r, "campaigns", CampaignsView(q, cards, a.sendable(q.Org)))
 }

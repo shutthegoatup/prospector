@@ -32,8 +32,10 @@ var opArea = map[string]string{
 	"StartDeal": areaSales, "ChangeDeal": areaSales, "RemoveDeal": areaSales, "ChangeOwnDeal": areaSales,
 	"StartRun": areaSales, "StopRun": areaSales,
 	"CreateTask": areaSales, "ChangeTask": areaSales, "AskTask": areaSales, "ChangeTaskRequest": areaSales,
+	"AddNote": areaSales, "FinishRequest": areaSales,
 	"ConverseEnquiry": areaAny, "AddSuppression": areaAny, "RemoveSuppression": areaSales,
 	"CreateCampaign": areaSales, "ChangeCampaign": areaSales, "RemoveCampaign": areaSales,
+	"SendCampaign": areaSales, "CancelCampaign": areaSales, "ResumeCampaign": areaSales,
 	"CreateAgreement": areaSales, "RenameAgreement": areaSales, "RemoveAgreement": areaSales, "PutAgreementDocument": areaSales,
 	"CreateAgent": "", "UpdateAgent": "", "DeleteAgent": "", "DeleteEnquiry": "",
 }

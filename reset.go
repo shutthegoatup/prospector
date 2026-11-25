@@ -200,8 +200,7 @@ func (a *App) forgot(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
-	if err := r.ParseForm(); err != nil {
+	if err := parseForm(w, r, 64<<10); err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
@@ -243,8 +242,7 @@ func (a *App) resetPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) reset(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
-	if err := r.ParseForm(); err != nil {
+	if err := parseForm(w, r, 64<<10); err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
