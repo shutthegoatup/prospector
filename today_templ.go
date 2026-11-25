@@ -1450,6 +1450,7 @@ func doNow(q *Req, d TodayData) []Todo {
 	add("Set next steps", "today?step=next", d.Counts["next"])
 	add("Move renewals and other deals on", "conversations", d.Deals)
 	add("Look at subscriptions coming due", "subscriptions", d.Subs)
+	add("Move onboarding steps on", "onboarding", d.Steps)
 	add("Make calls now", "today?step=call", d.Counts["call"]-d.LaterCall)
 	add("Send LinkedIn messages", "today?step=accepted", d.Counts["accepted"])
 	add("Send emails", "today?step=email", d.Counts["email"])
