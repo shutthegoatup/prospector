@@ -327,4 +327,11 @@ func TestDealsFromTheFirstReleaseBecomeTheConversationsOwn(t *testing.T) {
 	if err := old.db.AutoMigrate(&dealV1{}); err != nil {
 		t.Errorf("the first release starting on the upgraded table: %v", err)
 	}
+	third := repliedPerson(t, old, o, "Sven Dahl")
+	if err := old.db.Create(&dealV1{OrgID: o.ID, ContactID: third.ID, Kind: DealNew, Amount: 750000, Currency: "GBP"}).Error; err != nil {
+		t.Fatalf("the first release making a deal on the upgraded table: %v", err)
+	}
+	if d := must(s.Deals(o.ID))[third.ID]; d.Amount != 750000 || d.Seq != 0 {
+		t.Errorf("a deal the first release made after the upgrade reads as %+v", d)
+	}
 }
