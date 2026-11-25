@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Deal is what a conversation is worth, when it should close and whose it is. Where
@@ -38,9 +39,13 @@ var currencyRe = regexp.MustCompile(`^[A-Z]{3}$`)
 
 var moneyRe = regexp.MustCompile(`^\d{0,12}(\.\d{0,2})?$`)
 
-// parseMoney reads "14,000", "£14000.5" or "14 000.50" into hundredths.
+var leadingCode = regexp.MustCompile(`^[A-Za-z]{3}`)
+
+// parseMoney reads "14,000", "£14000.5", "14 000.50" or "CHF 14,000" into hundredths:
+// whatever formatMoney writes, since the card shows a value in the box it is edited in.
 func parseMoney(text string) (int64, error) {
 	s := strings.NewReplacer(",", "", " ", "", "£", "", "$", "", "€", "").Replace(text)
+	s = leadingCode.ReplaceAllString(s, "")
 	if !moneyRe.MatchString(s) || s == "." {
 		return 0, fmt.Errorf("%q isn't an amount", text)
 	}
@@ -101,7 +106,16 @@ func (s *Store) setDeal(tx *gorm.DB, org, contact int64, field, value, actor str
 	if err := tx.First(&o, org).Error; err != nil {
 		return err
 	}
+	var d Deal
+	if err := tx.Where("org_id = ? and contact_id = ?", org, contact).Limit(1).Find(&d).Error; err != nil {
+		return err
+	}
+	// A deal already valued keeps its currency: the setting changing mustn't turn
+	// pounds into euros the next time someone corrects the figure.
 	currency := o.Settings.withDefaults().Currency
+	if d.Amount != 0 && d.Currency != "" {
+		currency = d.Currency
+	}
 	updates := map[string]any{}
 	logged := value
 	switch field {
@@ -111,7 +125,10 @@ func (s *Store) setDeal(tx *gorm.DB, org, contact int64, field, value, actor str
 			return err
 		}
 		updates["amount"], updates["currency"] = amount, currency
-		logged = formatMoney(amount, currency)
+		logged = ""
+		if amount != 0 {
+			logged = formatMoney(amount, currency)
+		}
 	case "close_date":
 		if value != "" {
 			if _, err := time.Parse("2006-01-02", value); err != nil {
@@ -129,7 +146,7 @@ func (s *Store) setDeal(tx *gorm.DB, org, contact int64, field, value, actor str
 		}
 		updates["kind"] = value
 	case "owner":
-		if value != "" {
+		if value != "" && value != d.Owner {
 			var n int64
 			if err := tx.Table("memberships").Joins("join users on users.id = memberships.user_id").
 				Where("memberships.org_id = ? and users.name = ?", org, value).Count(&n).Error; err != nil {
@@ -143,9 +160,15 @@ func (s *Store) setDeal(tx *gorm.DB, org, contact int64, field, value, actor str
 	default:
 		return fmt.Errorf("a deal has no %q", field)
 	}
-	d := Deal{OrgID: org, ContactID: contact}
-	if err := tx.Where(d).Attrs(Deal{Kind: DealNew, Currency: currency}).FirstOrCreate(&d).Error; err != nil {
-		return err
+	if d.ID == 0 {
+		// Two fields changed at once are two requests; whichever comes second finds the row.
+		first := Deal{OrgID: org, ContactID: contact, Kind: DealNew, Currency: currency}
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&first).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("org_id = ? and contact_id = ?", org, contact).First(&d).Error; err != nil {
+			return err
+		}
 	}
 	if err := tx.Model(&d).Updates(updates).Error; err != nil {
 		return err

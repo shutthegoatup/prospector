@@ -24,7 +24,15 @@ func TestMoneyIsReadAndWritten(t *testing.T) {
 			t.Errorf("%q read as %d (%v), want %d", text, got, err, want)
 		}
 	}
-	for _, text := range []string{"-5", "a lot", "1.234", ".", "1e9", "12345678901234"} {
+	for _, currency := range []string{"GBP", "EUR", "USD", "CHF", "SEK"} {
+		for _, amount := range []int64{1, 99, 1400000, 140050, 100000000} {
+			shown := formatMoney(amount, currency)
+			if got, err := parseMoney(shown); err != nil || got != amount {
+				t.Errorf("%q, as a card shows it, reads back as %d (%v), want %d", shown, got, err, amount)
+			}
+		}
+	}
+	for _, text := range []string{"-5", "a lot", "1.234", ".", "1e9", "12345678901234", "CHFS 5"} {
 		if got, err := parseMoney(text); err == nil {
 			t.Errorf("%q was read as %d", text, got)
 		}
@@ -123,6 +131,61 @@ func TestADealIsInBothExportsAndGoesWithItsPerson(t *testing.T) {
 	}
 	if len(said) != 1 || said[0].Value != nil || said[0].ContactID != 0 {
 		t.Errorf("the history still says what an erased person's deal was worth: %+v", said)
+	}
+}
+
+func TestADealKeepsItsCurrencyWhenTheSettingChanges(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	c := repliedPerson(t, s, o, "Hannah Pryce")
+	set := func(value string) Deal {
+		t.Helper()
+		if err := s.Update(o.ID, c.ID, "deal_amount", value, "Ada Lovelace"); err != nil {
+			t.Fatal(err)
+		}
+		return must(s.Deals(o.ID))[c.ID]
+	}
+	set("14,000")
+	o.Settings.Currency = "EUR"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	if d := set("£14,500"); d.Value() != "£14,500" {
+		t.Errorf("correcting a figure in pounds after the setting became euros left %q", d.Value())
+	}
+	set("")
+	if d := set("9,000"); d.Value() != "€9,000" {
+		t.Errorf("a deal cleared and valued afresh reads %q, not the new currency", d.Value())
+	}
+	var cleared []Event
+	if err := s.db.Where("org_id = ? and action = ? and value is null", o.ID, "deal:amount").Find(&cleared).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(cleared) != 1 {
+		t.Errorf("clearing a value should be in the history once, with no figure: %+v", cleared)
+	}
+}
+
+func TestADealFollowsItsPersonThroughARestore(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	stays, goes := repliedPerson(t, s, o, "Hannah Pryce"), repliedPerson(t, s, o, "Tom Ellery")
+	for _, c := range []*Contact{stays, goes} {
+		if err := s.Update(o.ID, c.ID, "deal_amount", "20000", "Ada Lovelace"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var renumbered Contact
+	if err := s.db.First(&renumbered, stays.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	renumbered.ID = goes.ID + 50
+	if _, err := s.replaceContacts(o.ID, []Contact{renumbered}, nil); err != nil {
+		t.Fatal(err)
+	}
+	deals := must(s.Deals(o.ID))
+	if d, ok := deals[renumbered.ID]; len(deals) != 1 || !ok || d.Amount != 2000000 {
+		t.Errorf("after a restore that renumbered one person and dropped another, the deals are %+v", deals)
 	}
 }
 

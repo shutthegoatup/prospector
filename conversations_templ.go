@@ -56,6 +56,16 @@ func dealMeta(d Deal) string {
 	return strings.Join(parts, " · ")
 }
 
+// ownerLeft is a deal still held by someone who is no longer a member.
+func ownerLeft(d Deal, members []Member) bool {
+	for _, m := range members {
+		if m.Name == d.Owner {
+			return false
+		}
+	}
+	return d.Owner != ""
+}
+
 func dealField(c Contact, field string) templ.Attributes {
 	return templ.Attributes{"data-field": "deal_" + field, "data-id": strconv.FormatInt(c.ID, 10), "data-refresh": "true"}
 }
@@ -121,7 +131,7 @@ func ConversationsView(q *Req, b Board, day string) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templruntime.NewAttributeExpression(st.Label).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 88, Col: 74}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 98, Col: 74}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 			if templ_7745c5c3_Err != nil {
@@ -134,7 +144,7 @@ func ConversationsView(q *Req, b Board, day string) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(st.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 90, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 100, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -147,7 +157,7 @@ func ConversationsView(q *Req, b Board, day string) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(len(convs[st.Key])))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 92, Col: 41}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 102, Col: 41}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -161,7 +171,7 @@ func ConversationsView(q *Req, b Board, day string) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(" · " + worth)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 94, Col: 24}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 104, Col: 24}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -243,7 +253,7 @@ func DealCard(q *Req, c Contact, d Deal, members []Member, day string) templ.Com
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templruntime.NewAttributeExpression(strconv.FormatInt(c.ID, 10)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 111, Col: 142}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 121, Col: 142}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 			if templ_7745c5c3_Err != nil {
@@ -270,7 +280,7 @@ func DealCard(q *Req, c Contact, d Deal, members []Member, day string) templ.Com
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(displayName(c))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 113, Col: 22}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 123, Col: 22}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -288,7 +298,7 @@ func DealCard(q *Req, c Contact, d Deal, members []Member, day string) templ.Com
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(*c.CompanyID, 10))).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 115, Col: 90}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 125, Col: 90}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 			if templ_7745c5c3_Err != nil {
@@ -301,7 +311,7 @@ func DealCard(q *Req, c Contact, d Deal, members []Member, day string) templ.Com
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(" · " + companyName(deref(c.Maker)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 115, Col: 195}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 125, Col: 195}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -324,7 +334,7 @@ func DealCard(q *Req, c Contact, d Deal, members []Member, day string) templ.Com
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(deref(c.CallNotes))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 119, Col: 81}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 129, Col: 81}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -348,7 +358,7 @@ func DealCard(q *Req, c Contact, d Deal, members []Member, day string) templ.Com
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(d.Value())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 124, Col: 43}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 134, Col: 43}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -361,7 +371,7 @@ func DealCard(q *Req, c Contact, d Deal, members []Member, day string) templ.Com
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(" ")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 125, Col: 10}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 135, Col: 10}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 				if templ_7745c5c3_Err != nil {
@@ -375,7 +385,7 @@ func DealCard(q *Req, c Contact, d Deal, members []Member, day string) templ.Com
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(dealMeta(d))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 127, Col: 17}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 137, Col: 17}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -495,7 +505,7 @@ func DealCard(q *Req, c Contact, d Deal, members []Member, day string) templ.Com
 					var templ_7745c5c3_Var19 string
 					templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(k.Label)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 161, Col: 17}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 171, Col: 17}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 					if templ_7745c5c3_Err != nil {
@@ -556,7 +566,7 @@ func DealCard(q *Req, c Contact, d Deal, members []Member, day string) templ.Com
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			for _, m := range members {
+			if ownerLeft(d, members) {
 				templ_7745c5c3_Var22 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 					templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 					templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -570,9 +580,9 @@ func DealCard(q *Req, c Contact, d Deal, members []Member, day string) templ.Com
 					}
 					ctx = templ.InitializeContext(ctx)
 					var templ_7745c5c3_Var23 string
-					templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(m.Name)
+					templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(d.Owner + " (left)")
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 174, Col: 16}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 184, Col: 29}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 					if templ_7745c5c3_Err != nil {
@@ -580,7 +590,36 @@ func DealCard(q *Req, c Contact, d Deal, members []Member, day string) templ.Com
 					}
 					return nil
 				})
-				templ_7745c5c3_Err = nativeselect.Option(nativeselect.OptionProps{Value: m.Name, Selected: m.Name == d.Owner}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var22), templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = nativeselect.Option(nativeselect.OptionProps{Value: d.Owner, Selected: true}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var22), templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			for _, m := range members {
+				templ_7745c5c3_Var24 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+					templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+					templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+					if !templ_7745c5c3_IsBuffer {
+						defer func() {
+							templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+							if templ_7745c5c3_Err == nil {
+								templ_7745c5c3_Err = templ_7745c5c3_BufErr
+							}
+						}()
+					}
+					ctx = templ.InitializeContext(ctx)
+					var templ_7745c5c3_Var25 string
+					templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(m.Name)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `conversations.templ`, Line: 189, Col: 16}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					return nil
+				})
+				templ_7745c5c3_Err = nativeselect.Option(nativeselect.OptionProps{Value: m.Name, Selected: m.Name == d.Owner}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var24), templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

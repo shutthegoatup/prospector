@@ -47,6 +47,16 @@ func dealMeta(d Deal) string {
 	return strings.Join(parts, " · ")
 }
 
+// ownerLeft is a deal still held by someone who is no longer a member.
+func ownerLeft(d Deal, members []Member) bool {
+	for _, m := range members {
+		if m.Name == d.Owner {
+			return false
+		}
+	}
+	return d.Owner != ""
+}
+
 func dealField(c Contact, field string) templ.Attributes {
 	return templ.Attributes{"data-field": "deal_" + field, "data-id": strconv.FormatInt(c.ID, 10), "data-refresh": "true"}
 }
@@ -168,6 +178,11 @@ templ DealCard(q *Req, c Contact, d Deal, members []Member, day string) {
 					@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: dealField(c, "owner")}) {
 						@nativeselect.Option(nativeselect.OptionProps{Value: "", Selected: d.Owner == ""}) {
 							Nobody yet
+						}
+						if ownerLeft(d, members) {
+							@nativeselect.Option(nativeselect.OptionProps{Value: d.Owner, Selected: true}) {
+								{ d.Owner + " (left)" }
+							}
 						}
 						for _, m := range members {
 							@nativeselect.Option(nativeselect.OptionProps{Value: m.Name, Selected: m.Name == d.Owner}) {
