@@ -357,21 +357,43 @@ func (s *Store) Runs(org int64, before time.Time, limit int) (runs []Run, titles
 			return !first.IsZero() && first.Sub(r.End) < runGap
 		})
 	}
-	more := len(runs) > limit
-	if full && len(events) > 0 {
-		// The oldest of these may have begun earlier than was read; they wait for the next page.
-		oldest := events[0].At
-		whole := slices.DeleteFunc(slices.Clone(runs), func(r Run) bool { return r.Start.Sub(oldest) < runGap })
-		if len(whole) > 0 {
-			runs = whole
+	// The page is the newest runs, newest first. It stops before one that may have begun
+	// earlier than was read, which is whole on a later page, unless that run is the
+	// newest, which is then shown cut: one run of more events than are read.
+	cutShort := func(r Run) bool { return full && r.Start.Sub(events[0].At) < runGap }
+	shown := 0
+	for shown < len(runs) && shown < limit {
+		if cutShort(runs[shown]) && shown > 0 {
+			break
 		}
-		more = true
+		shown++
+		if cutShort(runs[shown-1]) {
+			break
+		}
 	}
-	if len(runs) > limit {
-		runs = runs[:limit]
+	// Never between two that ended together: the next page starts before that moment,
+	// which would leave the one not shown out of both.
+	for shown < len(runs) && shown > 0 && runs[shown].End.Equal(runs[shown-1].End) {
+		back := shown - 1
+		for back > 0 && runs[back-1].End.Equal(runs[shown].End) {
+			back--
+		}
+		if back > 0 {
+			shown = back
+			break
+		}
+		for shown < len(runs) && runs[shown].End.Equal(runs[0].End) {
+			shown++
+		}
 	}
-	if more && len(runs) > 0 {
+	more := shown < len(runs) || full
+	runs = runs[:shown]
+	switch {
+	case more && len(runs) > 0:
 		next = runs[len(runs)-1].End
+	case full:
+		// Every run read was one already shown, longer than a page reads: carry on past it.
+		next = events[0].At
 	}
 	var ids []int64
 	for _, r := range runs {
