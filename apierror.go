@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -105,8 +104,8 @@ func fromDatabase(err error) bool {
 func cutOff(err error) bool {
 	var network net.Error
 	var fromPgconn interface{ SafeToRetry() bool }
-	return errors.As(err, &network) || errors.As(err, &fromPgconn) || pgconn.Timeout(err) ||
-		errors.Is(err, io.ErrUnexpectedEOF)
+	// Not an unexpected EOF: that is also a request body cut short, which is the caller's.
+	return errors.As(err, &network) || errors.As(err, &fromPgconn) || pgconn.Timeout(err)
 }
 
 // elsewhere is a failure of another server's, such as a sign-in provider that couldn't

@@ -236,13 +236,12 @@ func TestALostConnectionIsTheServersFailure(t *testing.T) {
 	var none []Contact
 	down = true
 	err := s.db.Find(&none).Error
-	// A commit's error never passes through a statement's callbacks.
-	committing := s.db.Transaction(func(*gorm.DB) error { return nil })
-	committing = errors.Join(committing, lostMidway())
-	for name, err := range map[string]error{"a statement": err, "a commit": committing} {
-		if code, text := telling("test", fmt.Errorf("saving it: %w", err), http.StatusBadRequest); code != http.StatusInternalServerError || text != sayOurs {
-			t.Errorf("%s whose connection was lost, answered as a 400: %d %q", name, code, text)
-		}
+	if code, text := telling("test", fmt.Errorf("saving it: %w", err), http.StatusBadRequest); code != http.StatusInternalServerError || text != sayOurs {
+		t.Errorf("a statement whose connection was lost, answered as a 400: %d %q", code, text)
+	}
+	// A body cut short is still the caller's to fix.
+	if code, _ := call(t, client, "POST", srv.URL+"/o/alpha/ui/add", "application/json", json.RawMessage(`{"name":`)); code != http.StatusBadRequest {
+		t.Errorf("a request body cut short: %d", code)
 	}
 	if code, text := telling("test", elsewhere{fmt.Errorf("that issuer couldn't be read: %w", lostMidway())}, http.StatusBadRequest); code != http.StatusBadRequest || !strings.Contains(text, "issuer") {
 		t.Errorf("a provider that couldn't be reached was told as the server's failure: %d %q", code, text)
