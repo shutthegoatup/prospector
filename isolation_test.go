@@ -243,6 +243,10 @@ func seedFirst(t *testing.T, s *Store) *Org {
 		},
 		func() error { return s.Mark(first.ID, 1, "replied", "2020-01-02", "Owner One") },
 		func() error {
+			// Made directly: an owner has to be a member's name, which wouldn't carry the mark.
+			return s.db.Create(&Deal{OrgID: first.ID, ContactID: 1, Kind: DealNew, Owner: theirs + " owner"}).Error
+		},
+		func() error {
 			_, err := s.CreateTask(first.ID, theirs+" task", theirs+" brief", "Owner One")
 			return err
 		},
