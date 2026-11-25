@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/mail"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -54,6 +55,8 @@ func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
 	// Nothing they sent us is in what we send: a form filled in with someone else's
 	// address can't be made to carry the sender's words to them.
 	wire := string(compose(&mail.Address{Address: "site@prospector.example"}, &mail.Address{Address: got.To}, got.Message, time.Now()))
+	// The Message-ID is random, and once in a while spells one of these words.
+	wire = regexp.MustCompile(`(?m)^Message-ID: .*\r\n`).ReplaceAllString(wire, "")
 	for _, theirs := range []string{"WATCHES", "spam.example", "victim", "Hannah", "Bcc"} {
 		if strings.Contains(wire, theirs) {
 			t.Errorf("the mail carries %q from the enquiry:\n%s", theirs, wire)
