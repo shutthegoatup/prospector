@@ -253,3 +253,47 @@ func TestADatabaseFromBeforeOnboardingOpens(t *testing.T) {
 		t.Errorf("the first onboarding after the upgrade: %v", err)
 	}
 }
+
+func TestAWonDealOffersOnboarding(t *testing.T) {
+	s, o, srv, client := signedIn(t)
+	won := repliedPerson(t, s, o, "Hannah Pryce")
+	open := repliedPerson(t, s, o, "Tom Ellery")
+	if err := s.Update(o.ID, won.ID, "stage", "won", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	board := func() string {
+		_, page := call(t, client, "GET", srv.URL+"/o/alpha/conversations", "", nil)
+		return page
+	}
+	// With no steps written there is nothing to start.
+	if strings.Contains(board(), "Start onboarding") {
+		t.Error("onboarding is offered though no steps are written")
+	}
+	o.Settings.OnboardingSteps = fourSteps
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	page := board()
+	if n := strings.Count(page, "Start onboarding"); n != 1 {
+		t.Fatalf("onboarding is offered on %d cards, want only the won one", n)
+	}
+	// The button carries what the route needs; pressing it is this post.
+	body := `{&#34;company&#34;:` + itoa(*won.CompanyID) + `,&#34;start&#34;:&#34;` + today() + `&#34;}`
+	if !strings.Contains(page, body) {
+		t.Errorf("the button lacks the company and the date: want %s", body)
+	}
+	if code, text := call(t, client, "POST", srv.URL+"/o/alpha/ui/onboarding", "application/json", map[string]any{"company": *won.CompanyID, "start": today()}); code != http.StatusOK {
+		t.Fatalf("starting onboarding from a won deal: %d %s", code, text)
+	}
+	if page = board(); strings.Contains(page, "Start onboarding") || !strings.Contains(page, "Onboarding started") {
+		t.Error("a won deal whose company is being onboarded still offers to start")
+	}
+	// A renewal that is won, with the same company, says the same.
+	renewal := must(s.StartDeal(o.ID, open.ID, "renewal", "Ada Lovelace"))
+	if err := s.ChangeDeal(o.ID, renewal.ID, "stage", "won", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(board(), "Onboarding started"); n != 2 {
+		t.Errorf("%d cards say onboarding has started, want the won deal and the won renewal", n)
+	}
+}

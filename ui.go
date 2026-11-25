@@ -186,7 +186,19 @@ func (a *App) conversations(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, http.StatusInternalServerError)
 		return
 	}
-	a.page(w, r, "conversations", ConversationsView(q, Board{convs, deals, others, members}, time.Now().Format("2006-01-02")))
+	after := AfterWin{Started: map[int64]bool{}}
+	if plan, err := q.Org.Settings.Onboarding(); err == nil {
+		after.Planned = len(plan)
+	}
+	started, err := a.s.Onboardings(q.Org.ID, 0, today())
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	for _, ob := range started {
+		after.Started[ob.CompanyID] = true
+	}
+	a.page(w, r, "conversations", ConversationsView(q, Board{convs, deals, others, members, after}, time.Now().Format("2006-01-02")))
 }
 
 func (a *App) uiDealStart(w http.ResponseWriter, r *http.Request) {
