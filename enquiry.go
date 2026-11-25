@@ -507,28 +507,32 @@ func (s *Store) ConverseEnquiry(o *Org, id int64, actor string) (*Contact, error
 			return nil, missing(err, "no contact %d", *e.ContactID)
 		}
 	} else {
-		name := strings.TrimSpace(e.Name)
-		if name == "" {
-			name, _, _ = strings.Cut(e.Email, "@")
+		// Whoever holds that address now: they may have been added since this arrived,
+		// by hand or from another of their enquiries.
+		found := s.in(o.ID).Where("lower(email) = ? and key not like 'org:%'", e.Email).Order("id").Limit(1).Find(&c)
+		if found.Error != nil {
+			return nil, found.Error
 		}
-		company := strings.TrimSpace(e.Company)
-		if company == "" && e.CompanyID != nil {
-			var co Company
-			if err := s.in(o.ID).Where("id = ?", *e.CompanyID).First(&co).Error; err != nil {
-				return nil, missing(err, "no company %d", *e.CompanyID)
+		if found.RowsAffected == 0 {
+			company, err := s.enquiryCompany(o.ID, e)
+			if err != nil {
+				return nil, err
 			}
-			company = co.Name
+			added, err := s.QuickAddPerson(o, QuickAdd{Name: senderName(e), Company: company, Email: e.Email}, actor)
+			if err != nil {
+				return nil, err
+			}
+			c = *added
 		}
-		added, err := s.QuickAddPerson(o, QuickAdd{Name: name, Company: company, Email: e.Email}, actor)
-		if err != nil {
-			return nil, err
-		}
-		c = *added
 		// Matched now, so their export and erasure take this enquiry with them.
 		if err := s.in(o.ID).Model(&Enquiry{}).Where("id = ?", e.ID).
 			Updates(map[string]any{"contact_id": c.ID, "company_id": c.CompanyID}).Error; err != nil {
 			return nil, err
 		}
+	}
+	// Someone put on the never-contact list since they were matched stays off the board.
+	if err := s.allowed(o, deref(c.Email), deref(c.Linkedin)); err != nil {
+		return nil, err
 	}
 	if c.Declined != nil {
 		return nil, errors.New("they are marked as not interested, which keeps them off the board")
@@ -545,6 +549,43 @@ func (s *Store) ConverseEnquiry(o *Org, id int64, actor string) (*Contact, error
 		}
 	}
 	return &c, nil
+}
+
+// senderName is the name on an enquiry as a contact's: one line, short enough to be a
+// name. The form's sender chose every character, and a contact's name is read by
+// agents, so a paragraph of text isn't taken as one.
+func senderName(e Enquiry) string {
+	name := clip(strings.Join(strings.Fields(e.Name), " "), 80)
+	if name == "" {
+		name, _, _ = strings.Cut(e.Email, "@")
+	}
+	return name
+}
+
+// enquiryCompany is the company to put an enquiry's sender under. The one their
+// address matched is used. The name they typed is used only when no company here has
+// it: a form can claim to be from anyone, and that claim mustn't attach a stranger to
+// a company already held. Otherwise they are added with none.
+func (s *Store) enquiryCompany(org int64, e Enquiry) (string, error) {
+	if e.CompanyID != nil {
+		var co Company
+		if err := s.in(org).Where("id = ?", *e.CompanyID).First(&co).Error; err != nil {
+			return "", missing(err, "no company %d", *e.CompanyID)
+		}
+		return co.Name, nil
+	}
+	typed := clip(strings.Join(strings.Fields(e.Company), " "), 80)
+	if typed == "" {
+		return "", nil
+	}
+	var held int64
+	if err := s.in(org).Model(&Company{}).Where("lower(name) = ?", strings.ToLower(typed)).Count(&held).Error; err != nil {
+		return "", err
+	}
+	if held > 0 {
+		return "", nil
+	}
+	return typed, nil
 }
 
 func (a *App) uiConverseEnquiry(w http.ResponseWriter, r *http.Request) {
