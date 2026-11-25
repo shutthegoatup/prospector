@@ -11,7 +11,7 @@ templ AddForm(q *Req, in QuickAdd, popup bool) {
 }
 
 templ addForm(q *Req, in QuickAdd, popup bool) {
-	<form data-form="ui/add" data-reset="true" data-close={ boolAttr(popup) } class="flex flex-col gap-4">
+	<form data-form="api/v1/people" data-reset="true" data-close={ boolAttr(popup) } class="flex flex-col gap-4">
 		<label class="flex flex-col gap-1.5">
 			@Label("LinkedIn profile")
 			<input name="linkedin" type="url" value={ in.Linkedin } autofocus?={ in.Linkedin == "" } placeholder="https://www.linkedin.com/in/…" class="h-10 rounded-lg border border-input bg-muted px-3 text-sm"/>

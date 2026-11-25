@@ -595,6 +595,7 @@
   var subscriptionFields = ["name", "amount", "per", "start", "term_months", "then", "notice_days", "notice_on", "ended_on"];
   var dealFields = ["kind", "amount", "close_date", "owner", "stage", "next_step", "next_date", "lost_reason"];
   var enquiryFields = ["state", "owner", "note"];
+  var contactFields = ["person", "title", "email", "linkedin", "phone", "tz", "sources", "call_notes", "send_to", "message", "note", "subject", "body", "followup", "stage", "next_step", "next_date", "lost_reason"];
   var campaignFields = ["name", "audience", "subject", "body"];
   function oneOf(list, f, what) {
     if (!list.includes(f)) throw new Error(`${what} has no ${f}.`);
@@ -643,7 +644,13 @@
       } else if (f.dataset.step) {
         if (field !== "due") throw new Error(`A step's ${field} is changed another way.`);
         answered(await api.PATCH("/o/{org}/api/v1/onboarding-steps/{id}", { params: { path: { org, id: +f.dataset.step } }, body: { due: f.value } }));
-      } else await send("ui/update", { id: +(f.dataset.id || 0), field, value: f.value });
+      } else if (field.startsWith("deal_")) {
+        const change = { [oneOf(dealFields, field.slice(5), "A deal")]: f.value };
+        answered(await api.PATCH("/o/{org}/api/v1/contacts/{id}/deal", { params: { path: { org, id: +(f.dataset.id || 0) } }, body: change }));
+      } else {
+        const change = { [oneOf(contactFields, field, "A person")]: f.value };
+        answered(await api.PATCH("/o/{org}/api/v1/contacts/{id}", { params: { path: { org, id: +(f.dataset.id || 0) } }, body: change }));
+      }
       if (f.dataset.refresh || field === "phone") refresh();
     } catch (err) {
       report(err);

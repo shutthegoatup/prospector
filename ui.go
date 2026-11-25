@@ -473,69 +473,6 @@ func (a *App) uiMark(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *App) uiUpdate(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID    int64  `json:"id"`
-		Field string `json:"field"`
-		Value string `json:"value"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.Update(q.Org.ID, in.ID, in.Field, in.Value, q.Actor()))
-	}
-}
-
-func (a *App) uiCompany(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID    int64  `json:"id"`
-		Stage string `json:"stage"`
-		Fit   string `json:"fit"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.SetCompanyStage(q.Org.ID, in.ID, in.Stage, in.Fit, q.Actor()))
-	}
-}
-
-func (a *App) uiPick(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID int64 `json:"id"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.PickContact(q.Org.ID, q.Org, in.ID, q.Actor()))
-	}
-}
-
-func (a *App) uiSuggestion(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID       int64  `json:"id"`
-		Decision string `json:"decision"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.DecideSuggestion(q.Org.ID, in.ID, in.Decision, q.Actor()))
-	}
-}
-
-func (a *App) uiAdd(w http.ResponseWriter, r *http.Request) {
-	var in QuickAdd
-	if !decode(w, r, &in) {
-		return
-	}
-	q := reqOf(r)
-	c, err := a.s.QuickAddPerson(q.Org, in, q.Actor())
-	if err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	where := "is in the LinkedIn queue"
-	if in.Added {
-		where = "is marked added; their email comes up in " + plural(q.Org.Settings.withDefaults().EmailAfterDays, "day")
-	}
-	writeJSON(w, map[string]string{"message": displayName(*c) + " " + where + "."})
-}
-
 func (a *App) uiVoice(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		CallerName string `json:"caller_name"`

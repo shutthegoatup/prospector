@@ -100,7 +100,7 @@ func TestFormEnquiryIsKept(t *testing.T) {
 	}
 
 	// The listed site still can't do anything else here.
-	if res, _ := fromSite(t, "POST", srv.URL+"/o/alpha/ui/add", formSite, map[string]string{"name": "Mallory"}); res.StatusCode != http.StatusForbidden {
+	if res, _ := fromSite(t, "POST", srv.URL+"/o/alpha/api/v1/people", formSite, map[string]string{"name": "Mallory"}); res.StatusCode != http.StatusForbidden {
 		t.Errorf("a listed site reached another route: %d", res.StatusCode)
 	}
 }

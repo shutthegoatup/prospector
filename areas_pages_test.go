@@ -56,7 +56,13 @@ func controls(page string) []control {
 			case a["data-step"] != "":
 				out = append(out, control{"PATCH", "api/v1/onboarding-steps/" + a["data-step"], `{"due":""}`})
 			case a["data-id"] != "":
-				out = append(out, control{"POST", "ui/update", `{"id":` + a["data-id"] + `,"field":"` + a["data-field"] + `","value":""}`})
+				// A person's own deal is changed through them; anything else is their own field.
+				if of, ok := strings.CutPrefix(a["data-field"], "deal_"); ok {
+					deal, _ := json.Marshal(map[string]string{of: ""})
+					out = append(out, control{"PATCH", "api/v1/contacts/" + a["data-id"] + "/deal", string(deal)})
+				} else {
+					out = append(out, control{"PATCH", "api/v1/contacts/" + a["data-id"], string(change)})
+				}
 			}
 		}
 	}
@@ -121,7 +127,7 @@ func TestNoPageOffersWorkItsViewerWouldBeRefused(t *testing.T) {
 
 	everything := offered(owner)
 	for _, want := range []string{
-		"POST ui/mark", "POST ui/update", "POST ui/company", "POST ui/pick", "POST ui/note/delete",
+		"POST ui/mark", "PATCH api/v1/contacts/N", "PATCH api/v1/companies/N", "POST api/v1/contacts/N/pick", "POST ui/note/delete",
 		"PATCH api/v1/deals/N", "DELETE api/v1/deals/N", "POST api/v1/deals", "POST api/v1/onboardings",
 		"PATCH api/v1/enquiries/N", "POST api/v1/enquiries/N/answers", "POST api/v1/enquiries/N/conversation",
 		"PATCH api/v1/subscriptions/N", "PATCH api/v1/onboarding-steps/N", "PATCH api/v1/campaigns/N",
@@ -140,9 +146,9 @@ func TestNoPageOffersWorkItsViewerWouldBeRefused(t *testing.T) {
 	}{
 		{"grace@example.com", []string{areaSupport},
 			[]string{"PATCH api/v1/enquiries/N", "POST api/v1/enquiries/N/answers", "PATCH api/v1/subscriptions/N", "PATCH api/v1/onboarding-steps/N", "POST api/v1/onboardings", "POST api/v1/enquiries/N/conversation", "POST api/v1/suppressions"},
-			[]string{"POST ui/mark", "PATCH api/v1/deals/N", "POST ui/company", "POST ui/pick", "POST ui/note/delete", "POST api/v1/tasks/N/requests", "DELETE api/v1/suppressions/N"}},
+			[]string{"POST ui/mark", "PATCH api/v1/deals/N", "PATCH api/v1/companies/N", "POST api/v1/contacts/N/pick", "POST ui/note/delete", "POST api/v1/tasks/N/requests", "DELETE api/v1/suppressions/N"}},
 		{"alan@example.com", []string{areaSales},
-			[]string{"POST ui/mark", "PATCH api/v1/deals/N", "POST ui/company", "POST ui/pick", "POST ui/note/delete", "POST api/v1/tasks/N/requests", "POST api/v1/onboardings", "POST api/v1/suppressions"},
+			[]string{"POST ui/mark", "PATCH api/v1/deals/N", "PATCH api/v1/companies/N", "POST api/v1/contacts/N/pick", "POST ui/note/delete", "POST api/v1/tasks/N/requests", "POST api/v1/onboardings", "POST api/v1/suppressions"},
 			[]string{"PATCH api/v1/enquiries/N", "POST api/v1/enquiries/N/answers", "PATCH api/v1/subscriptions/N", "PATCH api/v1/onboarding-steps/N"}},
 		{"carol@example.com", nil, nil,
 			[]string{"POST ui/mark", "PATCH api/v1/enquiries/N", "POST api/v1/enquiries/N/conversation", "POST api/v1/onboardings", "POST api/v1/suppressions"}},

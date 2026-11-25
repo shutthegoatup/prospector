@@ -33,6 +33,10 @@ tags:
     description: Prospector's own agents, each a model behind an endpoint with tools from an MCP server.
   - name: runs
     description: An agent working a task.
+  - name: people
+    description: The people you are in touch with, and their conversations.
+  - name: research
+    description: Reviewing what agents found before anyone is contacted.
   - name: tasks
     description: Briefs that agents and people work together, each a list of requests.
   - name: enquiries
@@ -1466,6 +1470,113 @@ paths:
               schema: { type: string, format: binary }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/people:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    post:
+      operationId: addPerson
+      tags: [people]
+      summary: Add a person straight to outreach
+      description: For someone you found yourself. They go into the LinkedIn queue, or, marked `added`, straight on to the email that follows. The never-contact list applies.
+      security:
+        - session: []
+        - bearer: ["contacts:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PersonNew" }
+      responses:
+        "201":
+          description: The person, added.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PersonAdded" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/contacts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeContact
+      tags: [people]
+      summary: Change a person's details, or where their conversation stands
+      description: Send only what changes; they are saved together or not at all. An empty value clears a field. An email or profile on the never-contact list, or of someone erased on request, is refused.
+      security:
+        - session: []
+        - bearer: ["contacts:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContactChange" }
+      responses:
+        "204": { description: Changed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/contacts/{id}/pick:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: pickContact
+      tags: [research]
+      summary: Pick a suggested person for outreach
+      description: Takes someone an agent suggested out of Research and into the LinkedIn queue.
+      security:
+        - session: []
+        - bearer: ["research:review"]
+      responses:
+        "204": { description: Picked. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/companies/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: reviewCompany
+      tags: [research]
+      summary: Qualify a company, reject it, or put it back for review
+      description: A rejected company is one agents are told not to suggest again.
+      security:
+        - session: []
+        - bearer: ["research:review"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompanyReview" }
+      responses:
+        "204": { description: Changed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/suggestions/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: decideSuggestion
+      tags: [research]
+      summary: Accept or dismiss a detail an agent found for someone already stored
+      description: Accepting fills the detail in; one dismissed isn't raised again.
+      security:
+        - session: []
+        - bearer: ["research:review"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [accepted, dismissed] }
+      responses:
+        "204": { description: Decided. }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -1514,6 +1625,55 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
 
   schemas:
+    ContactChange:
+      type: object
+      properties:
+        person: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Their name." }
+        title: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        email: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        linkedin: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Their profile's address." }
+        phone: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Setting it also guesses their time zone." }
+        tz: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Their time zone, as an IANA name." }
+        sources: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        call_notes: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        send_to: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        message: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        note: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        subject: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        body: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        followup: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        stage: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Where their conversation stands on the board." }
+        next_step: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        next_date: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "YYYY-MM-DD, or empty for none." }
+        lost_reason: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+
+    CompanyReview:
+      type: object
+      required: [stage]
+      properties:
+        stage: { type: string, enum: [review, qualified, rejected] }
+        fit: { type: string, description: "Why, in a few words; kept with the company. Empty leaves it as it was." }
+
+    PersonNew:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        linkedin: { type: string, description: "Their profile's address." }
+        title: { type: string }
+        company: { type: string, description: "The company's name; one not yet stored is added." }
+        email: { type: string }
+        note: { type: string, description: "The note to send them with the connection request." }
+        added: { type: boolean, description: "Already connected on LinkedIn: their email comes up next." }
+
+    PersonAdded:
+      type: object
+      required: [id, name, message]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        message: { type: string, description: "Where they went, for a person." }
+
     TaskCounts:
       type: object
       required: [companies, people]

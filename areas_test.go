@@ -38,7 +38,11 @@ func TestEachAreaChangesOnlyItsOwnWork(t *testing.T) {
 	help := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "support", Name: "Edsger Dijkstra", Email: "edsger@eindhoven.example", Message: "Colours look pale on phones"}))
 	base := srv.URL + "/o/alpha/"
 	sales := func(cl *http.Client) (int, string) {
-		return call(t, cl, "POST", base+"ui/update", "application/json", map[string]any{"id": c.ID, "field": "call_notes", "value": "rang twice"})
+		code, body := call(t, cl, "PATCH", base+"api/v1/contacts/"+itoa(c.ID), "application/json", map[string]any{"call_notes": "rang twice"})
+		if code == http.StatusNoContent {
+			code = http.StatusOK
+		}
+		return code, body
 	}
 	deal := func(cl *http.Client) (int, string) {
 		return call(t, cl, "POST", base+"api/v1/deals", "application/json", map[string]any{"contact": c.ID, "kind": "renewal"})
