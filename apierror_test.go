@@ -46,21 +46,25 @@ func TestNoRawDatabaseErrorsGoOut(t *testing.T) {
 		}
 	}
 
-	// With the database gone, the sign-in page says as little.
-	app := tempStore(t)
-	mustOrg(t, app, "alpha")
-	down := httptest.NewServer((&App{s: app}).Routes())
-	t.Cleanup(down.Close)
-	db, _ := app.db.DB()
-	db.Close()
+	if !fromDatabase(&pgconn.ConnectError{}) {
+		t.Error("a failure to connect to Postgres, which names its user and host, would go out as it is")
+	}
+
+	// The sign-in page says as little when the right password can't be given a session.
+	app, _, down, _ := signedIn(t)
+	app.db.Callback().Create().Before("gorm:create").Register("no-sessions", func(tx *gorm.DB) {
+		if tx.Statement.Table == "sessions" {
+			tx.AddError(&pgconn.PgError{Code: "08006", Message: "connection to db.internal:5432 lost"})
+		}
+	})
 	res, err := http.PostForm(down.URL+"/login", url.Values{"email": {"ada@example.com"}, "password": {"correct horse battery"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	said, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	if strings.Contains(string(said), "sql") || strings.Contains(string(said), "database") {
-		t.Errorf("signing in with the database gone: %d %s", res.StatusCode, said)
+	if res.StatusCode != http.StatusInternalServerError || !strings.Contains(string(said), "try again in a moment") || strings.Contains(string(said), "db.internal") {
+		t.Errorf("signing in when no session can be kept: %d %s", res.StatusCode, said)
 	}
 
 	api := httptest.NewRecorder()

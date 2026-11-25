@@ -71,8 +71,13 @@ const (
 func fromDatabase(err error) bool {
 	var pg *pgconn.PgError
 	var lite *sqlite.Error
+	// A failure to connect names the database's user and host.
+	var dial *pgconn.ConnectError
+	if errors.As(err, &pg) || errors.As(err, &lite) || errors.As(err, &dial) {
+		return true
+	}
 	// database/sql keeps some of its errors to itself, such as a pool that has closed.
-	return errors.As(err, &pg) || errors.As(err, &lite) || strings.Contains(err.Error(), "sql: ") ||
+	return strings.Contains(err.Error(), "sql: ") ||
 		errors.Is(err, sql.ErrConnDone) || errors.Is(err, sql.ErrTxDone) || errors.Is(err, driver.ErrBadConn) ||
 		errors.Is(err, gorm.ErrInvalidTransaction) || errors.Is(err, gorm.ErrInvalidDB)
 }
