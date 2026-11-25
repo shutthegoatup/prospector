@@ -16,8 +16,38 @@ type TasksData struct {
 
 type TaskPage struct {
 	TaskView
-	Prompt string
-	Now    time.Time
+	Prompt     string
+	Now        time.Time
+	AgentReady bool
+	AgentRuns  []AgentRun
+}
+
+func runGoing(runs []AgentRun) *AgentRun {
+	if len(runs) > 0 && runs[0].Going() {
+		return &runs[0]
+	}
+	return nil
+}
+
+func agentRunText(r AgentRun) string {
+	text := plural(r.Turns, "turn") + " · " + plural(r.ToolCalls, "tool call") + " · " + plural(r.Added, "thing") + " added"
+	if r.Episodes > 1 {
+		text += " · " + plural(r.Episodes, "fresh start")
+	}
+	if r.Resumes > 0 {
+		text += " · carried on after " + plural(r.Resumes, "restart")
+	}
+	return text
+}
+
+func agentRunState(r AgentRun) string {
+	switch {
+	case r.Status == RunWaiting && r.WaitUntil != nil:
+		return "Waiting for the model endpoint's limit, until " + r.WaitUntil.Format("2 Jan 15:04")
+	case r.Going():
+		return "Working, with " + r.Model
+	}
+	return r.Status + ": " + r.StopReason
 }
 
 func taskStatusLabel(status string) (string, string) {
@@ -239,6 +269,33 @@ templ TaskDetailView(q *Req, d TaskPage) {
 			}
 		</div>
 		<aside class="flex min-w-0 flex-[1_1_280px] flex-col gap-5">
+			if d.AgentReady || len(d.AgentRuns) > 0 {
+				@Section("Prospector's agent", "Works the task here, with the model and tools set in Settings. What it finds waits in Research.") {
+					if run := runGoing(d.AgentRuns); run != nil {
+						<p class="text-sm"><b>{ agentRunState(*run) }</b></p>
+						@Meta(agentRunText(*run))
+						<div>
+							@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/task/agent/stop", "data-body": jsonBody("id", run.ID)}}) {
+								Stop
+							}
+						</div>
+					} else if d.ClosedAt == nil && d.AgentReady {
+						<div>
+							@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "ui/task/agent/start", "data-body": jsonBody("task", d.ID)}}) {
+								Run Prospector's agent
+							}
+						</div>
+					}
+					for _, r := range d.AgentRuns {
+						if !r.Going() {
+							<div class="border-b border-dashed border-border py-2 text-sm last:border-0">
+								<span class="block">{ agentRunState(r) }</span>
+								@Meta(r.StartedBy + " · " + r.StartedAt.Format("2 Jan 15:04") + " · " + agentRunText(r))
+							</div>
+						}
+					}
+				}
+			}
 			if d.ClosedAt == nil {
 				@Section("Hand it to your agent", "Paste this into an agent connected to this organisation. Clients that show prompts as commands also have it as work_task.") {
 					@Quote(d.Prompt)
