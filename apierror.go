@@ -55,9 +55,16 @@ func ours(err error) bool {
 // 23). Trying again with the same request can't help.
 func unstorable(err error) bool {
 	var pg *pgconn.PgError
+	return breaksRule(err) || errors.As(err, &pg) && strings.HasPrefix(pg.Code, "22")
+}
+
+// breaksRule is the part of unstorable that is a row against one of the database's
+// rules, a unique index among them, and not a character it won't store.
+func breaksRule(err error) bool {
+	var pg *pgconn.PgError
 	var lite *sqlite.Error
 	if errors.As(err, &pg) {
-		return strings.HasPrefix(pg.Code, "22") || strings.HasPrefix(pg.Code, "23")
+		return strings.HasPrefix(pg.Code, "23")
 	}
 	const sqliteConstraint = 19
 	return errors.As(err, &lite) && lite.Code()&0xff == sqliteConstraint

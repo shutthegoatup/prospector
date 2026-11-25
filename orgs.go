@@ -201,7 +201,7 @@ func createOrg(tx *gorm.DB, slug, name string) (*Org, error) {
 	o := &Org{Slug: slug, Name: strings.TrimSpace(name), Color: orgColors[int(n)%len(orgColors)]}
 	// Two asking for the same address at once both find it free; the index stops the
 	// second, and the slug is the only thing about a new organisation it guards.
-	if err := tx.Create(o).Error; unstorable(err) {
+	if err := tx.Create(o).Error; breaksRule(err) {
 		return nil, taken
 	} else if err != nil {
 		return nil, err

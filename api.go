@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -220,7 +221,8 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 				id, _ := strconv.ParseInt(strings.TrimSpace(r.Params.Arguments["id"]), 10, 64)
 				t, err := a.s.Task(org.ID, id, time.Now())
 				if err != nil {
-					return nil, err
+					_, text := telling("prompt work_task", err, statusOf(err))
+					return nil, errors.New(text)
 				}
 				return &mcp.GetPromptResult{Description: t.Title, Messages: []*mcp.PromptMessage{
 					{Role: "user", Content: &mcp.TextContent{Text: taskPrompt(org, t.Task)}}}}, nil

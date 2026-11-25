@@ -36,10 +36,14 @@ func TestAgentToolsDontPassDatabaseErrorsOn(t *testing.T) {
 		t.Errorf("an agent naming a company that isn't here is told: %s", got)
 	}
 	s.db.Callback().Query().Before("gorm:query").Register("lost", func(tx *gorm.DB) {
-		if tx.Statement.Table == "companies" || tx.Statement.Table == "contacts" {
+		if tx.Statement.Table == "companies" || tx.Statement.Table == "contacts" || tx.Statement.Table == "tasks" {
 			tx.AddError(&pgconn.PgError{Code: "08006", Message: "connection to db.internal:5432 lost"})
 		}
 	})
+	_, err := session.GetPrompt(context.Background(), &mcp.GetPromptParams{Name: "work_task", Arguments: map[string]string{"id": "1"}})
+	if err == nil || !strings.Contains(err.Error(), "try again in a moment") || strings.Contains(err.Error(), "db.internal") {
+		t.Errorf("an agent asking for a task's prompt with the database gone is told: %v", err)
+	}
 	if got := said("search", map[string]any{"query": "yachts"}); !strings.Contains(got, "try again in a moment") || strings.Contains(got, "db.internal") {
 		t.Errorf("an agent searching with the database gone is told: %s", got)
 	}
