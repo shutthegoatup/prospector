@@ -543,7 +543,8 @@ func (a *App) finishSSO(w http.ResponseWriter, r *http.Request, att attempt, ref
 }
 
 func sentence(err error) string {
-	_, message := problemText(http.StatusBadRequest, err.Error())
+	_, text := telling("single sign-on", err, http.StatusBadRequest)
+	_, message := problemText(http.StatusBadRequest, text)
 	return message
 }
 
