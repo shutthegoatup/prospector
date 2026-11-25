@@ -263,3 +263,75 @@ func TestTheBoardShowsWhatAStageIsWorth(t *testing.T) {
 		t.Error("Settings doesn't show the currency that was saved")
 	}
 }
+
+// dealV1 is the deals table as the first release with deals made it: one per contact.
+type dealV1 struct {
+	ID        int64  `gorm:"primaryKey"`
+	OrgID     int64  `gorm:"uniqueIndex:idx_deal_contact;not null"`
+	ContactID int64  `gorm:"uniqueIndex:idx_deal_contact;not null"`
+	Kind      string `gorm:"not null;default:'new'"`
+	Amount    int64  `gorm:"not null;default:0"`
+	Currency  string `gorm:"not null;default:''"`
+	CloseDate *string
+	Owner     string `gorm:"not null;default:''"`
+	UpdatedAt time.Time
+}
+
+func (dealV1) TableName() string { return "deals" }
+
+// A database from the first release with deals has rows without a seq, and an index
+// that allows each contact one deal.
+func TestDealsFromTheFirstReleaseBecomeTheConversationsOwn(t *testing.T) {
+	dsn := filepath.Join(t.TempDir(), "old.sqlite")
+	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
+		dsn = pg
+	}
+	old := must(Open(dsn))
+	if err := old.db.Migrator().DropTable(models...); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.db.AutoMigrate(models...); err != nil {
+		t.Fatal(err)
+	}
+	o := mustOrg(t, old, "alpha")
+	valued, fresh := repliedPerson(t, old, o, "Hannah Pryce"), repliedPerson(t, old, o, "Tom Ellery")
+	if err := old.db.Migrator().DropTable(&Deal{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.db.AutoMigrate(&dealV1{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.db.Create(&dealV1{OrgID: o.ID, ContactID: valued.ID, Kind: DealNew, Amount: 1400000, Currency: "GBP"}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	s := must(Open(dsn))
+	if !s.db.Migrator().HasIndex(&Deal{}, "idx_deal_seq") {
+		t.Error("the upgrade didn't add the index that tells a contact's deals apart")
+	}
+	for _, c := range []*Contact{valued, fresh} {
+		if err := s.Update(o.ID, c.ID, "deal_close_date", "2026-12-12", "Ada Lovelace"); err != nil {
+			t.Fatalf("setting a deal after the upgrade: %v", err)
+		}
+	}
+	deals := must(s.Deals(o.ID))
+	if d := deals[valued.ID]; len(deals) != 2 || d.Amount != 1400000 || d.Seq != 0 || deref(d.CloseDate) != "2026-12-12" {
+		t.Errorf("the deals after the upgrade: %+v", deals)
+	}
+
+	// Going back a release: it still finds and changes the deals it made.
+	var before []dealV1
+	if err := old.db.Order("id").Find(&before).Error; err != nil || len(before) != 2 || before[0].Amount != 1400000 {
+		t.Errorf("the first release reading the upgraded table: %+v (%v)", before, err)
+	}
+	if err := old.db.AutoMigrate(&dealV1{}); err != nil {
+		t.Errorf("the first release starting on the upgraded table: %v", err)
+	}
+	third := repliedPerson(t, old, o, "Sven Dahl")
+	if err := old.db.Create(&dealV1{OrgID: o.ID, ContactID: third.ID, Kind: DealNew, Amount: 750000, Currency: "GBP"}).Error; err != nil {
+		t.Fatalf("the first release making a deal on the upgraded table: %v", err)
+	}
+	if d := must(s.Deals(o.ID))[third.ID]; d.Amount != 750000 || d.Seq != 0 {
+		t.Errorf("a deal the first release made after the upgrade reads as %+v", d)
+	}
+}
