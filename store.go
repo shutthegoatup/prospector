@@ -35,6 +35,8 @@ type OrgSettings struct {
 	// LookFor is what this organisation looks for at a company, one "field: hint"
 	// per line; see Assets.
 	LookFor string `json:"look_for"`
+	// Currency is the three-letter code deals are valued in.
+	Currency string `json:"currency"`
 }
 
 func (s OrgSettings) withDefaults() OrgSettings {
@@ -49,6 +51,9 @@ func (s OrgSettings) withDefaults() OrgSettings {
 	}
 	if s.NoteTemplate == "" {
 		s.NoteTemplate = "Hi {first},\n\nI work on {org}. [ONE LINE ABOUT {company}].\n\nWould be glad to connect."
+	}
+	if s.Currency == "" {
+		s.Currency = defaultCurrency
 	}
 	return s
 }
@@ -239,7 +244,7 @@ type Store struct {
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
 	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &Suggestion{},
-	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}, &Agent{}, &AgentRun{}}
+	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}, &Agent{}, &AgentRun{}, &Deal{}}
 
 // Open takes a postgres:// URL or a SQLite file path.
 func Open(dsn string) (*Store, error) {
@@ -444,6 +449,9 @@ func (s *Store) mark(org, id int64, step, date string, who Actor, note string) e
 
 func (s *Store) Update(org, id int64, field, value, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		if of, ok := strings.CutPrefix(field, "deal_"); ok {
+			return s.setDeal(tx, org, id, of, value, actor)
+		}
 		return s.set(tx, org, id, field, value, actor)
 	})
 }

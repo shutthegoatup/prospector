@@ -122,7 +122,17 @@ func (a *App) conversations(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, http.StatusInternalServerError)
 		return
 	}
-	a.page(w, r, "conversations", ConversationsView(q, convs, time.Now().Format("2006-01-02")))
+	deals, err := a.s.Deals(q.Org.ID)
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	members, err := a.s.Members(q.Org.ID)
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	a.page(w, r, "conversations", ConversationsView(q, Board{convs, deals, members}, time.Now().Format("2006-01-02")))
 }
 
 type CompanyFilter struct{ Q, Segment, Stage string }
@@ -394,6 +404,11 @@ func (a *App) uiSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := in.Assets(); err != nil {
 		fail(w, err, http.StatusBadRequest)
+		return
+	}
+	in.Currency = strings.ToUpper(strings.TrimSpace(in.Currency))
+	if in.Currency != "" && !currencyRe.MatchString(in.Currency) {
+		fail(w, errors.New("a currency is three letters, such as GBP, EUR or USD"), http.StatusBadRequest)
 		return
 	}
 	o := reqOf(r).Org

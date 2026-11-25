@@ -49,6 +49,8 @@ An agent that picks a task up is kept the oldest open request no other agent has
 
 Replies move across a board: replied, meeting, proposal, won, lost. Each needs a next step with a date. Ones without, or due today, come back on Today.
 
+A conversation can carry a deal: what it's worth, when you expect it to close, whether it's new business, a renewal or an expansion, and which teammate owns it. Each stage then shows what its deals add up to. Values are in the currency set in Settings (GBP unless you change it).
+
 ![Conversations: a board from replied to won](docs/images/conversations.png)
 
 ### Agents and API

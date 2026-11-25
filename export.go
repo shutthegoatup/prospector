@@ -18,6 +18,7 @@ type PersonExport struct {
 	Facts      []Fact        `json:"facts"`
 	Enquiries  []Enquiry     `json:"enquiries"`
 	Suggested  []Suggestion  `json:"suggested_details"`
+	Deals      []Deal        `json:"deals"`
 	History    []ExportEvent `json:"history"`
 }
 
@@ -29,7 +30,7 @@ type ExportEvent struct {
 }
 
 func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error) {
-	out := &PersonExport{ExportedAt: time.Now().UTC(), Facts: []Fact{}, Enquiries: []Enquiry{}, Suggested: []Suggestion{}, History: []ExportEvent{}}
+	out := &PersonExport{ExportedAt: time.Now().UTC(), Facts: []Fact{}, Enquiries: []Enquiry{}, Suggested: []Suggestion{}, Deals: []Deal{}, History: []ExportEvent{}}
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		c := &out.Person
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(c).Error; err != nil {
@@ -62,6 +63,9 @@ func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error)
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("id").Find(&out.Suggested).Error; err != nil {
 			return err
 		}
+		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("id").Find(&out.Deals).Error; err != nil {
+			return err
+		}
 		var events []Event
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("at, id").Find(&events).Error; err != nil {
 			return err
@@ -91,6 +95,7 @@ type OrgExport struct {
 	Companies    []Company      `json:"companies"`
 	Facts        []Fact         `json:"facts"`
 	Contacts     []Contact      `json:"contacts"`
+	Deals        []Deal         `json:"deals"`
 	Enquiries    []Enquiry      `json:"enquiries"`
 	Suggested    []Suggestion   `json:"suggested_details"`
 	Tasks        []Task         `json:"tasks"`
@@ -207,7 +212,7 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			out.Agents = append(out.Agents, ExportAgent{Name: a.Name, Kind: a.Kind, Endpoint: a.BaseURL, Model: a.Model, ToolsURL: a.ToolsURL, Tools: a.AllowedTools()})
 		}
 		mine := func() *gorm.DB { return tx.Where("org_id = ?", org).Order("id") }
-		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Enquiries, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
+		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Enquiries, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
 			if err := mine().Find(rows).Error; err != nil {
 				return err
 			}

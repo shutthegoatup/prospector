@@ -2,8 +2,64 @@ package main
 
 import (
 	"github.com/shutthegoatup/prospector/components/input"
+	"github.com/shutthegoatup/prospector/components/nativeselect"
+	"sort"
 	"strconv"
+	"strings"
 )
+
+// Board is the conversations by stage, with each one's deal and who may own it.
+type Board struct {
+	Convs   map[string][]Contact
+	Deals   map[int64]Deal
+	Members []Member
+}
+
+// worth is what a stage's deals add up to, a sum for each currency they were valued in.
+func (b Board) worth(stage string) string {
+	sums := map[string]int64{}
+	for _, c := range b.Convs[stage] {
+		if d := b.Deals[c.ID]; d.Amount != 0 {
+			sums[d.Currency] += d.Amount
+		}
+	}
+	var parts []string
+	for currency, sum := range sums {
+		parts = append(parts, formatMoney(sum, currency))
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, " + ")
+}
+
+func dealMeta(d Deal) string {
+	var parts []string
+	for _, k := range DealKinds {
+		if k.Key == d.Kind && d.Kind != DealNew {
+			parts = append(parts, k.Label)
+		}
+	}
+	if d.CloseDate != nil {
+		parts = append(parts, "closes "+*d.CloseDate)
+	}
+	if d.Owner != "" {
+		parts = append(parts, d.Owner)
+	}
+	return strings.Join(parts, " · ")
+}
+
+// ownerLeft is a deal still held by someone who is no longer a member.
+func ownerLeft(d Deal, members []Member) bool {
+	for _, m := range members {
+		if m.Name == d.Owner {
+			return false
+		}
+	}
+	return d.Owner != ""
+}
+
+func dealField(c Contact, field string) templ.Attributes {
+	return templ.Attributes{"data-field": "deal_" + field, "data-id": strconv.FormatInt(c.ID, 10), "data-refresh": "true"}
+}
 
 func dealClass(c Contact, day string) string {
 	if NeedsNextStep(c, day) {
@@ -32,22 +88,28 @@ func nextText(c Contact, day string) (string, string) {
 	return c.NextStep, "agent"
 }
 
-templ ConversationsView(q *Req, convs map[string][]Contact, day string) {
+templ ConversationsView(q *Req, b Board, day string) {
+	{{ convs := b.Convs }}
 	@PageHead("Conversations")
-	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">Everyone who replied, until it's won or lost. Each needs a next step with a date; ones without, or due today, also show on Today.</p>
+	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">Everyone who replied, until it's won or lost. Each needs a next step with a date; ones without, or due today, also show on Today. Give one a value and each stage shows what it is worth.</p>
 	<div class="overflow-x-auto pb-4">
 		<div class="flex min-w-max gap-4">
 			for _, st := range Stages {
 				<section class="flex w-[280px] flex-col gap-2.5" aria-label={ st.Label }>
 					<div class="flex items-baseline justify-between border-b-2 border-border px-1 pb-1.5">
 						<h2 class="font-heading text-base font-semibold">{ st.Label }</h2>
-						<span class="font-mono text-xs text-muted-foreground">{ strconv.Itoa(len(convs[st.Key])) }</span>
+						<span class="font-mono text-xs text-muted-foreground">
+							{ strconv.Itoa(len(convs[st.Key])) }
+							if worth := b.worth(st.Key); worth != "" {
+								{ " · " + worth }
+							}
+						</span>
 					</div>
 					if len(convs[st.Key]) == 0 {
 						<p class="rounded-xl border border-dashed border-border p-3.5 font-mono text-xs text-muted-foreground">None</p>
 					}
 					for _, c := range convs[st.Key] {
-						@Deal(q, c, day)
+						@DealCard(q, c, b.Deals[c.ID], b.Members, day)
 					}
 				</section>
 			}
@@ -55,7 +117,7 @@ templ ConversationsView(q *Req, convs map[string][]Contact, day string) {
 	</div>
 }
 
-templ Deal(q *Req, c Contact, day string) {
+templ DealCard(q *Req, c Contact, d Deal, members []Member, day string) {
 	<article class={ "flex flex-col gap-2.5 rounded-xl border bg-card p-3.5 text-sm", dealClass(c, day) } data-card={ strconv.FormatInt(c.ID, 10) }>
 		<div>
 			<b>{ displayName(c) }</b>
@@ -65,6 +127,15 @@ templ Deal(q *Req, c Contact, day string) {
 		</div>
 		if deref(c.CallNotes) != "" {
 			<p class="line-clamp-3 text-[13px] text-muted-foreground">{ deref(c.CallNotes) }</p>
+		}
+		if d.Value() != "" || dealMeta(d) != "" {
+			<p class="font-mono text-xs text-muted-foreground">
+				if d.Value() != "" {
+					<b class="text-foreground">{ d.Value() }</b>
+					{ " " }
+				}
+				{ dealMeta(d) }
+			</p>
 		}
 		{{ text, state := nextText(c, day) }}
 		if text != "" {
@@ -83,6 +154,42 @@ templ Deal(q *Req, c Contact, day string) {
 					@Label("By")
 					@input.Input(input.Props{Type: "date", Value: deref(c.NextDate), Class: "h-8 bg-muted",
 						Attributes: templ.Attributes{"data-field": "next_date", "data-id": strconv.FormatInt(c.ID, 10), "data-refresh": "true"}})
+				</label>
+				<label class="flex flex-col gap-1">
+					@Label("Value")
+					@input.Input(input.Props{Value: d.Value(), Placeholder: "e.g. 14,000", Class: "h-8 bg-muted", Attributes: dealField(c, "amount")})
+				</label>
+				<label class="flex flex-col gap-1">
+					@Label("Expected to close")
+					@input.Input(input.Props{Type: "date", Value: deref(d.CloseDate), Class: "h-8 bg-muted", Attributes: dealField(c, "close_date")})
+				</label>
+				<label class="flex items-center gap-2">
+					@Label("Kind")
+					@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: dealField(c, "kind")}) {
+						for _, k := range DealKinds {
+							@nativeselect.Option(nativeselect.OptionProps{Value: k.Key, Selected: k.Key == d.Kind || (d.Kind == "" && k.Key == DealNew)}) {
+								{ k.Label }
+							}
+						}
+					}
+				</label>
+				<label class="flex items-center gap-2">
+					@Label("Owner")
+					@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: dealField(c, "owner")}) {
+						@nativeselect.Option(nativeselect.OptionProps{Value: "", Selected: d.Owner == ""}) {
+							Nobody yet
+						}
+						if ownerLeft(d, members) {
+							@nativeselect.Option(nativeselect.OptionProps{Value: d.Owner, Selected: true}) {
+								{ d.Owner + " (left)" }
+							}
+						}
+						for _, m := range members {
+							@nativeselect.Option(nativeselect.OptionProps{Value: m.Name, Selected: m.Name == d.Owner}) {
+								{ m.Name }
+							}
+						}
+					}
 				</label>
 				if c.Stage == "lost" {
 					<label class="flex flex-col gap-1">
