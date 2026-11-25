@@ -336,6 +336,39 @@ func TestMCPSessionsBelongToOneKey(t *testing.T) {
 	}
 }
 
+func TestOnlyAssetsAreKeptByABrowser(t *testing.T) {
+	s, o, srv, client := signedIn(t)
+	key, _, err := s.CreateKey(o.ID, "bot", []string{"read"}, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]string{
+		"/o/alpha/today":                           "no-store",
+		"/o/alpha/companies":                       "no-store",
+		"/login":                                   "no-store",
+		"/o/alpha/api/v1/due":                      "no-store",
+		"/o/alpha/api/v1/companies/no":             "no-store",
+		"/assets/css/output.css":                   "no-cache",
+		"/assets/css/output.css?v=" + assetVersion: "public, max-age=31536000, immutable",
+	} {
+		req, _ := http.NewRequest("GET", srv.URL+path, nil)
+		req.Header.Set("Authorization", "Bearer "+key)
+		who := http.DefaultClient
+		if !strings.Contains(path, "/api/") {
+			req.Header.Del("Authorization")
+			who = client
+		}
+		res, err := who.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if got := res.Header.Get("Cache-Control"); got != want {
+			t.Errorf("%s: %d with Cache-Control %q, want %q", path, res.StatusCode, got, want)
+		}
+	}
+}
+
 func TestTransportHeaders(t *testing.T) {
 	_, _, srv, _ := signedIn(t)
 	get := func(proto string) http.Header {
