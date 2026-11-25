@@ -267,6 +267,9 @@ func Open(dsn string) (*Store, error) {
 	if err := moveAssetColumns(db); err != nil {
 		return nil, err
 	}
+	if err := allowSeveralDeals(db); err != nil {
+		return nil, err
+	}
 	s := &Store{db: db}
 	s.oneNameWhateverItsCapitals()
 	s.indexSearch()

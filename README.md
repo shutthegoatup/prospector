@@ -51,6 +51,8 @@ Replies move across a board: replied, meeting, proposal, won, lost. Each needs a
 
 A conversation can carry a deal: what it's worth, when you expect it to close, whether it's new business, a renewal or an expansion, and which teammate owns it. Each stage then shows what its deals add up to. Values are in the currency set in Settings (GBP unless you change it).
 
+A renewal or an expansion with someone already on the board is a deal of its own: start one from their card and it gets its own card, stage, next step and value, beside the first. One started by mistake can be removed; one that ran its course is marked won or lost.
+
 ![Conversations: a board from replied to won](docs/images/conversations.png)
 
 ### Agents and API
@@ -208,8 +210,9 @@ claude mcp add --transport http prospector https://<host>/o/<slug>/mcp --header 
 An organisation can have Prospector work its tasks with models of its choosing: Claude, ChatGPT and open models side by side. An owner adds each as an agent in Settings → Prospector's agents, with a name and:
 
 - **Endpoint:** any OpenAI-compatible endpoint: its base URL (the one `/models` and `/chat/completions` are under), an API key and a model. Saving reads the endpoint's model list to choose from, and a router model that picks one per request works as well as a single model. OpenAI's is `https://api.openai.com/v1` and OpenRouter's `https://openrouter.ai/api/v1`; an LLM gateway of your own works the same way.
+- **Or Anthropic:** an agent of the Anthropic kind reaches Claude through Anthropic's own API with its official Go SDK, given an Anthropic API key. Leave the endpoint empty for Anthropic's own address. Saving reads Anthropic's model list and offers Claude Opus 5.5 first. The conversation is cached between turns, so a long run pays full price only for what is new. On the models that support it, a request Claude declines is passed to another model in the same call (Anthropic's server-side fallback); a decline that still stands ends the run, saying so. The SDK is given the agent's key and nothing else: the server's own `ANTHROPIC_*` settings and profiles are never used.
 - **Tools:** an MCP server whose tools the agent may use, such as a gateway's federated `/mcp` with web search and page fetching. Saving lists its tools; the agent uses only the ones ticked, and a tool that appears later starts unticked. The server is sent the endpoint's key only when it is on the same address. LinkedIn's terms forbid automated access, logged-in browsers included, so prefer search and fetch tools to browser and captcha ones.
-- **Keys:** sealed under the server's [secret key](#secret-keys), never shown again, and left out of exports. Changing the endpoint needs the key entered again. `prospector agent set <org> <name> <endpoint> <model> [<tools-url> [<tool>…]]` does the same from the shell, adding the agent or changing the one with that name, with the key in `PROSPECTOR_AGENT_API_KEY`.
+- **Keys:** sealed under the server's [secret key](#secret-keys), never shown again, and left out of exports. Changing the endpoint needs the key entered again. `prospector agent set <org> <name> <endpoint> <model> [<tools-url> [<tool>…]]` does the same from the shell, adding the agent or changing the one with that name, with the key in `PROSPECTOR_AGENT_API_KEY` and, for Claude, `PROSPECTOR_AGENT_KIND=anthropic` (an empty endpoint, `""`, is Anthropic's own); without a kind, a new agent is OpenAI-compatible and an existing one keeps its own.
 - **Deleting** an agent stops its runs and revokes its key. What it found stays, as any agent's does.
 - **Addresses:** the endpoint and tool server must be `https` at public addresses. An operator whose gateway sits on a private network sets `PROSPECTOR_AGENT_ALLOW_PRIVATE=1`.
 
