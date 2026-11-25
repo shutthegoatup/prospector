@@ -65,8 +65,23 @@ func enquiryStateLabel(state string) string {
 
 // SetEnquiry changes where answering an enquiry stands, who has it, or our note on it.
 func (s *Store) SetEnquiry(org, id int64, field, value, actor string) error {
-	value = strings.TrimSpace(value)
+	return s.SetEnquiryFields(org, id, []Change{{field, value}}, actor)
+}
+
+// SetEnquiryFields makes several of those changes or none.
+func (s *Store) SetEnquiryFields(org, id int64, changes []Change, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		for _, c := range changes {
+			if err := s.setEnquiry(tx, org, id, c.Field, strings.TrimSpace(c.Value), actor); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (s *Store) setEnquiry(tx *gorm.DB, org, id int64, field, value, actor string) error {
+	{
 		var e Enquiry
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&e).Error; err != nil {
 			return missing(err, "no enquiry %d", id)
@@ -108,7 +123,7 @@ func (s *Store) SetEnquiry(org, id int64, field, value, actor string) error {
 			contact = *e.ContactID
 		}
 		return s.log(tx, org, contact, e.CompanyID, actor, "enquiry:"+field, nonEmpty(logged))
-	})
+	}
 }
 
 var EnquiryKinds = []struct{ Key, Label string }{
@@ -418,27 +433,6 @@ func (a *App) intake(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, ok{true})
 }
 
-func (a *App) uiSetEnquiry(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID    int64  `json:"id"`
-		Field string `json:"field"`
-		Value string `json:"value"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.SetEnquiry(q.Org.ID, in.ID, in.Field, in.Value, q.Actor()))
-	}
-}
-
-func (a *App) uiDeleteEnquiry(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID int64 `json:"id"`
-	}
-	if decode(w, r, &in) {
-		done(w, a.s.DeleteEnquiry(reqOf(r).Org.ID, in.ID))
-	}
-}
-
 type EnquiriesData struct {
 	Filter    EnquiryFilter
 	Rows      []Enquiry
@@ -603,15 +597,4 @@ func (s *Store) enquiryCompany(org int64, e Enquiry) (string, error) {
 		return "", nil
 	}
 	return typed, nil
-}
-
-func (a *App) uiConverseEnquiry(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID int64 `json:"id"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		_, err := a.s.ConverseEnquiry(q.Org, in.ID, q.Actor())
-		done(w, err)
-	}
 }

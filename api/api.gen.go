@@ -184,6 +184,95 @@ type AgentSettings struct {
 	ToolsUrl string `json:"tools_url,omitempty"`
 }
 
+// Deal defines model for Deal.
+type Deal struct {
+	// Amount In the currency's hundredths.
+	Amount int64 `json:"amount"`
+
+	// CloseDate YYYY-MM-DD, or empty.
+	CloseDate string `json:"close_date"`
+
+	// CompanyId 0 when they have no company here.
+	CompanyId int64  `json:"company_id"`
+	ContactId int64  `json:"contact_id"`
+	Currency  string `json:"currency"`
+
+	// Id 0 for a conversation's own deal that nothing has been set on yet.
+	Id         int64  `json:"id"`
+	Kind       string `json:"kind"`
+	LostReason string `json:"lost_reason"`
+
+	// NextDate YYYY-MM-DD, or empty.
+	NextDate string `json:"next_date"`
+	NextStep string `json:"next_step"`
+	Owner    string `json:"owner"`
+	Person   string `json:"person"`
+
+	// Seq 0 for the conversation's own deal.
+	Seq int `json:"seq"`
+
+	// Stage `replied`, `meeting`, `proposal`, `won` or `lost`.
+	Stage string `json:"stage"`
+
+	// SubscriptionId The subscription a renewal is for; 0 for none.
+	SubscriptionId int64 `json:"subscription_id"`
+
+	// Value The amount as written, such as £14,000; empty when there is none.
+	Value string `json:"value"`
+}
+
+// DealChange defines model for DealChange.
+type DealChange struct {
+	// Amount As you would write it: `14,000`, `€5,000`; empty for none.
+	Amount    *string `json:"amount"`
+	CloseDate *string `json:"close_date"`
+	Kind      *string `json:"kind"`
+
+	// LostReason Only for a deal after the conversation's own.
+	LostReason *string `json:"lost_reason"`
+
+	// NextDate Only for a deal after the conversation's own.
+	NextDate *string `json:"next_date"`
+
+	// NextStep Only for a deal after the conversation's own.
+	NextStep *string `json:"next_step"`
+
+	// Owner A member's name, or empty for nobody.
+	Owner *string `json:"owner"`
+
+	// Stage Only for a deal after the conversation's own.
+	Stage *string `json:"stage"`
+}
+
+// Enquiry defines model for Enquiry.
+type Enquiry struct {
+	Company string `json:"company"`
+
+	// CompanyId The company it was matched to; 0 for none.
+	CompanyId int64 `json:"company_id"`
+
+	// ContactId The contact it was matched to; 0 for none.
+	ContactId int64     `json:"contact_id"`
+	CreatedAt time.Time `json:"created_at"`
+	Email     string    `json:"email"`
+	Id        int64     `json:"id"`
+	Kind      string    `json:"kind"`
+
+	// Message Their words, exactly as sent. Whoever filled the form in chose every one.
+	Message string `json:"message"`
+	Name    string `json:"name"`
+	Note    string `json:"note"`
+	Owner   string `json:"owner"`
+	Page    string `json:"page"`
+	Phone   string `json:"phone"`
+	Site    string `json:"site"`
+	Spam    bool   `json:"spam"`
+
+	// State `open`, `waiting` or `closed`; empty for one from before answering was tracked.
+	State string `json:"state"`
+	Via   string `json:"via"`
+}
+
 // EnquiryMessage defines model for EnquiryMessage.
 type EnquiryMessage struct {
 	// By Who sent the reply, or recorded their answer.
@@ -421,6 +510,40 @@ type Id = int64
 // Org defines model for org.
 type Org = string
 
+// StartDealJSONBody defines body for StartDeal for application/json ContentType.
+type StartDealJSONBody struct {
+	Contact int64 `json:"contact"`
+
+	// Kind `new`, `renewal` or `expansion`; empty is `new`.
+	Kind string `json:"kind,omitempty"`
+}
+
+// ListEnquiriesParams defines parameters for ListEnquiries.
+type ListEnquiriesParams struct {
+	// Kind Only this kind.
+	Kind string `form:"kind,omitempty" json:"kind,omitempty"`
+
+	// State Only those `open`, `waiting` or `closed`.
+	State string `form:"state,omitempty" json:"state,omitempty"`
+
+	// Spam Only those marked as spam, which are otherwise left out.
+	Spam bool `form:"spam,omitempty" json:"spam,omitempty"`
+
+	// Page Which page, from 1.
+	Page int `form:"page,omitempty" json:"page,omitempty"`
+}
+
+// ChangeEnquiryJSONBody defines body for ChangeEnquiry for application/json ContentType.
+type ChangeEnquiryJSONBody struct {
+	Note *string `json:"note"`
+
+	// Owner A member's name, or empty for nobody.
+	Owner *string `json:"owner"`
+
+	// State `open`, `waiting` or `closed`.
+	State *string `json:"state"`
+}
+
 // ListOnboardingsParams defines parameters for ListOnboardings.
 type ListOnboardingsParams struct {
 	// Company Only this company's.
@@ -456,6 +579,18 @@ type CreateAgentJSONRequestBody = AgentSettings
 
 // UpdateAgentJSONRequestBody defines body for UpdateAgent for application/json ContentType.
 type UpdateAgentJSONRequestBody = AgentSettings
+
+// ChangeOwnDealJSONRequestBody defines body for ChangeOwnDeal for application/json ContentType.
+type ChangeOwnDealJSONRequestBody = DealChange
+
+// StartDealJSONRequestBody defines body for StartDeal for application/json ContentType.
+type StartDealJSONRequestBody StartDealJSONBody
+
+// ChangeDealJSONRequestBody defines body for ChangeDeal for application/json ContentType.
+type ChangeDealJSONRequestBody = DealChange
+
+// ChangeEnquiryJSONRequestBody defines body for ChangeEnquiry for application/json ContentType.
+type ChangeEnquiryJSONRequestBody ChangeEnquiryJSONBody
 
 // RecordEnquiryAnswerJSONRequestBody defines body for RecordEnquiryAnswer for application/json ContentType.
 type RecordEnquiryAnswerJSONRequestBody = EnquiryText
@@ -501,9 +636,36 @@ type ServerInterface interface {
 	// UpdateAgent Change an agent
 	// (PUT /o/{org}/api/v1/agents/{id})
 	UpdateAgent(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ChangeOwnDeal Change a conversation's own deal
+	// (PATCH /o/{org}/api/v1/contacts/{id}/deal)
+	ChangeOwnDeal(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ListDeals Every deal on the Conversations board
+	// (GET /o/{org}/api/v1/deals)
+	ListDeals(w http.ResponseWriter, r *http.Request, org Org)
+	// StartDeal Start another deal with someone already in conversation
+	// (POST /o/{org}/api/v1/deals)
+	StartDeal(w http.ResponseWriter, r *http.Request, org Org)
+	// RemoveDeal Remove a deal started by mistake
+	// (DELETE /o/{org}/api/v1/deals/{id})
+	RemoveDeal(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ChangeDeal Change a deal started after the conversation's own
+	// (PATCH /o/{org}/api/v1/deals/{id})
+	ChangeDeal(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ListEnquiries What people sent in, newest first
+	// (GET /o/{org}/api/v1/enquiries)
+	ListEnquiries(w http.ResponseWriter, r *http.Request, org Org, params ListEnquiriesParams)
+	// DeleteEnquiry Delete an enquiry for good
+	// (DELETE /o/{org}/api/v1/enquiries/{id})
+	DeleteEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ChangeEnquiry Say where answering an enquiry stands, who has it, or note something on it
+	// (PATCH /o/{org}/api/v1/enquiries/{id})
+	ChangeEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id)
 	// RecordEnquiryAnswer Record what they said back
 	// (POST /o/{org}/api/v1/enquiries/{id}/answers)
 	RecordEnquiryAnswer(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ConverseEnquiry Put whoever sent an enquiry on the Conversations board
+	// (POST /o/{org}/api/v1/enquiries/{id}/conversation)
+	ConverseEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id)
 	// ListEnquiryMessages What has been said in answering an enquiry
 	// (GET /o/{org}/api/v1/enquiries/{id}/messages)
 	ListEnquiryMessages(w http.ResponseWriter, r *http.Request, org Org, id Id)
@@ -720,6 +882,314 @@ func (siw *ServerInterfaceWrapper) UpdateAgent(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// ChangeOwnDeal operation middleware
+func (siw *ServerInterfaceWrapper) ChangeOwnDeal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeOwnDeal(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDeals operation middleware
+func (siw *ServerInterfaceWrapper) ListDeals(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDeals(w, r, org)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartDeal operation middleware
+func (siw *ServerInterfaceWrapper) StartDeal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartDeal(w, r, org)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveDeal operation middleware
+func (siw *ServerInterfaceWrapper) RemoveDeal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveDeal(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeDeal operation middleware
+func (siw *ServerInterfaceWrapper) ChangeDeal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeDeal(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListEnquiries operation middleware
+func (siw *ServerInterfaceWrapper) ListEnquiries(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListEnquiriesParams
+
+	// ------------- Optional query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "spam" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "spam", r.URL.Query(), &params.Spam, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "spam"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "spam", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListEnquiries(w, r, org, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteEnquiry operation middleware
+func (siw *ServerInterfaceWrapper) DeleteEnquiry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteEnquiry(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeEnquiry operation middleware
+func (siw *ServerInterfaceWrapper) ChangeEnquiry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeEnquiry(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RecordEnquiryAnswer operation middleware
 func (siw *ServerInterfaceWrapper) RecordEnquiryAnswer(w http.ResponseWriter, r *http.Request) {
 
@@ -746,6 +1216,41 @@ func (siw *ServerInterfaceWrapper) RecordEnquiryAnswer(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RecordEnquiryAnswer(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConverseEnquiry operation middleware
+func (siw *ServerInterfaceWrapper) ConverseEnquiry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConverseEnquiry(w, r, org, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1453,6 +1958,15 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/o/{org}/api/v1/subscriptions/{id}", wrapper.RemoveSubscription)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/o/{org}/api/v1/subscriptions/{id}", wrapper.ChangeSubscription)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/subscriptions/{id}/renewals", wrapper.StartRenewal)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/o/{org}/api/v1/deals", wrapper.ListDeals)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/deals", wrapper.StartDeal)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/o/{org}/api/v1/deals/{id}", wrapper.RemoveDeal)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/o/{org}/api/v1/deals/{id}", wrapper.ChangeDeal)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/o/{org}/api/v1/contacts/{id}/deal", wrapper.ChangeOwnDeal)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/o/{org}/api/v1/enquiries", wrapper.ListEnquiries)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/o/{org}/api/v1/enquiries/{id}", wrapper.DeleteEnquiry)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/o/{org}/api/v1/enquiries/{id}", wrapper.ChangeEnquiry)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/enquiries/{id}/conversation", wrapper.ConverseEnquiry)
 
 	return m
 }
@@ -1653,6 +2167,321 @@ func (response UpdateAgentdefaultApplicationProblemPlusJSONResponse) VisitUpdate
 	return err
 }
 
+type ChangeOwnDealRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *ChangeOwnDealJSONRequestBody
+}
+
+type ChangeOwnDealResponseObject interface {
+	VisitChangeOwnDealResponse(w http.ResponseWriter) error
+}
+
+type ChangeOwnDeal200JSONResponse Deal
+
+func (response ChangeOwnDeal200JSONResponse) VisitChangeOwnDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOwnDealdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ChangeOwnDealdefaultApplicationProblemPlusJSONResponse) VisitChangeOwnDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDealsRequestObject struct {
+	Org Org `json:"org"`
+}
+
+type ListDealsResponseObject interface {
+	VisitListDealsResponse(w http.ResponseWriter) error
+}
+
+type ListDeals200JSONResponse []Deal
+
+func (response ListDeals200JSONResponse) VisitListDealsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDealsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListDealsdefaultApplicationProblemPlusJSONResponse) VisitListDealsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartDealRequestObject struct {
+	Org  Org `json:"org"`
+	Body *StartDealJSONRequestBody
+}
+
+type StartDealResponseObject interface {
+	VisitStartDealResponse(w http.ResponseWriter) error
+}
+
+type StartDeal201JSONResponse Deal
+
+func (response StartDeal201JSONResponse) VisitStartDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartDealdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response StartDealdefaultApplicationProblemPlusJSONResponse) VisitStartDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveDealRequestObject struct {
+	Org Org `json:"org"`
+	Id  Id  `json:"id"`
+}
+
+type RemoveDealResponseObject interface {
+	VisitRemoveDealResponse(w http.ResponseWriter) error
+}
+
+type RemoveDeal204Response struct {
+}
+
+func (response RemoveDeal204Response) VisitRemoveDealResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RemoveDealdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RemoveDealdefaultApplicationProblemPlusJSONResponse) VisitRemoveDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDealRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *ChangeDealJSONRequestBody
+}
+
+type ChangeDealResponseObject interface {
+	VisitChangeDealResponse(w http.ResponseWriter) error
+}
+
+type ChangeDeal200JSONResponse Deal
+
+func (response ChangeDeal200JSONResponse) VisitChangeDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDealdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ChangeDealdefaultApplicationProblemPlusJSONResponse) VisitChangeDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiriesRequestObject struct {
+	Org    Org `json:"org"`
+	Params ListEnquiriesParams
+}
+
+type ListEnquiriesResponseObject interface {
+	VisitListEnquiriesResponse(w http.ResponseWriter) error
+}
+
+type ListEnquiries200JSONResponse struct {
+	Enquiries []Enquiry `json:"enquiries"`
+	Page      int       `json:"page"`
+	Pages     int       `json:"pages"`
+	Total     int       `json:"total"`
+}
+
+func (response ListEnquiries200JSONResponse) VisitListEnquiriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiriesdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListEnquiriesdefaultApplicationProblemPlusJSONResponse) VisitListEnquiriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEnquiryRequestObject struct {
+	Org Org `json:"org"`
+	Id  Id  `json:"id"`
+}
+
+type DeleteEnquiryResponseObject interface {
+	VisitDeleteEnquiryResponse(w http.ResponseWriter) error
+}
+
+type DeleteEnquiry204Response struct {
+}
+
+func (response DeleteEnquiry204Response) VisitDeleteEnquiryResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteEnquirydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeleteEnquirydefaultApplicationProblemPlusJSONResponse) VisitDeleteEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeEnquiryRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *ChangeEnquiryJSONRequestBody
+}
+
+type ChangeEnquiryResponseObject interface {
+	VisitChangeEnquiryResponse(w http.ResponseWriter) error
+}
+
+type ChangeEnquiry200JSONResponse Enquiry
+
+func (response ChangeEnquiry200JSONResponse) VisitChangeEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeEnquirydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ChangeEnquirydefaultApplicationProblemPlusJSONResponse) VisitChangeEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RecordEnquiryAnswerRequestObject struct {
 	Org  Org `json:"org"`
 	Id   Id  `json:"id"`
@@ -1683,6 +2512,48 @@ type RecordEnquiryAnswerdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response RecordEnquiryAnswerdefaultApplicationProblemPlusJSONResponse) VisitRecordEnquiryAnswerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConverseEnquiryRequestObject struct {
+	Org Org `json:"org"`
+	Id  Id  `json:"id"`
+}
+
+type ConverseEnquiryResponseObject interface {
+	VisitConverseEnquiryResponse(w http.ResponseWriter) error
+}
+
+type ConverseEnquiry201JSONResponse struct {
+	Contact int64 `json:"contact"`
+}
+
+func (response ConverseEnquiry201JSONResponse) VisitConverseEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConverseEnquirydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ConverseEnquirydefaultApplicationProblemPlusJSONResponse) VisitConverseEnquiryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
@@ -2330,9 +3201,36 @@ type StrictServerInterface interface {
 	// UpdateAgent Change an agent
 	// (PUT /o/{org}/api/v1/agents/{id})
 	UpdateAgent(ctx context.Context, request UpdateAgentRequestObject) (UpdateAgentResponseObject, error)
+	// ChangeOwnDeal Change a conversation's own deal
+	// (PATCH /o/{org}/api/v1/contacts/{id}/deal)
+	ChangeOwnDeal(ctx context.Context, request ChangeOwnDealRequestObject) (ChangeOwnDealResponseObject, error)
+	// ListDeals Every deal on the Conversations board
+	// (GET /o/{org}/api/v1/deals)
+	ListDeals(ctx context.Context, request ListDealsRequestObject) (ListDealsResponseObject, error)
+	// StartDeal Start another deal with someone already in conversation
+	// (POST /o/{org}/api/v1/deals)
+	StartDeal(ctx context.Context, request StartDealRequestObject) (StartDealResponseObject, error)
+	// RemoveDeal Remove a deal started by mistake
+	// (DELETE /o/{org}/api/v1/deals/{id})
+	RemoveDeal(ctx context.Context, request RemoveDealRequestObject) (RemoveDealResponseObject, error)
+	// ChangeDeal Change a deal started after the conversation's own
+	// (PATCH /o/{org}/api/v1/deals/{id})
+	ChangeDeal(ctx context.Context, request ChangeDealRequestObject) (ChangeDealResponseObject, error)
+	// ListEnquiries What people sent in, newest first
+	// (GET /o/{org}/api/v1/enquiries)
+	ListEnquiries(ctx context.Context, request ListEnquiriesRequestObject) (ListEnquiriesResponseObject, error)
+	// DeleteEnquiry Delete an enquiry for good
+	// (DELETE /o/{org}/api/v1/enquiries/{id})
+	DeleteEnquiry(ctx context.Context, request DeleteEnquiryRequestObject) (DeleteEnquiryResponseObject, error)
+	// ChangeEnquiry Say where answering an enquiry stands, who has it, or note something on it
+	// (PATCH /o/{org}/api/v1/enquiries/{id})
+	ChangeEnquiry(ctx context.Context, request ChangeEnquiryRequestObject) (ChangeEnquiryResponseObject, error)
 	// RecordEnquiryAnswer Record what they said back
 	// (POST /o/{org}/api/v1/enquiries/{id}/answers)
 	RecordEnquiryAnswer(ctx context.Context, request RecordEnquiryAnswerRequestObject) (RecordEnquiryAnswerResponseObject, error)
+	// ConverseEnquiry Put whoever sent an enquiry on the Conversations board
+	// (POST /o/{org}/api/v1/enquiries/{id}/conversation)
+	ConverseEnquiry(ctx context.Context, request ConverseEnquiryRequestObject) (ConverseEnquiryResponseObject, error)
 	// ListEnquiryMessages What has been said in answering an enquiry
 	// (GET /o/{org}/api/v1/enquiries/{id}/messages)
 	ListEnquiryMessages(ctx context.Context, request ListEnquiryMessagesRequestObject) (ListEnquiryMessagesResponseObject, error)
@@ -2572,6 +3470,248 @@ func (sh *strictHandler) UpdateAgent(w http.ResponseWriter, r *http.Request, org
 	}
 }
 
+// ChangeOwnDeal operation middleware
+func (sh *strictHandler) ChangeOwnDeal(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ChangeOwnDealRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body ChangeOwnDealJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ChangeOwnDeal(ctx, request.(ChangeOwnDealRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeOwnDeal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeOwnDealResponseObject); ok {
+		if err := validResponse.VisitChangeOwnDealResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDeals operation middleware
+func (sh *strictHandler) ListDeals(w http.ResponseWriter, r *http.Request, org Org) {
+	var request ListDealsRequestObject
+
+	request.Org = org
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ListDeals(ctx, request.(ListDealsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDeals")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDealsResponseObject); ok {
+		if err := validResponse.VisitListDealsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartDeal operation middleware
+func (sh *strictHandler) StartDeal(w http.ResponseWriter, r *http.Request, org Org) {
+	var request StartDealRequestObject
+
+	request.Org = org
+
+	var body StartDealJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.StartDeal(ctx, request.(StartDealRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartDeal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartDealResponseObject); ok {
+		if err := validResponse.VisitStartDealResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveDeal operation middleware
+func (sh *strictHandler) RemoveDeal(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request RemoveDealRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.RemoveDeal(ctx, request.(RemoveDealRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveDeal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveDealResponseObject); ok {
+		if err := validResponse.VisitRemoveDealResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeDeal operation middleware
+func (sh *strictHandler) ChangeDeal(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ChangeDealRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body ChangeDealJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ChangeDeal(ctx, request.(ChangeDealRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeDeal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeDealResponseObject); ok {
+		if err := validResponse.VisitChangeDealResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListEnquiries operation middleware
+func (sh *strictHandler) ListEnquiries(w http.ResponseWriter, r *http.Request, org Org, params ListEnquiriesParams) {
+	var request ListEnquiriesRequestObject
+
+	request.Org = org
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ListEnquiries(ctx, request.(ListEnquiriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListEnquiries")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListEnquiriesResponseObject); ok {
+		if err := validResponse.VisitListEnquiriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteEnquiry operation middleware
+func (sh *strictHandler) DeleteEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request DeleteEnquiryRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.DeleteEnquiry(ctx, request.(DeleteEnquiryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteEnquiry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteEnquiryResponseObject); ok {
+		if err := validResponse.VisitDeleteEnquiryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeEnquiry operation middleware
+func (sh *strictHandler) ChangeEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ChangeEnquiryRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body ChangeEnquiryJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ChangeEnquiry(ctx, request.(ChangeEnquiryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeEnquiry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeEnquiryResponseObject); ok {
+		if err := validResponse.VisitChangeEnquiryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // RecordEnquiryAnswer operation middleware
 func (sh *strictHandler) RecordEnquiryAnswer(w http.ResponseWriter, r *http.Request, org Org, id Id) {
 	var request RecordEnquiryAnswerRequestObject
@@ -2599,6 +3739,33 @@ func (sh *strictHandler) RecordEnquiryAnswer(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RecordEnquiryAnswerResponseObject); ok {
 		if err := validResponse.VisitRecordEnquiryAnswerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ConverseEnquiry operation middleware
+func (sh *strictHandler) ConverseEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ConverseEnquiryRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ConverseEnquiry(ctx, request.(ConverseEnquiryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConverseEnquiry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConverseEnquiryResponseObject); ok {
+		if err := validResponse.VisitConverseEnquiryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3097,100 +4264,123 @@ func (sh *strictHandler) StartRun(w http.ResponseWriter, r *http.Request, org Or
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"AA==",
+	"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",
+	"ul0kTb0I/bYFu0Zc4NRZzvcM3364/d8BAA==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
