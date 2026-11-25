@@ -165,6 +165,14 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 		return s
 	}
 	org, actor, k := q.Org, q.Agent(), q.Key
+	// Each session holds its own claims, so two clients sharing a key take different requests.
+	sessionOf := func(r *mcp.CallToolRequest) Actor {
+		who := actor
+		if r != nil && r.Session != nil {
+			who.Session = r.Session.ID()
+		}
+		return who
+	}
 	// Settings saved while a session is open (waits, the never-contact list) apply to its next call.
 	current := func() (*Org, error) { return a.s.OrgByID(org.ID) }
 	s := mcp.NewServer(&mcp.Implementation{Name: "prospector", Title: "Prospector: " + org.Name, Version: "1"},
@@ -175,19 +183,19 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 				return nil, &GuidanceOut{Guidance: agentInstructions(org, k)}, nil
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "search", Description: "Find companies and contacts by name, domain, email or notes. Each company says which agent last changed it."},
-			func(_ context.Context, _ *mcp.CallToolRequest, in SearchIn) (*mcp.CallToolResult, []SearchHit, error) {
-				hits, err := a.s.AgentSearch(org.ID, actor, in.Query)
+			func(_ context.Context, req *mcp.CallToolRequest, in SearchIn) (*mcp.CallToolResult, []SearchHit, error) {
+				hits, err := a.s.AgentSearch(org.ID, sessionOf(req), in.Query)
 				return nil, hits, err
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "get_company", Description: "A company's details, facts with sources, people, and its history: what people and agents did here, newest first. Read the history before researching, so you don't redo work or suggest what a person rejected."},
-			func(_ context.Context, _ *mcp.CallToolRequest, in struct {
+			func(_ context.Context, req *mcp.CallToolRequest, in struct {
 				Company string `json:"company" jsonschema:"company id or exact name"`
 			}) (*mcp.CallToolResult, *CompanyDetail, error) {
-				c, err := a.s.AgentCompany(org.ID, actor, in.Company)
+				c, err := a.s.AgentCompany(org.ID, sessionOf(req), in.Company)
 				return nil, c, err
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "list_due", Description: "What is due on Today, and whether its text is written yet."},
-			func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, []DueItem, error) {
+			func(_ context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, []DueItem, error) {
 				o, err := current()
 				if err != nil {
 					return nil, nil, err
@@ -196,13 +204,13 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 				return nil, items, err
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "list_tasks", Description: "The open tasks people have written for agents: what each asks for, what is still unfinished, and whether another agent is on it now."},
-			func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, tasksOut, error) {
-				tasks, err := a.s.AgentTasks(org.ID, actor)
+			func(_ context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, tasksOut, error) {
+				tasks, err := a.s.AgentTasks(org.ID, sessionOf(req))
 				return nil, tasksOut{tasks}, err
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "get_task", Description: "Everything needed to carry a task on: the brief in the person's words, what has been asked since, the companies and people already found, and the notes other agents left. Read it before working a task; people see that you picked it up."},
-			func(_ context.Context, _ *mcp.CallToolRequest, in taskRef) (*mcp.CallToolResult, *TaskOut, error) {
-				out, err := a.s.AgentTask(org.ID, actor, in.ID)
+		mcp.AddTool(s, &mcp.Tool{Name: "get_task", Description: "Everything needed to carry a task on: the brief in the person's words, what has been asked since, the companies and people already found, and the notes other agents left. Read it before working a task; people see that you picked it up. With a key that can add research, it also keeps an open request for you (claimed_request): work that one. If other agents hold every open request, leave the task to them."},
+			func(_ context.Context, req *mcp.CallToolRequest, in taskRef) (*mcp.CallToolResult, *TaskOut, error) {
+				out, err := a.s.AgentTask(org.ID, sessionOf(req), in.ID)
 				return nil, out, err
 			})
 		s.AddPrompt(&mcp.Prompt{Name: "work_task", Description: "Start on a task a person wrote in Prospector.",
@@ -219,46 +227,46 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 	}
 	if k.Has("research:write") {
 		mcp.AddTool(s, &mcp.Tool{Name: "task_note", Description: "Leave a short working note on a task or a company for whoever comes next: what you skipped and why, where you found nothing, or what you would do next. Not a fact, and not for naming people."},
-			func(_ context.Context, _ *mcp.CallToolRequest, in NoteIn) (*mcp.CallToolResult, ok, error) {
-				_, err := a.s.AgentNote(org.ID, actor, in)
+			func(_ context.Context, req *mcp.CallToolRequest, in NoteIn) (*mcp.CallToolResult, ok, error) {
+				_, err := a.s.AgentNote(org.ID, sessionOf(req), in)
 				return nil, ok{err == nil}, err
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "finish_request", Description: "Say that an open request on a task is done. A person can reopen it."},
-			func(_ context.Context, _ *mcp.CallToolRequest, in FinishIn) (*mcp.CallToolResult, ok, error) {
-				err := a.s.AgentFinish(org.ID, actor, in)
+			func(_ context.Context, req *mcp.CallToolRequest, in FinishIn) (*mcp.CallToolResult, ok, error) {
+				err := a.s.AgentFinish(org.ID, sessionOf(req), in)
 				return nil, ok{err == nil}, err
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "add_company", Description: "Add a company to Research for a person to review, with facts and their sources. If its name or domain is already known, the facts it lacks are added to that company."},
-			func(_ context.Context, _ *mcp.CallToolRequest, in AddCompanyIn) (*mcp.CallToolResult, *AddCompanyOut, error) {
-				out, err := a.s.AgentAddCompany(org.ID, actor, in)
+			func(_ context.Context, req *mcp.CallToolRequest, in AddCompanyIn) (*mcp.CallToolResult, *AddCompanyOut, error) {
+				out, err := a.s.AgentAddCompany(org.ID, sessionOf(req), in)
 				return nil, out, err
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "add_fact", Description: "Add one fact about a company, with the page that shows it. A fact the company already has from that page isn't added twice."},
-			func(_ context.Context, _ *mcp.CallToolRequest, in AddFactIn) (*mcp.CallToolResult, factAdded, error) {
-				out, err := a.s.AgentAddFact(org.ID, actor, in)
+			func(_ context.Context, req *mcp.CallToolRequest, in AddFactIn) (*mcp.CallToolResult, factAdded, error) {
+				out, err := a.s.AgentAddFact(org.ID, sessionOf(req), in)
 				return nil, factAdded{OK: err == nil, Existed: err == nil && out.Existed}, err
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "add_contact", Description: "Suggest a person at a company. They wait in Research until a person picks them. Someone already at the company comes back as existed: an email, phone or profile you send that they lack isn't filled in, it waits for a person to accept and is listed in suggested. Never scrape LinkedIn; use links found by search."},
-			func(_ context.Context, _ *mcp.CallToolRequest, in AddContactIn) (*mcp.CallToolResult, *AddContactOut, error) {
+			func(_ context.Context, req *mcp.CallToolRequest, in AddContactIn) (*mcp.CallToolResult, *AddContactOut, error) {
 				o, err := current()
 				if err != nil {
 					return nil, nil, err
 				}
-				out, err := a.s.AgentAddContact(o, actor, in)
+				out, err := a.s.AgentAddContact(o, sessionOf(req), in)
 				return nil, out, err
 			})
 	}
 	if k.Has("drafts:write") {
 		mcp.AddTool(s, &mcp.Tool{Name: "draft_message", Description: "Write the LinkedIn note (300 characters at most), LinkedIn message, email or follow-up for a contact. It shows as written by an agent; a person edits and sends it. Text a person has edited, or that has already gone out, is refused."},
-			func(_ context.Context, _ *mcp.CallToolRequest, in DraftIn) (*mcp.CallToolResult, ok, error) {
-				err := a.s.AgentDraft(org.ID, actor, in)
+			func(_ context.Context, req *mcp.CallToolRequest, in DraftIn) (*mcp.CallToolResult, ok, error) {
+				err := a.s.AgentDraft(org.ID, sessionOf(req), in)
 				return nil, ok{err == nil}, err
 			})
 	}
 	if k.Has("outcomes:write") {
 		mcp.AddTool(s, &mcp.Tool{Name: "mark", Description: "Record an outcome for a contact in outreach: LinkedIn request sent, accepted, email or follow-up sent, called, replied, declined or on hold. It shows as yours, with your note."},
-			func(_ context.Context, _ *mcp.CallToolRequest, in MarkIn) (*mcp.CallToolResult, ok, error) {
-				err := a.s.AgentMark(org.ID, actor, in)
+			func(_ context.Context, req *mcp.CallToolRequest, in MarkIn) (*mcp.CallToolResult, ok, error) {
+				err := a.s.AgentMark(org.ID, sessionOf(req), in)
 				return nil, ok{err == nil}, err
 			})
 	}

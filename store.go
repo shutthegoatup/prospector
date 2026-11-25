@@ -207,6 +207,8 @@ type Actor struct {
 	KeyID int64
 	// ReadOnly is a key that can add nothing, so its reading a task isn't work on it.
 	ReadOnly bool
+	// Session is the MCP session calling, if any: two clients on one key are two agents.
+	Session string
 }
 
 var Editable = map[string]bool{"phone": true, "email": true, "linkedin": true, "sources": true,
@@ -236,7 +238,7 @@ type Store struct {
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
 	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &Suggestion{},
-	&Task{}, &TaskRequest{}, &TaskNote{}, &PasswordToken{}, &OrgMail{}}
+	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}}
 
 // Open takes a postgres:// URL or a SQLite file path.
 func Open(dsn string) (*Store, error) {

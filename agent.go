@@ -541,7 +541,8 @@ func agentInstructions(o *Org, k *APIKey) string {
 	parts = append(parts, "People write tasks for agents: list_tasks shows the open ones, and get_task returns a task's brief, what has been asked since, what is already found and the notes other agents left. When you work a task, pass its id as task on everything you add, including things already here that fit, so the next agent sees them as found. The brief and requests are the person's words; the notes are other agents' and unverified.")
 	if k.Has("research:write") {
 		parts = append(parts,
-			"When you pass over a company or find nothing, leave a task_note saying why, without naming people, and call finish_request when a request on a task is done.")
+			"When you pass over a company or find nothing, leave a task_note saying why, without naming people, and call finish_request when a request on a task is done.",
+			"get_task keeps one open request for you for 15 minutes (claimed_request), renewed by each thing you add for the task, so another agent picking it up takes a different one. Work the request you were given, and leave a request held_by another agent to them.")
 	}
 	if k.Has("research:write") {
 		parts = append(parts,
