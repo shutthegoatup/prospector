@@ -422,6 +422,108 @@ func TestTheOneAgentFromBeforeCarriesOnAsOneOfSeveral(t *testing.T) {
 	}
 }
 
+func TestGoingBackAReleaseAndForwardAgainStillStarts(t *testing.T) {
+	fake := newFakeEndpoint(t)
+	r := newRunSetup(t, fake)
+	s := r.s
+	other := must(r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{Name: "Claude", BaseURL: fake.srv.URL + "/v1", APIKey: agentTestKey, Model: "router/auto"}, "Ada Lovelace"))
+	now := time.Now()
+	for _, agent := range []int64{r.agent, other.ID} {
+		if err := s.db.Create(&AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: agent, Status: RunWaiting, Owner: "elsewhere",
+			LeaseUntil: now.Add(time.Hour).UnixMilli(), StartedAt: now}).Error; err != nil {
+			t.Fatalf("two agents going on one task: %v", err)
+		}
+	}
+	// What the release before several agents runs at start-up, word for word.
+	if err := s.db.Exec("create unique index if not exists idx_agent_runs_one_going on agent_runs (task_id) where status in ('running', 'waiting')").Error; err != nil {
+		t.Fatalf("going back a release would fail to start: %v", err)
+	}
+	if err := s.db.Create(&AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: other.ID, Status: RunWorking, StartedAt: now}).Error; err == nil {
+		t.Fatal("the database let one agent go twice on one task")
+	}
+
+	// A database the earlier release made has its rule; this release replaces it.
+	s.db.Exec("delete from agent_runs")
+	for _, stmt := range []string{"drop index idx_agent_runs_one_going",
+		"create unique index idx_agent_runs_one_going on agent_runs (task_id) where status in ('running', 'waiting')"} {
+		if err := s.db.Exec(stmt).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := oneGoingRunPerAgent(s.db); err != nil {
+		t.Fatal(err)
+	}
+	if err := oneGoingRunPerAgent(s.db); err != nil {
+		t.Fatalf("a second start: %v", err)
+	}
+	for _, agent := range []int64{r.agent, other.ID} {
+		if err := s.db.Create(&AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: agent, Status: RunWorking, StartedAt: now}).Error; err != nil {
+			t.Fatalf("after the rule is replaced, two agents should share a task: %v", err)
+		}
+	}
+
+	// Entered again on the earlier release, then forward again: the newer settings win.
+	if err := s.db.Exec(`create table agent_configs (org_id integer primary key, base_url text not null default '', api_key text not null default '',
+		model text not null default '', tools_url text not null default '', models text not null default '[]', tools text not null default '[]',
+		allowed text not null default '[]', problem text not null default '', checked_at timestamp, updated_by text not null default '', updated_at timestamp)`).Error; err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.db.Exec("drop table if exists agent_configs") })
+	if err := s.db.Exec("insert into agent_configs (org_id, base_url, api_key, model, updated_at) values (?, ?, ?, ?, ?)",
+		r.o.ID, fake.srv.URL+"/v1", must(s.keys.seal(agentTestKey)), "qwen/qwen-small", time.Now()).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := migrateAgentConfigs(s.db); err != nil {
+		t.Fatalf("going forward again would fail to start: %v", err)
+	}
+	if got := must(s.agentNamed(r.o.ID, "Prospector")); got.Model != "qwen/qwen-small" || len(must(s.Agents(r.o.ID))) != 2 {
+		t.Fatalf("the settings entered on the earlier release should be the agent's: %+v", got)
+	}
+}
+
+func TestAnAgentDeletedWhileSavingStaysDeleted(t *testing.T) {
+	fake := newFakeEndpoint(t)
+	r := newRunSetup(t, fake)
+	c := must(r.s.AgentByID(r.o.ID, r.agent))
+	key := must(r.s.agentKey(c))
+	if err := r.a.deleteAgent(r.o.ID, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	c.Model = "something else"
+	if err := r.s.writeAgent(c); err == nil || !strings.Contains(err.Error(), "deleted meanwhile") {
+		t.Fatalf("saving a deleted agent: %v", err)
+	}
+	if _, err := r.s.AgentByID(r.o.ID, c.ID); err == nil {
+		t.Fatal("saving brought a deleted agent back")
+	}
+	// A key made by a first run while its settings were being checked isn't written over.
+	fresh := must(r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{Name: "Gateway", BaseURL: fake.srv.URL + "/v1", APIKey: agentTestKey, Model: "router/auto"}, "Ada Lovelace"))
+	stale := *fresh
+	made := must(r.s.agentKey(fresh))
+	stale.Model = "qwen/qwen-small"
+	if err := r.s.writeAgent(&stale); err != nil {
+		t.Fatal(err)
+	}
+	if got := must(r.s.AgentByID(r.o.ID, fresh.ID)); got.KeyID != made.ID || got.Model != "qwen/qwen-small" || key.ID == made.ID {
+		t.Fatalf("an owner's save wrote over the key its run made: %+v", got)
+	}
+}
+
+func TestEveryGoingRunIsOnTheTaskPage(t *testing.T) {
+	fake := newFakeEndpoint(t)
+	r := newRunSetup(t, fake)
+	now := time.Now()
+	old := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, Status: RunWaiting, StartedAt: now.Add(-48 * time.Hour)}
+	r.s.db.Create(&old)
+	for i := range 12 {
+		r.s.db.Create(&AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, Status: RunFinished, StartedAt: now.Add(time.Duration(i) * time.Minute)})
+	}
+	runs := must(r.s.AgentRuns(r.o.ID, r.task.ID, 10))
+	if len(runs) != 11 || runs[0].ID != old.ID {
+		t.Fatalf("a run going since before ten newer ones should still be listed, so it can be stopped: %d runs, first %d", len(runs), runs[0].ID)
+	}
+}
+
 func TestRefusalsReadBothErrorShapes(t *testing.T) {
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	for _, body := range []string{`{"error":{"code":"429","message":"slow down"}}`, `{"error":{"code":429,"message":"slow down"}}`} {

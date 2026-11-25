@@ -125,11 +125,31 @@ func migrateAgentConfigs(db *gorm.DB) error {
 				return err
 			}
 			if c.BaseURL != "" {
-				a := Agent{OrgID: c.OrgID, Name: "Prospector", Kind: "openai", KeyID: key.ID, BaseURL: c.BaseURL, APIKey: c.APIKey, Model: c.Model,
-					ToolsURL: c.ToolsURL, Models: c.Models, Tools: c.Tools, Allowed: c.Allowed, Problem: c.Problem, CheckedAt: c.CheckedAt,
-					UpdatedBy: c.UpdatedBy, UpdatedAt: c.UpdatedAt}
-				if err := tx.Create(&a).Error; err != nil {
+				settings := map[string]any{"base_url": c.BaseURL, "api_key": c.APIKey, "model": c.Model, "tools_url": c.ToolsURL,
+					"models": c.Models, "tools": c.Tools, "allowed": c.Allowed, "problem": c.Problem, "checked_at": c.CheckedAt,
+					"updated_by": c.UpdatedBy, "updated_at": c.UpdatedAt}
+				// Moved before, then entered again on an earlier release: the newer
+				// settings are the ones in this row.
+				var a Agent
+				if err := tx.Where("org_id = ? and name = ?", c.OrgID, "Prospector").Limit(1).Find(&a).Error; err != nil {
 					return err
+				}
+				if a.ID != 0 {
+					if err := tx.Model(&Agent{}).Where("id = ?", a.ID).Updates(settings).Error; err != nil {
+						return err
+					}
+				} else {
+					a = Agent{OrgID: c.OrgID, Name: "Prospector", Kind: "openai", KeyID: key.ID, BaseURL: c.BaseURL, APIKey: c.APIKey, Model: c.Model,
+						ToolsURL: c.ToolsURL, Models: c.Models, Tools: c.Tools, Allowed: c.Allowed, Problem: c.Problem, CheckedAt: c.CheckedAt,
+						UpdatedBy: c.UpdatedBy, UpdatedAt: c.UpdatedAt}
+					if err := tx.Create(&a).Error; err != nil {
+						return err
+					}
+				}
+				if key.ID != 0 && key.ID == a.KeyID {
+					if err := tx.Model(&APIKey{}).Where("id = ?", key.ID).Update("name", builtinKeyName(a.Name)).Error; err != nil {
+						return err
+					}
 				}
 				if err := tx.Model(&AgentRun{}).Where("org_id = ? and agent_id = 0", c.OrgID).
 					Updates(map[string]any{"agent_id": a.ID, "agent_name": a.Name}).Error; err != nil {
@@ -451,7 +471,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	c.Allowed = encodeList(allowed)
 	now := time.Now()
 	c.Problem, c.CheckedAt = strings.Join(problems, " "), &now
-	if err := a.s.db.Save(c).Error; err != nil {
+	if err := a.s.writeAgent(c); err != nil {
 		return nil, err
 	}
 	if renamed && c.KeyID != 0 {
@@ -464,6 +484,23 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 		a.mu.Unlock()
 	}
 	return c, nil
+}
+
+// writeAgent stores an agent's settings: a new one is made; an existing one has only
+// what an owner edits written, and only while it is still there. Checking an endpoint
+// takes seconds, and an agent deleted meanwhile mustn't come back, nor a key its first
+// run made meanwhile be lost.
+func (s *Store) writeAgent(c *Agent) error {
+	if c.ID == 0 {
+		return s.db.Create(c).Error
+	}
+	res := s.db.Model(&Agent{}).Where("id = ? and org_id = ?", c.ID, c.OrgID).
+		Select("name", "base_url", "api_key", "model", "tools_url", "models", "tools", "allowed", "problem", "checked_at", "updated_by", "updated_at").
+		Updates(c)
+	if res.Error == nil && res.RowsAffected == 0 {
+		return fmt.Errorf("%s was deleted meanwhile", c.Name)
+	}
+	return res.Error
 }
 
 // deleteAgent stops what the agent is doing, revokes its key so nothing more is done

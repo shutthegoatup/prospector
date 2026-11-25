@@ -268,16 +268,38 @@ func Open(dsn string) (*Store, error) {
 	if err := migrateAgentConfigs(db); err != nil {
 		return nil, err
 	}
-	// An agent works a task once at a time, held by the database however two starts
-	// interleave; several agents can share a task. Before there could be several, the
-	// rule was one run per task.
-	for _, stmt := range []string{"drop index if exists idx_agent_runs_one_going",
-		"create unique index if not exists idx_agent_runs_one_going_per_agent on agent_runs (task_id, agent_id) where status in ('running', 'waiting')"} {
-		if err := db.Exec(stmt).Error; err != nil {
-			return nil, err
-		}
+	if err := oneGoingRunPerAgent(db); err != nil {
+		return nil, err
 	}
 	return s, nil
+}
+
+// oneGoingRunPerAgent has the database hold that an agent works a task once at a time,
+// however two starts interleave; several agents can share a task. It keeps the name of
+// the earlier rule, one run per task, because an earlier release creates that name only
+// if nothing has it: so going back to one still starts, whatever runs are going.
+func oneGoingRunPerAgent(db *gorm.DB) error {
+	const name = "idx_agent_runs_one_going"
+	var def string
+	lookup := "select coalesce(sql, '') from sqlite_master where type = 'index' and name = ?"
+	if db.Dialector.Name() == "postgres" {
+		lookup = "select indexdef from pg_indexes where indexname = ?"
+	}
+	if err := db.Raw(lookup, name).Scan(&def).Error; err != nil {
+		return err
+	}
+	if strings.Contains(def, "agent_id") {
+		return nil
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		for _, stmt := range []string{"drop index if exists " + name,
+			"create unique index " + name + " on agent_runs (task_id, agent_id) where status in ('running', 'waiting')"} {
+			if err := tx.Exec(stmt).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (s *Store) postgres() bool { return s.db.Dialector.Name() == "postgres" }

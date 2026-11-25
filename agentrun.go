@@ -145,10 +145,18 @@ func (s *Store) agentKey(c *Agent) (*APIKey, error) {
 	return &k, s.db.Model(&Agent{}).Where("id = ?", c.ID).Update("key_id", k.ID).Error
 }
 
-// AgentRuns are a task's runs, newest first.
+// AgentRuns are a task's runs, newest first: every one going, however old, so each
+// can be stopped, and the latest that ended, up to limit.
 func (s *Store) AgentRuns(org, task int64, limit int) ([]AgentRun, error) {
-	var out []AgentRun
-	return out, s.db.Where("org_id = ? and task_id = ?", org, task).Order("id desc").Limit(limit).Find(&out).Error
+	going := []string{RunWorking, RunWaiting}
+	var out, ended []AgentRun
+	if err := s.db.Where("org_id = ? and task_id = ? and status in ?", org, task, going).Order("id desc").Find(&out).Error; err != nil {
+		return nil, err
+	}
+	if err := s.db.Where("org_id = ? and task_id = ? and status not in ?", org, task, going).Order("id desc").Limit(limit).Find(&ended).Error; err != nil {
+		return nil, err
+	}
+	return append(out, ended...), nil
 }
 
 // StartRun sets the organisation's agent going on a task.

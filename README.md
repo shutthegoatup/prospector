@@ -217,7 +217,7 @@ Any member can then press "Run" with an agent's name on a task. Several agents c
 
 A run stores counts (turns, tool calls, tokens, what it added) and why it ended, never what was said. A server runs at most 8 at once, or `PROSPECTOR_AGENT_MAX_RUNS`.
 
-Before there could be several agents, an organisation had one. On the first start of this release it becomes an agent called "Prospector", keeping its key, its record and any run it had going. Going back to an earlier release afterwards means entering its settings again. There are no spending caps yet: use an endpoint whose costs you control, or set a limit on its key.
+Before there could be several agents, an organisation had one. On the first start of this release it becomes an agent called "Prospector", keeping its key, its record and any run it had going. Going back to an earlier release afterwards still starts, but that release sees no agent until its settings are entered again; coming forward once more keeps the settings entered there. There are no spending caps yet: use an endpoint whose costs you control, or set a limit on its key.
 
 What leaves the server: the task's brief and requests, and what Prospector's tools return, which includes companies' facts and people's names, titles, email addresses, profile links and the next step planned with them, go to the endpoint and on to whoever serves the model.
 
