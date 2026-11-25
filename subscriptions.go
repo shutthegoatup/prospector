@@ -573,7 +573,11 @@ func (a *App) uiSubscriptionRemove(w http.ResponseWriter, r *http.Request) {
 func (s *Store) StartRenewal(org, subscription, contact int64, actor string) (*Deal, error) {
 	var d Deal
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		// Held, so two started together are numbered one after the other.
+		// The subscription is held so two people can't each start its renewal with a
+		// different person at once, and the contact so their deals are numbered in turn.
+		if err := hold(tx, &Subscription{}, org, subscription); err != nil {
+			return err
+		}
 		if err := hold(tx, &Contact{}, org, contact); err != nil {
 			return err
 		}
@@ -608,12 +612,20 @@ func (s *Store) StartRenewal(org, subscription, contact int64, actor string) (*D
 			Select("coalesce(max(seq), 0)").Scan(&last).Error; err != nil {
 			return err
 		}
+		currency := sub.Currency
+		if currency == "" {
+			var o Org
+			if err := tx.First(&o, org).Error; err != nil {
+				return err
+			}
+			currency = o.Settings.withDefaults().Currency
+		}
 		closes := st.TermEnd
 		if st.Ends != "" {
 			closes = st.Ends
 		}
 		d = Deal{OrgID: org, ContactID: contact, Seq: last + 1, Kind: "renewal", Stage: Stages[0].Key, SubscriptionID: sub.ID,
-			Amount: sub.Yearly(), Currency: sub.Currency, CloseDate: nonEmpty(closes)}
+			Amount: sub.Yearly(), Currency: currency, CloseDate: nonEmpty(closes)}
 		if err := tx.Create(&d).Error; err != nil {
 			return err
 		}
