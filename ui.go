@@ -237,19 +237,16 @@ func panelPage(r *http.Request, name string) int {
 	return n
 }
 
-// panelLink is the address for one list's page n, keeping where the others are.
-func panelLink(path, name string, n int, others ...Page) func(string) string {
-	return func(other string) string {
-		at := ""
-		if len(others) > 0 && others[0].N > 1 {
-			at = strconv.Itoa(others[0].N)
-		}
-		this := ""
+// panelLink is the address for page n of the list called name, keeping the page's
+// other list, if it has one, where it is.
+func panelLink(path, name string, n int, otherName string, other Page) string {
+	past := func(n int) string {
 		if n > 1 {
-			this = strconv.Itoa(n)
+			return strconv.Itoa(n)
 		}
-		return pageLink(path, 0, name, this, other, at)
+		return ""
 	}
+	return pageLink(path, 0, name, past(n), otherName, past(other.N))
 }
 
 func pageLink(path string, page int, filters ...string) string {

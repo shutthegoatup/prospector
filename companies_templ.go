@@ -918,7 +918,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			templ_7745c5c3_Err = Pager(p.NotesPage, func(n int) string {
-				return panelLink(string(companyHref(q, p.Company.ID)), "notes", n, p.HistoryPage)("history")
+				return panelLink(string(companyHref(q, p.Company.ID)), "notes", n, "history", p.HistoryPage)
 			}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -1028,7 +1028,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 			}
 		}
 		templ_7745c5c3_Err = Pager(p.HistoryPage, func(n int) string {
-			return panelLink(string(companyHref(q, p.Company.ID)), "history", n, p.NotesPage)("notes")
+			return panelLink(string(companyHref(q, p.Company.ID)), "history", n, "notes", p.NotesPage)
 		}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

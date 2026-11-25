@@ -230,11 +230,6 @@ func (s *Store) DeleteNote(org, id int64) error {
 	return res.Error
 }
 
-func (s *Store) CompanyNotes(org, company int64, limit int) ([]TaskNote, error) {
-	var notes []TaskNote
-	return notes, s.in(org).Where("company_id = ?", company).Order("id desc").Limit(limit).Find(&notes).Error
-}
-
 const companyNotesPageSize = 20
 
 // CompanyNotesPage is one page of the notes agents left about a company, newest first.

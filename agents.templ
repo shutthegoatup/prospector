@@ -136,7 +136,7 @@ templ AgentsView(q *Req, d AgentsData) {
 						<span>{ historyText(HistoryItem{Action: e.Action, Value: e.Value}) }</span>
 					</div>
 				}
-				@Pager(d.ActivityPage, func(n int) string { return panelLink(q.Base()+"agents", "activity", n)("") })
+				@Pager(d.ActivityPage, func(n int) string { return panelLink(q.Base()+"agents", "activity", n, "", Page{}) })
 			}
 		</div>
 	</div>

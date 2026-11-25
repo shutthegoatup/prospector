@@ -241,7 +241,7 @@ templ CompanyView(q *Req, p CompanyPage) {
 			<div>
 				@Label("Agents' notes, unchecked")
 				@Notes(q, p.Notes)
-				@Pager(p.NotesPage, func(n int) string { return panelLink(string(companyHref(q, p.Company.ID)), "notes", n, p.HistoryPage)("history") })
+				@Pager(p.NotesPage, func(n int) string { return panelLink(string(companyHref(q, p.Company.ID)), "notes", n, "history", p.HistoryPage) })
 			</div>
 		}
 		<div>
@@ -255,7 +255,7 @@ templ CompanyView(q *Req, p CompanyPage) {
 					<span><span class={ "font-mono text-xs", actorColor(h.Actor) }>{ actorLabel(h.Actor) }</span> { historyText(h) }</span>
 				</div>
 			}
-			@Pager(p.HistoryPage, func(n int) string { return panelLink(string(companyHref(q, p.Company.ID)), "history", n, p.NotesPage)("notes") })
+			@Pager(p.HistoryPage, func(n int) string { return panelLink(string(companyHref(q, p.Company.ID)), "history", n, "notes", p.NotesPage) })
 		</div>
 	</div>
 }
