@@ -510,8 +510,11 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	if err == nil || errors.Is(err, errWrongLogin) {
 		a.logins.record(who, err == nil)
 	}
-	if err != nil {
-		refuse(telling("sign-in", err, http.StatusUnauthorized))
+	if errors.Is(err, errWrongLogin) {
+		refuse(http.StatusUnauthorized, err.Error())
+		return
+	} else if err != nil {
+		refuse(telling("sign-in", err, http.StatusInternalServerError))
 		return
 	}
 	if !known {
