@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
 	"gorm.io/gorm"
@@ -38,7 +39,16 @@ func (s apiServer) ChangeContact(ctx context.Context, in api.ChangeContactReques
 	if len(fields) == 0 {
 		return nil, errors.New("send at least one field to change")
 	}
-	slices.Sort(fields)
+	// A time zone sent with a phone is the one wanted, not the phone's guess: it goes last.
+	slices.SortFunc(fields, func(a, b string) int {
+		if (a == "tz") != (b == "tz") {
+			if a == "tz" {
+				return 1
+			}
+			return -1
+		}
+		return strings.Compare(a, b)
+	})
 	err = s.a.s.db.Transaction(func(tx *gorm.DB) error {
 		for _, f := range fields {
 			if err := s.a.s.set(tx, q.Org.ID, in.Id, f, *changes[f], q.Actor()); err != nil {

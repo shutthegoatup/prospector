@@ -52,6 +52,13 @@ func TestARobotAddsPeopleAndReviewsResearchAsItsScopesAllow(t *testing.T) {
 	if c := row[Contact](t, s, o.ID, added.Id); deref(c.CallNotes) != "Rang, left a message." {
 		t.Fatalf("a refused change still changed the other field: %q", deref(c.CallNotes))
 	}
+	// A time zone sent alongside a new phone is kept, not replaced by the phone's guess.
+	if code, body := asKey(t, "PATCH", contact, contacts, map[string]any{"phone": "+1 212 555 0100", "tz": "Europe/Lisbon"}); code != http.StatusNoContent {
+		t.Fatalf("a phone and a time zone together: %d %s", code, body)
+	}
+	if c := row[Contact](t, s, o.ID, added.Id); deref(c.Tz) != "Europe/Lisbon" {
+		t.Fatalf("the time zone sent should win over the phone's guess: %q", deref(c.Tz))
+	}
 	if code, _ := asKey(t, "PATCH", contact, contacts, map[string]any{}); code != http.StatusBadRequest {
 		t.Fatalf("a change of nothing: %d", code)
 	}
