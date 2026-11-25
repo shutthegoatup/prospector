@@ -290,6 +290,8 @@ func TestARestoreDropsSuggestionsForPeopleItDrops(t *testing.T) {
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	in := AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
 	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	// A restore refuses a file with nobody in it, so someone else is there throughout.
+	must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Jonas Lindqvist", SourceURL: "https://larkmoor.example/team"}))
 	before := must(s.SnapshotText(o.ID))
 	must(s.AgentAddContact(o, scout, in))
 	in.Phone = "+44 20 7946 0000"
