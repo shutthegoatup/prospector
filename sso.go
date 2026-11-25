@@ -644,7 +644,7 @@ func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
 		if _, derr := a.probe(r.Context(), idpSpec{Issuer: c.Issuer, ClientID: c.ClientID}); errors.Is(derr, errManyTenants) {
 			err = derr
 		} else if derr != nil {
-			err = fmt.Errorf("that issuer couldn't be read, so nothing was saved: %w", derr)
+			err = elsewhere{fmt.Errorf("that issuer couldn't be read, so nothing was saved: %w", derr)}
 		}
 	}
 	if err != nil {

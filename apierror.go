@@ -89,8 +89,7 @@ func fromDatabase(err error) bool {
 	var lite *sqlite.Error
 	// A failure to connect names the database's user and host.
 	var dial *pgconn.ConnectError
-	var lost lostConnection
-	if errors.As(err, &pg) || errors.As(err, &lite) || errors.As(err, &dial) || errors.As(err, &lost) {
+	if errors.As(err, &pg) || errors.As(err, &lite) || errors.As(err, &dial) {
 		return true
 	}
 	// database/sql keeps some of its errors to itself, such as a pool that has closed.
@@ -99,49 +98,35 @@ func fromDatabase(err error) bool {
 		errors.Is(err, gorm.ErrInvalidTransaction) || errors.Is(err, gorm.ErrInvalidDB)
 }
 
-// lostConnection marks an error a database statement came back with that is about the
-// connection rather than the data: Postgres passes a connection lost part-way on as
-// the network's own error, addresses and all, which looks like any other server's.
-type lostConnection struct{ err error }
-
-func (e lostConnection) Error() string { return e.err.Error() }
-func (e lostConnection) Unwrap() error { return e.err }
-
-// markLostConnections tags such errors as each statement finishes, where nothing but
-// the database can have caused them.
-func markLostConnections(db *gorm.DB) error {
-	mark := func(tx *gorm.DB) {
-		var network net.Error
-		var already lostConnection
-		var fromPgconn interface{ SafeToRetry() bool }
-		err := tx.Error
-		if err == nil || errors.As(err, &already) {
-			return
-		}
-		if errors.As(err, &network) || errors.As(err, &fromPgconn) || pgconn.Timeout(err) ||
-			errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-			tx.Error = lostConnection{err}
-		}
-	}
-	cb := db.Callback()
-	for name, p := range map[string]interface {
-		Register(string, func(*gorm.DB)) error
-	}{"create": cb.Create().After("*"), "query": cb.Query().After("*"), "update": cb.Update().After("*"),
-		"delete": cb.Delete().After("*"), "row": cb.Row().After("*"), "raw": cb.Raw().After("*")} {
-		if err := p.Register("prospector:lost-connection-"+name, mark); err != nil {
-			return err
-		}
-	}
-	return nil
+// cutOff is a connection that failed underneath whatever was asked. Postgres passes
+// one lost part-way through a statement or a commit on as the network's own error,
+// with the database's address in it, so any such error is taken for the server's
+// unless a handler has said it is another server's.
+func cutOff(err error) bool {
+	var network net.Error
+	var fromPgconn interface{ SafeToRetry() bool }
+	return errors.As(err, &network) || errors.As(err, &fromPgconn) || pgconn.Timeout(err) ||
+		errors.Is(err, io.ErrUnexpectedEOF)
 }
 
+// elsewhere is a failure of another server's, such as a sign-in provider that couldn't
+// be reached, worded by the handler for whoever asked: theirs to know, and not ours.
+type elsewhere struct{ err error }
+
+func (e elsewhere) Error() string { return e.err.Error() }
+func (e elsewhere) Unwrap() error { return e.err }
+
 // telling is what a caller is told about err when a handler would answer with code. A
-// database's own words never go out, nor what a handler calls a failure of the
-// server's: they carry internals and mean nothing to a reader, so they are logged and
-// the caller gets ours instead. Any other answer is the handler's to word, such as a
-// 502 passing on what another server said.
+// database's own words never go out, nor a connection's, nor what a handler calls a
+// failure of the server's: they carry internals and mean nothing to a reader, so they
+// are logged and the caller gets ours instead. Any other answer is the handler's to
+// word, such as a 502 passing on what another server said.
 func telling(where string, err error, code int) (int, string) {
 	var clash conflict
+	var theirs elsewhere
+	if errors.As(err, &theirs) && !fromDatabase(err) {
+		return code, err.Error()
+	}
 	switch {
 	case breaksRule(err):
 		log.Printf("%s: %v", where, err)
@@ -151,7 +136,7 @@ func telling(where string, err error, code int) (int, string) {
 		return http.StatusBadRequest, sayUnstorable
 	case errors.As(err, &clash):
 		return http.StatusConflict, err.Error()
-	case code == http.StatusInternalServerError, code < 500 && fromDatabase(err):
+	case code == http.StatusInternalServerError, code < 500 && (fromDatabase(err) || cutOff(err)):
 		log.Printf("%s: %v", where, err)
 		return http.StatusInternalServerError, sayOurs
 	}
