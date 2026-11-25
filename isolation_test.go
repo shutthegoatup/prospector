@@ -324,7 +324,7 @@ func seedFirst(t *testing.T, s *Store) *Org {
 // test to see: they change something and answer with a yes, a count, a number or only
 // what they were given.
 var saysNothingBack = map[string]bool{
-	"AddMember": true, "RemoveMember": true, "SetRole": true, "SaveVoice": true, "SaveOrg": true, "RevokeKey": true, "SetKeyScopes": true, "DeleteOrgMail": true,
+	"AddMember": true, "RemoveMember": true, "SetRole": true, "SetAreas": true, "SaveVoice": true, "SaveOrg": true, "RevokeKey": true, "SetKeyScopes": true, "DeleteOrgMail": true,
 	"Mark": true, "Update": true, "SetCompanyStage": true, "PickContact": true, "DecideSuggestion": true,
 	"AgentDraft": true, "AgentMark": true, "AgentFinish": true, "AgentAddFact": true, "AgentAddContact": true,
 	"AskTask": true, "SetRequestDone": true, "SetTaskClosed": true, "DeleteNote": true, "DeleteEnquiry": true,

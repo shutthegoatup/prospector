@@ -153,6 +153,7 @@ type ExportMember struct {
 	Name       string `json:"name"`
 	Email      string `json:"email"`
 	Role       string `json:"role"`
+	Areas      string `json:"areas"`
 	CallerName string `json:"caller_name,omitempty"`
 	Signature  string `json:"signature,omitempty"`
 }
@@ -220,7 +221,7 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			return err
 		}
 		out.Organisation = ExportedOrg{Slug: o.Slug, Name: o.Name, Color: o.Color, Settings: o.Settings, CreatedAt: o.CreatedAt}
-		if err := tx.Table("memberships").Select("users.name, users.email, memberships.role, memberships.caller_name, memberships.signature").
+		if err := tx.Table("memberships").Select("users.name, users.email, memberships.role, memberships.areas, memberships.caller_name, memberships.signature").
 			Joins("join users on users.id = memberships.user_id").
 			Where("memberships.org_id = ?", org).Order("users.email").Scan(&out.Members).Error; err != nil {
 			return err
