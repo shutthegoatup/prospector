@@ -77,24 +77,67 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if strings.HasPrefix(c.Key, "org:") {
 			return errors.New("that row stands for a company, not a person")
 		}
+		// Agents' notes are free text that can't be searched for a name, so every note on a
+		// task their row was part of goes, as below does every note about their company.
+		var touched []int64
+		if err := tx.Model(&Event{}).Where("org_id = ? and contact_id = ? and task_id <> 0", org, id).
+			Distinct().Pluck("task_id", &touched).Error; err != nil {
+			return err
+		}
+		if len(touched) > 0 {
+			if err := tx.Where("org_id = ? and task_id in ?", org, touched).Delete(&TaskNote{}).Error; err != nil {
+				return err
+			}
+		}
 		if err := forgetEvents(tx.Where("org_id = ? and contact_id = ?", org, id)); err != nil {
 			return err
 		}
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Delete(&Fact{}).Error; err != nil {
 			return err
 		}
+		// An address or profile suggested for them identifies them too, unless someone
+		// dismissed it as not theirs.
+		var suggested []Suggestion
+		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Find(&suggested).Error; err != nil {
+			return err
+		}
+		addresses := deref(c.Email)
+		hashes := identifiers(org, displayName(c), deref(c.Maker), deref(c.Email), deref(c.Linkedin))
+		for _, sg := range suggested {
+			if sg.Decision == SuggestionDismissed {
+				continue
+			}
+			switch sg.Field {
+			case "email":
+				addresses += " " + sg.Value
+				hashes = append(hashes, identifiers(org, "", "", sg.Value, "")...)
+			case "linkedin":
+				hashes = append(hashes, identifiers(org, "", "", "", sg.Value)...)
+			}
+		}
+		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Delete(&Suggestion{}).Error; err != nil {
+			return err
+		}
 		// What they wrote to us goes too, whether or not it was matched to them.
 		gone := tx.Where("org_id = ? and contact_id = ?", org, id)
-		if emails := emailRe.FindAllString(strings.ToLower(deref(c.Email)), -1); len(emails) > 0 {
+		if emails := emailRe.FindAllString(strings.ToLower(addresses), -1); len(emails) > 0 {
 			gone = tx.Where("org_id = ? and (contact_id = ? or email in ?)", org, id, emails)
 		}
 		if err := gone.Delete(&Enquiry{}).Error; err != nil {
 			return err
 		}
+		// Agents' notes are free text that can't be searched for a name, so every note
+		// about their company goes, and every note on a task that touched it.
+		if c.CompanyID != nil {
+			tasks := tx.Model(&Event{}).Select("task_id").Where("org_id = ? and company_id = ? and task_id > 0", org, *c.CompanyID)
+			if err := tx.Where("org_id = ? and (company_id = ? or task_id in (?))", org, *c.CompanyID, tasks).Delete(&TaskNote{}).Error; err != nil {
+				return err
+			}
+		}
 		if err := tx.Delete(&c).Error; err != nil {
 			return err
 		}
-		for _, h := range identifiers(org, displayName(c), deref(c.Maker), deref(c.Email), deref(c.Linkedin)) {
+		for _, h := range hashes {
 			row := Erasure{OrgID: org, Hash: h, At: time.Now()}
 			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
 				return err

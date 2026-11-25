@@ -77,6 +77,11 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	}
 
 	// A snapshot from another host can number the same people differently.
+	do(s.db.Create(&Suggestion{OrgID: o.ID, ContactID: hannah.ID, Field: "phone", Value: "+44 20 7946 0111", By: "agent:scout"}).Error)
+	waitsFor := func() (id int64) {
+		s.db.Model(&Suggestion{}).Where("org_id = ?", o.ID).Limit(1).Pluck("contact_id", &id)
+		return id
+	}
 	var rows []Contact
 	do(s.in(o.ID).Find(&rows).Error)
 	for i := range rows {
@@ -99,6 +104,9 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	if h := history(hannah.ID); h["set:tz"] != "Europe/Berlin" || h["set:phone"] != "" {
 		t.Fatalf("Jonas's history didn't follow him to his new id: %v", h)
 	}
+	if waitsFor() != jonas.ID {
+		t.Fatalf("what was suggested for Hannah didn't follow her to her new id: it waits for %d", waitsFor())
+	}
 
 	do(s.in(o.ID).Find(&rows).Error)
 	for i := range rows {
@@ -111,5 +119,8 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	}
 	if h := history(jonas.ID); len(h) != 0 {
 		t.Fatalf("a stranger who arrived under Hannah's id inherited her history: %v", h)
+	}
+	if waitsFor() != 0 {
+		t.Fatal("a stranger who arrived under Hannah's id inherited what was suggested for her")
 	}
 }

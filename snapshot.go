@@ -261,7 +261,7 @@ func (s *Store) replaceContacts(org int64, rows []Contact) (int, error) {
 	return len(rows), err
 }
 
-var pointAtContacts = []any{&Event{}, &Fact{}, &Enquiry{}}
+var pointAtContacts = []any{&Event{}, &Fact{}, &Enquiry{}, &Suggestion{}}
 
 // follow keeps history, facts and enquiries with their person across a restore. They
 // point at a contact by id, and a restore can drop a contact or give its id to someone
@@ -311,6 +311,10 @@ func forgetStrays(tx *gorm.DB, org int64) error {
 		return err
 	}
 	if err := tx.Where("org_id = ? and contact_id is not null and contact_id not in (?)", org, here).Delete(&Fact{}).Error; err != nil {
+		return err
+	}
+	// What was suggested for them has nobody left to wait for.
+	if err := tx.Where("org_id = ? and contact_id not in (?)", org, here).Delete(&Suggestion{}).Error; err != nil {
 		return err
 	}
 	return tx.Model(&Enquiry{}).Where("org_id = ? and contact_id is not null and contact_id not in (?)", org, here).

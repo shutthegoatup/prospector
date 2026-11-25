@@ -191,16 +191,22 @@ type Event struct {
 	CompanyID *int64 `gorm:"index"`
 	User      string
 	// KeyID is the API key behind an agent's action, since key names can repeat; 0 for people.
-	KeyID  int64 `gorm:"not null;default:0"`
+	KeyID int64 `gorm:"not null;default:0"`
+	// TaskID is the task an action was done for, 0 when for none.
+	TaskID int64 `gorm:"index;not null;default:0"`
 	Action string
 	Value  *string
 	At     time.Time `gorm:"index"`
 }
 
-// Actor is who an agent operation is recorded against: "agent:<key name>" and its key.
+// Actor is who an operation is recorded against: a name ("agent:<key name>" for an
+// agent), the key behind it, and the task it is working on, if any.
 type Actor struct {
+	Task  int64
 	Name  string
 	KeyID int64
+	// ReadOnly is a key that can add nothing, so its reading a task isn't work on it.
+	ReadOnly bool
 }
 
 var Editable = map[string]bool{"phone": true, "email": true, "linkedin": true, "sources": true,
@@ -222,7 +228,8 @@ type Store struct {
 }
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
-	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}}
+	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &Suggestion{},
+	&Task{}, &TaskRequest{}, &TaskNote{}, &PasswordToken{}, &OrgMail{}}
 
 // Open takes a postgres:// URL or a SQLite file path.
 func Open(dsn string) (*Store, error) {
@@ -313,7 +320,7 @@ func (s *Store) log(tx *gorm.DB, org, contact int64, company *int64, actor, acti
 }
 
 func (s *Store) logAs(tx *gorm.DB, org, contact int64, company *int64, who Actor, action string, value *string) error {
-	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: who.Name, KeyID: who.KeyID, Action: action, Value: value, At: time.Now()}).Error
+	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: who.Name, KeyID: who.KeyID, TaskID: who.Task, Action: action, Value: value, At: time.Now()}).Error
 }
 
 func (s *Store) Mark(org, id int64, step, date, actor string) error {
@@ -352,6 +359,12 @@ func (s *Store) mark(org, id int64, step, date string, who Actor, note string) e
 }
 
 func (s *Store) Update(org, id int64, field, value, actor string) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		return s.set(tx, org, id, field, value, actor)
+	})
+}
+
+func (s *Store) set(tx *gorm.DB, org, id int64, field, value, actor string) error {
 	if !Editable[field] {
 		return fmt.Errorf("%q can't be edited", field)
 	}
@@ -360,42 +373,40 @@ func (s *Store) Update(org, id int64, field, value, actor string) error {
 	if stringFields[field] {
 		v = value
 	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		var c Contact
-		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
-			return fmt.Errorf("no contact %d", id)
-		}
-		if field == "stage" {
-			if err := c.canEnterStage(value); err != nil {
-				return err
-			}
-		}
-		if field == "email" || field == "linkedin" {
-			var o Org
-			if err := tx.First(&o, org).Error; err != nil {
-				return err
-			}
-			email, link := value, ""
-			if field == "linkedin" {
-				email, link = "", value
-			}
-			if err := s.allowed(&o, email, link); err != nil {
-				return err
-			}
-			if err := erased(tx, org, "", "", email, link); err != nil {
-				return err
-			}
-		}
-		if err := tx.Model(&c).Update(field, v).Error; err != nil {
+	var c Contact
+	if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
+		return fmt.Errorf("no contact %d", id)
+	}
+	if field == "stage" {
+		if err := c.canEnterStage(value); err != nil {
 			return err
 		}
-		if field == "phone" {
-			if err := tx.Model(&c).Update("tz", GuessTZ(value, deref(c.Maker))).Error; err != nil {
-				return err
-			}
+	}
+	if field == "email" || field == "linkedin" {
+		var o Org
+		if err := tx.First(&o, org).Error; err != nil {
+			return err
 		}
-		return s.log(tx, org, id, c.CompanyID, actor, "set:"+field, nonEmpty(value))
-	})
+		email, link := value, ""
+		if field == "linkedin" {
+			email, link = "", value
+		}
+		if err := s.allowed(&o, email, link); err != nil {
+			return err
+		}
+		if err := erased(tx, org, "", "", email, link); err != nil {
+			return err
+		}
+	}
+	if err := tx.Model(&c).Update(field, v).Error; err != nil {
+		return err
+	}
+	if field == "phone" {
+		if err := tx.Model(&c).Update("tz", GuessTZ(value, deref(c.Maker))).Error; err != nil {
+			return err
+		}
+	}
+	return s.log(tx, org, id, c.CompanyID, actor, "set:"+field, nonEmpty(value))
 }
 
 // Find matches the CLI's name argument against person, maker or first name.

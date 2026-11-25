@@ -35,6 +35,14 @@ Companies found by agents, imports and people wait here to be qualified or rejec
 
 ![Research: two companies an agent found, with sourced facts and a suggested contact](docs/images/research.png)
 
+### Tasks: write a brief, hand it to an agent
+
+Write what you want found. An agent picks the task up and what it finds waits in Research, tied to the task. Anyone can ask for more later, and a different agent can carry on: it is shown the brief, every request, what has already been found and what a person rejected, and the notes earlier agents left on what they skipped.
+
+Your own agent starts on a task from the prompt on its page (clients that show MCP prompts as commands have it as `work_task`). Prospector doesn't run agents itself, and can't start one for you.
+
+A task shows as waiting, being worked on, or done. Nothing an agent says while working is stored: its status and results are read from what it added. Agents often stop without saying so, so each request shows what has been added since it was asked, and you can mark one done or reopen it yourself.
+
 ### Conversations: replies to deals
 
 Replies move across a board: replied, meeting, proposal, won, lost. Each needs a next step with a date. Ones without, or due today, come back on Today.
@@ -50,9 +58,9 @@ Each organisation has an MCP endpoint and a REST API, with scoped keys. Agents c
 ### Also
 
 - **Companies:** search, plus each company's people, facts and full history: who did what, people and agents alike.
-- **Take everything with you:** an owner can download all the organisation holds from Settings (or `prospector export-org <file>`): companies, people, facts, enquiries, history, settings and who has access, as one JSON file. It holds no passwords, API keys or sign-on secrets, and nothing that identifies people you erased.
+- **Take everything with you:** an owner can download all the organisation holds from Settings (or `prospector export-org <file>`): companies, people, facts, enquiries, history, settings and who has access, as one JSON file. It holds no passwords (a mail server's included), API keys or sign-on secrets, and nothing that identifies people you erased.
 - **Export a person:** when someone asks what you hold on them, an owner can download it from their company's page (or `prospector export-person <name> <file>`): their details, drafts, notes, the facts recorded against them, what they wrote to you and their history. The history names the teammates and agents who acted, so read it through before you send it on. The export is itself noted in the history.
-- **Erase a person:** an owner can erase someone from their company's page (or `prospector erase <name>`) when they ask to be forgotten. Their details, drafts, notes and facts are deleted, the history keeps only that something happened and when, and an import, a restore or an agent can't add them again. A row that names several people goes whole. Company facts and other people's notes that mention them, your own lead files and database backups aren't touched: take them out there too.
+- **Erase a person:** an owner can erase someone from their company's page (or `prospector erase <name>`) when they ask to be forgotten. Their details, drafts, notes and facts are deleted, the history keeps only that something happened and when, and an import, a restore or an agent can't add them again. A row that names several people goes whole. Agents' notes about their company, and on any task that touched it, are deleted too, since free text can't be searched for a name. Company facts and other people's notes that mention them, the briefs and requests people wrote on tasks, your own lead files and database backups aren't touched: take them out there too.
 - **Add person:** paste a LinkedIn profile link and the name fills in. A bookmarklet opens the same form pre-filled from the profile you're viewing.
 - **Settings, per organisation:** waits between steps, connection-note template, call-script pitch, never-contact list, what you look for at a company and team. Each member sets their own caller name and signature.
 - **What you look for:** each organisation names the things that make a company a fit, one per line in Settings, such as `configurator: a product configurator on their site` or `careers_page: a jobs page`. Agents are told the list and record each as a fact under that name; Research and the company page show which ones a company has.
@@ -73,7 +81,9 @@ prospector serve                                          # http://127.0.0.1:876
 | `DATABASE_URL` | A `postgres://` URL or a SQLite file path (default `prospector.sqlite`) |
 | `PORT` | Listen on `:PORT` instead of `127.0.0.1:8766` |
 | `PROSPECTOR_URL` | The address people reach it at, e.g. `https://prospector.example.com`. With an `https://` address the session cookie is always marked Secure, and links shown in the app use this address. Set it if a proxy in front changes the `Host` header |
-| `PROSPECTOR_SECRET_KEYS` | The server's secret keys, newest first: `2:<64 hex>,1:<64 hex>`. Needed for an organisation's single sign-on (see [Secret keys](#secret-keys)) |
+| `SMTP_ADDR`, `MAIL_FROM` | The mail server the app's own mail leaves through, e.g. `smtp.example.com:587` and `Prospector <prospector@example.com>`. Set both or neither; see [Mail](#mail) |
+| `SMTP_USERNAME`, `SMTP_PASSWORD` | What that server asks for, if anything |
+| `PROSPECTOR_SECRET_KEYS` | The server's secret keys, newest first: `2:<64 hex>,1:<64 hex>`. Needed for an organisation's single sign-on and for a mail server of its own (see [Secret keys](#secret-keys)) |
 | `PROSPECTOR_GOOGLE_CLIENT_ID`, `PROSPECTOR_GOOGLE_CLIENT_SECRET` | Offer "Continue with Google" on the sign-in page. The same pair exists for `MICROSOFT` and `LINKEDIN`. Each needs `PROSPECTOR_URL` (see [Signing in](#signing-in)) |
 | `TZ` | The time zone "today" is counted in |
 | `PROSPECTOR_ORG` | Default organisation for CLI commands (`--org=` overrides it) |
@@ -86,11 +96,27 @@ prospector serve                                          # http://127.0.0.1:876
 - Repeated wrong passwords for one email are slowed, up to a minute between tries. A browser that has signed in to that account before is counted separately, so someone guessing elsewhere can't hold its owner up.
 - An owner adds and removes members in Settings. Removing someone ends their sign-in access to that organisation; their account, and other organisations, are untouched. API keys they created keep working until revoked on the Agents page. If the organisation lets people join through its single sign-on, someone removed here joins again while its provider still lets them in: remove them there too.
 - Someone added from Settings gets a first password that the person adding them sees; they are made to choose their own the first time they sign in.
+- With [mail](#mail) set up, whoever reads a member's mailbox can choose that member's password. Without it there is no reset but `prospector user password`.
 - Members change their own password in Settings, which signs out their other sessions. `prospector user password` signs them out everywhere.
 - Every page needs a sign-in except the sign-in pages and the front page at `/`, which describes Prospector to a signed-out visitor and shows nothing from your data. The single sign-on page does name the organisations that have verified an email domain to anyone who types an address at it. Every browser POST must be JSON, which blocks cross-site form posts, and a request that a browser marks as coming from another site is refused, sign-in and sign-out included.
 - The one exception is the enquiry route, `/o/<slug>/intake`, which exists to be posted to from your own sites. It answers only the sites an owner lists in Settings, reads no session, and can add an enquiry and nothing else. With no sites listed it refuses everything.
 
 There's a Dockerfile for container hosting.
+
+## Mail
+
+The app sends two kinds of mail, both to its own members. It never sends outreach: people do that from their own mailbox.
+
+- **Password resets.** The sign-in page offers "Forgot your password?", which emails a link that lasts an hour and works once.
+- **Invitations.** Someone an owner adds is emailed a link to choose their password, good for 7 days, instead of the owner being shown a first password to pass on.
+
+Both need `SMTP_ADDR`, `MAIL_FROM` and `PROSPECTOR_URL`: a link is only ever built from the address you gave, never from what a request claims. With any of them missing there is no reset and first passwords are shown as before. `prospector mail test you@example.com` sends a message through the server you set.
+
+Any SMTP submission service that takes a username and password (`AUTH PLAIN`) works, a transactional mail provider's included. Mail goes over TLS (STARTTLS, or implicit TLS on port 465) or not at all; only a server on the same machine is spoken to in the clear.
+
+**An organisation can use a server of its own**, set by an owner under Settings → Outgoing mail. Invitations to that organisation then leave through it, from its address. Resets belong to the account, not to an organisation, so they always use the app's. The password is kept sealed under the server's [secret key](#secret-keys), which must be set first, and is never shown again. The server must be on port 587, 465, 2525 or 25. It carries an invitation only for an account that the invitation itself creates: whoever runs a mail server reads what passes through it, so someone who already has an account, and hasn't chosen a password yet, is sent the link by the app's own server or not at all. A second invitation to the same person waits five minutes and ends the first.
+
+A reset link gives a password to an account that had none because it signs in through a provider. An organisation that requires its single sign-on refuses that password as it does any other.
 
 ## Signing in
 
@@ -127,7 +153,7 @@ People start from "Use your organisation's single sign-on" on the sign-in page a
 `PROSPECTOR_SECRET_KEYS` holds the server's master keys, each with a version: `1:<64 hex characters>`. `prospector secret-key` prints a first entry, and `prospector secret-key 2` the one to replace it with. It is the only secret of its own the server is given.
 
 - **A master key is never used directly.** Each job gets its own key derived from it with HKDF-SHA256 (RFC 5869).
-- **What it seals** is each organisation's single sign-on client secret, stored as a compact JWE (RFC 7516, `dir` with `A256GCM`) whose `kid` is the key's version.
+- **What it seals** is each organisation's single sign-on client secret and the password of its own mail server, each stored as a compact JWE (RFC 7516, `dir` with `A256GCM`) whose `kid` is the key's version.
 - **What it keys** is how a session and an API key are found: by an HMAC of the token under the server's key, where without a key it is the token's plain hash. Someone who can write to the database but hasn't the key can't mint a session. An API key is not protected that far: one made before the server had a key is still accepted by its plain hash, because an agent can't sign in again, so a row written with a plain hash is accepted too.
 - **What it signs** is the cookie that carries a sign-in to a provider and back.
 - **Passwords** are bcrypt hashes and take no part: a key mixed into them couldn't be replaced without everyone choosing a new password.
@@ -147,8 +173,8 @@ Each organisation has an MCP endpoint at `/o/<slug>/mcp` (streamable HTTP) and a
 
 | Scope | Allows |
 |---|---|
-| `read` | `search`, `get_company`, `list_due` |
-| `research:write` | `add_company`, `add_fact`, `add_contact`; these wait in Research for a person |
+| `read` | `search`, `get_company`, `list_due`, `list_tasks`, `get_task` |
+| `research:write` | `add_company`, `add_fact`, `add_contact`; these wait in Research for a person. `task_note` and `finish_request` on tasks |
 | `drafts:write` | `draft_message`, shown as written by the agent |
 | `import` | `push` and `pull`: a full sync, for a person's own files rather than an agent |
 | `outcomes:write` | `mark`: record an outcome (sent, accepted, called, replied, declined, hold), shown as the agent's |
@@ -156,7 +182,7 @@ Each organisation has an MCP endpoint at `/o/<slug>/mcp` (streamable HTTP) and a
 
 - **What no key can do:** send anything, change settings, or see another organisation. A key with `outcomes:write` can record what happened (sent, accepted, replied, declined…); each mark shows as the agent's, with its note, on Today and in the company's history. `import` is the one scope that skips review: it puts people from your own files straight into outreach and marks those in `sent-log.md` as added.
 - **Writes are checked:** every fact and contact an agent adds needs a source URL. The never-contact list applies to agents, imports and edits alike: an import that would bring in an address on it is refused whole, though people already stored stay as they are. Someone already stored who falls under the list drops out of the outreach queues on Today and the agents' due list until the entry is removed, and Settings names them; a person who has already replied stays in Conversations. An entry is a domain, an email address or a LinkedIn profile link, matched whole: a company name or a loose word matches nobody.
-- **Doing it twice is safe:** an agent that runs again, or a second agent on the same company, adds nothing that is already there, and the reply says `existed`. A company matches on its name, or on its domain when one company alone has it; a fact on its field, wording and source page; a person on their profile, address or name at that company. The same fact worded differently is still a second fact, and new details for a person already there are not merged in. An agent's draft is refused once a person has edited that text or it has gone out.
+- **Doing it twice is safe:** an agent that runs again, or a second agent on the same company, adds nothing that is already there, and the reply says `existed`. A company matches on its name, or on its domain when one company alone has it; a fact on its field, wording and source page; a person on their profile, address or name at that company. The same fact worded differently is still a second fact, and an email, phone or profile found for a person already there is not filled in: it waits under **Details to check** in Research, and on the company's page, for someone to accept or dismiss. One that was dismissed isn't raised again, and details sent under a different name from the person they matched are left out, since they may be a colleague's. An agent's draft is refused once a person has edited that text or it has gone out.
 - **Agents see what came before:** `get_company` returns the company's last 20 history entries (who, what, when, and for whom) and each person's next step, and it and `search` say which agent last changed a company and whether that was the same key. Only writes show: an agent that has looked but not yet added anything is invisible to the others. Free text from the history, such as the note on a mark, is left out.
 - **Sessions:** an MCP session works only with the key that opened it.
 
