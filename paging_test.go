@@ -150,7 +150,7 @@ func TestEveryListAnAgentReadsComesInPages(t *testing.T) {
 			t.Errorf("%s: %d in all over %d pages, want %d", path, got, fetched, want)
 		}
 	}
-	for path, says := range map[string]string{"tasks?limit=0": "limit", "tasks?limit=lots": "limit", "tasks?cursor=nonsense": "cursor"} {
+	for path, says := range map[string]string{"tasks?limit=-1": "limit", "tasks?limit=lots": "limit", "tasks?cursor=nonsense": "cursor"} {
 		req, _ := http.NewRequest("GET", srv.URL+"/o/alpha/api/v1/"+path, nil)
 		req.Header.Set("Authorization", "Bearer "+key)
 		res, err := http.DefaultClient.Do(req)
