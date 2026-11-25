@@ -33,6 +33,77 @@ type Enquiry struct {
 	ContactID *int64    `gorm:"index" json:"contact_id"`
 	CompanyID *int64    `gorm:"index" json:"company_id"`
 	CreatedAt time.Time `gorm:"index" json:"created_at"`
+	// State is where answering it stands; empty for one that arrived before enquiries
+	// were tracked, which nobody is asked to answer now.
+	State string `gorm:"not null;default:''" json:"state"`
+	// Owner is the teammate answering it.
+	Owner string `gorm:"not null;default:''" json:"owner"`
+	// Note is ours, about answering it: never shown to whoever sent the enquiry.
+	Note string `gorm:"not null;default:''" json:"note"`
+}
+
+const (
+	EnquiryOpen    = "open"
+	EnquiryWaiting = "waiting"
+	EnquiryClosed  = "closed"
+)
+
+var EnquiryStates = []struct{ Key, Label string }{
+	{EnquiryOpen, "To answer"}, {EnquiryWaiting, "Waiting on them"}, {EnquiryClosed, "Closed"},
+}
+
+func enquiryStateLabel(state string) string {
+	for _, s := range EnquiryStates {
+		if s.Key == state {
+			return s.Label
+		}
+	}
+	return ""
+}
+
+// SetEnquiry changes where answering an enquiry stands, who has it, or our note on it.
+func (s *Store) SetEnquiry(org, id int64, field, value, actor string) error {
+	value = strings.TrimSpace(value)
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var e Enquiry
+		if err := tx.Where("org_id = ? and id = ?", org, id).First(&e).Error; err != nil {
+			return missing(err, "no enquiry %d", id)
+		}
+		logged := value
+		switch field {
+		case "state":
+			if enquiryStateLabel(value) == "" {
+				return fmt.Errorf("unknown state %q", value)
+			}
+		case "owner":
+			if value != "" && value != e.Owner {
+				var n int64
+				if err := tx.Table("memberships").Joins("join users on users.id = memberships.user_id").
+					Where("memberships.org_id = ? and users.name = ?", org, value).Count(&n).Error; err != nil {
+					return err
+				}
+				if n == 0 {
+					return fmt.Errorf("%q isn't a member of this organisation", value)
+				}
+			}
+		case "note":
+			value, logged = clip(value, 2000), ""
+		default:
+			return fmt.Errorf("an enquiry has no %q to set", field)
+		}
+		if err := tx.Model(&e).Update(field, value).Error; err != nil {
+			return err
+		}
+		// As when it arrived: history is a company's, so one matched to none has none.
+		if e.CompanyID == nil {
+			return nil
+		}
+		var contact int64
+		if e.ContactID != nil {
+			contact = *e.ContactID
+		}
+		return s.log(tx, org, contact, e.CompanyID, actor, "enquiry:"+field, nonEmpty(logged))
+	})
 }
 
 var EnquiryKinds = []struct{ Key, Label string }{
@@ -93,6 +164,9 @@ func (s *Store) AddEnquiry(org int64, via string, in EnquiryIn) (*Enquiry, error
 	e := Enquiry{OrgID: org, Kind: enquiryKind(in.Kind), Name: clip(in.Name, 200), Email: strings.ToLower(clip(in.Email, 320)),
 		Company: clip(in.Company, 200), Phone: clip(in.Phone, 50), Message: clip(in.Message, 10000),
 		Site: clip(in.Site, 200), Page: clip(in.Page, 500), Via: via, Spam: strings.TrimSpace(in.Trap) != ""}
+	if !e.Spam {
+		e.State = EnquiryOpen
+	}
 	if !emailRe.MatchString(e.Email) || strings.ContainsAny(e.Email, " \t\r\n") {
 		return nil, errEnquiryEmail
 	}
@@ -146,6 +220,8 @@ func (s *Store) DeleteEnquiry(org, id int64) error {
 type EnquiryFilter struct {
 	Kind string
 	Spam bool
+	// State narrows to one state of answering, when set.
+	State string
 }
 
 const enquiryPageSize = 200
@@ -155,18 +231,22 @@ func (s *Store) Enquiries(org int64, f EnquiryFilter) ([]Enquiry, error) {
 	if f.Kind != "" {
 		q = q.Where("kind = ?", f.Kind)
 	}
+	if f.State != "" {
+		q = q.Where("state = ?", f.State)
+	}
 	var rows []Enquiry
 	return rows, q.Order("created_at desc, id desc").Limit(enquiryPageSize).Find(&rows).Error
 }
 
-// EnquiryCounts is how many enquiries there are of each kind, with spam under "spam".
+// EnquiryCounts is how many enquiries there are of each kind, with spam under "spam"
+// and each state of answering under "state:" and its name.
 func (s *Store) EnquiryCounts(org int64) map[string]int {
 	var rows []struct {
-		Kind string
-		Spam bool
-		N    int
+		Kind, State string
+		Spam        bool
+		N           int
 	}
-	logged(s.in(org).Model(&Enquiry{}).Select("kind, spam, count(*) as n").Group("kind, spam").Scan(&rows))
+	logged(s.in(org).Model(&Enquiry{}).Select("kind, state, spam, count(*) as n").Group("kind, state, spam").Scan(&rows))
 	out := map[string]int{}
 	for _, r := range rows {
 		if r.Spam {
@@ -175,6 +255,9 @@ func (s *Store) EnquiryCounts(org int64) map[string]int {
 		}
 		out[r.Kind] += r.N
 		out[""] += r.N
+		if r.State != "" {
+			out["state:"+r.State] += r.N
+		}
 	}
 	return out
 }
@@ -306,6 +389,18 @@ func (a *App) intake(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, ok{true})
 }
 
+func (a *App) uiSetEnquiry(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID    int64  `json:"id"`
+		Field string `json:"field"`
+		Value string `json:"value"`
+	}
+	if decode(w, r, &in) {
+		q := reqOf(r)
+		done(w, a.s.SetEnquiry(q.Org.ID, in.ID, in.Field, in.Value, q.Actor()))
+	}
+}
+
 func (a *App) uiDeleteEnquiry(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		ID int64 `json:"id"`
@@ -320,11 +415,12 @@ type EnquiriesData struct {
 	Rows      []Enquiry
 	Counts    map[string]int
 	Companies map[int64]string
+	Members   []Member
 }
 
 func (a *App) enquiriesPage(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
-	f := EnquiryFilter{Kind: r.URL.Query().Get("kind"), Spam: r.URL.Query().Get("spam") != ""}
+	f := EnquiryFilter{Kind: r.URL.Query().Get("kind"), Spam: r.URL.Query().Get("spam") != "", State: r.URL.Query().Get("state")}
 	rows, err := a.s.Enquiries(q.Org.ID, f)
 	if err != nil {
 		fail(w, err, http.StatusInternalServerError)
@@ -344,5 +440,10 @@ func (a *App) enquiriesPage(w http.ResponseWriter, r *http.Request) {
 			names[c.ID] = c.Name
 		}
 	}
-	a.page(w, r, "enquiries", EnquiriesView(q, EnquiriesData{Filter: f, Rows: rows, Counts: a.s.EnquiryCounts(q.Org.ID), Companies: names}))
+	members, err := a.s.Members(q.Org.ID)
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	a.page(w, r, "enquiries", EnquiriesView(q, EnquiriesData{Filter: f, Rows: rows, Counts: a.s.EnquiryCounts(q.Org.ID), Companies: names, Members: members}))
 }

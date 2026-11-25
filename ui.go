@@ -14,6 +14,8 @@ type Nav struct {
 	*Req
 	Active                                    string
 	Today, Research, Conversations, Companies int
+	// Enquiries is how many are waiting for an answer from us.
+	Enquiries int
 }
 
 func (a *App) dueByStep(q *Req, now time.Time) map[string][]Contact {
@@ -46,6 +48,7 @@ func (a *App) nav(q *Req, active string) Nav {
 		n.Today += len(list)
 	}
 	n.Research = a.s.ResearchCount(q.Org.ID, "review")
+	n.Enquiries = a.s.EnquiryCounts(q.Org.ID)["state:"+EnquiryOpen]
 	convs, _ := a.s.Conversations(q.Org.ID)
 	for k, list := range convs {
 		if k != "won" && k != "lost" {
@@ -80,8 +83,10 @@ type TodayData struct {
 	Deals int
 	// Subs are the subscriptions with a day to cancel by, a renewal or an end coming soon.
 	Subs int
-	Week Stats
-	Now  string
+	// Enquiries are the ones nobody has answered yet.
+	Enquiries int
+	Week      Stats
+	Now       string
 }
 
 func (a *App) today(w http.ResponseWriter, r *http.Request) {
@@ -107,6 +112,7 @@ func (a *App) today(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, http.StatusInternalServerError)
 		return
 	}
+	d.Enquiries = a.s.EnquiryCounts(q.Org.ID)["state:"+EnquiryOpen]
 	for _, sub := range subs {
 		if sub.Soon(now.Format(dayLayout)) {
 			d.Subs++
