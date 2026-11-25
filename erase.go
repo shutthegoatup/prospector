@@ -127,8 +127,12 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		}
 		// What they wrote to us goes too, whether or not it was matched to them.
 		gone := tx.Where("org_id = ? and contact_id = ?", org, id)
-		if emails := emailRe.FindAllString(strings.ToLower(addresses), -1); len(emails) > 0 {
+		emails := emailRe.FindAllString(strings.ToLower(addresses), -1)
+		if len(emails) > 0 {
 			gone = tx.Where("org_id = ? and (contact_id = ? or email in ?)", org, id, emails)
+		}
+		if err := forgetAddresses(tx, org, emails); err != nil {
+			return err
 		}
 		// With what was said in answering them: their words, and ours to them.
 		if err := tx.Where("org_id = ? and enquiry_id in (?)", org, gone.Session(&gorm.Session{}).Model(&Enquiry{}).Select("id")).Delete(&EnquiryMessage{}).Error; err != nil {
