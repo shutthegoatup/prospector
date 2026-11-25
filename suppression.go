@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"net/mail"
@@ -135,27 +136,67 @@ func (s *Store) Suppressions(org int64, page PageIn) ([]Suppression, string, err
 }
 
 // marketable says why marketing mail can't go to an address, or nil when it can: it
-// is one address, not on the suppression list, not on the never-contact list, and not
-// someone erased on request.
-func (s *Store) marketable(tx *gorm.DB, o *Org, address string) error {
+// is one address, not on the suppression list, not on the never-contact list (by the
+// address or the person's LinkedIn profile), and not someone erased on request. An
+// error that is none of errSuppressed, errNeverContact and errErased is a failure to
+// check, not a reason.
+func (s *Store) marketable(tx *gorm.DB, o *Org, address, link string) error {
+	g, err := s.gate(tx, o)
+	if err != nil {
+		return err
+	}
+	return g.why(address, link)
+}
+
+var (
+	errSuppressed   = errors.New("that address is on the list not to be mailed")
+	errNeverContact = errors.New("on the never-contact list")
+)
+
+// mailGate holds what keeps marketing mail from an organisation's addresses, read once,
+// so a whole audience is checked without a query a person.
+type mailGate struct {
+	o          *Org
+	suppressed map[string]bool
+	erased     map[string]bool
+}
+
+func (s *Store) gate(tx *gorm.DB, o *Org) (*mailGate, error) {
+	g := &mailGate{o: o, suppressed: map[string]bool{}, erased: map[string]bool{}}
+	var addresses, hashes []string
+	if err := tx.Model(&Suppression{}).Where("org_id = ?", o.ID).Pluck("address", &addresses).Error; err != nil {
+		return nil, err
+	}
+	if err := tx.Model(&Erasure{}).Where("org_id = ?", o.ID).Pluck("hash", &hashes).Error; err != nil {
+		return nil, err
+	}
+	for _, a := range addresses {
+		g.suppressed[a] = true
+	}
+	for _, h := range hashes {
+		g.erased[h] = true
+	}
+	return g, nil
+}
+
+func (g *mailGate) why(address, link string) error {
 	addr, err := bareAddress(address)
 	if err != nil {
 		return err
 	}
-	var n int64
-	if err := tx.Model(&Suppression{}).Where("org_id = ? and address = ?", o.ID, addr).Count(&n).Error; err != nil {
-		return err
-	}
-	if n > 0 {
+	if g.suppressed[addr] {
 		return errSuppressed
 	}
-	if err := o.Settings.listed(addr, ""); err != nil {
-		return err
+	if err := g.o.Settings.listed(addr, link); err != nil {
+		return fmt.Errorf("%w: %v", errNeverContact, err)
 	}
-	return erased(tx, o.ID, "", "", addr, "")
+	for _, h := range identifiers(g.o.ID, "", "", addr, link) {
+		if g.erased[h] {
+			return errErased
+		}
+	}
+	return nil
 }
-
-var errSuppressed = errors.New("that address is on the list not to be mailed")
 
 // unsubscribeLink makes the secret for one mail's unsubscribe link to an address.
 func (s *Store) unsubscribeLink(tx *gorm.DB, org int64, address string) (string, error) {
