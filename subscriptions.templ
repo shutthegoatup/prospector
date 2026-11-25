@@ -126,10 +126,9 @@ templ SubscriptionLine(q *Req, r SubscriptionRow, day string, named bool) {
 			if r.Renewing {
 				<p class="mt-2 border-t border-border pt-2"><a href={ templ.SafeURL(q.Base() + "conversations") } class="font-mono text-xs text-mark underline">Renewal under way in Conversations</a></p>
 			} else if r.Status != SubEnded && len(r.People) > 0 {
-				<form data-form="ui/subscription/renew" data-refresh="true" class="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
-					<input type="number" name="id" value={ strconv.FormatInt(r.ID, 10) } hidden/>
+				<form data-form={ "api/v1/subscriptions/" + strconv.FormatInt(r.ID, 10) + "/renewals" } data-refresh="true" class="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
 					@Label("Renewal with")
-					<select name="contact" aria-label="Who the renewal is with" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
+					<select name="contact" data-number="true" aria-label="Who the renewal is with" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
 						for _, p := range r.People {
 							<option value={ strconv.FormatInt(p.ID, 10) }>{ displayName(p) }</option>
 						}
@@ -142,8 +141,7 @@ templ SubscriptionLine(q *Req, r SubscriptionRow, day string, named bool) {
 			} else if r.Status != SubEnded {
 				<p class="mt-2 border-t border-border pt-2 font-mono text-xs text-muted-foreground">To start a renewal deal, someone at this company needs to be on the Conversations board first.</p>
 			}
-			<form data-form="ui/subscription/remove" data-refresh="true" class="mt-2 flex items-center gap-2 border-t border-border pt-2">
-				<input type="number" name="id" value={ strconv.FormatInt(r.ID, 10) } hidden/>
+			<form data-form={ "api/v1/subscriptions/" + strconv.FormatInt(r.ID, 10) } data-method="DELETE" data-refresh="true" class="mt-2 flex items-center gap-2 border-t border-border pt-2">
 				@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Type: button.TypeSubmit}) {
 					Remove: recorded by mistake
 				}
@@ -155,7 +153,7 @@ templ SubscriptionLine(q *Req, r SubscriptionRow, day string, named bool) {
 
 // SubscriptionForm records a new subscription for a company.
 templ SubscriptionForm(company int64, day string) {
-	<form data-form="ui/subscription" data-refresh="true" data-reset="true" class="mt-2 flex flex-wrap items-start gap-2">
+	<form data-form="api/v1/subscriptions" data-refresh="true" data-reset="true" class="mt-2 flex flex-wrap items-start gap-2">
 		<input type="number" name="company" value={ strconv.FormatInt(company, 10) } hidden/>
 		<label class="flex min-w-[220px] flex-1 flex-col gap-1">
 			@Label("What they're on")

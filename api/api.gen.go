@@ -85,6 +85,33 @@ func (e RunStatus) Valid() bool {
 	}
 }
 
+// Defines values for SubscriptionStatus.
+const (
+	Active      SubscriptionStatus = "active"
+	Ended       SubscriptionStatus = "ended"
+	Ending      SubscriptionStatus = "ending"
+	NoticeGiven SubscriptionStatus = "notice given"
+	Scheduled   SubscriptionStatus = "scheduled"
+)
+
+// Valid indicates whether the value is a known member of the SubscriptionStatus enum.
+func (e SubscriptionStatus) Valid() bool {
+	switch e {
+	case Active:
+		return true
+	case Ended:
+		return true
+	case Ending:
+		return true
+	case NoticeGiven:
+		return true
+	case Scheduled:
+		return true
+	default:
+		return false
+	}
+}
+
 // Agent defines model for Agent.
 type Agent struct {
 	AllowedTools    []string   `json:"allowed_tools"`
@@ -295,6 +322,93 @@ type Run struct {
 // RunStatus defines model for RunStatus.
 type RunStatus string
 
+// Subscription defines model for Subscription.
+type Subscription struct {
+	// Amount The price for one period, in the currency's hundredths.
+	Amount int64 `json:"amount"`
+
+	// CancelBy The next day by which notice can still be given; empty when it ends anyway or notice was given.
+	CancelBy string `json:"cancel_by"`
+
+	// CancelEnds The last day of the term that notice by `cancel_by` would end it at.
+	CancelEnds string    `json:"cancel_ends"`
+	Company    string    `json:"company"`
+	CompanyId  int64     `json:"company_id"`
+	CreatedAt  time.Time `json:"created_at"`
+	Currency   string    `json:"currency"`
+
+	// EndedOn Empty unless an end was recorded.
+	EndedOn string `json:"ended_on"`
+
+	// Ends The last day, once that is settled.
+	Ends       string `json:"ends"`
+	Id         int64  `json:"id"`
+	Name       string `json:"name"`
+	NoticeDays int    `json:"notice_days"`
+
+	// NoticeOn Empty when no notice has been given.
+	NoticeOn string `json:"notice_on"`
+	Per      string `json:"per"`
+
+	// Renewing Whether a renewal deal for it is open.
+	Renewing bool   `json:"renewing"`
+	Start    string `json:"start"`
+
+	// Status Where it stands today.
+	Status SubscriptionStatus `json:"status"`
+
+	// TermEnd The last day of the term in hand; empty before it starts.
+	TermEnd    string    `json:"term_end"`
+	TermMonths int       `json:"term_months"`
+	Then       string    `json:"then"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// SubscriptionStatus Where it stands today.
+type SubscriptionStatus string
+
+// SubscriptionChange defines model for SubscriptionChange.
+type SubscriptionChange struct {
+	Amount *string `json:"amount"`
+
+	// EndedOn The day it stopped, YYYY-MM-DD; empty to take it back.
+	EndedOn    *string `json:"ended_on"`
+	Name       *string `json:"name"`
+	NoticeDays *int    `json:"notice_days"`
+
+	// NoticeOn The day notice was given, YYYY-MM-DD; empty to take it back.
+	NoticeOn   *string `json:"notice_on"`
+	Per        *string `json:"per"`
+	Start      *string `json:"start"`
+	TermMonths *int    `json:"term_months"`
+	Then       *string `json:"then"`
+}
+
+// SubscriptionNew defines model for SubscriptionNew.
+type SubscriptionNew struct {
+	// Amount The price for one period as you would write it: `14,000`, `€5,000`. Empty for none.
+	Amount  string `json:"amount,omitempty"`
+	Company int64  `json:"company"`
+
+	// Name What they are on, in your words.
+	Name string `json:"name"`
+
+	// NoticeDays Days of notice needed to stop it renewing.
+	NoticeDays int `json:"notice_days,omitempty"`
+
+	// Per `year` or `month`; empty is `year`.
+	Per string `json:"per,omitempty"`
+
+	// Start YYYY-MM-DD.
+	Start string `json:"start"`
+
+	// TermMonths Months committed for; 0 is no commitment.
+	TermMonths int `json:"term_months,omitempty"`
+
+	// Then What happens when the term is up: `renews` for the same term, `rolls` on a period at a time, or `ends`; empty is `renews`.
+	Then string `json:"then,omitempty"`
+}
+
 // Tool defines model for Tool.
 type Tool struct {
 	Description string `json:"description"`
@@ -316,6 +430,18 @@ type ListOnboardingsParams struct {
 // InviteCustomerJSONBody defines body for InviteCustomer for application/json ContentType.
 type InviteCustomerJSONBody struct {
 	// Contact The contact to invite.
+	Contact int64 `json:"contact"`
+}
+
+// ListSubscriptionsParams defines parameters for ListSubscriptions.
+type ListSubscriptionsParams struct {
+	// Company Only this company's.
+	Company int64 `form:"company,omitempty" json:"company,omitempty"`
+}
+
+// StartRenewalJSONBody defines body for StartRenewal for application/json ContentType.
+type StartRenewalJSONBody struct {
+	// Contact Who the renewal is with.
 	Contact int64 `json:"contact"`
 }
 
@@ -345,6 +471,15 @@ type StartOnboardingJSONRequestBody = OnboardingStart
 
 // InviteCustomerJSONRequestBody defines body for InviteCustomer for application/json ContentType.
 type InviteCustomerJSONRequestBody InviteCustomerJSONBody
+
+// AddSubscriptionJSONRequestBody defines body for AddSubscription for application/json ContentType.
+type AddSubscriptionJSONRequestBody = SubscriptionNew
+
+// ChangeSubscriptionJSONRequestBody defines body for ChangeSubscription for application/json ContentType.
+type ChangeSubscriptionJSONRequestBody = SubscriptionChange
+
+// StartRenewalJSONRequestBody defines body for StartRenewal for application/json ContentType.
+type StartRenewalJSONRequestBody StartRenewalJSONBody
 
 // StartRunJSONRequestBody defines body for StartRun for application/json ContentType.
 type StartRunJSONRequestBody StartRunJSONBody
@@ -396,6 +531,21 @@ type ServerInterface interface {
 	// StopRun Stop a run
 	// (POST /o/{org}/api/v1/runs/{id}/stop)
 	StopRun(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ListSubscriptions What customers are on, and where each stands today
+	// (GET /o/{org}/api/v1/subscriptions)
+	ListSubscriptions(w http.ResponseWriter, r *http.Request, org Org, params ListSubscriptionsParams)
+	// AddSubscription Record what a customer is on
+	// (POST /o/{org}/api/v1/subscriptions)
+	AddSubscription(w http.ResponseWriter, r *http.Request, org Org)
+	// RemoveSubscription Remove a subscription recorded by mistake
+	// (DELETE /o/{org}/api/v1/subscriptions/{id})
+	RemoveSubscription(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ChangeSubscription Change a subscription
+	// (PATCH /o/{org}/api/v1/subscriptions/{id})
+	ChangeSubscription(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// StartRenewal Start a renewal deal for a subscription
+	// (POST /o/{org}/api/v1/subscriptions/{id}/renewals)
+	StartRenewal(w http.ResponseWriter, r *http.Request, org Org, id Id)
 	// ListRuns A task's agent runs
 	// (GET /o/{org}/api/v1/tasks/{task}/runs)
 	ListRuns(w http.ResponseWriter, r *http.Request, org Org, task int64)
@@ -918,6 +1068,179 @@ func (siw *ServerInterfaceWrapper) StopRun(w http.ResponseWriter, r *http.Reques
 	handler.ServeHTTP(w, r)
 }
 
+// ListSubscriptions operation middleware
+func (siw *ServerInterfaceWrapper) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSubscriptionsParams
+
+	// ------------- Optional query parameter "company" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "company", r.URL.Query(), &params.Company, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "company"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "company", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSubscriptions(w, r, org, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddSubscription operation middleware
+func (siw *ServerInterfaceWrapper) AddSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddSubscription(w, r, org)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveSubscription operation middleware
+func (siw *ServerInterfaceWrapper) RemoveSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveSubscription(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeSubscription operation middleware
+func (siw *ServerInterfaceWrapper) ChangeSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeSubscription(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartRenewal operation middleware
+func (siw *ServerInterfaceWrapper) StartRenewal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartRenewal(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListRuns operation middleware
 func (siw *ServerInterfaceWrapper) ListRuns(w http.ResponseWriter, r *http.Request) {
 
@@ -1125,6 +1448,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/o/{org}/api/v1/onboarding-steps/{id}", wrapper.ChangeOnboardingStep)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/onboardings/{id}/invites", wrapper.InviteCustomer)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/o/{org}/api/v1/onboarding-invites/{id}", wrapper.WithdrawCustomerInvite)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/o/{org}/api/v1/subscriptions", wrapper.ListSubscriptions)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/subscriptions", wrapper.AddSubscription)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/o/{org}/api/v1/subscriptions/{id}", wrapper.RemoveSubscription)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/o/{org}/api/v1/subscriptions/{id}", wrapper.ChangeSubscription)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/subscriptions/{id}/renewals", wrapper.StartRenewal)
 
 	return m
 }
@@ -1705,6 +2033,205 @@ func (response StopRundefaultApplicationProblemPlusJSONResponse) VisitStopRunRes
 	return err
 }
 
+type ListSubscriptionsRequestObject struct {
+	Org    Org `json:"org"`
+	Params ListSubscriptionsParams
+}
+
+type ListSubscriptionsResponseObject interface {
+	VisitListSubscriptionsResponse(w http.ResponseWriter) error
+}
+
+type ListSubscriptions200JSONResponse []Subscription
+
+func (response ListSubscriptions200JSONResponse) VisitListSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubscriptionsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListSubscriptionsdefaultApplicationProblemPlusJSONResponse) VisitListSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSubscriptionRequestObject struct {
+	Org  Org `json:"org"`
+	Body *AddSubscriptionJSONRequestBody
+}
+
+type AddSubscriptionResponseObject interface {
+	VisitAddSubscriptionResponse(w http.ResponseWriter) error
+}
+
+type AddSubscription201JSONResponse Subscription
+
+func (response AddSubscription201JSONResponse) VisitAddSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSubscriptiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response AddSubscriptiondefaultApplicationProblemPlusJSONResponse) VisitAddSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSubscriptionRequestObject struct {
+	Org Org `json:"org"`
+	Id  Id  `json:"id"`
+}
+
+type RemoveSubscriptionResponseObject interface {
+	VisitRemoveSubscriptionResponse(w http.ResponseWriter) error
+}
+
+type RemoveSubscription204Response struct {
+}
+
+func (response RemoveSubscription204Response) VisitRemoveSubscriptionResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RemoveSubscriptiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RemoveSubscriptiondefaultApplicationProblemPlusJSONResponse) VisitRemoveSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeSubscriptionRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *ChangeSubscriptionJSONRequestBody
+}
+
+type ChangeSubscriptionResponseObject interface {
+	VisitChangeSubscriptionResponse(w http.ResponseWriter) error
+}
+
+type ChangeSubscription200JSONResponse Subscription
+
+func (response ChangeSubscription200JSONResponse) VisitChangeSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeSubscriptiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ChangeSubscriptiondefaultApplicationProblemPlusJSONResponse) VisitChangeSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRenewalRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *StartRenewalJSONRequestBody
+}
+
+type StartRenewalResponseObject interface {
+	VisitStartRenewalResponse(w http.ResponseWriter) error
+}
+
+type StartRenewal201JSONResponse struct {
+	Contact int64 `json:"contact"`
+	Deal    int64 `json:"deal"`
+}
+
+func (response StartRenewal201JSONResponse) VisitStartRenewalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRenewaldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response StartRenewaldefaultApplicationProblemPlusJSONResponse) VisitStartRenewalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListRunsRequestObject struct {
 	Org  Org   `json:"org"`
 	Task int64 `json:"task"`
@@ -1833,6 +2360,21 @@ type StrictServerInterface interface {
 	// StopRun Stop a run
 	// (POST /o/{org}/api/v1/runs/{id}/stop)
 	StopRun(ctx context.Context, request StopRunRequestObject) (StopRunResponseObject, error)
+	// ListSubscriptions What customers are on, and where each stands today
+	// (GET /o/{org}/api/v1/subscriptions)
+	ListSubscriptions(ctx context.Context, request ListSubscriptionsRequestObject) (ListSubscriptionsResponseObject, error)
+	// AddSubscription Record what a customer is on
+	// (POST /o/{org}/api/v1/subscriptions)
+	AddSubscription(ctx context.Context, request AddSubscriptionRequestObject) (AddSubscriptionResponseObject, error)
+	// RemoveSubscription Remove a subscription recorded by mistake
+	// (DELETE /o/{org}/api/v1/subscriptions/{id})
+	RemoveSubscription(ctx context.Context, request RemoveSubscriptionRequestObject) (RemoveSubscriptionResponseObject, error)
+	// ChangeSubscription Change a subscription
+	// (PATCH /o/{org}/api/v1/subscriptions/{id})
+	ChangeSubscription(ctx context.Context, request ChangeSubscriptionRequestObject) (ChangeSubscriptionResponseObject, error)
+	// StartRenewal Start a renewal deal for a subscription
+	// (POST /o/{org}/api/v1/subscriptions/{id}/renewals)
+	StartRenewal(ctx context.Context, request StartRenewalRequestObject) (StartRenewalResponseObject, error)
 	// ListRuns A task's agent runs
 	// (GET /o/{org}/api/v1/tasks/{task}/runs)
 	ListRuns(ctx context.Context, request ListRunsRequestObject) (ListRunsResponseObject, error)
@@ -2334,6 +2876,161 @@ func (sh *strictHandler) StopRun(w http.ResponseWriter, r *http.Request, org Org
 	}
 }
 
+// ListSubscriptions operation middleware
+func (sh *strictHandler) ListSubscriptions(w http.ResponseWriter, r *http.Request, org Org, params ListSubscriptionsParams) {
+	var request ListSubscriptionsRequestObject
+
+	request.Org = org
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ListSubscriptions(ctx, request.(ListSubscriptionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSubscriptions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSubscriptionsResponseObject); ok {
+		if err := validResponse.VisitListSubscriptionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddSubscription operation middleware
+func (sh *strictHandler) AddSubscription(w http.ResponseWriter, r *http.Request, org Org) {
+	var request AddSubscriptionRequestObject
+
+	request.Org = org
+
+	var body AddSubscriptionJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.AddSubscription(ctx, request.(AddSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddSubscriptionResponseObject); ok {
+		if err := validResponse.VisitAddSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveSubscription operation middleware
+func (sh *strictHandler) RemoveSubscription(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request RemoveSubscriptionRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.RemoveSubscription(ctx, request.(RemoveSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveSubscriptionResponseObject); ok {
+		if err := validResponse.VisitRemoveSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeSubscription operation middleware
+func (sh *strictHandler) ChangeSubscription(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ChangeSubscriptionRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body ChangeSubscriptionJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ChangeSubscription(ctx, request.(ChangeSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeSubscriptionResponseObject); ok {
+		if err := validResponse.VisitChangeSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartRenewal operation middleware
+func (sh *strictHandler) StartRenewal(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request StartRenewalRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body StartRenewalJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.StartRenewal(ctx, request.(StartRenewalRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartRenewal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartRenewalResponseObject); ok {
+		if err := validResponse.VisitStartRenewalResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListRuns operation middleware
 func (sh *strictHandler) ListRuns(w http.ResponseWriter, r *http.Request, org Org, task int64) {
 	var request ListRunsRequestObject
@@ -2400,82 +3097,99 @@ func (sh *strictHandler) StartRun(w http.ResponseWriter, r *http.Request, org Or
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"BWiWsUFNzsLC9CCYvN4SQ9N2/+H+/wYA",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

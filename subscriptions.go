@@ -536,37 +536,6 @@ func (a *App) subscriptionsPage(w http.ResponseWriter, r *http.Request) {
 	a.page(w, r, "subscriptions", SubscriptionsView(q, rows, today()))
 }
 
-func (a *App) uiSubscription(w http.ResponseWriter, r *http.Request) {
-	var in SubscriptionIn
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		_, err := a.s.AddSubscription(q.Org.ID, in, q.Actor())
-		done(w, err)
-	}
-}
-
-func (a *App) uiSubscriptionChange(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID    int64  `json:"id"`
-		Field string `json:"field"`
-		Value string `json:"value"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.ChangeSubscription(q.Org.ID, in.ID, in.Field, in.Value, q.Actor()))
-	}
-}
-
-func (a *App) uiSubscriptionRemove(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID int64 `json:"id"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.RemoveSubscription(q.Org.ID, in.ID, q.Actor()))
-	}
-}
-
 // StartRenewal opens a renewal deal for a subscription with someone at its company who
 // is already in conversation. The deal starts with what the subscription costs for a
 // year and closes when the term in hand ends, both of which can then be changed.
@@ -635,23 +604,4 @@ func (s *Store) StartRenewal(org, subscription, contact int64, actor string) (*D
 		return nil, err
 	}
 	return &d, nil
-}
-
-func (a *App) uiSubscriptionRenew(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID      int64  `json:"id"`
-		Contact string `json:"contact"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	// A select posts its value as text.
-	contact, err := strconv.ParseInt(in.Contact, 10, 64)
-	if err != nil {
-		fail(w, errors.New("choose who the renewal is with"), http.StatusBadRequest)
-		return
-	}
-	q := reqOf(r)
-	_, err = a.s.StartRenewal(q.Org.ID, in.ID, contact, q.Actor())
-	done(w, err)
 }
