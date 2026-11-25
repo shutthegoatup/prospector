@@ -31,6 +31,9 @@ type OrgSettings struct {
 	IncorporatedOnly  bool   `json:"incorporated_only"`
 	AgentGuidance     string `json:"agent_guidance"`
 	EnquirySites      string `json:"enquiry_sites"`
+	// LookFor is what this organisation looks for at a company, one "field: hint"
+	// per line; see Assets.
+	LookFor string `json:"look_for"`
 }
 
 func (s OrgSettings) withDefaults() OrgSettings {
@@ -92,23 +95,20 @@ type APIKey struct {
 }
 
 type Company struct {
-	ID              int64     `gorm:"primaryKey" json:"id"`
-	OrgID           int64     `gorm:"uniqueIndex:idx_org_company;not null" json:"-"`
-	Name            string    `gorm:"uniqueIndex:idx_org_company;not null" json:"name"`
-	Domain          string    `json:"domain"`
-	Country         string    `json:"country"`
-	Segment         string    `json:"segment"`
-	Fit             string    `json:"fit"`
-	Stage           string    `gorm:"index" json:"stage"`
-	ConfiguratorURL string    `json:"configurator_url"`
-	Platform        string    `json:"platform"`
-	BuiltBy         string    `json:"built_by"`
-	Why             string    `json:"why"`
-	FoundBy         string    `json:"found_by"`
-	Incorporated    *bool     `json:"incorporated"`
-	Hold            *string   `json:"hold"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID           int64     `gorm:"primaryKey" json:"id"`
+	OrgID        int64     `gorm:"uniqueIndex:idx_org_company;not null" json:"-"`
+	Name         string    `gorm:"uniqueIndex:idx_org_company;not null" json:"name"`
+	Domain       string    `json:"domain"`
+	Country      string    `json:"country"`
+	Segment      string    `json:"segment"`
+	Fit          string    `json:"fit"`
+	Stage        string    `gorm:"index" json:"stage"`
+	Why          string    `json:"why"`
+	FoundBy      string    `json:"found_by"`
+	Incorporated *bool     `json:"incorporated"`
+	Hold         *string   `json:"hold"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 const (
@@ -190,9 +190,17 @@ type Event struct {
 	ContactID int64  `gorm:"index"`
 	CompanyID *int64 `gorm:"index"`
 	User      string
-	Action    string
-	Value     *string
-	At        time.Time `gorm:"index"`
+	// KeyID is the API key behind an agent's action, since key names can repeat; 0 for people.
+	KeyID  int64 `gorm:"not null;default:0"`
+	Action string
+	Value  *string
+	At     time.Time `gorm:"index"`
+}
+
+// Actor is who an agent operation is recorded against: "agent:<key name>" and its key.
+type Actor struct {
+	Name  string
+	KeyID int64
 }
 
 var Editable = map[string]bool{"phone": true, "email": true, "linkedin": true, "sources": true,
@@ -211,7 +219,12 @@ var stringFields = map[string]bool{"stage": true, "next_step": true, "lost_reaso
 var Marks = map[string]string{"linkedin": "linkedin_added", "email": "email_sent", "followup": "followup_sent",
 	"call": "called", "replied": "replied", "declined": "declined", "hold": "hold", "accepted": "accepted"}
 
-type Store struct{ db *gorm.DB }
+type Store struct {
+	db *gorm.DB
+	// keys seal what is stored but mustn't be readable from the database alone; nil
+	// when the server was given none.
+	keys *keyring
+}
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
 	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}}
@@ -229,6 +242,9 @@ func Open(dsn string) (*Store, error) {
 		return nil, err
 	}
 	if err := db.AutoMigrate(models...); err != nil {
+		return nil, err
+	}
+	if err := moveAssetColumns(db); err != nil {
 		return nil, err
 	}
 	return &Store{db: db}, nil
@@ -298,14 +314,18 @@ func (s *Store) Due(org int64, step string, now time.Time, set OrgSettings) ([]C
 }
 
 func (s *Store) log(tx *gorm.DB, org, contact int64, company *int64, actor, action string, value *string) error {
-	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: actor, Action: action, Value: value, At: time.Now()}).Error
+	return s.logAs(tx, org, contact, company, Actor{Name: actor}, action, value)
+}
+
+func (s *Store) logAs(tx *gorm.DB, org, contact int64, company *int64, who Actor, action string, value *string) error {
+	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: who.Name, KeyID: who.KeyID, Action: action, Value: value, At: time.Now()}).Error
 }
 
 func (s *Store) Mark(org, id int64, step, date, actor string) error {
-	return s.mark(org, id, step, date, actor, "")
+	return s.mark(org, id, step, date, Actor{Name: actor}, "")
 }
 
-func (s *Store) mark(org, id int64, step, date, actor, note string) error {
+func (s *Store) mark(org, id int64, step, date string, who Actor, note string) error {
 	column, ok := Marks[step]
 	if !ok {
 		return fmt.Errorf("unknown step %q", step)
@@ -332,7 +352,7 @@ func (s *Store) mark(org, id int64, step, date, actor, note string) error {
 		if note != "" {
 			value += " · " + note
 		}
-		return s.log(tx, org, id, c.CompanyID, actor, "mark:"+step, &value)
+		return s.logAs(tx, org, id, c.CompanyID, who, "mark:"+step, &value)
 	})
 }
 

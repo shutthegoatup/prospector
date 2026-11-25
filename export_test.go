@@ -29,7 +29,7 @@ func TestExportPerson(t *testing.T) {
 	do(s.Update(o.ID, colleague.ID, "call_notes", "asked for a callback in spring", "ada"))
 	do(s.Update(o.ID, hannah.ID, "phone", "+44 20 7946 0000", "ada"))
 	do(s.Update(o.ID, hannah.ID, "call_notes", "prefers mornings, has a dog called Biscuit", "ada"))
-	do(s.AgentMark(o.ID, "agent:scout", MarkIn{ContactID: hannah.ID, Step: "replied", Date: "2020-01-02", Note: "she wrote back from her own gmail"}))
+	do(s.AgentMark(o.ID, Actor{Name: "agent:scout"}, MarkIn{ContactID: hannah.ID, Step: "replied", Date: "2020-01-02", Note: "she wrote back from her own gmail"}))
 	do(s.Update(o.ID, hannah.ID, "stage", "meeting", "ada"))
 	do(s.db.Create(&Fact{OrgID: o.ID, CompanyID: *hannah.CompanyID, ContactID: &hannah.ID, Field: "role", Value: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}).Error)
 	do(s.db.Create(&[]Enquiry{

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var (
@@ -48,7 +49,40 @@ func ensureCompany(tx *gorm.DB, org int64, c Company) (*Company, bool, error) {
 	if c.Stage == "" {
 		c.Stage = CompanyReview
 	}
-	return &c, true, tx.Create(&c).Error
+	res := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&c)
+	if res.Error != nil {
+		return nil, false, res.Error
+	}
+	if res.RowsAffected == 0 {
+		// Someone added it between the look-up and the insert.
+		err := tx.Where("org_id = ? and name = ?", org, c.Name).First(&found).Error
+		return &found, false, err
+	}
+	return &c, true, nil
+}
+
+// companyAt finds the company an agent means by its website when the name is new,
+// so one company found under two spellings stays one row. A site that several
+// companies share (a group's brands, a marketplace) identifies none of them.
+func companyAt(tx *gorm.DB, org int64, domain string) (*Company, error) {
+	if domain == "" {
+		return nil, nil
+	}
+	var found []Company
+	if err := tx.Where("org_id = ? and lower(domain) = ?", org, domain).Limit(2).Find(&found).Error; err != nil || len(found) != 1 {
+		return nil, err
+	}
+	return &found[0], nil
+}
+
+// bareDomain reads "https://www.Example.com/about" and "example.com" alike.
+func bareDomain(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	if d := domainOf(v); d != "" {
+		return d
+	}
+	v, _, _ = strings.Cut(v, "/")
+	return strings.TrimPrefix(v, "www.")
 }
 
 func (s *Store) CompanyByID(org, id int64) (*Company, error) {
@@ -395,7 +429,14 @@ func (s *Store) QuickAddPerson(o *Org, in QuickAdd, actor string) (*Contact, err
 		if err := tx.Create(&out).Error; err != nil {
 			return err
 		}
-		return s.log(tx, o.ID, out.ID, companyID, actor, "add:person", nil)
+		if err := s.log(tx, o.ID, out.ID, companyID, actor, "add:person", nil); err != nil {
+			return err
+		}
+		if strings.TrimSpace(in.Note) != "" {
+			// Recorded as an edit so an agent's draft doesn't replace a note the person wrote.
+			return s.log(tx, o.ID, out.ID, companyID, actor, "set:note", nil)
+		}
+		return nil
 	})
 	return &out, err
 }

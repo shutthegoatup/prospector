@@ -14,27 +14,28 @@ import (
 // organisation and actor taken from the API key, never from the request body.
 
 type FactIn struct {
-	Field     string `json:"field" jsonschema:"what the fact is about, e.g. configurator, built_by, team_page, press"`
+	Field     string `json:"field" jsonschema:"what the fact is about, e.g. team_page or press, or one of the things the guidance says this organisation looks for"`
 	Value     string `json:"value" jsonschema:"the fact itself, one sentence"`
 	SourceURL string `json:"source_url" jsonschema:"the page that shows it (required)"`
 }
 
 type AddCompanyIn struct {
 	Name            string   `json:"name" jsonschema:"company name"`
-	Domain          string   `json:"domain,omitempty" jsonschema:"website domain, e.g. example.com"`
+	Domain          string   `json:"domain,omitempty" jsonschema:"the company's own website domain, e.g. example.com; leave empty rather than give a shared site"`
 	Country         string   `json:"country,omitempty" jsonschema:"ISO country code"`
 	Segment         string   `json:"segment,omitempty"`
 	Fit             string   `json:"fit,omitempty" jsonschema:"suggested fit grade A, B or C"`
-	ConfiguratorURL string   `json:"configurator_url,omitempty"`
-	Platform        string   `json:"platform,omitempty" jsonschema:"configurator platform if detected"`
-	BuiltBy         string   `json:"built_by,omitempty" jsonschema:"agency or vendor that built it, if a source says so"`
+	ConfiguratorURL string   `json:"configurator_url,omitempty" jsonschema:"older clients only: add a fact instead"`
+	Platform        string   `json:"platform,omitempty" jsonschema:"older clients only: add a fact instead"`
+	BuiltBy         string   `json:"built_by,omitempty" jsonschema:"older clients only: add a fact instead"`
 	Why             string   `json:"why,omitempty" jsonschema:"why it fits, one sentence"`
 	Facts           []FactIn `json:"facts,omitempty" jsonschema:"facts with their sources"`
 }
 
 type AddCompanyOut struct {
 	ID      int64  `json:"id"`
-	Existed bool   `json:"existed" jsonschema:"true if the company was already known; new facts were still added"`
+	Name    string `json:"name" jsonschema:"the name it is filed under, which can differ from yours if the domain was already known"`
+	Existed bool   `json:"existed" jsonschema:"true if the company was already known; facts it didn't have were still added"`
 	Stage   string `json:"stage"`
 }
 
@@ -48,34 +49,78 @@ func checkFact(f FactIn) error {
 	return nil
 }
 
-func (s *Store) AgentAddCompany(org int64, actor string, in AddCompanyIn) (*AddCompanyOut, error) {
+// addFact stores a fact unless the company already has the same one from the same
+// page, so an agent that runs again, or a second agent, doesn't double the list.
+func addFact(tx *gorm.DB, org, company int64, in FactIn, actor string) (*Fact, bool, error) {
+	f := Fact{OrgID: org, CompanyID: company, Field: strings.TrimSpace(in.Field), Value: strings.TrimSpace(in.Value),
+		SourceURL: strings.TrimSpace(in.SourceURL), Actor: actor}
+	var from []Fact
+	if err := tx.Where("org_id = ? and company_id = ? and source_url = ?", org, company, f.SourceURL).Order("id").Find(&from).Error; err != nil {
+		return nil, false, err
+	}
+	// Compared here because SQLite's lower() only folds ASCII.
+	for i, had := range from {
+		if strings.EqualFold(had.Field, f.Field) && strings.EqualFold(strings.TrimSpace(had.Value), f.Value) {
+			return &from[i], true, nil
+		}
+	}
+	return &f, false, tx.Create(&f).Error
+}
+
+func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddCompanyOut, error) {
+	if in.ConfiguratorURL != "" && !httpURL.MatchString(strings.TrimSpace(in.ConfiguratorURL)) {
+		return nil, errors.New("configurator_url must be an http(s) link")
+	}
 	for _, f := range in.Facts {
 		if err := checkFact(f); err != nil {
 			return nil, err
 		}
 	}
-	if in.ConfiguratorURL != "" && !httpURL.MatchString(strings.TrimSpace(in.ConfiguratorURL)) {
-		return nil, errors.New("configurator_url must be an http(s) link")
-	}
 	var out AddCompanyOut
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		c, created, err := ensureCompany(tx, org, Company{Name: in.Name, Domain: strings.ToLower(in.Domain), Country: in.Country,
-			Segment: in.Segment, Fit: in.Fit, ConfiguratorURL: in.ConfiguratorURL, Platform: in.Platform, BuiltBy: in.BuiltBy,
-			Why: in.Why, FoundBy: actor, Stage: CompanyReview})
+		domain := bareDomain(in.Domain)
+		var c *Company
+		var named int64
+		err := tx.Model(&Company{}).Where("org_id = ? and lower(name) = ?", org, strings.ToLower(strings.TrimSpace(in.Name))).Count(&named).Error
+		if err == nil && named == 0 {
+			c, err = companyAt(tx, org, domain)
+		}
 		if err != nil {
 			return err
 		}
-		out = AddCompanyOut{ID: c.ID, Existed: !created, Stage: c.Stage}
-		for _, f := range in.Facts {
-			if err := tx.Create(&Fact{OrgID: org, CompanyID: c.ID, Field: f.Field, Value: f.Value, SourceURL: strings.TrimSpace(f.SourceURL), Actor: actor}).Error; err != nil {
+		created := false
+		if c == nil {
+			c, created, err = ensureCompany(tx, org, Company{Name: in.Name, Domain: domain, Country: in.Country,
+				Segment: in.Segment, Fit: in.Fit, Why: in.Why, FoundBy: who.Name, Stage: CompanyReview})
+			if err != nil {
 				return err
 			}
+		}
+		out = AddCompanyOut{ID: c.ID, Name: c.Name, Existed: !created, Stage: c.Stage}
+		added := 0
+		for _, f := range in.Facts {
+			_, had, err := addFact(tx, org, c.ID, f, who.Name)
+			if err != nil {
+				return err
+			}
+			if !had {
+				added++
+			}
+		}
+		// Older clients' fields become facts; with no configurator link they cite nothing, as they did as columns.
+		older, err := addConfiguratorFacts(tx, org, c.ID, in.ConfiguratorURL, in.Platform, in.BuiltBy, who.Name)
+		if err != nil {
+			return err
+		}
+		added += older
+		if !created && added == 0 {
+			return nil
 		}
 		action := "add:company"
 		if !created {
 			action = "add:facts"
 		}
-		return s.log(tx, org, 0, &c.ID, actor, action, str(fmt.Sprintf("%s, %d facts", c.Name, len(in.Facts))))
+		return s.logAs(tx, org, 0, &c.ID, who, action, str(fmt.Sprintf("%s, %d facts", c.Name, added)))
 	})
 	return &out, err
 }
@@ -85,7 +130,12 @@ type AddFactIn struct {
 	FactIn
 }
 
-func (s *Store) AgentAddFact(org int64, actor string, in AddFactIn) (*Fact, error) {
+type AddFactOut struct {
+	Fact
+	Existed bool `json:"existed" jsonschema:"true if the company already had this fact from this page; nothing was added"`
+}
+
+func (s *Store) AgentAddFact(org int64, who Actor, in AddFactIn) (*AddFactOut, error) {
 	if err := checkFact(in.FactIn); err != nil {
 		return nil, err
 	}
@@ -93,13 +143,19 @@ func (s *Store) AgentAddFact(org int64, actor string, in AddFactIn) (*Fact, erro
 	if err != nil {
 		return nil, err
 	}
-	f := Fact{OrgID: org, CompanyID: c.ID, Field: in.Field, Value: in.Value, SourceURL: strings.TrimSpace(in.SourceURL), Actor: actor}
-	return &f, s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&f).Error; err != nil {
+	var out AddFactOut
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		f, had, err := addFact(tx, org, c.ID, in.FactIn, who.Name)
+		if err != nil {
 			return err
 		}
-		return s.log(tx, org, 0, &c.ID, actor, "add:fact", str(in.Field))
+		out = AddFactOut{Fact: *f, Existed: had}
+		if had {
+			return nil
+		}
+		return s.logAs(tx, org, 0, &c.ID, who, "add:fact", str(f.Field))
 	})
+	return &out, err
 }
 
 type AddContactIn struct {
@@ -114,11 +170,26 @@ type AddContactIn struct {
 }
 
 type AddContactOut struct {
-	ID     int64  `json:"id"`
-	Status string `json:"status" jsonschema:"suggested: waits in Research until a person picks them"`
+	ID      int64  `json:"id"`
+	Status  string `json:"status" jsonschema:"suggested: waits in Research until a person picks them; empty once picked"`
+	Existed bool   `json:"existed" jsonschema:"true if this person was already at the company; nothing was added or changed"`
 }
 
-func (s *Store) AgentAddContact(o *Org, actor string, in AddContactIn) (*AddContactOut, error) {
+// samePerson finds someone already at the company by profile, address or name, so a
+// second suggestion of them doesn't become a second row to be contacted twice.
+func samePerson(people []Contact, in AddContactIn) *Contact {
+	link, email, name := linkedinPath(in.Linkedin), strings.ToLower(strings.TrimSpace(in.Email)), strings.ToLower(personKey(in.Name))
+	for i, p := range people {
+		if link != "" && linkedinPath(deref(p.Linkedin)) == link ||
+			email != "" && strings.ToLower(deref(p.Email)) == email ||
+			name != "" && strings.ToLower(personKey(displayName(p))) == name {
+			return &people[i]
+		}
+	}
+	return nil
+}
+
+func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContactOut, error) {
 	if strings.TrimSpace(in.Name) == "" {
 		return nil, errors.New("name is required")
 	}
@@ -148,7 +219,15 @@ func (s *Store) AgentAddContact(o *Org, actor string, in AddContactIn) (*AddCont
 	first := firstField(in.Name)
 	var out AddContactOut
 	err = s.db.Transaction(func(tx *gorm.DB) error {
-		contact := Contact{OrgID: o.ID, Key: uniqueKey(tx, o.ID, personKey(in.Name)), File: "added by " + actor,
+		var people []Contact
+		if err := tx.Where("org_id = ? and company_id = ? and key not like 'org:%'", o.ID, c.ID).Order("id").Find(&people).Error; err != nil {
+			return err
+		}
+		if p := samePerson(people, in); p != nil {
+			out = AddContactOut{ID: p.ID, Status: p.Status, Existed: true}
+			return nil
+		}
+		contact := Contact{OrgID: o.ID, Key: uniqueKey(tx, o.ID, personKey(in.Name)), File: "added by " + who.Name,
 			Person: &person, First: &first, Maker: &c.Name, CompanyID: &c.ID, Title: strings.TrimSpace(in.Title),
 			Email: nonEmpty(strings.TrimSpace(in.Email)), EmailStatus: in.EmailStatus, Linkedin: nonEmpty(strings.TrimSpace(in.Linkedin)),
 			Phone: nonEmpty(strings.TrimSpace(in.Phone)), Sources: str(strings.TrimSpace(in.SourceURL)), Status: ContactSuggested}
@@ -157,7 +236,7 @@ func (s *Store) AgentAddContact(o *Org, actor string, in AddContactIn) (*AddCont
 			return err
 		}
 		out = AddContactOut{ID: contact.ID, Status: contact.Status}
-		return s.log(tx, o.ID, contact.ID, &c.ID, actor, "add:contact", nil)
+		return s.logAs(tx, o.ID, contact.ID, &c.ID, who, "add:contact", nil)
 	})
 	return &out, err
 }
@@ -171,7 +250,34 @@ type DraftIn struct {
 
 var draftFields = map[string]string{"note": "note", "message": "message", "email": "body", "followup": "followup"}
 
-func (s *Store) AgentDraft(org int64, actor string, in DraftIn) error {
+// draftSent is the mark that says a draft's text has gone out. A LinkedIn message
+// has no mark of its own.
+func draftSent(c Contact, kind string) string {
+	switch kind {
+	case "note":
+		return deref(c.LinkedinAdded)
+	case "email":
+		return deref(c.EmailSent)
+	case "followup":
+		return deref(c.FollowupSent)
+	}
+	return ""
+}
+
+// editedBy names the person whose edit is the last word on a draft field, or "" if
+// an agent or nobody wrote what is there. The template note that picking fills in
+// and imported text leave no edit, so an agent may still improve on them.
+func editedBy(tx *gorm.DB, org, contact int64, field, kind string) (string, error) {
+	var last Event
+	err := tx.Where("org_id = ? and contact_id = ? and action in ?", org, contact, []string{"set:" + field, "draft:" + kind}).
+		Order("at desc, id desc").First(&last).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) || err == nil && last.Action != "set:"+field {
+		return "", nil
+	}
+	return last.User, err
+}
+
+func (s *Store) AgentDraft(org int64, who Actor, in DraftIn) error {
 	field, ok := draftFields[in.Kind]
 	if !ok {
 		return fmt.Errorf("kind is note, message, email or followup, not %q", in.Kind)
@@ -187,14 +293,27 @@ func (s *Store) AgentDraft(org int64, actor string, in DraftIn) error {
 		if err := tx.Where("org_id = ? and id = ?", org, in.ContactID).First(&c).Error; err != nil {
 			return fmt.Errorf("no contact %d", in.ContactID)
 		}
-		updates := map[string]any{field: strings.TrimSpace(in.Text), "draft_by": actor}
+		if day := draftSent(c, in.Kind); day != "" {
+			return fmt.Errorf("that went out on %s, so its text stays as sent", day)
+		}
+		current := map[string]*string{"note": c.Note, "message": c.Message, "body": c.Body, "followup": c.Followup}[field]
+		if deref(current) != "" {
+			person, err := editedBy(tx, org, c.ID, field, in.Kind)
+			if err != nil {
+				return err
+			}
+			if person != "" {
+				return fmt.Errorf("%s edited this text, so it is theirs to change", person)
+			}
+		}
+		updates := map[string]any{field: strings.TrimSpace(in.Text), "draft_by": who.Name}
 		if in.Kind == "email" && in.Subject != "" {
 			updates["subject"] = in.Subject
 		}
 		if err := tx.Model(&c).Updates(updates).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, c.ID, c.CompanyID, actor, "draft:"+in.Kind, nil)
+		return s.logAs(tx, org, c.ID, c.CompanyID, who, "draft:"+in.Kind, nil)
 	})
 }
 
@@ -203,14 +322,47 @@ type SearchIn struct {
 }
 
 type SearchHit struct {
-	Kind    string `json:"kind"`
-	ID      int64  `json:"id"`
-	Name    string `json:"name"`
-	Company string `json:"company,omitempty"`
-	Stage   string `json:"stage"`
+	Kind      string     `json:"kind"`
+	ID        int64      `json:"id"`
+	Name      string     `json:"name"`
+	Company   string     `json:"company,omitempty"`
+	Stage     string     `json:"stage"`
+	LastAgent *LastAgent `json:"last_agent,omitempty" jsonschema:"the agent that last changed this company, if any"`
 }
 
-func (s *Store) AgentSearch(org int64, q string) ([]SearchHit, error) {
+// LastAgent is the latest change an agent made to a company. People's actions
+// don't count: someone qualifying a company is the cue to work on it.
+type LastAgent struct {
+	Actor string    `json:"actor"`
+	At    time.Time `json:"at"`
+	ByYou bool      `json:"by_you" jsonschema:"true if it was this key, perhaps in an earlier run"`
+}
+
+func (who Actor) did(e Event) bool {
+	if e.KeyID != 0 && who.KeyID != 0 {
+		return e.KeyID == who.KeyID
+	}
+	return e.User == who.Name
+}
+
+func (s *Store) lastAgents(org int64, who Actor, companies []int64) (map[int64]*LastAgent, error) {
+	out := map[int64]*LastAgent{}
+	if len(companies) == 0 {
+		return out, nil
+	}
+	latest := s.db.Model(&Event{}).Select("max(id)").
+		Where(`org_id = ? and company_id in ? and "user" like 'agent:%'`, org, companies).Group("company_id")
+	var events []Event
+	if err := s.in(org).Where("id in (?)", latest).Find(&events).Error; err != nil {
+		return nil, err
+	}
+	for _, e := range events {
+		out[*e.CompanyID] = &LastAgent{Actor: e.User, At: e.At, ByYou: who.did(e)}
+	}
+	return out, nil
+}
+
+func (s *Store) AgentSearch(org int64, who Actor, q string) ([]SearchHit, error) {
 	q = strings.ToLower(strings.TrimSpace(q))
 	if len(q) < 2 {
 		return nil, errors.New("search for at least two characters")
@@ -220,9 +372,17 @@ func (s *Store) AgentSearch(org int64, q string) ([]SearchHit, error) {
 	if err := s.in(org).Where("lower(name) like ? or lower(domain) like ? or lower(why) like ?", like, like, like).Limit(25).Find(&companies).Error; err != nil {
 		return nil, err
 	}
+	ids := make([]int64, len(companies))
+	for i, c := range companies {
+		ids[i] = c.ID
+	}
+	last, err := s.lastAgents(org, who, ids)
+	if err != nil {
+		return nil, err
+	}
 	hits := []SearchHit{}
 	for _, c := range companies {
-		hits = append(hits, SearchHit{Kind: "company", ID: c.ID, Name: c.Name, Stage: c.Stage})
+		hits = append(hits, SearchHit{Kind: "company", ID: c.ID, Name: c.Name, Stage: c.Stage, LastAgent: last[c.ID]})
 	}
 	var people []Contact
 	if err := s.in(org).Where("key not like 'org:%' and (lower(person) like ? or lower(email) like ? or lower(maker) like ?)", like, like, like).Limit(25).Find(&people).Error; err != nil {
@@ -242,9 +402,11 @@ func contactStage(c Contact) string {
 }
 
 type CompanyDetail struct {
-	Company Company       `json:"company"`
-	Facts   []Fact        `json:"facts"`
-	People  []PersonBrief `json:"people"`
+	Company   Company       `json:"company"`
+	Facts     []Fact        `json:"facts"`
+	People    []PersonBrief `json:"people"`
+	LastAgent *LastAgent    `json:"last_agent,omitempty" jsonschema:"the agent that last changed this company, if any"`
+	History   []Happened    `json:"history" jsonschema:"what people and agents did here, newest first"`
 }
 
 type PersonBrief struct {
@@ -255,9 +417,24 @@ type PersonBrief struct {
 	EmailStatus string `json:"email_status,omitempty"`
 	Linkedin    string `json:"linkedin,omitempty"`
 	Stage       string `json:"stage"`
+	NextStep    string `json:"next_step,omitempty" jsonschema:"what the person working this conversation plans to do"`
+	NextDate    string `json:"next_date,omitempty"`
+	LostReason  string `json:"lost_reason,omitempty"`
 }
 
-func (s *Store) AgentCompany(org int64, ref string) (*CompanyDetail, error) {
+// Happened is one line of a company's history as an agent sees it.
+type Happened struct {
+	At     time.Time `json:"at"`
+	Actor  string    `json:"actor" jsonschema:"a person's name, or agent:<key name>"`
+	Action string    `json:"action" jsonschema:"e.g. add:fact, add:contact, pick, company:rejected, draft:email, mark:replied"`
+	Value  string    `json:"value,omitempty" jsonschema:"the day of a mark, or a conversation stage"`
+	Person string    `json:"person,omitempty"`
+	ByYou  bool      `json:"by_you,omitempty"`
+}
+
+const agentHistory = 20
+
+func (s *Store) AgentCompany(org int64, who Actor, ref string) (*CompanyDetail, error) {
 	c, err := s.companyRef(org, ref)
 	if err != nil {
 		return nil, err
@@ -270,10 +447,27 @@ func (s *Store) AgentCompany(org int64, ref string) (*CompanyDetail, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := &CompanyDetail{Company: *c, Facts: facts, People: []PersonBrief{}}
+	out := &CompanyDetail{Company: *c, Facts: facts, People: []PersonBrief{}, History: []Happened{}}
+	names := map[int64]string{}
 	for _, p := range people {
+		names[p.ID] = displayName(p)
 		out.People = append(out.People, PersonBrief{ID: p.ID, Name: displayName(p), Title: p.Title, Email: deref(p.Email),
-			EmailStatus: p.EmailStatus, Linkedin: deref(p.Linkedin), Stage: contactStage(p)})
+			EmailStatus: p.EmailStatus, Linkedin: deref(p.Linkedin), Stage: contactStage(p),
+			NextStep: p.NextStep, NextDate: deref(p.NextDate), LostReason: p.LostReason})
+	}
+	last, err := s.lastAgents(org, who, []int64{c.ID})
+	if err != nil {
+		return nil, err
+	}
+	out.LastAgent = last[c.ID]
+	var events []Event
+	if err := s.in(org).Where("company_id = ?", c.ID).Order("at desc, id desc").Limit(agentHistory).Find(&events).Error; err != nil {
+		return nil, err
+	}
+	for _, e := range events {
+		// Only what erasure would keep: an event's value can hold a note or someone's details.
+		out.History = append(out.History, Happened{At: e.At, Actor: e.User, Action: e.Action, Value: deref(keptValue(e)),
+			Person: names[e.ContactID], ByYou: who.did(e)})
 	}
 	return out, nil
 }
@@ -304,10 +498,12 @@ func (s *Store) AgentDue(o *Org) ([]DueItem, error) {
 // agentInstructions describes each task rather than naming a model: the client
 // picks the model, and the agents page shows how each key's suggestions fare.
 func agentInstructions(o *Org, k *APIKey) string {
-	parts := []string{"Research and outreach data for " + o.Name + ". Companies and contacts you add wait in Research until a person qualifies them. Every fact and contact needs a source URL. Search before adding, to avoid duplicates. You can draft messages; only people send them."}
+	parts := []string{"Research and outreach data for " + o.Name + ". Companies and contacts you add wait in Research until a person qualifies them. Every fact and contact needs a source URL. Search before adding, to avoid duplicates. You can draft messages; only people send them.",
+		"Other agents and people work the same companies. get_company returns the company's history: read it before researching, don't suggest again what a person rejected, and if last_agent shows another agent was there within the hour, take a different company. by_you marks what this key did, perhaps in an earlier run."}
 	if k.Has("research:write") {
 		parts = append(parts,
-			"Companies and facts are high volume with simple judgement, so a small, fast model does them well. One claim per fact, from the page that shows it. Leave built_by and platform empty unless a source says so.",
+			"Companies and facts are high volume with simple judgement, so a small, fast model does them well. One claim per fact, from the page that shows it.",
+			lookForGuidance(o),
 			"Contacts need care more than speed, so use a capable model. Pick the person who owns the decision, not a general inbox. Confirm they hold the role now on a current page: an old bio, press release or speaker listing isn't enough. Set email_status to guess for any address inferred from a pattern. If you can't confirm someone, don't add them; add a team_page fact so a person can look.")
 	}
 	if k.Has("outcomes:write") {
@@ -323,6 +519,20 @@ func agentInstructions(o *Org, k *APIKey) string {
 		parts = append(parts, "From "+o.Name+":\n"+g)
 	}
 	return strings.Join(parts, "\n\n")
+}
+
+// lookForGuidance names the assets the organisation looks for, so agents record
+// each under the field the Research page checks.
+func lookForGuidance(o *Org) string {
+	assets, _ := o.Settings.Assets()
+	if len(assets) == 0 {
+		return "Add any fact a source shows that helps judge fit."
+	}
+	lines := []string{o.Name + " looks for these at each company. When a source shows one, add a fact with exactly this field. Add nothing for one you didn't find:"}
+	for _, a := range assets {
+		lines = append(lines, "- "+a.Field+prefixed(": ", a.Hint))
+	}
+	return strings.Join(lines, "\n")
 }
 
 type GuidanceOut struct {
@@ -392,12 +602,12 @@ type MarkIn struct {
 
 // AgentMark records an outcome for a contact already in outreach. Suggested
 // contacts haven't been picked by a person yet, so nothing has happened to them.
-func (s *Store) AgentMark(org int64, actor string, in MarkIn) error {
+func (s *Store) AgentMark(org int64, who Actor, in MarkIn) error {
 	date := strings.TrimSpace(in.Date)
 	if date == "" {
 		date = today()
 	}
-	return s.mark(org, in.ContactID, in.Step, date, actor, strings.TrimSpace(in.Note))
+	return s.mark(org, in.ContactID, in.Step, date, who, strings.TrimSpace(in.Note))
 }
 
 // AgentMarks is, per contact and step, the agent behind the latest mark, so a
