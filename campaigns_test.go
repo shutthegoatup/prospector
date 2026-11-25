@@ -214,3 +214,37 @@ func TestThePostalAddressIsKept(t *testing.T) {
 	}
 	_ = o
 }
+
+// What the review of drafts found: a never-contact LinkedIn profile, a subscription not
+// yet started, and a body's last line.
+func TestTheAudienceHoldsAtItsEdges(t *testing.T) {
+	s, o, srv, member := signedIn(t)
+	listedByProfile := must(s.QuickAddPerson(o, QuickAdd{Name: "Profile Listed", Company: "Larkmoor Yachts", Email: "listed@larkmoor.example", Linkedin: "https://www.linkedin.com/in/li-never"}, "Ada Lovelace"))
+	if err := s.Mark(o.ID, listedByProfile.ID, "replied", today(), "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	o.Settings.NeverContact = "linkedin.com/in/li-never"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	c := must(s.AddCampaign(o.ID, CampaignIn{Name: "Spring", Body: "Prices change.\n-- \nAda\n\n\n"}, "Ada Lovelace"))
+	if got := leftOut(must(s.Audience(o, *c)))["Profile Listed"]; got != "on the never-contact list" {
+		t.Errorf("someone whose LinkedIn profile is on the never-contact list: left out %q", got)
+	}
+	if c.Body != "Prices change.\n-- \nAda" {
+		t.Errorf("the body was saved as %q", c.Body)
+	}
+
+	later := person(t, s, o, "Not Yet", "Quayside Ltd", "notyet@quayside.example", false)
+	if _, err := s.AddSubscription(o.ID, SubscriptionIn{Company: *later.CompanyID, Name: "Starts later", Start: "2099-01-01", TermMonths: 12}, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	c = must(s.ChangeCampaign(o.ID, c.ID, []Change{{"audience", AudienceCustomers}}, "Ada Lovelace"))
+	if _, there := leftOut(must(s.Audience(o, *c)))["Not Yet"]; there {
+		t.Error("someone at a company whose subscription has not started is in the customers' audience")
+	}
+
+	if code, _ := call(t, member, "POST", srv.URL+"/o/alpha/ui/settings", "application/json", map[string]any{"name": "Alpha", "color": "#56c5f4", "postal_address": strings.Repeat("a", 301)}); code != http.StatusBadRequest {
+		t.Errorf("a postal address past 300 characters: %d", code)
+	}
+}

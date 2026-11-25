@@ -82,7 +82,8 @@ func campaignField(field, value string) (string, error) {
 			return "", fmt.Errorf("a subject is %d characters at most", campaignSubjectLimit)
 		}
 	case "body":
-		value = strings.TrimRight(strings.ReplaceAll(value, "\r\n", "\n"), " \n\t")
+		// Only trailing blank lines go: a line that ends in a space, as "-- " does, keeps it.
+		value = strings.TrimRight(strings.ReplaceAll(value, "\r\n", "\n"), "\n")
 		if utf8.RuneCountInString(value) > campaignBodyLimit {
 			return "", fmt.Errorf("a campaign is %d characters at most", campaignBodyLimit)
 		}
@@ -186,6 +187,33 @@ type Recipient struct {
 
 // Audience is everyone a campaign is for, those it goes to first, each address once.
 func (s *Store) Audience(o *Org, c Campaign) ([]Recipient, error) {
+	w, err := s.audienceWork(o)
+	if err != nil {
+		return nil, err
+	}
+	return s.audience(o, c, w)
+}
+
+// audienceWork is what every campaign's audience is checked against, read once for a
+// page of them.
+type audienceWork struct {
+	gate      *mailGate
+	customers []int64
+}
+
+func (s *Store) audienceWork(o *Org) (*audienceWork, error) {
+	g, err := s.gate(s.db, o)
+	if err != nil {
+		return nil, err
+	}
+	customers, err := s.customerCompanies(o.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &audienceWork{gate: g, customers: customers}, nil
+}
+
+func (s *Store) audience(o *Org, c Campaign, w *audienceWork) ([]Recipient, error) {
 	if c.OrgID != o.ID {
 		return nil, noSuch("no campaign %d", c.ID)
 	}
@@ -194,10 +222,7 @@ func (s *Store) Audience(o *Org, c Campaign) ([]Recipient, error) {
 	case AudienceConversations:
 		q = q.Where(inConversation)
 	case AudienceCustomers:
-		companies, err := s.customerCompanies(o.ID)
-		if err != nil {
-			return nil, err
-		}
+		companies := w.customers
 		if len(companies) == 0 {
 			return []Recipient{}, nil
 		}
@@ -230,8 +255,12 @@ func (s *Store) Audience(o *Org, c Campaign) ([]Recipient, error) {
 			r.Address = addr
 			if first, twice := seen[addr]; twice {
 				r.LeftOut = "same address as " + first
-			} else if why := s.marketable(s.db, o, addr); why != nil {
-				r.LeftOut = leftOutBecause(why)
+			} else if why := w.gate.why(addr, deref(p.Linkedin)); why != nil {
+				because, known := leftOutBecause(why)
+				if !known {
+					return nil, why
+				}
+				r.LeftOut = because
 			} else {
 				seen[addr] = r.Name
 			}
@@ -242,17 +271,21 @@ func (s *Store) Audience(o *Org, c Campaign) ([]Recipient, error) {
 	return out, nil
 }
 
-func leftOutBecause(err error) string {
+// leftOutBecause says why someone is left out, for the reasons there are. Any other
+// error is a failure to check, and is not passed off as a reason.
+func leftOutBecause(err error) (string, bool) {
 	switch {
 	case errors.Is(err, errSuppressed):
-		return "on the list not to be mailed"
+		return "on the list not to be mailed", true
 	case errors.Is(err, errErased):
-		return "erased on request"
+		return "erased on request", true
+	case errors.Is(err, errNeverContact):
+		return "on the never-contact list", true
 	}
-	return "on the never-contact list"
+	return "", false
 }
 
-// customerCompanies are those with a subscription that hasn't ended.
+// customerCompanies are those with a subscription running today: started, not ended.
 func (s *Store) customerCompanies(org int64) ([]int64, error) {
 	subs, err := s.Subscriptions(org, 0, today())
 	if err != nil {
@@ -261,7 +294,7 @@ func (s *Store) customerCompanies(org int64) ([]int64, error) {
 	var out []int64
 	seen := map[int64]bool{}
 	for _, sub := range subs {
-		if sub.Status != SubEnded && !seen[sub.CompanyID] {
+		if sub.Status != SubEnded && sub.Status != SubScheduled && !seen[sub.CompanyID] {
 			seen[sub.CompanyID] = true
 			out = append(out, sub.CompanyID)
 		}
@@ -308,8 +341,13 @@ func (a *App) campaignsPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cards := make([]CampaignCard, 0, len(list))
+	work, err := a.s.audienceWork(q.Org)
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
 	for _, c := range list {
-		people, err := a.s.Audience(q.Org, c)
+		people, err := a.s.audience(q.Org, c, work)
 		if err != nil {
 			fail(w, err, http.StatusInternalServerError)
 			return

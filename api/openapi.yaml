@@ -901,7 +901,7 @@ paths:
       summary: Write a campaign
       description: |
         A draft of a marketing mail to everyone in conversation, or everyone at a company
-        with a subscription that hasn't ended. Nothing is sent: a draft can be changed and
+        whose subscription has started and not ended. Nothing is sent: a draft can be changed and
         its audience looked at as often as you like.
       security:
         - session: []
@@ -966,7 +966,8 @@ paths:
       description: |
         Worked out afresh each time, from who is in conversation or at a customer today.
         Someone with no address, on the list not to be mailed, on the never-contact list or
-        erased is left out, and an address shared by two people goes to the first only.
+        erased (by their address or LinkedIn profile) is left out, and an address shared by
+        two people goes to the first only.
         Those it goes to come first.
       parameters:
         - $ref: "#/components/parameters/limit"
@@ -1362,7 +1363,7 @@ components:
     CampaignAudience:
       type: string
       enum: [conversations, customers]
-      description: "`conversations`: everyone in conversation. `customers`: everyone at a company with a subscription that hasn't ended."
+      description: "`conversations`: everyone in conversation. `customers`: everyone at a company whose subscription has started and not ended, whether or not they ever replied."
 
     CampaignNew:
       type: object

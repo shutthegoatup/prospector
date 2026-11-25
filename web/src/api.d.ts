@@ -602,7 +602,7 @@ export interface paths {
         /**
          * Write a campaign
          * @description A draft of a marketing mail to everyone in conversation, or everyone at a company
-         *     with a subscription that hasn't ended. Nothing is sent: a draft can be changed and
+         *     whose subscription has started and not ended. Nothing is sent: a draft can be changed and
          *     its audience looked at as often as you like.
          */
         post: operations["createCampaign"];
@@ -655,7 +655,8 @@ export interface paths {
          * Who a campaign would go to now, and who is left out and why
          * @description Worked out afresh each time, from who is in conversation or at a customer today.
          *     Someone with no address, on the list not to be mailed, on the never-contact list or
-         *     erased is left out, and an address shared by two people goes to the first only.
+         *     erased (by their address or LinkedIn profile) is left out, and an address shared by
+         *     two people goes to the first only.
          *     Those it goes to come first.
          */
         get: operations["listCampaignAudience"];
@@ -1045,7 +1046,7 @@ export interface components {
             created_at: string;
         };
         /**
-         * @description `conversations`: everyone in conversation. `customers`: everyone at a company with a subscription that hasn't ended.
+         * @description `conversations`: everyone in conversation. `customers`: everyone at a company whose subscription has started and not ended, whether or not they ever replied.
          * @enum {string}
          */
         CampaignAudience: "conversations" | "customers";

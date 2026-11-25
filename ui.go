@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type Nav struct {
@@ -528,6 +529,10 @@ func (a *App) uiSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := in.Onboarding(); err != nil {
 		fail(w, err, http.StatusBadRequest)
+		return
+	}
+	if utf8.RuneCountInString(in.PostalAddress) > 300 {
+		fail(w, errors.New("a postal address is 300 characters at most"), http.StatusBadRequest)
 		return
 	}
 	in.Currency = strings.ToUpper(strings.TrimSpace(in.Currency))
