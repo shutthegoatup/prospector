@@ -136,6 +136,7 @@ type CompanyPage struct {
 	Facts   []Fact
 	People  []Contact
 	History []HistoryItem
+	Notes   []NoteView
 }
 
 func (a *App) company(w http.ResponseWriter, r *http.Request) {
@@ -149,6 +150,10 @@ func (a *App) company(w http.ResponseWriter, r *http.Request) {
 	p.Facts, _ = a.s.Facts(q.Org.ID, c.ID)
 	p.People, _ = a.s.People(q.Org.ID, c.ID)
 	p.History, _ = a.s.History(q.Org.ID, c.ID, 50)
+	notes, _ := a.s.CompanyNotes(q.Org.ID, c.ID, 20)
+	for _, n := range notes {
+		p.Notes = append(p.Notes, NoteView{TaskNote: n})
+	}
 	a.page(w, r, "companies", CompanyView(q, p))
 }
 
@@ -220,13 +225,18 @@ type AgentsData struct {
 	Base     string
 	Keys     []APIKey
 	Activity []AgentEvent
+	Runs     []Run
+	Tasks    map[int64]string
+	Now      time.Time
 	Scores   []AgentScore
 }
 
 func (a *App) agents(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	keys, _ := a.s.Keys(q.Org.ID)
-	a.page(w, r, "agents", AgentsView(q, AgentsData{Base: a.baseURL(r) + q.Base(), Keys: keys, Activity: a.s.AgentActivity(q.Org.ID, 20), Scores: a.s.AgentScores(q.Org.ID)}))
+	runs, tasks := a.s.Runs(q.Org.ID, 12)
+	a.page(w, r, "agents", AgentsView(q, AgentsData{Base: a.baseURL(r) + q.Base(), Keys: keys, Activity: a.s.AgentActivity(q.Org.ID, 20),
+		Scores: a.s.AgentScores(q.Org.ID), Runs: runs, Tasks: tasks, Now: time.Now()}))
 }
 
 func done(w http.ResponseWriter, err error) {

@@ -88,6 +88,9 @@ type OrgExport struct {
 	Facts        []Fact         `json:"facts"`
 	Contacts     []Contact      `json:"contacts"`
 	Enquiries    []Enquiry      `json:"enquiries"`
+	Tasks        []Task         `json:"tasks"`
+	TaskRequests []TaskRequest  `json:"task_requests"`
+	TaskNotes    []TaskNote     `json:"task_notes"`
 	History      []ExportRecord `json:"history"`
 	Erased       int64          `json:"people_erased"`
 }
@@ -141,6 +144,7 @@ type ExportRecord struct {
 	ExportEvent
 	ContactID int64  `json:"contact_id,omitempty"`
 	CompanyID *int64 `json:"company_id,omitempty"`
+	TaskID    int64  `json:"task_id,omitempty"`
 }
 
 func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
@@ -180,7 +184,7 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			return err
 		}
 		mine := func() *gorm.DB { return tx.Where("org_id = ?", org).Order("id") }
-		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Enquiries} {
+		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Enquiries, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
 			if err := mine().Find(rows).Error; err != nil {
 				return err
 			}
@@ -193,7 +197,7 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			if e.Action == "erase" {
 				out.Erased++
 			}
-			out.History = append(out.History, ExportRecord{ExportEvent{At: e.At, By: e.User, Action: e.Action, Value: deref(e.Value)}, e.ContactID, e.CompanyID})
+			out.History = append(out.History, ExportRecord{ExportEvent{At: e.At, By: e.User, Action: e.Action, Value: deref(e.Value)}, e.ContactID, e.CompanyID, e.TaskID})
 		}
 		return nil
 	})

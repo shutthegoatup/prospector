@@ -143,7 +143,7 @@ document.addEventListener("submit", async (e) => {
     if (res.go) return void (location.href = res.go);
     if (result) result.textContent = res.message || "Saved ✓";
     if (form.dataset.reset) {
-      for (const el of form.elements) if (el.type !== "checkbox" && el.type !== "submit" && el.tagName !== "SELECT" && !el.closest("fieldset[data-keep]")) el.value = "";
+      for (const el of form.elements) if (el.type !== "checkbox" && el.type !== "submit" && el.tagName !== "SELECT" && !el.hidden && !el.closest("fieldset[data-keep]")) el.value = "";
       form.querySelector("input:not([type=hidden])")?.focus();
     }
     if (form.dataset.close) setTimeout(() => window.close(), 1200);
