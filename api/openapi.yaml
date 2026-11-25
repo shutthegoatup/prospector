@@ -12,7 +12,8 @@ info:
     `enquiries:reply` to email a reply to an enquiry and record its answer;
     `customers:write` to record and change subscriptions and onboardings; `customers:invite`
     to email a customer a link to their steps and withdraw it; `pipeline:write` to work deals
-    and say where answering an enquiry stands; `enquiries:delete` to delete an enquiry;
+    and say where answering an enquiry stands; `enquiries:triage` to say where answering an
+    enquiry stands and put its sender on the board, without deals; `enquiries:delete` to delete an enquiry;
     `campaigns:write` to keep the list of addresses marketing mail never goes to. A
     signed-in member may do all of these except configuring agents and deleting enquiries,
     which need an owner.
@@ -738,6 +739,7 @@ paths:
       security:
         - session: []
         - bearer: ["pipeline:write"]
+        - bearer: ["enquiries:triage"]
       requestBody:
         required: true
         content:
@@ -779,6 +781,7 @@ paths:
       security:
         - session: []
         - bearer: ["pipeline:write"]
+        - bearer: ["enquiries:triage"]
       responses:
         "201":
           description: Who they are here.
