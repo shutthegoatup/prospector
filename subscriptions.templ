@@ -123,6 +123,25 @@ templ SubscriptionLine(q *Req, r SubscriptionRow, day string, named bool) {
 				@Label("Ended early on")
 				@input.Input(input.Props{Type: "date", Value: deref(r.EndedOn), Class: "h-8 w-44 bg-muted", Attributes: subField(r.Subscription, "ended_on")})
 			</div>
+			if r.Renewing {
+				<p class="mt-2 border-t border-border pt-2"><a href={ templ.SafeURL(q.Base() + "conversations") } class="font-mono text-xs text-mark underline">Renewal under way in Conversations</a></p>
+			} else if r.Status != SubEnded && len(r.People) > 0 {
+				<form data-form="ui/subscription/renew" data-refresh="true" class="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
+					<input type="number" name="id" value={ strconv.FormatInt(r.ID, 10) } hidden/>
+					@Label("Renewal with")
+					<select name="contact" aria-label="Who the renewal is with" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
+						for _, p := range r.People {
+							<option value={ strconv.FormatInt(p.ID, 10) }>{ displayName(p) }</option>
+						}
+					</select>
+					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Type: button.TypeSubmit}) {
+						Start the renewal deal
+					}
+					<span class="font-mono text-xs text-muted-foreground" data-result></span>
+				</form>
+			} else if r.Status != SubEnded {
+				<p class="mt-2 border-t border-border pt-2 font-mono text-xs text-muted-foreground">To start a renewal deal, someone at this company needs to be on the Conversations board first.</p>
+			}
 			<form data-form="ui/subscription/remove" data-refresh="true" class="mt-2 flex items-center gap-2 border-t border-border pt-2">
 				<input type="number" name="id" value={ strconv.FormatInt(r.ID, 10) } hidden/>
 				@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Type: button.TypeSubmit}) {

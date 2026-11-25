@@ -34,6 +34,8 @@ type Deal struct {
 	NextStep   string  `gorm:"not null;default:''" json:"next_step"`
 	NextDate   *string `json:"next_date"`
 	LostReason string  `gorm:"not null;default:''" json:"lost_reason"`
+	// SubscriptionID is the subscription a renewal is for; 0 when it is for none.
+	SubscriptionID int64 `gorm:"index;not null;default:0" json:"subscription_id"`
 }
 
 const DealNew = "new"

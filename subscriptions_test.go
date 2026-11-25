@@ -336,3 +336,111 @@ func TestTodayPointsAtSubscriptionsComingDue(t *testing.T) {
 	}
 	_ = rolled
 }
+
+func TestARenewalDealIsStartedFromASubscription(t *testing.T) {
+	s, o, srv, client := signedIn(t)
+	hannah := repliedPerson(t, s, o, "Hannah Pryce")
+	quiet := must(s.QuickAddPerson(o, QuickAdd{Name: "Tom Ellery", Company: "Larkmoor Yachts"}, "Ada Lovelace"))
+	elsewhere := must(s.QuickAddPerson(o, QuickAdd{Name: "Sven Dahl", Company: "Nordkap Boats"}, "Ada Lovelace"))
+	if err := s.Mark(o.ID, elsewhere.ID, "replied", today(), "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	start := mustDay(today()).AddDate(0, -11, 0).Format(dayLayout)
+	sub := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Amount: "1,500", Per: PerMonth, Start: start, TermMonths: 12, NoticeDays: 30}, "Ada Lovelace"))
+	ended := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *hannah.CompanyID, Name: "Old plan", Start: "2020-01-01", TermMonths: 12, Then: ThenEnds}, "Ada Lovelace"))
+
+	rows := must(s.Subscriptions(o.ID, 0, today()))
+	var row SubscriptionRow
+	for _, r := range rows {
+		if r.ID == sub.ID {
+			row = r
+		}
+	}
+	if row.Renewing || len(row.People) != 1 || row.People[0].ID != hannah.ID {
+		t.Fatalf("before a renewal, the people it can be with: %+v", row)
+	}
+	for why, with := range map[string]int64{"someone who has not replied": quiet.ID, "someone at another company": elsewhere.ID, "nobody": 99999} {
+		if _, err := s.StartRenewal(o.ID, sub.ID, with, "Ada Lovelace"); err == nil {
+			t.Errorf("a renewal was started with %s", why)
+		}
+	}
+	if _, err := s.StartRenewal(o.ID, ended.ID, hannah.ID, "Ada Lovelace"); err == nil {
+		t.Error("a renewal was started for a subscription that has ended")
+	}
+	other := mustOrg(t, s, "beta")
+	if _, err := s.StartRenewal(other.ID, sub.ID, hannah.ID, "Eve"); err == nil {
+		t.Error("another organisation started a renewal")
+	}
+
+	_, page := call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil)
+	if !strings.Contains(page, `data-form="ui/subscription/renew"`) || !strings.Contains(page, "Hannah Pryce") {
+		t.Error("the subscription lacks the offer of a renewal with the person in conversation")
+	}
+	renew := func(contact string) (int, string) {
+		return call(t, client, "POST", srv.URL+"/o/alpha/ui/subscription/renew", "application/json", map[string]any{"id": sub.ID, "contact": contact})
+	}
+	if code, _ := renew(""); code == http.StatusOK {
+		t.Error("a renewal was started with nobody chosen")
+	}
+	if code, body := renew(itoa(hannah.ID)); code != http.StatusOK {
+		t.Fatalf("starting the renewal: %d %s", code, body)
+	}
+	deals := must(s.OtherDeals(o.ID))["replied"]
+	if len(deals) != 1 || deals[0].Kind != "renewal" || deals[0].SubscriptionID != sub.ID || deals[0].Value() != "£18,000" || deref(deals[0].CloseDate) != row.TermEnd {
+		t.Fatalf("the renewal deal, worth a year of it and closing when the term ends: %+v", deals)
+	}
+	if code, _ := renew(itoa(hannah.ID)); code == http.StatusOK {
+		t.Error("a second renewal was started while the first is open")
+	}
+	_, page = call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil)
+	if !strings.Contains(page, "Renewal under way in Conversations") || strings.Contains(page, `data-form="ui/subscription/renew"`) {
+		t.Error("the subscription still offers a renewal while one is open")
+	}
+	// Once the renewal is closed, another can be started next time round.
+	if err := s.ChangeDeal(o.ID, deals[0].ID, "stage", "won", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if _, page = call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil); !strings.Contains(page, `data-form="ui/subscription/renew"`) {
+		t.Error("after the renewal was won, the subscription offers no next one")
+	}
+	// Removing the subscription leaves the deal, pointing at nothing.
+	if err := s.RemoveSubscription(o.ID, sub.ID, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if left := must(s.OtherDeals(o.ID))["won"]; len(left) != 1 || left[0].SubscriptionID != 0 {
+		t.Errorf("the renewal deal after its subscription was removed: %+v", left)
+	}
+}
+
+// A database from before a deal could point at a subscription has deals without the column.
+func TestDealsFromBeforeRenewalsPointedAtSubscriptions(t *testing.T) {
+	dsn := filepath.Join(t.TempDir(), "old.sqlite")
+	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
+		dsn = pg
+	}
+	old := must(Open(dsn))
+	if err := old.db.Migrator().DropTable(models...); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.db.AutoMigrate(models...); err != nil {
+		t.Fatal(err)
+	}
+	o := mustOrg(t, old, "alpha")
+	c := repliedPerson(t, old, o, "Hannah Pryce")
+	renewal := must(old.StartDeal(o.ID, c.ID, "renewal", "Ada Lovelace"))
+	if err := old.db.Migrator().DropIndex(&Deal{}, "idx_deals_subscription_id"); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.db.Migrator().DropColumn(&Deal{}, "subscription_id"); err != nil {
+		t.Fatal(err)
+	}
+	s := must(Open(dsn))
+	deals := must(s.OtherDeals(o.ID))["replied"]
+	if len(deals) != 1 || deals[0].ID != renewal.ID || deals[0].SubscriptionID != 0 {
+		t.Fatalf("the renewal after the upgrade: %+v", deals)
+	}
+	sub := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *c.CompanyID, Name: "Plan", Start: today(), TermMonths: 12}, "Ada Lovelace"))
+	if _, err := s.StartRenewal(o.ID, sub.ID, c.ID, "Ada Lovelace"); err != nil {
+		t.Errorf("a renewal for a subscription after the upgrade: %v", err)
+	}
+}

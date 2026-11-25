@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -441,6 +442,10 @@ func (s *Store) RemoveSubscription(org, id int64, actor string) error {
 		if err := tx.Delete(&sub).Error; err != nil {
 			return err
 		}
+		// A renewal deal for it carries on as a deal, pointing at nothing.
+		if err := tx.Model(&Deal{}).Where("org_id = ? and subscription_id = ?", org, id).Update("subscription_id", 0).Error; err != nil {
+			return err
+		}
 		return s.log(tx, org, 0, &sub.CompanyID, actor, "sub:remove", nil)
 	})
 }
@@ -450,6 +455,10 @@ type SubscriptionRow struct {
 	Subscription
 	Company string
 	Standing
+	// Renewing is whether a renewal deal for it is open on the Conversations board.
+	Renewing bool
+	// People are those at the company already in conversation: who a renewal can be with.
+	People []Contact
 }
 
 // Subscriptions lists an organisation's, the one needing attention soonest first;
@@ -476,7 +485,25 @@ func (s *Store) Subscriptions(org, company int64, day string) ([]SubscriptionRow
 	}
 	rows := make([]SubscriptionRow, len(subs))
 	for i, sub := range subs {
-		rows[i] = SubscriptionRow{sub, names[sub.CompanyID], sub.On(day)}
+		rows[i] = SubscriptionRow{Subscription: sub, Company: names[sub.CompanyID], Standing: sub.On(day)}
+	}
+	var renewing []int64
+	if err := s.in(org).Model(&Deal{}).Where("subscription_id <> 0 and stage not in ?", []string{"won", "lost"}).
+		Pluck("subscription_id", &renewing).Error; err != nil {
+		return nil, err
+	}
+	var people []Contact
+	if err := s.in(org).Where("company_id in (?)", s.in(org).Model(&Subscription{}).Select("company_id")).
+		Where(inConversation).Order("id").Find(&people).Error; err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		rows[i].Renewing = slices.Contains(renewing, rows[i].ID)
+		for _, p := range people {
+			if p.CompanyID != nil && *p.CompanyID == rows[i].CompanyID {
+				rows[i].People = append(rows[i].People, p)
+			}
+		}
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Attention() < rows[j].Attention() })
 	return rows, nil
@@ -538,4 +565,81 @@ func (a *App) uiSubscriptionRemove(w http.ResponseWriter, r *http.Request) {
 		q := reqOf(r)
 		done(w, a.s.RemoveSubscription(q.Org.ID, in.ID, q.Actor()))
 	}
+}
+
+// StartRenewal opens a renewal deal for a subscription with someone at its company who
+// is already in conversation. The deal starts with what the subscription costs for a
+// year and closes when the term in hand ends, both of which can then be changed.
+func (s *Store) StartRenewal(org, subscription, contact int64, actor string) (*Deal, error) {
+	var d Deal
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// Held, so two started together are numbered one after the other.
+		if err := hold(tx, &Contact{}, org, contact); err != nil {
+			return err
+		}
+		var sub Subscription
+		if err := tx.Where("org_id = ? and id = ?", org, subscription).First(&sub).Error; err != nil {
+			return missing(err, "no subscription %d", subscription)
+		}
+		var c Contact
+		if err := tx.Where("org_id = ? and id = ?", org, contact).First(&c).Error; err != nil {
+			return missing(err, "no contact %d", contact)
+		}
+		if c.CompanyID == nil || *c.CompanyID != sub.CompanyID {
+			return errors.New("that person is not at the company the subscription is with")
+		}
+		if c.Replied == nil || c.Declined != nil || c.Status == ContactSuggested {
+			return errors.New("a renewal is with someone you are in conversation with")
+		}
+		st := sub.On(today())
+		if st.Status == SubEnded {
+			return errors.New("that subscription has ended: record a new one when they come back")
+		}
+		var open int64
+		if err := tx.Model(&Deal{}).Where("org_id = ? and subscription_id = ? and stage not in ?", org, sub.ID, []string{"won", "lost"}).
+			Count(&open).Error; err != nil {
+			return err
+		}
+		if open > 0 {
+			return errors.New("a renewal for it is already under way on the Conversations board")
+		}
+		var last int
+		if err := tx.Model(&Deal{}).Where("org_id = ? and contact_id = ?", org, contact).
+			Select("coalesce(max(seq), 0)").Scan(&last).Error; err != nil {
+			return err
+		}
+		closes := st.TermEnd
+		if st.Ends != "" {
+			closes = st.Ends
+		}
+		d = Deal{OrgID: org, ContactID: contact, Seq: last + 1, Kind: "renewal", Stage: Stages[0].Key, SubscriptionID: sub.ID,
+			Amount: sub.Yearly(), Currency: sub.Currency, CloseDate: nonEmpty(closes)}
+		if err := tx.Create(&d).Error; err != nil {
+			return err
+		}
+		return s.log(tx, org, contact, c.CompanyID, actor, "deal:start", str("renewal"))
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func (a *App) uiSubscriptionRenew(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID      int64  `json:"id"`
+		Contact string `json:"contact"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	// A select posts its value as text.
+	contact, err := strconv.ParseInt(in.Contact, 10, 64)
+	if err != nil {
+		fail(w, errors.New("choose who the renewal is with"), http.StatusBadRequest)
+		return
+	}
+	q := reqOf(r)
+	_, err = a.s.StartRenewal(q.Org.ID, in.ID, contact, q.Actor())
+	done(w, err)
 }
