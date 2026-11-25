@@ -101,6 +101,36 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 	if pages != 3 {
 		t.Fatalf("a task with six companies, two a page, took %d pages", pages)
 	}
+	// More notes than the task's own page shows can all be reached.
+	extra := make([]TaskNote, taskNotesShown+20)
+	for i := range extra {
+		extra[i] = TaskNote{OrgID: o.ID, TaskID: task.ID, Actor: "agent:scout", Kind: "next", Text: fmt.Sprint("Later note ", i)}
+	}
+	if err := s.db.CreateInBatches(extra, 60).Error; err != nil {
+		t.Fatal(err)
+	}
+	left, in, pages = map[int64]int{}, PageIn{Limit: 50}, 0
+	for {
+		got := must(s.AgentTask(o.ID, scout, task.ID, in))
+		for _, n := range got.Notes {
+			left[n.ID]++
+		}
+		if pages++; got.NextCursor == "" || pages > 50 {
+			break
+		}
+		in.Cursor = got.NextCursor
+	}
+	once("notes on a task with many", left, taskNotesShown+25)
+	if err := s.db.Where("task_id = ? and text like ?", task.ID, "Later note%").Delete(&TaskNote{}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	// Carrying on from a company's short first answer reads full pages.
+	more := must(s.AgentCompany(o.ID, scout, co.Name, PageIn{Cursor: usual.NextCursor}))
+	if len(more.Notes) != 5-agentNotes || more.NextCursor != "" {
+		t.Fatalf("the rest of a company's notes after its first answer: %d notes, next %q", len(more.Notes), more.NextCursor)
+	}
+
 	if whole := must(s.AgentTask(o.ID, scout, task.ID, PageIn{})); len(whole.Companies) != 6 || whole.NextCursor != "" {
 		t.Fatalf("a task that fits one page: %d companies, next %q", len(whole.Companies), whole.NextCursor)
 	}

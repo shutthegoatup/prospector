@@ -733,14 +733,39 @@ func (s *Store) agentTaskPage(org int64, who Actor, id int64, page PageIn, now t
 	for _, r := range v.Requests {
 		out.Requests = append(out.Requests, asked(r, who))
 	}
-	for _, n := range v.Notes {
-		out.Notes = append(out.Notes, NoteOut{ID: n.ID, Kind: n.Kind, Text: n.Text, Actor: n.Actor, At: n.CreatedAt, Company: n.Company,
+	// The task's view holds only its latest notes, so a page of them is read here: all
+	// of them can then be reached.
+	notesFrom := s.in(org).Where("task_id = ?", id).Order("id desc").Limit(page.size() + 1)
+	if at[2] > 0 {
+		notesFrom = notesFrom.Where("id < ?", at[2])
+	}
+	var notes []TaskNote
+	if err := notesFrom.Find(&notes).Error; err != nil {
+		return nil, err
+	}
+	notes, at[2] = beforeID(notes, func(n TaskNote) int64 { return n.ID }, 0, page.size())
+	about := map[int64]string{}
+	for _, n := range notes {
+		if n.CompanyID != 0 {
+			about[n.CompanyID] = ""
+		}
+	}
+	if len(about) > 0 {
+		var companies []Company
+		if err := s.in(org).Where("id in ?", slices.Collect(maps.Keys(about))).Find(&companies).Error; err != nil {
+			return nil, err
+		}
+		for _, c := range companies {
+			about[c.ID] = c.Name
+		}
+	}
+	for _, n := range notes {
+		out.Notes = append(out.Notes, NoteOut{ID: n.ID, Kind: n.Kind, Text: n.Text, Actor: n.Actor, At: n.CreatedAt, Company: about[n.CompanyID],
 			ByYou: who.did(Event{User: n.Actor, KeyID: n.KeyID})})
 	}
 	// The counts in the brief are of everything found; only the lists are a page.
 	out.Companies, at[0] = afterID(out.Companies, func(c TaskCompany) int64 { return c.ID }, at[0], page.size())
 	out.People, at[1] = afterID(out.People, func(p TaskPerson) int64 { return p.ID }, at[1], page.size())
-	out.Notes, at[2] = beforeID(out.Notes, func(n NoteOut) int64 { return n.ID }, at[2], page.size())
 	if at[0] != ranOut || at[1] != ranOut || at[2] != noneBefore {
 		out.NextCursor = cursorOf(at...)
 	}
