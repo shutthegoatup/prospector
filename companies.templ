@@ -239,6 +239,7 @@ templ CompanyView(q *Req, p CompanyPage) {
 				</details>
 			}
 		</div>
+		@AgreementsBlock(q, p.Company.ID, p.Agreements)
 		if len(p.Facts) > 0 {
 			<div>
 				@Label("Facts")

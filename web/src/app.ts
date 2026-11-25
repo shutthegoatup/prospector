@@ -155,6 +155,28 @@ function oneOf<T extends string>(list: readonly T[], f: string, what: string): T
   return f as T;
 }
 
+// A file chosen for an agreement goes up as the PDF it is, the body of a PUT.
+document.addEventListener("change", async (e) => {
+  const input = (e.target as Element).closest<HTMLInputElement>("input[type=file][data-upload]");
+  const file = input?.files?.[0];
+  if (!input || !file) return;
+  try {
+    answered(
+      await api.PUT("/o/{org}/api/v1/agreements/{id}/document", {
+        params: { path: { org, id: +(input.dataset.upload || 0) }, query: { name: file.name } },
+        // The spec's binary body is typed as a string; the File is sent as it is.
+        body: file as unknown as string,
+        bodySerializer: (b) => b,
+        headers: { "content-type": "application/pdf" },
+      }),
+    );
+    refresh();
+  } catch (err) {
+    input.value = "";
+    report(err);
+  }
+});
+
 document.addEventListener("change", async (e) => {
   const f = (e.target as Element).closest<Field>("[data-field]");
   if (!f) return;

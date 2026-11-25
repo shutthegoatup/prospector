@@ -80,6 +80,10 @@ Once a company is a customer, record what they are on from its page: what it is,
 
 Subscriptions lists them all, the one that needs someone soonest first, with the day the term ends and the last day to give notice, and what is contracted for the year. Notice given, or an early end, is recorded on the subscription and it works out the day it stops. Nothing here takes payment or sends an invoice, and a subscription belongs to the company, so erasing a person leaves it.
 
+### Agreements: the contract as a PDF
+
+From a company's page, start an agreement and upload the contract as a PDF, 10 MB at most. Prospector keeps the file exactly as uploaded with its SHA-256, checks it against that hash whenever it is downloaded, and always hands it back as a download. It doesn't read what the contract says, and it is not for deeds or anything that must be witnessed or notarised. For now an agreement is a draft: sending it for signature comes later, with what the signer sees, the record of who signed what, and the sealed copy that goes to everyone. The organisation's export carries each agreement and its hash, not the file.
+
 ### Also
 
 - **Companies:** search, plus each company's people, facts and full history: who did what, people and agents alike.
@@ -229,6 +233,7 @@ The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml),
 | `customers:invite` | `POST /api/v1/onboardings/{id}/invites` emails a customer a link to their steps, through your mail server; `DELETE /api/v1/onboarding-invites/{id}` withdraws it |
 | `campaigns:write` | write campaign drafts and see their audience (`/api/v1/campaigns`); add an address to the list marketing mail never goes to, or take off one that was added (`/api/v1/suppressions`) |
 | `campaigns:send` | send, cancel and resume a campaign (`/api/v1/campaigns/{id}/send`, `…/cancel`, `…/resume`), through your own mail server |
+| `agreements:write` | start agreements for companies and upload their PDFs (`/api/v1/agreements`, `…/{id}/document`); nothing is sent for signature yet |
 | `pipeline:write` | work deals (`/api/v1/deals`, `/api/v1/contacts/{id}/deal`); set an enquiry's state, owner and note (`PATCH /api/v1/enquiries/{id}`) and put its sender on the board (`…/conversation`) |
 | `enquiries:triage` | the enquiry half of `pipeline:write` alone: `PATCH /api/v1/enquiries/{id}` and `…/conversation`, for a support agent that shouldn't touch deals |
 | `enquiries:delete` | `DELETE /api/v1/enquiries/{id}`: delete an enquiry for good |

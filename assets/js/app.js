@@ -602,6 +602,26 @@
     return f;
   }
   document.addEventListener("change", async (e) => {
+    const input = e.target.closest("input[type=file][data-upload]");
+    const file = input?.files?.[0];
+    if (!input || !file) return;
+    try {
+      answered(
+        await api.PUT("/o/{org}/api/v1/agreements/{id}/document", {
+          params: { path: { org, id: +(input.dataset.upload || 0) }, query: { name: file.name } },
+          // The spec's binary body is typed as a string; the File is sent as it is.
+          body: file,
+          bodySerializer: (b) => b,
+          headers: { "content-type": "application/pdf" }
+        })
+      );
+      refresh();
+    } catch (err) {
+      input.value = "";
+      report(err);
+    }
+  });
+  document.addEventListener("change", async (e) => {
     const f = e.target.closest("[data-field]");
     if (!f) return;
     const field = f.dataset.field || "";
