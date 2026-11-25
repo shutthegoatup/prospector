@@ -79,7 +79,7 @@ func TestACustomerIsOnboardedStepByStep(t *testing.T) {
 	set := func(seq int, field, value string) error {
 		return s.SetOnboardingStep(o.ID, r.Steps[seq-1].ID, field, value, "Ada Lovelace")
 	}
-	for field, value := range map[string]string{"due": "next week", "name": "Renamed", "who": "them"} {
+	for field, value := range map[string]string{"due": "next week", "name": "Renamed", "who": "them", "done": "no"} {
 		if err := set(1, field, value); err == nil {
 			t.Errorf("a step's %s was set to %q", field, value)
 		}
@@ -91,6 +91,10 @@ func TestACustomerIsOnboardedStepByStep(t *testing.T) {
 		if err := set(step.seq, step.field, step.value); err != nil {
 			t.Fatalf("setting step %d's %s: %v", step.seq, step.field, err)
 		}
+	}
+	// A teammate on a page that hadn't caught up presses Done on a step already done.
+	if err := s.SetOnboardingStep(o.ID, r.Steps[0].ID, "done", "yes", "Grace Okoro"); err != nil {
+		t.Fatal(err)
 	}
 	r = must(s.Onboardings(o.ID, company, "2026-11-13"))[0]
 	if len(r.Steps) != 4 || r.Done != 1 || r.Steps[0].DoneBy != "Ada Lovelace" || deref(r.Steps[0].DoneOn) != today() ||
@@ -111,7 +115,7 @@ func TestACustomerIsOnboardedStepByStep(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(said) != 8 || said[0].Action != "onboard:start" || deref(said[0].Value) != "2026-11-02" || deref(said[1].Value) != "Name a project lead" ||
-		deref(said[2].Value) != "2026-11-20" || said[4].Action != "onboard:undone" || said[0].ContactID != 0 {
+		deref(said[2].Value) != "Send your product files: 2026-11-20" || said[4].Action != "onboard:undone" || said[0].ContactID != 0 {
 		t.Errorf("the history of the onboarding: %+v", said)
 	}
 

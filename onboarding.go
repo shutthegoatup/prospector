@@ -82,7 +82,7 @@ func (s OrgSettings) Onboarding() ([]StepPlan, error) {
 			}
 		}
 		if line == "" {
-			return nil, errors.New("a step needs a name after who does it")
+			return nil, errors.New("every step needs a name: one line has only who does it or when it is due")
 		}
 		p.Name = clip(line, 200)
 		out = append(out, p)
@@ -162,18 +162,27 @@ func (s *Store) SetOnboardingStep(org, id int64, field, value, actor string) err
 		action, logged := "onboard:"+field, st.Name
 		switch field {
 		case "done":
-			if value == "" {
+			switch {
+			case value == "":
 				updates["done_on"], updates["done_by"], action = nil, "", "onboard:undone"
-				break
+			case value != "yes":
+				return fmt.Errorf("a step is done (yes) or not (empty), not %q", value)
+			case st.DoneOn != nil:
+				// Someone on a page that hadn't caught up: who did it, and when, stay as they were.
+				return nil
+			default:
+				updates["done_on"], updates["done_by"] = today(), actor
 			}
-			updates["done_on"], updates["done_by"] = today(), actor
 		case "due":
 			if value != "" {
 				if _, err := parseDay(value); err != nil {
 					return err
 				}
 			}
-			updates["due"], logged = nonEmpty(value), value
+			updates["due"], logged = nonEmpty(value), st.Name+": "+value
+			if value == "" {
+				logged = st.Name + ": no date"
+			}
 		default:
 			return fmt.Errorf("a step has no %q to set", field)
 		}
