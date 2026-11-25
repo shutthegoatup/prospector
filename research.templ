@@ -45,12 +45,15 @@ templ ResearchView(q *Req, f string, rows []ResearchRow, pg Page, counts map[str
 			@button.Button(button.Props{Href: q.Base() + "agents", Variant: button.VariantOutline, Size: button.SizeSm}) {
 				Connect an agent
 			}
-			@button.Button(button.Props{Href: q.Base() + "add", Size: button.SizeSm}) {
-				+ Add person
+			if canDo(ctx, areaSales) {
+				@button.Button(button.Props{Href: q.Base() + "add", Size: button.SizeSm}) {
+					+ Add person
+				}
 			}
 		</div>
 	}
 	<p class="mb-4 max-w-[70ch] text-sm text-muted-foreground">Companies found by agents, jobs and imports. Nothing reaches outreach until someone qualifies it and picks a contact. Every fact keeps the link it came from.</p>
+	@Whose(areaSales, "Research is")
 	<nav class="mb-5 flex flex-wrap gap-2" aria-label="Filter">
 		for _, rf := range ResearchFilters {
 			@Chip(q.Base()+"research?f="+rf.Key, rf.Label, counts[rf.Key], rf.Key == f)
@@ -88,19 +91,21 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 				<div>@Pill(actorLabel(r.FoundBy), actorState(r.FoundBy))</div>
 				@Meta(r.CreatedAt.Format("2 Jan 15:04"))
 			</div>
-			<div class="flex flex-[1_1_220px] flex-wrap items-center justify-end gap-2">
-				if r.Stage != CompanyQualified {
-					@FitPicker(r.Company)
-					@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "api/v1/companies/" + strconv.FormatInt(r.ID, 10), "data-method": "PATCH", "data-body": jsonBody("stage", CompanyQualified), "data-with-fit": "fit-" + strconv.FormatInt(r.ID, 10)}}) {
-						Qualify
+			if canDo(ctx, areaSales) {
+				<div class="flex flex-[1_1_220px] flex-wrap items-center justify-end gap-2">
+					if r.Stage != CompanyQualified {
+						@FitPicker(r.Company)
+						@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "api/v1/companies/" + strconv.FormatInt(r.ID, 10), "data-method": "PATCH", "data-body": jsonBody("stage", CompanyQualified), "data-with-fit": "fit-" + strconv.FormatInt(r.ID, 10)}}) {
+							Qualify
+						}
 					}
-				}
-				if r.Stage != CompanyRejected {
-					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/companies/" + strconv.FormatInt(r.ID, 10), "data-method": "PATCH", "data-body": jsonBody("stage", CompanyRejected)}}) {
-						Reject
+					if r.Stage != CompanyRejected {
+						@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/companies/" + strconv.FormatInt(r.ID, 10), "data-method": "PATCH", "data-body": jsonBody("stage", CompanyRejected)}}) {
+							Reject
+						}
 					}
-				}
-			</div>
+				</div>
+			}
 		</div>
 		<details class="group border-t border-border/70 bg-muted" open?={ i == 0 }>
 			<summary class="flex cursor-pointer list-none items-center gap-2 px-5 py-2.5 font-mono text-xs text-muted-foreground hover:text-foreground">
@@ -119,8 +124,10 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 				</div>
 				<div class="min-w-0 flex-[1_1_260px]">
 					@Label("People")
-					if len(r.People) == 0 {
+					if len(r.People) == 0 && canDo(ctx, areaSales) {
 						<p class="py-2 text-sm text-muted-foreground">None yet. <a href={ templ.SafeURL(q.Base() + "add?company=" + r.Name) }>Add someone</a></p>
+					} else if len(r.People) == 0 {
+						<p class="py-2 text-sm text-muted-foreground">None yet.</p>
 					}
 					for _, p := range r.People {
 						<div class="flex flex-col gap-1.5 border-b border-dashed border-border py-2.5 text-sm">
@@ -139,7 +146,9 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 									<a href={ safeHref(firstLine(deref(p.Sources))) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
 								}
 							</div>
-							if p.Status == ContactSuggested {
+							if p.Status == ContactSuggested && !canDo(ctx, areaSales) {
+								@Meta("Suggested, waiting for someone in sales to pick them")
+							} else if p.Status == ContactSuggested {
 								<div>
 									@button.Button(button.Props{Size: button.SizeXs, Attributes: templ.Attributes{"data-post": "api/v1/contacts/" + strconv.FormatInt(p.ID, 10) + "/pick"}}) {
 										Pick: start outreach
@@ -215,11 +224,13 @@ templ SuggestedDetails(list []PendingDetail) {
 					}
 				</span>
 			</span>
-			@button.Button(button.Props{Size: button.SizeXs, Attributes: templ.Attributes{"data-post": "api/v1/suggestions/" + strconv.FormatInt(d.ID, 10), "data-method": "PATCH", "data-body": jsonBody("decision", SuggestionAccepted)}}) {
-				Accept
-			}
-			@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/suggestions/" + strconv.FormatInt(d.ID, 10), "data-method": "PATCH", "data-body": jsonBody("decision", SuggestionDismissed)}}) {
-				Dismiss
+			if canDo(ctx, areaSales) {
+				@button.Button(button.Props{Size: button.SizeXs, Attributes: templ.Attributes{"data-post": "api/v1/suggestions/" + strconv.FormatInt(d.ID, 10), "data-method": "PATCH", "data-body": jsonBody("decision", SuggestionAccepted)}}) {
+					Accept
+				}
+				@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/suggestions/" + strconv.FormatInt(d.ID, 10), "data-method": "PATCH", "data-body": jsonBody("decision", SuggestionDismissed)}}) {
+					Dismiss
+				}
 			}
 		</div>
 	}
