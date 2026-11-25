@@ -322,8 +322,21 @@ func TestSearchIndexIsBuiltForExistingRows(t *testing.T) {
 			t.Errorf("search %q after the index was built: %d rows, %v", q, len(rows), err)
 		}
 	}
+	if !s.postgres() {
+		// An edit made while a rebuilt table had lost its triggers is put right at the next start.
+		for _, stmt := range []string{"drop trigger companies_fts_update", "update companies set name = 'Renamed Marine' where name = 'Larkmoor Yachts'"} {
+			if err := s.db.Exec(stmt).Error; err != nil {
+				t.Fatal(err)
+			}
+		}
+		s.indexSearch()
+		old, _, _ := s.Companies(o.ID, "larkmoor", "", "", 1)
+		if now, _, _ := s.Companies(o.ID, "renamed", "", "", 1); len(old) != 0 || len(now) != 1 {
+			t.Fatalf("a company is still found by its old name (%d) and not its new one (%d)", len(old), len(now))
+		}
+	}
 	var plan []map[string]any
-	query := "explain query plan select id from companies where " + "companies.id in (select rowid from companies_fts where companies_fts match 'larkmoor')"
+	query := "explain query plan select id from companies where " + "companies.id in (select rowid from companies_fts where companies_fts match 'windrush')"
 	if !s.postgres() {
 		if err := s.db.Raw(query).Scan(&plan).Error; err != nil || !strings.Contains(fmt.Sprint(plan), "VIRTUAL TABLE INDEX") {
 			t.Fatalf("the search doesn't use the index: %v %v", plan, err)

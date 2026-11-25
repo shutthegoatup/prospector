@@ -27,13 +27,12 @@ var sqliteSearch = []string{
 	`create trigger if not exists contacts_fts_update after update of person, email, maker on contacts begin
 		delete from contacts_fts where rowid = old.id;
 		insert into contacts_fts(rowid, person, email, maker) values (new.id, new.person, new.email, new.maker); end`,
-	// Rows from before the index existed, and any the triggers missed while a migration rebuilt a table.
-	`delete from companies_fts where rowid not in (select id from companies)`,
-	`insert into companies_fts(rowid, name, domain, why) select id, name, domain, why from companies
-		where id not in (select rowid from companies_fts)`,
-	`delete from contacts_fts where rowid not in (select id from contacts)`,
-	`insert into contacts_fts(rowid, person, email, maker) select id, person, email, maker from contacts
-		where id not in (select rowid from contacts_fts)`,
+	// Built afresh at every start: a migration that rebuilds a table takes its triggers
+	// with it, and an edit made meanwhile would otherwise stay searchable by its old text.
+	`delete from companies_fts`,
+	`insert into companies_fts(rowid, name, domain, why) select id, name, domain, why from companies`,
+	`delete from contacts_fts`,
+	`insert into contacts_fts(rowid, person, email, maker) select id, person, email, maker from contacts`,
 }
 
 // One text per row, because Postgres will scan the table rather than combine an index
