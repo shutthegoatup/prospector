@@ -1119,9 +1119,11 @@ paths:
         through the organisation's own mail server. Each mail is checked again as it goes,
         so someone who unsubscribes meanwhile gets nothing. Each carries the organisation's
         postal address and a one-click unsubscribe link. Refused without the organisation's
-        own mail server, a postal address, or this server's https address, and for a draft
+        own mail server (one signed in to, with a username, not port 25), a postal address,
+        or this server's https address, and for a draft
         with no subject, no body or nobody to go to. Nobody is mailed twice, even if the
         server stops mid-send: a mail that may have gone is marked `unknown` and not sent again.
+        An organisation sends at most 2,000 campaign mails a day.
       security:
         - session: []
         - bearer: ["campaigns:send"]

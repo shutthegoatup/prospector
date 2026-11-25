@@ -50,19 +50,39 @@ const (
 	// failuresToPause is how many sends in a row may fail to reach the mail server
 	// before the campaign waits for someone to look.
 	failuresToPause = 3
-	postalLimit     = 300
+	// campaignDailyCap is how many campaign mails one organisation sends in a day, and
+	// roundBudget how long one campaign's round may take.
+	campaignDailyCap = 2000
+	roundBudget      = time.Minute
+	postalLimit      = 300
 )
 
-var errCampaignMail = errors.New("a campaign goes through your organisation's own mail server, so an owner sets one in Settings first; the server's own is for sign-in mail")
+var (
+	errCampaignMail       = errors.New("a campaign goes through your organisation's own mail server, so an owner sets one in Settings first; the server's own is for sign-in mail")
+	errCampaignSubmission = errors.New("a campaign goes through a mail server you sign in to, with a username and password, on port 587, 465 or 2525; not straight to a recipient's server on port 25")
+)
 
 // campaignMail is the organisation's own mail server, or nil. Never the server's
 // fallback: anyone can make an organisation, and the host's mail isn't theirs to send
-// marketing through.
+// marketing through. It is built from the one row read here, so a server removed
+// meanwhile can't turn into the host's. And it must be a submission server signed in
+// to: one on port 25 with no sign-in would have this host deliver straight to anyone's
+// mail exchanger, as a relay.
 func (a *App) campaignMail(org int64) (*MailServer, error) {
-	if _, err := a.s.OrgMail(org); err != nil {
+	m, err := a.s.OrgMail(org)
+	if err != nil {
 		return nil, nil
 	}
-	return a.mailFor(org)
+	if m.Username == "" || m.Port == 25 {
+		return nil, errCampaignSubmission
+	}
+	via := &MailServer{Host: m.Host, Port: m.Port, Username: m.Username, From: m.Sender}
+	if m.Password != "" {
+		if via.Password, err = a.s.keys.open(m.Password); err != nil {
+			return nil, fmt.Errorf("this organisation's mail password can't be read: %w", err)
+		}
+	}
+	return via, nil
 }
 
 // sendable is why a campaign can't be sent from this server for this organisation.
@@ -253,8 +273,15 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 		log.Printf("campaign %d: %v", c.ID, err)
 		return
 	}
-	for range sendEach {
-		if ctx.Err() != nil {
+	// One organisation's day, and one round's time, are bounded: a host carries many,
+	// and a mail server that hangs mustn't hold up the rest.
+	var today int64
+	if !stored(a.s.db.Model(&CampaignRecipient{}).Where("org_id = ? and status = ? and sent_at >= ?", o.ID, MailSent, now.Add(-24*time.Hour)).Count(&today)) {
+		return
+	}
+	started := time.Now()
+	for range min(sendEach, max(0, campaignDailyCap-int(today))) {
+		if ctx.Err() != nil || time.Since(started) > roundBudget {
 			return
 		}
 		var r CampaignRecipient
@@ -267,7 +294,7 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 			return
 		}
 		claimed := a.s.db.Model(&CampaignRecipient{}).Where("id = ? and status = ?", r.ID, MailQueued).
-			Updates(map[string]any{"status": MailSending, "claimed_at": now})
+			Updates(map[string]any{"status": MailSending, "claimed_at": time.Now()})
 		if !stored(claimed) {
 			return
 		}
@@ -311,6 +338,10 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 			link = deref(who.Linkedin)
 		}
 	}
+	// An address made unreadable since it was queued, as erasure does, is nobody's.
+	if _, err := bareAddress(r.Address); err != nil {
+		return settle(MailSkipped, "no longer one email address")
+	}
 	if why := gate.why(r.Address, link); why != nil {
 		because, known := leftOutBecause(why)
 		if !known {
@@ -337,9 +368,12 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 		stored(a.s.db.Model(&Campaign{}).Where("id = ?", c.ID).Updates(map[string]any{"failures": 0, "sent_at": time.Now()}))
 		return settle(MailSent, "")
 	case errors.Is(sendErr, errRefusedRecipient):
+		// One refused address is that address; several in a row is the server refusing
+		// the campaign, which pauses it before the whole list is used up.
 		a.s.dropUnsubscribeLink(token)
 		log.Printf("campaign %d: %v", c.ID, sendErr)
-		return settle(MailFailed, "the mail server refused this address")
+		settled := settle(MailFailed, "the mail server refused this address")
+		return a.failedToSend(c) && settled
 	case errors.Is(sendErr, errUnsent):
 		// Nothing went, so it waits for the next round, and the round stops: the server
 		// is likely to refuse the next one too.
@@ -350,16 +384,21 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 		return false
 	default:
 		log.Printf("campaign %d: %v", c.ID, sendErr)
-		return settle(MailUnknown, "the mail server stopped answering while it was being sent, so it may have gone")
+		settled := settle(MailUnknown, "the mail server didn't confirm it while it was being sent, so it may have gone")
+		return a.failedToSend(c) && settled
 	}
 }
 
-func (a *App) failedToSend(c Campaign) {
+// failedToSend counts a send that didn't plainly go, and pauses the campaign after
+// several in a row. It reports whether the campaign is still sending.
+func (a *App) failedToSend(c Campaign) bool {
 	stored(a.s.db.Model(&Campaign{}).Where("id = ?", c.ID).Update("failures", gorm.Expr("failures + 1")))
 	var now Campaign
 	if stored(a.s.db.Where("id = ?", c.ID).First(&now)) && now.Failures >= failuresToPause {
-		a.pauseCampaign(c, "the mail server couldn't be reached, or refused to send, several times in a row")
+		a.pauseCampaign(c, "the mail server couldn't be reached, refused, or didn't confirm several mails in a row")
+		return false
 	}
+	return true
 }
 
 func (a *App) pauseCampaign(c Campaign, why string) {

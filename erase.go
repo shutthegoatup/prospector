@@ -139,7 +139,10 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if len(emails) > 0 {
 			recipients = tx.Model(&CampaignRecipient{}).Where("org_id = ? and (contact_id = ? or address in ?)", org, id, emails)
 		}
-		if err := recipients.Updates(map[string]any{"contact_id": nil, "address": gorm.Expr("'erased:' || id"), "name": ""}).Error; err != nil {
+		// One still waiting is not sent at all.
+		if err := recipients.Updates(map[string]any{"contact_id": nil, "address": gorm.Expr("'erased:' || id"), "name": "",
+			"status": gorm.Expr("case when status = ? then ? else status end", MailQueued, MailSkipped),
+			"reason": gorm.Expr("case when status = ? then ? else reason end", MailQueued, "erased on request")}).Error; err != nil {
 			return err
 		}
 		// With what was said in answering them: their words, and ours to them.

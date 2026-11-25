@@ -53,7 +53,7 @@ func campaignSite(t *testing.T) (*App, *Store, *Org, string, *http.Client, *post
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SaveOrgMail(&OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Sender: "Alpha <news@alpha.example>"}); err != nil {
+	if err := s.SaveOrgMail(&OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
 		t.Fatal(err)
 	}
 	for _, p := range []struct{ name, email string }{{"Hannah Pryce", "hannah@larkmoor.example"}, {"Tom Ellery", "tom@larkmoor.example"}, {"Sven Dahl", "sven@nordkap.example"}} {
@@ -138,7 +138,7 @@ func TestACampaignIsRefusedWhereItCannotBeSentProperly(t *testing.T) {
 	if code, body := send(); code != http.StatusBadRequest || !strings.Contains(body, "own mail server") {
 		t.Errorf("sending through the server's own mail: %d %s", code, body)
 	}
-	if err := s.SaveOrgMail(&OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Sender: "Alpha <news@alpha.example>"}); err != nil {
+	if err := s.SaveOrgMail(&OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
 		t.Fatal(err)
 	}
 	o.Settings.PostalAddress = " "
@@ -346,4 +346,76 @@ func TestErasingSomeoneScrubsTheirCampaignMail(t *testing.T) {
 			t.Errorf("her mail still says who she was: %+v", r)
 		}
 	}
+}
+
+// What the review of sending found: a relay, a race to the host's mail, an erasure that
+// stalled a campaign, refusals that used up the list, and a server that hangs.
+func TestCampaignSendingHoldsAtItsEdges(t *testing.T) {
+	a, s, o, list, member, box := campaignSite(t)
+
+	// Never straight to a recipient's server, and never without signing in.
+	for _, m := range []OrgMail{{OrgID: o.ID, Host: "mx.larkmoor.example", Port: 25, Username: "x", Sender: "Alpha <news@alpha.example>"}, {OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Sender: "Alpha <news@alpha.example>"}} {
+		if err := s.SaveOrgMail(&m); err != nil {
+			t.Fatal(err)
+		}
+		c := draft(t, s, o)
+		if code, body := call(t, member, "POST", list+"/"+itoa(c.ID)+"/send", "application/json", map[string]any{}); code != http.StatusBadRequest || !strings.Contains(body, "sign in to") {
+			t.Errorf("sending through %s:%d with username %q: %d %s", m.Host, m.Port, m.Username, code, body)
+		}
+		if err := s.RemoveCampaign(o.ID, c.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.SaveOrgMail(&OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
+		t.Fatal(err)
+	}
+	// A server removed after a campaign is sent pauses it; it never falls back to the host's.
+	c := draft(t, s, o)
+	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
+	if err := s.DeleteOrgMail(o.ID); err != nil {
+		t.Fatal(err)
+	}
+	a.sendRound(context.Background(), time.Now())
+	if len(box.to()) != 0 || must(s.Campaign(o.ID, c.ID)).Status != CampaignPaused {
+		t.Fatalf("with its mail server gone: mailed %v, campaign %s", box.to(), must(s.Campaign(o.ID, c.ID)).Status)
+	}
+	if err := s.SaveOrgMail(&OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Erasing someone whose mail is still waiting skips it, and the rest go.
+	hannah := mailOf(t, s, o, c)["hannah@larkmoor.example"]
+	if err := s.ErasePerson(o.ID, *hannah.ContactID, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	must(s.ResumeCampaign(o.ID, c.ID))
+	a.sendRound(context.Background(), time.Now())
+	if got := box.to(); len(got) != 2 {
+		t.Errorf("after erasing someone still waiting, mailed %v", got)
+	}
+	if now := must(s.Campaign(o.ID, c.ID)); now.Status != CampaignSent {
+		t.Errorf("the campaign is %s", now.Status)
+	}
+
+	// A server refusing every address pauses the campaign before the list is used up.
+	box.mu.Lock()
+	box.sent = nil
+	box.mu.Unlock()
+	for _, who := range []string{"a@one.example", "b@two.example", "c@three.example", "d@four.example", "e@five.example"} {
+		person(t, s, o, who, "Larkmoor Yachts", who, true)
+	}
+	second := draft(t, s, o)
+	must(s.SendCampaign(o, second.ID, "Ada Lovelace"))
+	box.answer = func(string) error { return fmt.Errorf("%w: 550 relaying denied", errRefusedRecipient) }
+	a.sendRound(context.Background(), time.Now())
+	refused := 0
+	for _, r := range mailOf(t, s, o, second) {
+		if r.Status == MailFailed {
+			refused++
+		}
+	}
+	if now := must(s.Campaign(o.ID, second.ID)); now.Status != CampaignPaused || refused != failuresToPause {
+		t.Errorf("a server refusing everyone: campaign %s after %d refused", now.Status, refused)
+	}
+	box.answer = nil
 }

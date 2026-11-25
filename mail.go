@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/mail"
 	"net/smtp"
+	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
@@ -156,6 +157,12 @@ func submit(conn net.Conn, via MailServer, from, to *mail.Address, m Message, se
 		return unsent(fmt.Errorf("%s refused mail from %s: %w", addr, from.Address, err))
 	}
 	if err := c.Rcpt(to.Address); err != nil {
+		// A 4xx is "not now" (a rate limit, greylisting): it can be tried again. Only a
+		// 5xx is the address refused for good.
+		var reply *textproto.Error
+		if errors.As(err, &reply) && reply.Code >= 400 && reply.Code < 500 {
+			return unsent(fmt.Errorf("%s put off mail to %s: %w", addr, to.Address, err))
+		}
 		return fmt.Errorf("%w: %s refused mail to %s: %w", errRefusedRecipient, addr, to.Address, err)
 	}
 	// Refused before any of the message is written, it didn't go.
