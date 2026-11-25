@@ -88,7 +88,6 @@ prospector serve                                          # http://127.0.0.1:876
 | `PROSPECTOR_SECRET_KEYS` | The server's secret keys, newest first: `2:<64 hex>,1:<64 hex>`. Needed for an organisation's single sign-on and for a mail server of its own (see [Secret keys](#secret-keys)) |
 | `PROSPECTOR_GOOGLE_CLIENT_ID`, `PROSPECTOR_GOOGLE_CLIENT_SECRET` | Offer "Continue with Google" on the sign-in page. The same pair exists for `MICROSOFT` and `LINKEDIN`. Each needs `PROSPECTOR_URL` (see [Signing in](#signing-in)) |
 | `TZ` | The time zone "today" is counted in |
-| `PROSPECTOR_FRONT_ORG` | The organisation whose Enquiries the front page's contact form adds to (see [Enquiries](#enquiries-website-forms-and-sign-ups)). Without it the front page has no form |
 | `PROSPECTOR_ORG` | Default organisation for CLI commands (`--org=` overrides it) |
 | `PROSPECTOR_KEY` | API key for `push` and `pull` |
 
@@ -104,7 +103,7 @@ Search uses a trigram index. On Postgres that needs the `pg_trgm` extension, whi
 - With [mail](#mail) set up, whoever reads a member's mailbox can choose that member's password. Without it there is no reset but `prospector user password`.
 - Members change their own password in Settings, which signs out their other sessions. `prospector user password` signs them out everywhere.
 - Every page needs a sign-in except the sign-in pages and the front page at `/`, which describes Prospector to a signed-out visitor and shows nothing from your data. The single sign-on page does name the organisations that have verified an email domain to anyone who types an address at it. Every browser POST must be JSON, which blocks cross-site form posts, and a request that a browser marks as coming from another site is refused, sign-in and sign-out included.
-- The one exception is the enquiry route, `/o/<slug>/intake`, which exists to be posted to from your own sites. It answers only the sites an owner lists in Settings, reads no session, and can add an enquiry and nothing else. With no sites listed it refuses everything. The front page's own contact form, when `PROSPECTOR_FRONT_ORG` turns it on, posts there too, so that page then carries that organisation's slug.
+- The one exception is the enquiry route, `/o/<slug>/intake`, which exists to be posted to from your own sites. It answers only the sites an owner lists in Settings, reads no session, and can add an enquiry and nothing else. With no sites listed it refuses everything. The front page's own contact form posts there too, for the `prospector` organisation. A server with `PROSPECTOR_URL` set makes that organisation with its own address listed, so there the route is open from the first start: up to 300 enquiries an hour are kept, read by nobody until someone is added to it. Remove the address from its sites if you don't want the form.
 
 There's a Dockerfile for container hosting.
 
@@ -222,7 +221,12 @@ curl https://<host>/o/<slug>/api/v1/enquiries -H "Authorization: Bearer $PROSPEC
   -d '{"kind":"signup","name":"Hannah Pryce","email":"hannah@quay.example","company":"Quay Marine","site":"app"}'
 ```
 
-**From this server's own front page.** Set `PROSPECTOR_FRONT_ORG` to an organisation's slug and, in that organisation's Settings, list the server's own address among the sites, as a browser shows it (`https://prospector.example.com`, with no `:443`). Behind a proxy, set `PROSPECTOR_URL` to that address too, or the server may not know it is reached over `https`. The front page then ends with a contact form that adds to that organisation's Enquiries. Until both are done the page has no form and loads no script, and someone who reaches the server at any other address doesn't see the form. The form posts to the same server, so the page's Content-Security-Policy is unchanged.
+**From this server's own front page.** A server makes an organisation called `prospector` the first time it starts without one, and the front page ends with a contact form that adds to its Enquiries.
+
+- **To read them**, add yourself: `prospector member add prospector you@example.com owner`. Until someone is added, what arrives is kept and nobody sees it.
+- **The form shows** where that organisation lists the server's own address among its sites, as a browser shows it (`https://prospector.example.com`, with no `:443`). A new `prospector` organisation starts with `PROSPECTOR_URL` listed, so with that set the form is on from the first start. Without it, or for an organisation called `prospector` you already had, list the address in its Settings.
+- **To turn it off**, remove the address from that organisation's sites. A restart doesn't put it back.
+- Someone who reaches the server at any other address doesn't see the form. It posts to the same server, so the page's Content-Security-Policy is unchanged, and a page without the form loads no script.
 
 Erasing a person also deletes their enquiries, and an owner can delete any single enquiry from the Enquiries page.
 

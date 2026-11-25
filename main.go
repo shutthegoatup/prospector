@@ -209,14 +209,14 @@ func run(args []string) error {
 			return err
 		}
 		s.resealAtStart()
-		front := os.Getenv("PROSPECTOR_FRONT_ORG")
-		if front != "" {
-			// Not a reason to stay down: the page is served without its form meanwhile.
-			if _, err := s.OrgBySlug(front); err != nil {
-				fmt.Fprintf(os.Stderr, "PROSPECTOR_FRONT_ORG: there is no organisation %q, so the front page has no contact form\n", front)
-			}
+		// Not a reason to stay down: the page is served without its form meanwhile.
+		if err := s.EnsureFrontOrg(base); err != nil {
+			fmt.Fprintf(os.Stderr, "the front page has no contact form: %v\n", err)
 		}
-		return serve(&App{s: s, base: base, frontOrg: front, social: social, mail: via}, arg(rest, 0, addr))
+		if os.Getenv("PROSPECTOR_FRONT_ORG") != "" {
+			fmt.Fprintf(os.Stderr, "PROSPECTOR_FRONT_ORG is no longer read: the front page's form sends to the %q organisation\n", frontOrgSlug)
+		}
+		return serve(&App{s: s, base: base, frontOrg: frontOrgSlug, social: social, mail: via}, arg(rest, 0, addr))
 	case "sso":
 		return ssoCommand(s, rest)
 	case "mail":
