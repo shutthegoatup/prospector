@@ -84,10 +84,16 @@ func historyText(h HistoryItem) string {
 		"note:skipped": "left a note: skipped", "note:dead_end": "left a note: found nothing", "note:next": "left a note: what to do next",
 		"task:new": "wrote a task", "task:ask": "asked for more on a task", "task:pickup": "picked up a task",
 		"task:done": "finished a request", "task:reopen": "reopened a request", "task:close": "closed a task", "task:open": "reopened a task",
+		"deal:start": "started another deal", "deal:remove": "removed a deal",
+		"sub:new": "recorded a subscription", "sub:remove": "removed a subscription",
 	}[h.Action]
 	if verb == "" {
 		if f, ok := strings.CutPrefix(h.Action, "set:"); ok {
 			verb = "set " + strings.ReplaceAll(f, "_", " ")
+		} else if f, ok := strings.CutPrefix(h.Action, "deal:"); ok {
+			verb = "set the deal's " + strings.ReplaceAll(f, "_", " ")
+		} else if f, ok := strings.CutPrefix(h.Action, "sub:"); ok {
+			verb = "changed a subscription's " + strings.ReplaceAll(f, "_", " ")
 		} else if k, ok := strings.CutPrefix(h.Action, "draft:"); ok {
 			verb = "drafted the " + k
 		} else {
@@ -181,6 +187,22 @@ templ CompanyView(q *Req, p CompanyPage) {
 				</div>
 				@SuggestedDetails(p.Pending[c.ID])
 			}
+		</div>
+		<div>
+			@Label("Subscriptions")
+			if len(p.Subs) == 0 {
+				<p class="py-2 text-sm text-muted-foreground">Nothing recorded. Once they are a customer, record what they are on.</p>
+			} else {
+				<div class="mt-1 overflow-hidden rounded-lg border border-border">
+					for _, r := range p.Subs {
+						@SubscriptionLine(q, r, p.Day, false)
+					}
+				</div>
+			}
+			<details class="mt-2 text-sm">
+				<summary class="cursor-pointer font-mono text-xs text-muted-foreground">Record a subscription</summary>
+				@SubscriptionForm(p.Company.ID, p.Day)
+			</details>
 		</div>
 		if len(p.Facts) > 0 {
 			<div>
