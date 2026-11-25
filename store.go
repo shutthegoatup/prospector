@@ -274,7 +274,8 @@ func Open(dsn string) (*Store, error) {
 
 func (s *Store) postgres() bool { return s.db.Dialector.Name() == "postgres" }
 
-// in scopes a query to one organisation. Every read and write of org data goes through it.
+// in scopes a query to one organisation. Not every query uses it, so what holds the
+// store's exported methods to their organisation is TestNoMethodReachesIntoAnotherOrganisation.
 func (s *Store) in(org int64) *gorm.DB { return s.db.Where("org_id = ?", org) }
 
 // holdOrg and hold make a transaction wait its turn on one row, so a rule that is
