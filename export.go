@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -34,7 +33,7 @@ func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error)
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		c := &out.Person
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(c).Error; err != nil {
-			return fmt.Errorf("no contact %d", id)
+			return noSuch("no contact %d", id)
 		}
 		if strings.HasPrefix(c.Key, "org:") {
 			return errors.New("that row stands for a company, not a person")

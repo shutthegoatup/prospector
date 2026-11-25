@@ -72,7 +72,7 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		var c Contact
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
-			return fmt.Errorf("no contact %d", id)
+			return noSuch("no contact %d", id)
 		}
 		if strings.HasPrefix(c.Key, "org:") {
 			return errors.New("that row stands for a company, not a person")

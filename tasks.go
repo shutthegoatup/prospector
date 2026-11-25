@@ -108,7 +108,7 @@ func (s *Store) CreateTask(org int64, title, brief, by string) (*Task, error) {
 func openTask(tx *gorm.DB, org, id int64) (*Task, error) {
 	var t Task
 	if err := tx.Where("org_id = ? and id = ? and closed_at is null", org, id).First(&t).Error; err != nil {
-		return nil, fmt.Errorf("no open task %d in this organisation", id)
+		return nil, noSuch("no open task %d in this organisation", id)
 	}
 	return &t, nil
 }
@@ -164,7 +164,7 @@ func (s *Store) setRequestDone(org, request int64, done bool, who Actor) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		var r TaskRequest
 		if err := tx.Where("org_id = ? and id = ?", org, request).First(&r).Error; err != nil {
-			return fmt.Errorf("no request %d in this organisation", request)
+			return noSuch("no request %d in this organisation", request)
 		}
 		if _, err := openTask(tx, org, r.TaskID); err != nil {
 			return err
@@ -202,7 +202,7 @@ func (s *Store) SetTaskClosed(org, task int64, closed bool, by string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		var t Task
 		if err := tx.Where("org_id = ? and id = ?", org, task).First(&t).Error; err != nil {
-			return fmt.Errorf("no task %d in this organisation", task)
+			return noSuch("no task %d in this organisation", task)
 		}
 		if closed == (t.ClosedAt != nil) {
 			return nil
@@ -223,7 +223,7 @@ func (s *Store) SetTaskClosed(org, task int64, closed bool, by string) error {
 func (s *Store) DeleteNote(org, id int64) error {
 	res := s.in(org).Where("id = ?", id).Delete(&TaskNote{})
 	if res.Error == nil && res.RowsAffected == 0 {
-		return fmt.Errorf("no note %d", id)
+		return noSuch("no note %d", id)
 	}
 	return res.Error
 }
@@ -518,7 +518,7 @@ func (s *Store) taskView(tx *gorm.DB, t Task, now time.Time) (*TaskView, error) 
 func (s *Store) Task(org, id int64, now time.Time) (*TaskView, error) {
 	var t Task
 	if err := s.in(org).First(&t, id).Error; err != nil {
-		return nil, fmt.Errorf("no task %d in this organisation", id)
+		return nil, noSuch("no task %d in this organisation", id)
 	}
 	return s.taskView(s.db, t, now)
 }

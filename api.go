@@ -15,28 +15,28 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 	v1 := "/o/{org}/api/v1/"
 	mux.HandleFunc("GET "+v1+"search", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
 		hits, err := a.s.AgentSearch(reqOf(r).Org.ID, reqOf(r).Agent(), r.URL.Query().Get("q"))
-		respond(w, hits, err)
+		respond(w, r, hits, err)
 	}))
 	mux.HandleFunc("GET "+v1+"companies/{ref}", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
 		c, err := a.s.AgentCompany(reqOf(r).Org.ID, reqOf(r).Agent(), r.PathValue("ref"))
 		if err != nil {
-			fail(w, err, http.StatusNotFound)
+			apiFail(w, r, err)
 			return
 		}
 		writeJSON(w, c)
 	}))
 	mux.HandleFunc("GET "+v1+"due", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
 		items, err := a.s.AgentDue(reqOf(r).Org)
-		respond(w, items, err)
+		respond(w, r, items, err)
 	}))
 	mux.HandleFunc("GET "+v1+"tasks", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
 		tasks, err := a.s.AgentTasks(reqOf(r).Org.ID, reqOf(r).Agent())
-		respond(w, tasksOut{tasks}, err)
+		respond(w, r, tasksOut{tasks}, err)
 	}))
 	mux.HandleFunc("GET "+v1+"tasks/{id}", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
 		t, err := a.s.AgentTask(reqOf(r).Org.ID, reqOf(r).Agent(), idParam(r, "id"))
 		if err != nil {
-			fail(w, err, http.StatusNotFound)
+			apiFail(w, r, err)
 			return
 		}
 		writeJSON(w, t)
@@ -46,14 +46,14 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 		if decode(w, r, &in) {
 			q := reqOf(r)
 			out, err := a.s.AgentNote(q.Org.ID, q.Agent(), in)
-			respond(w, out, err)
+			respond(w, r, out, err)
 		}
 	}))
 	mux.HandleFunc("POST "+v1+"requests/finish", a.agent("research:write", func(w http.ResponseWriter, r *http.Request) {
 		var in FinishIn
 		if decode(w, r, &in) {
 			q := reqOf(r)
-			respond(w, map[string]bool{"ok": true}, a.s.AgentFinish(q.Org.ID, q.Agent(), in))
+			respond(w, r, map[string]bool{"ok": true}, a.s.AgentFinish(q.Org.ID, q.Agent(), in))
 		}
 	}))
 	mux.HandleFunc("POST "+v1+"companies", a.agent("research:write", func(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +61,7 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 		if decode(w, r, &in) {
 			q := reqOf(r)
 			out, err := a.s.AgentAddCompany(q.Org.ID, q.Agent(), in)
-			respond(w, out, err)
+			respond(w, r, out, err)
 		}
 	}))
 	mux.HandleFunc("POST "+v1+"facts", a.agent("research:write", func(w http.ResponseWriter, r *http.Request) {
@@ -69,7 +69,7 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 		if decode(w, r, &in) {
 			q := reqOf(r)
 			out, err := a.s.AgentAddFact(q.Org.ID, q.Agent(), in)
-			respond(w, out, err)
+			respond(w, r, out, err)
 		}
 	}))
 	mux.HandleFunc("POST "+v1+"contacts", a.agent("research:write", func(w http.ResponseWriter, r *http.Request) {
@@ -77,21 +77,21 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 		if decode(w, r, &in) {
 			q := reqOf(r)
 			out, err := a.s.AgentAddContact(q.Org, q.Agent(), in)
-			respond(w, out, err)
+			respond(w, r, out, err)
 		}
 	}))
 	mux.HandleFunc("POST "+v1+"drafts", a.agent("drafts:write", func(w http.ResponseWriter, r *http.Request) {
 		var in DraftIn
 		if decode(w, r, &in) {
 			q := reqOf(r)
-			respond(w, map[string]bool{"ok": true}, a.s.AgentDraft(q.Org.ID, q.Agent(), in))
+			respond(w, r, map[string]bool{"ok": true}, a.s.AgentDraft(q.Org.ID, q.Agent(), in))
 		}
 	}))
 	mux.HandleFunc("POST "+v1+"marks", a.agent("outcomes:write", func(w http.ResponseWriter, r *http.Request) {
 		var in MarkIn
 		if decode(w, r, &in) {
 			q := reqOf(r)
-			respond(w, map[string]bool{"ok": true}, a.s.AgentMark(q.Org.ID, q.Agent(), in))
+			respond(w, r, map[string]bool{"ok": true}, a.s.AgentMark(q.Org.ID, q.Agent(), in))
 		}
 	}))
 	mux.HandleFunc("POST "+v1+"enquiries", a.agent("enquiries:write", func(w http.ResponseWriter, r *http.Request) {
@@ -100,20 +100,20 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 			q := reqOf(r)
 			in.Trap = ""
 			e, err := a.s.AddEnquiry(q.Org.ID, q.Actor(), in)
-			respond(w, e, err)
+			respond(w, r, e, err)
 		}
 	}))
 	mux.HandleFunc("POST "+v1+"import", a.agent("import", func(w http.ResponseWriter, r *http.Request) {
 		var p ImportPayload
 		if decode(w, r, &p) {
 			total, err := a.s.Import(reqOf(r).Org.ID, &p)
-			respond(w, map[string]int64{"contacts": total}, err)
+			respond(w, r, map[string]int64{"contacts": total}, err)
 		}
 	}))
 	mux.HandleFunc("GET "+v1+"snapshot", a.agent("import", func(w http.ResponseWriter, r *http.Request) {
 		text, err := a.s.SnapshotText(reqOf(r).Org.ID)
 		if err != nil {
-			fail(w, err, http.StatusInternalServerError)
+			apiFail(w, r, err)
 			return
 		}
 		w.Header().Set("content-type", "text/plain; charset=utf-8")
@@ -130,9 +130,9 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 	mux.Handle("/o/{org}/mcp", a.agent("", streaming(sameKey(mcpHandler))))
 }
 
-func respond(w http.ResponseWriter, v any, err error) {
+func respond(w http.ResponseWriter, r *http.Request, v any, err error) {
 	if err != nil {
-		fail(w, err, http.StatusBadRequest)
+		apiFail(w, r, err)
 		return
 	}
 	writeJSON(w, v)

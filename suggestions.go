@@ -176,7 +176,7 @@ func (s *Store) DecideSuggestion(org, id int64, decision, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		var sg Suggestion
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&sg).Error; err != nil {
-			return fmt.Errorf("no suggestion %d", id)
+			return noSuch("no suggestion %d", id)
 		}
 		if sg.Decision != "" {
 			return errors.New("that suggestion was already " + sg.Decision + " by " + sg.DecidedBy)

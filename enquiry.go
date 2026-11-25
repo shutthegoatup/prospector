@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -134,7 +135,7 @@ func (s *Store) AddEnquiry(org int64, via string, in EnquiryIn) (*Enquiry, error
 func (s *Store) DeleteEnquiry(org, id int64) error {
 	res := s.in(org).Where("id = ?", id).Delete(&Enquiry{})
 	if res.Error == nil && res.RowsAffected == 0 {
-		return fmt.Errorf("no enquiry %d", id)
+		return noSuch("no enquiry %d", id)
 	}
 	return res.Error
 }
@@ -286,6 +287,8 @@ func (a *App) intake(w http.ResponseWriter, r *http.Request) {
 	in.Site = r.Header.Get("Origin")
 	orgKey := fmt.Sprintf("%d", org.ID)
 	if !a.enquiries.allow(orgKey+"\x00"+loginKey(in.Email), enquiriesPerSender) || !a.enquiries.allow(orgKey, enquiriesPerOrg) {
+		// The longest it can be: the count starts again an hour after its first enquiry.
+		w.Header().Set("Retry-After", strconv.Itoa(int(enquiryWindow.Seconds())))
 		http.Error(w, "too many enquiries just now; please email us instead", http.StatusTooManyRequests)
 		return
 	}

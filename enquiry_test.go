@@ -141,6 +141,9 @@ func TestEnquiryOddities(t *testing.T) {
 		res, _ := fromSite(t, "POST", intake, formSite, EnquiryIn{Email: "keen@reef.example", Message: fmt.Sprint("again ", i)})
 		if res.StatusCode == http.StatusTooManyRequests {
 			refused++
+			if res.Header.Get("Retry-After") != "3600" {
+				t.Fatalf("a refused sender isn't told when to try again: Retry-After %q", res.Header.Get("Retry-After"))
+			}
 		}
 	}
 	if refused != 2 {

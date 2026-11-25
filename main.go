@@ -100,7 +100,12 @@ func remote(method, url string, body io.Reader) (*http.Response, error) {
 	if res.StatusCode != http.StatusOK {
 		msg, _ := io.ReadAll(res.Body)
 		res.Body.Close()
-		return nil, fmt.Errorf("%s: %s %s", url, res.Status, strings.TrimSpace(string(msg)))
+		said := strings.TrimSpace(string(msg))
+		var p problem
+		if json.Unmarshal(msg, &p) == nil && p.Detail != "" {
+			said = p.Detail
+		}
+		return nil, fmt.Errorf("%s: %s %s", url, res.Status, said)
 	}
 	return res, nil
 }
