@@ -80,7 +80,7 @@ func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
 	if _, body := call(t, client, "GET", srv.URL+page, "", nil); strings.Contains(body, `data-post="ui/suggestion"`) {
 		t.Fatal("settled suggestions are still offered")
 	}
-	if rows := must(s.Research(o.ID, "details")); len(rows) != 0 {
+	if rows, _, _ := s.Research(o.ID, "details", 1); len(rows) != 0 {
 		t.Fatalf("nothing is left to check, but Research lists %d", len(rows))
 	}
 
@@ -344,7 +344,7 @@ func TestAnAgentsGuessesDontPileUpOnOnePerson(t *testing.T) {
 	}
 
 	// Typed in by a person meanwhile, a suggestion leaves nothing to check.
-	if rows := must(s.Research(o.ID, "details")); len(rows) != 1 || rows[0].ID != co.ID {
+	if rows, _, _ := s.Research(o.ID, "details", 1); len(rows) != 1 || rows[0].ID != co.ID {
 		t.Fatalf("the company should be under Details to check: %+v", rows)
 	}
 	for _, guess := range []string{"hannah", "h.pryce", "hpryce"} {
@@ -359,7 +359,7 @@ func TestAnAgentsGuessesDontPileUpOnOnePerson(t *testing.T) {
 			}
 		}
 	}
-	if rows := must(s.Research(o.ID, "details")); len(rows) != 0 {
+	if rows, _, _ := s.Research(o.ID, "details", 1); len(rows) != 0 {
 		t.Fatalf("a company with nothing left to check is still listed: %+v", rows[0].Pending)
 	}
 }

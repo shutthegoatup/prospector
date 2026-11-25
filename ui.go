@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -14,7 +16,11 @@ type Nav struct {
 }
 
 func (a *App) dueByStep(q *Req, now time.Time) map[string][]Contact {
+	if q.due != nil {
+		return q.due
+	}
 	out := map[string][]Contact{}
+	q.due = out
 	for _, s := range Steps {
 		if s.Key == "next" {
 			continue
@@ -38,7 +44,7 @@ func (a *App) nav(q *Req, active string) Nav {
 	for _, list := range a.dueByStep(q, time.Now()) {
 		n.Today += len(list)
 	}
-	n.Research = a.s.ResearchCounts(q.Org.ID)["review"]
+	n.Research = a.s.ResearchCount(q.Org.ID, "review")
 	convs, _ := a.s.Conversations(q.Org.ID)
 	for k, list := range convs {
 		if k != "won" && k != "lost" {
@@ -71,7 +77,7 @@ func (a *App) today(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	cards, counts := Today(a.dueByStep(q, now), q.Voice(), now)
 	d := TodayData{Filter: r.URL.Query().Get("step"), Counts: counts, Total: len(cards),
-		Review: a.s.ResearchCounts(q.Org.ID)["review"], Week: a.s.Week(q.Org.ID, now), Now: now.Format("Mon 2 Jan · 15:04")}
+		Review: a.s.ResearchCount(q.Org.ID, "review"), Week: a.s.Week(q.Org.ID, now), Now: now.Format("Mon 2 Jan · 15:04")}
 	for _, c := range cards {
 		if c.Step == "call" && c.State != "ok" {
 			d.LaterCall++
@@ -100,12 +106,12 @@ func (a *App) research(w http.ResponseWriter, r *http.Request) {
 	if f == "" {
 		f = "review"
 	}
-	rows, err := a.s.Research(q.Org.ID, f)
+	rows, pg, err := a.s.Research(q.Org.ID, f, pageParam(r))
 	if err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
-	a.page(w, r, "research", ResearchView(q, f, rows, a.s.ResearchCounts(q.Org.ID)))
+	a.page(w, r, "research", ResearchView(q, f, rows, pg, a.s.ResearchCounts(q.Org.ID)))
 }
 
 func (a *App) conversations(w http.ResponseWriter, r *http.Request) {
@@ -120,15 +126,36 @@ func (a *App) conversations(w http.ResponseWriter, r *http.Request) {
 
 type CompanyFilter struct{ Q, Segment, Stage string }
 
+func pageParam(r *http.Request) int {
+	n, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	return n
+}
+
+func pageLink(path string, page int, filters ...string) string {
+	v := url.Values{}
+	for i := 0; i+1 < len(filters); i += 2 {
+		if filters[i+1] != "" {
+			v.Set(filters[i], filters[i+1])
+		}
+	}
+	if page > 1 {
+		v.Set("page", strconv.Itoa(page))
+	}
+	if len(v) == 0 {
+		return path
+	}
+	return path + "?" + v.Encode()
+}
+
 func (a *App) companies(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	f := CompanyFilter{r.URL.Query().Get("q"), r.URL.Query().Get("segment"), r.URL.Query().Get("stage")}
-	rows, err := a.s.Companies(q.Org.ID, f.Q, f.Segment, f.Stage)
+	rows, pg, err := a.s.Companies(q.Org.ID, f.Q, f.Segment, f.Stage, pageParam(r))
 	if err != nil {
 		fail(w, err, http.StatusInternalServerError)
 		return
 	}
-	a.page(w, r, "companies", CompaniesView(q, f, rows, a.s.Segments(q.Org.ID)))
+	a.page(w, r, "companies", CompaniesView(q, f, rows, pg, a.s.Segments(q.Org.ID)))
 }
 
 type CompanyPage struct {

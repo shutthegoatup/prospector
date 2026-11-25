@@ -162,8 +162,8 @@ type Contact struct {
 	Accepted      *string `json:"accepted"`
 	Message       *string `json:"message"`
 
-	OrgID       int64   `gorm:"uniqueIndex:idx_org_key;not null" json:"-"`
-	CompanyID   *int64  `gorm:"index" json:"company_id"`
+	OrgID       int64   `gorm:"uniqueIndex:idx_org_key;index:idx_contacts_org_company,priority:1;not null" json:"-"`
+	CompanyID   *int64  `gorm:"index;index:idx_contacts_org_company,priority:2" json:"company_id"`
 	Status      string  `gorm:"not null;default:''" json:"status"`
 	Title       string  `json:"title"`
 	EmailStatus string  `json:"email_status"`
@@ -230,6 +230,8 @@ type Store struct {
 	// keys seal what is stored but mustn't be readable from the database alone; nil
 	// when the server was given none.
 	keys *keyring
+	// fts is whether SQLite has its search tables; Postgres searches through an index of its own.
+	fts bool
 }
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
@@ -254,7 +256,9 @@ func Open(dsn string) (*Store, error) {
 	if err := moveAssetColumns(db); err != nil {
 		return nil, err
 	}
-	return &Store{db: db}, nil
+	s := &Store{db: db}
+	s.indexSearch()
+	return s, nil
 }
 
 func (s *Store) postgres() bool { return s.db.Dialector.Name() == "postgres" }

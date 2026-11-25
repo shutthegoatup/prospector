@@ -99,7 +99,7 @@ func StageTag(st string) templ.Component {
 	})
 }
 
-func CompaniesView(q *Req, f CompanyFilter, rows []CompanyListRow, segments []string) templ.Component {
+func CompaniesView(q *Req, f CompanyFilter, rows []CompanyListRow, pg Page, segments []string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -133,9 +133,9 @@ func CompaniesView(q *Req, f CompanyFilter, rows []CompanyListRow, segments []st
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var7 string
-			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(plural(len(rows), "company"))
+			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(plural(pg.Total, "company"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 25, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 25, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -385,6 +385,12 @@ func CompaniesView(q *Req, f CompanyFilter, rows []CompanyListRow, segments []st
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
+		templ_7745c5c3_Err = Pager(pg, func(n int) string {
+			return pageLink(q.Base()+"companies", n, "q", f.Q, "segment", f.Segment, "stage", f.Stage)
+		}).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
 		return nil
 	})
 }
@@ -459,7 +465,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(q.Base() + "companies")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 116, Col: 48}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 119, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 		if templ_7745c5c3_Err != nil {
@@ -472,7 +478,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(p.Company.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 120, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 123, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -530,7 +536,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(p.Company.Why)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 133, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 136, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
@@ -575,7 +581,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 				var templ_7745c5c3_Var24 string
 				templ_7745c5c3_Var24, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(q.Base() + "settings")).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 143, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 146, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
 				if templ_7745c5c3_Err != nil {
@@ -611,7 +617,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(actorLabel(p.Company.FoundBy))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 150, Col: 115}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 153, Col: 115}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
@@ -632,7 +638,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 		var templ_7745c5c3_Var26 string
 		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(touches(p.History)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 151, Col: 127}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 154, Col: 127}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 		if templ_7745c5c3_Err != nil {
@@ -653,7 +659,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 		var templ_7745c5c3_Var27 string
 		templ_7745c5c3_Var27, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(q.Base() + "add?company=" + p.Company.Name)).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 156, Col: 71}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 159, Col: 71}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
 		if templ_7745c5c3_Err != nil {
@@ -677,7 +683,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 			var templ_7745c5c3_Var28 string
 			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(displayName(c))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 163, Col: 30}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 166, Col: 30}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 			if templ_7745c5c3_Err != nil {
@@ -690,7 +696,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 			var templ_7745c5c3_Var29 string
 			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(prefixed("· ", c.Title))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 163, Col: 99}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 166, Col: 99}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {
@@ -708,7 +714,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 				var templ_7745c5c3_Var30 string
 				templ_7745c5c3_Var30, templ_7745c5c3_Err = templruntime.NewAttributeExpression(safeHref(deref(c.Linkedin))).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 166, Col: 44}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 169, Col: 44}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
 				if templ_7745c5c3_Err != nil {
@@ -842,7 +848,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 			var templ_7745c5c3_Var33 string
 			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(h.At.Format("2 Jan 15:04"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 203, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 206, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 			if templ_7745c5c3_Err != nil {
@@ -895,7 +901,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 			var templ_7745c5c3_Var36 string
 			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(actorLabel(h.Actor))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 204, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 207, Col: 89}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 			if templ_7745c5c3_Err != nil {
@@ -908,7 +914,7 @@ func CompanyView(q *Req, p CompanyPage) templ.Component {
 			var templ_7745c5c3_Var37 string
 			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(historyText(h))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 204, Col: 115}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 207, Col: 115}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 			if templ_7745c5c3_Err != nil {
@@ -976,7 +982,7 @@ func FactRow(f Fact) templ.Component {
 		var templ_7745c5c3_Var39 string
 		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(f.Field)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 238, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 241, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 		if templ_7745c5c3_Err != nil {
@@ -989,7 +995,7 @@ func FactRow(f Fact) templ.Component {
 		var templ_7745c5c3_Var40 string
 		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(f.Value)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 239, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 242, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 		if templ_7745c5c3_Err != nil {
@@ -1007,7 +1013,7 @@ func FactRow(f Fact) templ.Component {
 			var templ_7745c5c3_Var41 string
 			templ_7745c5c3_Var41, templ_7745c5c3_Err = templruntime.NewAttributeExpression(safeHref(f.SourceURL)).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 241, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `companies.templ`, Line: 244, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var41)
 			if templ_7745c5c3_Err != nil {

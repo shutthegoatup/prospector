@@ -90,6 +90,8 @@ prospector serve                                          # http://127.0.0.1:876
 | `PROSPECTOR_ORG` | Default organisation for CLI commands (`--org=` overrides it) |
 | `PROSPECTOR_KEY` | API key for `push` and `pull` |
 
+Search uses a trigram index. On Postgres that needs the `pg_trgm` extension, which is created on start-up if the database user may; without it search still works, by scanning.
+
 **Before exposing it beyond your machine:**
 - Put it behind HTTPS. Copy to clipboard needs a secure page, and the session cookie is marked Secure on HTTPS. Set `PROSPECTOR_URL` to the `https://` address so the cookie is always marked Secure; without it, that depends on the proxy sending `X-Forwarded-Proto: https`.
 - Pages carry a Content-Security-Policy that allows only what the app itself serves. The typefaces are bundled, so a visitor's browser contacts no other site.
