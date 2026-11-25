@@ -183,6 +183,28 @@ func TestFrontOrgIsMadeOnce(t *testing.T) {
 	}
 }
 
+// A server with no form on its front page says why at start-up, and how to put it right.
+func TestTheServerSaysWhyTheFrontPageHasNoForm(t *testing.T) {
+	const address = "https://crm.alpha.example"
+	for name, c := range map[string]struct {
+		base, sites, want string
+	}{
+		"no address and no sites":      {"", "", "PROSPECTOR_URL isn't set"},
+		"another address listed":       {address, "https://www.alpha.example", "lists only https://www.alpha.example, not " + address},
+		"an organisation made earlier": {address, "", "lists no enquiry sites, not " + address},
+		"its own address listed":       {address + ":443", address, ""},
+		"no address but sites listed":  {"", address, ""},
+	} {
+		s := tempStore(t)
+		o := mustOrg(t, s, frontOrgSlug)
+		takeEnquiriesFrom(t, s, o, c.sites)
+		why := s.frontFormOff(c.base)
+		if c.want == "" && why != "" || c.want != "" && (!strings.Contains(why, c.want) || !strings.Contains(why, "member add prospector")) {
+			t.Errorf("%s: %q", name, why)
+		}
+	}
+}
+
 // The app shares the front page's light palette: a page left on the old dark class
 // would turn the components' dark variants back on.
 func TestAppUsesTheLightPalette(t *testing.T) {

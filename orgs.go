@@ -164,6 +164,33 @@ func (s *Store) EnsureFrontOrg(base string) error {
 	return err
 }
 
+// frontFormOff says why the front page will have no contact form at base, the address
+// people reach the server at, or nothing when it will have one.
+func (s *Store) frontFormOff(base string) string {
+	o, err := s.OrgBySlug(frontOrgSlug)
+	if err != nil {
+		return err.Error()
+	}
+	sites, _ := enquiryOrigins(o.Settings.EnquirySites)
+	listed := "lists no enquiry sites"
+	if len(sites) > 0 {
+		listed = "lists only " + strings.Join(sites, ", ")
+	}
+	fix := fmt.Sprintf("add yourself with `prospector member add %s <email> owner` and list the address in its Settings", frontOrgSlug)
+	if base == "" && len(sites) > 0 {
+		return "" // Whether a request's own address is among them is only known as it arrives.
+	}
+	if base == "" {
+		// Setting PROSPECTOR_URL now wouldn't list it: the organisation is already made.
+		return fmt.Sprintf("PROSPECTOR_URL isn't set, so the form shows only at an address the %q organisation lists, and it %s; %s",
+			frontOrgSlug, listed, fix)
+	}
+	if !o.Settings.takesEnquiriesFrom(browserOrigin(base)) {
+		return fmt.Sprintf("the %q organisation %s, not %s; %s", frontOrgSlug, listed, browserOrigin(base), fix)
+	}
+	return ""
+}
+
 // CreateOrgWithOwner makes the organisation and its first owner together, so a failure
 // can't leave one nobody can get into.
 func (s *Store) CreateOrgWithOwner(slug, name string, owner *User) (*Org, error) {
