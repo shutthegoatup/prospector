@@ -379,7 +379,9 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 		}
 	}
 	var taken int64
-	a.s.db.Model(&Agent{}).Where("org_id = ? and name = ? and id <> ?", org, name, c.ID).Count(&taken)
+	if err := a.s.db.Model(&Agent{}).Where("org_id = ? and name = ? and id <> ?", org, name, c.ID).Count(&taken).Error; err != nil {
+		return nil, err
+	}
 	if taken > 0 {
 		return nil, fmt.Errorf("there is already an agent called %q", name)
 	}
@@ -472,7 +474,9 @@ func (a *App) deleteAgent(org, id int64) error {
 		return err
 	}
 	var going []AgentRun
-	a.s.db.Where("org_id = ? and agent_id = ? and status in ?", org, c.ID, []string{RunWorking, RunWaiting}).Find(&going)
+	if err := a.s.db.Where("org_id = ? and agent_id = ? and status in ?", org, c.ID, []string{RunWorking, RunWaiting}).Find(&going).Error; err != nil {
+		return err
+	}
 	for _, run := range going {
 		a.StopRun(org, run.ID)
 	}
