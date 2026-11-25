@@ -77,3 +77,34 @@ func linkNext(w http.ResponseWriter, r *http.Request, next string) {
 	q.Set("cursor", next)
 	w.Header().Set("Link", "<"+r.URL.Path+"?"+q.Encode()+`>; rel="next"`)
 }
+
+// afterID is the next page of rows that are in id order, after the row a cursor
+// names, and the cursor for the page after that: ranOut when this page is the last.
+func afterID[T any](rows []T, id func(T) int64, after int64, size int) (page []T, at int64) {
+	from := 0
+	for from < len(rows) && id(rows[from]) <= after {
+		from++
+	}
+	rows = rows[from:]
+	if len(rows) <= size {
+		return rows, ranOut
+	}
+	return rows[:size], id(rows[size-1])
+}
+
+// noneBefore is where a cursor stands once a newest-first list has run out: no row
+// has an id below 1. Zero is the start, which is every row.
+const noneBefore = 1
+
+// beforeID is afterID for rows that are newest first.
+func beforeID[T any](rows []T, id func(T) int64, before int64, size int) (page []T, at int64) {
+	from := 0
+	for before > 0 && from < len(rows) && id(rows[from]) >= before {
+		from++
+	}
+	rows = rows[from:]
+	if len(rows) <= size {
+		return rows, noneBefore
+	}
+	return rows[:size], id(rows[size-1])
+}
