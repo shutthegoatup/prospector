@@ -527,7 +527,7 @@ func (s *Store) Task(org, id int64, now time.Time) (*TaskView, error) {
 
 // Tasks lists an organisation's tasks, open ones first, newest first.
 func (s *Store) Tasks(org int64, closed bool, now time.Time) ([]TaskView, error) {
-	q := s.in(org).Order("closed_at is not null, id desc").Limit(200)
+	q := s.in(org).Order("closed_at is not null, id desc").Limit(tasksShown)
 	if !closed {
 		q = q.Where("closed_at is null")
 	}
@@ -620,17 +620,27 @@ func brief(v TaskView, who Actor) TaskBrief {
 	return b
 }
 
-func (s *Store) AgentTasks(org int64, who Actor) ([]TaskBrief, error) {
+func (s *Store) AgentTasks(org int64, who Actor) (briefs []TaskBrief, more bool, err error) {
 	tasks, err := s.Tasks(org, false, time.Now())
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	out := []TaskBrief{}
+	briefs = []TaskBrief{}
 	for _, v := range tasks {
-		out = append(out, brief(v, who))
+		briefs = append(briefs, brief(v, who))
 	}
-	return out, nil
+	if len(tasks) == tasksShown {
+		var open int64
+		if err := s.in(org).Model(&Task{}).Where("closed_at is null").Count(&open).Error; err != nil {
+			return nil, false, err
+		}
+		more = open > tasksShown
+	}
+	return briefs, more, nil
 }
+
+// tasksShown is how many tasks a list holds, newest first.
+const tasksShown = 200
 
 // AgentTask is everything an agent needs to carry a task on. Fetching it is
 // recorded, so people see the task was picked up before anything is added, and keeps

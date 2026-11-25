@@ -129,7 +129,7 @@ func TestAgentsSeeWhatHappenedAtACompany(t *testing.T) {
 		t.Fatal("a new key took an old key's work for its own because they share a name")
 	}
 
-	for _, hit := range must(s.AgentSearch(o.ID, second, "larkmoor")) {
+	for _, hit := range must(firstOf(s.AgentSearch(o.ID, second, "larkmoor"))) {
 		if hit.Kind == "company" && (hit.ID != added.ID || hit.LastAgent == nil || hit.LastAgent.Actor != "agent:scout" || hit.LastAgent.ByYou) {
 			t.Fatalf("search should say who was last at the company: %+v", hit)
 		}
