@@ -257,7 +257,7 @@ func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContact
 			return err
 		}
 		out = AddContactOut{ID: contact.ID, Status: contact.Status}
-		return s.logAs(tx, o.ID, contact.ID, &c.ID, who, "add:contact", &person)
+		return s.logAs(tx, o.ID, contact.ID, &c.ID, who, "add:contact", nil)
 	})
 	return &out, err
 }

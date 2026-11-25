@@ -441,12 +441,12 @@ func (s *Store) QuickAddPerson(o *Org, in QuickAdd, actor string) (*Contact, err
 		if err := tx.Create(&out).Error; err != nil {
 			return err
 		}
-		if err := s.log(tx, o.ID, out.ID, companyID, actor, "add:person", nonEmpty(in.Linkedin)); err != nil {
+		if err := s.log(tx, o.ID, out.ID, companyID, actor, "add:person", nil); err != nil {
 			return err
 		}
-		if typed := strings.TrimSpace(in.Note); typed != "" {
+		if strings.TrimSpace(in.Note) != "" {
 			// Recorded as an edit so an agent's draft doesn't replace a note the person wrote.
-			return s.log(tx, o.ID, out.ID, companyID, actor, "set:note", &typed)
+			return s.log(tx, o.ID, out.ID, companyID, actor, "set:note", nil)
 		}
 		return nil
 	})
