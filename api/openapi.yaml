@@ -9,8 +9,10 @@ info:
 
     Scopes: `read` to read; `agents:run` to start and stop agent runs;
     `agents:configure` to add, change and delete the organisation's agents;
-    `enquiries:reply` to email a reply to an enquiry and record its answer. A signed-in
-    member may read and run; configuring needs an owner.
+    `enquiries:reply` to email a reply to an enquiry and record its answer;
+    `customers:write` to start, change and remove onboardings; `customers:invite` to email a
+    customer a link to their steps and withdraw it. A signed-in
+    member may do all of these except configuring, which needs an owner.
 servers:
   - url: /
 security:
@@ -23,6 +25,8 @@ tags:
     description: An agent working a task.
   - name: enquiries
     description: What people sent in through a site's form or a product, and answering them.
+  - name: onboarding
+    description: The steps a new customer and the organisation take before the customer is live, and the customer's own page of theirs.
 
 paths:
   /o/{org}/api/v1/agents:
@@ -261,6 +265,137 @@ paths:
               schema: { $ref: "#/components/schemas/EnquiryMessage" }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/onboardings:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listOnboardings
+      tags: [onboarding]
+      summary: Onboardings, with their steps and who has been let see them
+      parameters:
+        - name: company
+          in: query
+          description: Only this company's.
+          schema: { type: integer, format: int64 }
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: "Late ones first, then the rest still going, then those that are live; newest start first within each."
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Onboarding" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: startOnboarding
+      tags: [onboarding]
+      summary: Start onboarding a company
+      description: Copies the organisation's steps, set in Settings, dated from `start`.
+      security:
+        - session: []
+        - bearer: ["customers:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OnboardingStart" }
+      responses:
+        "201":
+          description: The onboarding as started.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Onboarding" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/onboardings/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    delete:
+      operationId: removeOnboarding
+      tags: [onboarding]
+      summary: Remove an onboarding started by mistake
+      description: Its steps go with it, and anyone let see it loses their page.
+      security:
+        - session: []
+        - bearer: ["customers:write"]
+      responses:
+        "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/onboarding-steps/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeOnboardingStep
+      tags: [onboarding]
+      summary: Mark a step done or not, or move its date
+      description: Send `done`, `due`, or both. Marking done a step that already is keeps who did it and when.
+      security:
+        - session: []
+        - bearer: ["customers:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OnboardingStepChange" }
+      responses:
+        "200":
+          description: The step as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OnboardingStep" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/onboardings/{id}/invites:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: inviteCustomer
+      tags: [onboarding]
+      summary: Email someone at the company a link to their steps
+      description: |
+        The contact has to be at the onboarding's company, picked, with one email address,
+        and not on the never-contact list. They are mailed a link that opens a page of the
+        steps that are theirs. Inviting someone again sends a fresh link and restores access
+        that was withdrawn. Needs a mail server and the server's public address.
+      security:
+        - session: []
+        - bearer: ["customers:invite"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact]
+              properties:
+                contact: { type: integer, format: int64, description: The contact to invite. }
+      responses:
+        "204": { description: "Let in, and the link sent." }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/onboarding-invites/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    delete:
+      operationId: withdrawCustomerInvite
+      tags: [onboarding]
+      summary: Withdraw someone's access to their page
+      description: Their page closes in every browser at once and their links stop working.
+      security:
+        - session: []
+        - bearer: ["customers:invite"]
+      responses:
+        "204": { description: Withdrawn. }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -431,3 +566,63 @@ components:
         by: { type: string, description: "Who sent the reply, or recorded their answer." }
         sent_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false, description: When a reply of ours left. }
         created_at: { type: string, format: date-time }
+
+    OnboardingStart:
+      type: object
+      required: [company]
+      properties:
+        company: { type: integer, format: int64 }
+        name: { type: string, maxLength: 200, description: "Which one, when a company has several: a site, a product." }
+        start: { type: string, description: "The day steps are dated from, YYYY-MM-DD; empty is today." }
+
+    Onboarding:
+      type: object
+      required: [id, company_id, company, name, start, created_at, steps, done, late, live_on, invites]
+      properties:
+        id: { type: integer, format: int64 }
+        company_id: { type: integer, format: int64 }
+        company: { type: string }
+        name: { type: string }
+        start: { type: string, description: "YYYY-MM-DD." }
+        created_at: { type: string, format: date-time }
+        steps:
+          type: array
+          items: { $ref: "#/components/schemas/OnboardingStep" }
+        done: { type: integer, description: How many steps are done. }
+        late: { type: integer, description: How many are past their date and not done. }
+        live_on: { type: string, description: "The day the last step was done, once every step is; empty until then." }
+        invites:
+          type: array
+          items: { $ref: "#/components/schemas/OnboardingInvite" }
+          description: Who at the company has been let see their steps.
+
+    OnboardingStep:
+      type: object
+      required: [id, onboarding_id, seq, name, who, due, done_on, done_by]
+      properties:
+        id: { type: integer, format: int64 }
+        onboarding_id: { type: integer, format: int64 }
+        seq: { type: integer }
+        name: { type: string }
+        who: { type: string, enum: [them, us], description: "Whose it is to do: the customer's or the organisation's." }
+        due: { type: string, description: "YYYY-MM-DD, or empty for no date." }
+        done_on: { type: string, description: "YYYY-MM-DD, or empty while it isn't done." }
+        done_by: { type: string, description: "Who marked it; `customer` when they did from their own page." }
+
+    OnboardingStepChange:
+      type: object
+      properties:
+        done: { type: boolean, nullable: true, x-go-type-skip-optional-pointer: false }
+        due: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "YYYY-MM-DD, or empty for no date." }
+
+    OnboardingInvite:
+      type: object
+      required: [id, contact_id, name, email, invited_by, created_at, withdrawn]
+      properties:
+        id: { type: integer, format: int64 }
+        contact_id: { type: integer, format: int64 }
+        name: { type: string }
+        email: { type: string }
+        invited_by: { type: string }
+        created_at: { type: string, format: date-time }
+        withdrawn: { type: boolean }

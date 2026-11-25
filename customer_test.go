@@ -51,19 +51,19 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 	noEmail := must(s.QuickAddPerson(o, QuickAdd{Name: "Tom Ellery", Company: "Larkmoor Yachts"}, "Ada Lovelace"))
 	elsewhere := must(s.QuickAddPerson(o, QuickAdd{Name: "Sven Dahl", Company: "Nordkap Boats", Email: "sven@nordkap.example"}, "Ada Lovelace"))
 	ob := must(s.StartOnboarding(o.ID, OnboardingIn{Company: *hannah.CompanyID, Name: "Leith site", Start: today()}, "Ada Lovelace"))
-	invite := func(contact string) (int, string) {
-		return call(t, member, "POST", srv.URL+"/o/alpha/ui/onboarding/invite", "application/json", map[string]any{"id": ob.ID, "contact": contact})
+	invite := func(contact int64) (int, string) {
+		return call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": contact})
 	}
-	for why, who := range map[string]string{"nobody": "", "someone with no email address": itoa(noEmail.ID), "someone at another company": itoa(elsewhere.ID), "someone who isn't there": "99999"} {
-		if code, _ := invite(who); code == http.StatusOK {
+	for why, who := range map[string]int64{"nobody": 0, "someone with no email address": noEmail.ID, "someone at another company": elsewhere.ID, "someone who is not there": 99999} {
+		if code, _ := invite(who); code < 300 {
 			t.Errorf("%s was invited", why)
 		}
 	}
 	box.take(t, 0)
-	if _, page := call(t, member, "GET", srv.URL+"/o/alpha/onboarding", "", nil); !strings.Contains(page, `data-form="ui/onboarding/invite"`) || !strings.Contains(page, "hannah@larkmoor.example") || strings.Contains(page, "Tom Ellery ·") {
+	if _, page := call(t, member, "GET", srv.URL+"/o/alpha/onboarding", "", nil); !strings.Contains(page, `/invites"`) || !strings.Contains(page, "hannah@larkmoor.example") || strings.Contains(page, "Tom Ellery ·") {
 		t.Error("the onboarding page doesn't offer to invite the person with an address, or offers one without")
 	}
-	if code, body := invite(itoa(hannah.ID)); code != http.StatusOK {
+	if code, body := invite(hannah.ID); code != http.StatusNoContent {
 		t.Fatalf("inviting a customer: %d %s", code, body)
 	}
 	mail := box.take(t, 1)[0]
@@ -120,7 +120,7 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 	if res, page := as(t, outsider, "GET", srv.URL+"/o/alpha/onboarding"); res.Request.URL.Path != "/login" || strings.Contains(page, "Leith site") {
 		t.Errorf("a customer's browser reached a members' page: ended at %s", res.Request.URL.Path)
 	}
-	if code, _ := call(t, outsider, "POST", srv.URL+"/o/alpha/ui/onboarding/step", "application/json", map[string]any{"id": 1, "field": "done", "value": "yes"}); code != http.StatusUnauthorized {
+	if code, _ := call(t, outsider, "PATCH", srv.URL+"/o/alpha/api/v1/onboarding-steps/1", "application/json", map[string]any{"done": true}); code != http.StatusUnauthorized {
 		t.Errorf("a customer's browser posting to a members' route got %d", code)
 	}
 
@@ -161,7 +161,7 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 	if len(grants) != 1 || grants[0].Name != "Hannah Pryce" {
 		t.Fatalf("who can see the onboarding: %+v", grants)
 	}
-	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/ui/onboarding/revoke", "application/json", map[string]any{"id": grants[0].ID}); code != http.StatusOK {
+	if code, body := call(t, member, "DELETE", srv.URL+"/o/alpha/api/v1/onboarding-invites/"+itoa(grants[0].ID), "", nil); code != http.StatusNoContent {
 		t.Fatalf("withdrawing access: %d %s", code, body)
 	}
 	for name, c := range map[string]*http.Client{"the first": outsider, "the second": second} {
@@ -177,7 +177,7 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 
 	// Inviting them again brings it back; removing the onboarding ends it.
 	ageCustomerLinks(t, s)
-	if code, body := invite(itoa(hannah.ID)); code != http.StatusOK {
+	if code, body := invite(hannah.ID); code != http.StatusNoContent {
 		t.Fatalf("inviting again: %d %s", code, body)
 	}
 	again := srv.URL + customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1]
@@ -207,7 +207,7 @@ func TestErasingAPersonClosesTheirPage(t *testing.T) {
 	}
 	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	ob := must(s.StartOnboarding(o.ID, OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
-	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/ui/onboarding/invite", "application/json", map[string]any{"id": ob.ID, "contact": itoa(hannah.ID)}); code != http.StatusOK {
+	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": hannah.ID}); code != http.StatusNoContent {
 		t.Fatalf("inviting: %d %s", code, body)
 	}
 	link := srv.URL + customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1]
@@ -240,7 +240,7 @@ func TestACustomersLinkAndBrowserRunOut(t *testing.T) {
 	}
 	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	ob := must(s.StartOnboarding(o.ID, OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
-	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/ui/onboarding/invite", "application/json", map[string]any{"id": ob.ID, "contact": itoa(hannah.ID)}); code != http.StatusOK {
+	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": hannah.ID}); code != http.StatusNoContent {
 		t.Fatalf("inviting: %d %s", code, body)
 	}
 	link := srv.URL + customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1]
@@ -289,14 +289,14 @@ func TestNobodyIsInvitedWithoutMail(t *testing.T) {
 	}
 	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	ob := must(s.StartOnboarding(o.ID, OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
-	code, body := call(t, member, "POST", srv.URL+"/o/alpha/ui/onboarding/invite", "application/json", map[string]any{"id": ob.ID, "contact": itoa(hannah.ID)})
-	if code == http.StatusOK || !strings.Contains(body, "mail isn't set up") {
+	code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": hannah.ID})
+	if code < 300 || !strings.Contains(body, "mail isn't set up") {
 		t.Errorf("inviting with no mail server: %d %s", code, body)
 	}
 	if grants := must(s.CustomerInvites(o.ID)); len(grants) != 0 {
 		t.Errorf("someone was let in though no link could be sent: %+v", grants)
 	}
-	if _, page := call(t, member, "GET", srv.URL+"/o/alpha/onboarding", "", nil); strings.Contains(page, `data-form="ui/onboarding/invite"`) || !strings.Contains(page, "PROSPECTOR_URL") {
+	if _, page := call(t, member, "GET", srv.URL+"/o/alpha/onboarding", "", nil); strings.Contains(page, `/invites"`) || !strings.Contains(page, "PROSPECTOR_URL") {
 		t.Error("the onboarding page offers to invite, or doesn't say what is missing")
 	}
 }
@@ -312,7 +312,7 @@ func TestACustomersPageClosesWhenTheyNoLongerQualify(t *testing.T) {
 	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	other := must(s.QuickAddPerson(o, QuickAdd{Name: "Sven Dahl", Company: "Nordkap Boats", Email: "sven@nordkap.example"}, "Ada Lovelace"))
 	ob := must(s.StartOnboarding(o.ID, OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
-	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/ui/onboarding/invite", "application/json", map[string]any{"id": ob.ID, "contact": itoa(hannah.ID)}); code != http.StatusOK {
+	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": hannah.ID}); code != http.StatusNoContent {
 		t.Fatalf("inviting: %d %s", code, body)
 	}
 	link := srv.URL + customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1]
@@ -432,7 +432,7 @@ func TestACustomerMarksTheirOwnSteps(t *testing.T) {
 	browser := func(onboarding, contact int64) *http.Client {
 		t.Helper()
 		ageCustomerLinks(t, s)
-		if code, body := call(t, member, "POST", srv.URL+"/o/alpha/ui/onboarding/invite", "application/json", map[string]any{"id": onboarding, "contact": itoa(contact)}); code != http.StatusOK {
+		if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(onboarding)+"/invites", "application/json", map[string]any{"contact": contact}); code != http.StatusNoContent {
 			t.Fatalf("inviting: %d %s", code, body)
 		}
 		c := newMailClient()
@@ -535,7 +535,7 @@ func TestACustomersMarksKeepTheHistoryHonest(t *testing.T) {
 	}
 	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	ob := must(s.StartOnboarding(o.ID, OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
-	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/ui/onboarding/invite", "application/json", map[string]any{"id": ob.ID, "contact": itoa(hannah.ID)}); code != http.StatusOK {
+	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": hannah.ID}); code != http.StatusNoContent {
 		t.Fatalf("inviting: %d %s", code, body)
 	}
 	outsider := newMailClient()

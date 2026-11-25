@@ -341,7 +341,7 @@ templ WonNext(q *Req, company *int64, after AfterWin, day string) {
 		<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(*company, 10)) } class="font-mono text-xs text-mark underline">{ onboardingWord(after.Running[*company]) }</a>
 	} else if company != nil && after.Planned > 0 {
 		<div>
-			@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "ui/onboarding", "data-body": jsonBody("company", *company, "start", day)}}) {
+			@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "api/v1/onboardings", "data-body": jsonBody("company", *company, "start", day)}}) {
 				Start onboarding
 			}
 		</div>

@@ -322,37 +322,6 @@ func (a *App) onboardingPage(w http.ResponseWriter, r *http.Request) {
 	a.page(w, r, "onboarding", OnboardingView(q, rows, len(plan), today()))
 }
 
-func (a *App) uiOnboardingStart(w http.ResponseWriter, r *http.Request) {
-	var in OnboardingIn
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		_, err := a.s.StartOnboarding(q.Org.ID, in, q.Actor())
-		done(w, err)
-	}
-}
-
-func (a *App) uiOnboardingStep(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID    int64  `json:"id"`
-		Field string `json:"field"`
-		Value string `json:"value"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.SetOnboardingStep(q.Org.ID, in.ID, in.Field, in.Value, q.Actor()))
-	}
-}
-
-func (a *App) uiOnboardingRemove(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID int64 `json:"id"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.RemoveOnboarding(q.Org.ID, in.ID, q.Actor()))
-	}
-}
-
 // prefixedIf is text when on, else nothing.
 func prefixedIf(on bool, text string) string {
 	if on {

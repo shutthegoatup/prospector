@@ -76,8 +76,8 @@ func (a *App) apiCaller(next http.Handler) http.Handler {
 	})
 }
 
-// apiScope holds an operation to its scope: a key needs it granted; a member has read
-// and run, and configuring needs an owner.
+// apiScope holds an operation to its scope: a key needs it granted; a member has everything
+// but configuring, which needs an owner.
 func (a *App) apiScope(scopes map[string]string) api.StrictMiddlewareFunc {
 	return func(f api.StrictHandlerFunc, op string) api.StrictHandlerFunc {
 		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error) {

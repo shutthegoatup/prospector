@@ -10,6 +10,7 @@ import (
 	"compress/flate"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -33,6 +34,24 @@ func (e AgentKind) Valid() bool {
 	case Anthropic:
 		return true
 	case Openai:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OnboardingStepWho.
+const (
+	Them OnboardingStepWho = "them"
+	Us   OnboardingStepWho = "us"
+)
+
+// Valid indicates whether the value is a known member of the OnboardingStepWho enum.
+func (e OnboardingStepWho) Valid() bool {
+	switch e {
+	case Them:
+		return true
+	case Us:
 		return true
 	default:
 		return false
@@ -159,6 +178,83 @@ type EnquiryText struct {
 	Text string `json:"text"`
 }
 
+// Onboarding defines model for Onboarding.
+type Onboarding struct {
+	Company   string    `json:"company"`
+	CompanyId int64     `json:"company_id"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// Done How many steps are done.
+	Done int   `json:"done"`
+	Id   int64 `json:"id"`
+
+	// Invites Who at the company has been let see their steps.
+	Invites []OnboardingInvite `json:"invites"`
+
+	// Late How many are past their date and not done.
+	Late int `json:"late"`
+
+	// LiveOn The day the last step was done, once every step is; empty until then.
+	LiveOn string `json:"live_on"`
+	Name   string `json:"name"`
+
+	// Start YYYY-MM-DD.
+	Start string           `json:"start"`
+	Steps []OnboardingStep `json:"steps"`
+}
+
+// OnboardingInvite defines model for OnboardingInvite.
+type OnboardingInvite struct {
+	ContactId int64     `json:"contact_id"`
+	CreatedAt time.Time `json:"created_at"`
+	Email     string    `json:"email"`
+	Id        int64     `json:"id"`
+	InvitedBy string    `json:"invited_by"`
+	Name      string    `json:"name"`
+	Withdrawn bool      `json:"withdrawn"`
+}
+
+// OnboardingStart defines model for OnboardingStart.
+type OnboardingStart struct {
+	Company int64 `json:"company"`
+
+	// Name Which one, when a company has several: a site, a product.
+	Name string `json:"name,omitempty"`
+
+	// Start The day steps are dated from, YYYY-MM-DD; empty is today.
+	Start string `json:"start,omitempty"`
+}
+
+// OnboardingStep defines model for OnboardingStep.
+type OnboardingStep struct {
+	// DoneBy Who marked it; `customer` when they did from their own page.
+	DoneBy string `json:"done_by"`
+
+	// DoneOn YYYY-MM-DD, or empty while it isn't done.
+	DoneOn string `json:"done_on"`
+
+	// Due YYYY-MM-DD, or empty for no date.
+	Due          string `json:"due"`
+	Id           int64  `json:"id"`
+	Name         string `json:"name"`
+	OnboardingId int64  `json:"onboarding_id"`
+	Seq          int    `json:"seq"`
+
+	// Who Whose it is to do: the customer's or the organisation's.
+	Who OnboardingStepWho `json:"who"`
+}
+
+// OnboardingStepWho Whose it is to do: the customer's or the organisation's.
+type OnboardingStepWho string
+
+// OnboardingStepChange defines model for OnboardingStepChange.
+type OnboardingStepChange struct {
+	Done *bool `json:"done"`
+
+	// Due YYYY-MM-DD, or empty for no date.
+	Due *string `json:"due"`
+}
+
 // Problem defines model for Problem.
 type Problem struct {
 	Detail string `json:"detail,omitempty"`
@@ -211,6 +307,18 @@ type Id = int64
 // Org defines model for org.
 type Org = string
 
+// ListOnboardingsParams defines parameters for ListOnboardings.
+type ListOnboardingsParams struct {
+	// Company Only this company's.
+	Company int64 `form:"company,omitempty" json:"company,omitempty"`
+}
+
+// InviteCustomerJSONBody defines body for InviteCustomer for application/json ContentType.
+type InviteCustomerJSONBody struct {
+	// Contact The contact to invite.
+	Contact int64 `json:"contact"`
+}
+
 // StartRunJSONBody defines body for StartRun for application/json ContentType.
 type StartRunJSONBody struct {
 	// Agent The agent's id.
@@ -228,6 +336,15 @@ type RecordEnquiryAnswerJSONRequestBody = EnquiryText
 
 // ReplyToEnquiryJSONRequestBody defines body for ReplyToEnquiry for application/json ContentType.
 type ReplyToEnquiryJSONRequestBody = EnquiryText
+
+// ChangeOnboardingStepJSONRequestBody defines body for ChangeOnboardingStep for application/json ContentType.
+type ChangeOnboardingStepJSONRequestBody = OnboardingStepChange
+
+// StartOnboardingJSONRequestBody defines body for StartOnboarding for application/json ContentType.
+type StartOnboardingJSONRequestBody = OnboardingStart
+
+// InviteCustomerJSONRequestBody defines body for InviteCustomer for application/json ContentType.
+type InviteCustomerJSONRequestBody InviteCustomerJSONBody
 
 // StartRunJSONRequestBody defines body for StartRun for application/json ContentType.
 type StartRunJSONRequestBody StartRunJSONBody
@@ -258,6 +375,24 @@ type ServerInterface interface {
 	// ReplyToEnquiry Email a reply to whoever wrote in
 	// (POST /o/{org}/api/v1/enquiries/{id}/replies)
 	ReplyToEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// WithdrawCustomerInvite Withdraw someone's access to their page
+	// (DELETE /o/{org}/api/v1/onboarding-invites/{id})
+	WithdrawCustomerInvite(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ChangeOnboardingStep Mark a step done or not, or move its date
+	// (PATCH /o/{org}/api/v1/onboarding-steps/{id})
+	ChangeOnboardingStep(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ListOnboardings Onboardings, with their steps and who has been let see them
+	// (GET /o/{org}/api/v1/onboardings)
+	ListOnboardings(w http.ResponseWriter, r *http.Request, org Org, params ListOnboardingsParams)
+	// StartOnboarding Start onboarding a company
+	// (POST /o/{org}/api/v1/onboardings)
+	StartOnboarding(w http.ResponseWriter, r *http.Request, org Org)
+	// RemoveOnboarding Remove an onboarding started by mistake
+	// (DELETE /o/{org}/api/v1/onboardings/{id})
+	RemoveOnboarding(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// InviteCustomer Email someone at the company a link to their steps
+	// (POST /o/{org}/api/v1/onboardings/{id}/invites)
+	InviteCustomer(w http.ResponseWriter, r *http.Request, org Org, id Id)
 	// StopRun Stop a run
 	// (POST /o/{org}/api/v1/runs/{id}/stop)
 	StopRun(w http.ResponseWriter, r *http.Request, org Org, id Id)
@@ -540,6 +675,214 @@ func (siw *ServerInterfaceWrapper) ReplyToEnquiry(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// WithdrawCustomerInvite operation middleware
+func (siw *ServerInterfaceWrapper) WithdrawCustomerInvite(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.WithdrawCustomerInvite(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeOnboardingStep operation middleware
+func (siw *ServerInterfaceWrapper) ChangeOnboardingStep(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeOnboardingStep(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListOnboardings operation middleware
+func (siw *ServerInterfaceWrapper) ListOnboardings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListOnboardingsParams
+
+	// ------------- Optional query parameter "company" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "company", r.URL.Query(), &params.Company, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "company"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "company", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListOnboardings(w, r, org, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartOnboarding operation middleware
+func (siw *ServerInterfaceWrapper) StartOnboarding(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartOnboarding(w, r, org)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveOnboarding operation middleware
+func (siw *ServerInterfaceWrapper) RemoveOnboarding(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveOnboarding(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// InviteCustomer operation middleware
+func (siw *ServerInterfaceWrapper) InviteCustomer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.InviteCustomer(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // StopRun operation middleware
 func (siw *ServerInterfaceWrapper) StopRun(w http.ResponseWriter, r *http.Request) {
 
@@ -776,6 +1119,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/o/{org}/api/v1/enquiries/{id}/messages", wrapper.ListEnquiryMessages)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/enquiries/{id}/replies", wrapper.ReplyToEnquiry)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/enquiries/{id}/answers", wrapper.RecordEnquiryAnswer)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/o/{org}/api/v1/onboardings", wrapper.ListOnboardings)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/onboardings", wrapper.StartOnboarding)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/o/{org}/api/v1/onboardings/{id}", wrapper.RemoveOnboarding)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/o/{org}/api/v1/onboarding-steps/{id}", wrapper.ChangeOnboardingStep)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/onboardings/{id}/invites", wrapper.InviteCustomer)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/o/{org}/api/v1/onboarding-invites/{id}", wrapper.WithdrawCustomerInvite)
 
 	return m
 }
@@ -1098,6 +1447,230 @@ func (response ReplyToEnquirydefaultApplicationProblemPlusJSONResponse) VisitRep
 	return err
 }
 
+type WithdrawCustomerInviteRequestObject struct {
+	Org Org `json:"org"`
+	Id  Id  `json:"id"`
+}
+
+type WithdrawCustomerInviteResponseObject interface {
+	VisitWithdrawCustomerInviteResponse(w http.ResponseWriter) error
+}
+
+type WithdrawCustomerInvite204Response struct {
+}
+
+func (response WithdrawCustomerInvite204Response) VisitWithdrawCustomerInviteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type WithdrawCustomerInvitedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response WithdrawCustomerInvitedefaultApplicationProblemPlusJSONResponse) VisitWithdrawCustomerInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOnboardingStepRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *ChangeOnboardingStepJSONRequestBody
+}
+
+type ChangeOnboardingStepResponseObject interface {
+	VisitChangeOnboardingStepResponse(w http.ResponseWriter) error
+}
+
+type ChangeOnboardingStep200JSONResponse OnboardingStep
+
+func (response ChangeOnboardingStep200JSONResponse) VisitChangeOnboardingStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOnboardingStepdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ChangeOnboardingStepdefaultApplicationProblemPlusJSONResponse) VisitChangeOnboardingStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnboardingsRequestObject struct {
+	Org    Org `json:"org"`
+	Params ListOnboardingsParams
+}
+
+type ListOnboardingsResponseObject interface {
+	VisitListOnboardingsResponse(w http.ResponseWriter) error
+}
+
+type ListOnboardings200JSONResponse []Onboarding
+
+func (response ListOnboardings200JSONResponse) VisitListOnboardingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnboardingsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListOnboardingsdefaultApplicationProblemPlusJSONResponse) VisitListOnboardingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOnboardingRequestObject struct {
+	Org  Org `json:"org"`
+	Body *StartOnboardingJSONRequestBody
+}
+
+type StartOnboardingResponseObject interface {
+	VisitStartOnboardingResponse(w http.ResponseWriter) error
+}
+
+type StartOnboarding201JSONResponse Onboarding
+
+func (response StartOnboarding201JSONResponse) VisitStartOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOnboardingdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response StartOnboardingdefaultApplicationProblemPlusJSONResponse) VisitStartOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveOnboardingRequestObject struct {
+	Org Org `json:"org"`
+	Id  Id  `json:"id"`
+}
+
+type RemoveOnboardingResponseObject interface {
+	VisitRemoveOnboardingResponse(w http.ResponseWriter) error
+}
+
+type RemoveOnboarding204Response struct {
+}
+
+func (response RemoveOnboarding204Response) VisitRemoveOnboardingResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RemoveOnboardingdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RemoveOnboardingdefaultApplicationProblemPlusJSONResponse) VisitRemoveOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteCustomerRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *InviteCustomerJSONRequestBody
+}
+
+type InviteCustomerResponseObject interface {
+	VisitInviteCustomerResponse(w http.ResponseWriter) error
+}
+
+type InviteCustomer204Response struct {
+}
+
+func (response InviteCustomer204Response) VisitInviteCustomerResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type InviteCustomerdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response InviteCustomerdefaultApplicationProblemPlusJSONResponse) VisitInviteCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type StopRunRequestObject struct {
 	Org Org `json:"org"`
 	Id  Id  `json:"id"`
@@ -1239,6 +1812,24 @@ type StrictServerInterface interface {
 	// ReplyToEnquiry Email a reply to whoever wrote in
 	// (POST /o/{org}/api/v1/enquiries/{id}/replies)
 	ReplyToEnquiry(ctx context.Context, request ReplyToEnquiryRequestObject) (ReplyToEnquiryResponseObject, error)
+	// WithdrawCustomerInvite Withdraw someone's access to their page
+	// (DELETE /o/{org}/api/v1/onboarding-invites/{id})
+	WithdrawCustomerInvite(ctx context.Context, request WithdrawCustomerInviteRequestObject) (WithdrawCustomerInviteResponseObject, error)
+	// ChangeOnboardingStep Mark a step done or not, or move its date
+	// (PATCH /o/{org}/api/v1/onboarding-steps/{id})
+	ChangeOnboardingStep(ctx context.Context, request ChangeOnboardingStepRequestObject) (ChangeOnboardingStepResponseObject, error)
+	// ListOnboardings Onboardings, with their steps and who has been let see them
+	// (GET /o/{org}/api/v1/onboardings)
+	ListOnboardings(ctx context.Context, request ListOnboardingsRequestObject) (ListOnboardingsResponseObject, error)
+	// StartOnboarding Start onboarding a company
+	// (POST /o/{org}/api/v1/onboardings)
+	StartOnboarding(ctx context.Context, request StartOnboardingRequestObject) (StartOnboardingResponseObject, error)
+	// RemoveOnboarding Remove an onboarding started by mistake
+	// (DELETE /o/{org}/api/v1/onboardings/{id})
+	RemoveOnboarding(ctx context.Context, request RemoveOnboardingRequestObject) (RemoveOnboardingResponseObject, error)
+	// InviteCustomer Email someone at the company a link to their steps
+	// (POST /o/{org}/api/v1/onboardings/{id}/invites)
+	InviteCustomer(ctx context.Context, request InviteCustomerRequestObject) (InviteCustomerResponseObject, error)
 	// StopRun Stop a run
 	// (POST /o/{org}/api/v1/runs/{id}/stop)
 	StopRun(ctx context.Context, request StopRunRequestObject) (StopRunResponseObject, error)
@@ -1534,6 +2125,188 @@ func (sh *strictHandler) ReplyToEnquiry(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// WithdrawCustomerInvite operation middleware
+func (sh *strictHandler) WithdrawCustomerInvite(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request WithdrawCustomerInviteRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.WithdrawCustomerInvite(ctx, request.(WithdrawCustomerInviteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "WithdrawCustomerInvite")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(WithdrawCustomerInviteResponseObject); ok {
+		if err := validResponse.VisitWithdrawCustomerInviteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeOnboardingStep operation middleware
+func (sh *strictHandler) ChangeOnboardingStep(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ChangeOnboardingStepRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body ChangeOnboardingStepJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ChangeOnboardingStep(ctx, request.(ChangeOnboardingStepRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeOnboardingStep")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeOnboardingStepResponseObject); ok {
+		if err := validResponse.VisitChangeOnboardingStepResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListOnboardings operation middleware
+func (sh *strictHandler) ListOnboardings(w http.ResponseWriter, r *http.Request, org Org, params ListOnboardingsParams) {
+	var request ListOnboardingsRequestObject
+
+	request.Org = org
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ListOnboardings(ctx, request.(ListOnboardingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListOnboardings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListOnboardingsResponseObject); ok {
+		if err := validResponse.VisitListOnboardingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartOnboarding operation middleware
+func (sh *strictHandler) StartOnboarding(w http.ResponseWriter, r *http.Request, org Org) {
+	var request StartOnboardingRequestObject
+
+	request.Org = org
+
+	var body StartOnboardingJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.StartOnboarding(ctx, request.(StartOnboardingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartOnboarding")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartOnboardingResponseObject); ok {
+		if err := validResponse.VisitStartOnboardingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveOnboarding operation middleware
+func (sh *strictHandler) RemoveOnboarding(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request RemoveOnboardingRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.RemoveOnboarding(ctx, request.(RemoveOnboardingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveOnboarding")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveOnboardingResponseObject); ok {
+		if err := validResponse.VisitRemoveOnboardingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// InviteCustomer operation middleware
+func (sh *strictHandler) InviteCustomer(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request InviteCustomerRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body InviteCustomerJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.InviteCustomer(ctx, request.(InviteCustomerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "InviteCustomer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(InviteCustomerResponseObject); ok {
+		if err := validResponse.VisitInviteCustomerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // StopRun operation middleware
 func (sh *strictHandler) StopRun(w http.ResponseWriter, r *http.Request, org Org, id Id) {
 	var request StopRunRequestObject
@@ -1627,61 +2400,82 @@ func (sh *strictHandler) StartRun(w http.ResponseWriter, r *http.Request, org Or
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
