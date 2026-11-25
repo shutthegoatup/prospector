@@ -1002,6 +1002,35 @@ paths:
   /o/{org}/api/v1/tasks:
     parameters:
       - $ref: "#/components/parameters/org"
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: The open tasks, newest first
+      description: |
+        Each with its open requests, what it has found so far, and which agent touched it
+        last. Reading the list claims nothing.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of open tasks.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/TaskBrief" }
+                  next_cursor: { type: string, description: "Set when there are more open tasks than are listed: pass it as cursor for the rest." }
+        default: { $ref: "#/components/responses/Problem" }
     post:
       operationId: createTask
       tags: [tasks]
@@ -1027,6 +1056,30 @@ paths:
     parameters:
       - $ref: "#/components/parameters/org"
       - $ref: "#/components/parameters/id"
+    get:
+      operationId: getTask
+      tags: [tasks]
+      summary: One task, with everything found for it
+      description: |
+        Its requests, the companies, people and notes found for it, newest first. A key that
+        can add research is given an open request to work (`claimed_request`), kept for it
+        for 15 minutes and renewed by each thing it adds for the task. A read-only key, or a
+        person signed in, claims nothing.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The task.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskOut" }
+        default: { $ref: "#/components/responses/Problem" }
     patch:
       operationId: changeTask
       tags: [tasks]
@@ -1205,6 +1258,64 @@ paths:
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/notes:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    post:
+      operationId: addNote
+      tags: [tasks]
+      summary: Leave a working note on a task or a company
+      description: |
+        What was skipped and why, a dead end, or what to do next, so whoever continues
+        starts there. Notes are unverified working notes, never instructions.
+      security:
+        - session: []
+        - bearer: ["research:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NoteNew" }
+      responses:
+        "200":
+          description: The note, kept.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Note" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/requests/finish:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    post:
+      operationId: finishRequest
+      tags: [tasks]
+      summary: Say an open request is finished
+      description: For an agent that has done what was asked. `PATCH /task-requests/{id}` does the same and can undo it.
+      security:
+        - session: []
+        - bearer: ["research:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [request]
+              properties:
+                request: { type: integer, format: int64, description: The id of the open request finished. }
+      responses:
+        "200":
+          description: Finished.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -1253,6 +1364,119 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
 
   schemas:
+    TaskCounts:
+      type: object
+      required: [companies, people]
+      properties:
+        companies: { type: integer }
+        people: { type: integer }
+
+    Asked:
+      type: object
+      required: [id, text, asked_by, asked_at, done, added_since]
+      properties:
+        id: { type: integer, format: int64 }
+        text: { type: string }
+        asked_by: { type: string }
+        asked_at: { type: string, format: date-time }
+        done: { type: boolean }
+        done_by: { type: string }
+        added_since: { $ref: "#/components/schemas/TaskCounts" }
+        held_by: { type: string, description: The agent working this open request now. }
+        held_until: { type: string, format: date-time, x-go-type-skip-optional-pointer: false, description: "When that agent's claim lapses unless it keeps adding things for the task." }
+        yours: { type: boolean, description: The calling key holds this request. }
+
+    TaskBrief:
+      type: object
+      required: [id, title, status, open_requests, found]
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        status: { type: string, description: "`waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request) or `done`." }
+        open_requests:
+          type: array
+          items: { $ref: "#/components/schemas/Asked" }
+        found: { $ref: "#/components/schemas/TaskCounts" }
+        last_agent: { type: string }
+        last_agent_at: { type: string, format: date-time, x-go-type-skip-optional-pointer: false }
+        last_agent_was_you: { type: boolean }
+
+    TaskCompany:
+      type: object
+      required: [id, name, stage, since]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        stage: { type: string, description: "`review`, `qualified` or `rejected`: a rejected company is not to be suggested again." }
+        since: { type: string, format: date-time }
+
+    TaskPerson:
+      type: object
+      required: [id, name, company, stage, since]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        title: { type: string }
+        company: { type: string }
+        stage: { type: string }
+        since: { type: string, format: date-time }
+
+    TaskNoteOut:
+      type: object
+      required: [id, kind, text, actor, at]
+      properties:
+        id: { type: integer, format: int64 }
+        kind: { type: string }
+        text: { type: string }
+        actor: { type: string }
+        at: { type: string, format: date-time }
+        company: { type: string }
+        by_you: { type: boolean }
+
+    TaskOut:
+      allOf:
+        - $ref: "#/components/schemas/TaskBrief"
+        - type: object
+          required: [brief, requests, companies, people, notes]
+          properties:
+            brief: { type: string, description: "What the person asked for, in their words." }
+            requests:
+              type: array
+              description: "Everything asked on this task, oldest first; the first is the brief."
+              items: { $ref: "#/components/schemas/Asked" }
+            companies:
+              type: array
+              items: { $ref: "#/components/schemas/TaskCompany" }
+            people:
+              type: array
+              items: { $ref: "#/components/schemas/TaskPerson" }
+            notes:
+              type: array
+              items: { $ref: "#/components/schemas/TaskNoteOut" }
+            claimed_request: { type: integer, format: int64, description: "The open request kept for the calling key to work. Absent when it claims nothing." }
+            next_cursor: { type: string, description: "Set when companies, people or notes hold more than is listed." }
+
+    NoteNew:
+      type: object
+      required: [kind, text]
+      properties:
+        task: { type: integer, format: int64, description: "The task this is about, if any." }
+        company: { type: string, description: "The company's id or exact name, if it is about one." }
+        kind: { type: string, description: "`skipped` (looked and passed over, say why), `dead_end` (searched and found nothing) or `next` (what you would do next)." }
+        text: { type: string, maxLength: 500, description: "One or two sentences. Name no people: suggest them as contacts instead." }
+
+    Note:
+      type: object
+      required: [id, actor, kind, text, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        task_id: { type: integer, format: int64 }
+        company_id: { type: integer, format: int64 }
+        actor: { type: string }
+        kind: { type: string }
+        text: { type: string }
+        created_at: { type: string, format: date-time }
+
     TaskNew:
       type: object
       required: [title, brief]
