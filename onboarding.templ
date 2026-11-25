@@ -40,6 +40,7 @@ func stepMeta(st OnboardingStep, day string) string {
 templ OnboardingView(q *Req, rows []OnboardingRow, planned int, day string) {
 	@PageHead("Onboarding")
 	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">The steps between a signature and a live customer. Each onboarding is a copy of your steps, made the day it starts, so changing them in Settings later leaves the ones running as they are. Start one from a company's page. Ones running late come first.</p>
+	@Whose(areaSupport, "Onboarding is")
 	if planned == 0 {
 		@Empty("No steps written yet", "An owner writes the steps under Settings, one a line. Then start an onboarding from a company's page.")
 	} else if len(rows) == 0 {
@@ -81,13 +82,13 @@ templ OnboardingCard(q *Req, r OnboardingRow, day string, named bool) {
 						<span class="block font-mono text-xs text-muted-foreground">{ stepMeta(st, day) }</span>
 					</span>
 					<span class="flex items-center gap-2">
-						if st.DoneOn == nil {
+						if canDo(ctx, areaSupport) && st.DoneOn == nil {
 							@input.Input(input.Props{Type: "date", Value: deref(st.Due), Class: "h-8 w-44 bg-muted",
 								Attributes: templ.Attributes{"data-field": "due", "data-step": strconv.FormatInt(st.ID, 10), "data-refresh": "true", "aria-label": "Due"}})
 							@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "api/v1/onboarding-steps/" + strconv.FormatInt(st.ID, 10), "data-method": "PATCH", "data-body": `{"done":true}`}}) {
 								Done
 							}
-						} else {
+						} else if canDo(ctx, areaSupport) {
 							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/onboarding-steps/" + strconv.FormatInt(st.ID, 10), "data-method": "PATCH", "data-body": `{"done":false}`}}) {
 								Not done
 							}
@@ -110,14 +111,20 @@ templ OnboardingCard(q *Req, r OnboardingRow, day string, named bool) {
 					} else {
 						<span class="flex items-center gap-2">
 							@Pill("can open it", "ok")
-							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/onboarding-invites/" + strconv.FormatInt(inv.ID, 10), "data-method": "DELETE", "data-confirm": "Withdraw " + inv.Name + "'s access? Their page closes in every browser at once."}}) {
-								Withdraw
+							if canDo(ctx, areaSupport) {
+								@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/onboarding-invites/" + strconv.FormatInt(inv.ID, 10), "data-method": "DELETE", "data-confirm": "Withdraw " + inv.Name + "'s access? Their page closes in every browser at once."}}) {
+									Withdraw
+								}
 							}
 						</span>
 					}
 				</div>
 			}
-			if !r.MailOn {
+			if !canDo(ctx, areaSupport) {
+				if len(r.Invites) == 0 {
+					@Meta("Nobody has been invited yet.")
+				}
+			} else if !r.MailOn {
 				@Meta("To invite anyone, an owner sets a mail server in Settings and the server needs its public address (PROSPECTOR_URL).")
 			} else if len(r.Invitable) == 0 {
 				@Meta("Nobody at this company has an email address here to send a link to.")
@@ -135,11 +142,13 @@ templ OnboardingCard(q *Req, r OnboardingRow, day string, named bool) {
 				</form>
 			}
 		</div>
-		<div class="flex justify-end">
-			@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/onboardings/" + strconv.FormatInt(r.ID, 10), "data-method": "DELETE", "data-confirm": "Remove this onboarding and its steps? Use this for one started by mistake."}}) {
-				Remove
-			}
-		</div>
+		if canDo(ctx, areaSupport) {
+			<div class="flex justify-end">
+				@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/onboardings/" + strconv.FormatInt(r.ID, 10), "data-method": "DELETE", "data-confirm": "Remove this onboarding and its steps? Use this for one started by mistake."}}) {
+					Remove
+				}
+			</div>
+		}
 	</article>
 }
 
