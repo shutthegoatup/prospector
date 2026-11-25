@@ -21,6 +21,8 @@ var acrossOrganisations = map[string]bool{
 	"KeyFor": true, "Reseal": true, "SSOOrgsFor": true, "SocialUser": true, "SSOUser": true,
 	// Finds a customer by the secret in their link or cookie, which is all they have.
 	"CustomerByToken": true,
+	// An unsubscribe link names its organisation itself; whoever holds it has no session.
+	"UnsubscribeByToken": true,
 	// These take a row that already names its organisation, which their callers read with it.
 	"SaveOrgMail": true, "SaveSSO": true,
 }
@@ -322,13 +324,13 @@ func seedFirst(t *testing.T, s *Store) *Org {
 // test to see: they change something and answer with a yes, a count, a number or only
 // what they were given.
 var saysNothingBack = map[string]bool{
-	"AddMember": true, "RemoveMember": true, "SetRole": true, "SaveVoice": true, "SaveOrg": true, "RevokeKey": true, "SetKeyScopes": true, "DeleteOrgMail": true,
+	"AddMember": true, "RemoveMember": true, "SetRole": true, "SetAreas": true, "SaveVoice": true, "SaveOrg": true, "RevokeKey": true, "SetKeyScopes": true, "DeleteOrgMail": true,
 	"Mark": true, "Update": true, "SetCompanyStage": true, "PickContact": true, "DecideSuggestion": true,
 	"AgentDraft": true, "AgentMark": true, "AgentFinish": true, "AgentAddFact": true, "AgentAddContact": true,
 	"AskTask": true, "SetRequestDone": true, "SetTaskClosed": true, "DeleteNote": true, "DeleteEnquiry": true,
 	"StartDeal": true, "ChangeDeal": true, "RemoveDeal": true,
 	"AddSubscription": true, "ChangeSubscription": true, "ChangeSubscriptionFields": true, "RemoveSubscription": true, "StartRenewal": true, "SetEnquiry": true, "ConverseEnquiry": true, "SetEnquiryFields": true, "ChangeDealFields": true, "SetDealFields": true, "HearEnquiry": true,
-	"StartOnboarding": true, "SetOnboardingStep": true, "RemoveOnboarding": true, "InviteCustomer": true, "RevokeCustomer": true,
+	"StartOnboarding": true, "SetOnboardingStep": true, "RemoveOnboarding": true, "InviteCustomer": true, "RevokeCustomer": true, "Suppress": true, "Unsuppress": true,
 	"ErasePerson": true, "Import": true, "ImportLegacy": true, "Restore": true,
 	"ResearchCount": true, "ResearchCounts": true, "EnquiryCounts": true, "Week": true, "AgentMarks": true, "Touches": true,
 	"AddEnquiry": true, "AgentNote": true, "CreateKey": true, "CreateTask": true, "QuickAddPerson": true,

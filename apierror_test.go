@@ -219,6 +219,42 @@ func TestStatusOf(t *testing.T) {
 	}
 }
 
+// Postgres passes a connection lost part-way through a statement or a commit on as the
+// network's own error. It is told as the server's failure unless a handler has said it
+// is another server's, as a sign-in provider that couldn't be reached is.
+func TestALostConnectionIsTheServersFailure(t *testing.T) {
+	s, _, srv, client := signedIn(t)
+	lostMidway := func() error {
+		return &net.OpError{Op: "read", Net: "tcp", Addr: &net.TCPAddr{IP: net.IPv4(10, 0, 0, 9), Port: 5432}, Err: errors.New("connection reset by peer")}
+	}
+	down := false
+	s.db.Callback().Query().Before("gorm:query").Register("lost-midway", func(tx *gorm.DB) {
+		if down && tx.Statement.Table == "conversations" || down && tx.Statement.Table == "contacts" {
+			tx.AddError(lostMidway())
+		}
+	})
+	var none []Contact
+	down = true
+	err := s.db.Find(&none).Error
+	if code, text := telling("test", fmt.Errorf("saving it: %w", err), http.StatusBadRequest); code != http.StatusInternalServerError || text != sayOurs {
+		t.Errorf("a statement whose connection was lost, answered as a 400: %d %q", code, text)
+	}
+	// A body cut short is still the caller's to fix.
+	if code, _ := call(t, client, "POST", srv.URL+"/o/alpha/ui/add", "application/json", json.RawMessage(`{"name":`)); code != http.StatusBadRequest {
+		t.Errorf("a request body cut short: %d", code)
+	}
+	if code, text := telling("test", elsewhere{fmt.Errorf("that issuer couldn't be read: %w", lostMidway())}, http.StatusBadRequest); code != http.StatusBadRequest || !strings.Contains(text, "issuer") {
+		t.Errorf("a provider that couldn't be reached was told as the server's failure: %d %q", code, text)
+	}
+	if code, body := call(t, client, "GET", srv.URL+"/o/alpha/conversations", "", nil); code != http.StatusInternalServerError || strings.Contains(body, "10.0.0.9") {
+		t.Errorf("a page whose connection was lost: %d, showing the database's address or not the server's failure", code)
+	}
+	down = false
+	if err := s.db.Find(&none).Error; err != nil {
+		t.Errorf("the next statement after a lost connection: %v", err)
+	}
+}
+
 // A database that can't be asked says nothing about a password or a domain, so neither
 // failure reads as the person's: not a wrong password, and not a domain already listed.
 func TestAnOutageDoesNotReadAsThePersonsMistake(t *testing.T) {

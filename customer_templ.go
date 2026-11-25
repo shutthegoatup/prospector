@@ -11,6 +11,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"github.com/shutthegoatup/prospector/components/button"
+	"net/url"
 	"strconv"
 )
 
@@ -73,7 +74,7 @@ func CustomerPage(v CustomerView) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(v.Org)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 40, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 41, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -84,9 +85,9 @@ func CustomerPage(v CustomerView) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/c/" + v.Token)).ResolveURL(ctx)
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/c/" + url.PathEscape(v.Token))).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 42, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 43, Col: 81}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 			if templ_7745c5c3_Err != nil {
@@ -128,9 +129,9 @@ func CustomerPage(v CustomerView) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var5 string
-			templ_7745c5c3_Var5, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/c/" + v.Token + "/again")).ResolveURL(ctx)
+			templ_7745c5c3_Var5, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/c/" + url.PathEscape(v.Token) + "/again")).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 50, Col: 76}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 51, Col: 92}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 			if templ_7745c5c3_Err != nil {
@@ -179,7 +180,7 @@ func CustomerPage(v CustomerView) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(v.Org)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 61, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 62, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -202,7 +203,7 @@ func CustomerPage(v CustomerView) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(v.Done) + " of " + strconv.Itoa(len(v.Steps)) + " of your steps are done. Mark each one when you have done it.")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 66, Col: 174}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 67, Col: 174}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -225,7 +226,7 @@ func CustomerPage(v CustomerView) templ.Component {
 						var templ_7745c5c3_Var9 string
 						templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(st.Name)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 71, Col: 56}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 72, Col: 56}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 						if templ_7745c5c3_Err != nil {
@@ -243,7 +244,7 @@ func CustomerPage(v CustomerView) templ.Component {
 						var templ_7745c5c3_Var10 string
 						templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(st.Name)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 73, Col: 23}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 74, Col: 23}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 						if templ_7745c5c3_Err != nil {
@@ -261,7 +262,7 @@ func CustomerPage(v CustomerView) templ.Component {
 					var templ_7745c5c3_Var11 string
 					templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(customerStepMeta(st, v.Day))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 76, Col: 94}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 77, Col: 94}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 					if templ_7745c5c3_Err != nil {
@@ -279,7 +280,7 @@ func CustomerPage(v CustomerView) templ.Component {
 						var templ_7745c5c3_Var12 string
 						templ_7745c5c3_Var12, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/c/steps/" + strconv.FormatInt(st.ID, 10) + "/done")).ResolveURL(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 78, Col: 108}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 79, Col: 108}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 						if templ_7745c5c3_Err != nil {
@@ -323,7 +324,7 @@ func CustomerPage(v CustomerView) templ.Component {
 						var templ_7745c5c3_Var14 string
 						templ_7745c5c3_Var14, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/c/steps/" + strconv.FormatInt(st.ID, 10) + "/undone")).ResolveURL(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 84, Col: 110}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 85, Col: 110}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 						if templ_7745c5c3_Err != nil {
@@ -377,7 +378,7 @@ func CustomerPage(v CustomerView) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs("This page is open for " + v.Email + " in this browser.")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 96, Col: 119}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `customer.templ`, Line: 97, Col: 119}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {

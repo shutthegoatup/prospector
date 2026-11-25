@@ -175,15 +175,16 @@ templ SettingsView(q *Req, d SettingsData) {
 				<li class="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3 py-2.5"><span class="grid size-5 place-items-center rounded-full bg-secondary font-mono text-xs">4</span>Call</li>
 			</ol>
 		}
+		@NotToBeMailed(d.Suppressed, d.MoreSuppressed)
 		if q.Owner() {
 			@SSOSettings(q, d)
 		}
 		@Section("Team", "") {
 			for _, m := range d.Members {
-				<div class="flex justify-between border-b border-dashed border-border py-1.5 text-sm">
+				<div class="flex flex-wrap justify-between border-b border-dashed border-border py-1.5 text-sm">
 					<span><b>{ m.Name }</b> <span class="text-muted-foreground">{ m.Email }</span></span>
 					<span class="flex items-center gap-3">
-						@Meta(m.Role)
+						@Meta(memberWork(m.Membership))
 						if q.Owner() {
 							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/member/role", "data-body": jsonBody("user_id", m.UserID, "role", otherRole(m.Role)), "data-confirm": roleConfirm(q, m)}}) {
 								{ "Make " + otherRole(m.Role) }
@@ -193,6 +194,21 @@ templ SettingsView(q *Req, d SettingsData) {
 							}
 						}
 					</span>
+					if q.Owner() && m.Role != "owner" {
+						<form data-form="ui/member/areas" data-refresh="true" class="flex w-full flex-wrap items-center gap-3 pt-1.5">
+							<input type="hidden" name="user_id" value={ strconv.FormatInt(m.UserID, 10) } data-number="true"/>
+							for _, ar := range Areas {
+								<label class="flex items-center gap-1.5 text-xs text-muted-foreground" title={ ar.What }>
+									<input type="checkbox" name="areas" value={ ar.Name } data-multi="true" checked?={ m.Works(ar.Name) } class="size-4 accent-[var(--primary)]"/>
+									{ ar.Name }
+								</label>
+							}
+							@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeXs, Variant: button.VariantOutline}) {
+								Save
+							}
+							<p data-result class="text-xs text-[var(--ok)]" role="status"></p>
+						</form>
+					}
 				</div>
 			}
 			if q.Owner() {
@@ -221,6 +237,16 @@ templ SettingsView(q *Req, d SettingsData) {
 			}
 		}
 	</div>
+}
+
+func memberWork(m Membership) string {
+	if m.Role == "owner" {
+		return "owner"
+	}
+	if m.Areas == "" {
+		return "member · reads only"
+	}
+	return "member · " + strings.ReplaceAll(m.Areas, " ", ", ")
 }
 
 func otherRole(role string) string {
@@ -434,4 +460,41 @@ func ownerHint(q *Req) string {
 		return "Shared by everyone in this organisation."
 	}
 	return "Only an owner can change these."
+}
+
+// NotToBeMailed is the one list marketing mail never goes to: those who unsubscribed by
+// a link, and those added here. Only an added one can be taken off.
+templ NotToBeMailed(rows []Suppression, more bool) {
+	@Section("Not to be mailed", "Marketing mail never goes to these addresses. Someone who unsubscribes by the link in a mail lands here and stays: only they can undo it. Your never-contact list and anyone erased are kept out as well.") {
+		if len(rows) == 0 {
+			<p class="text-sm text-muted-foreground">Nobody yet.</p>
+		}
+		for _, r := range rows {
+			<div class="flex flex-wrap items-center justify-between gap-2 border-b border-dashed border-border py-1.5 text-sm">
+				<span><b>{ r.Address }</b> <span class="font-mono text-xs text-muted-foreground">{ suppressionMeta(r) }</span></span>
+				if r.Reason == SuppressAdded {
+					@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/suppressions/" + strconv.FormatInt(r.ID, 10), "data-method": "DELETE", "data-confirm": "Mail " + r.Address + " again?"}}) {
+						Take off
+					}
+				}
+			</div>
+		}
+		if more {
+			<p class="font-mono text-xs text-muted-foreground">The newest are shown. The API lists them all.</p>
+		}
+		<form data-form="api/v1/suppressions" data-reset="true" data-refresh="true" class="flex flex-wrap items-center gap-2">
+			<input name="address" type="email" required placeholder="someone@example.com" aria-label="Address not to mail" class={ fieldClass }/>
+			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantOutline}) {
+				Add
+			}
+			<span data-result class="font-mono text-xs text-muted-foreground"></span>
+		</form>
+	}
+}
+
+func suppressionMeta(r Suppression) string {
+	if r.Reason == SuppressUnsubscribed {
+		return "unsubscribed " + r.CreatedAt.Format("2 Jan 2006")
+	}
+	return "added by " + actorLabel(r.By) + " " + r.CreatedAt.Format("2 Jan 2006")
 }

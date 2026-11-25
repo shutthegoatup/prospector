@@ -10,9 +10,12 @@ info:
     Scopes: `read` to read; `agents:run` to start and stop agent runs;
     `agents:configure` to add, change and delete the organisation's agents;
     `enquiries:reply` to email a reply to an enquiry and record its answer;
-    `customers:write` to record and change subscriptions and onboardings; `customers:invite` to email a
-    customer a link to their steps and withdraw it. A signed-in
-    member may do all of these except configuring, which needs an owner.
+    `customers:write` to record and change subscriptions and onboardings; `customers:invite`
+    to email a customer a link to their steps and withdraw it; `pipeline:write` to work deals
+    and say where answering an enquiry stands; `enquiries:delete` to delete an enquiry;
+    `campaigns:write` to keep the list of addresses marketing mail never goes to. A
+    signed-in member may do all of these except configuring agents and deleting enquiries,
+    which need an owner.
 
     Every list comes a page at a time: it takes `limit` and `cursor`, and answers
     `{"items": [...], "next_cursor": "..."}`. When `next_cursor` is there, pass it back
@@ -35,6 +38,8 @@ tags:
     description: What a customer is on, its term and notice, and its renewal.
   - name: deals
     description: What each conversation is worth, who has it and when it should close.
+  - name: mail
+    description: Marketing mail, and the one list of addresses it never goes to.
 
 paths:
   /o/{org}/api/v1/agents:
@@ -786,6 +791,80 @@ paths:
                   contact: { type: integer, format: int64 }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/suppressions:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listSuppressions
+      tags: [mail]
+      summary: Addresses marketing mail never goes to
+      description: |
+        One list for every mailing: those who unsubscribed by a link in a mail, and those
+        a member or key added. Someone erased on request, and anyone on the never-contact
+        list, isn't mailed either, though they aren't listed here.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: Newest first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Suppression" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: addSuppression
+      tags: [mail]
+      summary: Stop marketing mail to an address
+      description: Adding one already there changes nothing.
+      security:
+        - session: []
+        - bearer: ["campaigns:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address]
+              properties:
+                address: { type: string, description: One email address. }
+      responses:
+        "201":
+          description: The address as listed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Suppression" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/suppressions/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    delete:
+      operationId: removeSuppression
+      tags: [mail]
+      summary: Take an added address off the list
+      description: Only one a member or key added. One the person unsubscribed themselves stays.
+      security:
+        - session: []
+        - bearer: ["campaigns:write"]
+      responses:
+        "204": { description: Taken off. }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -1141,3 +1220,13 @@ components:
         state: { type: string, description: "`open`, `waiting` or `closed`; empty for one from before answering was tracked." }
         owner: { type: string }
         note: { type: string }
+
+    Suppression:
+      type: object
+      required: [id, address, reason, by, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        address: { type: string }
+        reason: { type: string, enum: [unsubscribed, added], description: "`unsubscribed` when they asked, by a link in a mail; `added` when a member or key put them here." }
+        by: { type: string, description: Who added it; empty when they unsubscribed themselves. }
+        created_at: { type: string, format: date-time }

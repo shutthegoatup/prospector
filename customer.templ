@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/shutthegoatup/prospector/components/button"
+	"net/url"
 	"strconv"
 )
 
@@ -39,7 +40,7 @@ templ CustomerPage(v CustomerView) {
 					case "open":
 						<h1 class="font-heading text-3xl font-bold tracking-tight">{ v.Org } set up a page for you<span class="text-coral">.</span></h1>
 						<p class="text-sm text-muted-foreground">It shows the steps that are yours while they set you up. Opening it here keeps it open in this browser for 30 days. The link works once.</p>
-						<form method="post" action={ templ.SafeURL("/c/" + v.Token) }>
+						<form method="post" action={ templ.SafeURL("/c/" + url.PathEscape(v.Token)) }>
 							@button.Button(button.Props{Type: button.TypeSubmit}) {
 								Open my steps
 							}
@@ -47,7 +48,7 @@ templ CustomerPage(v CustomerView) {
 					case "again":
 						<h1 class="font-heading text-3xl font-bold tracking-tight">This link has been used or has run out<span class="text-coral">.</span></h1>
 						<p class="text-sm text-muted-foreground">A link opens the page once, in one browser. We can send a fresh one to the address this one was sent to.</p>
-						<form method="post" action={ templ.SafeURL("/c/" + v.Token + "/again") }>
+						<form method="post" action={ templ.SafeURL("/c/" + url.PathEscape(v.Token) + "/again") }>
 							@button.Button(button.Props{Type: button.TypeSubmit}) {
 								Send me a new link
 							}
