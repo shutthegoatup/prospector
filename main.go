@@ -9,8 +9,8 @@
 //	prospector key add <org> <name> <scope>…   prints the key once
 //	prospector mail test <address>           send a test through SMTP_ADDR
 //	prospector sso off <org>                 stop requiring single sign-on, when its provider has broken
-//	prospector agent set <org> <endpoint> <model> [<tools-url> [<tool>…]]   key from $PROSPECTOR_AGENT_API_KEY
-//	prospector agent show <org>              the agent's endpoint, model and tools, never its key
+//	prospector agent set <org> <name> <endpoint> <model> [<tools-url> [<tool>…]]   key from $PROSPECTOR_AGENT_API_KEY
+//	prospector agent show <org>              each agent's endpoint, model and tools, never its key
 //	prospector secret-key [version]          print a new entry for PROSPECTOR_SECRET_KEYS
 //	prospector version
 //

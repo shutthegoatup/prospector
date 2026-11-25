@@ -244,7 +244,7 @@ type Store struct {
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
 	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &Suggestion{},
-	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}, &AgentConfig{}, &AgentRun{}, &Deal{}}
+	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}, &Agent{}, &AgentRun{}, &Deal{}}
 
 // Open takes a postgres:// URL or a SQLite file path.
 func Open(dsn string) (*Store, error) {
@@ -270,11 +270,41 @@ func Open(dsn string) (*Store, error) {
 	s := &Store{db: db}
 	s.oneNameWhateverItsCapitals()
 	s.indexSearch()
-	// One run at a time per task, held by the database however two starts interleave.
-	if err := db.Exec("create unique index if not exists idx_agent_runs_one_going on agent_runs (task_id) where status in ('running', 'waiting')").Error; err != nil {
+	if err := migrateAgentConfigs(db); err != nil {
+		return nil, err
+	}
+	if err := oneGoingRunPerAgent(db); err != nil {
 		return nil, err
 	}
 	return s, nil
+}
+
+// oneGoingRunPerAgent has the database hold that an agent works a task once at a time,
+// however two starts interleave; several agents can share a task. It keeps the name of
+// the earlier rule, one run per task, because an earlier release creates that name only
+// if nothing has it: so going back to one still starts, whatever runs are going.
+func oneGoingRunPerAgent(db *gorm.DB) error {
+	const name = "idx_agent_runs_one_going"
+	var def string
+	lookup := "select coalesce(sql, '') from sqlite_master where type = 'index' and name = ?"
+	if db.Dialector.Name() == "postgres" {
+		lookup = "select indexdef from pg_indexes where indexname = ? and tablename = 'agent_runs' and schemaname = current_schema()"
+	}
+	if err := db.Raw(lookup, name).Scan(&def).Error; err != nil {
+		return err
+	}
+	if strings.Contains(def, "agent_id") {
+		return nil
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		for _, stmt := range []string{"drop index if exists " + name,
+			"create unique index " + name + " on agent_runs (task_id, agent_id) where status in ('running', 'waiting')"} {
+			if err := tx.Exec(stmt).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (s *Store) postgres() bool { return s.db.Dialector.Name() == "postgres" }

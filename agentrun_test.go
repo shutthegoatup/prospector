@@ -40,6 +40,7 @@ type runSetup struct {
 	o      *Org
 	task   *Task
 	brief  int64
+	agent  int64
 	mu     sync.Mutex
 	sleeps []time.Duration
 }
@@ -55,10 +56,8 @@ func newRunSetup(t *testing.T, fake *fakeEndpoint) *runSetup {
 		r.mu.Unlock()
 		return ctx.Err()
 	}}
-	if _, err := r.a.saveAgentConfig(context.Background(), r.o.ID, AgentSettingsIn{BaseURL: fake.srv.URL + "/v1", APIKey: agentTestKey,
-		Model: "router/auto", ToolsURL: fake.srv.URL + "/mcp", Tools: []string{searchTool}}, "Ada Lovelace"); err != nil {
-		t.Fatal(err)
-	}
+	r.agent = must(r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{Name: "Prospector", BaseURL: fake.srv.URL + "/v1", APIKey: agentTestKey,
+		Model: "router/auto", ToolsURL: fake.srv.URL + "/mcp", Tools: []string{searchTool}}, "Ada Lovelace")).ID
 	r.task = must(r.s.CreateTask(r.o.ID, "Yachts", "Yacht builders with a configurator.", "Ada Lovelace"))
 	r.brief = must(r.s.Task(r.o.ID, r.task.ID, time.Now())).Requests[0].ID
 	t.Cleanup(r.a.runs.wg.Wait)
@@ -100,7 +99,7 @@ func TestTheAgentWorksATaskToTheEnd(t *testing.T) {
 		}
 		return 200, chatText("I'm done.")
 	}
-	run := must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace"))
+	run := must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace"))
 	got := r.finished(t, run.ID)
 	if got.Status != RunFinished || got.StopReason != "the request is done" || got.Turns != 3 || got.Added != 1 || got.RequestID != r.brief {
 		for _, m := range messagesOf(fake.bodies[2]) {
@@ -117,7 +116,7 @@ func TestTheAgentWorksATaskToTheEnd(t *testing.T) {
 		t.Fatalf("only the fact from a page the agent was shown should be stored: %+v", facts)
 	}
 	v := must(r.s.Task(r.o.ID, r.task.ID, time.Now()))
-	if len(v.Companies) != 1 || v.Requests[0].DoneAt == nil || v.Requests[0].DoneBy != "agent:prospector" {
+	if len(v.Companies) != 1 || v.Requests[0].DoneAt == nil || v.Requests[0].DoneBy != "agent:Prospector (built in)" {
 		t.Fatalf("the task should count the company and the request be done by the agent: %+v %+v", v.Companies, v.Requests[0])
 	}
 
@@ -172,7 +171,7 @@ func TestTheAgentWaitsOutAnEndpointsLimit(t *testing.T) {
 		}
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
-	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	if got.Status != RunFinished || got.Turns != 1 {
 		t.Fatalf("after the wait the run should carry on and finish: %+v", got)
 	}
@@ -195,7 +194,7 @@ func TestTheAgentWorksThroughOutagesButNotAWrongModel(t *testing.T) {
 		}
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
-	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	if got.Status != RunFinished {
 		t.Fatalf("a run should outlast an endpoint that is away for a while: %+v", got)
 	}
@@ -216,14 +215,14 @@ func TestTheAgentWorksThroughOutagesButNotAWrongModel(t *testing.T) {
 	if err := r.s.SetRequestDone(r.o.ID, r.brief, false, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	got = r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	got = r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	if got.Status != RunFailed || !strings.Contains(got.StopReason, "no such model") || fake.chats != 1 {
 		t.Fatalf("a refusal that waiting won't fix should end the run, saying why: %+v after %d calls", got, fake.chats)
 	}
 
 	// An address whose /chat/completions is some site's page answers 200, but not a completion.
 	fake.chat = func(int, map[string]any) (int, string) { return 200, `<html><body>Welcome</body></html>` }
-	got = r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	got = r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	if got.Status != RunFailed || !strings.Contains(got.StopReason, "wasn't a chat completion") {
 		t.Fatalf("an answer that isn't a completion should end the run, not be waited on: %+v", got)
 	}
@@ -249,7 +248,7 @@ func TestAPersonStopsTheAgent(t *testing.T) {
 		}
 		return 200, chatTools(searchTool, `{"query":"more yacht builders"}`)
 	}
-	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	if got.Status != RunStopped || got.StopReason != "stopped by a person" || got.EndedAt == nil {
 		t.Fatalf("a stopped run: %+v", got)
 	}
@@ -265,13 +264,13 @@ func TestARunCarriesOnAfterItsServerStops(t *testing.T) {
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
 	lapsed := time.Now().Add(-time.Minute).UnixMilli()
-	left := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, StartedBy: "Ada Lovelace", Model: "router/auto", Status: RunWorking,
+	left := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, StartedBy: "Ada Lovelace", Model: "router/auto", Status: RunWorking,
 		Owner: "a server that stopped", LeaseUntil: lapsed, StartedAt: time.Now(), Turns: 7}
 	stopped := left
 	stopped.StopAsked, stopped.TaskID = true, must(r.s.CreateTask(r.o.ID, "Kitchens", "Kitchen makers.", "Ada Lovelace")).ID
 	r.s.db.Create(&left)
 	r.s.db.Create(&stopped)
-	held := AgentRun{OrgID: r.o.ID, TaskID: must(r.s.CreateTask(r.o.ID, "Boats", "Boat builders.", "Ada Lovelace")).ID, Status: RunWorking,
+	held := AgentRun{OrgID: r.o.ID, AgentID: r.agent, TaskID: must(r.s.CreateTask(r.o.ID, "Boats", "Boat builders.", "Ada Lovelace")).ID, Status: RunWorking,
 		Owner: "a live server", LeaseUntil: time.Now().Add(time.Minute).UnixMilli(), StartedAt: time.Now()}
 	r.s.db.Create(&held)
 
@@ -300,7 +299,7 @@ func TestFreshStartsKeepARunsContextBounded(t *testing.T) {
 		}
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
-	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	if got.Status != RunFinished || got.Episodes != 2 || got.Turns != 3 {
 		t.Fatalf("the run: %+v", got)
 	}
@@ -309,31 +308,50 @@ func TestFreshStartsKeepARunsContextBounded(t *testing.T) {
 	}
 }
 
-func TestAnyMemberStartsTheAgentOnceATask(t *testing.T) {
+func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 	fake := newFakeEndpoint(t)
 	s, srv, ada := agentSite(t, fake)
 	o := must(s.OrgBySlug("alpha"))
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
-	start := func(c *http.Client) (int, string) {
-		return call(t, c, "POST", srv.URL+"/o/alpha/ui/task/agent/start", "application/json", map[string]any{"task": task.ID})
+	if err := s.AskTask(o.ID, task.ID, "And Italy.", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
 	}
-	if code, body := start(ada); code != http.StatusBadRequest || !strings.Contains(body, "Settings") {
-		t.Fatalf("starting an agent nobody set up: %d %s", code, body)
+	start := func(c *http.Client, agent int64) (int, string) {
+		return call(t, c, "POST", srv.URL+"/o/alpha/ui/task/agent/start", "application/json", map[string]any{"task": task.ID, "agent": agent})
 	}
-	if code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/agent", "application/json", map[string]any{"base_url": fake.srv.URL + "/v1",
-		"api_key": agentTestKey, "model": "router/auto"}); code != http.StatusOK {
-		t.Fatalf("setting it up: %d %s", code, body)
+	if code, body := start(ada, 99); code != http.StatusBadRequest || !strings.Contains(body, "no agent") {
+		t.Fatalf("starting an agent that isn't there: %d %s", code, body)
 	}
 	page := fmt.Sprintf("%s/o/alpha/tasks/%d", srv.URL, task.ID)
-	if _, body := call(t, ada, "GET", page, "", nil); !strings.Contains(body, "Run Prospector's agent") {
-		t.Fatal("the task page doesn't offer the agent")
+	if _, body := call(t, ada, "GET", page, "", nil); strings.Contains(body, "ui/task/agent/start") {
+		t.Fatal("the task page offers agents nobody set up")
+	}
+	var agents []*Agent
+	for _, name := range []string{"Claude", "Gateway"} {
+		if code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/agent", "application/json", map[string]any{"name": name,
+			"base_url": fake.srv.URL + "/v1", "api_key": agentTestKey, "model": "router/auto"}); code != http.StatusOK {
+			t.Fatalf("setting up %s: %d %s", name, code, body)
+		}
+		agents = append(agents, must(s.agentNamed(o.ID, name)))
+	}
+	if _, body := call(t, ada, "GET", page, "", nil); !strings.Contains(body, "Run Claude") || !strings.Contains(body, "Run Gateway") {
+		t.Fatal("the task page doesn't offer each agent")
 	}
 
 	release := make(chan struct{})
-	fake.chat = func(n int, _ map[string]any) (int, string) {
-		if n == 0 {
-			<-release
+	var mu sync.Mutex
+	claimed := map[float64]bool{}
+	fake.chat = func(n int, body map[string]any) (int, string) {
+		<-release
+		// What get_task kept for this run is in its opening message.
+		msgs := messagesOf(body)
+		var opened TaskOut
+		if text := fmt.Sprint(msgs[1]["content"]); strings.Contains(text, "{") {
+			json.Unmarshal([]byte(text[strings.Index(text, "{"):]), &opened)
 		}
+		mu.Lock()
+		claimed[float64(opened.Claimed)] = true
+		mu.Unlock()
 		return 200, chatText("Nothing more to do.")
 	}
 	grace := must(s.CreateUser("grace@example.com", "Grace Hopper", "grace's own password"))
@@ -342,16 +360,43 @@ func TestAnyMemberStartsTheAgentOnceATask(t *testing.T) {
 	}
 	member := newMailClient()
 	signIn(t, member, srv, grace.Email, "grace's own password")
-	if code, body := start(member); code != http.StatusOK {
-		t.Fatalf("a member starting the agent: %d %s", code, body)
+	if code, body := start(member, agents[0].ID); code != http.StatusOK || !strings.Contains(body, "Claude is on it") {
+		t.Fatalf("a member starting an agent: %d %s", code, body)
 	}
-	if code, body := start(ada); code != http.StatusBadRequest || !strings.Contains(body, "already working") {
-		t.Fatalf("a second run on one task: %d %s", code, body)
+	if code, body := start(ada, agents[1].ID); code != http.StatusOK {
+		t.Fatalf("a second agent on the same task: %d %s", code, body)
 	}
-	if _, body := call(t, ada, "GET", page, "", nil); !strings.Contains(body, "Working, with router/auto") || !strings.Contains(body, "ui/task/agent/stop") {
-		t.Fatal("the task page doesn't show the run going")
+	if code, body := start(ada, agents[0].ID); code != http.StatusBadRequest || !strings.Contains(body, "Claude is already working") {
+		t.Fatalf("the same agent twice on one task: %d %s", code, body)
+	}
+	if _, body := call(t, ada, "GET", page, "", nil); !strings.Contains(body, "Stop Claude") || !strings.Contains(body, "Stop Gateway") || strings.Contains(body, "Run Claude") {
+		t.Fatal("the task page should show both runs going, and offer neither again")
 	}
 	close(release)
+	var runs []AgentRun
+	waitFor(t, func() bool {
+		s.db.Where("task_id = ?", task.ID).Find(&runs)
+		return len(runs) == 2 && !runs[0].Going() && !runs[1].Going()
+	})
+	if runs[0].RequestID == 0 || runs[0].RequestID == runs[1].RequestID {
+		t.Fatalf("two agents on one task should take different requests: %d and %d", runs[0].RequestID, runs[1].RequestID)
+	}
+	var keys []int64
+	s.db.Model(&AgentRun{}).Where("task_id = ?", task.ID).Distinct().Pluck("agent_id", &keys)
+	if len(keys) != 2 {
+		t.Fatalf("each run should be its agent's: %v", keys)
+	}
+}
+
+// waitFor polls a condition that background runs make true.
+func waitFor(t *testing.T, done func() bool) {
+	t.Helper()
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		if done() {
+			return
+		}
+	}
+	t.Fatal("timed out waiting")
 }
 
 func TestAToolNobodyTickedIsntRun(t *testing.T) {
@@ -363,7 +408,7 @@ func TestAToolNobodyTickedIsntRun(t *testing.T) {
 		}
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
-	r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	fake.mu.Lock()
 	defer fake.mu.Unlock()
 	for _, used := range fake.toolUse {
@@ -396,7 +441,7 @@ func TestOneServerDoesntTakeOverARunItIsDriving(t *testing.T) {
 		}
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
-	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	openings := 0
 	for _, b := range fake.bodies {
 		if len(messagesOf(b)) == 2 {
@@ -423,7 +468,7 @@ func TestOnlyOneRunStartsOnATask(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if _, err := r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace"); err == nil {
+			if _, err := r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace"); err == nil {
 				mu.Lock()
 				started++
 				mu.Unlock()
@@ -435,7 +480,7 @@ func TestOnlyOneRunStartsOnATask(t *testing.T) {
 	if started != 1 {
 		t.Fatalf("%d runs started on one task", started)
 	}
-	bad := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, Status: RunWaiting, StartedAt: time.Now()}
+	bad := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, Status: RunWaiting, StartedAt: time.Now()}
 	if err := r.s.db.Create(&bad).Error; err == nil {
 		t.Fatal("the database let a second going run onto the task")
 	}
@@ -447,12 +492,12 @@ func TestARunCarriedOnKeepsItsOwnClaim(t *testing.T) {
 	fake.chat = func(int, map[string]any) (int, string) {
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
-	bk := must(r.s.builtinKey(r.o.ID))
+	bk := must(r.s.agentKey(must(r.s.AgentByID(r.o.ID, r.agent))))
 	now := time.Now()
 	// The claim its run took before the server stopped, under a session that is gone.
 	r.s.db.Create(&RequestClaim{RequestID: r.brief, OrgID: r.o.ID, TaskID: r.task.ID, Holder: fmt.Sprintf("key:%d session:gone", bk.ID),
 		Actor: "agent:prospector", ClaimedAt: now.Add(-5 * time.Minute).UnixMilli(), ExpiresAt: now.Add(10 * time.Minute).UnixMilli()})
-	left := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, StartedBy: "Ada Lovelace", Model: "router/auto", Status: RunWorking,
+	left := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, StartedBy: "Ada Lovelace", Model: "router/auto", Status: RunWorking,
 		Owner: "a server that stopped", LeaseUntil: now.Add(-time.Second).UnixMilli(), StartedAt: now}
 	r.s.db.Create(&left)
 	r.a.resumeLapsed(now)
@@ -484,7 +529,7 @@ func TestTheSourceGuardHoldsForEveryWayToCiteAPage(t *testing.T) {
 		}
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
-	r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	for _, name := range []string{"Corvane", "Halvard"} {
 		if _, err := r.s.companyRef(r.o.ID, name); err == nil {
 			t.Errorf("%s was added with a source the agent was never shown", name)
@@ -495,13 +540,13 @@ func TestTheSourceGuardHoldsForEveryWayToCiteAPage(t *testing.T) {
 func TestARunStartingLeavesOtherKeysClaimsAlone(t *testing.T) {
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
-	bk := must(r.s.builtinKey(r.o.ID))
+	bk := must(r.s.agentKey(must(r.s.AgentByID(r.o.ID, r.agent))))
 	other := fmt.Sprintf("key:%d0 session:abc", bk.ID)
 	now := time.Now()
 	r.s.db.Create(&RequestClaim{RequestID: r.brief, OrgID: r.o.ID, TaskID: r.task.ID, Holder: other, Actor: "agent:claude",
 		ClaimedAt: now.UnixMilli(), ExpiresAt: now.Add(10 * time.Minute).UnixMilli()})
 	fake.chat = func(int, map[string]any) (int, string) { return 200, chatText("unused") }
-	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	if got.StopReason != "other agents hold every open request" {
 		t.Fatalf("another agent's claim, on a key whose id starts like the built-in one's, was dropped: %+v", got)
 	}
@@ -521,7 +566,7 @@ func TestTheAgentCantCiteAPageItWasntShownAnyOtherWay(t *testing.T) {
 		}
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
-	r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	if _, err := r.s.companyRef(r.o.ID, "Ghost Yachts"); err == nil {
 		t.Fatal("a company was added with a platform and builder sourced from nowhere")
 	}
@@ -537,7 +582,7 @@ func TestNextToNoRetryAfterBacksOffAsAnOutageDoes(t *testing.T) {
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
 	fake.retryAfter = "0"
-	r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	if len(r.sleeps) != 2 || r.sleeps[0].Round(time.Second) != 10*time.Second || r.sleeps[1].Round(time.Second) != 20*time.Second {
 		t.Fatalf("a Retry-After of nothing should back off as an outage does: %v", r.sleeps)
 	}
@@ -548,12 +593,12 @@ func TestRevokingTheAgentsKeyStopsItsRun(t *testing.T) {
 	r := newRunSetup(t, fake)
 	fake.chat = func(n int, _ map[string]any) (int, string) {
 		if n == 1 {
-			bk := must(r.s.builtinKey(r.o.ID))
+			bk := must(r.s.agentKey(must(r.s.AgentByID(r.o.ID, r.agent))))
 			r.s.db.Model(&APIKey{}).Where("id = ?", bk.ID).Update("revoked_at", time.Now())
 		}
 		return 200, chatTools(searchTool, `{"query":"yachts"}`)
 	}
-	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	if got.Status != RunStopped || !strings.Contains(got.StopReason, "revoked") {
 		t.Fatalf("a run whose key was revoked: %+v", got)
 	}

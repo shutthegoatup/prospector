@@ -158,7 +158,7 @@ templ SettingsView(q *Req, d SettingsData) {
 					<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
 				</form>
 			}
-			@AgentSettings(d.Agent)
+			@OwnAgents(d.Agents)
 		}
 		@Section("Sequence", "Every contact goes through these steps; the waits come from above.") {
 			<ol class="flex max-w-lg flex-col gap-1 text-sm">
@@ -256,56 +256,89 @@ func passwordHint(m MailView) string {
 	return ""
 }
 
-templ AgentSettings(v AgentView) {
-	<form data-form="ui/agent" data-refresh="true">
-		@Section("Prospector's agent", "A model Prospector calls itself to work tasks, through any OpenAI-compatible endpoint, with tools from an MCP server. What it finds waits in Research like any agent's.") {
-			if !v.Sealing {
-				<p class="text-sm text-[var(--stop)]" role="alert">This server has no secret key, so it can't keep an API key: whoever runs it needs to set PROSPECTOR_SECRET_KEYS first.</p>
-			}
-			@Row("Endpoint") {
-				<input name="base_url" value={ v.BaseURL } placeholder="https://openrouter.ai/api/v1" autocomplete="off" class={ fieldClass }/>
-				@Meta("The address its /models and /chat/completions are under. Clear it to turn the agent off.")
-			}
-			@Row("API key") {
-				<input name="api_key" type="password" autocomplete="new-password" placeholder={ agentKeyHint(v) } class={ fieldClass }/>
-				@Meta("Never shown again. Changing the endpoint needs it entered again.")
-			}
-			@Row("Model") {
-				<input name="model" value={ v.Model } list="agent-models" autocomplete="off" placeholder="one the endpoint lists" class={ fieldClass }/>
-				<datalist id="agent-models">
-					for _, m := range v.ModelList() {
-						<option value={ m }></option>
-					}
-				</datalist>
-				@Meta(agentModelHint(v))
-			}
-			@Row("Tools") {
-				<input name="tools_url" value={ v.ToolsURL } placeholder="https://mcp.example.com/mcp" autocomplete="off" class={ fieldClass }/>
-				@Meta("An MCP server, such as a gateway's federated /mcp. It's sent the endpoint's key only when it's on the same address.")
-			}
-			if tools := v.ToolList(); len(tools) > 0 {
-				@Row("Allowed tools") {
-					<div class="flex flex-col gap-1.5 pt-1.5">
-						for _, t := range tools {
-							<label class="flex items-start gap-2.5 text-sm">
-								<input type="checkbox" name="tools" value={ t.Name } data-multi="true" checked?={ v.Allows(t.Name) } class="mt-0.5 size-4 accent-[var(--primary)]"/>
-								<span><span class="font-mono text-xs">{ t.Name }</span> <span class="text-muted-foreground">{ t.Description }</span></span>
-							</label>
-						}
-					</div>
-					@Meta("The agent uses only the tools ticked here. LinkedIn's terms forbid automated access, logged-in browsers included: prefer search and fetch tools to browser and captcha ones.")
+
+templ OwnAgents(v OwnAgentsView) {
+	@Section("Prospector's agents", "Models Prospector calls itself to work tasks, each through its own OpenAI-compatible endpoint, with tools from an MCP server: Claude, ChatGPT and open models side by side. Several can work one task at once, each on its own request. What they find waits in Research like any agent's.") {
+		if !v.Sealing {
+			<p class="text-sm text-[var(--stop)]" role="alert">This server has no secret key, so it can't keep an API key: whoever runs it needs to set PROSPECTOR_SECRET_KEYS first.</p>
+		}
+		for _, agent := range v.Agents {
+			@AgentForm(agent)
+		}
+		<details class="rounded-lg border border-dashed border-border p-3" open?={ len(v.Agents) == 0 }>
+			<summary class="cursor-pointer text-sm font-medium">Add an agent</summary>
+			@AgentForm(AgentView{})
+		</details>
+	}
+}
+
+func agentModelsID(v AgentView) string {
+	if v.ID == 0 {
+		return "agent-models-new"
+	}
+	return "agent-models-" + strconv.FormatInt(v.ID, 10)
+}
+
+templ AgentForm(v AgentView) {
+	<form data-form="ui/agent" data-refresh="true" class="flex flex-col gap-3 border-b border-dashed border-border py-3 last:border-0">
+		<input type="number" name="id" value={ strconv.FormatInt(v.ID, 10) } hidden/>
+		@Row("Name") {
+			<input name="name" value={ v.Name } placeholder="Claude, ChatGPT, the gateway…" autocomplete="off" class={ fieldClass }/>
+			@Meta("What it is called on the task page and in the record.")
+		}
+		@Row("Endpoint") {
+			<input name="base_url" value={ v.BaseURL } placeholder="https://openrouter.ai/api/v1" autocomplete="off" class={ fieldClass }/>
+			@Meta("The address its /models and /chat/completions are under, such as https://api.openai.com/v1.")
+		}
+		@Row("API key") {
+			<input name="api_key" type="password" autocomplete="new-password" placeholder={ agentKeyHint(v) } class={ fieldClass }/>
+			@Meta("Never shown again. Changing the endpoint needs it entered again.")
+		}
+		@Row("Model") {
+			<input name="model" value={ v.Model } list={ agentModelsID(v) } autocomplete="off" placeholder="one the endpoint lists" class={ fieldClass }/>
+			<datalist id={ agentModelsID(v) }>
+				for _, m := range v.ModelList() {
+					<option value={ m }></option>
 				}
+			</datalist>
+			@Meta(agentModelHint(v))
+		}
+		@Row("Tools") {
+			<input name="tools_url" value={ v.ToolsURL } placeholder="https://mcp.example.com/mcp" autocomplete="off" class={ fieldClass }/>
+			@Meta("An MCP server, such as a gateway's federated /mcp. It's sent the endpoint's key only when it's on the same address.")
+		}
+		if tools := v.ToolList(); len(tools) > 0 {
+			@Row("Allowed tools") {
+				<div class="flex flex-col gap-1.5 pt-1.5">
+					for _, t := range tools {
+						<label class="flex items-start gap-2.5 text-sm">
+							<input type="checkbox" name="tools" value={ t.Name } data-multi="true" checked?={ v.Allows(t.Name) } class="mt-0.5 size-4 accent-[var(--primary)]"/>
+							<span><span class="font-mono text-xs">{ t.Name }</span> <span class="text-muted-foreground">{ t.Description }</span></span>
+						</label>
+					}
+				</div>
+				@Meta("The agent uses only the tools ticked here. LinkedIn's terms forbid automated access, logged-in browsers included: prefer search and fetch tools to browser and captcha ones.")
 			}
-			if v.Problem != "" {
-				<p class="text-sm text-[var(--stop)]" role="alert">{ "Last check: " + v.Problem }</p>
-			}
-			<div class="flex items-center gap-3">
-				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+		}
+		if v.Problem != "" {
+			<p class="text-sm text-[var(--stop)]" role="alert">{ "Last check: " + v.Problem }</p>
+		}
+		<div class="flex flex-wrap items-center gap-3">
+			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+				if v.ID == 0 {
+					Add and check
+				} else {
 					Save and check
 				}
-				<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
-			</div>
-		}
+			}
+			if v.ID != 0 {
+				@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/agent/delete", "data-body": jsonBody("id", v.ID),
+					"data-confirm": "Delete " + v.Name + "? Its runs stop and its key is revoked; what it found stays."}}) {
+					Delete
+				}
+			}
+			<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
+		</div>
 	</form>
 }
 

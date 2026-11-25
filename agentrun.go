@@ -11,12 +11,15 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"gorm.io/gorm"
 )
 
 // AgentRun is one go of Prospector's own agent at a task. It keeps counts, never what
@@ -25,6 +28,8 @@ type AgentRun struct {
 	ID        int64  `gorm:"primaryKey"`
 	OrgID     int64  `gorm:"index;not null"`
 	TaskID    int64  `gorm:"index;not null"`
+	AgentID   int64  `gorm:"index;not null;default:0"`
+	AgentName string `gorm:"not null;default:''"`
 	RequestID int64  `gorm:"not null;default:0"`
 	StartedBy string `gorm:"not null"`
 	Model     string `gorm:"not null"`
@@ -63,7 +68,7 @@ var (
 	// as long as it has work, with a bounded context and nothing lost between.
 	episodeTurns  = 30
 	episodeTokens = int64(100_000)
-	maxRunning    = 2
+	maxRunning    = runCap(os.Getenv("PROSPECTOR_AGENT_MAX_RUNS"))
 )
 
 const (
@@ -106,42 +111,76 @@ func (a *App) pause(ctx context.Context, d time.Duration) error {
 	}
 }
 
-// builtinKey is the organisation's own agent as an API key that no request can
-// present: its hash is nothing a secret could be looked up as.
-func (s *Store) builtinKey(org int64) (*APIKey, error) {
-	var k APIKey
-	if err := s.db.Where("org_id = ? and prefix = ? and revoked_at is null", org, builtinPrefix).Limit(1).Find(&k).Error; err != nil || k.ID != 0 {
-		return &k, err
+// runCap is how many runs one server drives at once: PROSPECTOR_AGENT_MAX_RUNS, or 8.
+func runCap(setting string) int {
+	if n, err := strconv.Atoi(strings.TrimSpace(setting)); err == nil && n > 0 {
+		return n
 	}
-	k = APIKey{OrgID: org, Name: "prospector", Prefix: builtinPrefix, Hash: "builtin:" + randomToken(24),
-		Scopes: "read research:write", CreatedBy: "prospector"}
-	return &k, s.db.Create(&k).Error
+	return 8
 }
 
-// AgentRuns are a task's runs, newest first.
+// builtinKeyName is an agent's name as its key carries it into the record, marked so
+// it isn't taken for a key someone made for an agent of their own.
+func builtinKeyName(agent string) string { return agent + " (built in)" }
+
+// agentKey is the agent as an API key that no request can present: its hash is
+// nothing a secret could be looked up as. One revoked is replaced, so a deleted
+// agent's runs stop while a new one called the same starts clean.
+func (s *Store) agentKey(c *Agent) (*APIKey, error) {
+	var k APIKey
+	if c.KeyID != 0 {
+		if err := s.db.Where("org_id = ? and id = ?", c.OrgID, c.KeyID).Limit(1).Find(&k).Error; err != nil {
+			return nil, err
+		}
+		if k.ID != 0 && k.RevokedAt == nil {
+			return &k, nil
+		}
+	}
+	k = APIKey{OrgID: c.OrgID, Name: builtinKeyName(c.Name), Prefix: builtinPrefix, Hash: "builtin:" + randomToken(24),
+		Scopes: "read research:write", CreatedBy: "prospector"}
+	if err := s.db.Create(&k).Error; err != nil {
+		return nil, err
+	}
+	c.KeyID = k.ID
+	return &k, s.db.Model(&Agent{}).Where("id = ?", c.ID).Update("key_id", k.ID).Error
+}
+
+// AgentRuns are a task's runs, newest first: every one going, however old, so each
+// can be stopped, and the latest that ended, up to limit.
 func (s *Store) AgentRuns(org, task int64, limit int) ([]AgentRun, error) {
-	var out []AgentRun
-	return out, s.db.Where("org_id = ? and task_id = ?", org, task).Order("id desc").Limit(limit).Find(&out).Error
+	going := []string{RunWorking, RunWaiting}
+	var out, ended []AgentRun
+	if err := s.db.Where("org_id = ? and task_id = ? and status in ?", org, task, going).Order("id desc").Find(&out).Error; err != nil {
+		return nil, err
+	}
+	if err := s.db.Where("org_id = ? and task_id = ? and status not in ?", org, task, going).Order("id desc").Limit(limit).Find(&ended).Error; err != nil {
+		return nil, err
+	}
+	return append(out, ended...), nil
 }
 
 // StartRun sets the organisation's agent going on a task.
-func (a *App) StartRun(org, task int64, by string) (*AgentRun, error) {
-	cfg, err := a.s.AgentConfigOf(org)
+func (a *App) StartRun(org, task, agent int64, by string) (*AgentRun, error) {
+	cfg, err := a.s.AgentByID(org, agent)
 	if err != nil {
 		return nil, err
 	}
 	if !cfg.Ready() {
-		return nil, errors.New("Prospector's agent isn't set up: an owner gives it an endpoint and a model in Settings")
+		return nil, fmt.Errorf("%s isn't set up: an owner gives it an endpoint and a model in Settings", cfg.Name)
 	}
 	if _, err := openTask(a.s.db, org, task); err != nil {
 		return nil, err
 	}
+	already := fmt.Errorf("%s is already working this task", cfg.Name)
+	goingHere := func() *gorm.DB {
+		return a.s.db.Model(&AgentRun{}).Where("org_id = ? and task_id = ? and agent_id = ? and status in ?", org, task, cfg.ID, []string{RunWorking, RunWaiting})
+	}
 	var going int64
-	if err := a.s.db.Model(&AgentRun{}).Where("org_id = ? and task_id = ? and status in ?", org, task, []string{RunWorking, RunWaiting}).Count(&going).Error; err != nil {
+	if err := goingHere().Count(&going).Error; err != nil {
 		return nil, err
 	}
 	if going > 0 {
-		return nil, errors.New("Prospector's agent is already working this task")
+		return nil, already
 	}
 	a.runs.mu.Lock()
 	busy := len(a.runs.cancel)
@@ -150,12 +189,12 @@ func (a *App) StartRun(org, task int64, by string) (*AgentRun, error) {
 		return nil, fmt.Errorf("this server is already running %d agents: try again when one finishes", busy)
 	}
 	now := time.Now()
-	run := AgentRun{OrgID: org, TaskID: task, StartedBy: by, Model: cfg.Model, Status: RunWorking, Owner: a.runOwner(),
-		LeaseUntil: now.Add(runLease).UnixMilli(), StartedAt: now}
+	run := AgentRun{OrgID: org, TaskID: task, AgentID: cfg.ID, AgentName: cfg.Name, StartedBy: by, Model: cfg.Model, Status: RunWorking,
+		Owner: a.runOwner(), LeaseUntil: now.Add(runLease).UnixMilli(), StartedAt: now}
 	if err := a.s.db.Create(&run).Error; err != nil {
-		// Another start won the race to this task.
-		if logged(a.s.db.Model(&AgentRun{}).Where("org_id = ? and task_id = ? and status in ?", org, task, []string{RunWorking, RunWaiting}).Count(&going)); going > 0 {
-			return nil, errors.New("Prospector's agent is already working this task")
+		// Another start of this agent won the race to this task.
+		if logged(goingHere().Count(&going)); going > 0 {
+			return nil, already
 		}
 		return nil, err
 	}
@@ -290,19 +329,19 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 	if err != nil {
 		return RunFailed, "the organisation can't be read"
 	}
-	cfg, err := a.s.AgentConfigOf(run.OrgID)
+	cfg, err := a.s.AgentByID(run.OrgID, run.AgentID)
 	if err != nil || !cfg.Ready() {
-		return RunFailed, "Prospector's agent is no longer set up in Settings"
+		return RunFailed, "the agent is no longer set up in Settings"
 	}
 	key, err := a.s.keys.open(cfg.APIKey)
 	if err != nil {
 		return RunFailed, "the endpoint's key can't be read: an owner enters it again in Settings"
 	}
-	bk, err := a.s.builtinKey(run.OrgID)
+	bk, err := a.s.agentKey(cfg)
 	if err != nil {
 		return RunFailed, "the agent's key couldn't be made"
 	}
-	// One run works a task at a time, so a claim of this key's on the task is this
+	// An agent works a task once at a time, so a claim of its key's on the task is this
 	// run's from before a restart, under a session that is gone.
 	mine := fmt.Sprintf("key:%d", bk.ID)
 	if err := a.s.db.Where("org_id = ? and task_id = ? and (holder = ? or holder like ?)", run.OrgID, run.TaskID, mine, mine+" %").
@@ -420,7 +459,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 // connectTools reaches the organisation's tool server and lists what the run may use.
 // A tool server behind the same limits as the model, or away for a while, is waited
 // out as the model is; one that can't be used by waiting ends the run.
-func (a *App) connectTools(ctx context.Context, run *AgentRun, own *mcp.ClientSession, cfg *AgentConfig, key string) (*mcp.ClientSession, []toolDef, error) {
+func (a *App) connectTools(ctx context.Context, run *AgentRun, own *mcp.ClientSession, cfg *Agent, key string) (*mcp.ClientSession, []toolDef, error) {
 	for failures := 0; ; failures++ {
 		connecting, cancel := context.WithTimeout(ctx, time.Minute)
 		var ext *mcp.ClientSession
@@ -531,7 +570,7 @@ func toolDefOf(t *mcp.Tool) toolDef {
 	return d
 }
 
-func agentTools(ctx context.Context, own, ext *mcp.ClientSession, cfg *AgentConfig) ([]toolDef, error) {
+func agentTools(ctx context.Context, own, ext *mcp.ClientSession, cfg *Agent) ([]toolDef, error) {
 	var out []toolDef
 	names := map[string]bool{}
 	for t, err := range own.Tools(ctx, nil) {
@@ -762,7 +801,7 @@ type chatReply struct {
 
 // complete asks the endpoint for the model's next turn. A failure on the way, or a
 // server error, is tried again a few times before the run gives up.
-func (a *App) complete(ctx context.Context, cfg *AgentConfig, key string, run *AgentRun, messages []chatMessage, tools []toolDef) (*chatReply, error) {
+func (a *App) complete(ctx context.Context, cfg *Agent, key string, run *AgentRun, messages []chatMessage, tools []toolDef) (*chatReply, error) {
 	body, err := json.Marshal(map[string]any{"model": cfg.Model, "messages": messages, "tools": tools, "tool_choice": "auto",
 		"max_tokens": 8192, "prompt_cache_key": fmt.Sprintf("prospector-run-%d", run.ID)})
 	if err != nil {

@@ -739,11 +739,10 @@ func (a *App) uiSSOVerify(w http.ResponseWriter, r *http.Request) {
 	fail(w, fmt.Errorf("no TXT record at %s holds the value yet: DNS changes can take a while to show", d.Record()), http.StatusBadRequest)
 }
 
-// ssoCommand is the way back in when a required provider has broken and no owner can sign in.
-// agentCommand sets an organisation's agent from the shell. The key comes from the
+// agentCommand sets up an organisation's agents from the shell. A key comes from the
 // environment, so it never sits in shell history or a process listing.
 func agentCommand(s *Store, rest []string) error {
-	usage := fmt.Errorf("usage: prospector agent set <org> <endpoint> <model> [<tools-url> [<tool>…]], or prospector agent show <org>")
+	usage := fmt.Errorf("usage: prospector agent set <org> <name> <endpoint> <model> [<tools-url> [<tool>…]], or prospector agent show <org>")
 	if len(rest) < 2 {
 		return usage
 	}
@@ -753,17 +752,23 @@ func agentCommand(s *Store, rest []string) error {
 	}
 	switch rest[0] {
 	case "set":
-		if len(rest) < 4 {
+		if len(rest) < 5 {
 			return usage
 		}
 		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
 			return err
 		}
-		in := AgentSettingsIn{BaseURL: rest[2], Model: rest[3], APIKey: os.Getenv("PROSPECTOR_AGENT_API_KEY"), Tools: []string{}}
-		if len(rest) > 4 {
-			in.ToolsURL, in.Tools = rest[4], rest[5:]
+		in := AgentSettingsIn{Name: rest[2], BaseURL: rest[3], Model: rest[4], APIKey: os.Getenv("PROSPECTOR_AGENT_API_KEY"), Tools: []string{}}
+		if len(rest) > 5 {
+			in.ToolsURL, in.Tools = rest[5], rest[6:]
 		}
-		c, err := (&App{s: s}).saveAgentConfig(context.Background(), o.ID, in, "cli")
+		// The name says which: an agent already called that is changed, else one is made.
+		if name, err := agentName(in.Name); err == nil {
+			if c, err := s.agentNamed(o.ID, name); err == nil {
+				in.ID = c.ID
+			}
+		}
+		c, err := (&App{s: s}).saveAgent(context.Background(), o.ID, in, "cli")
 		if err != nil {
 			return err
 		}
@@ -774,21 +779,24 @@ func agentCommand(s *Store, rest []string) error {
 	default:
 		return usage
 	}
-	c, err := s.AgentConfigOf(o.ID)
+	agents, err := s.Agents(o.ID)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("endpoint: %s\nmodel: %s\nkey: %v\ntools: %s\nmodels listed: %d\n", c.BaseURL, c.Model, c.APIKey != "", c.ToolsURL, len(c.ModelList()))
-	for _, t := range c.ToolList() {
-		mark := " "
-		if c.Allows(t.Name) {
-			mark = "✓"
+	for _, c := range agents {
+		fmt.Printf("%s\n  endpoint: %s\n  model: %s\n  key: %v\n  tools: %s\n  models listed: %d\n", c.Name, c.BaseURL, c.Model, c.APIKey != "", c.ToolsURL, len(c.ModelList()))
+		for _, t := range c.ToolList() {
+			mark := " "
+			if c.Allows(t.Name) {
+				mark = "✓"
+			}
+			fmt.Printf("    %s %s\n", mark, t.Name)
 		}
-		fmt.Printf("  %s %s\n", mark, t.Name)
 	}
 	return nil
 }
 
+// ssoCommand is the way back in when a required provider has broken and no owner can sign in.
 func ssoCommand(s *Store, rest []string) error {
 	if arg(rest, 0, "") != "off" || len(rest) < 2 {
 		return fmt.Errorf("usage: prospector sso off <org>")

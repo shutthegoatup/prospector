@@ -378,6 +378,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/mail", a.owner(a.uiMail))
 	mux.HandleFunc("POST /o/{org}/ui/mail/test", a.owner(a.uiMailTest))
 	mux.HandleFunc("POST /o/{org}/ui/agent", a.owner(a.uiAgent))
+	mux.HandleFunc("POST /o/{org}/ui/agent/delete", a.owner(a.uiAgentDelete))
 	mux.HandleFunc("POST /o/{org}/ui/sso", a.owner(a.uiSSO))
 	mux.HandleFunc("POST /o/{org}/ui/sso/domain", a.owner(a.uiSSODomain))
 	mux.HandleFunc("POST /o/{org}/ui/sso/domain/remove", a.owner(a.uiSSODomainRemove))
