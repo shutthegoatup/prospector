@@ -14,7 +14,8 @@ info:
     to email a customer a link to their steps and withdraw it; `pipeline:write` to work deals
     and say where answering an enquiry stands; `enquiries:triage` to say where answering an
     enquiry stands and put its sender on the board, without deals; `enquiries:delete` to delete an enquiry;
-    `campaigns:write` to keep the list of addresses marketing mail never goes to. A
+    `campaigns:write` to write campaigns and keep the list of addresses marketing mail
+    never goes to. A
     signed-in member may do all of these except configuring agents and deleting enquiries,
     which need an owner.
 
@@ -870,6 +871,134 @@ paths:
         "204": { description: Taken off. }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/campaigns:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listCampaigns
+      tags: [mail]
+      summary: Campaigns, newest first
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: Newest first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Campaign" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: createCampaign
+      tags: [mail]
+      summary: Write a campaign
+      description: |
+        A draft of a marketing mail to everyone in conversation, or everyone at a company
+        whose subscription has started and not ended. Nothing is sent: a draft can be changed and
+        its audience looked at as often as you like.
+      security:
+        - session: []
+        - bearer: ["campaigns:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CampaignNew" }
+      responses:
+        "201":
+          description: The draft.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Campaign" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/campaigns/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeCampaign
+      tags: [mail]
+      summary: Change a draft
+      description: Send only what changes; they are saved together or not at all. Only a draft can be changed.
+      security:
+        - session: []
+        - bearer: ["campaigns:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CampaignChange" }
+      responses:
+        "200":
+          description: The draft as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Campaign" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: removeCampaign
+      tags: [mail]
+      summary: Remove a draft
+      description: Only a draft can be removed.
+      security:
+        - session: []
+        - bearer: ["campaigns:write"]
+      responses:
+        "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/campaigns/{id}/audience:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listCampaignAudience
+      tags: [mail]
+      summary: Who a campaign would go to now, and who is left out and why
+      description: |
+        Worked out afresh each time, from who is in conversation or at a customer today.
+        Someone with no address, on the list not to be mailed, on the never-contact list or
+        erased (by their address or LinkedIn profile) is left out, and an address shared by
+        two people goes to the first only.
+        Those it goes to come first.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: One page of the audience, with the totals.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, going, left_out]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Recipient" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  going: { type: integer, description: How many it would go to. }
+                  left_out: { type: integer, description: How many are left out. }
+        default: { $ref: "#/components/responses/Problem" }
+
   /o/{org}/api/v1/tasks:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -1601,3 +1730,50 @@ components:
         reason: { type: string, enum: [unsubscribed, added], description: "`unsubscribed` when they asked, by a link in a mail; `added` when a member or key put them here." }
         by: { type: string, description: Who added it; empty when they unsubscribed themselves. }
         created_at: { type: string, format: date-time }
+
+    CampaignAudience:
+      type: string
+      enum: [conversations, customers]
+      description: "`conversations`: everyone in conversation. `customers`: everyone at a company whose subscription has started and not ended, whether or not they ever replied."
+
+    CampaignNew:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 120 }
+        audience: { type: string, description: "`conversations` or `customers`; empty is `conversations`." }
+        subject: { type: string, maxLength: 200 }
+        body: { type: string, maxLength: 20000, description: "Plain text. The postal address and the unsubscribe link are added when it is sent." }
+
+    CampaignChange:
+      type: object
+      properties:
+        name: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        audience: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        subject: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        body: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+
+    Campaign:
+      type: object
+      required: [id, name, audience, subject, body, status, created_by, updated_by, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        audience: { $ref: "#/components/schemas/CampaignAudience" }
+        subject: { type: string }
+        body: { type: string }
+        status: { type: string, enum: [draft], description: "Every campaign is a draft until sending arrives." }
+        created_by: { type: string }
+        updated_by: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Recipient:
+      type: object
+      required: [contact_id, name, company, address, left_out]
+      properties:
+        contact_id: { type: integer, format: int64 }
+        name: { type: string }
+        company: { type: string }
+        address: { type: string }
+        left_out: { type: string, description: "Empty for someone it goes to; otherwise why it doesn't." }

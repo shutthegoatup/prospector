@@ -586,6 +586,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /** Campaigns, newest first */
+        get: operations["listCampaigns"];
+        put?: never;
+        /**
+         * Write a campaign
+         * @description A draft of a marketing mail to everyone in conversation, or everyone at a company
+         *     whose subscription has started and not ended. Nothing is sent: a draft can be changed and
+         *     its audience looked at as often as you like.
+         */
+        post: operations["createCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/campaigns/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a draft
+         * @description Only a draft can be removed.
+         */
+        delete: operations["removeCampaign"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a draft
+         * @description Send only what changes; they are saved together or not at all. Only a draft can be changed.
+         */
+        patch: operations["changeCampaign"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/campaigns/{id}/audience": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Who a campaign would go to now, and who is left out and why
+         * @description Worked out afresh each time, from who is in conversation or at a customer today.
+         *     Someone with no address, on the list not to be mailed, on the never-contact list or
+         *     erased (by their address or LinkedIn profile) is left out, and an address shared by
+         *     two people goes to the first only.
+         *     Those it goes to come first.
+         */
+        get: operations["listCampaignAudience"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/tasks": {
         parameters: {
             query?: never;
@@ -1257,6 +1339,53 @@ export interface components {
             by: string;
             /** Format: date-time */
             created_at: string;
+        };
+        /**
+         * @description `conversations`: everyone in conversation. `customers`: everyone at a company whose subscription has started and not ended, whether or not they ever replied.
+         * @enum {string}
+         */
+        CampaignAudience: "conversations" | "customers";
+        CampaignNew: {
+            name: string;
+            /** @description `conversations` or `customers`; empty is `conversations`. */
+            audience?: string;
+            subject?: string;
+            /** @description Plain text. The postal address and the unsubscribe link are added when it is sent. */
+            body?: string;
+        };
+        CampaignChange: {
+            name?: string | null;
+            audience?: string | null;
+            subject?: string | null;
+            body?: string | null;
+        };
+        Campaign: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            audience: components["schemas"]["CampaignAudience"];
+            subject: string;
+            body: string;
+            /**
+             * @description Every campaign is a draft until sending arrives.
+             * @enum {string}
+             */
+            status: "draft";
+            created_by: string;
+            updated_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        Recipient: {
+            /** Format: int64 */
+            contact_id: number;
+            name: string;
+            company: string;
+            address: string;
+            /** @description Empty for someone it goes to; otherwise why it doesn't. */
+            left_out: string;
         };
     };
     responses: {
@@ -2291,6 +2420,157 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCampaigns: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest first. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Campaign"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignNew"];
+            };
+        };
+        responses: {
+            /** @description The draft. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changeCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignChange"];
+            };
+        };
+        responses: {
+            /** @description The draft as it now is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCampaignAudience: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of the audience, with the totals. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Recipient"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                        /** @description How many it would go to. */
+                        going: number;
+                        /** @description How many are left out. */
+                        left_out: number;
+                    };
+                };
             };
             default: components["responses"]["Problem"];
         };
