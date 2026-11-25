@@ -41,6 +41,8 @@ func TestExportOrg(t *testing.T) {
 	do(s.AddMember(other.ID, outsider.ID, "owner", outsider.Name))
 	do(s.SaveSSO(&SSOConnection{OrgID: o.ID, Issuer: "https://id.larkmoor.example", ClientID: "prospector-client", ClientSecret: "s3cret-client-value"}, "ada"))
 	do(s.db.Create(&SSODomain{OrgID: o.ID, Domain: "alpha.example", Token: "dns-proof-token"}).Error)
+	do(s.SaveOrgMail(&OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "mailer", Password: "sealed-mail-password", Sender: "Alpha <hello@alpha.example>"}))
+	do(s.SaveOrgMail(&OrgMail{OrgID: other.ID, Host: "smtp.beta.example", Port: 587, Sender: "beta@beta.example"}))
 
 	jar, _ := cookiejar.New(nil)
 	bob := &http.Client{Jar: jar}
@@ -100,6 +102,9 @@ func TestExportOrg(t *testing.T) {
 	if out.SignOn == nil || out.SignOn.Issuer != "https://id.larkmoor.example" || out.SignOn.ClientID != "prospector-client" || len(out.SignOn.Domains) != 1 {
 		t.Fatalf("sign-on: %+v", out.SignOn)
 	}
+	if out.Mail == nil || out.Mail.Host != "smtp.alpha.example" || out.Mail.Username != "mailer" || strings.Contains(body, "smtp.beta.example") {
+		t.Fatalf("mail server: %+v", out.Mail)
+	}
 	if !strings.Contains(body, "+44 20 7946 0000") || !strings.Contains(body, "Could you send pricing?") {
 		t.Fatal("the export is missing a person's details or what they wrote")
 	}
@@ -114,7 +119,7 @@ func TestExportOrg(t *testing.T) {
 	do(s.db.Find(&users).Error)
 	var erasures []Erasure
 	do(s.in(o.ID).Find(&erasures).Error)
-	secrets := []string{key, theirKey, "s3cret-client-value", conn.ClientSecret, "dns-proof-token", "correct horse battery"}
+	secrets := []string{key, theirKey, "s3cret-client-value", conn.ClientSecret, "dns-proof-token", "correct horse battery", "sealed-mail-password"}
 	for _, k := range keys {
 		secrets = append(secrets, k.Hash, k.Prefix)
 	}

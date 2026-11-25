@@ -133,6 +133,9 @@ templ LoginPage(v LoginView) {
 				if v.Problem != "" {
 					<p class="text-sm text-[var(--stop)]" role="alert">{ v.Problem }</p>
 				}
+				if v.Notice != "" {
+					<p class="text-sm text-[var(--ok)]" role="status">{ v.Notice }</p>
+				}
 				<form method="post" action="/login" class="flex flex-col gap-4">
 					<input type="hidden" name="next" value={ v.Next }/>
 					<label class="flex flex-col gap-1.5 text-sm">
@@ -145,6 +148,9 @@ templ LoginPage(v LoginView) {
 					</label>
 					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg}) {
 						Sign in
+					}
+					if v.Forgot {
+						<a href="/forgot" class="text-sm text-muted-foreground hover:text-foreground">Forgot your password?</a>
 					}
 				</form>
 				if len(v.Ways) > 0 || v.SSO {
@@ -163,6 +169,58 @@ templ LoginPage(v LoginView) {
 					</nav>
 				}
 			</main>
+		</body>
+	</html>
+}
+
+templ ForgotPage(sent bool) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			@Head("Reset your password · Prospector")
+		</head>
+		<body class="front-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased">
+			<form method="post" action="/forgot" class="flex w-full max-w-sm flex-col gap-4 panel panel-lift p-7">
+				<h1 class="font-heading text-2xl font-bold">Reset your password</h1>
+				if sent {
+					<p class="text-sm text-[var(--ok)]" role="status">If that address has an account, a link is on its way. It lasts an hour.</p>
+				} else {
+					<p class="text-sm text-muted-foreground">We'll email you a link to choose a new one.</p>
+				}
+				<label class="flex flex-col gap-1.5 text-sm">
+					<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Email</span>
+					<input name="email" type="email" required autocomplete="username" class="h-10 rounded-lg border border-input bg-muted px-3"/>
+				</label>
+				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg}) {
+					Email me a link
+				}
+				<a href="/login" class="text-sm text-muted-foreground hover:text-foreground">Back to sign in</a>
+			</form>
+		</body>
+	</html>
+}
+
+templ ResetPage(token, email, problem string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			@Head("Choose a password · Prospector")
+		</head>
+		<body class="front-backdrop grid min-h-svh place-items-center px-4 font-sans antialiased">
+			<form method="post" action={ templ.SafeURL("/reset/" + token) } class="flex w-full max-w-sm flex-col gap-4 panel panel-lift p-7">
+				<h1 class="font-heading text-2xl font-bold">Choose a password</h1>
+				<p class="text-sm text-muted-foreground">For { email }. 10 characters or more.</p>
+				if problem != "" {
+					<p class="text-sm text-[var(--stop)]" role="alert">{ problem }</p>
+				}
+				<label class="flex flex-col gap-1.5 text-sm">
+					<span class="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">New password</span>
+					<input name="password" type="password" required minlength="10" autocomplete="new-password" class="h-10 rounded-lg border border-input bg-muted px-3"/>
+				</label>
+				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeLg}) {
+					Save password
+				}
+			</form>
 		</body>
 	</html>
 }

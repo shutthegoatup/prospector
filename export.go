@@ -83,6 +83,7 @@ type OrgExport struct {
 	Members      []ExportMember `json:"members"`
 	Keys         []ExportKey    `json:"api_keys"`
 	SignOn       *ExportSignOn  `json:"single_sign_on,omitempty"`
+	Mail         *ExportMail    `json:"mail_server,omitempty"`
 	Companies    []Company      `json:"companies"`
 	Facts        []Fact         `json:"facts"`
 	Contacts     []Contact      `json:"contacts"`
@@ -127,6 +128,13 @@ type ExportSignOn struct {
 	Domains  []ExportDomain `json:"domains"`
 }
 
+type ExportMail struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username,omitempty"`
+	Sender   string `json:"sender"`
+}
+
 type ExportDomain struct {
 	Domain     string     `json:"domain"`
 	VerifiedAt *time.Time `json:"verified_at,omitempty"`
@@ -166,6 +174,12 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			if err := tx.Model(&SSODomain{}).Where("org_id = ?", org).Order("domain").Find(&out.SignOn.Domains).Error; err != nil {
 				return err
 			}
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		var mail OrgMail
+		if err := tx.Where("org_id = ?", org).First(&mail).Error; err == nil {
+			out.Mail = &ExportMail{Host: mail.Host, Port: mail.Port, Username: mail.Username, Sender: mail.Sender}
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}

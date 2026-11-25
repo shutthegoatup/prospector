@@ -58,7 +58,7 @@ Each organisation has an MCP endpoint and a REST API, with scoped keys. Agents c
 ### Also
 
 - **Companies:** search, plus each company's people, facts and full history: who did what, people and agents alike.
-- **Take everything with you:** an owner can download all the organisation holds from Settings (or `prospector export-org <file>`): companies, people, facts, enquiries, history, settings and who has access, as one JSON file. It holds no passwords, API keys or sign-on secrets, and nothing that identifies people you erased.
+- **Take everything with you:** an owner can download all the organisation holds from Settings (or `prospector export-org <file>`): companies, people, facts, enquiries, history, settings and who has access, as one JSON file. It holds no passwords (a mail server's included), API keys or sign-on secrets, and nothing that identifies people you erased.
 - **Export a person:** when someone asks what you hold on them, an owner can download it from their company's page (or `prospector export-person <name> <file>`): their details, drafts, notes, the facts recorded against them, what they wrote to you and their history. The history names the teammates and agents who acted, so read it through before you send it on. The export is itself noted in the history.
 - **Erase a person:** an owner can erase someone from their company's page (or `prospector erase <name>`) when they ask to be forgotten. Their details, drafts, notes and facts are deleted, the history keeps only that something happened and when, and an import, a restore or an agent can't add them again. A row that names several people goes whole. Agents' notes about their company, and on any task that touched it, are deleted too, since free text can't be searched for a name. Company facts and other people's notes that mention them, the briefs and requests people wrote on tasks, your own lead files and database backups aren't touched: take them out there too.
 - **Add person:** paste a LinkedIn profile link and the name fills in. A bookmarklet opens the same form pre-filled from the profile you're viewing.
@@ -81,7 +81,9 @@ prospector serve                                          # http://127.0.0.1:876
 | `DATABASE_URL` | A `postgres://` URL or a SQLite file path (default `prospector.sqlite`) |
 | `PORT` | Listen on `:PORT` instead of `127.0.0.1:8766` |
 | `PROSPECTOR_URL` | The address people reach it at, e.g. `https://prospector.example.com`. With an `https://` address the session cookie is always marked Secure, and links shown in the app use this address. Set it if a proxy in front changes the `Host` header |
-| `PROSPECTOR_SECRET_KEYS` | The server's secret keys, newest first: `2:<64 hex>,1:<64 hex>`. Needed for an organisation's single sign-on (see [Secret keys](#secret-keys)) |
+| `SMTP_ADDR`, `MAIL_FROM` | The mail server the app's own mail leaves through, e.g. `smtp.example.com:587` and `Prospector <prospector@example.com>`. Set both or neither; see [Mail](#mail) |
+| `SMTP_USERNAME`, `SMTP_PASSWORD` | What that server asks for, if anything |
+| `PROSPECTOR_SECRET_KEYS` | The server's secret keys, newest first: `2:<64 hex>,1:<64 hex>`. Needed for an organisation's single sign-on and for a mail server of its own (see [Secret keys](#secret-keys)) |
 | `PROSPECTOR_GOOGLE_CLIENT_ID`, `PROSPECTOR_GOOGLE_CLIENT_SECRET` | Offer "Continue with Google" on the sign-in page. The same pair exists for `MICROSOFT` and `LINKEDIN`. Each needs `PROSPECTOR_URL` (see [Signing in](#signing-in)) |
 | `TZ` | The time zone "today" is counted in |
 | `PROSPECTOR_ORG` | Default organisation for CLI commands (`--org=` overrides it) |
@@ -94,11 +96,27 @@ prospector serve                                          # http://127.0.0.1:876
 - Repeated wrong passwords for one email are slowed, up to a minute between tries. A browser that has signed in to that account before is counted separately, so someone guessing elsewhere can't hold its owner up.
 - An owner adds and removes members in Settings. Removing someone ends their sign-in access to that organisation; their account, and other organisations, are untouched. API keys they created keep working until revoked on the Agents page. If the organisation lets people join through its single sign-on, someone removed here joins again while its provider still lets them in: remove them there too.
 - Someone added from Settings gets a first password that the person adding them sees; they are made to choose their own the first time they sign in.
+- With [mail](#mail) set up, whoever reads a member's mailbox can choose that member's password. Without it there is no reset but `prospector user password`.
 - Members change their own password in Settings, which signs out their other sessions. `prospector user password` signs them out everywhere.
 - Every page needs a sign-in except the sign-in pages and the front page at `/`, which describes Prospector to a signed-out visitor and shows nothing from your data. The single sign-on page does name the organisations that have verified an email domain to anyone who types an address at it. Every browser POST must be JSON, which blocks cross-site form posts, and a request that a browser marks as coming from another site is refused, sign-in and sign-out included.
 - The one exception is the enquiry route, `/o/<slug>/intake`, which exists to be posted to from your own sites. It answers only the sites an owner lists in Settings, reads no session, and can add an enquiry and nothing else. With no sites listed it refuses everything.
 
 There's a Dockerfile for container hosting.
+
+## Mail
+
+The app sends two kinds of mail, both to its own members. It never sends outreach: people do that from their own mailbox.
+
+- **Password resets.** The sign-in page offers "Forgot your password?", which emails a link that lasts an hour and works once.
+- **Invitations.** Someone an owner adds is emailed a link to choose their password, good for 7 days, instead of the owner being shown a first password to pass on.
+
+Both need `SMTP_ADDR`, `MAIL_FROM` and `PROSPECTOR_URL`: a link is only ever built from the address you gave, never from what a request claims. With any of them missing there is no reset and first passwords are shown as before. `prospector mail test you@example.com` sends a message through the server you set.
+
+Any SMTP submission service that takes a username and password (`AUTH PLAIN`) works, a transactional mail provider's included. Mail goes over TLS (STARTTLS, or implicit TLS on port 465) or not at all; only a server on the same machine is spoken to in the clear.
+
+**An organisation can use a server of its own**, set by an owner under Settings → Outgoing mail. Invitations to that organisation then leave through it, from its address. Resets belong to the account, not to an organisation, so they always use the app's. The password is kept sealed under the server's [secret key](#secret-keys), which must be set first, and is never shown again. The server must be on port 587, 465, 2525 or 25. It carries an invitation only for an account that the invitation itself creates: whoever runs a mail server reads what passes through it, so someone who already has an account, and hasn't chosen a password yet, is sent the link by the app's own server or not at all. A second invitation to the same person waits five minutes and ends the first.
+
+A reset link gives a password to an account that had none because it signs in through a provider. An organisation that requires its single sign-on refuses that password as it does any other.
 
 ## Signing in
 
@@ -135,7 +153,7 @@ People start from "Use your organisation's single sign-on" on the sign-in page a
 `PROSPECTOR_SECRET_KEYS` holds the server's master keys, each with a version: `1:<64 hex characters>`. `prospector secret-key` prints a first entry, and `prospector secret-key 2` the one to replace it with. It is the only secret of its own the server is given.
 
 - **A master key is never used directly.** Each job gets its own key derived from it with HKDF-SHA256 (RFC 5869).
-- **What it seals** is each organisation's single sign-on client secret, stored as a compact JWE (RFC 7516, `dir` with `A256GCM`) whose `kid` is the key's version.
+- **What it seals** is each organisation's single sign-on client secret and the password of its own mail server, each stored as a compact JWE (RFC 7516, `dir` with `A256GCM`) whose `kid` is the key's version.
 - **What it keys** is how a session and an API key are found: by an HMAC of the token under the server's key, where without a key it is the token's plain hash. Someone who can write to the database but hasn't the key can't mint a session. An API key is not protected that far: one made before the server had a key is still accepted by its plain hash, because an agent can't sign in again, so a row written with a plain hash is accepted too.
 - **What it signs** is the cookie that carries a sign-in to a provider and back.
 - **Passwords** are bcrypt hashes and take no part: a key mixed into them couldn't be replaced without everyone choosing a new password.

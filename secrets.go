@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/go-jose/go-jose/v4"
+	"gorm.io/gorm"
 )
 
 // purpose is a job one derived key does, and the HKDF info (RFC 5869 §3.2) that
@@ -230,45 +231,67 @@ func (k *keyring) verify(p purpose, message, signature string) bool {
 	return ok
 }
 
+// sealedColumn is where one kind of sealed secret is stored, a row to an organisation.
+type sealedColumn struct {
+	table        string
+	column, what string
+}
+
+var sealedColumns = []sealedColumn{
+	{"sso_connections", "client_secret", "single sign-on secret"},
+	{"org_mails", "password", "mail password"},
+}
+
+type storedSecret struct {
+	OrgID  int64
+	Secret string
+}
+
+func (s *Store) stored(in sealedColumn) *gorm.DB {
+	return s.db.Table(in.table).Select("org_id, " + in.column + " as secret").Where(in.column + " <> ''")
+}
+
 // Reseal moves every stored secret onto the current key, sealing for the first time any
 // stored before there was one. Once it reports nothing left, an older key can be removed.
 func (s *Store) Reseal() (moved int, err error) {
 	if s.keys == nil {
 		return 0, errNoKeys
 	}
-	var conns []SSOConnection
-	if err := s.db.Where("client_secret <> ''").Find(&conns).Error; err != nil {
-		return 0, err
-	}
 	var failed []error
-	for _, c := range conns {
-		was, raced, err := s.resealOne(c)
-		// Somebody else changed it meanwhile: another server sealing it too, or its owner.
-		// What is there now is what counts.
-		if err == nil && raced {
-			var now SSOConnection
-			if err = s.db.Where("org_id = ?", c.OrgID).Limit(1).Find(&now).Error; err == nil && now.ClientSecret != "" {
-				if _, err = s.keys.open(now.ClientSecret); err == nil && s.keys.behind(now.ClientSecret) {
-					err = errors.New("changed while it was being sealed again, and is still under an older key: restart to move it")
+	for _, in := range sealedColumns {
+		var rows []storedSecret
+		if err := s.stored(in).Scan(&rows).Error; err != nil {
+			return moved, err
+		}
+		for _, row := range rows {
+			was, raced, err := s.resealOne(in, row)
+			// Somebody else changed it meanwhile: another server sealing it too, or its owner.
+			// What is there now is what counts.
+			if err == nil && raced {
+				var now []storedSecret
+				if err = s.stored(in).Where("org_id = ?", row.OrgID).Scan(&now).Error; err == nil && len(now) > 0 {
+					if _, err = s.keys.open(now[0].Secret); err == nil && s.keys.behind(now[0].Secret) {
+						err = errors.New("changed while it was being sealed again, and is still under an older key: restart to move it")
+					}
 				}
 			}
-		}
-		if err != nil {
-			failed = append(failed, fmt.Errorf("organisation %d's single sign-on secret: %w", c.OrgID, err))
-		} else if was {
-			moved++
+			if err != nil {
+				failed = append(failed, fmt.Errorf("organisation %d's %s: %w", row.OrgID, in.what, err))
+			} else if was {
+				moved++
+			}
 		}
 	}
 	return moved, errors.Join(failed...)
 }
 
-// resealOne moves one connection's secret to the current key, if it isn't under it
-// already. raced is the row having changed between being read and being written.
-func (s *Store) resealOne(c SSOConnection) (moved, raced bool, err error) {
+// resealOne moves one stored secret to the current key, if it isn't under it already.
+// raced is the row having changed between being read and being written.
+func (s *Store) resealOne(in sealedColumn, row storedSecret) (moved, raced bool, err error) {
 	// One that names the current key is still opened: a key replaced under the same
 	// version would otherwise pass for current and open nothing.
-	plain, err := s.keys.open(c.ClientSecret)
-	if err != nil || !s.keys.behind(c.ClientSecret) {
+	plain, err := s.keys.open(row.Secret)
+	if err != nil || !s.keys.behind(row.Secret) {
 		return false, false, err
 	}
 	again, err := s.keys.seal(plain)
@@ -276,7 +299,7 @@ func (s *Store) resealOne(c SSOConnection) (moved, raced bool, err error) {
 		return false, false, err
 	}
 	// Only the value that was read is replaced, so an owner's change made meanwhile wins.
-	res := s.db.Model(&SSOConnection{}).Where("org_id = ? and client_secret = ?", c.OrgID, c.ClientSecret).Update("client_secret", again)
+	res := s.db.Table(in.table).Where("org_id = ? and "+in.column+" = ?", row.OrgID, row.Secret).Update(in.column, again)
 	return res.RowsAffected > 0, res.RowsAffected == 0, res.Error
 }
 
