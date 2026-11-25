@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -222,7 +223,9 @@ func TestStatusOf(t *testing.T) {
 // failure reads as the person's: not a wrong password, and not a domain already listed.
 func TestAnOutageDoesNotReadAsThePersonsMistake(t *testing.T) {
 	s, _, srv, client := signedIn(t)
-	lost := &pgconn.PgError{Code: "08006", Message: "connection to db.internal:5432 lost"}
+	// Postgres hands back a connection lost part-way through a query as the network's
+	// own error, addresses and all, which nothing tells from any other.
+	lost := &net.OpError{Op: "read", Net: "tcp", Addr: &net.TCPAddr{IP: net.IPv4(10, 0, 0, 9), Port: 5432}, Err: errors.New("connection reset by peer")}
 	down, domainsDown := false, false
 	s.db.Callback().Query().Before("gorm:query").Register("no-users", func(tx *gorm.DB) {
 		if down && tx.Statement.Table == "users" {
@@ -258,7 +261,7 @@ func TestAnOutageDoesNotReadAsThePersonsMistake(t *testing.T) {
 	down = true
 	// More tries than the throttle lets a wrong password have at once.
 	for range 8 {
-		if code, body := signIn(); code != http.StatusInternalServerError || !strings.Contains(body, "try again in a moment") || strings.Contains(body, "wrong email or password") {
+		if code, body := signIn(); code != http.StatusInternalServerError || !strings.Contains(body, "try again in a moment") || strings.Contains(body, "wrong email or password") || strings.Contains(body, "10.0.0.9") {
 			t.Fatalf("signing in while the database can't be asked: %d, saying a wrong password or nothing of the server", code)
 		}
 	}
@@ -268,7 +271,7 @@ func TestAnOutageDoesNotReadAsThePersonsMistake(t *testing.T) {
 	}
 
 	domainsDown = true
-	if code, body := domain("beta.example"); code != http.StatusInternalServerError || strings.Contains(body, "already listed") || strings.Contains(body, "db.internal") {
+	if code, body := domain("beta.example"); code != http.StatusInternalServerError || strings.Contains(body, "already listed") || strings.Contains(body, "10.0.0.9") {
 		t.Errorf("listing a domain while the database can't be asked: %d %s", code, body)
 	}
 }
