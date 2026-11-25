@@ -60,18 +60,6 @@ func (s *Store) renewClaims(tx *gorm.DB, org, task int64, who Actor, now time.Ti
 		Update("expires_at", now.Add(claimFor).UnixMilli()).Error
 }
 
-func liveClaims(tx *gorm.DB, org, task int64, now time.Time) (map[int64]RequestClaim, error) {
-	var rows []RequestClaim
-	if err := tx.Where("org_id = ? and task_id = ? and expires_at > ?", org, task, now.UnixMilli()).Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	out := map[int64]RequestClaim{}
-	for _, c := range rows {
-		out[c.RequestID] = c
-	}
-	return out, nil
-}
-
 // claimNext keeps an open request for who: one it already holds, or else the oldest
 // nobody else does. It returns 0 when other agents hold every open request.
 func (s *Store) claimNext(v *TaskView, who Actor, now time.Time) (int64, error) {
