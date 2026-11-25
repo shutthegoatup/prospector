@@ -9,13 +9,13 @@ import (
 func (a *App) taskRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /o/{org}/tasks", a.member(a.tasksPage))
 	mux.HandleFunc("GET /o/{org}/tasks/{id}", a.member(a.taskPage))
-	mux.HandleFunc("POST /o/{org}/ui/task", a.member(a.uiTask))
-	mux.HandleFunc("POST /o/{org}/ui/task/ask", a.member(a.uiTaskAsk))
-	mux.HandleFunc("POST /o/{org}/ui/task/close", a.member(a.uiTaskClosed(true)))
-	mux.HandleFunc("POST /o/{org}/ui/task/reopen", a.member(a.uiTaskClosed(false)))
-	mux.HandleFunc("POST /o/{org}/ui/task/request/done", a.member(a.uiRequestDone(true)))
-	mux.HandleFunc("POST /o/{org}/ui/task/request/reopen", a.member(a.uiRequestDone(false)))
-	mux.HandleFunc("POST /o/{org}/ui/note/delete", a.member(a.uiDeleteNote))
+	mux.HandleFunc("POST /o/{org}/ui/task", a.works(areaSales, a.uiTask))
+	mux.HandleFunc("POST /o/{org}/ui/task/ask", a.works(areaSales, a.uiTaskAsk))
+	mux.HandleFunc("POST /o/{org}/ui/task/close", a.works(areaSales, a.uiTaskClosed(true)))
+	mux.HandleFunc("POST /o/{org}/ui/task/reopen", a.works(areaSales, a.uiTaskClosed(false)))
+	mux.HandleFunc("POST /o/{org}/ui/task/request/done", a.works(areaSales, a.uiRequestDone(true)))
+	mux.HandleFunc("POST /o/{org}/ui/task/request/reopen", a.works(areaSales, a.uiRequestDone(false)))
+	mux.HandleFunc("POST /o/{org}/ui/note/delete", a.works(areaSales, a.uiDeleteNote))
 }
 
 func (a *App) tasksPage(w http.ResponseWriter, r *http.Request) {
