@@ -214,6 +214,8 @@ func run(args []string) error {
 		// Not a reason to stay down: the page is served without its form meanwhile.
 		if err := s.EnsureFrontOrg(base); err != nil {
 			fmt.Fprintf(os.Stderr, "the front page has no contact form: %v\n", err)
+		} else if why := s.frontFormOff(base); why != "" {
+			fmt.Fprintf(os.Stderr, "the front page has no contact form: %s\n", why)
 		}
 		if os.Getenv("PROSPECTOR_FRONT_ORG") != "" {
 			fmt.Fprintf(os.Stderr, "PROSPECTOR_FRONT_ORG is no longer read: the front page's form sends to the %q organisation\n", frontOrgSlug)
