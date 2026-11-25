@@ -221,6 +221,38 @@ func (st Standing) Attention() string {
 	return st.TermEnd
 }
 
+// soonDays is how far ahead a date counts as coming up: long enough to talk to the
+// customer before a day to cancel by, short enough that the list means something.
+const soonDays = 30
+
+// within is a standing whose next date to know about falls within soonDays of day.
+func (st Standing) within(day string) bool {
+	at := st.Attention()
+	return st.Status != SubEnded && at >= day && at <= mustDay(day).AddDate(0, 0, soonDays).Format(dayLayout)
+}
+
+// monthsNow is how long the term day falls in runs: the commitment, then whatever follows it.
+func (s Subscription) monthsNow(day string) int {
+	start, err := parseDay(s.Start)
+	if err != nil || s.TermMonths <= 0 {
+		return s.period()
+	}
+	if s.Then == ThenRolls && day >= addMonths(start, s.TermMonths).Format(dayLayout) {
+		return s.period()
+	}
+	return s.TermMonths
+}
+
+// Soon is a subscription with something coming up worth looking at. One that turns
+// over every month always has a term ending within the month, which is routine, so it
+// counts only once it has a day it stops.
+func (r SubscriptionRow) Soon(day string) bool {
+	if r.Ends == "" && r.monthsNow(day) <= 1 {
+		return false
+	}
+	return r.within(day)
+}
+
 // SubscriptionIn is what someone types to record a subscription.
 type SubscriptionIn struct {
 	Company    int64  `json:"company"`
