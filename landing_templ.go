@@ -323,14 +323,14 @@ func LandingPage(intake, origin string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</div><div class=\"lp-rules\"><div><h3 class=\"lp-tag is-green\">A key can</h3><ul><li>Search companies and people, and read what's due and the tasks people wrote<code>read</code></li><li>Add companies, facts and suggested contacts, each with a source URL<code>research:write</code></li><li>Draft notes, emails and follow-ups, shown as the agent's<code>drafts:write</code></li><li>Record an outcome, shown as the agent's in the history<code>outcomes:write</code></li><li>Value deals, work a renewal or expansion through its stages, and say where answering an enquiry stands<code>pipeline:write</code></li><li>Record subscriptions and work customers' onboarding<code>customers:write</code></li><li>Email a reply to someone who wrote in<code>enquiries:reply</code></li><li>Email a customer the link to their onboarding steps<code>customers:invite</code></li></ul></div><div><h3 class=\"lp-tag is-coral\">No key can</h3><ul><li>Send mail without a scope that says so, or to anyone on your never-contact list or erased on request</li><li>Change your organisation's settings or members, or make or revoke API keys. Only <code>agents:configure</code> can change Prospector's own agents</li><li>See another organisation</li><li>Add anyone on your never-contact list</li></ul></div></div></div></div></section><section class=\"lp-section\" id=\"team\"><div class=\"lp-wrap\"><div class=\"lp-section-head\"><p class=\"lp-label\">Built for a small team</p><h2>The details that keep a list clean.</h2></div><div class=\"lp-grid\"><div class=\"lp-cell is-coral\"><h3>A never-contact list that holds</h3><p>Domains, email addresses and LinkedIn profiles. It applies to agents, imports and edits alike.</p></div><div class=\"lp-cell is-gold\"><h3>Calls at a sensible hour</h3><p>Office hours come from the contact's phone number, so Zurich gets called when Zurich is at work.</p></div><div class=\"lp-cell is-green\"><h3>The full history</h3><p>Every company shows who did what and when, people and agents alike.</p></div><div class=\"lp-cell is-violet\"><h3>Several organisations, one login</h3><p>Each has its own prospects, wording, team and keys. None can see another's.</p></div><div class=\"lp-cell is-coral\"><h3>Bring your own files</h3><p>Import companies from CSV and drafts from markdown. Re-importing never clears a date or an edit made in the app.</p></div><div class=\"lp-cell is-gold\"><h3>Your data stays with you</h3><p>Prospector runs on your own server, on SQLite or Postgres. Nobody else holds your prospect list.</p></div></div></div></section><section class=\"lp-install\" id=\"start\"><div class=\"lp-wrap lp-install-grid\"><div><p class=\"lp-label\">Get started</p><h2>Set up in four commands.</h2><p class=\"lp-lede\">Prospector is one program for Linux or macOS. Download it, name your organisation, add yourself and start working the list.</p><div class=\"lp-cta\"><a class=\"lp-btn is-primary\" href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</div><div class=\"lp-rules\"><div><h3 class=\"lp-tag is-green\">A key can</h3><ul><li>Search companies and people, and read what's due and the tasks people wrote<code>read</code></li><li>Add companies, facts and suggested contacts, each with a source URL<code>research:write</code></li><li>Draft notes, emails and follow-ups, shown as the agent's<code>drafts:write</code></li><li>Record an outcome, shown as the agent's in the history<code>outcomes:write</code></li><li>Value deals, work a renewal or expansion through its stages, and say where answering an enquiry stands<code>pipeline:write</code></li><li>Say where answering an enquiry stands, without deals<code>enquiries:triage</code></li><li>Record subscriptions and work customers' onboarding<code>customers:write</code></li><li>Email a reply to someone who wrote in<code>enquiries:reply</code></li><li>Email a customer the link to their onboarding steps<code>customers:invite</code></li></ul></div><div><h3 class=\"lp-tag is-coral\">No key can</h3><ul><li>Send mail without a scope that says so, or to anyone on your never-contact list or erased on request</li><li>Change your organisation's settings or members, or make or revoke API keys. Only <code>agents:configure</code> can change Prospector's own agents</li><li>See another organisation</li><li>Add anyone on your never-contact list</li></ul></div></div></div></div></section><section class=\"lp-section\" id=\"team\"><div class=\"lp-wrap\"><div class=\"lp-section-head\"><p class=\"lp-label\">Built for a small team</p><h2>The details that keep a list clean.</h2></div><div class=\"lp-grid\"><div class=\"lp-cell is-coral\"><h3>A never-contact list that holds</h3><p>Domains, email addresses and LinkedIn profiles. It applies to agents, imports and edits alike.</p></div><div class=\"lp-cell is-gold\"><h3>Calls at a sensible hour</h3><p>Office hours come from the contact's phone number, so Zurich gets called when Zurich is at work.</p></div><div class=\"lp-cell is-green\"><h3>The full history</h3><p>Every company shows who did what and when, people and agents alike.</p></div><div class=\"lp-cell is-violet\"><h3>Several organisations, one login</h3><p>Each has its own prospects, wording, team and keys. None can see another's.</p></div><div class=\"lp-cell is-coral\"><h3>Bring your own files</h3><p>Import companies from CSV and drafts from markdown. Re-importing never clears a date or an edit made in the app.</p></div><div class=\"lp-cell is-gold\"><h3>Your data stays with you</h3><p>Prospector runs on your own server, on SQLite or Postgres. Nobody else holds your prospect list.</p></div></div></div></section><section class=\"lp-install\" id=\"start\"><div class=\"lp-wrap lp-install-grid\"><div><p class=\"lp-label\">Get started</p><h2>Set up in four commands.</h2><p class=\"lp-lede\">Prospector is one program for Linux or macOS. Download it, name your organisation, add yourself and start working the list.</p><div class=\"lp-cta\"><a class=\"lp-btn is-primary\" href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(repoURL + "/releases/latest")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `landing.templ`, Line: 213, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `landing.templ`, Line: 214, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 		if templ_7745c5c3_Err != nil {
@@ -343,7 +343,7 @@ func LandingPage(intake, origin string) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(repoURL + "#readme")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `landing.templ`, Line: 214, Col: 66}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `landing.templ`, Line: 215, Col: 66}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 		if templ_7745c5c3_Err != nil {
@@ -374,7 +374,7 @@ func LandingPage(intake, origin string) templ.Component {
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(repoURL)).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `landing.templ`, Line: 237, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `landing.templ`, Line: 238, Col: 38}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 		if templ_7745c5c3_Err != nil {
@@ -387,7 +387,7 @@ func LandingPage(intake, origin string) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(repoURL + "/releases")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `landing.templ`, Line: 238, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `landing.templ`, Line: 239, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 		if templ_7745c5c3_Err != nil {
@@ -427,7 +427,7 @@ func EnquiryForm(intake, origin string) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templruntime.NewAttributeExpression(intake).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `landing.templ`, Line: 257, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `landing.templ`, Line: 258, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 		if templ_7745c5c3_Err != nil {
@@ -440,7 +440,7 @@ func EnquiryForm(intake, origin string) templ.Component {
 		var templ_7745c5c3_Var23 string
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templruntime.NewAttributeExpression(origin).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `landing.templ`, Line: 257, Col: 68}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `landing.templ`, Line: 258, Col: 68}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 		if templ_7745c5c3_Err != nil {

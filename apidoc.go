@@ -98,13 +98,8 @@ func apiDocOf(spec *openapi3.T) APIDoc {
 				continue
 			}
 			o := APIOp{ID: op.OperationID, Method: method, Path: path, Summary: op.Summary, About: oneLine(op.Description)}
-			if op.Security != nil {
-				for _, req := range *op.Security {
-					if s := req["bearer"]; len(s) > 0 {
-						o.Scope, o.OwnerOnly = s[0], ownersOnly(s[0])
-					}
-				}
-			}
+			s := opScopes(op)
+			o.Scope, o.OwnerOnly = strings.Join(s, " or "), slices.ContainsFunc(s, ownersOnly)
 			for _, p := range append(slices.Clone(item.Parameters), op.Parameters...) {
 				if p.Value.Name == "org" {
 					continue

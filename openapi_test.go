@@ -159,16 +159,14 @@ func TestTheSpecIsServedAndEveryOperationNamesAScopeAKeyCanHave(t *testing.T) {
 	for path, item := range spec.Paths.Map() {
 		for method, op := range item.Operations() {
 			ops++
-			var scope string
-			if op.Security != nil {
-				for _, req := range *op.Security {
-					if s := req["bearer"]; len(s) == 1 {
-						scope = s[0]
-					}
-				}
+			scopes := opScopes(op)
+			if len(scopes) == 0 {
+				t.Errorf("%s %s names no scope a key can be given", method, path)
 			}
-			if !validScope(scope) {
-				t.Errorf("%s %s names no scope a key can be given: %q", method, path, scope)
+			for _, scope := range scopes {
+				if !validScope(scope) {
+					t.Errorf("%s %s names a scope a key can't be given: %q", method, path, scope)
+				}
 			}
 		}
 	}

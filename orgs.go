@@ -455,6 +455,7 @@ var Scopes = []struct{ Name, What string }{
 	{"enquiries:reply", "email a reply to whoever sent an enquiry, through your mail server, and record what they said back"},
 	{"customers:write", "record and change subscriptions, start their renewals, and start, change and remove onboardings"},
 	{"pipeline:write", "work deals (start, value, stage, owner, remove) and say where answering an enquiry stands, who has it, and put its sender on the board"},
+	{"enquiries:triage", "say where answering an enquiry stands, who has it, and put its sender on the board, without touching deals"},
 	{"enquiries:delete", "delete an enquiry for good, with what was said in answering it"},
 	{"campaigns:write", "keep the list of addresses marketing mail never goes to"},
 	{"customers:invite", "email a customer a link to their onboarding steps, through your mail server, and withdraw it"},

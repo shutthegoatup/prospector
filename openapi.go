@@ -5,7 +5,10 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"slices"
+	"strings"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/shutthegoatup/prospector/api"
 )
 
@@ -24,16 +27,11 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 	if err != nil {
 		log.Fatalf("the API spec: %v", err)
 	}
-	scopes := map[string]string{}
+	scopes := map[string][]string{}
 	for _, item := range spec.Paths.Map() {
 		for _, op := range item.Operations() {
-			if op.Security == nil {
-				continue
-			}
-			for _, req := range *op.Security {
-				if s := req["bearer"]; len(s) > 0 {
-					scopes[op.OperationID] = s[0]
-				}
+			if s := opScopes(op); len(s) > 0 {
+				scopes[op.OperationID] = s
 			}
 		}
 	}
@@ -78,15 +76,15 @@ func (a *App) apiCaller(next http.Handler) http.Handler {
 
 // apiScope holds an operation to its scope: a key needs it granted; a member has everything
 // but configuring, which needs an owner.
-func (a *App) apiScope(scopes map[string]string) api.StrictMiddlewareFunc {
+func (a *App) apiScope(scopes map[string][]string) api.StrictMiddlewareFunc {
 	return func(f api.StrictHandlerFunc, op string) api.StrictHandlerFunc {
 		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error) {
 			q, need := reqFrom(ctx), scopes[op]
 			switch {
-			case q.Key != nil && need != "" && !q.Key.Has(need):
-				challenge(w, http.StatusForbidden, "insufficient_scope", need, "this key lacks the "+need+" scope")
+			case q.Key != nil && len(need) > 0 && !slices.ContainsFunc(need, q.Key.Has):
+				challenge(w, http.StatusForbidden, "insufficient_scope", need[0], "this key lacks the "+strings.Join(need, " or ")+" scope")
 				return nil, nil
-			case q.Key == nil && ownersOnly(need) && !q.Owner():
+			case q.Key == nil && slices.ContainsFunc(need, ownersOnly) && !q.Owner():
 				writeProblem(w, http.StatusForbidden, "only an owner of this organisation can change that")
 				return nil, nil
 			case q.Key == nil && !q.Member.Works(opArea[op]):
@@ -96,6 +94,19 @@ func (a *App) apiScope(scopes map[string]string) api.StrictMiddlewareFunc {
 			return f(ctx, w, r, in)
 		}
 	}
+}
+
+// opScopes are the scopes a key may make an operation with, any one of them.
+func opScopes(op *openapi3.Operation) []string {
+	var out []string
+	if op.Security != nil {
+		for _, req := range *op.Security {
+			if s := req["bearer"]; len(s) > 0 {
+				out = append(out, s[0])
+			}
+		}
+	}
+	return out
 }
 
 func ownersOnly(scope string) bool { return scope == "agents:configure" || scope == "enquiries:delete" }
