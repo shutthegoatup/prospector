@@ -16,6 +16,10 @@ info:
     `campaigns:write` to keep the list of addresses marketing mail never goes to. A
     signed-in member may do all of these except configuring agents and deleting enquiries,
     which need an owner.
+
+    Every list comes a page at a time: it takes `limit` and `cursor`, and answers
+    `{"items": [...], "next_cursor": "..."}`. When `next_cursor` is there, pass it back
+    as `cursor` for the next page; the `Link` header names that page too.
 servers:
   - url: /
 security:
@@ -45,17 +49,27 @@ paths:
       operationId: listAgents
       tags: [agents]
       summary: The organisation's agents
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
       security:
         - session: []
         - bearer: [read]
       responses:
         "200":
           description: Every agent, by name.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/Agent" }
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Agent" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
     post:
       operationId: createAgent
@@ -144,17 +158,27 @@ paths:
       tags: [runs]
       summary: A task's agent runs
       description: Every run still going, then the latest that ended.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
       security:
         - session: []
         - bearer: [read]
       responses:
         "200":
           description: The runs, newest first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/Run" }
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Run" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
     post:
       operationId: startRun
@@ -205,17 +229,27 @@ paths:
       tags: [enquiries]
       summary: What has been said in answering an enquiry
       description: Replies sent from here and what was recorded of their answers, oldest first. The enquiry's own message is on the enquiry.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
       security:
         - session: []
         - bearer: [read]
       responses:
         "200":
           description: The thread.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/EnquiryMessage" }
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/EnquiryMessage" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/enquiries/{id}/replies:
@@ -282,6 +316,8 @@ paths:
       tags: [onboarding]
       summary: Onboardings, with their steps and who has been let see them
       parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
         - name: company
           in: query
           description: Only this company's.
@@ -292,11 +328,18 @@ paths:
       responses:
         "200":
           description: "Late ones first, then the rest still going, then those that are live; newest start first within each."
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/Onboarding" }
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Onboarding" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
     post:
       operationId: startOnboarding
@@ -413,6 +456,8 @@ paths:
       tags: [subscriptions]
       summary: What customers are on, and where each stands today
       parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
         - name: company
           in: query
           description: Only this company's.
@@ -423,11 +468,18 @@ paths:
       responses:
         "200":
           description: The one needing attention soonest first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/Subscription" }
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Subscription" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
     post:
       operationId: addSubscription
@@ -530,17 +582,27 @@ paths:
         Each conversation has a deal of its own (`seq` 0), which stands where its contact
         does; its `id` is 0 until it is given a value, an owner or a date. Deals started
         after it (`seq` 1 and up) hold their own stage and next step.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
       security:
         - session: []
         - bearer: [read]
       responses:
         "200":
           description: By stage, in the board's order.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/Deal" }
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Deal" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
     post:
       operationId: startDeal
@@ -642,25 +704,26 @@ paths:
         - { name: kind, in: query, schema: { type: string }, description: Only this kind. }
         - { name: state, in: query, schema: { type: string }, description: "Only those `open`, `waiting` or `closed`." }
         - { name: spam, in: query, schema: { type: boolean }, description: "Only those marked as spam, which are otherwise left out." }
-        - { name: page, in: query, schema: { type: integer }, description: "Which page, from 1." }
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
       security:
         - session: []
         - bearer: [read]
       responses:
         "200":
-          description: One page of them.
+          description: A page of them.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
           content:
             application/json:
               schema:
                 type: object
-                required: [enquiries, page, pages, total]
+                required: [items]
                 properties:
-                  enquiries:
+                  items:
                     type: array
                     items: { $ref: "#/components/schemas/Enquiry" }
-                  page: { type: integer }
-                  pages: { type: integer }
-                  total: { type: integer }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/enquiries/{id}:
@@ -740,14 +803,16 @@ paths:
         a member or key added. Someone erased on request, and anyone on the never-contact
         list, isn't mailed either, though they aren't listed here.
       parameters:
-        - { name: limit, in: query, schema: { type: integer }, description: "How many to return: 50 if left out, 200 at most." }
-        - { name: cursor, in: query, schema: { type: string }, description: "The next_cursor of the previous answer; leave out to start." }
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
       security:
         - session: []
         - bearer: [read]
       responses:
         "200":
           description: Newest first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
           content:
             application/json:
               schema:
@@ -757,7 +822,7 @@ paths:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/Suppression" }
-                  next_cursor: { type: string, description: "Set when there are more: pass it as cursor for the rest." }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
     post:
       operationId: addSuppression
@@ -824,6 +889,21 @@ components:
       in: path
       required: true
       schema: { type: integer, format: int64 }
+    limit:
+      name: limit
+      in: query
+      description: How many to return. 50 if left out; 200 at most.
+      schema: { type: integer, minimum: 1, maximum: 200 }
+    cursor:
+      name: cursor
+      in: query
+      description: The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters.
+      schema: { type: string }
+
+  headers:
+    Link:
+      description: 'The next page, as `<…>; rel="next"` (RFC 8288), when there is one.'
+      schema: { type: string }
 
   responses:
     Problem:
@@ -833,6 +913,9 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
 
   schemas:
+    NextCursor:
+      type: string
+      description: There is more. Pass this back as `cursor` for the next page; it is left out on the last one.
     Problem:
       type: object
       required: [title, status]

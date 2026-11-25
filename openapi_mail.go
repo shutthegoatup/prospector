@@ -19,9 +19,10 @@ func (s apiServer) ListSuppressions(ctx context.Context, in api.ListSuppressions
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListSuppressions200JSONResponse{Items: []api.Suppression{}, NextCursor: next}
+	out := api.ListSuppressions200JSONResponse{Headers: api.ListSuppressions200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out.Body.Items, out.Body.NextCursor = []api.Suppression{}, next
 	for _, r := range rows {
-		out.Items = append(out.Items, suppressionOut(r))
+		out.Body.Items = append(out.Body.Items, suppressionOut(r))
 	}
 	return out, nil
 }

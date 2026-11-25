@@ -387,7 +387,7 @@ func TestARobotWorksOnboardingAsItsScopesAllow(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, `"email":"hannah@larkmoor.example"`) || !strings.Contains(body, `"withdrawn":false`) || strings.Contains(body, "token") {
 		t.Errorf("listing onboardings: %d %s", code, body)
 	}
-	if code, body := asKey(t, "GET", base+"onboardings?company=99999", reader, nil); code != http.StatusOK || strings.TrimSpace(body) != "[]" {
+	if code, body := asKey(t, "GET", base+"onboardings?company=99999", reader, nil); code != http.StatusOK || strings.TrimSpace(body) != `{"items":[]}` {
 		t.Errorf("listing another company's: %d %s", code, body)
 	}
 
