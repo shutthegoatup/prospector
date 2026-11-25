@@ -8,8 +8,11 @@ info:
     (`Authorization: Bearer pk_…`) whose scopes say what it may do.
 
     Scopes: `read` to read; `agents:run` to start and stop agent runs;
-    `agents:configure` to add, change and delete the organisation's agents. A signed-in
-    member may read and run; configuring needs an owner.
+    `agents:configure` to add, change and delete the organisation's agents;
+    `enquiries:reply` to email a reply to an enquiry and record its answer;
+    `customers:write` to record and change subscriptions and onboardings; `customers:invite` to email a
+    customer a link to their steps and withdraw it. A signed-in
+    member may do all of these except configuring, which needs an owner.
 servers:
   - url: /
 security:
@@ -20,6 +23,14 @@ tags:
     description: Prospector's own agents, each a model behind an endpoint with tools from an MCP server.
   - name: runs
     description: An agent working a task.
+  - name: enquiries
+    description: What people sent in through a site's form or a product, and answering them.
+  - name: onboarding
+    description: The steps a new customer and the organisation take before the customer is live, and the customer's own page of theirs.
+  - name: subscriptions
+    description: What a customer is on, its term and notice, and its renewal.
+  - name: deals
+    description: What each conversation is worth, who has it and when it should close.
 
 paths:
   /o/{org}/api/v1/agents:
@@ -180,6 +191,538 @@ paths:
         "204": { description: Asked to stop. }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/enquiries/{id}/messages:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listEnquiryMessages
+      tags: [enquiries]
+      summary: What has been said in answering an enquiry
+      description: Replies sent from here and what was recorded of their answers, oldest first. The enquiry's own message is on the enquiry.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The thread.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/EnquiryMessage" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/enquiries/{id}/replies:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: replyToEnquiry
+      tags: [enquiries]
+      summary: Email a reply to whoever wrote in
+      description: |
+        Sends `text`, and only that, to the address the enquiry gave, through the
+        organisation's mail server. Nothing from the enquiry is quoted in the mail. Their
+        answer goes to the member who sent it; a key's reply is answered to the mail
+        server's own address. Refused for spam, for an address on the never-contact list,
+        and for the same words twice within two minutes. Afterwards the enquiry is
+        `waiting`. If the mail server refuses it the answer is 502 and nothing is recorded.
+      security:
+        - session: []
+        - bearer: ["enquiries:reply"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EnquiryText" }
+      responses:
+        "201":
+          description: The reply as sent.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnquiryMessage" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/enquiries/{id}/answers:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: recordEnquiryAnswer
+      tags: [enquiries]
+      summary: Record what they said back
+      description: Their answer arrives in a mailbox, not here, so whoever reads it records it. Nothing is sent. Afterwards the enquiry is `open` again.
+      security:
+        - session: []
+        - bearer: ["enquiries:reply"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EnquiryText" }
+      responses:
+        "201":
+          description: The answer as recorded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnquiryMessage" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/onboardings:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listOnboardings
+      tags: [onboarding]
+      summary: Onboardings, with their steps and who has been let see them
+      parameters:
+        - name: company
+          in: query
+          description: Only this company's.
+          schema: { type: integer, format: int64 }
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: "Late ones first, then the rest still going, then those that are live; newest start first within each."
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Onboarding" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: startOnboarding
+      tags: [onboarding]
+      summary: Start onboarding a company
+      description: Copies the organisation's steps, set in Settings, dated from `start`.
+      security:
+        - session: []
+        - bearer: ["customers:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OnboardingStart" }
+      responses:
+        "201":
+          description: The onboarding as started.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Onboarding" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/onboardings/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    delete:
+      operationId: removeOnboarding
+      tags: [onboarding]
+      summary: Remove an onboarding started by mistake
+      description: Its steps go with it, and anyone let see it loses their page.
+      security:
+        - session: []
+        - bearer: ["customers:write"]
+      responses:
+        "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/onboarding-steps/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeOnboardingStep
+      tags: [onboarding]
+      summary: Mark a step done or not, or move its date
+      description: Send `done`, `due`, or both. Marking done a step that already is keeps who did it and when.
+      security:
+        - session: []
+        - bearer: ["customers:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OnboardingStepChange" }
+      responses:
+        "200":
+          description: The step as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OnboardingStep" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/onboardings/{id}/invites:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: inviteCustomer
+      tags: [onboarding]
+      summary: Email someone at the company a link to their steps
+      description: |
+        The contact has to be at the onboarding's company, picked, with one email address,
+        and not on the never-contact list. They are mailed a link that opens a page of the
+        steps that are theirs. Inviting someone again sends a fresh link and restores access
+        that was withdrawn. Needs a mail server and the server's public address.
+      security:
+        - session: []
+        - bearer: ["customers:invite"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact]
+              properties:
+                contact: { type: integer, format: int64, description: The contact to invite. }
+      responses:
+        "204": { description: "Let in, and the link sent." }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/onboarding-invites/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    delete:
+      operationId: withdrawCustomerInvite
+      tags: [onboarding]
+      summary: Withdraw someone's access to their page
+      description: Their page closes in every browser at once and their links stop working.
+      security:
+        - session: []
+        - bearer: ["customers:invite"]
+      responses:
+        "204": { description: Withdrawn. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/subscriptions:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listSubscriptions
+      tags: [subscriptions]
+      summary: What customers are on, and where each stands today
+      parameters:
+        - name: company
+          in: query
+          description: Only this company's.
+          schema: { type: integer, format: int64 }
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The one needing attention soonest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Subscription" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: addSubscription
+      tags: [subscriptions]
+      summary: Record what a customer is on
+      security:
+        - session: []
+        - bearer: ["customers:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubscriptionNew" }
+      responses:
+        "201":
+          description: The subscription as recorded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Subscription" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/subscriptions/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeSubscription
+      tags: [subscriptions]
+      summary: Change a subscription
+      description: Send only what changes. Each is checked as it would be when recording one, and they are saved together or not at all.
+      security:
+        - session: []
+        - bearer: ["customers:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubscriptionChange" }
+      responses:
+        "200":
+          description: The subscription as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Subscription" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: removeSubscription
+      tags: [subscriptions]
+      summary: Remove a subscription recorded by mistake
+      description: A renewal deal already opened for it carries on as a deal of its own.
+      security:
+        - session: []
+        - bearer: ["customers:write"]
+      responses:
+        "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/subscriptions/{id}/renewals:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: startRenewal
+      tags: [subscriptions]
+      summary: Start a renewal deal for a subscription
+      description: Opens a renewal deal on the Conversations board with someone at the company, under the rules the page applies.
+      security:
+        - session: []
+        - bearer: ["customers:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact]
+              properties:
+                contact: { type: integer, format: int64, description: Who the renewal is with. }
+      responses:
+        "201":
+          description: The deal that was opened.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deal, contact]
+                properties:
+                  deal: { type: integer, format: int64 }
+                  contact: { type: integer, format: int64 }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/deals:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listDeals
+      tags: [deals]
+      summary: Every deal on the Conversations board
+      description: |
+        Each conversation has a deal of its own (`seq` 0), which stands where its contact
+        does; its `id` is 0 until it is given a value, an owner or a date. Deals started
+        after it (`seq` 1 and up) hold their own stage and next step.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: By stage, in the board's order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Deal" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: startDeal
+      tags: [deals]
+      summary: Start another deal with someone already in conversation
+      security:
+        - session: []
+        - bearer: ["pipeline:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact]
+              properties:
+                contact: { type: integer, format: int64 }
+                kind: { type: string, description: "`new`, `renewal` or `expansion`; empty is `new`." }
+      responses:
+        "201":
+          description: The deal as started.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Deal" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/deals/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeDeal
+      tags: [deals]
+      summary: Change a deal started after the conversation's own
+      description: Send only what changes; they are saved together or not at all. A conversation's own deal is changed through its contact.
+      security:
+        - session: []
+        - bearer: ["pipeline:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DealChange" }
+      responses:
+        "200":
+          description: The deal as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Deal" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: removeDeal
+      tags: [deals]
+      summary: Remove a deal started by mistake
+      description: The conversation's own deal can't be removed.
+      security:
+        - session: []
+        - bearer: ["pipeline:write"]
+      responses:
+        "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/contacts/{id}/deal:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeOwnDeal
+      tags: [deals]
+      summary: Change a conversation's own deal
+      description: |
+        Its kind, value, close date and owner. Send only what changes; they are saved
+        together or not at all. Its stage and next step are the contact's, and are not
+        set here. The contact has to have replied.
+      security:
+        - session: []
+        - bearer: ["pipeline:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DealChange" }
+      responses:
+        "200":
+          description: The deal as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Deal" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/enquiries:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listEnquiries
+      tags: [enquiries]
+      summary: What people sent in, newest first
+      parameters:
+        - { name: kind, in: query, schema: { type: string }, description: Only this kind. }
+        - { name: state, in: query, schema: { type: string }, description: "Only those `open`, `waiting` or `closed`." }
+        - { name: spam, in: query, schema: { type: boolean }, description: "Only those marked as spam, which are otherwise left out." }
+        - { name: page, in: query, schema: { type: integer }, description: "Which page, from 1." }
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: One page of them.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enquiries, page, pages, total]
+                properties:
+                  enquiries:
+                    type: array
+                    items: { $ref: "#/components/schemas/Enquiry" }
+                  page: { type: integer }
+                  pages: { type: integer }
+                  total: { type: integer }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/enquiries/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeEnquiry
+      tags: [enquiries]
+      summary: Say where answering an enquiry stands, who has it, or note something on it
+      description: Send only what changes; they are saved together or not at all. The note is never sent, but it is in the sender's export. Refused for spam.
+      security:
+        - session: []
+        - bearer: ["pipeline:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                state: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "`open`, `waiting` or `closed`." }
+                owner: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "A member's name, or empty for nobody." }
+                note: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+      responses:
+        "200":
+          description: The enquiry as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Enquiry" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: deleteEnquiry
+      tags: [enquiries]
+      summary: Delete an enquiry for good
+      description: With what was said in answering it. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["enquiries:delete"]
+      responses:
+        "204": { description: Deleted. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/enquiries/{id}/conversation:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: converseEnquiry
+      tags: [enquiries]
+      summary: Put whoever sent an enquiry on the Conversations board
+      description: Someone not held yet is added first, under the never-contact and erasure rules that adding anyone goes through. Answers 201 whether or not they were already there. Refused for spam.
+      security:
+        - session: []
+        - bearer: ["pipeline:write"]
+      responses:
+        "201":
+          description: Who they are here.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [contact]
+                properties:
+                  contact: { type: integer, format: int64 }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -244,6 +787,9 @@ components:
           description: Sealed when saved and never returned. Empty keeps the saved key.
         model: { type: string, maxLength: 200 }
         tools_url: { type: string, description: An MCP server whose tools the agent may use. }
+        search_url:
+          type: string
+          description: A SearXNG instance, with `json` among its `search.formats`, that the built-in `web_search` asks. Empty, the agent has no search of its own; it can still read pages with `fetch_page`.
         tools:
           type: array
           items: { type: string }
@@ -258,7 +804,7 @@ components:
 
     Agent:
       type: object
-      required: [id, name, kind, base_url, model, tools_url, models, tools, allowed_tools, fallback, fallback_minutes, problem, checked_at, has_key, ready, updated_by, updated_at]
+      required: [id, name, kind, base_url, model, tools_url, search_url, models, tools, allowed_tools, fallback, fallback_minutes, problem, checked_at, has_key, ready, updated_by, updated_at]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
@@ -266,6 +812,7 @@ components:
         base_url: { type: string }
         model: { type: string }
         tools_url: { type: string }
+        search_url: { type: string }
         models:
           type: array
           items: { type: string }
@@ -328,3 +875,188 @@ components:
         tokens_in: { type: integer, format: int64 }
         tokens_out: { type: integer, format: int64 }
         stop_reason: { type: string }
+
+    EnquiryText:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string, maxLength: 10000 }
+
+    EnquiryMessage:
+      type: object
+      required: [id, enquiry_id, ours, text, by, sent_at, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        enquiry_id: { type: integer, format: int64 }
+        ours: { type: boolean, description: "True for a reply sent from here, false for what they said back." }
+        text: { type: string }
+        by: { type: string, description: "Who sent the reply, or recorded their answer." }
+        sent_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false, description: When a reply of ours left. }
+        created_at: { type: string, format: date-time }
+
+    OnboardingStart:
+      type: object
+      required: [company]
+      properties:
+        company: { type: integer, format: int64 }
+        name: { type: string, maxLength: 200, description: "Which one, when a company has several: a site, a product." }
+        start: { type: string, description: "The day steps are dated from, YYYY-MM-DD; empty is today." }
+
+    Onboarding:
+      type: object
+      required: [id, company_id, company, name, start, created_at, steps, done, late, live_on, invites]
+      properties:
+        id: { type: integer, format: int64 }
+        company_id: { type: integer, format: int64 }
+        company: { type: string }
+        name: { type: string }
+        start: { type: string, description: "YYYY-MM-DD." }
+        created_at: { type: string, format: date-time }
+        steps:
+          type: array
+          items: { $ref: "#/components/schemas/OnboardingStep" }
+        done: { type: integer, description: How many steps are done. }
+        late: { type: integer, description: How many are past their date and not done. }
+        live_on: { type: string, description: "The day the last step was done, once every step is; empty until then." }
+        invites:
+          type: array
+          items: { $ref: "#/components/schemas/OnboardingInvite" }
+          description: Who at the company has been let see their steps.
+
+    OnboardingStep:
+      type: object
+      required: [id, onboarding_id, seq, name, who, due, done_on, done_by]
+      properties:
+        id: { type: integer, format: int64 }
+        onboarding_id: { type: integer, format: int64 }
+        seq: { type: integer }
+        name: { type: string }
+        who: { type: string, enum: [them, us], description: "Whose it is to do: the customer's or the organisation's." }
+        due: { type: string, description: "YYYY-MM-DD, or empty for no date." }
+        done_on: { type: string, description: "YYYY-MM-DD, or empty while it isn't done." }
+        done_by: { type: string, description: "Who marked it; `customer` when they did from their own page." }
+
+    OnboardingStepChange:
+      type: object
+      properties:
+        done: { type: boolean, nullable: true, x-go-type-skip-optional-pointer: false }
+        due: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "YYYY-MM-DD, or empty for no date." }
+
+    OnboardingInvite:
+      type: object
+      required: [id, contact_id, name, email, invited_by, created_at, withdrawn]
+      properties:
+        id: { type: integer, format: int64 }
+        contact_id: { type: integer, format: int64 }
+        name: { type: string }
+        email: { type: string }
+        invited_by: { type: string }
+        created_at: { type: string, format: date-time }
+        withdrawn: { type: boolean }
+
+    SubscriptionNew:
+      type: object
+      required: [company, name, start]
+      properties:
+        company: { type: integer, format: int64 }
+        name: { type: string, description: "What they are on, in your words." }
+        amount: { type: string, description: "The price for one period as you would write it: `14,000`, `€5,000`. Empty for none." }
+        per: { type: string, description: "`year` or `month`; empty is `year`." }
+        start: { type: string, description: "YYYY-MM-DD." }
+        term_months: { type: integer, description: "Months committed for; 0 is no commitment." }
+        then: { type: string, description: "What happens when the term is up: `renews` for the same term, `rolls` on a period at a time, or `ends`; empty is `renews`. With no months committed it is always `rolls`, whatever is sent." }
+        notice_days: { type: integer, description: Days of notice needed to stop it renewing. }
+
+    SubscriptionChange:
+      type: object
+      properties:
+        name: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        amount: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        per: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        start: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        term_months: { type: integer, nullable: true, x-go-type-skip-optional-pointer: false }
+        then: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        notice_days: { type: integer, nullable: true, x-go-type-skip-optional-pointer: false }
+        notice_on: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "The day notice was given, YYYY-MM-DD; empty to take it back." }
+        ended_on: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "The day it stopped, YYYY-MM-DD; empty to take it back." }
+
+    Subscription:
+      type: object
+      required: [id, company_id, company, name, amount, currency, per, start, term_months, then, notice_days, notice_on, ended_on, status, term_end, cancel_by, cancel_ends, ends, renewing, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        company_id: { type: integer, format: int64 }
+        company: { type: string }
+        name: { type: string }
+        amount: { type: integer, format: int64, description: "The price for one period, in the currency's hundredths." }
+        currency: { type: string }
+        per: { type: string }
+        start: { type: string }
+        term_months: { type: integer }
+        then: { type: string }
+        notice_days: { type: integer }
+        notice_on: { type: string, description: Empty when no notice has been given. }
+        ended_on: { type: string, description: Empty unless an end was recorded. }
+        status: { type: string, enum: [scheduled, active, notice given, ending, ended], description: Where it stands today. }
+        term_end: { type: string, description: "The last day of the term in hand, or of its first term when it has yet to start." }
+        cancel_by: { type: string, description: "The next day by which notice can still be given; empty when it ends anyway or notice was given." }
+        cancel_ends: { type: string, description: The last day of the term that notice by `cancel_by` would end it at. }
+        ends: { type: string, description: "The last day, once that is settled." }
+        renewing: { type: boolean, description: Whether a renewal deal for it is open. }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Deal:
+      type: object
+      required: [id, contact_id, person, company_id, seq, kind, stage, next_step, next_date, lost_reason, amount, currency, value, close_date, owner, subscription_id]
+      properties:
+        id: { type: integer, format: int64, description: "0 for a conversation's own deal that nothing has been set on yet." }
+        contact_id: { type: integer, format: int64 }
+        person: { type: string }
+        company_id: { type: integer, format: int64, description: "0 when they have no company here." }
+        seq: { type: integer, description: "0 for the conversation's own deal." }
+        kind: { type: string }
+        stage: { type: string, description: "`replied`, `meeting`, `proposal`, `won` or `lost`." }
+        next_step: { type: string }
+        next_date: { type: string, description: "YYYY-MM-DD, or empty." }
+        lost_reason: { type: string }
+        amount: { type: integer, format: int64, description: "In the currency's hundredths." }
+        currency: { type: string }
+        value: { type: string, description: "The amount as written, such as £14,000; empty when there is none." }
+        close_date: { type: string, description: "YYYY-MM-DD, or empty." }
+        owner: { type: string }
+        subscription_id: { type: integer, format: int64, description: "The subscription a renewal is for; 0 for none." }
+
+    DealChange:
+      type: object
+      properties:
+        kind: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        amount: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "As you would write it: `14,000`, `€5,000`; empty for none." }
+        close_date: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        owner: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "A member's name, or empty for nobody." }
+        stage: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: Only for a deal after the conversation's own. }
+        next_step: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: Only for a deal after the conversation's own. }
+        next_date: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: Only for a deal after the conversation's own. }
+        lost_reason: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: Only for a deal after the conversation's own. }
+
+    Enquiry:
+      type: object
+      required: [id, kind, name, email, company, phone, message, site, page, via, spam, contact_id, company_id, created_at, state, owner, note]
+      properties:
+        id: { type: integer, format: int64 }
+        kind: { type: string }
+        name: { type: string }
+        email: { type: string }
+        company: { type: string }
+        phone: { type: string }
+        message: { type: string, description: "Their words, exactly as sent. Whoever filled the form in chose every one." }
+        site: { type: string }
+        page: { type: string }
+        via: { type: string }
+        spam: { type: boolean }
+        contact_id: { type: integer, format: int64, description: "The contact it was matched to; 0 for none." }
+        company_id: { type: integer, format: int64, description: "The company it was matched to; 0 for none." }
+        created_at: { type: string, format: date-time }
+        state: { type: string, description: "`open`, `waiting` or `closed`; empty for one from before answering was tracked." }
+        owner: { type: string }
+        note: { type: string }

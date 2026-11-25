@@ -84,11 +84,11 @@ templ OnboardingCard(q *Req, r OnboardingRow, day string, named bool) {
 						if st.DoneOn == nil {
 							@input.Input(input.Props{Type: "date", Value: deref(st.Due), Class: "h-8 w-44 bg-muted",
 								Attributes: templ.Attributes{"data-field": "due", "data-step": strconv.FormatInt(st.ID, 10), "data-refresh": "true", "aria-label": "Due"}})
-							@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "ui/onboarding/step", "data-body": jsonBody("id", st.ID, "field", "done", "value", "yes")}}) {
+							@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "api/v1/onboarding-steps/" + strconv.FormatInt(st.ID, 10), "data-method": "PATCH", "data-body": `{"done":true}`}}) {
 								Done
 							}
 						} else {
-							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/onboarding/step", "data-body": jsonBody("id", st.ID, "field", "done", "value", "")}}) {
+							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/onboarding-steps/" + strconv.FormatInt(st.ID, 10), "data-method": "PATCH", "data-body": `{"done":false}`}}) {
 								Not done
 							}
 						}
@@ -110,7 +110,7 @@ templ OnboardingCard(q *Req, r OnboardingRow, day string, named bool) {
 					} else {
 						<span class="flex items-center gap-2">
 							@Pill("can open it", "ok")
-							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/onboarding/revoke", "data-body": jsonBody("id", inv.ID), "data-confirm": "Withdraw " + inv.Name + "'s access? Their page closes in every browser at once."}}) {
+							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/onboarding-invites/" + strconv.FormatInt(inv.ID, 10), "data-method": "DELETE", "data-confirm": "Withdraw " + inv.Name + "'s access? Their page closes in every browser at once."}}) {
 								Withdraw
 							}
 						</span>
@@ -122,9 +122,8 @@ templ OnboardingCard(q *Req, r OnboardingRow, day string, named bool) {
 			} else if len(r.Invitable) == 0 {
 				@Meta("Nobody at this company has an email address here to send a link to.")
 			} else {
-				<form data-form="ui/onboarding/invite" data-refresh="true" class="flex flex-wrap items-center gap-2">
-					<input type="number" name="id" value={ strconv.FormatInt(r.ID, 10) } hidden/>
-					<select name="contact" aria-label="Who to invite" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
+				<form data-form={ "api/v1/onboardings/" + strconv.FormatInt(r.ID, 10) + "/invites" } data-refresh="true" class="flex flex-wrap items-center gap-2">
+					<select name="contact" data-number="true" aria-label="Who to invite" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
 						for _, p := range r.Invitable {
 							<option value={ strconv.FormatInt(p.ID, 10) }>{ displayName(p) + " · " + deref(p.Email) }</option>
 						}
@@ -137,7 +136,7 @@ templ OnboardingCard(q *Req, r OnboardingRow, day string, named bool) {
 			}
 		</div>
 		<div class="flex justify-end">
-			@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/onboarding/remove", "data-body": jsonBody("id", r.ID), "data-confirm": "Remove this onboarding and its steps? Use this for one started by mistake."}}) {
+			@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/onboardings/" + strconv.FormatInt(r.ID, 10), "data-method": "DELETE", "data-confirm": "Remove this onboarding and its steps? Use this for one started by mistake."}}) {
 				Remove
 			}
 		</div>
@@ -146,7 +145,7 @@ templ OnboardingCard(q *Req, r OnboardingRow, day string, named bool) {
 
 // OnboardingStart starts an onboarding for a company from the organisation's steps.
 templ OnboardingStart(company int64, day string) {
-	<form data-form="ui/onboarding" data-refresh="true" data-reset="true" class="mt-2 flex flex-wrap items-start gap-2">
+	<form data-form="api/v1/onboardings" data-refresh="true" data-reset="true" class="mt-2 flex flex-wrap items-start gap-2">
 		<input type="number" name="company" value={ strconv.FormatInt(company, 10) } hidden/>
 		<label class="flex min-w-[220px] flex-1 flex-col gap-1">
 			@Label("For, if they have several")

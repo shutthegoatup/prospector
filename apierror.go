@@ -25,6 +25,12 @@ func (e notFound) Error() string { return string(e) }
 
 func noSuch(format string, args ...any) error { return notFound(fmt.Sprintf(format, args...)) }
 
+// conflict is an error about something that can't be made because what is already here
+// has its place: asking again won't help until one of the two changes.
+type conflict string
+
+func (e conflict) Error() string { return string(e) }
+
 // missing is what a failed look-up means: nothing there, unless the look-up itself
 // failed, which mustn't read as the thing being gone.
 func missing(err error, format string, args ...any) error {
@@ -72,7 +78,8 @@ func breaksRule(err error) bool {
 
 const (
 	sayOurs       = "the server couldn't finish that; try again in a moment"
-	sayUnstorable = "that couldn't be saved: it clashes with something already here, or holds a character that can't be stored"
+	sayTaken      = "that couldn't be saved: it clashes with something already here"
+	sayUnstorable = "that couldn't be saved: it holds a character that can't be stored"
 )
 
 // fromDatabase is an error in the database's or its driver's own words.
@@ -96,13 +103,16 @@ func fromDatabase(err error) bool {
 // the caller gets ours instead. Any other answer is the handler's to word, such as a
 // 502 passing on what another server said.
 func telling(where string, err error, code int) (int, string) {
+	var clash conflict
 	switch {
-	case unstorable(err):
-		if code >= 500 {
-			code = http.StatusBadRequest
-		}
+	case breaksRule(err):
 		log.Printf("%s: %v", where, err)
-		return code, sayUnstorable
+		return http.StatusConflict, sayTaken
+	case unstorable(err):
+		log.Printf("%s: %v", where, err)
+		return http.StatusBadRequest, sayUnstorable
+	case errors.As(err, &clash):
+		return http.StatusConflict, err.Error()
 	case code == http.StatusInternalServerError, code < 500 && fromDatabase(err):
 		log.Printf("%s: %v", where, err)
 		return http.StatusInternalServerError, sayOurs
@@ -125,10 +135,14 @@ func addTool[In, Out any](s *mcp.Server, t *mcp.Tool, h mcp.ToolHandlerFor[In, O
 
 func statusOf(err error) int {
 	var missing notFound
+	var away notSent
+	var clash conflict
 	switch {
+	case errors.As(err, &away):
+		return http.StatusBadGateway
 	case errors.As(err, &missing), errors.Is(err, gorm.ErrRecordNotFound):
 		return http.StatusNotFound
-	case errors.Is(err, errErased):
+	case errors.Is(err, errErased), errors.As(err, &clash), breaksRule(err):
 		return http.StatusConflict
 	case ours(err):
 		return http.StatusInternalServerError

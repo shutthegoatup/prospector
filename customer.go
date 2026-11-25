@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"net/mail"
@@ -343,50 +342,6 @@ func (a *App) customerLinkMail(ctx context.Context, org *Org, to, token string) 
 			"The link works once, within 7 days, and opens the page in the browser you use it in. " +
 			"To open it somewhere else, use the link again and ask for a fresh one: it is sent to this address.\n\n" +
 			"If you weren't expecting this, ignore it: nothing happens unless the link is opened.\n"})
-}
-
-func (a *App) uiCustomerInvite(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID      int64  `json:"id"`
-		Contact string `json:"contact"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	// A select posts its value as text.
-	contact, err := strconv.ParseInt(in.Contact, 10, 64)
-	if err != nil {
-		fail(w, errors.New("choose who to invite"), http.StatusBadRequest)
-		return
-	}
-	q := reqOf(r)
-	// Checked before anyone is let in: access with no way to send the link is no use.
-	if !a.customerMailOn(q.Org.ID) {
-		fail(w, errNoCustomerMail, http.StatusBadRequest)
-		return
-	}
-	token, c, err := a.s.InviteCustomer(q.Org, in.ID, contact, q.Actor())
-	if err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	if err := a.customerLinkMail(r.Context(), q.Org, deref(c.Email), token); err != nil {
-		// Nothing was sent, so the wait before another try doesn't apply.
-		a.s.dropCustomerLink(token)
-		fail(w, fmt.Errorf("they were let in, but the link couldn't be sent: %w", err), http.StatusBadGateway)
-		return
-	}
-	done(w, nil)
-}
-
-func (a *App) uiCustomerRevoke(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID int64 `json:"id"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.RevokeCustomer(q.Org.ID, in.ID, q.Actor()))
-	}
 }
 
 // customerHeaders are for every page an outsider opens: a link in the address mustn't

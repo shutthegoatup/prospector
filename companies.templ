@@ -90,6 +90,7 @@ func historyText(h HistoryItem) string {
 		"onboard:invite": "emailed a link to their onboarding page", "onboard:revoke": "withdrew access to their onboarding page",
 		"onboard:done": "finished an onboarding step", "onboard:undone": "reopened an onboarding step",
 		"onboard:due": "moved an onboarding step's date",
+		"enquiry:reply": "emailed a reply to their enquiry", "enquiry:heard": "recorded their answer to an enquiry",
 	}[h.Action]
 	if verb == "" {
 		if f, ok := strings.CutPrefix(h.Action, "set:"); ok {

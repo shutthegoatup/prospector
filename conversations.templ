@@ -201,7 +201,7 @@ templ DealCard(q *Req, c Contact, d Deal, members []Member, after AfterWin, day 
 							Attributes: templ.Attributes{"data-field": "lost_reason", "data-id": strconv.FormatInt(c.ID, 10)}})
 					</label>
 				}
-				<form data-form="ui/deal/start" data-refresh="true" class="flex items-center gap-2 border-t border-border pt-2">
+				<form data-form="api/v1/deals" data-refresh="true" class="flex items-center gap-2 border-t border-border pt-2">
 					<input type="number" name="contact" value={ strconv.FormatInt(c.ID, 10) } hidden/>
 					@Label("Another deal")
 					@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: templ.Attributes{"name": "kind", "aria-label": "Kind of deal"}}) {
@@ -315,8 +315,7 @@ templ OtherDealCard(q *Req, o OtherDeal, members []Member, after AfterWin, day s
 						@input.Input(input.Props{Value: d.LostReason, Class: "h-8 bg-muted", Attributes: otherField(d, "lost_reason")})
 					</label>
 				}
-				<form data-form="ui/deal/remove" data-refresh="true" class="flex items-center gap-2 border-t border-border pt-2">
-					<input type="number" name="id" value={ strconv.FormatInt(d.ID, 10) } hidden/>
+				<form data-form={ "api/v1/deals/" + strconv.FormatInt(d.ID, 10) } data-method="DELETE" data-refresh="true" class="flex items-center gap-2 border-t border-border pt-2">
 					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Type: button.TypeSubmit}) {
 						Remove this deal
 					}
@@ -341,7 +340,7 @@ templ WonNext(q *Req, company *int64, after AfterWin, day string) {
 		<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(*company, 10)) } class="font-mono text-xs text-mark underline">{ onboardingWord(after.Running[*company]) }</a>
 	} else if company != nil && after.Planned > 0 {
 		<div>
-			@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "ui/onboarding", "data-body": jsonBody("company", *company, "start", day)}}) {
+			@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "api/v1/onboardings", "data-body": jsonBody("company", *company, "start", day)}}) {
 				Start onboarding
 			}
 		</div>

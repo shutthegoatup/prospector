@@ -76,8 +76,8 @@ func (a *App) apiCaller(next http.Handler) http.Handler {
 	})
 }
 
-// apiScope holds an operation to its scope: a key needs it granted; a member has read
-// and run, and configuring needs an owner.
+// apiScope holds an operation to its scope: a key needs it granted; a member has everything
+// but configuring, which needs an owner.
 func (a *App) apiScope(scopes map[string]string) api.StrictMiddlewareFunc {
 	return func(f api.StrictHandlerFunc, op string) api.StrictHandlerFunc {
 		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error) {
@@ -95,7 +95,7 @@ func (a *App) apiScope(scopes map[string]string) api.StrictMiddlewareFunc {
 	}
 }
 
-func ownersOnly(scope string) bool { return scope == "agents:configure" }
+func ownersOnly(scope string) bool { return scope == "agents:configure" || scope == "enquiries:delete" }
 
 func reqFrom(ctx context.Context) *Req { return ctx.Value(reqKey{}).(*Req) }
 
@@ -104,7 +104,7 @@ func agentOut(c Agent) api.Agent {
 	for _, t := range c.ToolList() {
 		tools = append(tools, api.Tool{Name: t.Name, Description: t.Description})
 	}
-	return api.Agent{Id: c.ID, Name: c.Name, Kind: api.AgentKind(c.Kind), BaseUrl: c.BaseURL, Model: c.Model, ToolsUrl: c.ToolsURL,
+	return api.Agent{Id: c.ID, Name: c.Name, Kind: api.AgentKind(c.Kind), BaseUrl: c.BaseURL, Model: c.Model, ToolsUrl: c.ToolsURL, SearchUrl: c.SearchURL,
 		Models: nonNil(c.ModelList()), Tools: tools, AllowedTools: nonNil(c.AllowedTools()), Fallback: c.FallbackID, FallbackMinutes: c.FallbackMinutes,
 		Problem: c.Problem, CheckedAt: c.CheckedAt, HasKey: c.APIKey != "", Ready: c.Ready(), UpdatedBy: c.UpdatedBy, UpdatedAt: c.UpdatedAt}
 }
@@ -126,7 +126,7 @@ func settingsIn(id int64, b *api.AgentSettings) (AgentSettingsIn, error) {
 	if b == nil {
 		return AgentSettingsIn{}, errors.New("send the agent's settings")
 	}
-	return AgentSettingsIn{ID: id, Name: b.Name, Kind: b.Kind, BaseURL: b.BaseUrl, APIKey: b.ApiKey, Model: b.Model, ToolsURL: b.ToolsUrl,
+	return AgentSettingsIn{ID: id, Name: b.Name, Kind: b.Kind, BaseURL: b.BaseUrl, APIKey: b.ApiKey, Model: b.Model, ToolsURL: b.ToolsUrl, SearchURL: b.SearchUrl,
 		Tools: nonNil(b.Tools), Fallback: b.Fallback, FallbackMinutes: b.FallbackMinutes}, nil
 }
 

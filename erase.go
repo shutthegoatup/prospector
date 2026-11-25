@@ -130,6 +130,10 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if emails := emailRe.FindAllString(strings.ToLower(addresses), -1); len(emails) > 0 {
 			gone = tx.Where("org_id = ? and (contact_id = ? or email in ?)", org, id, emails)
 		}
+		// With what was said in answering them: their words, and ours to them.
+		if err := tx.Where("org_id = ? and enquiry_id in (?)", org, gone.Session(&gorm.Session{}).Model(&Enquiry{}).Select("id")).Delete(&EnquiryMessage{}).Error; err != nil {
+			return err
+		}
 		if err := gone.Delete(&Enquiry{}).Error; err != nil {
 			return err
 		}

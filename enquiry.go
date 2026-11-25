@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"strconv"
 	"strings"
@@ -64,8 +65,23 @@ func enquiryStateLabel(state string) string {
 
 // SetEnquiry changes where answering an enquiry stands, who has it, or our note on it.
 func (s *Store) SetEnquiry(org, id int64, field, value, actor string) error {
-	value = strings.TrimSpace(value)
+	return s.SetEnquiryFields(org, id, []Change{{field, value}}, actor)
+}
+
+// SetEnquiryFields makes several of those changes or none.
+func (s *Store) SetEnquiryFields(org, id int64, changes []Change, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		for _, c := range changes {
+			if err := s.setEnquiry(tx, org, id, c.Field, strings.TrimSpace(c.Value), actor); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (s *Store) setEnquiry(tx *gorm.DB, org, id int64, field, value, actor string) error {
+	{
 		var e Enquiry
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&e).Error; err != nil {
 			return missing(err, "no enquiry %d", id)
@@ -107,7 +123,7 @@ func (s *Store) SetEnquiry(org, id int64, field, value, actor string) error {
 			contact = *e.ContactID
 		}
 		return s.log(tx, org, contact, e.CompanyID, actor, "enquiry:"+field, nonEmpty(logged))
-	})
+	}
 }
 
 var EnquiryKinds = []struct{ Key, Label string }{
@@ -171,7 +187,9 @@ func (s *Store) AddEnquiry(org int64, via string, in EnquiryIn) (*Enquiry, error
 	if !e.Spam {
 		e.State = EnquiryOpen
 	}
-	if !emailRe.MatchString(e.Email) || strings.ContainsAny(e.Email, " \t\r\n") {
+	// One bare address and nothing round it: a name or a comment beside it would hide it
+	// from the look-ups that erasure and matching to a contact make by address.
+	if at, err := mail.ParseAddress(e.Email); err != nil || at.Address != e.Email || !emailRe.MatchString(e.Email) || strings.ContainsAny(e.Email, " \t\r\n") {
 		return nil, errEnquiryEmail
 	}
 	return &e, s.db.Transaction(func(tx *gorm.DB) error {
@@ -214,11 +232,16 @@ func (s *Store) AddEnquiry(org int64, via string, in EnquiryIn) (*Enquiry, error
 
 // DeleteEnquiry removes one for good: spam, or a person asking for what they sent to go.
 func (s *Store) DeleteEnquiry(org, id int64) error {
-	res := s.in(org).Where("id = ?", id).Delete(&Enquiry{})
-	if res.Error == nil && res.RowsAffected == 0 {
-		return noSuch("no enquiry %d", id)
-	}
-	return res.Error
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		res := tx.Where("org_id = ? and id = ?", org, id).Delete(&Enquiry{})
+		if res.Error == nil && res.RowsAffected == 0 {
+			return noSuch("no enquiry %d", id)
+		}
+		if res.Error != nil {
+			return res.Error
+		}
+		return tx.Where("org_id = ? and enquiry_id = ?", org, id).Delete(&EnquiryMessage{}).Error
+	})
 }
 
 type EnquiryFilter struct {
@@ -410,27 +433,6 @@ func (a *App) intake(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, ok{true})
 }
 
-func (a *App) uiSetEnquiry(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID    int64  `json:"id"`
-		Field string `json:"field"`
-		Value string `json:"value"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.SetEnquiry(q.Org.ID, in.ID, in.Field, in.Value, q.Actor()))
-	}
-}
-
-func (a *App) uiDeleteEnquiry(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID int64 `json:"id"`
-	}
-	if decode(w, r, &in) {
-		done(w, a.s.DeleteEnquiry(reqOf(r).Org.ID, in.ID))
-	}
-}
-
 type EnquiriesData struct {
 	Filter    EnquiryFilter
 	Rows      []Enquiry
@@ -440,6 +442,9 @@ type EnquiriesData struct {
 	Members   []Member
 	// Talking are the contacts, among those who sent these, already on the Conversations board.
 	Talking map[int64]bool
+	// Threads is what has been said in answering each, and MailOn whether a reply can be sent from here.
+	Threads map[int64][]EnquiryMessage
+	MailOn  bool
 }
 
 func (a *App) enquiriesPage(w http.ResponseWriter, r *http.Request) {
@@ -486,7 +491,13 @@ func (a *App) enquiriesPage(w http.ResponseWriter, r *http.Request) {
 			talking[id] = true
 		}
 	}
-	a.page(w, r, "enquiries", EnquiriesView(q, EnquiriesData{Filter: f, Rows: rows, Page: pg, Counts: a.s.EnquiryCounts(q.Org.ID), Companies: names, Members: members, Talking: talking}))
+	threads, err := a.s.EnquiryThreads(q.Org.ID, enquiryIDs(rows))
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	via, _ := a.mailFor(q.Org.ID)
+	a.page(w, r, "enquiries", EnquiriesView(q, EnquiriesData{Filter: f, Rows: rows, Page: pg, Counts: a.s.EnquiryCounts(q.Org.ID), Companies: names, Members: members, Talking: talking, Threads: threads, MailOn: via != nil}))
 }
 
 // ConverseEnquiry puts whoever sent an enquiry on the Conversations board: writing in is
@@ -586,15 +597,4 @@ func (s *Store) enquiryCompany(org int64, e Enquiry) (string, error) {
 		return "", nil
 	}
 	return typed, nil
-}
-
-func (a *App) uiConverseEnquiry(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID int64 `json:"id"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		_, err := a.s.ConverseEnquiry(q.Org, in.ID, q.Actor())
-		done(w, err)
-	}
 }

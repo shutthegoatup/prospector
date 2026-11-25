@@ -58,7 +58,9 @@ type App struct {
 	// agentClient reaches an organisation's model endpoint and tool server; nil means
 	// one that refuses private addresses unless the operator allows them.
 	agentClient *http.Client
-	runs        agentRuns
+	// pageClient reads the pages an agent asks for; tests stand in their own.
+	pageClient *http.Client
+	runs       agentRuns
 	// sleep stands in for waiting in tests; nil is the clock.
 	sleep func(ctx context.Context, d time.Duration) error
 }
@@ -377,18 +379,6 @@ func (a *App) Routes() http.Handler {
 
 	mux.HandleFunc("POST /o/{org}/ui/mark", a.member(a.uiMark))
 	mux.HandleFunc("POST /o/{org}/ui/update", a.member(a.uiUpdate))
-	mux.HandleFunc("POST /o/{org}/ui/deal", a.member(a.uiDeal))
-	mux.HandleFunc("POST /o/{org}/ui/deal/start", a.member(a.uiDealStart))
-	mux.HandleFunc("POST /o/{org}/ui/deal/remove", a.member(a.uiDealRemove))
-	mux.HandleFunc("POST /o/{org}/ui/subscription", a.member(a.uiSubscription))
-	mux.HandleFunc("POST /o/{org}/ui/subscription/change", a.member(a.uiSubscriptionChange))
-	mux.HandleFunc("POST /o/{org}/ui/subscription/remove", a.member(a.uiSubscriptionRemove))
-	mux.HandleFunc("POST /o/{org}/ui/subscription/renew", a.member(a.uiSubscriptionRenew))
-	mux.HandleFunc("POST /o/{org}/ui/onboarding", a.member(a.uiOnboardingStart))
-	mux.HandleFunc("POST /o/{org}/ui/onboarding/step", a.member(a.uiOnboardingStep))
-	mux.HandleFunc("POST /o/{org}/ui/onboarding/remove", a.member(a.uiOnboardingRemove))
-	mux.HandleFunc("POST /o/{org}/ui/onboarding/invite", a.member(a.uiCustomerInvite))
-	mux.HandleFunc("POST /o/{org}/ui/onboarding/revoke", a.member(a.uiCustomerRevoke))
 	mux.HandleFunc("POST /o/{org}/ui/company", a.member(a.uiCompany))
 	mux.HandleFunc("POST /o/{org}/ui/pick", a.member(a.uiPick))
 	mux.HandleFunc("POST /o/{org}/ui/suggestion", a.member(a.uiSuggestion))
@@ -406,9 +396,6 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/export", a.owner(a.uiExport))
 	mux.HandleFunc("POST /o/{org}/ui/export-org", a.owner(a.uiExportOrg))
 	mux.HandleFunc("POST /o/{org}/ui/erase", a.owner(a.uiErase))
-	mux.HandleFunc("POST /o/{org}/ui/enquiry/delete", a.owner(a.uiDeleteEnquiry))
-	mux.HandleFunc("POST /o/{org}/ui/enquiry/update", a.member(a.uiSetEnquiry))
-	mux.HandleFunc("POST /o/{org}/ui/enquiry/converse", a.member(a.uiConverseEnquiry))
 	mux.HandleFunc("POST /o/{org}/ui/keys", a.owner(a.uiKey))
 	mux.HandleFunc("POST /o/{org}/ui/keys/revoke", a.owner(a.uiRevoke))
 

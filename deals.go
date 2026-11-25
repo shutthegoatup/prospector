@@ -308,8 +308,39 @@ func (s *Store) otherDeal(tx *gorm.DB, org, id int64) (Deal, Contact, error) {
 // ChangeDeal sets one field of a deal after the conversation's own. Those hold their
 // stage and next step themselves; the conversation's own are still its contact's.
 func (s *Store) ChangeDeal(org, id int64, field, value, actor string) error {
-	value = strings.TrimSpace(value)
+	return s.ChangeDealFields(org, id, []Change{{field, value}}, actor)
+}
+
+// Change is one field given a new value.
+type Change struct{ Field, Value string }
+
+// ChangeDealFields makes several changes to a deal after the conversation's own, or
+// none: one that is refused takes back those before it.
+func (s *Store) ChangeDealFields(org, id int64, changes []Change, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		for _, c := range changes {
+			if err := s.changeDeal(tx, org, id, c.Field, strings.TrimSpace(c.Value), actor); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// SetDealFields does the same for a conversation's own deal, which is its contact's.
+func (s *Store) SetDealFields(org, contact int64, changes []Change, actor string) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		for _, c := range changes {
+			if err := s.setDeal(tx, org, contact, c.Field, c.Value, actor); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (s *Store) changeDeal(tx *gorm.DB, org, id int64, field, value, actor string) error {
+	{
 		d, c, err := s.otherDeal(tx, org, id)
 		if err != nil {
 			return err
@@ -330,7 +361,7 @@ func (s *Store) ChangeDeal(org, id int64, field, value, actor string) error {
 			return err
 		}
 		return s.log(tx, org, c.ID, c.CompanyID, actor, "deal:"+field, nonEmpty(logged))
-	})
+	}
 }
 
 // RemoveDeal takes back a deal that was started by mistake. One that ran its course is

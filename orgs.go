@@ -187,13 +187,13 @@ func createOrg(tx *gorm.DB, slug, name string) (*Org, error) {
 	if !slugRe.MatchString(slug) {
 		return nil, fmt.Errorf("%q can't be used in a URL: use a-z, 0-9 and -", slug)
 	}
-	taken := fmt.Errorf("another organisation already has the address /o/%s: choose a different name", slug)
+	inUse := conflict(fmt.Sprintf("another organisation already has the address /o/%s: choose a different name", slug))
 	var same, n int64
 	if err := tx.Model(&Org{}).Where("slug = ?", slug).Count(&same).Error; err != nil {
 		return nil, err
 	}
 	if same > 0 {
-		return nil, taken
+		return nil, inUse
 	}
 	if err := tx.Model(&Org{}).Count(&n).Error; err != nil {
 		return nil, err
@@ -202,7 +202,7 @@ func createOrg(tx *gorm.DB, slug, name string) (*Org, error) {
 	// Two asking for the same address at once both find it free; the index stops the
 	// second, and the slug is the only thing about a new organisation it guards.
 	if err := tx.Create(o).Error; breaksRule(err) {
-		return nil, taken
+		return nil, inUse
 	} else if err != nil {
 		return nil, err
 	}
@@ -415,14 +415,19 @@ func (s *Store) Logout(token string) error {
 	return s.db.Where("token_hash in ?", s.keys.lookups(sessions, token)).Delete(&Session{}).Error
 }
 
-// Scopes an API key can carry. None of them can send, change settings or reach another org; only import skips review.
+// Scopes an API key can carry. None can change settings or reach another org; only enquiries:reply and customers:invite send mail, and only import skips review.
 var Scopes = []struct{ Name, What string }{
-	{"read", "search companies and people, read what's due and the tasks people wrote"},
+	{"read", "search companies and people, read what's due and the tasks people wrote, and read deals, subscriptions, onboardings and enquiries with what was said in answering them"},
 	{"research:write", "add companies, facts and suggested contacts (they wait in Research), and leave notes on tasks"},
 	{"drafts:write", "write draft notes and emails, marked as written by the agent"},
 	{"outcomes:write", "record what happened (added, accepted, sent, called, replied, declined, hold), shown as the agent's"},
 	{"import", "push the repo's markdown and pull the snapshot"},
 	{"enquiries:write", "record an enquiry or sign-up from your own product or site backend"},
+	{"enquiries:reply", "email a reply to whoever sent an enquiry, through your mail server, and record what they said back"},
+	{"customers:write", "record and change subscriptions, start their renewals, and start, change and remove onboardings"},
+	{"pipeline:write", "work deals (start, value, stage, owner, remove) and say where answering an enquiry stands, who has it, and put its sender on the board"},
+	{"enquiries:delete", "delete an enquiry for good, with what was said in answering it"},
+	{"customers:invite", "email a customer a link to their onboarding steps, through your mail server, and withdraw it"},
 	{"agents:run", "start and stop Prospector's own agents on tasks"},
 	{"agents:configure", "add, change and delete Prospector's own agents, their endpoints, keys and tools"},
 }

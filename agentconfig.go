@@ -36,6 +36,8 @@ type Agent struct {
 	APIKey   string `gorm:"not null;default:''"`
 	Model    string `gorm:"not null;default:''"`
 	ToolsURL string `gorm:"not null;default:''"`
+	// SearchURL is a SearXNG instance its web_search asks; empty, it has no search of its own.
+	SearchURL string `gorm:"not null;default:''"`
 	// Models and Tools are what the endpoints offered when last checked, as JSON, so
 	// Settings never has to call them to render. Allowed is the tools ticked.
 	Models  string `gorm:"not null;default:'[]'"`
@@ -224,8 +226,12 @@ func refusal(res *http.Response, now time.Time) error {
 // allows private addresses, each connection is checked as it is made, and a
 // redirect, being a second destination, isn't followed. Contexts bound each call.
 func agentClient() *http.Client {
+	return publicClient(os.Getenv("PROSPECTOR_AGENT_ALLOW_PRIVATE") == "1")
+}
+
+func publicClient(allowPrivate bool) *http.Client {
 	dialer := &net.Dialer{Timeout: 10 * time.Second}
-	if os.Getenv("PROSPECTOR_AGENT_ALLOW_PRIVATE") != "1" {
+	if !allowPrivate {
 		dialer.Control = func(_, address string, _ syscall.RawConn) error {
 			ap, err := netip.ParseAddrPort(address)
 			if err != nil || !publicAddr(ap.Addr()) {
@@ -353,14 +359,15 @@ func (a *App) listTools(ctx context.Context, endpoint, key string) ([]AgentTool,
 // keeps the one saved, but only for the same endpoint: a key isn't sent to an address
 // it wasn't given for.
 type AgentSettingsIn struct {
-	ID       int64    `json:"id"`
-	Name     string   `json:"name"`
-	Kind     string   `json:"kind"`
-	BaseURL  string   `json:"base_url"`
-	APIKey   string   `json:"api_key"`
-	Model    string   `json:"model"`
-	ToolsURL string   `json:"tools_url"`
-	Tools    []string `json:"tools"`
+	ID        int64    `json:"id"`
+	Name      string   `json:"name"`
+	Kind      string   `json:"kind"`
+	BaseURL   string   `json:"base_url"`
+	APIKey    string   `json:"api_key"`
+	Model     string   `json:"model"`
+	ToolsURL  string   `json:"tools_url"`
+	SearchURL string   `json:"search_url"`
+	Tools     []string `json:"tools"`
 	// Fallback is the id of the agent that takes over, 0 for none; FallbackMinutes is
 	// how long it waits first, 0 for the default.
 	Fallback        int64 `json:"fallback"`
@@ -422,12 +429,16 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	if err != nil {
 		return nil, fmt.Errorf("tools: %w", err)
 	}
+	search, err := endpointURL(in.SearchURL)
+	if err != nil {
+		return nil, fmt.Errorf("search: %w", err)
+	}
 	var taken int64
 	if err := a.s.db.Model(&Agent{}).Where("org_id = ? and name = ? and id <> ?", org, name, c.ID).Count(&taken).Error; err != nil {
 		return nil, err
 	}
 	if taken > 0 {
-		return nil, fmt.Errorf("there is already an agent called %q", name)
+		return nil, conflict(fmt.Sprintf("there is already an agent called %q", name))
 	}
 	renamed := c.ID != 0 && c.Name != name
 	c.Name = name
@@ -485,7 +496,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 		return nil, errors.New("wait between a minute and a week before falling back")
 	}
 	c.FallbackID, c.FallbackMinutes = fallback, in.FallbackMinutes
-	c.Kind, c.BaseURL, c.APIKey, c.ToolsURL, c.UpdatedBy = kind, base, sealedKey, tools, by
+	c.Kind, c.BaseURL, c.APIKey, c.ToolsURL, c.SearchURL, c.UpdatedBy = kind, base, sealedKey, tools, search, by
 	c.Model = strings.TrimSpace(in.Model)
 	if len(c.Model) > 200 {
 		return nil, errors.New("that model name is too long")
@@ -510,6 +521,11 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 			c.Model = models[0]
 		case kind == kindAnthropic && slices.Contains(models, defaultClaude):
 			c.Model = defaultClaude
+		}
+	}
+	if search != "" {
+		if _, err := a.webSearch(check, search, "prospector", 0); err != nil {
+			problems = append(problems, "Search: "+err.Error())
 		}
 	}
 	if tools != "" {
@@ -558,7 +574,7 @@ func (s *Store) writeAgent(c *Agent) error {
 		return s.db.Create(c).Error
 	}
 	res := s.db.Model(&Agent{}).Where("id = ? and org_id = ?", c.ID, c.OrgID).
-		Select("name", "kind", "base_url", "fallback_id", "fallback_minutes", "api_key", "model", "tools_url", "models", "tools", "allowed", "problem", "checked_at", "updated_by", "updated_at").
+		Select("name", "kind", "base_url", "fallback_id", "fallback_minutes", "api_key", "model", "tools_url", "search_url", "models", "tools", "allowed", "problem", "checked_at", "updated_by", "updated_at").
 		Updates(c)
 	if res.Error == nil && res.RowsAffected == 0 {
 		return fmt.Errorf("%s was deleted meanwhile", c.Name)

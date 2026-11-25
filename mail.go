@@ -28,6 +28,8 @@ type MailServer struct {
 
 type Message struct {
 	To, Subject, Body string
+	// ReplyTo is where an answer should go when that isn't the sender; empty for none.
+	ReplyTo string
 }
 
 // sendFunc is how mail leaves; tests put a recorder in its place.
@@ -149,7 +151,10 @@ func submit(conn net.Conn, via MailServer, from, to *mail.Address, m Message, se
 	if err := w.Close(); err != nil {
 		return err
 	}
-	return c.Quit()
+	// The server took the message when the data closed. A goodbye that fails after that
+	// isn't a failed send, and calling it one would have the same mail sent twice.
+	c.Quit()
+	return nil
 }
 
 func compose(from, to *mail.Address, m Message, now time.Time) []byte {
@@ -157,6 +162,10 @@ func compose(from, to *mail.Address, m Message, now time.Time) []byte {
 	_, domain, _ := strings.Cut(from.Address, "@")
 	subject := strings.Join(strings.Fields(m.Subject), " ")
 	fmt.Fprintf(&b, "From: %s\r\nTo: %s\r\nSubject: %s\r\n", from.String(), to.String(), mime.QEncoding.Encode("utf-8", subject))
+	// Parsed and written back out, so nothing in it can start a header of its own.
+	if answer, err := mail.ParseAddress(m.ReplyTo); err == nil {
+		fmt.Fprintf(&b, "Reply-To: %s\r\n", (&mail.Address{Address: answer.Address}).String())
+	}
 	fmt.Fprintf(&b, "Date: %s\r\nMessage-ID: <%s@%s>\r\n", now.Format(time.RFC1123Z), randomToken(16), domain)
 	b.WriteString("MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n")
 	body := quotedprintable.NewWriter(&b)

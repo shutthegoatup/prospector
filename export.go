@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -11,16 +12,17 @@ import (
 // PersonExport is everything held about one contact row, for answering a request
 // from that person to see it.
 type PersonExport struct {
-	ExportedAt time.Time       `json:"exported_at"`
-	Note       string          `json:"note,omitempty"`
-	Company    string          `json:"company,omitempty"`
-	Person     Contact         `json:"person"`
-	Facts      []Fact          `json:"facts"`
-	Enquiries  []Enquiry       `json:"enquiries"`
-	Suggested  []Suggestion    `json:"suggested_details"`
-	Deals      []Deal          `json:"deals"`
-	Access     []CustomerGrant `json:"onboarding_access"`
-	History    []ExportEvent   `json:"history"`
+	ExportedAt    time.Time        `json:"exported_at"`
+	Note          string           `json:"note,omitempty"`
+	Company       string           `json:"company,omitempty"`
+	Person        Contact          `json:"person"`
+	Facts         []Fact           `json:"facts"`
+	Enquiries     []Enquiry        `json:"enquiries"`
+	EnquiryThread []EnquiryMessage `json:"enquiry_messages"`
+	Suggested     []Suggestion     `json:"suggested_details"`
+	Deals         []Deal           `json:"deals"`
+	Access        []CustomerGrant  `json:"onboarding_access"`
+	History       []ExportEvent    `json:"history"`
 }
 
 type ExportEvent struct {
@@ -61,6 +63,12 @@ func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error)
 		if err := wrote.Order("id").Find(&out.Enquiries).Error; err != nil {
 			return err
 		}
+		out.EnquiryThread = []EnquiryMessage{}
+		if ids := enquiryIDs(out.Enquiries); len(ids) > 0 {
+			if err := tx.Where("org_id = ? and enquiry_id in ?", org, ids).Where(inThread).Order("id").Find(&out.EnquiryThread).Error; err != nil {
+				return err
+			}
+		}
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("id").Find(&out.Suggested).Error; err != nil {
 			return err
 		}
@@ -89,28 +97,29 @@ func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error)
 // holds no secret: not a password or key hash, nor the sign-on client secret, sealed
 // or otherwise. What identifies erased people is left out too; only how many there are.
 type OrgExport struct {
-	ExportedAt   time.Time        `json:"exported_at"`
-	Organisation ExportedOrg      `json:"organisation"`
-	Members      []ExportMember   `json:"members"`
-	Keys         []ExportKey      `json:"api_keys"`
-	SignOn       *ExportSignOn    `json:"single_sign_on,omitempty"`
-	Mail         *ExportMail      `json:"mail_server,omitempty"`
-	Agents       []ExportAgent    `json:"agents"`
-	Companies    []Company        `json:"companies"`
-	Facts        []Fact           `json:"facts"`
-	Contacts     []Contact        `json:"contacts"`
-	Deals        []Deal           `json:"deals"`
-	Subs         []Subscription   `json:"subscriptions"`
-	Onboardings  []Onboarding     `json:"onboardings"`
-	OnboardSteps []OnboardingStep `json:"onboarding_steps"`
-	Access       []CustomerGrant  `json:"onboarding_access"`
-	Enquiries    []Enquiry        `json:"enquiries"`
-	Suggested    []Suggestion     `json:"suggested_details"`
-	Tasks        []Task           `json:"tasks"`
-	TaskRequests []TaskRequest    `json:"task_requests"`
-	TaskNotes    []TaskNote       `json:"task_notes"`
-	History      []ExportRecord   `json:"history"`
-	Erased       int64            `json:"people_erased"`
+	ExportedAt    time.Time        `json:"exported_at"`
+	Organisation  ExportedOrg      `json:"organisation"`
+	Members       []ExportMember   `json:"members"`
+	Keys          []ExportKey      `json:"api_keys"`
+	SignOn        *ExportSignOn    `json:"single_sign_on,omitempty"`
+	Mail          *ExportMail      `json:"mail_server,omitempty"`
+	Agents        []ExportAgent    `json:"agents"`
+	Companies     []Company        `json:"companies"`
+	Facts         []Fact           `json:"facts"`
+	Contacts      []Contact        `json:"contacts"`
+	Deals         []Deal           `json:"deals"`
+	Subs          []Subscription   `json:"subscriptions"`
+	Onboardings   []Onboarding     `json:"onboardings"`
+	OnboardSteps  []OnboardingStep `json:"onboarding_steps"`
+	Access        []CustomerGrant  `json:"onboarding_access"`
+	Enquiries     []Enquiry        `json:"enquiries"`
+	EnquiryThread []EnquiryMessage `json:"enquiry_messages"`
+	Suggested     []Suggestion     `json:"suggested_details"`
+	Tasks         []Task           `json:"tasks"`
+	TaskRequests  []TaskRequest    `json:"task_requests"`
+	TaskNotes     []TaskNote       `json:"task_notes"`
+	History       []ExportRecord   `json:"history"`
+	Erased        int64            `json:"people_erased"`
 }
 
 type ExportedOrg struct {
@@ -148,12 +157,13 @@ type ExportSignOn struct {
 
 // ExportAgent is one of the organisation's own agents, without its key.
 type ExportAgent struct {
-	Name     string   `json:"name"`
-	Kind     string   `json:"kind"`
-	Endpoint string   `json:"endpoint"`
-	Model    string   `json:"model"`
-	ToolsURL string   `json:"tools_url,omitempty"`
-	Tools    []string `json:"allowed_tools"`
+	Name      string   `json:"name"`
+	Kind      string   `json:"kind"`
+	Endpoint  string   `json:"endpoint"`
+	Model     string   `json:"model"`
+	ToolsURL  string   `json:"tools_url,omitempty"`
+	SearchURL string   `json:"search_url,omitempty"`
+	Tools     []string `json:"allowed_tools"`
 	// FallsBackTo is the agent that takes over after FallbackMinutes of waiting.
 	FallsBackTo     string `json:"falls_back_to,omitempty"`
 	FallbackMinutes int    `json:"fallback_minutes,omitempty"`
@@ -224,18 +234,20 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			names[a.ID] = a.Name
 		}
 		for _, a := range agents {
-			e := ExportAgent{Name: a.Name, Kind: a.Kind, Endpoint: a.BaseURL, Model: a.Model, ToolsURL: a.ToolsURL, Tools: a.AllowedTools()}
+			e := ExportAgent{Name: a.Name, Kind: a.Kind, Endpoint: a.BaseURL, Model: a.Model, ToolsURL: a.ToolsURL, SearchURL: a.SearchURL, Tools: a.AllowedTools()}
 			if next, ok := names[a.FallbackID]; ok {
 				e.FallsBackTo, e.FallbackMinutes = next, a.FallbackMinutes
 			}
 			out.Agents = append(out.Agents, e)
 		}
 		mine := func() *gorm.DB { return tx.Where("org_id = ?", org).Order("id") }
-		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Onboardings, &out.OnboardSteps, &out.Access, &out.Enquiries, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
+		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Onboardings, &out.OnboardSteps, &out.Access, &out.Enquiries, &out.EnquiryThread, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
 			if err := mine().Find(rows).Error; err != nil {
 				return err
 			}
 		}
+		// A reply that never left isn't part of what was said.
+		out.EnquiryThread = slices.DeleteFunc(out.EnquiryThread, func(m EnquiryMessage) bool { return m.Ours && m.SentAt == nil })
 		var events []Event
 		if err := mine().Find(&events).Error; err != nil {
 			return err

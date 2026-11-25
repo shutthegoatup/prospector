@@ -10,6 +10,7 @@ import (
 	"compress/flate"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -33,6 +34,24 @@ func (e AgentKind) Valid() bool {
 	case Anthropic:
 		return true
 	case Openai:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OnboardingStepWho.
+const (
+	Them OnboardingStepWho = "them"
+	Us   OnboardingStepWho = "us"
+)
+
+// Valid indicates whether the value is a known member of the OnboardingStepWho enum.
+func (e OnboardingStepWho) Valid() bool {
+	switch e {
+	case Them:
+		return true
+	case Us:
 		return true
 	default:
 		return false
@@ -66,6 +85,33 @@ func (e RunStatus) Valid() bool {
 	}
 }
 
+// Defines values for SubscriptionStatus.
+const (
+	Active      SubscriptionStatus = "active"
+	Ended       SubscriptionStatus = "ended"
+	Ending      SubscriptionStatus = "ending"
+	NoticeGiven SubscriptionStatus = "notice given"
+	Scheduled   SubscriptionStatus = "scheduled"
+)
+
+// Valid indicates whether the value is a known member of the SubscriptionStatus enum.
+func (e SubscriptionStatus) Valid() bool {
+	switch e {
+	case Active:
+		return true
+	case Ended:
+		return true
+	case Ending:
+		return true
+	case NoticeGiven:
+		return true
+	case Scheduled:
+		return true
+	default:
+		return false
+	}
+}
+
 // Agent defines model for Agent.
 type Agent struct {
 	AllowedTools    []string   `json:"allowed_tools"`
@@ -88,7 +134,8 @@ type Agent struct {
 	Problem string `json:"problem"`
 
 	// Ready Whether it has what it needs to be run.
-	Ready bool `json:"ready"`
+	Ready     bool   `json:"ready"`
+	SearchUrl string `json:"search_url"`
 
 	// Tools The tools the tool server listed when last checked.
 	Tools     []Tool    `json:"tools"`
@@ -127,11 +174,201 @@ type AgentSettings struct {
 	Model string `json:"model,omitempty"`
 	Name  string `json:"name"`
 
+	// SearchUrl A SearXNG instance, with `json` among its `search.formats`, that the built-in `web_search` asks. Empty, the agent has no search of its own; it can still read pages with `fetch_page`.
+	SearchUrl string `json:"search_url,omitempty"`
+
 	// Tools The tools it may use, from those the tool server lists.
 	Tools []string `json:"tools,omitempty"`
 
 	// ToolsUrl An MCP server whose tools the agent may use.
 	ToolsUrl string `json:"tools_url,omitempty"`
+}
+
+// Deal defines model for Deal.
+type Deal struct {
+	// Amount In the currency's hundredths.
+	Amount int64 `json:"amount"`
+
+	// CloseDate YYYY-MM-DD, or empty.
+	CloseDate string `json:"close_date"`
+
+	// CompanyId 0 when they have no company here.
+	CompanyId int64  `json:"company_id"`
+	ContactId int64  `json:"contact_id"`
+	Currency  string `json:"currency"`
+
+	// Id 0 for a conversation's own deal that nothing has been set on yet.
+	Id         int64  `json:"id"`
+	Kind       string `json:"kind"`
+	LostReason string `json:"lost_reason"`
+
+	// NextDate YYYY-MM-DD, or empty.
+	NextDate string `json:"next_date"`
+	NextStep string `json:"next_step"`
+	Owner    string `json:"owner"`
+	Person   string `json:"person"`
+
+	// Seq 0 for the conversation's own deal.
+	Seq int `json:"seq"`
+
+	// Stage `replied`, `meeting`, `proposal`, `won` or `lost`.
+	Stage string `json:"stage"`
+
+	// SubscriptionId The subscription a renewal is for; 0 for none.
+	SubscriptionId int64 `json:"subscription_id"`
+
+	// Value The amount as written, such as £14,000; empty when there is none.
+	Value string `json:"value"`
+}
+
+// DealChange defines model for DealChange.
+type DealChange struct {
+	// Amount As you would write it: `14,000`, `€5,000`; empty for none.
+	Amount    *string `json:"amount"`
+	CloseDate *string `json:"close_date"`
+	Kind      *string `json:"kind"`
+
+	// LostReason Only for a deal after the conversation's own.
+	LostReason *string `json:"lost_reason"`
+
+	// NextDate Only for a deal after the conversation's own.
+	NextDate *string `json:"next_date"`
+
+	// NextStep Only for a deal after the conversation's own.
+	NextStep *string `json:"next_step"`
+
+	// Owner A member's name, or empty for nobody.
+	Owner *string `json:"owner"`
+
+	// Stage Only for a deal after the conversation's own.
+	Stage *string `json:"stage"`
+}
+
+// Enquiry defines model for Enquiry.
+type Enquiry struct {
+	Company string `json:"company"`
+
+	// CompanyId The company it was matched to; 0 for none.
+	CompanyId int64 `json:"company_id"`
+
+	// ContactId The contact it was matched to; 0 for none.
+	ContactId int64     `json:"contact_id"`
+	CreatedAt time.Time `json:"created_at"`
+	Email     string    `json:"email"`
+	Id        int64     `json:"id"`
+	Kind      string    `json:"kind"`
+
+	// Message Their words, exactly as sent. Whoever filled the form in chose every one.
+	Message string `json:"message"`
+	Name    string `json:"name"`
+	Note    string `json:"note"`
+	Owner   string `json:"owner"`
+	Page    string `json:"page"`
+	Phone   string `json:"phone"`
+	Site    string `json:"site"`
+	Spam    bool   `json:"spam"`
+
+	// State `open`, `waiting` or `closed`; empty for one from before answering was tracked.
+	State string `json:"state"`
+	Via   string `json:"via"`
+}
+
+// EnquiryMessage defines model for EnquiryMessage.
+type EnquiryMessage struct {
+	// By Who sent the reply, or recorded their answer.
+	By        string    `json:"by"`
+	CreatedAt time.Time `json:"created_at"`
+	EnquiryId int64     `json:"enquiry_id"`
+	Id        int64     `json:"id"`
+
+	// Ours True for a reply sent from here, false for what they said back.
+	Ours bool `json:"ours"`
+
+	// SentAt When a reply of ours left.
+	SentAt *time.Time `json:"sent_at"`
+	Text   string     `json:"text"`
+}
+
+// EnquiryText defines model for EnquiryText.
+type EnquiryText struct {
+	Text string `json:"text"`
+}
+
+// Onboarding defines model for Onboarding.
+type Onboarding struct {
+	Company   string    `json:"company"`
+	CompanyId int64     `json:"company_id"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// Done How many steps are done.
+	Done int   `json:"done"`
+	Id   int64 `json:"id"`
+
+	// Invites Who at the company has been let see their steps.
+	Invites []OnboardingInvite `json:"invites"`
+
+	// Late How many are past their date and not done.
+	Late int `json:"late"`
+
+	// LiveOn The day the last step was done, once every step is; empty until then.
+	LiveOn string `json:"live_on"`
+	Name   string `json:"name"`
+
+	// Start YYYY-MM-DD.
+	Start string           `json:"start"`
+	Steps []OnboardingStep `json:"steps"`
+}
+
+// OnboardingInvite defines model for OnboardingInvite.
+type OnboardingInvite struct {
+	ContactId int64     `json:"contact_id"`
+	CreatedAt time.Time `json:"created_at"`
+	Email     string    `json:"email"`
+	Id        int64     `json:"id"`
+	InvitedBy string    `json:"invited_by"`
+	Name      string    `json:"name"`
+	Withdrawn bool      `json:"withdrawn"`
+}
+
+// OnboardingStart defines model for OnboardingStart.
+type OnboardingStart struct {
+	Company int64 `json:"company"`
+
+	// Name Which one, when a company has several: a site, a product.
+	Name string `json:"name,omitempty"`
+
+	// Start The day steps are dated from, YYYY-MM-DD; empty is today.
+	Start string `json:"start,omitempty"`
+}
+
+// OnboardingStep defines model for OnboardingStep.
+type OnboardingStep struct {
+	// DoneBy Who marked it; `customer` when they did from their own page.
+	DoneBy string `json:"done_by"`
+
+	// DoneOn YYYY-MM-DD, or empty while it isn't done.
+	DoneOn string `json:"done_on"`
+
+	// Due YYYY-MM-DD, or empty for no date.
+	Due          string `json:"due"`
+	Id           int64  `json:"id"`
+	Name         string `json:"name"`
+	OnboardingId int64  `json:"onboarding_id"`
+	Seq          int    `json:"seq"`
+
+	// Who Whose it is to do: the customer's or the organisation's.
+	Who OnboardingStepWho `json:"who"`
+}
+
+// OnboardingStepWho Whose it is to do: the customer's or the organisation's.
+type OnboardingStepWho string
+
+// OnboardingStepChange defines model for OnboardingStepChange.
+type OnboardingStepChange struct {
+	Done *bool `json:"done"`
+
+	// Due YYYY-MM-DD, or empty for no date.
+	Due *string `json:"due"`
 }
 
 // Problem defines model for Problem.
@@ -174,6 +411,93 @@ type Run struct {
 // RunStatus defines model for RunStatus.
 type RunStatus string
 
+// Subscription defines model for Subscription.
+type Subscription struct {
+	// Amount The price for one period, in the currency's hundredths.
+	Amount int64 `json:"amount"`
+
+	// CancelBy The next day by which notice can still be given; empty when it ends anyway or notice was given.
+	CancelBy string `json:"cancel_by"`
+
+	// CancelEnds The last day of the term that notice by `cancel_by` would end it at.
+	CancelEnds string    `json:"cancel_ends"`
+	Company    string    `json:"company"`
+	CompanyId  int64     `json:"company_id"`
+	CreatedAt  time.Time `json:"created_at"`
+	Currency   string    `json:"currency"`
+
+	// EndedOn Empty unless an end was recorded.
+	EndedOn string `json:"ended_on"`
+
+	// Ends The last day, once that is settled.
+	Ends       string `json:"ends"`
+	Id         int64  `json:"id"`
+	Name       string `json:"name"`
+	NoticeDays int    `json:"notice_days"`
+
+	// NoticeOn Empty when no notice has been given.
+	NoticeOn string `json:"notice_on"`
+	Per      string `json:"per"`
+
+	// Renewing Whether a renewal deal for it is open.
+	Renewing bool   `json:"renewing"`
+	Start    string `json:"start"`
+
+	// Status Where it stands today.
+	Status SubscriptionStatus `json:"status"`
+
+	// TermEnd The last day of the term in hand, or of its first term when it has yet to start.
+	TermEnd    string    `json:"term_end"`
+	TermMonths int       `json:"term_months"`
+	Then       string    `json:"then"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// SubscriptionStatus Where it stands today.
+type SubscriptionStatus string
+
+// SubscriptionChange defines model for SubscriptionChange.
+type SubscriptionChange struct {
+	Amount *string `json:"amount"`
+
+	// EndedOn The day it stopped, YYYY-MM-DD; empty to take it back.
+	EndedOn    *string `json:"ended_on"`
+	Name       *string `json:"name"`
+	NoticeDays *int    `json:"notice_days"`
+
+	// NoticeOn The day notice was given, YYYY-MM-DD; empty to take it back.
+	NoticeOn   *string `json:"notice_on"`
+	Per        *string `json:"per"`
+	Start      *string `json:"start"`
+	TermMonths *int    `json:"term_months"`
+	Then       *string `json:"then"`
+}
+
+// SubscriptionNew defines model for SubscriptionNew.
+type SubscriptionNew struct {
+	// Amount The price for one period as you would write it: `14,000`, `€5,000`. Empty for none.
+	Amount  string `json:"amount,omitempty"`
+	Company int64  `json:"company"`
+
+	// Name What they are on, in your words.
+	Name string `json:"name"`
+
+	// NoticeDays Days of notice needed to stop it renewing.
+	NoticeDays int `json:"notice_days,omitempty"`
+
+	// Per `year` or `month`; empty is `year`.
+	Per string `json:"per,omitempty"`
+
+	// Start YYYY-MM-DD.
+	Start string `json:"start"`
+
+	// TermMonths Months committed for; 0 is no commitment.
+	TermMonths int `json:"term_months,omitempty"`
+
+	// Then What happens when the term is up: `renews` for the same term, `rolls` on a period at a time, or `ends`; empty is `renews`. With no months committed it is always `rolls`, whatever is sent.
+	Then string `json:"then,omitempty"`
+}
+
 // Tool defines model for Tool.
 type Tool struct {
 	Description string `json:"description"`
@@ -186,6 +510,64 @@ type Id = int64
 // Org defines model for org.
 type Org = string
 
+// StartDealJSONBody defines body for StartDeal for application/json ContentType.
+type StartDealJSONBody struct {
+	Contact int64 `json:"contact"`
+
+	// Kind `new`, `renewal` or `expansion`; empty is `new`.
+	Kind string `json:"kind,omitempty"`
+}
+
+// ListEnquiriesParams defines parameters for ListEnquiries.
+type ListEnquiriesParams struct {
+	// Kind Only this kind.
+	Kind string `form:"kind,omitempty" json:"kind,omitempty"`
+
+	// State Only those `open`, `waiting` or `closed`.
+	State string `form:"state,omitempty" json:"state,omitempty"`
+
+	// Spam Only those marked as spam, which are otherwise left out.
+	Spam bool `form:"spam,omitempty" json:"spam,omitempty"`
+
+	// Page Which page, from 1.
+	Page int `form:"page,omitempty" json:"page,omitempty"`
+}
+
+// ChangeEnquiryJSONBody defines body for ChangeEnquiry for application/json ContentType.
+type ChangeEnquiryJSONBody struct {
+	Note *string `json:"note"`
+
+	// Owner A member's name, or empty for nobody.
+	Owner *string `json:"owner"`
+
+	// State `open`, `waiting` or `closed`.
+	State *string `json:"state"`
+}
+
+// ListOnboardingsParams defines parameters for ListOnboardings.
+type ListOnboardingsParams struct {
+	// Company Only this company's.
+	Company int64 `form:"company,omitempty" json:"company,omitempty"`
+}
+
+// InviteCustomerJSONBody defines body for InviteCustomer for application/json ContentType.
+type InviteCustomerJSONBody struct {
+	// Contact The contact to invite.
+	Contact int64 `json:"contact"`
+}
+
+// ListSubscriptionsParams defines parameters for ListSubscriptions.
+type ListSubscriptionsParams struct {
+	// Company Only this company's.
+	Company int64 `form:"company,omitempty" json:"company,omitempty"`
+}
+
+// StartRenewalJSONBody defines body for StartRenewal for application/json ContentType.
+type StartRenewalJSONBody struct {
+	// Contact Who the renewal is with.
+	Contact int64 `json:"contact"`
+}
+
 // StartRunJSONBody defines body for StartRun for application/json ContentType.
 type StartRunJSONBody struct {
 	// Agent The agent's id.
@@ -197,6 +579,42 @@ type CreateAgentJSONRequestBody = AgentSettings
 
 // UpdateAgentJSONRequestBody defines body for UpdateAgent for application/json ContentType.
 type UpdateAgentJSONRequestBody = AgentSettings
+
+// ChangeOwnDealJSONRequestBody defines body for ChangeOwnDeal for application/json ContentType.
+type ChangeOwnDealJSONRequestBody = DealChange
+
+// StartDealJSONRequestBody defines body for StartDeal for application/json ContentType.
+type StartDealJSONRequestBody StartDealJSONBody
+
+// ChangeDealJSONRequestBody defines body for ChangeDeal for application/json ContentType.
+type ChangeDealJSONRequestBody = DealChange
+
+// ChangeEnquiryJSONRequestBody defines body for ChangeEnquiry for application/json ContentType.
+type ChangeEnquiryJSONRequestBody ChangeEnquiryJSONBody
+
+// RecordEnquiryAnswerJSONRequestBody defines body for RecordEnquiryAnswer for application/json ContentType.
+type RecordEnquiryAnswerJSONRequestBody = EnquiryText
+
+// ReplyToEnquiryJSONRequestBody defines body for ReplyToEnquiry for application/json ContentType.
+type ReplyToEnquiryJSONRequestBody = EnquiryText
+
+// ChangeOnboardingStepJSONRequestBody defines body for ChangeOnboardingStep for application/json ContentType.
+type ChangeOnboardingStepJSONRequestBody = OnboardingStepChange
+
+// StartOnboardingJSONRequestBody defines body for StartOnboarding for application/json ContentType.
+type StartOnboardingJSONRequestBody = OnboardingStart
+
+// InviteCustomerJSONRequestBody defines body for InviteCustomer for application/json ContentType.
+type InviteCustomerJSONRequestBody InviteCustomerJSONBody
+
+// AddSubscriptionJSONRequestBody defines body for AddSubscription for application/json ContentType.
+type AddSubscriptionJSONRequestBody = SubscriptionNew
+
+// ChangeSubscriptionJSONRequestBody defines body for ChangeSubscription for application/json ContentType.
+type ChangeSubscriptionJSONRequestBody = SubscriptionChange
+
+// StartRenewalJSONRequestBody defines body for StartRenewal for application/json ContentType.
+type StartRenewalJSONRequestBody StartRenewalJSONBody
 
 // StartRunJSONRequestBody defines body for StartRun for application/json ContentType.
 type StartRunJSONRequestBody StartRunJSONBody
@@ -218,9 +636,78 @@ type ServerInterface interface {
 	// UpdateAgent Change an agent
 	// (PUT /o/{org}/api/v1/agents/{id})
 	UpdateAgent(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ChangeOwnDeal Change a conversation's own deal
+	// (PATCH /o/{org}/api/v1/contacts/{id}/deal)
+	ChangeOwnDeal(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ListDeals Every deal on the Conversations board
+	// (GET /o/{org}/api/v1/deals)
+	ListDeals(w http.ResponseWriter, r *http.Request, org Org)
+	// StartDeal Start another deal with someone already in conversation
+	// (POST /o/{org}/api/v1/deals)
+	StartDeal(w http.ResponseWriter, r *http.Request, org Org)
+	// RemoveDeal Remove a deal started by mistake
+	// (DELETE /o/{org}/api/v1/deals/{id})
+	RemoveDeal(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ChangeDeal Change a deal started after the conversation's own
+	// (PATCH /o/{org}/api/v1/deals/{id})
+	ChangeDeal(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ListEnquiries What people sent in, newest first
+	// (GET /o/{org}/api/v1/enquiries)
+	ListEnquiries(w http.ResponseWriter, r *http.Request, org Org, params ListEnquiriesParams)
+	// DeleteEnquiry Delete an enquiry for good
+	// (DELETE /o/{org}/api/v1/enquiries/{id})
+	DeleteEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ChangeEnquiry Say where answering an enquiry stands, who has it, or note something on it
+	// (PATCH /o/{org}/api/v1/enquiries/{id})
+	ChangeEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// RecordEnquiryAnswer Record what they said back
+	// (POST /o/{org}/api/v1/enquiries/{id}/answers)
+	RecordEnquiryAnswer(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ConverseEnquiry Put whoever sent an enquiry on the Conversations board
+	// (POST /o/{org}/api/v1/enquiries/{id}/conversation)
+	ConverseEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ListEnquiryMessages What has been said in answering an enquiry
+	// (GET /o/{org}/api/v1/enquiries/{id}/messages)
+	ListEnquiryMessages(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ReplyToEnquiry Email a reply to whoever wrote in
+	// (POST /o/{org}/api/v1/enquiries/{id}/replies)
+	ReplyToEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// WithdrawCustomerInvite Withdraw someone's access to their page
+	// (DELETE /o/{org}/api/v1/onboarding-invites/{id})
+	WithdrawCustomerInvite(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ChangeOnboardingStep Mark a step done or not, or move its date
+	// (PATCH /o/{org}/api/v1/onboarding-steps/{id})
+	ChangeOnboardingStep(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ListOnboardings Onboardings, with their steps and who has been let see them
+	// (GET /o/{org}/api/v1/onboardings)
+	ListOnboardings(w http.ResponseWriter, r *http.Request, org Org, params ListOnboardingsParams)
+	// StartOnboarding Start onboarding a company
+	// (POST /o/{org}/api/v1/onboardings)
+	StartOnboarding(w http.ResponseWriter, r *http.Request, org Org)
+	// RemoveOnboarding Remove an onboarding started by mistake
+	// (DELETE /o/{org}/api/v1/onboardings/{id})
+	RemoveOnboarding(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// InviteCustomer Email someone at the company a link to their steps
+	// (POST /o/{org}/api/v1/onboardings/{id}/invites)
+	InviteCustomer(w http.ResponseWriter, r *http.Request, org Org, id Id)
 	// StopRun Stop a run
 	// (POST /o/{org}/api/v1/runs/{id}/stop)
 	StopRun(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ListSubscriptions What customers are on, and where each stands today
+	// (GET /o/{org}/api/v1/subscriptions)
+	ListSubscriptions(w http.ResponseWriter, r *http.Request, org Org, params ListSubscriptionsParams)
+	// AddSubscription Record what a customer is on
+	// (POST /o/{org}/api/v1/subscriptions)
+	AddSubscription(w http.ResponseWriter, r *http.Request, org Org)
+	// RemoveSubscription Remove a subscription recorded by mistake
+	// (DELETE /o/{org}/api/v1/subscriptions/{id})
+	RemoveSubscription(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ChangeSubscription Change a subscription
+	// (PATCH /o/{org}/api/v1/subscriptions/{id})
+	ChangeSubscription(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// StartRenewal Start a renewal deal for a subscription
+	// (POST /o/{org}/api/v1/subscriptions/{id}/renewals)
+	StartRenewal(w http.ResponseWriter, r *http.Request, org Org, id Id)
 	// ListRuns A task's agent runs
 	// (GET /o/{org}/api/v1/tasks/{task}/runs)
 	ListRuns(w http.ResponseWriter, r *http.Request, org Org, task int64)
@@ -395,6 +882,662 @@ func (siw *ServerInterfaceWrapper) UpdateAgent(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// ChangeOwnDeal operation middleware
+func (siw *ServerInterfaceWrapper) ChangeOwnDeal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeOwnDeal(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDeals operation middleware
+func (siw *ServerInterfaceWrapper) ListDeals(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDeals(w, r, org)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartDeal operation middleware
+func (siw *ServerInterfaceWrapper) StartDeal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartDeal(w, r, org)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveDeal operation middleware
+func (siw *ServerInterfaceWrapper) RemoveDeal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveDeal(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeDeal operation middleware
+func (siw *ServerInterfaceWrapper) ChangeDeal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeDeal(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListEnquiries operation middleware
+func (siw *ServerInterfaceWrapper) ListEnquiries(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListEnquiriesParams
+
+	// ------------- Optional query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "spam" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "spam", r.URL.Query(), &params.Spam, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "spam"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "spam", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListEnquiries(w, r, org, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteEnquiry operation middleware
+func (siw *ServerInterfaceWrapper) DeleteEnquiry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteEnquiry(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeEnquiry operation middleware
+func (siw *ServerInterfaceWrapper) ChangeEnquiry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeEnquiry(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RecordEnquiryAnswer operation middleware
+func (siw *ServerInterfaceWrapper) RecordEnquiryAnswer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RecordEnquiryAnswer(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConverseEnquiry operation middleware
+func (siw *ServerInterfaceWrapper) ConverseEnquiry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConverseEnquiry(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListEnquiryMessages operation middleware
+func (siw *ServerInterfaceWrapper) ListEnquiryMessages(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListEnquiryMessages(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReplyToEnquiry operation middleware
+func (siw *ServerInterfaceWrapper) ReplyToEnquiry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReplyToEnquiry(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// WithdrawCustomerInvite operation middleware
+func (siw *ServerInterfaceWrapper) WithdrawCustomerInvite(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.WithdrawCustomerInvite(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeOnboardingStep operation middleware
+func (siw *ServerInterfaceWrapper) ChangeOnboardingStep(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeOnboardingStep(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListOnboardings operation middleware
+func (siw *ServerInterfaceWrapper) ListOnboardings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListOnboardingsParams
+
+	// ------------- Optional query parameter "company" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "company", r.URL.Query(), &params.Company, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "company"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "company", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListOnboardings(w, r, org, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartOnboarding operation middleware
+func (siw *ServerInterfaceWrapper) StartOnboarding(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartOnboarding(w, r, org)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveOnboarding operation middleware
+func (siw *ServerInterfaceWrapper) RemoveOnboarding(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveOnboarding(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// InviteCustomer operation middleware
+func (siw *ServerInterfaceWrapper) InviteCustomer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.InviteCustomer(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // StopRun operation middleware
 func (siw *ServerInterfaceWrapper) StopRun(w http.ResponseWriter, r *http.Request) {
 
@@ -421,6 +1564,179 @@ func (siw *ServerInterfaceWrapper) StopRun(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.StopRun(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSubscriptions operation middleware
+func (siw *ServerInterfaceWrapper) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSubscriptionsParams
+
+	// ------------- Optional query parameter "company" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "company", r.URL.Query(), &params.Company, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "company"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "company", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSubscriptions(w, r, org, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddSubscription operation middleware
+func (siw *ServerInterfaceWrapper) AddSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddSubscription(w, r, org)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveSubscription operation middleware
+func (siw *ServerInterfaceWrapper) RemoveSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveSubscription(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeSubscription operation middleware
+func (siw *ServerInterfaceWrapper) ChangeSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeSubscription(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartRenewal operation middleware
+func (siw *ServerInterfaceWrapper) StartRenewal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartRenewal(w, r, org, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -628,6 +1944,29 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/o/{org}/api/v1/tasks/{task}/runs", wrapper.ListRuns)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/tasks/{task}/runs", wrapper.StartRun)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/runs/{id}/stop", wrapper.StopRun)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/o/{org}/api/v1/enquiries/{id}/messages", wrapper.ListEnquiryMessages)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/enquiries/{id}/replies", wrapper.ReplyToEnquiry)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/enquiries/{id}/answers", wrapper.RecordEnquiryAnswer)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/o/{org}/api/v1/onboardings", wrapper.ListOnboardings)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/onboardings", wrapper.StartOnboarding)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/o/{org}/api/v1/onboardings/{id}", wrapper.RemoveOnboarding)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/o/{org}/api/v1/onboarding-steps/{id}", wrapper.ChangeOnboardingStep)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/onboardings/{id}/invites", wrapper.InviteCustomer)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/o/{org}/api/v1/onboarding-invites/{id}", wrapper.WithdrawCustomerInvite)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/o/{org}/api/v1/subscriptions", wrapper.ListSubscriptions)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/subscriptions", wrapper.AddSubscription)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/o/{org}/api/v1/subscriptions/{id}", wrapper.RemoveSubscription)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/o/{org}/api/v1/subscriptions/{id}", wrapper.ChangeSubscription)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/subscriptions/{id}/renewals", wrapper.StartRenewal)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/o/{org}/api/v1/deals", wrapper.ListDeals)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/deals", wrapper.StartDeal)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/o/{org}/api/v1/deals/{id}", wrapper.RemoveDeal)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/o/{org}/api/v1/deals/{id}", wrapper.ChangeDeal)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/o/{org}/api/v1/contacts/{id}/deal", wrapper.ChangeOwnDeal)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/o/{org}/api/v1/enquiries", wrapper.ListEnquiries)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/o/{org}/api/v1/enquiries/{id}", wrapper.DeleteEnquiry)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/o/{org}/api/v1/enquiries/{id}", wrapper.ChangeEnquiry)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/enquiries/{id}/conversation", wrapper.ConverseEnquiry)
 
 	return m
 }
@@ -828,6 +2167,709 @@ func (response UpdateAgentdefaultApplicationProblemPlusJSONResponse) VisitUpdate
 	return err
 }
 
+type ChangeOwnDealRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *ChangeOwnDealJSONRequestBody
+}
+
+type ChangeOwnDealResponseObject interface {
+	VisitChangeOwnDealResponse(w http.ResponseWriter) error
+}
+
+type ChangeOwnDeal200JSONResponse Deal
+
+func (response ChangeOwnDeal200JSONResponse) VisitChangeOwnDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOwnDealdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ChangeOwnDealdefaultApplicationProblemPlusJSONResponse) VisitChangeOwnDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDealsRequestObject struct {
+	Org Org `json:"org"`
+}
+
+type ListDealsResponseObject interface {
+	VisitListDealsResponse(w http.ResponseWriter) error
+}
+
+type ListDeals200JSONResponse []Deal
+
+func (response ListDeals200JSONResponse) VisitListDealsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDealsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListDealsdefaultApplicationProblemPlusJSONResponse) VisitListDealsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartDealRequestObject struct {
+	Org  Org `json:"org"`
+	Body *StartDealJSONRequestBody
+}
+
+type StartDealResponseObject interface {
+	VisitStartDealResponse(w http.ResponseWriter) error
+}
+
+type StartDeal201JSONResponse Deal
+
+func (response StartDeal201JSONResponse) VisitStartDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartDealdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response StartDealdefaultApplicationProblemPlusJSONResponse) VisitStartDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveDealRequestObject struct {
+	Org Org `json:"org"`
+	Id  Id  `json:"id"`
+}
+
+type RemoveDealResponseObject interface {
+	VisitRemoveDealResponse(w http.ResponseWriter) error
+}
+
+type RemoveDeal204Response struct {
+}
+
+func (response RemoveDeal204Response) VisitRemoveDealResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RemoveDealdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RemoveDealdefaultApplicationProblemPlusJSONResponse) VisitRemoveDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDealRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *ChangeDealJSONRequestBody
+}
+
+type ChangeDealResponseObject interface {
+	VisitChangeDealResponse(w http.ResponseWriter) error
+}
+
+type ChangeDeal200JSONResponse Deal
+
+func (response ChangeDeal200JSONResponse) VisitChangeDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDealdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ChangeDealdefaultApplicationProblemPlusJSONResponse) VisitChangeDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiriesRequestObject struct {
+	Org    Org `json:"org"`
+	Params ListEnquiriesParams
+}
+
+type ListEnquiriesResponseObject interface {
+	VisitListEnquiriesResponse(w http.ResponseWriter) error
+}
+
+type ListEnquiries200JSONResponse struct {
+	Enquiries []Enquiry `json:"enquiries"`
+	Page      int       `json:"page"`
+	Pages     int       `json:"pages"`
+	Total     int       `json:"total"`
+}
+
+func (response ListEnquiries200JSONResponse) VisitListEnquiriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiriesdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListEnquiriesdefaultApplicationProblemPlusJSONResponse) VisitListEnquiriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEnquiryRequestObject struct {
+	Org Org `json:"org"`
+	Id  Id  `json:"id"`
+}
+
+type DeleteEnquiryResponseObject interface {
+	VisitDeleteEnquiryResponse(w http.ResponseWriter) error
+}
+
+type DeleteEnquiry204Response struct {
+}
+
+func (response DeleteEnquiry204Response) VisitDeleteEnquiryResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteEnquirydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeleteEnquirydefaultApplicationProblemPlusJSONResponse) VisitDeleteEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeEnquiryRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *ChangeEnquiryJSONRequestBody
+}
+
+type ChangeEnquiryResponseObject interface {
+	VisitChangeEnquiryResponse(w http.ResponseWriter) error
+}
+
+type ChangeEnquiry200JSONResponse Enquiry
+
+func (response ChangeEnquiry200JSONResponse) VisitChangeEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeEnquirydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ChangeEnquirydefaultApplicationProblemPlusJSONResponse) VisitChangeEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordEnquiryAnswerRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *RecordEnquiryAnswerJSONRequestBody
+}
+
+type RecordEnquiryAnswerResponseObject interface {
+	VisitRecordEnquiryAnswerResponse(w http.ResponseWriter) error
+}
+
+type RecordEnquiryAnswer201JSONResponse EnquiryMessage
+
+func (response RecordEnquiryAnswer201JSONResponse) VisitRecordEnquiryAnswerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordEnquiryAnswerdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RecordEnquiryAnswerdefaultApplicationProblemPlusJSONResponse) VisitRecordEnquiryAnswerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConverseEnquiryRequestObject struct {
+	Org Org `json:"org"`
+	Id  Id  `json:"id"`
+}
+
+type ConverseEnquiryResponseObject interface {
+	VisitConverseEnquiryResponse(w http.ResponseWriter) error
+}
+
+type ConverseEnquiry201JSONResponse struct {
+	Contact int64 `json:"contact"`
+}
+
+func (response ConverseEnquiry201JSONResponse) VisitConverseEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConverseEnquirydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ConverseEnquirydefaultApplicationProblemPlusJSONResponse) VisitConverseEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiryMessagesRequestObject struct {
+	Org Org `json:"org"`
+	Id  Id  `json:"id"`
+}
+
+type ListEnquiryMessagesResponseObject interface {
+	VisitListEnquiryMessagesResponse(w http.ResponseWriter) error
+}
+
+type ListEnquiryMessages200JSONResponse []EnquiryMessage
+
+func (response ListEnquiryMessages200JSONResponse) VisitListEnquiryMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiryMessagesdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListEnquiryMessagesdefaultApplicationProblemPlusJSONResponse) VisitListEnquiryMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplyToEnquiryRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *ReplyToEnquiryJSONRequestBody
+}
+
+type ReplyToEnquiryResponseObject interface {
+	VisitReplyToEnquiryResponse(w http.ResponseWriter) error
+}
+
+type ReplyToEnquiry201JSONResponse EnquiryMessage
+
+func (response ReplyToEnquiry201JSONResponse) VisitReplyToEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplyToEnquirydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ReplyToEnquirydefaultApplicationProblemPlusJSONResponse) VisitReplyToEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WithdrawCustomerInviteRequestObject struct {
+	Org Org `json:"org"`
+	Id  Id  `json:"id"`
+}
+
+type WithdrawCustomerInviteResponseObject interface {
+	VisitWithdrawCustomerInviteResponse(w http.ResponseWriter) error
+}
+
+type WithdrawCustomerInvite204Response struct {
+}
+
+func (response WithdrawCustomerInvite204Response) VisitWithdrawCustomerInviteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type WithdrawCustomerInvitedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response WithdrawCustomerInvitedefaultApplicationProblemPlusJSONResponse) VisitWithdrawCustomerInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOnboardingStepRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *ChangeOnboardingStepJSONRequestBody
+}
+
+type ChangeOnboardingStepResponseObject interface {
+	VisitChangeOnboardingStepResponse(w http.ResponseWriter) error
+}
+
+type ChangeOnboardingStep200JSONResponse OnboardingStep
+
+func (response ChangeOnboardingStep200JSONResponse) VisitChangeOnboardingStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOnboardingStepdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ChangeOnboardingStepdefaultApplicationProblemPlusJSONResponse) VisitChangeOnboardingStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnboardingsRequestObject struct {
+	Org    Org `json:"org"`
+	Params ListOnboardingsParams
+}
+
+type ListOnboardingsResponseObject interface {
+	VisitListOnboardingsResponse(w http.ResponseWriter) error
+}
+
+type ListOnboardings200JSONResponse []Onboarding
+
+func (response ListOnboardings200JSONResponse) VisitListOnboardingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnboardingsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListOnboardingsdefaultApplicationProblemPlusJSONResponse) VisitListOnboardingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOnboardingRequestObject struct {
+	Org  Org `json:"org"`
+	Body *StartOnboardingJSONRequestBody
+}
+
+type StartOnboardingResponseObject interface {
+	VisitStartOnboardingResponse(w http.ResponseWriter) error
+}
+
+type StartOnboarding201JSONResponse Onboarding
+
+func (response StartOnboarding201JSONResponse) VisitStartOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOnboardingdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response StartOnboardingdefaultApplicationProblemPlusJSONResponse) VisitStartOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveOnboardingRequestObject struct {
+	Org Org `json:"org"`
+	Id  Id  `json:"id"`
+}
+
+type RemoveOnboardingResponseObject interface {
+	VisitRemoveOnboardingResponse(w http.ResponseWriter) error
+}
+
+type RemoveOnboarding204Response struct {
+}
+
+func (response RemoveOnboarding204Response) VisitRemoveOnboardingResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RemoveOnboardingdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RemoveOnboardingdefaultApplicationProblemPlusJSONResponse) VisitRemoveOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteCustomerRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *InviteCustomerJSONRequestBody
+}
+
+type InviteCustomerResponseObject interface {
+	VisitInviteCustomerResponse(w http.ResponseWriter) error
+}
+
+type InviteCustomer204Response struct {
+}
+
+func (response InviteCustomer204Response) VisitInviteCustomerResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type InviteCustomerdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response InviteCustomerdefaultApplicationProblemPlusJSONResponse) VisitInviteCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type StopRunRequestObject struct {
 	Org Org `json:"org"`
 	Id  Id  `json:"id"`
@@ -851,6 +2893,205 @@ type StopRundefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response StopRundefaultApplicationProblemPlusJSONResponse) VisitStopRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubscriptionsRequestObject struct {
+	Org    Org `json:"org"`
+	Params ListSubscriptionsParams
+}
+
+type ListSubscriptionsResponseObject interface {
+	VisitListSubscriptionsResponse(w http.ResponseWriter) error
+}
+
+type ListSubscriptions200JSONResponse []Subscription
+
+func (response ListSubscriptions200JSONResponse) VisitListSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubscriptionsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListSubscriptionsdefaultApplicationProblemPlusJSONResponse) VisitListSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSubscriptionRequestObject struct {
+	Org  Org `json:"org"`
+	Body *AddSubscriptionJSONRequestBody
+}
+
+type AddSubscriptionResponseObject interface {
+	VisitAddSubscriptionResponse(w http.ResponseWriter) error
+}
+
+type AddSubscription201JSONResponse Subscription
+
+func (response AddSubscription201JSONResponse) VisitAddSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSubscriptiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response AddSubscriptiondefaultApplicationProblemPlusJSONResponse) VisitAddSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSubscriptionRequestObject struct {
+	Org Org `json:"org"`
+	Id  Id  `json:"id"`
+}
+
+type RemoveSubscriptionResponseObject interface {
+	VisitRemoveSubscriptionResponse(w http.ResponseWriter) error
+}
+
+type RemoveSubscription204Response struct {
+}
+
+func (response RemoveSubscription204Response) VisitRemoveSubscriptionResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RemoveSubscriptiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RemoveSubscriptiondefaultApplicationProblemPlusJSONResponse) VisitRemoveSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeSubscriptionRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *ChangeSubscriptionJSONRequestBody
+}
+
+type ChangeSubscriptionResponseObject interface {
+	VisitChangeSubscriptionResponse(w http.ResponseWriter) error
+}
+
+type ChangeSubscription200JSONResponse Subscription
+
+func (response ChangeSubscription200JSONResponse) VisitChangeSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeSubscriptiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ChangeSubscriptiondefaultApplicationProblemPlusJSONResponse) VisitChangeSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRenewalRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *StartRenewalJSONRequestBody
+}
+
+type StartRenewalResponseObject interface {
+	VisitStartRenewalResponse(w http.ResponseWriter) error
+}
+
+type StartRenewal201JSONResponse struct {
+	Contact int64 `json:"contact"`
+	Deal    int64 `json:"deal"`
+}
+
+func (response StartRenewal201JSONResponse) VisitStartRenewalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRenewaldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response StartRenewaldefaultApplicationProblemPlusJSONResponse) VisitStartRenewalResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
@@ -960,9 +3201,78 @@ type StrictServerInterface interface {
 	// UpdateAgent Change an agent
 	// (PUT /o/{org}/api/v1/agents/{id})
 	UpdateAgent(ctx context.Context, request UpdateAgentRequestObject) (UpdateAgentResponseObject, error)
+	// ChangeOwnDeal Change a conversation's own deal
+	// (PATCH /o/{org}/api/v1/contacts/{id}/deal)
+	ChangeOwnDeal(ctx context.Context, request ChangeOwnDealRequestObject) (ChangeOwnDealResponseObject, error)
+	// ListDeals Every deal on the Conversations board
+	// (GET /o/{org}/api/v1/deals)
+	ListDeals(ctx context.Context, request ListDealsRequestObject) (ListDealsResponseObject, error)
+	// StartDeal Start another deal with someone already in conversation
+	// (POST /o/{org}/api/v1/deals)
+	StartDeal(ctx context.Context, request StartDealRequestObject) (StartDealResponseObject, error)
+	// RemoveDeal Remove a deal started by mistake
+	// (DELETE /o/{org}/api/v1/deals/{id})
+	RemoveDeal(ctx context.Context, request RemoveDealRequestObject) (RemoveDealResponseObject, error)
+	// ChangeDeal Change a deal started after the conversation's own
+	// (PATCH /o/{org}/api/v1/deals/{id})
+	ChangeDeal(ctx context.Context, request ChangeDealRequestObject) (ChangeDealResponseObject, error)
+	// ListEnquiries What people sent in, newest first
+	// (GET /o/{org}/api/v1/enquiries)
+	ListEnquiries(ctx context.Context, request ListEnquiriesRequestObject) (ListEnquiriesResponseObject, error)
+	// DeleteEnquiry Delete an enquiry for good
+	// (DELETE /o/{org}/api/v1/enquiries/{id})
+	DeleteEnquiry(ctx context.Context, request DeleteEnquiryRequestObject) (DeleteEnquiryResponseObject, error)
+	// ChangeEnquiry Say where answering an enquiry stands, who has it, or note something on it
+	// (PATCH /o/{org}/api/v1/enquiries/{id})
+	ChangeEnquiry(ctx context.Context, request ChangeEnquiryRequestObject) (ChangeEnquiryResponseObject, error)
+	// RecordEnquiryAnswer Record what they said back
+	// (POST /o/{org}/api/v1/enquiries/{id}/answers)
+	RecordEnquiryAnswer(ctx context.Context, request RecordEnquiryAnswerRequestObject) (RecordEnquiryAnswerResponseObject, error)
+	// ConverseEnquiry Put whoever sent an enquiry on the Conversations board
+	// (POST /o/{org}/api/v1/enquiries/{id}/conversation)
+	ConverseEnquiry(ctx context.Context, request ConverseEnquiryRequestObject) (ConverseEnquiryResponseObject, error)
+	// ListEnquiryMessages What has been said in answering an enquiry
+	// (GET /o/{org}/api/v1/enquiries/{id}/messages)
+	ListEnquiryMessages(ctx context.Context, request ListEnquiryMessagesRequestObject) (ListEnquiryMessagesResponseObject, error)
+	// ReplyToEnquiry Email a reply to whoever wrote in
+	// (POST /o/{org}/api/v1/enquiries/{id}/replies)
+	ReplyToEnquiry(ctx context.Context, request ReplyToEnquiryRequestObject) (ReplyToEnquiryResponseObject, error)
+	// WithdrawCustomerInvite Withdraw someone's access to their page
+	// (DELETE /o/{org}/api/v1/onboarding-invites/{id})
+	WithdrawCustomerInvite(ctx context.Context, request WithdrawCustomerInviteRequestObject) (WithdrawCustomerInviteResponseObject, error)
+	// ChangeOnboardingStep Mark a step done or not, or move its date
+	// (PATCH /o/{org}/api/v1/onboarding-steps/{id})
+	ChangeOnboardingStep(ctx context.Context, request ChangeOnboardingStepRequestObject) (ChangeOnboardingStepResponseObject, error)
+	// ListOnboardings Onboardings, with their steps and who has been let see them
+	// (GET /o/{org}/api/v1/onboardings)
+	ListOnboardings(ctx context.Context, request ListOnboardingsRequestObject) (ListOnboardingsResponseObject, error)
+	// StartOnboarding Start onboarding a company
+	// (POST /o/{org}/api/v1/onboardings)
+	StartOnboarding(ctx context.Context, request StartOnboardingRequestObject) (StartOnboardingResponseObject, error)
+	// RemoveOnboarding Remove an onboarding started by mistake
+	// (DELETE /o/{org}/api/v1/onboardings/{id})
+	RemoveOnboarding(ctx context.Context, request RemoveOnboardingRequestObject) (RemoveOnboardingResponseObject, error)
+	// InviteCustomer Email someone at the company a link to their steps
+	// (POST /o/{org}/api/v1/onboardings/{id}/invites)
+	InviteCustomer(ctx context.Context, request InviteCustomerRequestObject) (InviteCustomerResponseObject, error)
 	// StopRun Stop a run
 	// (POST /o/{org}/api/v1/runs/{id}/stop)
 	StopRun(ctx context.Context, request StopRunRequestObject) (StopRunResponseObject, error)
+	// ListSubscriptions What customers are on, and where each stands today
+	// (GET /o/{org}/api/v1/subscriptions)
+	ListSubscriptions(ctx context.Context, request ListSubscriptionsRequestObject) (ListSubscriptionsResponseObject, error)
+	// AddSubscription Record what a customer is on
+	// (POST /o/{org}/api/v1/subscriptions)
+	AddSubscription(ctx context.Context, request AddSubscriptionRequestObject) (AddSubscriptionResponseObject, error)
+	// RemoveSubscription Remove a subscription recorded by mistake
+	// (DELETE /o/{org}/api/v1/subscriptions/{id})
+	RemoveSubscription(ctx context.Context, request RemoveSubscriptionRequestObject) (RemoveSubscriptionResponseObject, error)
+	// ChangeSubscription Change a subscription
+	// (PATCH /o/{org}/api/v1/subscriptions/{id})
+	ChangeSubscription(ctx context.Context, request ChangeSubscriptionRequestObject) (ChangeSubscriptionResponseObject, error)
+	// StartRenewal Start a renewal deal for a subscription
+	// (POST /o/{org}/api/v1/subscriptions/{id}/renewals)
+	StartRenewal(ctx context.Context, request StartRenewalRequestObject) (StartRenewalResponseObject, error)
 	// ListRuns A task's agent runs
 	// (GET /o/{org}/api/v1/tasks/{task}/runs)
 	ListRuns(ctx context.Context, request ListRunsRequestObject) (ListRunsResponseObject, error)
@@ -1160,6 +3470,552 @@ func (sh *strictHandler) UpdateAgent(w http.ResponseWriter, r *http.Request, org
 	}
 }
 
+// ChangeOwnDeal operation middleware
+func (sh *strictHandler) ChangeOwnDeal(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ChangeOwnDealRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body ChangeOwnDealJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ChangeOwnDeal(ctx, request.(ChangeOwnDealRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeOwnDeal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeOwnDealResponseObject); ok {
+		if err := validResponse.VisitChangeOwnDealResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDeals operation middleware
+func (sh *strictHandler) ListDeals(w http.ResponseWriter, r *http.Request, org Org) {
+	var request ListDealsRequestObject
+
+	request.Org = org
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ListDeals(ctx, request.(ListDealsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDeals")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDealsResponseObject); ok {
+		if err := validResponse.VisitListDealsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartDeal operation middleware
+func (sh *strictHandler) StartDeal(w http.ResponseWriter, r *http.Request, org Org) {
+	var request StartDealRequestObject
+
+	request.Org = org
+
+	var body StartDealJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.StartDeal(ctx, request.(StartDealRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartDeal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartDealResponseObject); ok {
+		if err := validResponse.VisitStartDealResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveDeal operation middleware
+func (sh *strictHandler) RemoveDeal(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request RemoveDealRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.RemoveDeal(ctx, request.(RemoveDealRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveDeal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveDealResponseObject); ok {
+		if err := validResponse.VisitRemoveDealResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeDeal operation middleware
+func (sh *strictHandler) ChangeDeal(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ChangeDealRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body ChangeDealJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ChangeDeal(ctx, request.(ChangeDealRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeDeal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeDealResponseObject); ok {
+		if err := validResponse.VisitChangeDealResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListEnquiries operation middleware
+func (sh *strictHandler) ListEnquiries(w http.ResponseWriter, r *http.Request, org Org, params ListEnquiriesParams) {
+	var request ListEnquiriesRequestObject
+
+	request.Org = org
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ListEnquiries(ctx, request.(ListEnquiriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListEnquiries")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListEnquiriesResponseObject); ok {
+		if err := validResponse.VisitListEnquiriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteEnquiry operation middleware
+func (sh *strictHandler) DeleteEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request DeleteEnquiryRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.DeleteEnquiry(ctx, request.(DeleteEnquiryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteEnquiry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteEnquiryResponseObject); ok {
+		if err := validResponse.VisitDeleteEnquiryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeEnquiry operation middleware
+func (sh *strictHandler) ChangeEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ChangeEnquiryRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body ChangeEnquiryJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ChangeEnquiry(ctx, request.(ChangeEnquiryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeEnquiry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeEnquiryResponseObject); ok {
+		if err := validResponse.VisitChangeEnquiryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RecordEnquiryAnswer operation middleware
+func (sh *strictHandler) RecordEnquiryAnswer(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request RecordEnquiryAnswerRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body RecordEnquiryAnswerJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.RecordEnquiryAnswer(ctx, request.(RecordEnquiryAnswerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RecordEnquiryAnswer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RecordEnquiryAnswerResponseObject); ok {
+		if err := validResponse.VisitRecordEnquiryAnswerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ConverseEnquiry operation middleware
+func (sh *strictHandler) ConverseEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ConverseEnquiryRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ConverseEnquiry(ctx, request.(ConverseEnquiryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConverseEnquiry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConverseEnquiryResponseObject); ok {
+		if err := validResponse.VisitConverseEnquiryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListEnquiryMessages operation middleware
+func (sh *strictHandler) ListEnquiryMessages(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ListEnquiryMessagesRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ListEnquiryMessages(ctx, request.(ListEnquiryMessagesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListEnquiryMessages")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListEnquiryMessagesResponseObject); ok {
+		if err := validResponse.VisitListEnquiryMessagesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReplyToEnquiry operation middleware
+func (sh *strictHandler) ReplyToEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ReplyToEnquiryRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body ReplyToEnquiryJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ReplyToEnquiry(ctx, request.(ReplyToEnquiryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReplyToEnquiry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReplyToEnquiryResponseObject); ok {
+		if err := validResponse.VisitReplyToEnquiryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// WithdrawCustomerInvite operation middleware
+func (sh *strictHandler) WithdrawCustomerInvite(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request WithdrawCustomerInviteRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.WithdrawCustomerInvite(ctx, request.(WithdrawCustomerInviteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "WithdrawCustomerInvite")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(WithdrawCustomerInviteResponseObject); ok {
+		if err := validResponse.VisitWithdrawCustomerInviteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeOnboardingStep operation middleware
+func (sh *strictHandler) ChangeOnboardingStep(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ChangeOnboardingStepRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body ChangeOnboardingStepJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ChangeOnboardingStep(ctx, request.(ChangeOnboardingStepRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeOnboardingStep")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeOnboardingStepResponseObject); ok {
+		if err := validResponse.VisitChangeOnboardingStepResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListOnboardings operation middleware
+func (sh *strictHandler) ListOnboardings(w http.ResponseWriter, r *http.Request, org Org, params ListOnboardingsParams) {
+	var request ListOnboardingsRequestObject
+
+	request.Org = org
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ListOnboardings(ctx, request.(ListOnboardingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListOnboardings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListOnboardingsResponseObject); ok {
+		if err := validResponse.VisitListOnboardingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartOnboarding operation middleware
+func (sh *strictHandler) StartOnboarding(w http.ResponseWriter, r *http.Request, org Org) {
+	var request StartOnboardingRequestObject
+
+	request.Org = org
+
+	var body StartOnboardingJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.StartOnboarding(ctx, request.(StartOnboardingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartOnboarding")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartOnboardingResponseObject); ok {
+		if err := validResponse.VisitStartOnboardingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveOnboarding operation middleware
+func (sh *strictHandler) RemoveOnboarding(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request RemoveOnboardingRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.RemoveOnboarding(ctx, request.(RemoveOnboardingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveOnboarding")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveOnboardingResponseObject); ok {
+		if err := validResponse.VisitRemoveOnboardingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// InviteCustomer operation middleware
+func (sh *strictHandler) InviteCustomer(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request InviteCustomerRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body InviteCustomerJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.InviteCustomer(ctx, request.(InviteCustomerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "InviteCustomer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(InviteCustomerResponseObject); ok {
+		if err := validResponse.VisitInviteCustomerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // StopRun operation middleware
 func (sh *strictHandler) StopRun(w http.ResponseWriter, r *http.Request, org Org, id Id) {
 	var request StopRunRequestObject
@@ -1180,6 +4036,161 @@ func (sh *strictHandler) StopRun(w http.ResponseWriter, r *http.Request, org Org
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(StopRunResponseObject); ok {
 		if err := validResponse.VisitStopRunResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSubscriptions operation middleware
+func (sh *strictHandler) ListSubscriptions(w http.ResponseWriter, r *http.Request, org Org, params ListSubscriptionsParams) {
+	var request ListSubscriptionsRequestObject
+
+	request.Org = org
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ListSubscriptions(ctx, request.(ListSubscriptionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSubscriptions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSubscriptionsResponseObject); ok {
+		if err := validResponse.VisitListSubscriptionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddSubscription operation middleware
+func (sh *strictHandler) AddSubscription(w http.ResponseWriter, r *http.Request, org Org) {
+	var request AddSubscriptionRequestObject
+
+	request.Org = org
+
+	var body AddSubscriptionJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.AddSubscription(ctx, request.(AddSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddSubscriptionResponseObject); ok {
+		if err := validResponse.VisitAddSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveSubscription operation middleware
+func (sh *strictHandler) RemoveSubscription(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request RemoveSubscriptionRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.RemoveSubscription(ctx, request.(RemoveSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveSubscriptionResponseObject); ok {
+		if err := validResponse.VisitRemoveSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeSubscription operation middleware
+func (sh *strictHandler) ChangeSubscription(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ChangeSubscriptionRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body ChangeSubscriptionJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ChangeSubscription(ctx, request.(ChangeSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeSubscriptionResponseObject); ok {
+		if err := validResponse.VisitChangeSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartRenewal operation middleware
+func (sh *strictHandler) StartRenewal(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request StartRenewalRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body StartRenewalJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.StartRenewal(ctx, request.(StartRenewalRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartRenewal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartRenewalResponseObject); ok {
+		if err := validResponse.VisitStartRenewalResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1253,48 +4264,123 @@ func (sh *strictHandler) StartRun(w http.ResponseWriter, r *http.Request, org Or
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"ul0kTb0I/bYFu0Zc4NRZzvcM3364/d8BAA==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

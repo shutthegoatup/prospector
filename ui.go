@@ -204,40 +204,6 @@ func (a *App) conversations(w http.ResponseWriter, r *http.Request) {
 	a.page(w, r, "conversations", ConversationsView(q, Board{convs, deals, others, members, after}, time.Now().Format("2006-01-02")))
 }
 
-func (a *App) uiDealStart(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Contact int64  `json:"contact"`
-		Kind    string `json:"kind"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		_, err := a.s.StartDeal(q.Org.ID, in.Contact, in.Kind, q.Actor())
-		done(w, err)
-	}
-}
-
-func (a *App) uiDeal(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID    int64  `json:"id"`
-		Field string `json:"field"`
-		Value string `json:"value"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.ChangeDeal(q.Org.ID, in.ID, in.Field, in.Value, q.Actor()))
-	}
-}
-
-func (a *App) uiDealRemove(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID int64 `json:"id"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.RemoveDeal(q.Org.ID, in.ID, q.Actor()))
-	}
-}
-
 type CompanyFilter struct{ Q, Segment, Stage string }
 
 func pageParam(r *http.Request) int {

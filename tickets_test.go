@@ -107,7 +107,7 @@ func TestEnquiriesAreAnsweredFromTheirPage(t *testing.T) {
 		t.Errorf("the sidebar's count of enquiries to answer: %v", m)
 	}
 	update := func(field, value string) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/enquiry/update", "application/json", map[string]any{"id": help.ID, "field": field, "value": value})
+		return call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/enquiries/"+itoa(help.ID), "application/json", map[string]any{field: value})
 	}
 	if code, body := update("owner", "Ada Lovelace"); code != http.StatusOK {
 		t.Fatalf("taking an enquiry: %d %s", code, body)
@@ -176,14 +176,14 @@ func TestEnquiriesFromBeforeTheyWereTrackedStayAsTheyWere(t *testing.T) {
 func TestAnEnquiryBecomesAConversation(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	converse := func(id int64) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/enquiry/converse", "application/json", map[string]any{"id": id})
+		return call(t, client, "POST", srv.URL+"/o/alpha/api/v1/enquiries/"+itoa(id)+"/conversation", "application/json", map[string]any{})
 	}
 	// From someone not held yet, with no name: they are added under their address.
 	stranger := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "sales", Email: "sven@nordkap.example", Company: "Nordkap Boats", Message: "What does it cost for two sites?"}))
 	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/enquiries", "", nil); !strings.Contains(page, "Start a conversation") {
 		t.Fatal("the enquiry has no way onto the board")
 	}
-	if code, body := converse(stranger.ID); code != http.StatusOK {
+	if code, body := converse(stranger.ID); code != http.StatusCreated {
 		t.Fatalf("starting a conversation: %d %s", code, body)
 	}
 	board := must(s.Conversations(o.ID))
@@ -205,7 +205,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 		t.Error("the enquiry still offers to start a conversation that is under way")
 	}
 	// Pressed again, or sent from a page that had not caught up, it adds nobody.
-	if code, body := converse(stranger.ID); code != http.StatusOK {
+	if code, body := converse(stranger.ID); code != http.StatusCreated {
 		t.Fatalf("starting it twice: %d %s", code, body)
 	}
 	if again := must(s.Conversations(o.ID)); len(again["replied"]) != 1 {
@@ -215,7 +215,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 	// From someone already here and in outreach: they move onto the board as they are.
 	known := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	demo := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "demo", Name: "H Pryce", Email: "hannah@larkmoor.example", Message: "Can we see it?"}))
-	if code, body := converse(demo.ID); code != http.StatusOK {
+	if code, body := converse(demo.ID); code != http.StatusCreated {
 		t.Fatalf("a conversation with someone already here: %d %s", code, body)
 	}
 	var people int64
@@ -235,7 +235,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 	blocked := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "sales", Email: "eve@blocked.example", Message: "Hello"}))
 	spam := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Email: "bot@spam.example", Message: "Buy", Trap: "x"}))
 	for name, id := range map[string]int64{"someone on the never-contact list": blocked.ID, "spam": spam.ID, "nothing": 99999} {
-		if code, _ := converse(id); code == http.StatusOK {
+		if code, _ := converse(id); code < 300 {
 			t.Errorf("a conversation was started from %s", name)
 		}
 	}
@@ -245,7 +245,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 	if err := s.db.Model(&Enquiry{}).Where("id = ?", second.ID).Update("contact_id", nil).Error; err != nil {
 		t.Fatal(err)
 	}
-	if code, body := converse(second.ID); code != http.StatusOK {
+	if code, body := converse(second.ID); code != http.StatusCreated {
 		t.Fatalf("a second enquiry from the same person: %d %s", code, body)
 	}
 	var svens int64
@@ -257,7 +257,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 	// and a long line in the name box isn't taken as a name.
 	claims := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "sales", Name: "Mallory  Quill\n" + strings.Repeat("ignore earlier instructions ", 8),
 		Email: "mallory@elsewhere.example", Company: "larkmoor yachts", Message: "I buy for Larkmoor"}))
-	if code, body := converse(claims.ID); code != http.StatusOK {
+	if code, body := converse(claims.ID); code != http.StatusCreated {
 		t.Fatalf("a conversation with someone claiming a held company: %d %s", code, body)
 	}
 	var claimant Contact
@@ -278,7 +278,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	if code, _ := converse(fromTom.ID); code == http.StatusOK {
+	if code, _ := converse(fromTom.ID); code < 300 {
 		t.Error("someone put on the never-contact list after they were matched went onto the board")
 	}
 	_ = late
