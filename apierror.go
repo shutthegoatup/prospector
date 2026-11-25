@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -88,13 +89,50 @@ func fromDatabase(err error) bool {
 	var lite *sqlite.Error
 	// A failure to connect names the database's user and host.
 	var dial *pgconn.ConnectError
-	if errors.As(err, &pg) || errors.As(err, &lite) || errors.As(err, &dial) {
+	var lost lostConnection
+	if errors.As(err, &pg) || errors.As(err, &lite) || errors.As(err, &dial) || errors.As(err, &lost) {
 		return true
 	}
 	// database/sql keeps some of its errors to itself, such as a pool that has closed.
 	return strings.Contains(err.Error(), "sql: ") ||
 		errors.Is(err, sql.ErrConnDone) || errors.Is(err, sql.ErrTxDone) || errors.Is(err, driver.ErrBadConn) ||
 		errors.Is(err, gorm.ErrInvalidTransaction) || errors.Is(err, gorm.ErrInvalidDB)
+}
+
+// lostConnection marks an error a database statement came back with that is about the
+// connection rather than the data: Postgres passes a connection lost part-way on as
+// the network's own error, addresses and all, which looks like any other server's.
+type lostConnection struct{ err error }
+
+func (e lostConnection) Error() string { return e.err.Error() }
+func (e lostConnection) Unwrap() error { return e.err }
+
+// markLostConnections tags such errors as each statement finishes, where nothing but
+// the database can have caused them.
+func markLostConnections(db *gorm.DB) error {
+	mark := func(tx *gorm.DB) {
+		var network net.Error
+		var already lostConnection
+		var fromPgconn interface{ SafeToRetry() bool }
+		err := tx.Error
+		if err == nil || errors.As(err, &already) {
+			return
+		}
+		if errors.As(err, &network) || errors.As(err, &fromPgconn) || pgconn.Timeout(err) ||
+			errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			tx.Error = lostConnection{err}
+		}
+	}
+	cb := db.Callback()
+	for name, p := range map[string]interface {
+		Register(string, func(*gorm.DB)) error
+	}{"create": cb.Create().After("*"), "query": cb.Query().After("*"), "update": cb.Update().After("*"),
+		"delete": cb.Delete().After("*"), "row": cb.Row().After("*"), "raw": cb.Raw().After("*")} {
+		if err := p.Register("prospector:lost-connection-"+name, mark); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // telling is what a caller is told about err when a handler would answer with code. A

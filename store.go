@@ -263,6 +263,9 @@ func Open(dsn string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := markLostConnections(db); err != nil {
+		return nil, err
+	}
 	if err := db.AutoMigrate(models...); err != nil {
 		return nil, err
 	}
