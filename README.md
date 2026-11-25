@@ -67,7 +67,12 @@ An owner writes the steps a new customer goes through under Settings, one a line
 
 Start an onboarding from a company's page and it gets its own copy of those steps, dated from the day it starts. Tick each off as it is done, or move its date; the page says who finished it and when. A company can have several, one a site or a product. Onboarding lists everyone being set up, the ones running late first, and Today points at steps that are late or due. A customer is live once every step is done. Changing the steps in Settings later leaves the ones already running as they are.
 
-The customer has no page of their own here yet: you tick their steps off for them.
+**The customer's page.** From an onboarding you can invite someone at the company, who has an email address here, to a page of their own. They are emailed a link; nobody outside gets an account or a password. The page shows the steps that are theirs and whether each is done, and nothing else: not your own steps, not your teammates' names. For now it is for reading: you still mark their steps done.
+
+- A link opens the page once, within 7 days, in the browser it is used in, which then keeps it for 30 days. Looking at a link does nothing until its button is pressed, because mail scanners follow links.
+- Another browser needs a link of its own. A used or expired link offers to send a fresh one, which goes only to the address that was invited, at most once every five minutes.
+- Withdraw someone's access from the onboarding and their page closes in every browser at once. Removing the onboarding, or erasing the person, does the same.
+- Inviting needs a mail server (the organisation's own, in Settings, or the server's) and `PROSPECTOR_URL`, since a link is never built from what a request says its host is.
 
 ### Subscriptions: what a customer is on
 

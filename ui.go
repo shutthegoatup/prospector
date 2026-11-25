@@ -319,6 +319,9 @@ func (a *App) company(w http.ResponseWriter, r *http.Request) {
 	// Half a company's page would read as the whole of it, so any part failing fails the page.
 	var failed [8]error
 	p.Onboard, failed[6] = a.s.Onboardings(q.Org.ID, c.ID, today())
+	if failed[6] == nil {
+		failed[6] = a.customerControls(q.Org.ID, p.Onboard)
+	}
 	if plan, err := q.Org.Settings.Onboarding(); err == nil {
 		p.Planned = len(plan)
 	}
