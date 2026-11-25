@@ -415,7 +415,7 @@ func (s *Store) Logout(token string) error {
 	return s.db.Where("token_hash in ?", s.keys.lookups(sessions, token)).Delete(&Session{}).Error
 }
 
-// Scopes an API key can carry. None can change settings or reach another org; only enquiries:reply sends mail, and only import skips review.
+// Scopes an API key can carry. None can change settings or reach another org; only enquiries:reply and customers:invite send mail, and only import skips review.
 var Scopes = []struct{ Name, What string }{
 	{"read", "search companies and people, read what's due and the tasks people wrote"},
 	{"research:write", "add companies, facts and suggested contacts (they wait in Research), and leave notes on tasks"},
@@ -424,6 +424,8 @@ var Scopes = []struct{ Name, What string }{
 	{"import", "push the repo's markdown and pull the snapshot"},
 	{"enquiries:write", "record an enquiry or sign-up from your own product or site backend"},
 	{"enquiries:reply", "email a reply to whoever sent an enquiry, through your mail server, and record what they said back"},
+	{"customers:write", "start, change and remove onboardings, and mark their steps"},
+	{"customers:invite", "email a customer a link to their onboarding steps, through your mail server, and withdraw it"},
 	{"agents:run", "start and stop Prospector's own agents on tasks"},
 	{"agents:configure", "add, change and delete Prospector's own agents, their endpoints, keys and tools"},
 }

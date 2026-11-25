@@ -185,13 +185,13 @@ func TestOnboardingIsWorkedFromItsPages(t *testing.T) {
 	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/settings", "", nil); !strings.Contains(page, "them: Send your product files, 7 days") {
 		t.Error("Settings doesn't show the steps that were saved")
 	}
-	if code, body := post("onboarding", map[string]any{"company": company, "name": "Leith site", "start": "2020-01-06"}); code != http.StatusOK {
+	if code, body := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/onboardings", "application/json", map[string]any{"company": company, "name": "Leith site", "start": "2020-01-06"}); code != http.StatusCreated || !strings.Contains(body, `"who":"them"`) {
 		t.Fatalf("starting an onboarding: %d %s", code, body)
 	}
 	row := must(s.Onboardings(o.ID, 0, today()))[0]
 	for _, path := range []string{"/o/alpha/onboarding", "/o/alpha/companies/" + itoa(company)} {
 		_, page := call(t, client, "GET", srv.URL+path, "", nil)
-		for _, want := range []string{"Leith site", "Send your product files", "3 steps late", "late, was due 2020-01-08", `data-step="` + itoa(row.Steps[0].ID) + `"`, "ui/onboarding/step"} {
+		for _, want := range []string{"Leith site", "Send your product files", "3 steps late", "late, was due 2020-01-08", `data-step="` + itoa(row.Steps[0].ID) + `"`, "api/v1/onboarding-steps/"} {
 			if !strings.Contains(page, want) {
 				t.Errorf("%s doesn't show %q", path, want)
 			}
@@ -202,11 +202,11 @@ func TestOnboardingIsWorkedFromItsPages(t *testing.T) {
 		t.Error("Today says nothing of onboarding steps that are late")
 	}
 	for _, st := range row.Steps {
-		if code, body := post("onboarding/step", map[string]any{"id": st.ID, "field": "done", "value": "yes"}); code != http.StatusOK {
+		if code, body := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/onboarding-steps/"+itoa(st.ID), "application/json", map[string]any{"done": true}); code != http.StatusOK {
 			t.Fatalf("finishing step %d: %d %s", st.Seq, code, body)
 		}
 	}
-	if code, _ := post("onboarding/step", map[string]any{"id": row.Steps[0].ID, "field": "name", "value": "Other"}); code == http.StatusOK {
+	if code, _ := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/onboarding-steps/"+itoa(row.Steps[0].ID), "application/json", map[string]any{"name": "Other"}); code == http.StatusOK {
 		t.Error("a step was renamed through the route")
 	}
 	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/onboarding", "", nil); !strings.Contains(page, "live since "+today()) || !strings.Contains(page, "Ada Lovelace") {
@@ -215,7 +215,7 @@ func TestOnboardingIsWorkedFromItsPages(t *testing.T) {
 	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(page, prompt) {
 		t.Error("Today still points at onboarding once every step is done")
 	}
-	if code, body := post("onboarding/remove", map[string]any{"id": row.ID}); code != http.StatusOK {
+	if code, body := call(t, client, "DELETE", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(row.ID), "", nil); code != http.StatusNoContent {
 		t.Fatalf("removing an onboarding: %d %s", code, body)
 	}
 	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/onboarding", "", nil); !strings.Contains(page, "Nobody is being onboarded") {
@@ -282,7 +282,7 @@ func TestAWonDealOffersOnboarding(t *testing.T) {
 	if !strings.Contains(page, body) {
 		t.Errorf("the button lacks the company and the date: want %s", body)
 	}
-	if code, text := call(t, client, "POST", srv.URL+"/o/alpha/ui/onboarding", "application/json", map[string]any{"company": *won.CompanyID, "start": today()}); code != http.StatusOK {
+	if code, text := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/onboardings", "application/json", map[string]any{"company": *won.CompanyID, "start": today()}); code != http.StatusCreated {
 		t.Fatalf("starting onboarding from a won deal: %d %s", code, text)
 	}
 	if page = board(); strings.Contains(page, "Start onboarding") || !strings.Contains(page, "Onboarding under way") {
@@ -317,5 +317,105 @@ func TestAWonDealSaysWhenItsCompanyIsOnboarded(t *testing.T) {
 	_, page := call(t, client, "GET", srv.URL+"/o/alpha/conversations", "", nil)
 	if !strings.Contains(page, ">Onboarded<") || strings.Contains(page, "Onboarding under way") || strings.Contains(page, "Start onboarding") {
 		t.Error("a won deal whose company is live lacks Onboarded, or still offers to start")
+	}
+}
+
+func TestARobotWorksOnboardingAsItsScopesAllow(t *testing.T) {
+	s, srv, _, box := mailSite(t, nil)
+	o := must(s.OrgBySlug("alpha"))
+	other := mustOrg(t, s, "beta")
+	o.Settings.OnboardingSteps = "them: Send your product files, 7 days\nus: Go live"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	key := func(org int64, scopes ...string) string {
+		secret, _, err := s.CreateKey(org, "robot "+strings.Join(scopes, "+"), scopes, "Ada Lovelace")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return secret
+	}
+	reader, writer, inviter, stranger := key(o.ID, "read"), key(o.ID, "read", "customers:write"), key(o.ID, "customers:invite"), key(other.ID, "read", "customers:write", "customers:invite")
+	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	base := srv.URL + "/o/alpha/api/v1/"
+	start := map[string]any{"company": *hannah.CompanyID, "name": "Leith site", "start": "2020-01-06"}
+
+	if code, _ := asKey(t, "GET", base+"onboardings", "", nil); code != http.StatusUnauthorized {
+		t.Errorf("nobody at all listing onboardings: %d", code)
+	}
+	if code, body := asKey(t, "POST", base+"onboardings", reader, start); code != http.StatusForbidden || !strings.Contains(body, "customers:write") {
+		t.Errorf("a read key starting an onboarding: %d %s", code, body)
+	}
+	code, body := asKey(t, "POST", base+"onboardings", writer, start)
+	if code != http.StatusCreated || !strings.Contains(body, `"due":"2020-01-13"`) || !strings.Contains(body, `"company":"Larkmoor Yachts"`) {
+		t.Fatalf("starting an onboarding: %d %s", code, body)
+	}
+	row := must(s.Onboardings(o.ID, 0, today()))[0]
+	step := base + "onboarding-steps/" + itoa(row.Steps[0].ID)
+	if code, body := asKey(t, "PATCH", step, reader, map[string]any{"done": true}); code != http.StatusForbidden {
+		t.Errorf("a read key marking a step: %d %s", code, body)
+	}
+	if code, body := asKey(t, "PATCH", step, writer, map[string]any{}); code != http.StatusBadRequest {
+		t.Errorf("changing nothing about a step: %d %s", code, body)
+	}
+	if code, body := asKey(t, "PATCH", step, writer, map[string]any{"done": true, "due": "2020-02-01"}); code != http.StatusOK || !strings.Contains(body, `"due":"2020-02-01"`) || !strings.Contains(body, `"done_by":"agent:robot read+customers:write"`) {
+		t.Errorf("marking a step and moving its date: %d %s", code, body)
+	}
+	if code, body := asKey(t, "PATCH", step, writer, map[string]any{"done": false}); code != http.StatusOK || !strings.Contains(body, `"done_on":""`) {
+		t.Errorf("reopening a step: %d %s", code, body)
+	}
+
+	// Mailing a customer is a scope of its own.
+	invites := base + "onboardings/" + itoa(row.ID) + "/invites"
+	if code, body := asKey(t, "POST", invites, writer, map[string]any{"contact": hannah.ID}); code != http.StatusForbidden || !strings.Contains(body, "customers:invite") {
+		t.Errorf("a key without customers:invite inviting: %d %s", code, body)
+	}
+	box.take(t, 0)
+	if code, body := asKey(t, "POST", invites, inviter, map[string]any{"contact": hannah.ID}); code != http.StatusNoContent {
+		t.Fatalf("inviting: %d %s", code, body)
+	}
+	if got := box.take(t, 1)[0]; got.To != "hannah@larkmoor.example" {
+		t.Errorf("the link went to %q", got.To)
+	}
+	code, body = asKey(t, "GET", base+"onboardings?company="+itoa(*hannah.CompanyID), reader, nil)
+	if code != http.StatusOK || !strings.Contains(body, `"email":"hannah@larkmoor.example"`) || !strings.Contains(body, `"withdrawn":false`) || strings.Contains(body, "token") {
+		t.Errorf("listing onboardings: %d %s", code, body)
+	}
+	if code, body := asKey(t, "GET", base+"onboardings?company=99999", reader, nil); code != http.StatusOK || strings.TrimSpace(body) != "[]" {
+		t.Errorf("listing another company's: %d %s", code, body)
+	}
+
+	// Another organisation's key reaches none of it, here or by number from its own address.
+	grant := must(s.CustomerInvites(o.ID))[row.ID][0]
+	theirs := srv.URL + "/o/beta/api/v1/"
+	for what, try := range map[string][3]string{
+		"listing": {"GET", base + "onboardings", ""}, "marking": {"PATCH", theirs + "onboarding-steps/" + itoa(row.Steps[0].ID), `done`},
+		"inviting": {"POST", theirs + "onboardings/" + itoa(row.ID) + "/invites", `contact`}, "withdrawing": {"DELETE", theirs + "onboarding-invites/" + itoa(grant.ID), ""},
+		"removing": {"DELETE", theirs + "onboardings/" + itoa(row.ID), ""},
+	} {
+		var sent any
+		switch try[2] {
+		case "done":
+			sent = map[string]any{"done": true}
+		case "contact":
+			sent = map[string]any{"contact": hannah.ID}
+		}
+		if code, body := asKey(t, try[0], try[1], stranger, sent); code < 400 {
+			t.Errorf("another organisation's key %s: %d %s", what, code, body)
+		}
+	}
+	box.take(t, 0)
+	if left := must(s.Onboardings(o.ID, 0, today())); len(left) != 1 || left[0].Steps[0].DoneOn != nil {
+		t.Errorf("another organisation's key changed something: %+v", left)
+	}
+
+	if code, body := asKey(t, "DELETE", base+"onboarding-invites/"+itoa(grant.ID), inviter, nil); code != http.StatusNoContent {
+		t.Errorf("withdrawing: %d %s", code, body)
+	}
+	if code, body := asKey(t, "DELETE", base+"onboardings/"+itoa(row.ID), writer, nil); code != http.StatusNoContent {
+		t.Errorf("removing: %d %s", code, body)
+	}
+	if code, _ := asKey(t, "DELETE", base+"onboardings/"+itoa(row.ID), writer, nil); code != http.StatusNotFound {
+		t.Errorf("removing what is gone: %d", code)
 	}
 }
