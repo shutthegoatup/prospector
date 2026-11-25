@@ -30,7 +30,7 @@ func TestOpenTasksAreListedBeforeClosedOnes(t *testing.T) {
 	if err := s.SetTaskClosed(o.ID, newer.ID, true, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	all := must(s.Tasks(o.ID, true, time.Now()))
+	all := must(firstOf(s.Tasks(o.ID, true, 1, time.Now())))
 	if len(all) != 2 || all[0].ID != older.ID || all[1].ID != newer.ID {
 		t.Fatalf("the open task should come first: %+v", all)
 	}

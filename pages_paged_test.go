@@ -8,6 +8,45 @@ import (
 	"time"
 )
 
+func TestTheTasksPageHasPages(t *testing.T) {
+	s, o, srv, client := signedIn(t)
+	rows := make([]Task, taskPageSize+2)
+	for i := range rows {
+		rows[i] = Task{OrgID: o.ID, Title: fmt.Sprint("Brief number ", i), CreatedBy: "Nia"}
+	}
+	if err := s.db.CreateInBatches(rows, 50).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetTaskClosed(o.ID, rows[0].ID, true, "Nia"); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	open, pg, err := s.Tasks(o.ID, false, 1, now)
+	if err != nil || len(open) != taskPageSize || pg.Total != taskPageSize+1 || pg.Pages() != 2 {
+		t.Fatalf("the first page of open tasks: %d rows, %+v, %v", len(open), pg, err)
+	}
+	// With closed ones shown they come last, on the last page.
+	last, pg, err := s.Tasks(o.ID, true, 2, now)
+	if err != nil || len(last) != 2 || pg.Total != taskPageSize+2 || last[1].ID != rows[0].ID {
+		t.Fatalf("the last page with closed tasks: %d rows, %+v, %v", len(last), pg, err)
+	}
+
+	code, body := call(t, client, "GET", srv.URL+"/o/alpha/tasks?closed=1", "", nil)
+	if code != http.StatusOK || !strings.Contains(body, "Page 1 of 2") || !strings.Contains(body, "tasks?closed=1&amp;page=2") {
+		t.Fatalf("the page doesn't offer the next one with closed tasks still shown: %d", code)
+	}
+	if strings.Contains(body, "Brief number 0<") {
+		t.Fatal("the first page shows the task that belongs on the second")
+	}
+	// The counts on the chips are of every task, not of the page.
+	if !strings.Contains(body, fmt.Sprint(taskPageSize+1)) || !strings.Contains(body, fmt.Sprint(taskPageSize+2)) {
+		t.Fatal("the page doesn't count every open task and every task")
+	}
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/tasks?closed=1&page=2", "", nil); !strings.Contains(body, "Brief number 0") {
+		t.Fatal("the second page doesn't show the closed task")
+	}
+}
+
 func TestTheEnquiriesPageHasPages(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	rows := make([]Enquiry, enquiryPageSize+1)

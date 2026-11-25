@@ -24,14 +24,15 @@ func (a *App) tasksPage(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	now := time.Now()
 	closed := r.URL.Query().Get("closed") != ""
-	rows, err := a.s.Tasks(q.Org.ID, closed, now)
+	rows, pg, err := a.s.Tasks(q.Org.ID, closed, pageParam(r), now)
 	if err != nil {
 		fail(w, err, http.StatusInternalServerError)
 		return
 	}
-	var all int64
+	var open, all int64
+	logged(a.s.in(q.Org.ID).Model(&Task{}).Where("closed_at is null").Count(&open))
 	logged(a.s.in(q.Org.ID).Model(&Task{}).Count(&all))
-	a.page(w, r, "tasks", TasksView(q, TasksData{Rows: rows, Closed: closed, All: int(all), Now: now}))
+	a.page(w, r, "tasks", TasksView(q, TasksData{Rows: rows, Page: pg, Closed: closed, Open: int(open), All: int(all), Now: now}))
 }
 
 func (a *App) taskPage(w http.ResponseWriter, r *http.Request) {
@@ -139,4 +140,12 @@ func (a *App) uiDeleteNote(w http.ResponseWriter, r *http.Request) {
 	if decode(w, r, &in) {
 		done(w, a.s.DeleteNote(reqOf(r).Org.ID, in.ID))
 	}
+}
+
+// taskClosedParam is whether closed tasks are shown, as the page's link carries it.
+func taskClosedParam(closed bool) string {
+	if closed {
+		return "1"
+	}
+	return ""
 }

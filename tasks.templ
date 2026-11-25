@@ -9,8 +9,10 @@ import (
 
 type TasksData struct {
 	Rows   []TaskView
+	Page   Page
 	Closed bool
-	All    int
+	// Open and All count every task, not only those on this page.
+	Open, All int
 	Now    time.Time
 }
 
@@ -148,7 +150,7 @@ templ TasksView(q *Req, d TasksData) {
 	<div class="flex flex-wrap items-start gap-8">
 		<div class="flex min-w-0 flex-[999_1_480px] flex-col gap-3">
 			<div class="flex flex-wrap gap-2">
-				@Chip(q.Base()+"tasks", "Open", openCount(d.Rows), !d.Closed)
+				@Chip(q.Base()+"tasks", "Open", d.Open, !d.Closed)
 				@Chip(q.Base()+"tasks?closed=1", "With closed", d.All, d.Closed)
 			</div>
 			if len(d.Rows) == 0 {
@@ -169,6 +171,7 @@ templ TasksView(q *Req, d TasksData) {
 					</div>
 				</article>
 			}
+			@Pager(d.Page, func(n int) string { return pageLink(q.Base()+"tasks", n, "closed", taskClosedParam(d.Closed)) })
 		</div>
 		<aside class="flex min-w-0 flex-[1_1_280px] flex-col gap-3 panel p-5 text-sm">
 			<form data-form="ui/task" class="flex flex-col gap-4">
@@ -190,16 +193,6 @@ templ TasksView(q *Req, d TasksData) {
 			<p class="text-muted-foreground">Agents can read the brief and everyone's requests. Don't put anything in them you wouldn't put in a note to a colleague.</p>
 		</aside>
 	</div>
-}
-
-func openCount(rows []TaskView) int {
-	n := 0
-	for _, t := range rows {
-		if t.ClosedAt == nil {
-			n++
-		}
-	}
-	return n
 }
 
 templ TaskDetailView(q *Req, d TaskPage) {
