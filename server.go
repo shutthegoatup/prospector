@@ -698,6 +698,8 @@ func serve(a *App, addr string) error {
 	}
 	// Runs a stopped server left going are carried on, here or by another server.
 	go a.keepRunsGoing(context.Background(), 30*time.Second)
+	// Campaigns being sent go on being sent, here or by another server.
+	go a.keepSending(context.Background(), sendEvery)
 	log.Printf("listening on http://%s", addr)
 	// A release is installed by stopping this process, so every merge sends one of these.
 	asked, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

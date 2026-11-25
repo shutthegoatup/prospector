@@ -234,7 +234,7 @@ func TestTheFrontPageTellsTheTruthAboutKeys(t *testing.T) {
 			t.Errorf("the front page names a scope that does not exist: %s", m[1])
 		}
 	}
-	for _, sends := range []string{"enquiries:reply", "customers:invite"} {
+	for _, sends := range []string{"enquiries:reply", "customers:invite", "campaigns:send"} {
 		if !strings.Contains(body, "<code>"+sends+"</code>") {
 			t.Errorf("the front page leaves out %s, which lets a key send mail", sends)
 		}
