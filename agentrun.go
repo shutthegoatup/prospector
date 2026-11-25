@@ -383,10 +383,8 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 			return RunFinished, "other agents hold every open request"
 		}
 		run.RequestID = task.Claimed
-		messages := []chatMessage{
-			{Role: "system", Content: runInstructions(o, bk)},
-			{Role: "user", Content: taskPrompt(o, Task{ID: task.ID, Title: task.Title}) + "\n\nThis is what get_task returned just now, so you needn't call it first:\n" + brief},
-		}
+		chat := a.converse(cfg, key, run, tools, runInstructions(o, bk),
+			taskPrompt(o, Task{ID: task.ID, Title: task.Title})+"\n\nThis is what get_task returned just now, so you needn't call it first:\n"+brief)
 		idle, failures := 0, 0
 		for turn := 0; turn < episodeTurns; turn++ {
 			if goOn, err := a.hold(ctx, run, RunWorking, nil); err != nil || !goOn {
@@ -397,7 +395,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 			if revoked > 0 {
 				return RunStopped, "its key was revoked on the Agents page"
 			}
-			reply, err := a.complete(ctx, cfg, key, run, messages, tools)
+			reply, err := chat.next(ctx)
 			if err != nil && ctx.Err() == nil && passing(err) {
 				// Limits and outages are waited out, however long, until someone stops it.
 				until := time.Now().Add(backoff(failures))
@@ -419,37 +417,36 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 			}
 			failures = 0
 			run.Turns++
-			run.TokensIn += reply.Usage.PromptTokens
-			run.TokensOut += reply.Usage.CompletionTokens
-			msg := reply.Choices[0].Message
-			messages = append(messages, chatMessage{Role: "assistant", Content: msg.Content, ToolCalls: msg.ToolCalls})
-			if len(msg.ToolCalls) == 0 {
+			run.TokensIn += reply.tokensIn
+			run.TokensOut += reply.tokensOut
+			if len(reply.calls) == 0 {
 				if t.requestDone() {
 					return RunFinished, "the request is done"
 				}
 				if idle++; idle >= 2 {
 					return RunFinished, "the agent stopped without finishing the request"
 				}
-				messages = append(messages, chatMessage{Role: "user",
-					Content: fmt.Sprintf("Carry on with request %d. If it is done, call finish_request with request %d.", run.RequestID, run.RequestID)})
+				chat.say(fmt.Sprintf("Carry on with request %d. If it is done, call finish_request with request %d.", run.RequestID, run.RequestID))
 				continue
 			}
 			idle = 0
-			for _, c := range msg.ToolCalls {
+			var results []toolResult
+			for _, c := range reply.calls {
 				run.ToolCalls++
-				result, err := t.call(ctx, c.Function.Name, c.Function.Arguments)
+				result, err := t.call(ctx, c.name, c.args)
 				if ctx.Err() != nil {
 					return a.ended(ctx, run, ctx.Err())
 				}
 				if err != nil {
 					result = "Error: " + err.Error()
 				}
-				messages = append(messages, chatMessage{Role: "tool", ToolCallID: c.ID, Content: result})
+				results = append(results, toolResult{id: c.id, text: result, failed: err != nil})
 			}
+			chat.answer(results)
 			if t.requestDone() {
 				return RunFinished, "the request is done"
 			}
-			if reply.Usage.PromptTokens > episodeTokens {
+			if reply.tokensIn > episodeTokens {
 				break
 			}
 		}
@@ -764,6 +761,72 @@ func toolText(res *mcp.CallToolResult) string {
 		text = string(r[:maxToolResult]) + "\n[cut short]"
 	}
 	return text
+}
+
+// conversation is one episode with the agent's model, in whatever shape its kind takes.
+type conversation interface {
+	// next is the model's next turn, given everything said so far.
+	next(ctx context.Context) (*modelTurn, error)
+	// answer gives the model what its last turn's tool calls returned.
+	answer(results []toolResult)
+	// say tells the model something, as the person it is working for.
+	say(text string)
+}
+
+type modelCall struct{ id, name, args string }
+
+// modelTurn is what the model said: the tools it called, and the size of the prompt
+// it was given and of its answer.
+type modelTurn struct {
+	calls               []modelCall
+	tokensIn, tokensOut int64
+}
+
+type toolResult struct {
+	id, text string
+	failed   bool
+}
+
+func (a *App) converse(c *Agent, key string, run *AgentRun, tools []toolDef, system, opening string) conversation {
+	if c.Kind == kindAnthropic {
+		return a.newClaudeChat(c, key, tools, system, opening)
+	}
+	return &openAIChat{app: a, agent: c, key: key, run: run, tools: tools,
+		messages: []chatMessage{{Role: "system", Content: system}, {Role: "user", Content: opening}}}
+}
+
+// openAIChat is an episode with a model behind an OpenAI-compatible endpoint.
+type openAIChat struct {
+	app      *App
+	agent    *Agent
+	key      string
+	run      *AgentRun
+	tools    []toolDef
+	messages []chatMessage
+}
+
+func (c *openAIChat) next(ctx context.Context) (*modelTurn, error) {
+	reply, err := c.app.complete(ctx, c.agent, c.key, c.run, c.messages, c.tools)
+	if err != nil {
+		return nil, err
+	}
+	msg := reply.Choices[0].Message
+	c.messages = append(c.messages, chatMessage{Role: "assistant", Content: msg.Content, ToolCalls: msg.ToolCalls})
+	turn := &modelTurn{tokensIn: reply.Usage.PromptTokens, tokensOut: reply.Usage.CompletionTokens}
+	for _, call := range msg.ToolCalls {
+		turn.calls = append(turn.calls, modelCall{id: call.ID, name: call.Function.Name, args: call.Function.Arguments})
+	}
+	return turn, nil
+}
+
+func (c *openAIChat) answer(results []toolResult) {
+	for _, r := range results {
+		c.messages = append(c.messages, chatMessage{Role: "tool", ToolCallID: r.id, Content: r.text})
+	}
+}
+
+func (c *openAIChat) say(text string) {
+	c.messages = append(c.messages, chatMessage{Role: "user", Content: text})
 }
 
 type chatMessage struct {

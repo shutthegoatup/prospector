@@ -286,9 +286,17 @@ templ AgentForm(v AgentView) {
 			<input name="name" value={ v.Name } placeholder="Claude, ChatGPT, the gateway…" autocomplete="off" class={ fieldClass }/>
 			@Meta("What it is called on the task page and in the record.")
 		}
+		@Row("Kind") {
+			<select name="kind" class={ fieldClass }>
+				for _, k := range AgentKinds {
+					<option value={ k.Key } selected?={ k.Key == v.Kind || (v.Kind == "" && k.Key == kindOpenAI) }>{ k.Label }</option>
+				}
+			</select>
+			@Meta("Anthropic reaches Claude through Anthropic's own API with its official SDK; OpenAI-compatible is ChatGPT, OpenRouter, a gateway of your own or any open model behind one.")
+		}
 		@Row("Endpoint") {
 			<input name="base_url" value={ v.BaseURL } placeholder="https://openrouter.ai/api/v1" autocomplete="off" class={ fieldClass }/>
-			@Meta("The address its /models and /chat/completions are under, such as https://api.openai.com/v1.")
+			@Meta("For OpenAI-compatible, the address its /models and /chat/completions are under, such as https://api.openai.com/v1. For Anthropic, leave it empty for Anthropic's own.")
 		}
 		@Row("API key") {
 			<input name="api_key" type="password" autocomplete="new-password" placeholder={ agentKeyHint(v) } class={ fieldClass }/>

@@ -72,10 +72,12 @@ func encodeList(v any) string {
 	return string(raw)
 }
 
-func (c Agent) ModelList() []string     { return decodeList[string](c.Models) }
-func (c Agent) ToolList() []AgentTool   { return decodeList[AgentTool](c.Tools) }
-func (c Agent) AllowedTools() []string  { return decodeList[string](c.Allowed) }
-func (c Agent) Ready() bool             { return c.BaseURL != "" && c.APIKey != "" && c.Model != "" }
+func (c Agent) ModelList() []string    { return decodeList[string](c.Models) }
+func (c Agent) ToolList() []AgentTool  { return decodeList[AgentTool](c.Tools) }
+func (c Agent) AllowedTools() []string { return decodeList[string](c.Allowed) }
+func (c Agent) Ready() bool {
+	return (c.BaseURL != "" || c.Kind == kindAnthropic) && c.APIKey != "" && c.Model != ""
+}
 func (c Agent) Allows(tool string) bool { return slices.Contains(c.AllowedTools(), tool) }
 
 // Agents are an organisation's own agents, by name.
@@ -349,6 +351,7 @@ func (a *App) listTools(ctx context.Context, endpoint, key string) ([]AgentTool,
 type AgentSettingsIn struct {
 	ID       int64    `json:"id"`
 	Name     string   `json:"name"`
+	Kind     string   `json:"kind"`
 	BaseURL  string   `json:"base_url"`
 	APIKey   string   `json:"api_key"`
 	Model    string   `json:"model"`
@@ -358,7 +361,8 @@ type AgentSettingsIn struct {
 
 // toolsKey is the key the tools URL may be sent: the endpoint's, on the same origin only.
 func (c Agent) toolsKey(key string) string {
-	if sameOrigin(c.BaseURL, c.ToolsURL) {
+	// An Anthropic key is for Anthropic, and no tool server is.
+	if c.Kind == kindOpenAI && sameOrigin(c.BaseURL, c.ToolsURL) {
 		return key
 	}
 	return ""
@@ -384,22 +388,31 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	if err != nil {
 		return nil, err
 	}
+	c := &Agent{OrgID: org, Kind: kindOpenAI, Models: "[]", Tools: "[]", Allowed: "[]"}
+	if in.ID != 0 {
+		if c, err = a.s.AgentByID(org, in.ID); err != nil {
+			return nil, err
+		}
+	}
+	// A save that doesn't say keeps the agent's kind.
+	kind := strings.TrimSpace(in.Kind)
+	if kind == "" {
+		kind = c.Kind
+	}
+	if !slices.ContainsFunc(AgentKinds, func(k struct{ Key, Label string }) bool { return k.Key == kind }) {
+		return nil, fmt.Errorf("an agent is OpenAI-compatible or Anthropic, not %q", kind)
+	}
 	base, err := endpointURL(in.BaseURL)
 	if err != nil {
 		return nil, err
 	}
-	if base == "" {
+	// Anthropic's own address is the SDK's; another is for a proxy in front of it.
+	if base == "" && kind == kindOpenAI {
 		return nil, errors.New("enter the endpoint's address")
 	}
 	tools, err := endpointURL(in.ToolsURL)
 	if err != nil {
 		return nil, fmt.Errorf("tools: %w", err)
-	}
-	c := &Agent{OrgID: org, Kind: "openai", Models: "[]", Tools: "[]", Allowed: "[]"}
-	if in.ID != 0 {
-		if c, err = a.s.AgentByID(org, in.ID); err != nil {
-			return nil, err
-		}
 	}
 	var taken int64
 	if err := a.s.db.Model(&Agent{}).Where("org_id = ? and name = ? and id <> ?", org, name, c.ID).Count(&taken).Error; err != nil {
@@ -411,7 +424,8 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	renamed := c.ID != 0 && c.Name != name
 	c.Name = name
 	key := strings.TrimSpace(in.APIKey)
-	if key == "" && c.APIKey != "" && c.BaseURL == base {
+	sameEndpoint := c.BaseURL == base && c.Kind == kind
+	if key == "" && c.APIKey != "" && sameEndpoint {
 		if key, err = a.s.keys.open(c.APIKey); err != nil {
 			return nil, fmt.Errorf("the saved key can't be read: enter it again (%w)", err)
 		}
@@ -429,13 +443,13 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	if err != nil {
 		return nil, err
 	}
-	if c.BaseURL != base {
+	if !sameEndpoint {
 		c.Models = "[]"
 	}
 	if c.ToolsURL != tools {
 		c.Tools, c.Allowed = "[]", "[]"
 	}
-	c.BaseURL, c.APIKey, c.ToolsURL, c.UpdatedBy = base, sealedKey, tools, by
+	c.Kind, c.BaseURL, c.APIKey, c.ToolsURL, c.UpdatedBy = kind, base, sealedKey, tools, by
 	c.Model = strings.TrimSpace(in.Model)
 	if len(c.Model) > 200 {
 		return nil, errors.New("that model name is too long")
@@ -444,12 +458,22 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	var problems []string
 	check, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
-	if models, err := a.listModels(check, base, key); err != nil {
+	var models []string
+	if kind == kindAnthropic {
+		models, err = a.listClaudeModels(check, c, key)
+	} else {
+		models, err = a.listModels(check, base, key)
+	}
+	if err != nil {
 		problems = append(problems, "Models: "+err.Error())
 	} else {
 		c.Models = encodeList(models)
-		if c.Model == "" && len(models) == 1 {
+		switch {
+		case c.Model != "":
+		case len(models) == 1:
 			c.Model = models[0]
+		case kind == kindAnthropic && slices.Contains(models, defaultClaude):
+			c.Model = defaultClaude
 		}
 	}
 	if tools != "" {
@@ -498,7 +522,7 @@ func (s *Store) writeAgent(c *Agent) error {
 		return s.db.Create(c).Error
 	}
 	res := s.db.Model(&Agent{}).Where("id = ? and org_id = ?", c.ID, c.OrgID).
-		Select("name", "base_url", "api_key", "model", "tools_url", "models", "tools", "allowed", "problem", "checked_at", "updated_by", "updated_at").
+		Select("name", "kind", "base_url", "api_key", "model", "tools_url", "models", "tools", "allowed", "problem", "checked_at", "updated_by", "updated_at").
 		Updates(c)
 	if res.Error == nil && res.RowsAffected == 0 {
 		return fmt.Errorf("%s was deleted meanwhile", c.Name)

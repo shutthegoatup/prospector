@@ -758,7 +758,8 @@ func agentCommand(s *Store, rest []string) error {
 		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
 			return err
 		}
-		in := AgentSettingsIn{Name: rest[2], BaseURL: rest[3], Model: rest[4], APIKey: os.Getenv("PROSPECTOR_AGENT_API_KEY"), Tools: []string{}}
+		in := AgentSettingsIn{Name: rest[2], Kind: os.Getenv("PROSPECTOR_AGENT_KIND"), BaseURL: rest[3], Model: rest[4],
+			APIKey: os.Getenv("PROSPECTOR_AGENT_API_KEY"), Tools: []string{}}
 		if len(rest) > 5 {
 			in.ToolsURL, in.Tools = rest[5], rest[6:]
 		}
