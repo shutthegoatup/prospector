@@ -61,6 +61,14 @@ Each organisation has an MCP endpoint and a REST API, with scoped keys. Agents c
 
 ![Agents & API: the MCP endpoint, REST calls and the tools each key gets](docs/images/agents.png)
 
+### Onboarding: the steps to a live customer
+
+An owner writes the steps a new customer goes through under Settings, one a line, in order: who does it (`them:` or `us:`), what it is, and how many days after the start it is due, such as `them: Send your product files, 7 days`.
+
+Start an onboarding from a company's page and it gets its own copy of those steps, dated from the day it starts. Tick each off as it is done, or move its date; the page says who finished it and when. A company can have several, one a site or a product. Onboarding lists everyone being set up, the ones running late first, and Today points at steps that are late or due. A customer is live once every step is done. Changing the steps in Settings later leaves the ones already running as they are.
+
+The customer has no page of their own here yet: you tick their steps off for them.
+
 ### Subscriptions: what a customer is on
 
 Once a company is a customer, record what they are on from its page: what it is, the price for a month or a year, when it starts, how many months they committed for, what happens when that is up (it renews, rolls on a period at a time, or ends) and how many days' notice ends it. A company can have several, each with its own dates.

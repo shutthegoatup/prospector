@@ -85,25 +85,27 @@ func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error)
 // holds no secret: not a password or key hash, nor the sign-on client secret, sealed
 // or otherwise. What identifies erased people is left out too; only how many there are.
 type OrgExport struct {
-	ExportedAt   time.Time      `json:"exported_at"`
-	Organisation ExportedOrg    `json:"organisation"`
-	Members      []ExportMember `json:"members"`
-	Keys         []ExportKey    `json:"api_keys"`
-	SignOn       *ExportSignOn  `json:"single_sign_on,omitempty"`
-	Mail         *ExportMail    `json:"mail_server,omitempty"`
-	Agents       []ExportAgent  `json:"agents"`
-	Companies    []Company      `json:"companies"`
-	Facts        []Fact         `json:"facts"`
-	Contacts     []Contact      `json:"contacts"`
-	Deals        []Deal         `json:"deals"`
-	Subs         []Subscription `json:"subscriptions"`
-	Enquiries    []Enquiry      `json:"enquiries"`
-	Suggested    []Suggestion   `json:"suggested_details"`
-	Tasks        []Task         `json:"tasks"`
-	TaskRequests []TaskRequest  `json:"task_requests"`
-	TaskNotes    []TaskNote     `json:"task_notes"`
-	History      []ExportRecord `json:"history"`
-	Erased       int64          `json:"people_erased"`
+	ExportedAt   time.Time        `json:"exported_at"`
+	Organisation ExportedOrg      `json:"organisation"`
+	Members      []ExportMember   `json:"members"`
+	Keys         []ExportKey      `json:"api_keys"`
+	SignOn       *ExportSignOn    `json:"single_sign_on,omitempty"`
+	Mail         *ExportMail      `json:"mail_server,omitempty"`
+	Agents       []ExportAgent    `json:"agents"`
+	Companies    []Company        `json:"companies"`
+	Facts        []Fact           `json:"facts"`
+	Contacts     []Contact        `json:"contacts"`
+	Deals        []Deal           `json:"deals"`
+	Subs         []Subscription   `json:"subscriptions"`
+	Onboardings  []Onboarding     `json:"onboardings"`
+	OnboardSteps []OnboardingStep `json:"onboarding_steps"`
+	Enquiries    []Enquiry        `json:"enquiries"`
+	Suggested    []Suggestion     `json:"suggested_details"`
+	Tasks        []Task           `json:"tasks"`
+	TaskRequests []TaskRequest    `json:"task_requests"`
+	TaskNotes    []TaskNote       `json:"task_notes"`
+	History      []ExportRecord   `json:"history"`
+	Erased       int64            `json:"people_erased"`
 }
 
 type ExportedOrg struct {
@@ -213,7 +215,7 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			out.Agents = append(out.Agents, ExportAgent{Name: a.Name, Kind: a.Kind, Endpoint: a.BaseURL, Model: a.Model, ToolsURL: a.ToolsURL, Tools: a.AllowedTools()})
 		}
 		mine := func() *gorm.DB { return tx.Where("org_id = ?", org).Order("id") }
-		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Enquiries, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
+		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Onboardings, &out.OnboardSteps, &out.Enquiries, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
 			if err := mine().Find(rows).Error; err != nil {
 				return err
 			}
