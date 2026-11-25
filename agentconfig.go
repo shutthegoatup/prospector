@@ -363,8 +363,8 @@ type AgentSettingsIn struct {
 	Tools    []string `json:"tools"`
 	// Fallback is the id of the agent that takes over, 0 for none; FallbackMinutes is
 	// how long it waits first, 0 for the default.
-	Fallback        string `json:"fallback"`
-	FallbackMinutes int    `json:"fallback_minutes"`
+	Fallback        int64 `json:"fallback"`
+	FallbackMinutes int   `json:"fallback_minutes"`
 }
 
 // toolsKey is the key the tools URL may be sent: the endpoint's, on the same origin only.
@@ -457,13 +457,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	if c.ToolsURL != tools {
 		c.Tools, c.Allowed = "[]", "[]"
 	}
-	fallback, err := strconv.ParseInt(strings.TrimSpace(in.Fallback), 10, 64)
-	if strings.TrimSpace(in.Fallback) == "" {
-		fallback, err = 0, nil
-	}
-	if err != nil {
-		return nil, errors.New("choose the fallback agent from the list")
-	}
+	fallback := in.Fallback
 	if fallback != 0 {
 		next, err := a.s.AgentByID(org, fallback)
 		if err != nil {
@@ -598,36 +592,6 @@ func (a *App) deleteAgent(org, id int64) error {
 		}
 		return tx.Delete(c).Error
 	})
-}
-
-func (a *App) uiAgent(w http.ResponseWriter, r *http.Request) {
-	var in AgentSettingsIn
-	if !decode(w, r, &in) {
-		return
-	}
-	q := reqOf(r)
-	c, err := a.saveAgent(r.Context(), q.Org.ID, in, q.Actor())
-	if err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	msg := c.Name + " saved."
-	switch {
-	case c.Problem != "":
-		msg = c.Name + " saved, but " + c.Problem
-	case !c.Ready():
-		msg = c.Name + " saved. Pick a model to finish."
-	}
-	writeJSON(w, map[string]string{"message": msg})
-}
-
-func (a *App) uiAgentDelete(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID int64 `json:"id"`
-	}
-	if decode(w, r, &in) {
-		done(w, a.deleteAgent(reqOf(r).Org.ID, in.ID))
-	}
 }
 
 // AgentView is what Settings shows of an agent: never the key.

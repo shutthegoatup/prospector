@@ -345,6 +345,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /login/sso/start", a.ssoStart)
 	mux.HandleFunc("GET /login/callback", a.loginCallback)
 	mux.HandleFunc("GET /{$}", a.front)
+	mux.HandleFunc("GET /api", a.apiDocPage())
 	mux.HandleFunc("POST /orgs", a.member(a.newOrg))
 	mux.HandleFunc("GET /password", a.member(a.passwordPage))
 	mux.HandleFunc("POST /password", a.member(a.changePassword))
@@ -389,8 +390,6 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/member/remove", a.owner(a.uiRemoveMember))
 	mux.HandleFunc("POST /o/{org}/ui/mail", a.owner(a.uiMail))
 	mux.HandleFunc("POST /o/{org}/ui/mail/test", a.owner(a.uiMailTest))
-	mux.HandleFunc("POST /o/{org}/ui/agent", a.owner(a.uiAgent))
-	mux.HandleFunc("POST /o/{org}/ui/agent/delete", a.owner(a.uiAgentDelete))
 	mux.HandleFunc("POST /o/{org}/ui/sso", a.owner(a.uiSSO))
 	mux.HandleFunc("POST /o/{org}/ui/sso/domain", a.owner(a.uiSSODomain))
 	mux.HandleFunc("POST /o/{org}/ui/sso/domain/remove", a.owner(a.uiSSODomainRemove))
@@ -405,6 +404,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/keys/revoke", a.owner(a.uiRevoke))
 
 	a.apiRoutes(mux)
+	a.routeAPI(mux)
 
 	sameOrigin := http.NewCrossOriginProtection()
 	// Enquiry forms live on other sites. The route checks the origin against the

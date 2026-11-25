@@ -763,7 +763,7 @@ func TaskDetailView(q *Req, d TaskPage) templ.Component {
 							}
 							return nil
 						})
-						templ_7745c5c3_Err = button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/task/agent/stop", "data-body": jsonBody("id", run.ID)}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var25), templ_7745c5c3_Buffer)
+						templ_7745c5c3_Err = button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/runs/" + strconv.FormatInt(run.ID, 10) + "/stop"}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var25), templ_7745c5c3_Buffer)
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -807,7 +807,7 @@ func TaskDetailView(q *Req, d TaskPage) templ.Component {
 								}
 								return nil
 							})
-							templ_7745c5c3_Err = button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "ui/task/agent/start", "data-body": jsonBody("task", d.ID, "agent", agent.ID)}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var27), templ_7745c5c3_Buffer)
+							templ_7745c5c3_Err = button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "api/v1/tasks/" + strconv.FormatInt(d.ID, 10) + "/runs", "data-body": jsonBody("agent", agent.ID)}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var27), templ_7745c5c3_Buffer)
 							if templ_7745c5c3_Err != nil {
 								return templ_7745c5c3_Err
 							}

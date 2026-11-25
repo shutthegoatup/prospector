@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -767,7 +766,7 @@ func agentCommand(s *Store, rest []string) error {
 		// The name says which: an agent already called that is changed, else one is made.
 		if name, err := agentName(in.Name); err == nil {
 			if c, err := s.agentNamed(o.ID, name); err == nil {
-				in.ID, in.Fallback, in.FallbackMinutes = c.ID, strconv.FormatInt(c.FallbackID, 10), c.FallbackMinutes
+				in.ID, in.Fallback, in.FallbackMinutes = c.ID, c.FallbackID, c.FallbackMinutes
 			}
 		}
 		c, err := (&App{s: s}).saveAgent(context.Background(), o.ID, in, "cli")

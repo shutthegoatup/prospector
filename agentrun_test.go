@@ -317,18 +317,18 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 	start := func(c *http.Client, agent int64) (int, string) {
-		return call(t, c, "POST", srv.URL+"/o/alpha/ui/task/agent/start", "application/json", map[string]any{"task": task.ID, "agent": agent})
+		return call(t, c, "POST", fmt.Sprintf("%s/o/alpha/api/v1/tasks/%d/runs", srv.URL, task.ID), "application/json", map[string]any{"agent": agent})
 	}
 	if code, body := start(ada, 99); code != http.StatusBadRequest || !strings.Contains(body, "no agent") {
 		t.Fatalf("starting an agent that isn't there: %d %s", code, body)
 	}
 	page := fmt.Sprintf("%s/o/alpha/tasks/%d", srv.URL, task.ID)
-	if _, body := call(t, ada, "GET", page, "", nil); strings.Contains(body, "ui/task/agent/start") {
+	if _, body := call(t, ada, "GET", page, "", nil); strings.Contains(body, "/runs&#34;") {
 		t.Fatal("the task page offers agents nobody set up")
 	}
 	var agents []*Agent
 	for _, name := range []string{"Claude", "Gateway"} {
-		if code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/agent", "application/json", map[string]any{"name": name,
+		if code, body := saveAgentAt(t, ada, srv.URL, map[string]any{"name": name,
 			"base_url": fake.srv.URL + "/v1", "api_key": agentTestKey, "model": "router/auto"}); code != http.StatusOK {
 			t.Fatalf("setting up %s: %d %s", name, code, body)
 		}
@@ -360,10 +360,10 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 	}
 	member := newMailClient()
 	signIn(t, member, srv, grace.Email, "grace's own password")
-	if code, body := start(member, agents[0].ID); code != http.StatusOK || !strings.Contains(body, "Claude is on it") {
+	if code, body := start(member, agents[0].ID); code != http.StatusCreated || !strings.Contains(body, `"agent_name":"Claude"`) {
 		t.Fatalf("a member starting an agent: %d %s", code, body)
 	}
-	if code, body := start(ada, agents[1].ID); code != http.StatusOK {
+	if code, body := start(ada, agents[1].ID); code != http.StatusCreated {
 		t.Fatalf("a second agent on the same task: %d %s", code, body)
 	}
 	if code, body := start(ada, agents[0].ID); code != http.StatusBadRequest || !strings.Contains(body, "Claude is already working") {

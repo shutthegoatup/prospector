@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -15,7 +14,7 @@ func TestAWaitingAgentHandsItsTaskToItsFallback(t *testing.T) {
 	claudeID := r.agent
 	first := must(r.s.agentNamed(r.o.ID, "Prospector"))
 	in := AgentSettingsIn{ID: first.ID, Name: first.Name, BaseURL: first.BaseURL, Model: first.Model, ToolsURL: first.ToolsURL,
-		Tools: first.AllowedTools(), Fallback: strconv.FormatInt(claudeID, 10)}
+		Tools: first.AllowedTools(), Fallback: claudeID}
 	if got := must(r.a.saveAgent(ctx, r.o.ID, in, "Ada Lovelace")); got.FallbackID != claudeID || got.FallbackMinutes != 15 {
 		t.Fatalf("a fallback should be kept, waiting 15 minutes unless told: %+v", got)
 	}
@@ -107,16 +106,16 @@ func TestAFallbackIsAnotherOfTheOrganisationsAgents(t *testing.T) {
 	c := must(r.s.AgentByID(r.o.ID, r.agent))
 	first := must(r.s.agentNamed(r.o.ID, "Prospector"))
 	must(r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{ID: first.ID, Name: first.Name, BaseURL: first.BaseURL, Model: first.Model,
-		ToolsURL: first.ToolsURL, Tools: first.AllowedTools(), Fallback: strconv.FormatInt(c.ID, 10)}, "Ada Lovelace"))
+		ToolsURL: first.ToolsURL, Tools: first.AllowedTools(), Fallback: c.ID}, "Ada Lovelace"))
 	base := AgentSettingsIn{ID: c.ID, Name: c.Name, BaseURL: c.BaseURL, Model: c.Model, ToolsURL: c.ToolsURL, Tools: []string{searchTool}}
 	for _, bad := range []struct {
-		fallback string
+		fallback int64
 		minutes  int
-	}{{strconv.FormatInt(c.ID, 10), 0}, {strconv.FormatInt(first.ID, 10), 0}, {"999", 0}, {"Claude", 0}, {"0", -5}, {"", 7*24*60 + 1}} {
+	}{{c.ID, 0}, {first.ID, 0}, {999, 0}, {0, -5}, {0, 7*24*60 + 1}} {
 		in := base
 		in.Fallback, in.FallbackMinutes = bad.fallback, bad.minutes
 		if _, err := r.a.saveAgent(context.Background(), r.o.ID, in, "Ada Lovelace"); err == nil {
-			t.Fatalf("fallback %q after %d minutes was taken", bad.fallback, bad.minutes)
+			t.Fatalf("fallback %d after %d minutes was taken", bad.fallback, bad.minutes)
 		}
 	}
 }
