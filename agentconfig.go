@@ -38,13 +38,17 @@ type Agent struct {
 	ToolsURL string `gorm:"not null;default:''"`
 	// Models and Tools are what the endpoints offered when last checked, as JSON, so
 	// Settings never has to call them to render. Allowed is the tools ticked.
-	Models    string `gorm:"not null;default:'[]'"`
-	Tools     string `gorm:"not null;default:'[]'"`
-	Allowed   string `gorm:"not null;default:'[]'"`
-	Problem   string `gorm:"not null;default:''"`
-	CheckedAt *time.Time
-	UpdatedBy string `gorm:"not null;default:''"`
-	UpdatedAt time.Time
+	Models  string `gorm:"not null;default:'[]'"`
+	Tools   string `gorm:"not null;default:'[]'"`
+	Allowed string `gorm:"not null;default:'[]'"`
+	// FallbackID is the agent that takes the task over once this one's endpoint has kept
+	// it waiting FallbackMinutes; 0 is none, so it waits however long.
+	FallbackID      int64  `gorm:"not null;default:0"`
+	FallbackMinutes int    `gorm:"not null;default:15"`
+	Problem         string `gorm:"not null;default:''"`
+	CheckedAt       *time.Time
+	UpdatedBy       string `gorm:"not null;default:''"`
+	UpdatedAt       time.Time
 }
 
 type AgentTool struct {
@@ -357,6 +361,10 @@ type AgentSettingsIn struct {
 	Model    string   `json:"model"`
 	ToolsURL string   `json:"tools_url"`
 	Tools    []string `json:"tools"`
+	// Fallback is the id of the agent that takes over, 0 for none; FallbackMinutes is
+	// how long it waits first, 0 for the default.
+	Fallback        string `json:"fallback"`
+	FallbackMinutes int    `json:"fallback_minutes"`
 }
 
 // toolsKey is the key the tools URL may be sent: the endpoint's, on the same origin only.
@@ -449,6 +457,29 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	if c.ToolsURL != tools {
 		c.Tools, c.Allowed = "[]", "[]"
 	}
+	fallback, err := strconv.ParseInt(strings.TrimSpace(in.Fallback), 10, 64)
+	if strings.TrimSpace(in.Fallback) == "" {
+		fallback, err = 0, nil
+	}
+	if err != nil {
+		return nil, errors.New("choose the fallback agent from the list")
+	}
+	if fallback != 0 {
+		next, err := a.s.AgentByID(org, fallback)
+		if err != nil {
+			return nil, errors.New("the fallback agent isn't one of this organisation's")
+		}
+		if next.ID == c.ID && c.ID != 0 {
+			return nil, errors.New("an agent can't be its own fallback")
+		}
+	}
+	switch {
+	case in.FallbackMinutes == 0:
+		in.FallbackMinutes = 15
+	case in.FallbackMinutes < 1 || in.FallbackMinutes > 7*24*60:
+		return nil, errors.New("wait between a minute and a week before falling back")
+	}
+	c.FallbackID, c.FallbackMinutes = fallback, in.FallbackMinutes
 	c.Kind, c.BaseURL, c.APIKey, c.ToolsURL, c.UpdatedBy = kind, base, sealedKey, tools, by
 	c.Model = strings.TrimSpace(in.Model)
 	if len(c.Model) > 200 {
@@ -522,7 +553,7 @@ func (s *Store) writeAgent(c *Agent) error {
 		return s.db.Create(c).Error
 	}
 	res := s.db.Model(&Agent{}).Where("id = ? and org_id = ?", c.ID, c.OrgID).
-		Select("name", "kind", "base_url", "api_key", "model", "tools_url", "models", "tools", "allowed", "problem", "checked_at", "updated_by", "updated_at").
+		Select("name", "kind", "base_url", "fallback_id", "fallback_minutes", "api_key", "model", "tools_url", "models", "tools", "allowed", "problem", "checked_at", "updated_by", "updated_at").
 		Updates(c)
 	if res.Error == nil && res.RowsAffected == 0 {
 		return fmt.Errorf("%s was deleted meanwhile", c.Name)
@@ -550,6 +581,9 @@ func (a *App) deleteAgent(org, id int64) error {
 			if err := tx.Model(&APIKey{}).Where("id = ? and revoked_at is null", c.KeyID).Update("revoked_at", &now).Error; err != nil {
 				return err
 			}
+		}
+		if err := tx.Model(&Agent{}).Where("org_id = ? and fallback_id = ?", org, c.ID).Update("fallback_id", 0).Error; err != nil {
+			return err
 		}
 		return tx.Delete(c).Error
 	})
@@ -589,12 +623,16 @@ func (a *App) uiAgentDelete(w http.ResponseWriter, r *http.Request) {
 type AgentView struct {
 	Agent
 	HasKey bool
+	// Others are the agents it could fall back to.
+	Others []Agent
 }
 
 type OwnAgentsView struct {
 	Agents []AgentView
 	// Sealing is whether the server can keep a key at all.
 	Sealing bool
+	// New is the form for adding one.
+	New AgentView
 }
 
 func (a *App) ownAgents(org int64) OwnAgentsView {
@@ -603,7 +641,15 @@ func (a *App) ownAgents(org int64) OwnAgentsView {
 	for _, c := range list {
 		view := AgentView{Agent: c, HasKey: c.APIKey != ""}
 		view.APIKey = ""
+		for _, o := range list {
+			if o.ID != c.ID {
+				view.Others = append(view.Others, Agent{ID: o.ID, Name: o.Name})
+			}
+		}
 		v.Agents = append(v.Agents, view)
+	}
+	for _, c := range list {
+		v.New.Others = append(v.New.Others, Agent{ID: c.ID, Name: c.Name})
 	}
 	return v
 }

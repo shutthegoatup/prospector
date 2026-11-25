@@ -386,6 +386,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 		chat := a.converse(cfg, key, run, tools, runInstructions(o, bk),
 			taskPrompt(o, Task{ID: task.ID, Title: task.Title})+"\n\nThis is what get_task returned just now, so you needn't call it first:\n"+brief)
 		idle, failures := 0, 0
+		var waitingSince time.Time
 		for turn := 0; turn < episodeTurns; turn++ {
 			if goOn, err := a.hold(ctx, run, RunWorking, nil); err != nil || !goOn {
 				return a.ended(ctx, run, err)
@@ -406,6 +407,12 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 					until = refused.RetryAfter
 				}
 				failures++
+				if waitingSince.IsZero() {
+					waitingSince = time.Now()
+				}
+				if reason, handed := a.handOver(run, cfg, time.Since(waitingSince)+time.Until(until)); handed {
+					return RunStopped, reason
+				}
 				if err := a.wait(ctx, run, until); err != nil {
 					return a.ended(ctx, run, err)
 				}
@@ -415,7 +422,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 			if err != nil {
 				return a.ended(ctx, run, err)
 			}
-			failures = 0
+			failures, waitingSince = 0, time.Time{}
 			run.Turns++
 			run.TokensIn += reply.tokensIn
 			run.TokensOut += reply.tokensOut
@@ -527,6 +534,31 @@ func (a *App) wait(ctx context.Context, run *AgentRun, until time.Time) error {
 	}
 	// The lease goes on being renewed meanwhile; a Stop cancels ctx.
 	return a.pause(ctx, time.Until(until))
+}
+
+// handOver starts the agent's fallback on the task once its own endpoint would have
+// kept it waiting longer than it is set to wait. A fallback that can't start, as when
+// it isn't set up, leaves the run waiting as before.
+func (a *App) handOver(run *AgentRun, c *Agent, waited time.Duration) (string, bool) {
+	if c.FallbackID == 0 || c.FallbackID == c.ID || waited < time.Duration(c.FallbackMinutes)*time.Minute {
+		return "", false
+	}
+	next, err := a.s.AgentByID(run.OrgID, c.FallbackID)
+	if err != nil {
+		return "", false
+	}
+	why := fmt.Sprintf("its endpoint stayed limited or away for over %d minutes", c.FallbackMinutes)
+	if _, err := a.StartRun(run.OrgID, run.TaskID, next.ID, c.Name+" (fallback)"); err != nil {
+		var going int64
+		logged(a.s.db.Model(&AgentRun{}).Where("org_id = ? and task_id = ? and agent_id = ? and status in ?",
+			run.OrgID, run.TaskID, next.ID, []string{RunWorking, RunWaiting}).Count(&going))
+		if going == 0 {
+			log.Printf("agent run %d: its fallback, agent %d, didn't start: %v", run.ID, next.ID, err)
+			return "", false
+		}
+		return fmt.Sprintf("left the task to %s, already working it: %s", next.Name, why), true
+	}
+	return fmt.Sprintf("handed the task to %s: %s", next.Name, why), true
 }
 
 func runInstructions(o *Org, k *APIKey) string {
