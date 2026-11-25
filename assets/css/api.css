@@ -1,0 +1,71 @@
+/* The public API contract at /api, on top of landing.css's palette and type. */
+.api-top { border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #fff3cf 0%, var(--paper) 100%); }
+.api-hero { padding: 40px 0 48px; max-width: 760px; }
+.api-hero h1 { font: 700 clamp(40px, 6vw, 64px)/1.02 var(--display); letter-spacing: -0.03em; margin: 14px 0 18px; }
+.api-lede { color: var(--soft); font-size: 18px; margin-top: 12px; }
+
+.api-body { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 48px; padding-top: 40px; padding-bottom: 80px; }
+.api-side { position: sticky; top: 20px; align-self: start; max-height: calc(100vh - 40px); overflow: auto; display: flex; flex-direction: column; gap: 2px; padding-right: 8px; }
+.api-side .lp-label { margin: 18px 0 6px; }
+.api-side .lp-label:first-child { margin-top: 0; }
+.api-side a { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; font-size: 14px; color: var(--soft); }
+.api-side a:hover { background: var(--card); color: var(--ink); }
+
+.api-main { min-width: 0; }
+.api-section { padding-bottom: 28px; margin-bottom: 36px; border-bottom: 1px dashed var(--line); }
+.api-section:last-child { border-bottom: 0; }
+.api-section h2 { font: 700 30px/1.15 var(--display); letter-spacing: -0.02em; margin-bottom: 14px; }
+.api-section > p { max-width: 70ch; margin-bottom: 12px; }
+.api-group { text-transform: capitalize; }
+.api-soft { color: var(--soft); }
+.api code { font: 500 0.88em/1.4 var(--mono); background: rgba(28, 24, 16, 0.06); padding: 1px 5px; border-radius: 4px; }
+.api a:not(.lp-btn):not(.lp-brand):not(.api-side a) { text-decoration: underline; text-decoration-color: var(--gold); text-underline-offset: 3px; }
+
+.api-m { display: inline-block; min-width: 46px; padding: 2px 6px; border-radius: 5px; background: var(--tone); color: var(--ink); font: 600 11px/1.4 var(--mono); letter-spacing: 0.06em; text-align: center; }
+.api-m.is-big { font-size: 13px; padding: 4px 10px; min-width: 64px; }
+
+.api-op { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; margin-top: 18px; scroll-margin-top: 20px; box-shadow: 0 1px 0 rgba(28, 24, 16, 0.04), 0 10px 30px -18px rgba(28, 24, 16, 0.25); }
+.api-op-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.api-path { font-size: 15px; background: none; padding: 0; overflow-wrap: anywhere; }
+.api-op h3 { font: 600 20px/1.3 var(--display); margin: 14px 0 6px; }
+.api-op > p { color: var(--soft); max-width: 70ch; }
+.api-scope { margin-top: 10px; font-size: 14px; color: var(--soft); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.api-op-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr); gap: 24px; margin-top: 16px; align-items: start; }
+.api-op h4 { font: 500 12px/1.4 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--soft); margin: 16px 0 6px; }
+.api-op h4:first-child { margin-top: 0; }
+
+.api-fields { margin: 0; }
+.api-field { padding: 8px 0; border-top: 1px solid var(--line); }
+.api-field:first-child { border-top: 0; }
+.api-field dt { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.api-field dd { margin: 4px 0 0; color: var(--soft); font-size: 15px; }
+.api-name { font-weight: 600; background: none !important; padding: 0 !important; }
+.api-type { font: 400 13px/1.4 var(--mono); color: #6a55e8; }
+.api-flag { font: 500 11px/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--soft); }
+.api-flag.is-req { border-color: var(--coral); color: #b8401f; }
+.api-code-tag { font: 600 12px/1.4 var(--mono); padding: 1px 7px; border-radius: 4px; background: rgba(53, 197, 138, 0.18); color: #1d7a52; }
+.api-code-tag.is-bad { background: rgba(255, 116, 82, 0.16); color: #b8401f; }
+
+.api-code { margin: 10px 0 14px; padding: 14px 16px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); overflow-x: auto; font: 400 13px/1.6 var(--mono); white-space: pre; }
+.api-code code { background: none; padding: 0; font: inherit; }
+.api-code.is-dark { margin: 0; background: var(--night); color: #f4ecdc; border-color: var(--night); white-space: pre-wrap; overflow-wrap: anywhere; position: sticky; top: 20px; }
+.api-op h4 .api-type { margin-left: 6px; text-transform: none; letter-spacing: 0; }
+
+.api-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 15px; }
+.api-table th { text-align: left; font: 500 12px/1.4 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--soft); padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); }
+.api-table td { padding: 10px 10px 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.api-table td:first-child { white-space: nowrap; }
+
+.api-schema { padding: 18px 0; border-top: 1px solid var(--line); scroll-margin-top: 20px; }
+.api-schema h3 { font-size: 17px; margin-bottom: 6px; }
+.api-schema h3 code { background: none; padding: 0; font-weight: 600; }
+.api-schema > p { color: var(--soft); margin-bottom: 6px; }
+.api-enum { display: flex; gap: 6px; flex-wrap: wrap; }
+
+@media (max-width: 900px) {
+  .api-body { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .api-side { display: none; }
+  .api-op-grid { grid-template-columns: minmax(0, 1fr); }
+  .api-op { padding: 18px 16px; }
+  .api-table td:first-child { white-space: normal; }
+}

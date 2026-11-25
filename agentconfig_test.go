@@ -126,7 +126,7 @@ func TestAnOwnerSetsUpTheAgent(t *testing.T) {
 		if c, err := s.agentNamed(o.ID, "Prospector"); err == nil {
 			body["id"] = c.ID
 		}
-		return call(t, ada, "POST", srv.URL+"/o/alpha/ui/agent", "application/json", body)
+		return saveAgentAt(t, ada, srv.URL, body)
 	}
 
 	code, body := save(map[string]any{"base_url": fake.srv.URL + "/v1/", "api_key": agentTestKey, "tools_url": fake.srv.URL + "/mcp"})
@@ -150,7 +150,7 @@ func TestAnOwnerSetsUpTheAgent(t *testing.T) {
 
 	// The key, left empty, is kept for the same endpoint.
 	code, body = save(map[string]any{"base_url": fake.srv.URL + "/v1", "model": "router/auto", "tools_url": fake.srv.URL + "/mcp", "tools": []string{"fetch_fetch", "made_up"}})
-	if code != http.StatusOK || body != `{"message":"Prospector saved."}`+"\n" {
+	if code != http.StatusOK || !strings.Contains(body, `"message":"Prospector saved."`) {
 		t.Fatalf("saving the model and a tool: %d %s", code, body)
 	}
 	c = must(s.agentNamed(o.ID, "Prospector"))
@@ -199,7 +199,7 @@ func TestAnOrganisationHasSeveralAgents(t *testing.T) {
 	add := func(body map[string]any) (int, string) {
 		t.Helper()
 		body["base_url"], body["api_key"] = fake.srv.URL+"/v1", agentTestKey
-		return call(t, ada, "POST", srv.URL+"/o/alpha/ui/agent", "application/json", body)
+		return saveAgentAt(t, ada, srv.URL, body)
 	}
 	for _, name := range []string{"Claude", "ChatGPT", "Gateway"} {
 		if code, body := add(map[string]any{"name": name, "model": "router/auto"}); code != http.StatusOK {
@@ -242,10 +242,10 @@ func TestAnOrganisationHasSeveralAgents(t *testing.T) {
 	beta := mustOrg(t, s, "beta")
 	theirs := must((&App{s: s, agentClient: fake.srv.Client()}).saveAgent(context.Background(), beta.ID,
 		AgentSettingsIn{Name: "Theirs", BaseURL: fake.srv.URL + "/v1", APIKey: agentTestKey, Model: "router/auto"}, "Grace Hopper"))
-	if code, _ := add(map[string]any{"id": theirs.ID, "name": "Mine now", "model": "router/auto"}); code != http.StatusBadRequest {
-		t.Fatal("an owner saved over another organisation's agent")
+	if code, body := add(map[string]any{"id": theirs.ID, "name": "Mine now", "model": "router/auto"}); code != http.StatusNotFound {
+		t.Fatalf("an owner saved over another organisation's agent: %d %s", code, body)
 	}
-	if code, _ := call(t, ada, "POST", srv.URL+"/o/alpha/ui/agent/delete", "application/json", map[string]any{"id": theirs.ID}); code == http.StatusOK {
+	if code, _ := call(t, ada, "DELETE", fmt.Sprintf("%s/o/alpha/api/v1/agents/%d", srv.URL, theirs.ID), "", nil); code != http.StatusNotFound {
 		t.Fatal("an owner deleted another organisation's agent")
 	}
 	if must(s.agentNamed(beta.ID, "Theirs")).Name != "Theirs" {
@@ -253,7 +253,7 @@ func TestAnOrganisationHasSeveralAgents(t *testing.T) {
 	}
 
 	// Deleting one revokes its key and forgets it.
-	if code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/agent/delete", "application/json", map[string]any{"id": claude.ID}); code != http.StatusOK {
+	if code, body := call(t, ada, "DELETE", fmt.Sprintf("%s/o/alpha/api/v1/agents/%d", srv.URL, claude.ID), "", nil); code != http.StatusNoContent {
 		t.Fatalf("deleting: %d %s", code, body)
 	}
 	if _, err := s.AgentByID(o.ID, claude.ID); err == nil {
@@ -274,7 +274,7 @@ func TestAToolServerElsewhereIsntSentTheKey(t *testing.T) {
 	s, srv, ada := agentSite(t, fake)
 	pool := fake.srv.Client()
 	pool.Transport.(*http.Transport).TLSClientConfig.RootCAs.AddCert(other.srv.Certificate())
-	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/agent", "application/json",
+	code, body := saveAgentAt(t, ada, srv.URL,
 		map[string]any{"name": "Prospector", "base_url": fake.srv.URL + "/v1", "api_key": agentTestKey, "model": "router/auto", "tools_url": other.srv.URL + "/mcp"})
 	if code != http.StatusOK {
 		t.Fatalf("saving: %d %s", code, body)
@@ -300,7 +300,7 @@ func TestAnEndpointAtItsLimitStillSaves(t *testing.T) {
 	fake := newFakeEndpoint(t)
 	fake.limited = true
 	s, srv, ada := agentSite(t, fake)
-	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/agent", "application/json",
+	code, body := saveAgentAt(t, ada, srv.URL,
 		map[string]any{"name": "Prospector", "base_url": fake.srv.URL + "/v1", "api_key": agentTestKey, "model": "router/auto"})
 	if code != http.StatusOK || !strings.Contains(body, "answered 429") || !strings.Contains(body, "until") {
 		t.Fatalf("a check refused for its limit should be reported, and the settings kept: %d %s", code, body)
@@ -327,7 +327,7 @@ func TestOnlyOwnersSetUpTheAgentAndOnlyWithASecretKey(t *testing.T) {
 	member := newMailClient()
 	signIn(t, member, srv, grace.Email, "grace's own password")
 	body := map[string]any{"name": "Prospector", "base_url": fake.srv.URL + "/v1", "api_key": agentTestKey, "model": "router/auto"}
-	if code, _ := call(t, member, "POST", srv.URL+"/o/alpha/ui/agent", "application/json", body); code != http.StatusForbidden {
+	if code, _ := saveAgentAt(t, member, srv.URL, body); code != http.StatusForbidden {
 		t.Fatalf("a member saving the agent: %d", code)
 	}
 
@@ -575,4 +575,20 @@ func TestRefusalsReadBothErrorShapes(t *testing.T) {
 			t.Fatalf("%s: %+v", body, e)
 		}
 	}
+}
+
+// saveAgentAt saves an agent through the API as a browser's form does: a new one
+// posted, one with an id put to its own address. A save answers 200 either way.
+func saveAgentAt(t *testing.T, c *http.Client, base string, body map[string]any) (int, string) {
+	t.Helper()
+	method, path := "POST", base+"/o/alpha/api/v1/agents"
+	if id, ok := body["id"].(int64); ok && id != 0 {
+		method, path = "PUT", fmt.Sprintf("%s/%d", path, id)
+	}
+	delete(body, "id")
+	code, out := call(t, c, method, path, "application/json", body)
+	if code == http.StatusCreated {
+		code = http.StatusOK
+	}
+	return code, out
 }

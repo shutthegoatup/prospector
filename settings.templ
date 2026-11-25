@@ -276,6 +276,21 @@ templ OwnAgents(v OwnAgentsView) {
 	}
 }
 
+// agentPath and agentMethod are where an agent's form goes in the API.
+func agentPath(v AgentView) string {
+	if v.ID == 0 {
+		return "api/v1/agents"
+	}
+	return "api/v1/agents/" + strconv.FormatInt(v.ID, 10)
+}
+
+func agentMethod(v AgentView) string {
+	if v.ID == 0 {
+		return "POST"
+	}
+	return "PUT"
+}
+
 func agentFallbackMinutes(v AgentView) int {
 	if v.FallbackMinutes == 0 {
 		return 15
@@ -291,8 +306,7 @@ func agentModelsID(v AgentView) string {
 }
 
 templ AgentForm(v AgentView) {
-	<form data-form="ui/agent" data-refresh="true" class="flex flex-col gap-3 border-b border-dashed border-border py-3 last:border-0">
-		<input type="number" name="id" value={ strconv.FormatInt(v.ID, 10) } hidden/>
+	<form data-form={ agentPath(v) } data-method={ agentMethod(v) } data-refresh="true" class="flex flex-col gap-3 border-b border-dashed border-border py-3 last:border-0">
 		@Row("Name") {
 			<input name="name" value={ v.Name } placeholder="Claude, ChatGPT, the gateway…" autocomplete="off" class={ fieldClass }/>
 			@Meta("What it is called on the task page and in the record.")
@@ -329,7 +343,7 @@ templ AgentForm(v AgentView) {
 		if len(v.Others) > 0 {
 			@Row("Fallback") {
 				<div class="flex flex-wrap items-center gap-2">
-					<select name="fallback" class={ fieldClass }>
+					<select name="fallback" data-number="true" class={ fieldClass }>
 						<option value="0">None: wait however long it takes</option>
 						for _, o := range v.Others {
 							<option value={ strconv.FormatInt(o.ID, 10) } selected?={ o.ID == v.FallbackID }>{ o.Name }</option>
@@ -367,7 +381,7 @@ templ AgentForm(v AgentView) {
 				}
 			}
 			if v.ID != 0 {
-				@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/agent/delete", "data-body": jsonBody("id", v.ID),
+				@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": agentPath(v), "data-method": "DELETE",
 					"data-confirm": "Delete " + v.Name + "? Its runs stop and its key is revoked; what it found stays."}}) {
 					Delete
 				}

@@ -273,7 +273,7 @@ templ TaskDetailView(q *Req, d TaskPage) {
 								<span><b>{ run.AgentName }</b> · { agentRunState(run) }</span>
 								@Meta(agentRunText(run))
 								<div>
-									@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/task/agent/stop", "data-body": jsonBody("id", run.ID)}}) {
+									@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/runs/" + strconv.FormatInt(run.ID, 10) + "/stop"}}) {
 										{ "Stop " + run.AgentName }
 									}
 								</div>
@@ -284,7 +284,7 @@ templ TaskDetailView(q *Req, d TaskPage) {
 						<div class="flex flex-wrap gap-2">
 							for _, agent := range d.Agents {
 								if !agentGoing(d.AgentRuns, agent.ID) {
-									@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "ui/task/agent/start", "data-body": jsonBody("task", d.ID, "agent", agent.ID)}}) {
+									@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "api/v1/tasks/" + strconv.FormatInt(d.ID, 10) + "/runs", "data-body": jsonBody("agent", agent.ID)}}) {
 										{ "Run " + agent.Name }
 									}
 								}

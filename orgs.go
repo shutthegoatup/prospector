@@ -423,6 +423,8 @@ var Scopes = []struct{ Name, What string }{
 	{"outcomes:write", "record what happened (added, accepted, sent, called, replied, declined, hold), shown as the agent's"},
 	{"import", "push the repo's markdown and pull the snapshot"},
 	{"enquiries:write", "record an enquiry or sign-up from your own product or site backend"},
+	{"agents:run", "start and stop Prospector's own agents on tasks"},
+	{"agents:configure", "add, change and delete Prospector's own agents, their endpoints, keys and tools"},
 }
 
 func validScope(s string) bool {

@@ -15,8 +15,6 @@ func (a *App) taskRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /o/{org}/ui/task/reopen", a.member(a.uiTaskClosed(false)))
 	mux.HandleFunc("POST /o/{org}/ui/task/request/done", a.member(a.uiRequestDone(true)))
 	mux.HandleFunc("POST /o/{org}/ui/task/request/reopen", a.member(a.uiRequestDone(false)))
-	mux.HandleFunc("POST /o/{org}/ui/task/agent/start", a.member(a.uiRunStart))
-	mux.HandleFunc("POST /o/{org}/ui/task/agent/stop", a.member(a.uiRunStop))
 	mux.HandleFunc("POST /o/{org}/ui/note/delete", a.member(a.uiDeleteNote))
 }
 
@@ -53,32 +51,6 @@ func (a *App) taskPage(w http.ResponseWriter, r *http.Request) {
 	}
 	d.AgentRuns, _ = a.s.AgentRuns(q.Org.ID, t.ID, 10)
 	a.page(w, r, "tasks", TaskDetailView(q, d))
-}
-
-func (a *App) uiRunStart(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Task  int64 `json:"task"`
-		Agent int64 `json:"agent"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	q := reqOf(r)
-	run, err := a.StartRun(q.Org.ID, in.Task, in.Agent, q.Actor())
-	if err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	writeJSON(w, map[string]string{"message": run.AgentName + " is on it."})
-}
-
-func (a *App) uiRunStop(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID int64 `json:"id"`
-	}
-	if decode(w, r, &in) {
-		done(w, a.StopRun(reqOf(r).Org.ID, in.ID))
-	}
 }
 
 func (a *App) uiTask(w http.ResponseWriter, r *http.Request) {

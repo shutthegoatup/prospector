@@ -213,8 +213,19 @@ func (a *App) startRun(org, task, agent int64, by string, replacing int64) (*Age
 
 func (a *App) StopRun(org, id int64) error {
 	res := a.s.db.Model(&AgentRun{}).Where("org_id = ? and id = ? and status in ?", org, id, []string{RunWorking, RunWaiting}).Update("stop_asked", true)
-	if res.Error != nil || res.RowsAffected == 0 {
-		return errors.Join(res.Error, errors.New("that run isn't going"))
+	if res.Error != nil {
+		return res.Error
+	}
+	// A run that ended meanwhile is as stopped as it will get.
+	if res.RowsAffected == 0 {
+		var ended int64
+		if err := a.s.db.Model(&AgentRun{}).Where("org_id = ? and id = ?", org, id).Count(&ended).Error; err != nil {
+			return err
+		}
+		if ended == 0 {
+			return noSuch("no run %d in this organisation", id)
+		}
+		return nil
 	}
 	a.runs.mu.Lock()
 	cancel := a.runs.cancel[id]

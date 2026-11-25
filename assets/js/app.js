@@ -5,11 +5,15 @@ function url(path) {
   return path.startsWith("/") ? path : base + path;
 }
 
-async function post(path, data) {
-  const res = await fetch(url(path), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) });
+async function post(path, data, method = "POST") {
+  const init = { method, headers: { "content-type": "application/json" } };
+  if (method !== "DELETE") init.body = JSON.stringify(data);
+  const res = await fetch(url(path), init);
   if (res.status === 401) location.href = "/login?next=" + encodeURIComponent(location.pathname + location.search);
-  if (!res.ok) throw new Error((await res.text()).trim());
-  return res.headers.get("content-type")?.includes("json") ? res.json() : {};
+  const type = res.headers.get("content-type") || "";
+  // The API answers a failure as RFC 9457 problem JSON; older routes in plain text.
+  if (!res.ok) throw new Error(type.includes("problem+json") ? (await res.json()).detail || res.statusText : (await res.text()).trim());
+  return type.includes("json") ? res.json() : {};
 }
 
 function save(data, name) {
@@ -81,7 +85,7 @@ document.addEventListener("click", async (e) => {
       if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
       const body = JSON.parse(b.dataset.body || "{}");
       if (b.dataset.withFit) body.fit = document.getElementById(b.dataset.withFit)?.value || "";
-      const res = await post(b.dataset.post, body);
+      const res = await post(b.dataset.post, body, b.dataset.method);
       if (res.go) return void (location.href = res.go);
       refresh();
     }
@@ -127,7 +131,7 @@ function formJSON(form) {
       if (el.checked) out[el.name].push(el.value);
     } else if (el.type === "checkbox") {
       out[el.name] = el.checked;
-    } else if (el.type === "number") {
+    } else if (el.type === "number" || el.dataset.number) {
       out[el.name] = el.value === "" ? 0 : +el.value;
     } else {
       out[el.name] = el.value;
@@ -144,7 +148,7 @@ document.addEventListener("submit", async (e) => {
   const button = form.querySelector("[type=submit]");
   if (button) button.disabled = true;
   try {
-    const res = await post(form.dataset.form, formJSON(form));
+    const res = await post(form.dataset.form, formJSON(form), form.dataset.method);
     if (res.go) return void (location.href = res.go);
     if (result) result.textContent = res.message || "Saved ✓";
     if (form.dataset.reset) {
