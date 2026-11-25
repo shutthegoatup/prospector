@@ -164,18 +164,13 @@ func enquiryOut(e Enquiry) api.Enquiry {
 
 func (s apiServer) ListEnquiries(ctx context.Context, in api.ListEnquiriesRequestObject) (api.ListEnquiriesResponseObject, error) {
 	p := in.Params
-	page := PageIn{Limit: p.Limit, Cursor: p.Cursor}
-	at, err := page.at(1)
+	page, err := pageIn(p.Limit, p.Cursor)
 	if err != nil {
 		return nil, err
 	}
-	rows, total, err := s.a.s.enquiriesFrom(reqFrom(ctx).Org.ID, EnquiryFilter{Kind: p.Kind, Spam: p.Spam, State: p.State}, int(at[0]), page.size())
+	rows, next, err := s.a.s.enquiriesBefore(reqFrom(ctx).Org.ID, EnquiryFilter{Kind: p.Kind, Spam: p.Spam, State: p.State}, page)
 	if err != nil {
 		return nil, err
-	}
-	next := ""
-	if to := int(at[0]) + len(rows); to < total {
-		next = cursorOf(int64(to))
 	}
 	out := api.ListEnquiries200JSONResponse{Headers: api.ListEnquiries200ResponseHeaders{Link: nextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor = []api.Enquiry{}, next

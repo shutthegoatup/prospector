@@ -268,7 +268,8 @@ func (s *Store) Enquiries(org int64, f EnquiryFilter, page int) ([]Enquiry, Page
 		return nil, Page{}, err
 	}
 	pg := pageOf(page, enquiryPageSize, int(total))
-	rows, _, err := s.enquiriesFrom(org, f, pg.offset(), pg.Size)
+	var rows []Enquiry
+	err := s.enquiriesMatching(org, f).Order("created_at desc, id desc").Limit(pg.Size).Offset(pg.offset()).Find(&rows).Error
 	return rows, pg, err
 }
 
@@ -283,16 +284,26 @@ func (s *Store) enquiriesMatching(org int64, f EnquiryFilter) *gorm.DB {
 	return q
 }
 
-// enquiriesFrom is size enquiries a filter matches, newest first, from the one offset
-// down, and how many it matches in all.
-func (s *Store) enquiriesFrom(org int64, f EnquiryFilter, offset, size int) ([]Enquiry, int, error) {
-	var total int64
-	if err := s.enquiriesMatching(org, f).Count(&total).Error; err != nil {
-		return nil, 0, err
+// enquiriesBefore is a page of the enquiries a filter matches, newest first, after
+// the one a cursor names. The cursor is that enquiry's id, so one answered or marked
+// as spam while the list is walked, or one arriving, moves no other between pages.
+func (s *Store) enquiriesBefore(org int64, f EnquiryFilter, page PageIn) (rows []Enquiry, next string, err error) {
+	at, err := page.at(1)
+	if err != nil {
+		return nil, "", err
 	}
-	var rows []Enquiry
-	err := s.enquiriesMatching(org, f).Order("created_at desc, id desc").Limit(size).Offset(offset).Find(&rows).Error
-	return rows, int(total), err
+	q := s.enquiriesMatching(org, f).Order("id desc").Limit(page.size() + 1)
+	if at[0] > 0 {
+		q = q.Where("id < ?", at[0])
+	}
+	if err := q.Find(&rows).Error; err != nil {
+		return nil, "", err
+	}
+	if len(rows) > page.size() {
+		rows = rows[:page.size()]
+		next = cursorOf(rows[len(rows)-1].ID)
+	}
+	return rows, next, nil
 }
 
 // EnquiryCounts is how many enquiries there are of each kind, with spam under "spam"

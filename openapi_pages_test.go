@@ -27,10 +27,19 @@ func TestEveryListInTheSpecComesInPages(t *testing.T) {
 		if ok == nil || ok.Value.Content.Get("application/json") == nil {
 			continue
 		}
-		schema := ok.Value.Content.Get("application/json").Schema.Value
+		ref := ok.Value.Content.Get("application/json").Schema
+		schema := ref.Value
 		if schema.Type.Is("array") {
 			t.Errorf("GET %s (%s) answers a bare list: answer {items, next_cursor} and take limit and cursor", path, op.OperationID)
 			continue
+		}
+		// A list written into the answer itself, as enquiries once were, under its own name.
+		if ref.Ref == "" {
+			for name, p := range schema.Properties {
+				if name != "items" && p.Value.Type.Is("array") {
+					t.Errorf("GET %s (%s) answers a list as %q: call it items, beside next_cursor", path, op.OperationID, name)
+				}
+			}
 		}
 		items := schema.Properties["items"]
 		if items == nil || !items.Value.Type.Is("array") {
@@ -78,6 +87,8 @@ func TestAListLeftWholeComesOutAPageAtATime(t *testing.T) {
 		t.Fatalf("a cursor past the end: %v %q", page, next)
 	}
 }
+
+func reader(key string) string { return key }
 
 // Following next_cursor, or the Link header, through a list reaches every row once.
 func TestTheAPIsListsWalkToTheirEnd(t *testing.T) {
@@ -143,7 +154,38 @@ func TestTheAPIsListsWalkToTheirEnd(t *testing.T) {
 			t.Errorf("%s: %d rows over %d pages, want 5 over 3", list, len(seen), pages)
 		}
 	}
-	for _, bad := range []string{"agents?cursor=nonsense", "enquiries?cursor=nonsense", "agents?limit=lots"} {
+
+	// Closing each open enquiry as it is read, as an agent working through them would,
+	// leaves none of the others unread.
+	writer, _, err := s.CreateKey(o.ID, "closer", []string{"read", "pipeline:write"}, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	read, cursor := map[string]bool{}, ""
+	for pages := 0; pages < 10; pages++ {
+		code, body := asKey(t, "GET", base+"enquiries?state=open&limit=2&cursor="+cursor, reader(key), nil)
+		var page struct {
+			Items      []map[string]any `json:"items"`
+			NextCursor string           `json:"next_cursor"`
+		}
+		if err := json.Unmarshal([]byte(body), &page); err != nil || code != http.StatusOK {
+			t.Fatalf("open enquiries: %d %s", code, body)
+		}
+		for _, e := range page.Items {
+			id := fmt.Sprint(e["id"])
+			read[id] = true
+			if code, body := asKey(t, "PATCH", base+"enquiries/"+id, writer, map[string]string{"state": "closed"}); code != http.StatusOK {
+				t.Fatalf("closing enquiry %s: %d %s", id, code, body)
+			}
+		}
+		if cursor = page.NextCursor; cursor == "" {
+			break
+		}
+	}
+	if len(read) != 5 {
+		t.Fatalf("closing enquiries while walking them read %d of 5", len(read))
+	}
+	for _, bad := range []string{"agents?cursor=nonsense", "enquiries?cursor=nonsense", "agents?limit=lots", "agents?limit=-1", "enquiries?limit=-1"} {
 		req, _ := http.NewRequest("GET", base+bad, nil)
 		req.Header.Set("Authorization", "Bearer "+key)
 		res, err := http.DefaultClient.Do(req)

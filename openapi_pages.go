@@ -2,11 +2,21 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 )
 
 type listURLKey struct{}
+
+// pageIn checks what a list was asked for as the other lists do. Zero is the limit
+// left out, which the generated code can't tell from 0 asked for.
+func pageIn(limit int, cursor string) (PageIn, error) {
+	if limit < 0 {
+		return PageIn{}, errors.New("limit is a whole number, 1 or more")
+	}
+	return PageIn{Limit: limit, Cursor: cursor}, nil
+}
 
 // listURL hands each operation the address it was asked at, so a page of a list can
 // name the next one in its Link header.
@@ -31,7 +41,10 @@ func nextLink(ctx context.Context, next string) string {
 // how far down the list the page ended, so a row added or gone between two pages
 // moves the rest by one.
 func listPage[T any](all []T, limit int, cursor string) (page []T, next string, err error) {
-	in := PageIn{Limit: limit, Cursor: cursor}
+	in, err := pageIn(limit, cursor)
+	if err != nil {
+		return nil, "", err
+	}
 	at, err := in.at(1)
 	if err != nil {
 		return nil, "", err
