@@ -105,7 +105,7 @@ func (s *Store) companyRef(org int64, ref string) (*Company, error) {
 		q = q.Where("lower(name) = ?", strings.ToLower(strings.TrimSpace(ref)))
 	}
 	if err := q.First(&c).Error; err != nil {
-		return nil, fmt.Errorf("no company %q in this organisation", ref)
+		return nil, missing(err, "no company %q in this organisation", ref)
 	}
 	return &c, nil
 }
@@ -313,7 +313,7 @@ func (s *Store) SetCompanyStage(org, id int64, stage, fit, actor string) error {
 		}
 		res := tx.Model(&Company{}).Where("org_id = ? and id = ?", org, id).Updates(updates)
 		if res.Error != nil || res.RowsAffected == 0 {
-			return fmt.Errorf("no company %d", id)
+			return missing(res.Error, "no company %d", id)
 		}
 		return s.log(tx, org, 0, &id, actor, "company:"+stage, nonEmpty(fit))
 	})
@@ -324,7 +324,7 @@ func (s *Store) PickContact(org int64, o *Org, id int64, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		var c Contact
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
-			return fmt.Errorf("no contact %d", id)
+			return missing(err, "no contact %d", id)
 		}
 		updates := map[string]any{"status": ""}
 		if deref(c.Note) == "" {

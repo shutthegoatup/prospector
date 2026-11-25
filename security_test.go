@@ -708,6 +708,17 @@ func TestOrgIsCreatedWithItsOwner(t *testing.T) {
 	if _, err := s.OrgBySlug("delta"); err == nil {
 		t.Fatal("an organisation was left with nobody in it")
 	}
+	// A name whose address is taken, here by the organisation every server makes, is
+	// refused in words about organisations rather than the database's about an index.
+	if err := s.EnsureFrontOrg(""); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"Prospector", "gamma boats"} {
+		code, body := call(t, client, "POST", srv.URL+"/orgs", "application/json", map[string]string{"name": name})
+		if code != http.StatusBadRequest || !strings.Contains(body, "already has the address /o/"+slugify(name)) || regexp.MustCompile(`(?i)unique|constraint|duplicate`).MatchString(body) {
+			t.Errorf("a second organisation named %q: %d %s", name, code, body)
+		}
+	}
 	if code, _ := call(t, client, "POST", srv.URL+"/orgs", "application/json", map[string]string{"name": "!!!"}); code != http.StatusBadRequest {
 		t.Fatalf("a name with no usable characters: %d", code)
 	}
@@ -1117,7 +1128,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, ctype, body := get(http.DefaultClient, "GET", "/o/alpha/api/v1/companies/nope", map[string]string{"Accept": "text/html", "Authorization": "Bearer " + key})
-	if code != http.StatusNotFound || !strings.HasPrefix(ctype, "text/plain") || styled(body) {
+	if code != http.StatusNotFound || ctype != "application/problem+json" || styled(body) {
 		t.Fatalf("an agent's error: %d %s, styled=%v", code, ctype, styled(body))
 	}
 

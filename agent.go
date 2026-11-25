@@ -337,7 +337,7 @@ func (s *Store) AgentDraft(org int64, who Actor, in DraftIn) error {
 		}
 		var c Contact
 		if err := tx.Where("org_id = ? and id = ?", org, in.ContactID).First(&c).Error; err != nil {
-			return fmt.Errorf("no contact %d", in.ContactID)
+			return missing(err, "no contact %d", in.ContactID)
 		}
 		if day := draftSent(c, in.Kind); day != "" {
 			return fmt.Errorf("that went out on %s, so its text stays as sent", day)
