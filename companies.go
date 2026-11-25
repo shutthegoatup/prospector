@@ -136,7 +136,9 @@ func (s *Store) History(org, company int64, limit int) ([]HistoryItem, error) {
 	}
 	names := map[int64]string{}
 	var people []Contact
-	s.in(org).Where("company_id = ?", company).Find(&people)
+	if err := s.in(org).Where("company_id = ?", company).Find(&people).Error; err != nil {
+		return nil, err
+	}
 	for _, p := range people {
 		names[p.ID] = displayName(p)
 	}
@@ -290,7 +292,7 @@ func (s *Store) ResearchCount(org int64, filter string) int {
 		return 0
 	}
 	var n int64
-	q.Count(&n)
+	logged(q.Count(&n))
 	return int(n)
 }
 
@@ -503,7 +505,7 @@ func (s *Store) Companies(org int64, q, segment, stage string, page int) ([]Comp
 
 func (s *Store) Segments(org int64) []string {
 	var out []string
-	s.in(org).Model(&Company{}).Where("segment <> ''").Distinct().Order("segment").Pluck("segment", &out)
+	logged(s.in(org).Model(&Company{}).Where("segment <> ''").Distinct().Order("segment").Pluck("segment", &out))
 	return out
 }
 
@@ -516,12 +518,12 @@ func (s *Store) Week(org int64, now time.Time) Stats {
 	// From the contacts' own dates, so history brought over from an import counts.
 	for _, col := range []string{"linkedin_added", "email_sent", "followup_sent", "called"} {
 		var n int64
-		s.in(org).Model(&Contact{}).Where(col+" >= ?", day).Count(&n)
+		logged(s.in(org).Model(&Contact{}).Where(col+" >= ?", day).Count(&n))
 		st.Touches += n
 	}
-	s.in(org).Model(&Contact{}).Where("replied >= ?", day).Count(&st.Replies)
-	s.in(org).Model(&Event{}).Where("at >= ? and action = ? and value = ?", since, "set:stage", "meeting").Count(&st.Meetings)
-	s.in(org).Model(&Company{}).Where("created_at >= ? and found_by <> 'import'", since).Count(&st.Researched)
+	logged(s.in(org).Model(&Contact{}).Where("replied >= ?", day).Count(&st.Replies))
+	logged(s.in(org).Model(&Event{}).Where("at >= ? and action = ? and value = ?", since, "set:stage", "meeting").Count(&st.Meetings))
+	logged(s.in(org).Model(&Company{}).Where("created_at >= ? and found_by <> 'import'", since).Count(&st.Researched))
 	return st
 }
 
@@ -534,7 +536,7 @@ type AgentEvent struct {
 
 func (s *Store) AgentActivity(org int64, limit int) []AgentEvent {
 	var events []Event
-	s.in(org).Where(`"user" like 'agent:%'`).Order("at desc").Limit(limit).Find(&events)
+	logged(s.in(org).Where(`"user" like 'agent:%'`).Order("at desc").Limit(limit).Find(&events))
 	out := make([]AgentEvent, len(events))
 	for i, e := range events {
 		out[i] = AgentEvent{e.At, strings.TrimPrefix(e.User, "agent:"), e.Action, deref(e.Value)}
@@ -616,7 +618,7 @@ func uniqueKey(tx *gorm.DB, org int64, key string) string {
 	try := key
 	for i := 2; ; i++ {
 		var n int64
-		tx.Model(&Contact{}).Where("org_id = ? and key = ?", org, try).Count(&n)
+		logged(tx.Model(&Contact{}).Where("org_id = ? and key = ?", org, try).Count(&n))
 		if n == 0 {
 			return try
 		}
@@ -678,7 +680,7 @@ func (s *Store) NeverContactCovers(o *Org) []string {
 		return nil
 	}
 	var people []Contact
-	s.in(o.ID).Where(openContacts).Where(companyNotRejected).Order("id").Find(&people)
+	logged(s.in(o.ID).Where(openContacts).Where(companyNotRejected).Order("id").Find(&people))
 	var names []string
 	for _, p := range people {
 		if o.Settings.listed(deref(p.Email), deref(p.Linkedin)) != nil {

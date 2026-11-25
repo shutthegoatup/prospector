@@ -301,6 +301,15 @@ func (s *Store) oneNameWhateverItsCapitals() {
 	}
 }
 
+// logged is for a query whose caller has nowhere to send an error: a count or a list
+// on its way to a page. The page then shows nothing, and the log says why.
+func logged(res *gorm.DB) error {
+	if res.Error != nil {
+		log.Printf("database: %v", res.Error)
+	}
+	return res.Error
+}
+
 func today() string { return time.Now().Format("2006-01-02") }
 
 func str(v string) *string { return &v }

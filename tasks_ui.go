@@ -30,7 +30,7 @@ func (a *App) tasksPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var all int64
-	a.s.in(q.Org.ID).Model(&Task{}).Count(&all)
+	logged(a.s.in(q.Org.ID).Model(&Task{}).Count(&all))
 	a.page(w, r, "tasks", TasksView(q, TasksData{Rows: rows, Closed: closed, All: int(all), Now: now}))
 }
 

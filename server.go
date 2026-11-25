@@ -652,7 +652,7 @@ func (a *App) newOrg(w http.ResponseWriter, r *http.Request) {
 // until `prospector user add` has run against the same database.
 func serve(a *App, addr string) error {
 	var users int64
-	a.s.db.Model(&User{}).Count(&users)
+	logged(a.s.db.Model(&User{}).Count(&users))
 	if users == 0 {
 		log.Print("no users yet: create one with `prospector user add <email> <name>`")
 	}

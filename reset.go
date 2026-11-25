@@ -60,11 +60,13 @@ func (s *Store) newPasswordToken(user int64, invite bool) (string, error) {
 // restart doesn't reset the wait.
 func (s *Store) ResetToken(user int64) (string, error) {
 	var recent int64
-	s.db.Model(&PasswordToken{}).Where("user_id = ? and invite = ? and created_at > ?", user, false, time.Now().Add(-resetGap)).Count(&recent)
+	if err := s.db.Model(&PasswordToken{}).Where("user_id = ? and invite = ? and created_at > ?", user, false, time.Now().Add(-resetGap)).Count(&recent).Error; err != nil {
+		return "", err
+	}
 	if recent > 0 {
 		return "", errTooSoon
 	}
-	s.db.Where("expires_at < ?", time.Now()).Delete(&PasswordToken{})
+	logged(s.db.Where("expires_at < ?", time.Now()).Delete(&PasswordToken{}))
 	return s.newPasswordToken(user, false)
 }
 
@@ -72,7 +74,9 @@ func (s *Store) ResetToken(user int64) (string, error) {
 // adding someone over and over can't fill their inbox.
 func (s *Store) InviteToken(user int64) (string, error) {
 	var recent int64
-	s.db.Model(&PasswordToken{}).Where("user_id = ? and invite = ? and created_at > ?", user, true, time.Now().Add(-resetGap)).Count(&recent)
+	if err := s.db.Model(&PasswordToken{}).Where("user_id = ? and invite = ? and created_at > ?", user, true, time.Now().Add(-resetGap)).Count(&recent).Error; err != nil {
+		return "", err
+	}
 	if recent > 0 {
 		return "", errTooSoon
 	}

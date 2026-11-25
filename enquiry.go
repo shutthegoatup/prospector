@@ -166,7 +166,7 @@ func (s *Store) EnquiryCounts(org int64) map[string]int {
 		Spam bool
 		N    int
 	}
-	s.in(org).Model(&Enquiry{}).Select("kind, spam, count(*) as n").Group("kind, spam").Scan(&rows)
+	logged(s.in(org).Model(&Enquiry{}).Select("kind, spam, count(*) as n").Group("kind, spam").Scan(&rows))
 	out := map[string]int{}
 	for _, r := range rows {
 		if r.Spam {
@@ -339,7 +339,7 @@ func (a *App) enquiriesPage(w http.ResponseWriter, r *http.Request) {
 	names := map[int64]string{}
 	if len(ids) > 0 {
 		var companies []Company
-		a.s.in(q.Org.ID).Where("id in ?", ids).Find(&companies)
+		logged(a.s.in(q.Org.ID).Where("id in ?", ids).Find(&companies))
 		for _, c := range companies {
 			names[c.ID] = c.Name
 		}

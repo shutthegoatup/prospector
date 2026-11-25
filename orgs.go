@@ -189,11 +189,16 @@ func createOrg(tx *gorm.DB, slug, name string) (*Org, error) {
 	}
 	// Asked first, since the unique index would answer in the database's own words.
 	var taken int64
-	if tx.Model(&Org{}).Where("slug = ?", slug).Count(&taken); taken > 0 {
+	if err := tx.Model(&Org{}).Where("slug = ?", slug).Count(&taken).Error; err != nil {
+		return nil, err
+	}
+	if taken > 0 {
 		return nil, fmt.Errorf("another organisation already has the address /o/%s: choose a different name", slug)
 	}
 	var n int64
-	tx.Model(&Org{}).Count(&n)
+	if err := tx.Model(&Org{}).Count(&n).Error; err != nil {
+		return nil, err
+	}
 	o := &Org{Slug: slug, Name: strings.TrimSpace(name), Color: orgColors[int(n)%len(orgColors)]}
 	return o, tx.Create(o).Error
 }
@@ -242,7 +247,10 @@ func lockOrg(tx *gorm.DB, org int64) error {
 
 func lastOwner(tx *gorm.DB, org int64) bool {
 	var owners int64
-	tx.Model(&Membership{}).Where("org_id = ? and role = ?", org, "owner").Count(&owners)
+	// A count that failed is taken as one owner, so nobody is removed on the strength of it.
+	if logged(tx.Model(&Membership{}).Where("org_id = ? and role = ?", org, "owner").Count(&owners)) != nil {
+		return true
+	}
 	return owners <= 1
 }
 
@@ -463,7 +471,7 @@ func (s *Store) KeyFor(secret string) (*APIKey, error) {
 	if s.keys.lookupBehind(k.Hash) {
 		set["hash"] = s.keys.lookup(apiKeys, secret)
 	}
-	s.db.Model(&k).Updates(set)
+	logged(s.db.Model(&k).Updates(set))
 	return &k, nil
 }
 

@@ -137,7 +137,9 @@ func (a *App) StartRun(org, task int64, by string) (*AgentRun, error) {
 		return nil, err
 	}
 	var going int64
-	a.s.db.Model(&AgentRun{}).Where("org_id = ? and task_id = ? and status in ?", org, task, []string{RunWorking, RunWaiting}).Count(&going)
+	if err := a.s.db.Model(&AgentRun{}).Where("org_id = ? and task_id = ? and status in ?", org, task, []string{RunWorking, RunWaiting}).Count(&going).Error; err != nil {
+		return nil, err
+	}
 	if going > 0 {
 		return nil, errors.New("Prospector's agent is already working this task")
 	}
@@ -152,7 +154,7 @@ func (a *App) StartRun(org, task int64, by string) (*AgentRun, error) {
 		LeaseUntil: now.Add(runLease).UnixMilli(), StartedAt: now}
 	if err := a.s.db.Create(&run).Error; err != nil {
 		// Another start won the race to this task.
-		if a.s.db.Model(&AgentRun{}).Where("org_id = ? and task_id = ? and status in ?", org, task, []string{RunWorking, RunWaiting}).Count(&going); going > 0 {
+		if logged(a.s.db.Model(&AgentRun{}).Where("org_id = ? and task_id = ? and status in ?", org, task, []string{RunWorking, RunWaiting}).Count(&going)); going > 0 {
 			return nil, errors.New("Prospector's agent is already working this task")
 		}
 		return nil, err
@@ -217,10 +219,10 @@ func (a *App) launch(run AgentRun) {
 			return
 		}
 		now := time.Now()
-		a.s.db.Model(&AgentRun{}).Where("id = ? and owner = ?", run.ID, run.Owner).
+		logged(a.s.db.Model(&AgentRun{}).Where("id = ? and owner = ?", run.ID, run.Owner).
 			Updates(map[string]any{"status": status, "stop_reason": reason, "ended_at": &now, "lease_until": 0, "wait_until": nil,
 				"turns": run.Turns, "episodes": run.Episodes, "tool_calls": run.ToolCalls, "added": run.Added,
-				"tokens_in": run.TokensIn, "tokens_out": run.TokensOut, "request_id": run.RequestID})
+				"tokens_in": run.TokensIn, "tokens_out": run.TokensOut, "request_id": run.RequestID}))
 	}()
 }
 
@@ -238,7 +240,7 @@ func (a *App) keepRunsGoing(ctx context.Context, every time.Duration) {
 
 func (a *App) resumeLapsed(now time.Time) {
 	var lapsed []AgentRun
-	a.s.db.Where("status in ? and lease_until < ?", []string{RunWorking, RunWaiting}, now.UnixMilli()).Find(&lapsed)
+	logged(a.s.db.Where("status in ? and lease_until < ?", []string{RunWorking, RunWaiting}, now.UnixMilli()).Find(&lapsed))
 	for _, run := range lapsed {
 		a.runs.mu.Lock()
 		_, mine := a.runs.cancel[run.ID]
@@ -249,8 +251,8 @@ func (a *App) resumeLapsed(now time.Time) {
 			continue
 		}
 		if run.StopAsked {
-			a.s.db.Model(&AgentRun{}).Where("id = ? and lease_until = ?", run.ID, run.LeaseUntil).
-				Updates(map[string]any{"status": RunStopped, "stop_reason": "stopped by a person", "ended_at": &now, "lease_until": 0})
+			logged(a.s.db.Model(&AgentRun{}).Where("id = ? and lease_until = ?", run.ID, run.LeaseUntil).
+				Updates(map[string]any{"status": RunStopped, "stop_reason": "stopped by a person", "ended_at": &now, "lease_until": 0}))
 			continue
 		}
 		if busy >= maxRunning {
@@ -358,7 +360,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 				return a.ended(ctx, run, err)
 			}
 			var revoked int64
-			a.s.db.Model(&APIKey{}).Where("id = ? and revoked_at is not null", bk.ID).Count(&revoked)
+			logged(a.s.db.Model(&APIKey{}).Where("id = ? and revoked_at is not null", bk.ID).Count(&revoked))
 			if revoked > 0 {
 				return RunStopped, "its key was revoked on the Agents page"
 			}
@@ -425,7 +427,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 // server is going away, nobody's if another server took it over, else failed.
 func (a *App) ended(ctx context.Context, run *AgentRun, err error) (string, string) {
 	var now AgentRun
-	a.s.db.Where("id = ?", run.ID).Limit(1).Find(&now)
+	logged(a.s.db.Where("id = ?", run.ID).Limit(1).Find(&now))
 	switch {
 	case now.Owner != run.Owner:
 		return "", ""
@@ -583,7 +585,7 @@ func sources(name string, args map[string]any) []string {
 
 func (t *turnState) requestDone() bool {
 	var r TaskRequest
-	t.app.s.db.Where("org_id = ? and id = ?", t.run.OrgID, t.run.RequestID).Limit(1).Find(&r)
+	logged(t.app.s.db.Where("org_id = ? and id = ?", t.run.OrgID, t.run.RequestID).Limit(1).Find(&r))
 	return r.DoneAt != nil
 }
 
