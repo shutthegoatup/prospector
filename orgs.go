@@ -324,6 +324,10 @@ func (s *Store) Login(email, password string) (string, *User, error) {
 	u, err := s.UserByEmail(email)
 	if err != nil {
 		bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
+		// A look-up that failed says nothing about the password, and mustn't read as a wrong one.
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", nil, err
+		}
 		return "", nil, errWrongLogin
 	}
 	// An account with no password takes as long to refuse as any other.
