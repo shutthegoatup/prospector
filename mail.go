@@ -118,13 +118,14 @@ func submit(conn net.Conn, via MailServer, from, to *mail.Address, m Message, se
 		return fmt.Errorf("%s: %w", addr, err)
 	}
 	defer c.Close()
-	if via.Port != 465 {
-		if ok, _ := c.Extension("STARTTLS"); ok {
-			if err := c.StartTLS(secure); err != nil {
-				return fmt.Errorf("%s: %w", addr, err)
-			}
-		} else if needTLS {
+	// A server on this machine is spoken to in the clear even when it offers TLS: its
+	// certificate is usually self-signed, and nothing leaves the machine.
+	if via.Port != 465 && needTLS {
+		if ok, _ := c.Extension("STARTTLS"); !ok {
 			return fmt.Errorf("%s doesn't offer TLS, so nothing was sent", addr)
+		}
+		if err := c.StartTLS(secure); err != nil {
+			return fmt.Errorf("%s: %w", addr, err)
 		}
 	}
 	if via.Username != "" {

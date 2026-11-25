@@ -374,12 +374,14 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 	msg := u.Email + " added to " + q.Org.Name + "."
 	// Someone who never chose a password is sent the link again, so a lost one isn't the end.
 	if password != "" || u.MustChangePassword {
-		sent, err := a.invite(r.Context(), q, u)
+		sent, err := a.invite(r.Context(), q, u, password != "")
 		if sent {
 			writeJSON(w, map[string]string{"message": msg + " They've been emailed a link to choose their password; it lasts 7 days."})
 			return
 		}
-		if err != nil {
+		if errors.Is(err, errTooSoon) {
+			msg += " They were emailed a link to choose their password a moment ago, so no other was sent."
+		} else if err != nil {
 			msg += " The invitation couldn't be emailed (" + err.Error() + ")."
 		}
 	} else if !u.HasPassword() {

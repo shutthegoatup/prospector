@@ -106,7 +106,7 @@ Both need `SMTP_ADDR`, `MAIL_FROM` and `PROSPECTOR_URL`: a link is only ever bui
 
 Any SMTP submission service that takes a username and password (`AUTH PLAIN`) works, a transactional mail provider's included. Mail goes over TLS (STARTTLS, or implicit TLS on port 465) or not at all; only a server on the same machine is spoken to in the clear.
 
-**An organisation can use a server of its own**, set by an owner under Settings → Outgoing mail. Invitations to that organisation then leave through it, from its address. Resets belong to the account, not to an organisation, so they always use the app's. The password is kept sealed under the server's [secret key](#secret-keys), which must be set first, and is never shown again. The server must be on port 587, 465, 2525 or 25.
+**An organisation can use a server of its own**, set by an owner under Settings → Outgoing mail. Invitations to that organisation then leave through it, from its address. Resets belong to the account, not to an organisation, so they always use the app's. The password is kept sealed under the server's [secret key](#secret-keys), which must be set first, and is never shown again. The server must be on port 587, 465, 2525 or 25. It carries an invitation only for an account that the invitation itself creates: whoever runs a mail server reads what passes through it, so someone who already has an account, and hasn't chosen a password yet, is sent the link by the app's own server or not at all. A second invitation to the same person waits five minutes and ends the first.
 
 A reset link gives a password to an account that had none because it signs in through a provider. An organisation that requires its single sign-on refuses that password as it does any other.
 

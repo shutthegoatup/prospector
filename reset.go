@@ -68,7 +68,23 @@ func (s *Store) ResetToken(user int64) (string, error) {
 	return s.newPasswordToken(user, false)
 }
 
-func (s *Store) InviteToken(user int64) (string, error) { return s.newPasswordToken(user, true) }
+// InviteToken replaces any earlier invitation, and refuses a second inside resetGap, so
+// adding someone over and over can't fill their inbox.
+func (s *Store) InviteToken(user int64) (string, error) {
+	var recent int64
+	s.db.Model(&PasswordToken{}).Where("user_id = ? and invite = ? and created_at > ?", user, true, time.Now().Add(-resetGap)).Count(&recent)
+	if recent > 0 {
+		return "", errTooSoon
+	}
+	if err := s.dropInvites(user); err != nil {
+		return "", err
+	}
+	return s.newPasswordToken(user, true)
+}
+
+func (s *Store) dropInvites(user int64) error {
+	return s.db.Where("user_id = ? and invite = ?", user, true).Delete(&PasswordToken{}).Error
+}
 
 func (s *Store) PasswordTokenUser(token string) (*User, error) {
 	var t PasswordToken
@@ -252,8 +268,15 @@ func (a *App) reset(w http.ResponseWriter, r *http.Request) {
 
 // invite emails a new member a link to choose their password. It reports false when
 // there is no way to send one, and then the first password is shown instead.
-func (a *App) invite(ctx context.Context, q *Req, u *User) (bool, error) {
-	via, err := a.mailFor(q.Org.ID)
+//
+// The organisation's own server carries it only for an account this request created.
+// Whoever runs that server reads the link, and for an account that was already here
+// the link would hand them someone else's account.
+func (a *App) invite(ctx context.Context, q *Req, u *User, created bool) (bool, error) {
+	via, err := a.mail, error(nil)
+	if created {
+		via, err = a.mailFor(q.Org.ID)
+	}
 	if a.base == "" || (via == nil && err == nil) {
 		return false, nil
 	}
@@ -268,6 +291,10 @@ func (a *App) invite(ctx context.Context, q *Req, u *User) (bool, error) {
 		Body: q.Actor() + " added you to " + q.Org.Name + " on Prospector, at " + a.base + ".\n\n" +
 			"Choose your password here, within 7 days:\n" + a.base + "/reset/" + token + "\n\n" +
 			"Then sign in with " + u.Email + ".\n"})
+	if err != nil {
+		// Nothing was sent, so the wait before another try doesn't apply.
+		a.s.dropInvites(u.ID)
+	}
 	return err == nil, err
 }
 

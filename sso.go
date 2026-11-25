@@ -191,6 +191,10 @@ func claim(tx *gorm.DB, u *User) error {
 	if err := tx.Model(u).Select("password_hash", "must_change_password").Updates(u).Error; err != nil {
 		return err
 	}
+	// An emailed invitation could still set a password; it ends with the first password.
+	if err := tx.Where("user_id = ?", u.ID).Delete(&PasswordToken{}).Error; err != nil {
+		return err
+	}
 	return tx.Where("user_id = ?", u.ID).Delete(&Session{}).Error
 }
 

@@ -16,6 +16,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	"gorm.io/gorm"
 )
 
 const testSite = "https://prospector.example"
@@ -323,12 +326,34 @@ func TestInvitationByEmail(t *testing.T) {
 		t.Fatal("adding Alan")
 	}
 	first := linkIn(t, box.take(t, 1)[0])
+	alan := must(s.UserByEmail("alan@example.com"))
+	// Straight away nothing more is sent, so adding someone repeatedly can't fill their inbox.
+	code, body = call(t, ada, "POST", srv.URL+"/o/alpha/ui/member", "application/json", map[string]string{"email": "alan@example.com"})
+	if code != http.StatusOK || !strings.Contains(body, "a moment ago") || strings.Contains(body, "first password") {
+		t.Fatalf("adding Alan again at once: %d %s", code, body)
+	}
+	box.take(t, 0)
+	if err := s.db.Model(&PasswordToken{}).Where("user_id = ?", alan.ID).Update("created_at", time.Now().Add(-2*resetGap)).Error; err != nil {
+		t.Fatal(err)
+	}
 	code, body = call(t, ada, "POST", srv.URL+"/o/alpha/ui/member", "application/json", map[string]string{"email": "alan@example.com"})
 	if code != http.StatusOK || !strings.Contains(body, "emailed a link") || strings.Contains(body, "first password") {
 		t.Fatalf("adding Alan again: %d %s", code, body)
 	}
 	if again := linkIn(t, box.take(t, 1)[0]); again == first {
 		t.Error("the second invitation reused the first link")
+	}
+	if code, _ := call(t, http.DefaultClient, "GET", srv.URL+first, "", nil); code != http.StatusGone {
+		t.Errorf("the first invitation still works after the second: %d", code)
+	}
+
+	// Arriving through a provider ends the invitation with the first password.
+	if err := s.db.Transaction(func(tx *gorm.DB) error { return claim(tx, alan) }); err != nil {
+		t.Fatal(err)
+	}
+	var left int64
+	if s.db.Model(&PasswordToken{}).Where("user_id = ?", alan.ID).Count(&left); left != 0 {
+		t.Error("an invitation outlived the account's sign-in through a provider")
 	}
 
 	// Someone who already has an account is added without mail.
@@ -444,6 +469,48 @@ func TestMailPasswordNeedsAKey(t *testing.T) {
 	}
 	if _, err := s.OrgMail(must(s.OrgBySlug("alpha")).ID); err == nil {
 		t.Error("it was stored anyway")
+	}
+}
+
+// Whoever runs an organisation's mail server reads what it carries, so a link to
+// choose the password of an account that was already here never goes through it.
+func TestAnotherOrganisationsMailServerNeverCarriesAnExistingAccountsLink(t *testing.T) {
+	s, srv, ada, box := mailSite(t, nil)
+	if code, _ := call(t, ada, "POST", srv.URL+"/o/alpha/ui/member", "application/json", map[string]string{"email": "grace@example.com", "name": "Grace Hopper"}); code != http.StatusOK {
+		t.Fatal("adding Grace")
+	}
+	box.take(t, 1)
+	grace := must(s.UserByEmail("grace@example.com"))
+	if err := s.db.Model(&PasswordToken{}).Where("user_id = ?", grace.ID).Update("created_at", time.Now().Add(-2*resetGap)).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	mallory := must(s.CreateUser("mallory@example.com", "Mallory", "mallory's password"))
+	beta := mustOrg(t, s, "beta")
+	if err := s.AddMember(beta.ID, mallory.ID, "owner", mallory.Name); err != nil {
+		t.Fatal(err)
+	}
+	theirs := newMailClient()
+	signIn(t, theirs, srv, "mallory@example.com", "mallory's password")
+	if code, body := call(t, theirs, "POST", srv.URL+"/o/beta/ui/mail", "application/json",
+		map[string]any{"host": "smtp.mallory.example", "port": 587, "sender": "m@mallory.example"}); code != http.StatusOK {
+		t.Fatalf("saving beta's mail server: %d %s", code, body)
+	}
+	if code, body := call(t, theirs, "POST", srv.URL+"/o/beta/ui/member", "application/json", map[string]string{"email": "grace@example.com"}); code != http.StatusOK {
+		t.Fatalf("adding Grace to beta: %d %s", code, body)
+	}
+	for _, m := range box.take(t, 1) {
+		if m.via.Host != "smtp.site.example" || m.To != "grace@example.com" {
+			t.Fatalf("a link to an existing account's password went through %s to %s", m.via.Host, m.To)
+		}
+	}
+
+	// Someone the request itself creates is still invited through the organisation's server.
+	if code, _ := call(t, theirs, "POST", srv.URL+"/o/beta/ui/member", "application/json", map[string]string{"email": "new@example.com", "name": "New"}); code != http.StatusOK {
+		t.Fatal("adding someone new to beta")
+	}
+	if m := box.take(t, 1)[0]; m.via.Host != "smtp.mallory.example" {
+		t.Fatalf("a new member's invitation went through %s", m.via.Host)
 	}
 }
 
@@ -713,5 +780,15 @@ func TestSMTPNeedsTLS(t *testing.T) {
 		if got := said(f); strings.Contains(got, "AUTH") || strings.Contains(got, "MAIL") {
 			t.Errorf("%s: the server was sent: %s", name, got)
 		}
+	}
+
+	// A relay on this machine usually offers TLS under a certificate of its own making.
+	local, relay := via, newFakeSMTP(t, offer)
+	local.Username = ""
+	if err := submit(dial(relay), local, from, to, Message{Subject: "x", Body: "y"}, &tls.Config{ServerName: via.Host}, false); err != nil {
+		t.Fatalf("a local relay with a self-signed certificate: %v", err)
+	}
+	if got := said(relay); strings.Contains(got, "STARTTLS") || !strings.Contains(got, "DATA") {
+		t.Errorf("a local relay was sent: %s", got)
 	}
 }
