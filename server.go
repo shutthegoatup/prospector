@@ -411,6 +411,9 @@ func (a *App) Routes() http.Handler {
 		w.Header().Set("Referrer-Policy", "same-origin")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Content-Security-Policy", contentPolicy)
+		// Pages and answers hold people's details: a browser shouldn't keep them for the
+		// back button after signing out, nor anything in between. Assets set their own.
+		w.Header().Set("Cache-Control", "no-store")
 		if a.secure(r) {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		}
