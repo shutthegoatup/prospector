@@ -474,3 +474,31 @@ func TestARenewalIsStartedAndWorkedFromTheBoard(t *testing.T) {
 		t.Error("a removed renewal is still on the board")
 	}
 }
+
+// A renewal has no card on Today, so the side panel says how many need moving on.
+func TestTodayPointsAtDealsThatNeedANextStep(t *testing.T) {
+	s, o, srv, client := signedIn(t)
+	c := repliedPerson(t, s, o, "Hannah Pryce")
+	const prompt = "Move renewals and other deals on"
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(page, prompt) {
+		t.Fatal("Today points at deals when there are none")
+	}
+	renewal := must(s.StartDeal(o.ID, c.ID, "renewal", "Ada Lovelace"))
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); !strings.Contains(page, prompt) || !strings.Contains(page, "/o/alpha/conversations") {
+		t.Error("Today says nothing of a renewal with no next step")
+	}
+	for field, value := range map[string]string{"next_step": "Send renewal terms", "next_date": "2999-01-01"} {
+		if err := s.ChangeDeal(o.ID, renewal.ID, field, value, "Ada Lovelace"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(page, prompt) {
+		t.Error("Today still points at a renewal whose next step is a long way off")
+	}
+	if err := s.ChangeDeal(o.ID, renewal.ID, "next_date", "2020-01-01", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); !strings.Contains(page, prompt) {
+		t.Error("Today says nothing of a renewal whose next step is overdue")
+	}
+}

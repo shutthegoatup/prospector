@@ -52,6 +52,12 @@ func (a *App) nav(q *Req, active string) Nav {
 			n.Conversations += len(list)
 		}
 	}
+	others, _ := a.s.OtherDeals(q.Org.ID)
+	for k, list := range others {
+		if k != "won" && k != "lost" {
+			n.Conversations += len(list)
+		}
+	}
 	var companies int64
 	logged(a.s.in(q.Org.ID).Model(&Company{}).Count(&companies))
 	n.Companies = int(companies)
@@ -69,8 +75,10 @@ type TodayData struct {
 	Total     int
 	Review    int
 	LaterCall int
-	Week      Stats
-	Now       string
+	// Deals are the renewals and other further deals with no next step, or one that's due.
+	Deals int
+	Week  Stats
+	Now   string
 }
 
 func (a *App) today(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +87,18 @@ func (a *App) today(w http.ResponseWriter, r *http.Request) {
 	cards, counts := Today(a.dueByStep(q, now), q.Voice(), now)
 	d := TodayData{Filter: r.URL.Query().Get("step"), Counts: counts, Total: len(cards),
 		Review: a.s.ResearchCount(q.Org.ID, "review"), Week: a.s.Week(q.Org.ID, now), Now: now.Format("Mon 2 Jan · 15:04")}
+	others, err := a.s.OtherDeals(q.Org.ID)
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	for _, list := range others {
+		for _, o := range list {
+			if o.needsNextStep(now.Format("2006-01-02")) {
+				d.Deals++
+			}
+		}
+	}
 	for _, c := range cards {
 		if c.Step == "call" && c.State != "ok" {
 			d.LaterCall++
