@@ -4,6 +4,8 @@ import (
 	"log"
 	"strings"
 	"unicode/utf8"
+
+	"gorm.io/gorm"
 )
 
 // Search matches a substring anywhere in a few text columns. A trigram index serves
@@ -52,15 +54,25 @@ var postgresSearch = []string{
 
 // indexSearch never stops the server starting: without the index, search scans as it always did.
 func (s *Store) indexSearch() {
-	stmts := sqliteSearch
-	if s.postgres() {
-		stmts = postgresSearch
-	}
-	for _, stmt := range stmts {
-		if err := s.db.Exec(stmt).Error; err != nil {
-			log.Printf("search index unavailable, searching by scan: %v", err)
-			return
+	run := func(db *gorm.DB, stmts []string) error {
+		for _, stmt := range stmts {
+			if err := db.Exec(stmt).Error; err != nil {
+				return err
+			}
 		}
+		return nil
+	}
+	var err error
+	if s.postgres() {
+		err = run(s.db, postgresSearch)
+	} else {
+		// One transaction: every command opens the store, and a server on the same file
+		// mustn't search an index another command has emptied and not yet refilled.
+		err = s.db.Transaction(func(tx *gorm.DB) error { return run(tx, sqliteSearch) })
+	}
+	if err != nil {
+		log.Printf("search index unavailable, searching by scan: %v", err)
+		return
 	}
 	s.fts = !s.postgres()
 }
