@@ -748,7 +748,7 @@ func TestOrgIsCreatedWithItsOwner(t *testing.T) {
 	}
 	for _, name := range []string{"Prospector", "gamma boats"} {
 		code, body := call(t, client, "POST", srv.URL+"/orgs", "application/json", map[string]string{"name": name})
-		if code != http.StatusBadRequest || !strings.Contains(body, "already has the address /o/"+slugify(name)) || regexp.MustCompile(`(?i)unique|constraint|duplicate`).MatchString(body) {
+		if code != http.StatusConflict || !strings.Contains(body, "already has the address /o/"+slugify(name)) || regexp.MustCompile(`(?i)unique|constraint|duplicate`).MatchString(body) {
 			t.Errorf("a second organisation named %q: %d %s", name, code, body)
 		}
 	}
