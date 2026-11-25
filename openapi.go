@@ -95,7 +95,7 @@ func (a *App) apiScope(scopes map[string]string) api.StrictMiddlewareFunc {
 	}
 }
 
-func ownersOnly(scope string) bool { return scope == "agents:configure" }
+func ownersOnly(scope string) bool { return scope == "agents:configure" || scope == "enquiries:delete" }
 
 func reqFrom(ctx context.Context) *Req { return ctx.Value(reqKey{}).(*Req) }
 

@@ -422,7 +422,7 @@ func (s *Store) Logout(token string) error {
 
 // Scopes an API key can carry. None can change settings or reach another org; only enquiries:reply and customers:invite send mail, and only import skips review.
 var Scopes = []struct{ Name, What string }{
-	{"read", "search companies and people, read what's due and the tasks people wrote"},
+	{"read", "search companies and people, read what's due and the tasks people wrote, and read deals, subscriptions, onboardings and enquiries with what was said in answering them"},
 	{"research:write", "add companies, facts and suggested contacts (they wait in Research), and leave notes on tasks"},
 	{"drafts:write", "write draft notes and emails, marked as written by the agent"},
 	{"outcomes:write", "record what happened (added, accepted, sent, called, replied, declined, hold), shown as the agent's"},
@@ -430,6 +430,8 @@ var Scopes = []struct{ Name, What string }{
 	{"enquiries:write", "record an enquiry or sign-up from your own product or site backend"},
 	{"enquiries:reply", "email a reply to whoever sent an enquiry, through your mail server, and record what they said back"},
 	{"customers:write", "record and change subscriptions, start their renewals, and start, change and remove onboardings"},
+	{"pipeline:write", "work deals (start, value, stage, owner, remove) and say where answering an enquiry stands, who has it, and put its sender on the board"},
+	{"enquiries:delete", "delete an enquiry for good, with what was said in answering it"},
 	{"customers:invite", "email a customer a link to their onboarding steps, through your mail server, and withdraw it"},
 	{"agents:run", "start and stop Prospector's own agents on tasks"},
 	{"agents:configure", "add, change and delete Prospector's own agents, their endpoints, keys and tools"},
