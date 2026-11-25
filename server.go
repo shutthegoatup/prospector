@@ -375,6 +375,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/subscription", a.member(a.uiSubscription))
 	mux.HandleFunc("POST /o/{org}/ui/subscription/change", a.member(a.uiSubscriptionChange))
 	mux.HandleFunc("POST /o/{org}/ui/subscription/remove", a.member(a.uiSubscriptionRemove))
+	mux.HandleFunc("POST /o/{org}/ui/subscription/renew", a.member(a.uiSubscriptionRenew))
 	mux.HandleFunc("POST /o/{org}/ui/onboarding", a.member(a.uiOnboardingStart))
 	mux.HandleFunc("POST /o/{org}/ui/onboarding/step", a.member(a.uiOnboardingStep))
 	mux.HandleFunc("POST /o/{org}/ui/onboarding/remove", a.member(a.uiOnboardingRemove))
