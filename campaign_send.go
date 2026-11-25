@@ -126,6 +126,15 @@ func (s *Store) SendCampaign(o *Org, id int64, actor string) (*Campaign, error) 
 		if flipped.RowsAffected == 0 {
 			return errors.New("it has been sent already")
 		}
+		// Read again now it is ours: a change that landed between the first read and the
+		// flip, or a row an older release wrote, must not send a service notice to anyone
+		// but customers.
+		if err := tx.Where("org_id = ? and id = ?", o.ID, id).First(&c).Error; err != nil {
+			return err
+		}
+		if err := c.fits(); err != nil {
+			return err
+		}
 		w, err := s.audienceWork(o)
 		if err != nil {
 			return err

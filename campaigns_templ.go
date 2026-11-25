@@ -596,7 +596,7 @@ func CampaignDraftCard(c CampaignCard, ready bool) templ.Component {
 			templ_7745c5c3_ElementWriter := templ_7745c5c3_Buffer
 			templ_7745c5c3_Buffer := templ.GetBuffer()
 			var templ_7745c5c3_ElementScripts []templ.ComponentScript
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<textarea rows=\"8\" maxlength=\"20000\" placeholder=\"What it says, as plain text. Your postal address and an unsubscribe link are added at the foot.\" aria-label=\"What it says\" class=\"rounded-lg border border-input bg-muted px-3 py-2 leading-relaxed\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<textarea rows=\"8\" maxlength=\"20000\" placeholder=\"What it says, as plain text. Your postal address is added at the foot, and for marketing an unsubscribe link.\" aria-label=\"What it says\" class=\"rounded-lg border border-input bg-muted px-3 py-2 leading-relaxed\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -621,7 +621,7 @@ func CampaignDraftCard(c CampaignCard, ready bool) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(c.Body)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `campaigns.templ`, Line: 110, Col: 298}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `campaigns.templ`, Line: 110, Col: 312}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {

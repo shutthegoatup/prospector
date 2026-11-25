@@ -1450,7 +1450,7 @@ export interface components {
             /** @description `marketing`, or `service` for a notice to current customers about what they have; empty is `marketing`. */
             kind?: string;
             subject?: string;
-            /** @description Plain text. The postal address and the unsubscribe link are added when it is sent. */
+            /** @description Plain text. The postal address is added when it is sent, and for marketing an unsubscribe link. */
             body?: string;
         };
         CampaignChange: {

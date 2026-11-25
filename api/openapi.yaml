@@ -1843,7 +1843,7 @@ components:
         audience: { type: string, description: "`conversations` or `customers`; empty is `conversations`, or `customers` for a service notice." }
         kind: { type: string, description: "`marketing`, or `service` for a notice to current customers about what they have; empty is `marketing`." }
         subject: { type: string, maxLength: 200 }
-        body: { type: string, maxLength: 20000, description: "Plain text. The postal address and the unsubscribe link are added when it is sent." }
+        body: { type: string, maxLength: 20000, description: "Plain text. The postal address is added when it is sent, and for marketing an unsubscribe link." }
 
     CampaignChange:
       type: object

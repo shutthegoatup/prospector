@@ -107,7 +107,7 @@ templ CampaignDraftCard(c CampaignCard, ready bool) {
 			<p class="rounded-lg border border-border bg-muted px-3 py-2">A service notice goes to everyone at a current customer, including anyone who unsubscribed from your marketing, because it is about what they already have: a price or terms change, an outage, a date that matters. Keep it to that. Anything promotional in it makes it marketing, whatever it is called. It never goes to anyone on the never-contact list or erased, and carries no unsubscribe link.</p>
 		}
 		<input value={ c.Subject } maxlength="200" placeholder="Subject" aria-label="Subject" class="h-9 rounded-lg border border-input bg-muted px-3" { campaignInput(c.Campaign, "subject")... }/>
-		<textarea rows="8" maxlength="20000" placeholder="What it says, as plain text. Your postal address and an unsubscribe link are added at the foot." aria-label="What it says" class="rounded-lg border border-input bg-muted px-3 py-2 leading-relaxed" { campaignInput(c.Campaign, "body")... }>{ c.Body }</textarea>
+		<textarea rows="8" maxlength="20000" placeholder="What it says, as plain text. Your postal address is added at the foot, and for marketing an unsubscribe link." aria-label="What it says" class="rounded-lg border border-input bg-muted px-3 py-2 leading-relaxed" { campaignInput(c.Campaign, "body")... }>{ c.Body }</textarea>
 		<details>
 			<summary class="cursor-pointer font-mono text-xs text-muted-foreground">{ "Would go to " + plural(c.Going, "person") + "; " + strconv.Itoa(c.LeftOut) + " left out" }</summary>
 			<div class="mt-2 flex flex-col">
