@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -100,8 +101,8 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 			t.Errorf("the customer's page shows %q", private)
 		}
 	}
-	if !strings.Contains(page, "hannah@larkmoor.example") || !strings.Contains(page, "Leith site") {
-		t.Error("the customer's page doesn't say whose it is or which onboarding")
+	if !strings.Contains(page, "hannah@larkmoor.example") || strings.Contains(page, "Leith site") {
+		t.Error("the customer's page lacks whose it is, or shows the name members gave the onboarding")
 	}
 
 	// The link is spent. Another browser gets nothing from it but the offer of a new one.
@@ -297,5 +298,120 @@ func TestNobodyIsInvitedWithoutMail(t *testing.T) {
 	}
 	if _, page := call(t, member, "GET", srv.URL+"/o/alpha/onboarding", "", nil); strings.Contains(page, `data-form="ui/onboarding/invite"`) || !strings.Contains(page, "PROSPECTOR_URL") {
 		t.Error("the onboarding page offers to invite, or doesn't say what is missing")
+	}
+}
+
+// What made someone invitable has to hold each time, not only on the day they were invited.
+func TestACustomersPageClosesWhenTheyNoLongerQualify(t *testing.T) {
+	s, srv, member, box := mailSite(t, nil)
+	o := must(s.OrgBySlug("alpha"))
+	o.Settings.OnboardingSteps = "them: Send your product files"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	other := must(s.QuickAddPerson(o, QuickAdd{Name: "Sven Dahl", Company: "Nordkap Boats", Email: "sven@nordkap.example"}, "Ada Lovelace"))
+	ob := must(s.StartOnboarding(o.ID, OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
+	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/ui/onboarding/invite", "application/json", map[string]any{"id": ob.ID, "contact": itoa(hannah.ID)}); code != http.StatusOK {
+		t.Fatalf("inviting: %d %s", code, body)
+	}
+	link := srv.URL + customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1]
+	outsider := newMailClient()
+	open := func() bool {
+		_, page := as(t, outsider, "GET", srv.URL+"/c")
+		return strings.Contains(page, "Send your product files")
+	}
+	if as(t, outsider, "POST", link); !open() {
+		t.Fatal("the page did not open")
+	}
+	set := func(column string, value any) {
+		t.Helper()
+		if err := s.db.Model(&Contact{}).Where("id = ?", hannah.ID).Update(column, value).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	again := func() int {
+		t.Helper()
+		ageCustomerLinks(t, s)
+		as(t, newMailClient(), "POST", link+"/again")
+		box.mu.Lock()
+		defer box.mu.Unlock()
+		n := len(box.all)
+		box.all = nil
+		return n
+	}
+
+	set("company_id", *other.CompanyID)
+	if open() || again() != 0 {
+		t.Error("someone who moved to another company kept the page, or was mailed a new link to it")
+	}
+	set("company_id", *hannah.CompanyID)
+	if !open() {
+		t.Fatal("the page did not come back when they were at the company again")
+	}
+
+	o.Settings.NeverContact = "larkmoor.example"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	if open() || again() != 0 {
+		t.Error("someone put on the never-contact list kept the page, or was mailed")
+	}
+	o.Settings.NeverContact = ""
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+
+	set("email", "hannah@larkmoor.example, other@elsewhere.example")
+	if open() || again() != 0 {
+		t.Error("someone whose address became two addresses kept the page, or was mailed")
+	}
+	set("email", nil)
+	if open() {
+		t.Error("someone with no address kept the page")
+	}
+	// A changed address is still them: the next link goes to the new one, and only there.
+	set("email", "hannah.pryce@larkmoor.example")
+	if !open() {
+		t.Fatal("the page did not come back with a good address")
+	}
+	ageCustomerLinks(t, s)
+	as(t, newMailClient(), "POST", link+"/again")
+	if sent := box.take(t, 1); sent[0].To != "hannah.pryce@larkmoor.example" {
+		t.Errorf("the new link went to %q", sent[0].To)
+	}
+
+	// A send that fails does not use up the wait before the next.
+	ageCustomerLinks(t, s)
+	box.mu.Lock()
+	box.fail = errors.New("the mail server is away")
+	box.mu.Unlock()
+	as(t, newMailClient(), "POST", link+"/again")
+	box.mu.Lock()
+	box.fail = nil
+	box.mu.Unlock()
+	as(t, newMailClient(), "POST", link+"/again")
+	box.take(t, 1)
+
+	// A restore that gives them another id takes their page with them, and one that
+	// leaves them out closes it.
+	var kept Contact
+	if err := s.db.First(&kept, hannah.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	kept.ID = hannah.ID + 500
+	if _, err := s.replaceContacts(o.ID, []Contact{kept}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if grants := must(s.CustomerInvites(o.ID))[ob.ID]; len(grants) != 1 || grants[0].ContactID != kept.ID || !open() {
+		t.Errorf("after a restore that renumbered them: %+v, page open %v", grants, open())
+	}
+	someone := "Someone Else"
+	stranger := Contact{ID: kept.ID + 1, Key: "someone else", File: "restore", Person: &someone}
+	if _, err := s.replaceContacts(o.ID, []Contact{stranger}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if grants := must(s.CustomerInvites(o.ID)); len(grants) != 0 || open() {
+		t.Errorf("after a restore without them: %+v, page open %v", grants, open())
 	}
 }

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/mail"
 	"strconv"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -90,7 +92,30 @@ func (s *Store) customerAccess(grant int64) (*CustomerAccess, error) {
 	if err := s.db.Where("org_id = ? and id = ?", org, a.Grant.ContactID).First(&a.Contact).Error; err != nil {
 		return nil, errNoCustomer
 	}
+	// What made them invitable has to hold still, each time: someone who has left the
+	// company, lost their address or gone on the never-contact list has no page.
+	if invitable(&a.Org, a.Onboarding, a.Contact) != nil {
+		return nil, errNoCustomer
+	}
 	return &a, nil
+}
+
+// invitable is whether a contact may have a page for an onboarding: they are a person,
+// picked, at the company being onboarded, with one address a link can be mailed to, and
+// not on the never-contact list.
+func invitable(o *Org, ob Onboarding, c Contact) error {
+	switch {
+	case strings.HasPrefix(c.Key, "org:"):
+		return errors.New("that row stands for a company, not a person")
+	case c.CompanyID == nil || *c.CompanyID != ob.CompanyID:
+		return errors.New("that person is not at the company being onboarded")
+	case c.Status == ContactSuggested:
+		return errors.New("this contact is still a suggestion in Research; a person picks them first")
+	}
+	if _, err := mail.ParseAddress(strings.TrimSpace(deref(c.Email))); err != nil {
+		return errors.New("they have no single email address to send the link to")
+	}
+	return o.Settings.listed(deref(c.Email), deref(c.Linkedin))
 }
 
 // CustomerByToken is the one look-up that starts from a secret and not an organisation:
@@ -139,6 +164,9 @@ func (s *Store) redeemCustomerLink(a *CustomerAccess, token string) (string, err
 		if spent.RowsAffected != 1 {
 			return errNoCustomer
 		}
+		if err := tx.Where("org_id = ? and expires_at < ?", a.Grant.OrgID, now).Delete(&CustomerSession{}).Error; err != nil {
+			return err
+		}
 		return tx.Create(&CustomerSession{OrgID: a.Grant.OrgID, GrantID: a.Grant.ID, TokenHash: hashToken(session), ExpiresAt: now.Add(customerSessionLife)}).Error
 	})
 	return session, err
@@ -152,6 +180,10 @@ var errLinkTooSoon = errors.New("a link was sent a moment ago: it can take a min
 
 // newCustomerLink makes a link for a grant, unless one was made inside customerLinkGap.
 func (s *Store) newCustomerLink(tx *gorm.DB, g CustomerGrant) (string, error) {
+	// Held, so a burst of requests for one person is counted one at a time.
+	if err := hold(tx, &CustomerGrant{}, g.OrgID, g.ID); err != nil {
+		return "", err
+	}
 	var recent int64
 	if err := tx.Model(&CustomerLink{}).Where("org_id = ? and grant_id = ? and created_at > ?", g.OrgID, g.ID, time.Now().Add(-customerLinkGap)).Count(&recent).Error; err != nil {
 		return "", err
@@ -183,16 +215,7 @@ func (s *Store) InviteCustomer(o *Org, onboarding, contact int64, actor string) 
 		if err := tx.Where("org_id = ? and id = ?", o.ID, contact).First(&c).Error; err != nil {
 			return missing(err, "no contact %d", contact)
 		}
-		if c.CompanyID == nil || *c.CompanyID != ob.CompanyID {
-			return errors.New("that person is not at the company being onboarded")
-		}
-		if c.Status == ContactSuggested {
-			return errors.New("this contact is still a suggestion in Research; a person picks them first")
-		}
-		if !emailRe.MatchString(deref(c.Email)) {
-			return errors.New("they have no email address to send the link to")
-		}
-		if err := s.allowed(o, deref(c.Email), deref(c.Linkedin)); err != nil {
+		if err := invitable(o, ob, c); err != nil {
 			return err
 		}
 		g := CustomerGrant{OrgID: o.ID, OnboardingID: ob.ID, ContactID: c.ID}
@@ -390,7 +413,6 @@ type CustomerView struct {
 	// State is which page this is: "open", "again", "sent", "none" or "steps".
 	State string
 	Org   string
-	For   string
 	Email string
 	Steps []OnboardingStep
 	Done  int
@@ -449,6 +471,8 @@ func (a *App) customerAgain(w http.ResponseWriter, r *http.Request) {
 				ctx, cancel := context.WithTimeout(context.Background(), sendLimit)
 				defer cancel()
 				if err := a.customerLinkMail(ctx, &org, to, fresh); err != nil {
+					// Nothing was sent, so the wait before another try doesn't apply.
+					a.s.dropCustomerLink(fresh)
 					log.Printf("a customer's link wasn't sent: %v", err)
 				}
 			})
@@ -480,7 +504,7 @@ func (a *App) customerPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "the page couldn't be read", http.StatusInternalServerError)
 		return
 	}
-	v := CustomerView{State: "steps", Org: acc.Org.Name, For: acc.Onboarding.Name, Email: deref(acc.Contact.Email), Steps: steps, Day: today()}
+	v := CustomerView{State: "steps", Org: acc.Org.Name, Email: deref(acc.Contact.Email), Steps: steps, Day: today()}
 	for _, st := range steps {
 		if st.DoneOn != nil {
 			v.Done++

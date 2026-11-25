@@ -58,7 +58,7 @@ templ CustomerPage(v CustomerView) {
 					case "steps":
 						<header class="flex flex-wrap items-baseline justify-between gap-3">
 							<h1 class="font-heading text-3xl font-bold tracking-tight">Getting you set up<span class="text-coral">.</span></h1>
-							<span class="font-mono text-xs text-muted-foreground">{ joinNonEmpty(" · ", v.Org, v.For) }</span>
+							<span class="font-mono text-xs text-muted-foreground">{ v.Org }</span>
 						</header>
 						if len(v.Steps) == 0 {
 							<p class="text-sm text-muted-foreground">There is nothing for you to do at the moment.</p>
