@@ -58,7 +58,9 @@ type App struct {
 	// agentClient reaches an organisation's model endpoint and tool server; nil means
 	// one that refuses private addresses unless the operator allows them.
 	agentClient *http.Client
-	runs        agentRuns
+	// pageClient reads the pages an agent asks for; tests stand in their own.
+	pageClient *http.Client
+	runs       agentRuns
 	// sleep stands in for waiting in tests; nil is the clock.
 	sleep func(ctx context.Context, d time.Duration) error
 }
