@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -20,6 +23,10 @@ type federatedMCP struct {
 	calls  []string
 	others int
 	page   string
+	// limited is how many more of each method to turn away with the gateway's 429,
+	// which comes before it looks at what was asked.
+	limited map[string]int
+	refused int
 }
 
 func (f *federatedMCP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -31,6 +38,26 @@ func (f *federatedMCP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	raw, _ := io.ReadAll(r.Body)
+	var peek struct {
+		Method string `json:"method"`
+	}
+	json.Unmarshal(raw, &peek)
+	f.mu.Lock()
+	turnedAway := f.limited[peek.Method] > 0
+	if turnedAway {
+		f.limited[peek.Method]--
+		f.refused++
+	}
+	f.mu.Unlock()
+	if turnedAway {
+		w.Header().Set("Retry-After", "10")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		w.Write([]byte(`{"error":{"code":"429","message":"exceeded requests-per-minute limit (30)","type":"rate_limit_error"}}`))
+		return
+	}
+	r.Body = io.NopCloser(bytes.NewReader(raw))
 	var req struct {
 		ID     json.RawMessage `json:"id"`
 		Method string          `json:"method"`
@@ -48,7 +75,18 @@ func (f *federatedMCP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
+	// As the gateway does: a server-sent event for a client that accepts them, else JSON.
+	reply := func(body map[string]any) {
+		body["jsonrpc"], body["id"] = "2.0", req.ID
+		raw, _ := json.Marshal(body)
+		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
+			w.Header().Set("Content-Type", "text/event-stream")
+			fmt.Fprintf(w, "data: %s\n\n", raw)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(raw)
+	}
 	var result any
 	switch req.Method {
 	case "initialize":
@@ -78,10 +116,65 @@ func (f *federatedMCP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		result = map[string]any{"content": []any{map[string]any{"type": "text", "text": text}}}
 	default:
-		json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "error": map[string]any{"code": -32601, "message": "method not found"}})
+		reply(map[string]any{"error": map[string]any{"code": -32601, "message": "method not found: " + req.Method}})
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": result})
+	reply(map[string]any{"result": result})
+}
+
+func TestOnlyAToolServersPassingFailuresAreWaitedOut(t *testing.T) {
+	for msg, passes := range map[string]bool{
+		`calling "initialize": rejected by transport: sending "initialize": Too Many Requests`: true,
+		`sending "tools/list": Service Unavailable`:                                            true,
+		`calling "initialize": rejected by transport: sending "initialize": Unauthorized`:      false,
+		`sending "initialize": Not Found`:                                                      false,
+	} {
+		if toolsPassing(errors.New(msg)) != passes {
+			t.Errorf("%q: waited out %v, want %v", msg, !passes, passes)
+		}
+	}
+	if !toolsPassing(fmt.Errorf("listing: %w", context.DeadlineExceeded)) {
+		t.Error("a tool server that is slow to answer should be waited out")
+	}
+}
+
+func TestARunWaitsOutAGatewaysLimitOnItsTools(t *testing.T) {
+	for _, method := range []string{"initialize", "tools/list", "tools/call"} {
+		t.Run(method, func(t *testing.T) {
+			gateway := &federatedMCP{limited: map[string]int{method: 2}}
+			tools := httptest.NewTLSServer(gateway)
+			t.Cleanup(tools.Close)
+			fake := newFakeEndpoint(t)
+			fake.srv.Client().Transport.(*http.Transport).TLSClientConfig.RootCAs.AddCert(tools.Certificate())
+			r := newRunSetup(t, fake)
+			gateway.mu.Lock()
+			gateway.limited[method] = 0
+			gateway.mu.Unlock()
+			if _, err := r.a.saveAgentConfig(context.Background(), r.o.ID, AgentSettingsIn{BaseURL: fake.srv.URL + "/v1", APIKey: agentTestKey,
+				Model: "router/auto", ToolsURL: tools.URL + "/mcp", Tools: []string{"brave-search_brave_web_search"}}, "Ada Lovelace"); err != nil {
+				t.Fatal(err)
+			}
+			gateway.mu.Lock()
+			gateway.limited[method], gateway.refused = 2, 0
+			gateway.mu.Unlock()
+			fake.chat = func(n int, _ map[string]any) (int, string) {
+				if n == 0 {
+					return 200, chatTools("brave-search_brave_web_search", `{"query":"yacht builders"}`)
+				}
+				return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
+			}
+			got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+			gateway.mu.Lock()
+			refused, calls := gateway.refused, slices.Clone(gateway.calls)
+			gateway.mu.Unlock()
+			if got.Status != RunFinished || refused != 2 || !slices.Contains(calls, "brave-search_brave_web_search") {
+				t.Fatalf("a run should wait out the gateway turning away %s, then use its tools: %+v, refused %d, calls %v", method, got, refused, calls)
+			}
+			if len(r.sleeps) < 2 {
+				t.Fatalf("it should have waited each time: %v", r.sleeps)
+			}
+		})
+	}
 }
 
 func TestTheAgentWorksThroughAGatewaysFederatedTools(t *testing.T) {

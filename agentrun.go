@@ -314,18 +314,12 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 		return RunFailed, "Prospector's own tools couldn't be reached"
 	}
 	defer own.Close()
-	connecting, cancel := context.WithTimeout(ctx, time.Minute)
-	defer cancel()
-	var ext *mcp.ClientSession
-	if cfg.ToolsURL != "" && len(cfg.AllowedTools()) > 0 {
-		if ext, err = a.toolSession(connecting, cfg.ToolsURL, cfg.toolsKey(key)); err != nil {
-			return RunFailed, "couldn't connect to the tools: " + err.Error()
-		}
-		defer ext.Close()
-	}
-	tools, err := agentTools(connecting, own, ext, cfg)
+	ext, tools, err := a.connectTools(ctx, run, own, cfg, key)
 	if err != nil {
-		return RunFailed, err.Error()
+		return a.ended(ctx, run, err)
+	}
+	if ext != nil {
+		defer ext.Close()
 	}
 	t := &turnState{app: a, run: run, own: own, ext: ext, seen: map[string]bool{}, offered: map[string]bool{}}
 	for _, d := range tools {
@@ -421,6 +415,50 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 			}
 		}
 	}
+}
+
+// connectTools reaches the organisation's tool server and lists what the run may use.
+// A tool server behind the same limits as the model, or away for a while, is waited
+// out as the model is; one that can't be used by waiting ends the run.
+func (a *App) connectTools(ctx context.Context, run *AgentRun, own *mcp.ClientSession, cfg *AgentConfig, key string) (*mcp.ClientSession, []toolDef, error) {
+	for failures := 0; ; failures++ {
+		connecting, cancel := context.WithTimeout(ctx, time.Minute)
+		var ext *mcp.ClientSession
+		var err error
+		if cfg.ToolsURL != "" && len(cfg.AllowedTools()) > 0 {
+			ext, err = a.toolSession(connecting, cfg.ToolsURL, cfg.toolsKey(key))
+			if err != nil {
+				err = fmt.Errorf("couldn't connect to the tools: %w", err)
+			}
+		}
+		var tools []toolDef
+		if err == nil {
+			tools, err = agentTools(connecting, own, ext, cfg)
+		}
+		cancel()
+		if err == nil {
+			return ext, tools, nil
+		}
+		if ext != nil {
+			ext.Close()
+		}
+		if ctx.Err() != nil || !toolsPassing(err) {
+			return nil, nil, err
+		}
+		if err := a.wait(ctx, run, time.Now().Add(backoff(failures))); err != nil {
+			return nil, nil, err
+		}
+	}
+}
+
+// toolsPassing is a tool server's failure that waiting can get past: a limit, or it
+// being away or slow. Its messages are all an MCP client gives.
+func toolsPassing(err error) bool {
+	var netErr net.Error
+	msg := err.Error()
+	return errors.As(err, &netErr) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, io.ErrUnexpectedEOF) ||
+		strings.Contains(msg, "Too Many Requests") || strings.Contains(msg, "Service Unavailable") ||
+		strings.Contains(msg, "Bad Gateway") || strings.Contains(msg, "Gateway Timeout")
 }
 
 // ended says how a run that couldn't go on ends: stopped if a person asked or the
