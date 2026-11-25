@@ -112,9 +112,8 @@ var formWords = append([]string{"new", "renewal", "month", "year", "openai", "an
 // refused for what it was sent before or after it looked for a row, which the test
 // can't tell apart.
 var stopsShort = map[string]string{
-	"/o/{org}/ui/mail/test":    "needs a mail server to send through",
-	"/o/{org}/ui/subscription": "checks a period, a currency and an amount, which one word for every field can't satisfy together",
-	"/o/{org}/ui/settings":     "checks every setting at once, and changes only the organisation in its own address",
+	"/o/{org}/ui/mail/test": "needs a mail server to send through",
+	"/o/{org}/ui/settings":  "checks every setting at once, and changes only the organisation in its own address",
 }
 
 // looked matches a refusal that says the form went looking for a row and found none

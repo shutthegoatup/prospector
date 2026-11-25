@@ -215,7 +215,7 @@ The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml),
 | `outcomes:write` | `mark`: record an outcome (sent, accepted, called, replied, declined, hold), shown as the agent's |
 | `enquiries:write` | `POST /api/v1/enquiries`: record an enquiry or sign-up from your own product or site backend |
 | `enquiries:reply` | `POST /api/v1/enquiries/{id}/replies` emails a reply to whoever sent an enquiry, through your mail server; `…/answers` records what they said back |
-| `customers:write` | start, change and remove onboardings (`/api/v1/onboardings`) and mark their steps (`/api/v1/onboarding-steps/{id}`) |
+| `customers:write` | record, change and remove subscriptions and start their renewals (`/api/v1/subscriptions`); start, change and remove onboardings (`/api/v1/onboardings`) and mark their steps (`/api/v1/onboarding-steps/{id}`) |
 | `customers:invite` | `POST /api/v1/onboardings/{id}/invites` emails a customer a link to their steps, through your mail server; `DELETE /api/v1/onboarding-invites/{id}` withdraws it |
 | `agents:run` | Start and stop Prospector's own agents on a task, and list a task's runs |
 | `agents:configure` | Add, change and delete Prospector's own agents: endpoint, key, model, tools and fallback. Owner-level: a signed-in member needs to be an owner |

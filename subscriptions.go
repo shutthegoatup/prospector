@@ -109,7 +109,7 @@ func (s Subscription) Price() string {
 // Standing is where a subscription stands on a day.
 type Standing struct {
 	Status string
-	// TermEnd is the last day of the term that day falls in; empty before it starts.
+	// TermEnd is the last day of the term that day falls in, or of the first term before it starts.
 	TermEnd string
 	// CancelBy is the next day still to come by which notice can be given, and Out the
 	// last day of the term that notice would end it at. Both are empty when it ends
@@ -343,8 +343,26 @@ func (s *Store) AddSubscription(org int64, in SubscriptionIn, actor string) (*Su
 // was agreed when; a name is free text and a price is the customer's business, so
 // those are noted as changed and no more.
 func (s *Store) ChangeSubscription(org, id int64, field, value, actor string) error {
-	value = strings.TrimSpace(value)
+	return s.ChangeSubscriptionFields(org, id, []SubscriptionChange{{field, value}}, actor)
+}
+
+type SubscriptionChange struct{ Field, Value string }
+
+// ChangeSubscriptionFields makes several changes or none: one that is refused takes
+// back those before it.
+func (s *Store) ChangeSubscriptionFields(org, id int64, changes []SubscriptionChange, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		for _, c := range changes {
+			if err := s.changeSubscription(tx, org, id, c.Field, strings.TrimSpace(c.Value), actor); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (s *Store) changeSubscription(tx *gorm.DB, org, id int64, field, value, actor string) error {
+	{
 		var sub Subscription
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&sub).Error; err != nil {
 			return missing(err, "no subscription %d", id)
@@ -428,7 +446,7 @@ func (s *Store) ChangeSubscription(org, id int64, field, value, actor string) er
 			return err
 		}
 		return s.log(tx, org, 0, &sub.CompanyID, actor, "sub:"+field, nonEmpty(logged))
-	})
+	}
 }
 
 // RemoveSubscription takes back one recorded by mistake. One that ran its course is
@@ -536,37 +554,6 @@ func (a *App) subscriptionsPage(w http.ResponseWriter, r *http.Request) {
 	a.page(w, r, "subscriptions", SubscriptionsView(q, rows, today()))
 }
 
-func (a *App) uiSubscription(w http.ResponseWriter, r *http.Request) {
-	var in SubscriptionIn
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		_, err := a.s.AddSubscription(q.Org.ID, in, q.Actor())
-		done(w, err)
-	}
-}
-
-func (a *App) uiSubscriptionChange(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID    int64  `json:"id"`
-		Field string `json:"field"`
-		Value string `json:"value"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.ChangeSubscription(q.Org.ID, in.ID, in.Field, in.Value, q.Actor()))
-	}
-}
-
-func (a *App) uiSubscriptionRemove(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID int64 `json:"id"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.RemoveSubscription(q.Org.ID, in.ID, q.Actor()))
-	}
-}
-
 // StartRenewal opens a renewal deal for a subscription with someone at its company who
 // is already in conversation. The deal starts with what the subscription costs for a
 // year and closes when the term in hand ends, both of which can then be changed.
@@ -635,23 +622,4 @@ func (s *Store) StartRenewal(org, subscription, contact int64, actor string) (*D
 		return nil, err
 	}
 	return &d, nil
-}
-
-func (a *App) uiSubscriptionRenew(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID      int64  `json:"id"`
-		Contact string `json:"contact"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	// A select posts its value as text.
-	contact, err := strconv.ParseInt(in.Contact, 10, 64)
-	if err != nil {
-		fail(w, errors.New("choose who the renewal is with"), http.StatusBadRequest)
-		return
-	}
-	q := reqOf(r)
-	_, err = a.s.StartRenewal(q.Org.ID, in.ID, contact, q.Actor())
-	done(w, err)
 }

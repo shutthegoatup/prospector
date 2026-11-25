@@ -110,7 +110,12 @@ document.addEventListener("change", async (e) => {
   try {
     // A deal after the conversation's own is changed by its own id, not its person's.
     if (f.dataset.deal) await post("ui/deal", { id: +f.dataset.deal, field: f.dataset.field, value: f.value });
-    else if (f.dataset.sub) await post("ui/subscription/change", { id: +f.dataset.sub, field: f.dataset.field, value: f.value });
+    else if (f.dataset.sub) {
+      const number = f.type === "number" || f.dataset.number;
+      // An emptied number box is not a nought: saving one would end a commitment.
+      if (number && f.value.trim() === "") throw new Error("Enter a number, or 0 for none.");
+      await post("api/v1/subscriptions/" + f.dataset.sub, { [f.dataset.field]: number ? +f.value : f.value }, "PATCH");
+    }
     else if (f.dataset.enquiry) await post("ui/enquiry/update", { id: +f.dataset.enquiry, field: f.dataset.field, value: f.value });
     else if (f.dataset.step) await post("api/v1/onboarding-steps/" + f.dataset.step, { [f.dataset.field]: f.value }, "PATCH");
     else await post("ui/update", { id: +f.dataset.id, field: f.dataset.field, value: f.value });

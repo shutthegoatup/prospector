@@ -192,18 +192,16 @@ func TestSubscriptionsAreRecordedAndChangedFromThePages(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	person := repliedPerson(t, s, o, "Hannah Pryce")
 	company := *person.CompanyID
-	post := func(path string, body map[string]any) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/"+path, "application/json", body)
-	}
-	if code, body := post("subscription", map[string]any{"company": company, "name": "Standard plan", "amount": "14,000", "per": "year",
-		"start": "2026-01-12", "term_months": 12, "then": "renews", "notice_days": 60}); code != http.StatusOK {
+	subs := srv.URL + "/o/alpha/api/v1/subscriptions"
+	if code, body := call(t, client, "POST", subs, "application/json", map[string]any{"company": company, "name": "Standard plan", "amount": "14,000", "per": "year",
+		"start": "2026-01-12", "term_months": 12, "then": "renews", "notice_days": 60}); code != http.StatusCreated {
 		t.Fatalf("recording a subscription: %d %s", code, body)
 	}
-	if code, _ := post("subscription", map[string]any{"company": company, "name": "", "start": "2026-01-12"}); code == http.StatusOK {
+	if code, _ := call(t, client, "POST", subs, "application/json", map[string]any{"company": company, "name": "", "start": "2026-01-12"}); code < 300 {
 		t.Error("a subscription with no name was recorded")
 	}
 	sub := must(s.Subscriptions(o.ID, 0, today()))[0]
-	if code, body := post("subscription/change", map[string]any{"id": sub.ID, "field": "notice_days", "value": "30"}); code != http.StatusOK {
+	if code, body := call(t, client, "PATCH", subs+"/"+itoa(sub.ID), "application/json", map[string]any{"notice_days": 30}); code != http.StatusOK {
 		t.Fatalf("changing a subscription: %d %s", code, body)
 	}
 	for _, path := range []string{"/o/alpha/subscriptions", "/o/alpha/companies/" + itoa(company)} {
@@ -217,10 +215,10 @@ func TestSubscriptionsAreRecordedAndChangedFromThePages(t *testing.T) {
 	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil); !strings.Contains(page, "Larkmoor Yachts") || !strings.Contains(page, "a year at today") {
 		t.Error("the subscriptions page doesn't name the company or say what is contracted")
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/companies/"+itoa(company), "", nil); !strings.Contains(page, "recorded a subscription: ") || !strings.Contains(page, `data-form="ui/subscription"`) {
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/companies/"+itoa(company), "", nil); !strings.Contains(page, "recorded a subscription: ") || !strings.Contains(page, `data-form="api/v1/subscriptions"`) {
 		t.Error("the company's page lacks the history line or the form")
 	}
-	if code, body := post("subscription/remove", map[string]any{"id": sub.ID}); code != http.StatusOK {
+	if code, body := call(t, client, "DELETE", subs+"/"+itoa(sub.ID), "", nil); code != http.StatusNoContent {
 		t.Fatalf("removing a subscription: %d %s", code, body)
 	}
 	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil); !strings.Contains(page, "No subscriptions yet") {
@@ -373,34 +371,34 @@ func TestARenewalDealIsStartedFromASubscription(t *testing.T) {
 	}
 
 	_, page := call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil)
-	if !strings.Contains(page, `data-form="ui/subscription/renew"`) || !strings.Contains(page, "Hannah Pryce") {
+	if !strings.Contains(page, `/renewals"`) || !strings.Contains(page, "Hannah Pryce") {
 		t.Error("the subscription lacks the offer of a renewal with the person in conversation")
 	}
-	renew := func(contact string) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/subscription/renew", "application/json", map[string]any{"id": sub.ID, "contact": contact})
+	renew := func(contact int64) (int, string) {
+		return call(t, client, "POST", srv.URL+"/o/alpha/api/v1/subscriptions/"+itoa(sub.ID)+"/renewals", "application/json", map[string]any{"contact": contact})
 	}
-	if code, _ := renew(""); code == http.StatusOK {
+	if code, _ := renew(0); code < 300 {
 		t.Error("a renewal was started with nobody chosen")
 	}
-	if code, body := renew(itoa(hannah.ID)); code != http.StatusOK {
+	if code, body := renew(hannah.ID); code != http.StatusCreated {
 		t.Fatalf("starting the renewal: %d %s", code, body)
 	}
 	deals := must(s.OtherDeals(o.ID))["replied"]
 	if len(deals) != 1 || deals[0].Kind != "renewal" || deals[0].SubscriptionID != sub.ID || deals[0].Value() != "£18,000" || deref(deals[0].CloseDate) != row.TermEnd {
 		t.Fatalf("the renewal deal, worth a year of it and closing when the term ends: %+v", deals)
 	}
-	if code, _ := renew(itoa(hannah.ID)); code == http.StatusOK {
+	if code, _ := renew(hannah.ID); code < 300 {
 		t.Error("a second renewal was started while the first is open")
 	}
 	_, page = call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil)
-	if !strings.Contains(page, "Renewal under way in Conversations") || strings.Contains(page, `data-form="ui/subscription/renew"`) {
+	if !strings.Contains(page, "Renewal under way in Conversations") || strings.Contains(page, `/renewals"`) {
 		t.Error("the subscription still offers a renewal while one is open")
 	}
 	// Once the renewal is closed, another can be started next time round.
 	if err := s.ChangeDeal(o.ID, deals[0].ID, "stage", "won", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if _, page = call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil); !strings.Contains(page, `data-form="ui/subscription/renew"`) {
+	if _, page = call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil); !strings.Contains(page, `/renewals"`) {
 		t.Error("after the renewal was won, the subscription offers no next one")
 	}
 	// Removing the subscription leaves the deal, pointing at nothing.
@@ -442,5 +440,82 @@ func TestDealsFromBeforeRenewalsPointedAtSubscriptions(t *testing.T) {
 	sub := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *c.CompanyID, Name: "Plan", Start: today(), TermMonths: 12}, "Ada Lovelace"))
 	if _, err := s.StartRenewal(o.ID, sub.ID, c.ID, "Ada Lovelace"); err != nil {
 		t.Errorf("a renewal for a subscription after the upgrade: %v", err)
+	}
+}
+
+func TestARobotWorksSubscriptionsAsItsScopesAllow(t *testing.T) {
+	s, o, srv, _ := signedIn(t)
+	other := mustOrg(t, s, "beta")
+	key := func(org int64, scopes ...string) string {
+		secret, _, err := s.CreateKey(org, "robot "+strings.Join(scopes, "+"), scopes, "Ada Lovelace")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return secret
+	}
+	reader, writer, stranger := key(o.ID, "read"), key(o.ID, "customers:write"), key(other.ID, "read", "customers:write")
+	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	subs := srv.URL + "/o/alpha/api/v1/subscriptions"
+	plan := map[string]any{"company": *hannah.CompanyID, "name": "Standard plan", "amount": "14,000", "start": "2026-01-12", "term_months": 12, "notice_days": 60}
+
+	if code, _ := asKey(t, "GET", subs, "", nil); code != http.StatusUnauthorized {
+		t.Errorf("nobody at all listing subscriptions: %d", code)
+	}
+	if code, body := asKey(t, "POST", subs, reader, plan); code != http.StatusForbidden || !strings.Contains(body, "customers:write") {
+		t.Errorf("a read key recording a subscription: %d %s", code, body)
+	}
+	code, body := asKey(t, "POST", subs, writer, plan)
+	if code != http.StatusCreated || !strings.Contains(body, `"amount":1400000`) || !strings.Contains(body, `"per":"year"`) || !strings.Contains(body, `"then":"renews"`) || !strings.Contains(body, `"company":"Larkmoor Yachts"`) {
+		t.Fatalf("recording a subscription: %d %s", code, body)
+	}
+	sub := must(s.Subscriptions(o.ID, 0, today()))[0]
+	one := subs + "/" + itoa(sub.ID)
+	if code, body := asKey(t, "PATCH", one, writer, map[string]any{}); code != http.StatusBadRequest {
+		t.Errorf("changing nothing: %d %s", code, body)
+	}
+	if code, body := asKey(t, "PATCH", one, writer, map[string]any{"term_months": 24, "amount": "18,000", "then": "ends"}); code != http.StatusOK || !strings.Contains(body, `"term_months":24`) || !strings.Contains(body, `"amount":1800000`) || !strings.Contains(body, `"then":"ends"`) {
+		t.Errorf("changing a subscription: %d %s", code, body)
+	}
+	// Saved together or not at all, and a date cleared in the same change counts as cleared.
+	if code, body := asKey(t, "PATCH", one, writer, map[string]any{"name": "Renamed", "per": "fortnight"}); code != http.StatusBadRequest {
+		t.Errorf("a change with one part refused: %d %s", code, body)
+	} else if now := must(s.Subscriptions(o.ID, 0, today()))[0]; now.Name != "Standard plan" {
+		t.Errorf("the part before the refused one was saved: %q", now.Name)
+	}
+	if code, body := asKey(t, "PATCH", one, writer, map[string]any{"notice_on": "2026-03-01"}); code != http.StatusOK {
+		t.Fatalf("giving notice: %d %s", code, body)
+	}
+	if code, body := asKey(t, "PATCH", one, writer, map[string]any{"start": "2026-04-01", "notice_on": ""}); code != http.StatusOK || !strings.Contains(body, `"start":"2026-04-01"`) || !strings.Contains(body, `"notice_on":""`) {
+		t.Errorf("moving the start and taking back notice together: %d %s", code, body)
+	}
+	if code, body := asKey(t, "PATCH", one, writer, map[string]any{"per": "fortnight"}); code != http.StatusBadRequest {
+		t.Errorf("a period that is not one: %d %s", code, body)
+	}
+	if code, body := asKey(t, "GET", subs+"?company="+itoa(*hannah.CompanyID), reader, nil); code != http.StatusOK || !strings.Contains(body, `"name":"Standard plan"`) || !strings.Contains(body, `"status":"`) {
+		t.Errorf("listing: %d %s", code, body)
+	}
+
+	theirs := srv.URL + "/o/beta/api/v1/subscriptions/" + itoa(sub.ID)
+	if code, _ := asKey(t, "GET", subs, stranger, nil); code < 400 {
+		t.Errorf("another organisation's key listing ours: %d", code)
+	}
+	if code, body := asKey(t, "PATCH", theirs, stranger, map[string]any{"name": "Theirs now"}); code != http.StatusNotFound {
+		t.Errorf("another organisation changing ours by number: %d %s", code, body)
+	}
+	if code, body := asKey(t, "POST", theirs+"/renewals", stranger, map[string]any{"contact": hannah.ID}); code < 400 {
+		t.Errorf("another organisation renewing ours by number: %d %s", code, body)
+	}
+	if code, body := asKey(t, "DELETE", theirs, stranger, nil); code != http.StatusNotFound {
+		t.Errorf("another organisation removing ours by number: %d %s", code, body)
+	}
+	if now := must(s.Subscriptions(o.ID, 0, today())); len(now) != 1 || now[0].Name != "Standard plan" {
+		t.Errorf("another organisation's key changed something: %+v", now)
+	}
+
+	if code, body := asKey(t, "DELETE", one, reader, nil); code != http.StatusForbidden {
+		t.Errorf("a read key removing: %d %s", code, body)
+	}
+	if code, body := asKey(t, "DELETE", one, writer, nil); code != http.StatusNoContent {
+		t.Errorf("removing: %d %s", code, body)
 	}
 }

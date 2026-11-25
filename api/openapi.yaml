@@ -10,7 +10,7 @@ info:
     Scopes: `read` to read; `agents:run` to start and stop agent runs;
     `agents:configure` to add, change and delete the organisation's agents;
     `enquiries:reply` to email a reply to an enquiry and record its answer;
-    `customers:write` to start, change and remove onboardings; `customers:invite` to email a
+    `customers:write` to record and change subscriptions and onboardings; `customers:invite` to email a
     customer a link to their steps and withdraw it. A signed-in
     member may do all of these except configuring, which needs an owner.
 servers:
@@ -27,6 +27,8 @@ tags:
     description: What people sent in through a site's form or a product, and answering them.
   - name: onboarding
     description: The steps a new customer and the organisation take before the customer is live, and the customer's own page of theirs.
+  - name: subscriptions
+    description: What a customer is on, its term and notice, and its renewal.
 
 paths:
   /o/{org}/api/v1/agents:
@@ -396,6 +398,120 @@ paths:
         "204": { description: Withdrawn. }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/subscriptions:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listSubscriptions
+      tags: [subscriptions]
+      summary: What customers are on, and where each stands today
+      parameters:
+        - name: company
+          in: query
+          description: Only this company's.
+          schema: { type: integer, format: int64 }
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The one needing attention soonest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Subscription" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: addSubscription
+      tags: [subscriptions]
+      summary: Record what a customer is on
+      security:
+        - session: []
+        - bearer: ["customers:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubscriptionNew" }
+      responses:
+        "201":
+          description: The subscription as recorded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Subscription" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/subscriptions/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeSubscription
+      tags: [subscriptions]
+      summary: Change a subscription
+      description: Send only what changes. Each is checked as it would be when recording one, and they are saved together or not at all.
+      security:
+        - session: []
+        - bearer: ["customers:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubscriptionChange" }
+      responses:
+        "200":
+          description: The subscription as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Subscription" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: removeSubscription
+      tags: [subscriptions]
+      summary: Remove a subscription recorded by mistake
+      description: A renewal deal already opened for it carries on as a deal of its own.
+      security:
+        - session: []
+        - bearer: ["customers:write"]
+      responses:
+        "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/subscriptions/{id}/renewals:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: startRenewal
+      tags: [subscriptions]
+      summary: Start a renewal deal for a subscription
+      description: Opens a renewal deal on the Conversations board with someone at the company, under the rules the page applies.
+      security:
+        - session: []
+        - bearer: ["customers:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact]
+              properties:
+                contact: { type: integer, format: int64, description: Who the renewal is with. }
+      responses:
+        "201":
+          description: The deal that was opened.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deal, contact]
+                properties:
+                  deal: { type: integer, format: int64 }
+                  contact: { type: integer, format: int64 }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -626,3 +742,55 @@ components:
         invited_by: { type: string }
         created_at: { type: string, format: date-time }
         withdrawn: { type: boolean }
+
+    SubscriptionNew:
+      type: object
+      required: [company, name, start]
+      properties:
+        company: { type: integer, format: int64 }
+        name: { type: string, description: "What they are on, in your words." }
+        amount: { type: string, description: "The price for one period as you would write it: `14,000`, `€5,000`. Empty for none." }
+        per: { type: string, description: "`year` or `month`; empty is `year`." }
+        start: { type: string, description: "YYYY-MM-DD." }
+        term_months: { type: integer, description: "Months committed for; 0 is no commitment." }
+        then: { type: string, description: "What happens when the term is up: `renews` for the same term, `rolls` on a period at a time, or `ends`; empty is `renews`. With no months committed it is always `rolls`, whatever is sent." }
+        notice_days: { type: integer, description: Days of notice needed to stop it renewing. }
+
+    SubscriptionChange:
+      type: object
+      properties:
+        name: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        amount: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        per: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        start: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        term_months: { type: integer, nullable: true, x-go-type-skip-optional-pointer: false }
+        then: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        notice_days: { type: integer, nullable: true, x-go-type-skip-optional-pointer: false }
+        notice_on: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "The day notice was given, YYYY-MM-DD; empty to take it back." }
+        ended_on: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "The day it stopped, YYYY-MM-DD; empty to take it back." }
+
+    Subscription:
+      type: object
+      required: [id, company_id, company, name, amount, currency, per, start, term_months, then, notice_days, notice_on, ended_on, status, term_end, cancel_by, cancel_ends, ends, renewing, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        company_id: { type: integer, format: int64 }
+        company: { type: string }
+        name: { type: string }
+        amount: { type: integer, format: int64, description: "The price for one period, in the currency's hundredths." }
+        currency: { type: string }
+        per: { type: string }
+        start: { type: string }
+        term_months: { type: integer }
+        then: { type: string }
+        notice_days: { type: integer }
+        notice_on: { type: string, description: Empty when no notice has been given. }
+        ended_on: { type: string, description: Empty unless an end was recorded. }
+        status: { type: string, enum: [scheduled, active, notice given, ending, ended], description: Where it stands today. }
+        term_end: { type: string, description: "The last day of the term in hand, or of its first term when it has yet to start." }
+        cancel_by: { type: string, description: "The next day by which notice can still be given; empty when it ends anyway or notice was given." }
+        cancel_ends: { type: string, description: The last day of the term that notice by `cancel_by` would end it at. }
+        ends: { type: string, description: "The last day, once that is settled." }
+        renewing: { type: boolean, description: Whether a renewal deal for it is open. }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
