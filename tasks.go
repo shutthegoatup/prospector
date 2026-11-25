@@ -308,7 +308,7 @@ func runsOf(events []Event) []Run {
 // Runs is the organisation's recent agent work, newest first.
 func (s *Store) Runs(org int64, limit int) ([]Run, map[int64]string) {
 	var events []Event
-	s.in(org).Where(`"user" like 'agent:%'`).Order("at desc, id desc").Limit(1000).Find(&events)
+	logged(s.in(org).Where(`"user" like 'agent:%'`).Order("at desc, id desc").Limit(1000).Find(&events))
 	for i, j := 0, len(events)-1; i < j; i, j = i+1, j-1 {
 		events[i], events[j] = events[j], events[i]
 	}
@@ -323,7 +323,7 @@ func (s *Store) Runs(org int64, limit int) ([]Run, map[int64]string) {
 	titles := map[int64]string{}
 	if len(ids) > 0 {
 		var tasks []Task
-		s.in(org).Where("id in ?", ids).Find(&tasks)
+		logged(s.in(org).Where("id in ?", ids).Find(&tasks))
 		for _, t := range tasks {
 			titles[t.ID] = t.Title
 		}
@@ -502,7 +502,9 @@ func (s *Store) taskView(tx *gorm.DB, t Task, now time.Time) (*TaskView, error) 
 	}
 	if len(missing) > 0 {
 		var companies []Company
-		tx.Where("org_id = ? and id in ?", t.OrgID, missing).Find(&companies)
+		if err := tx.Where("org_id = ? and id in ?", t.OrgID, missing).Find(&companies).Error; err != nil {
+			return nil, err
+		}
 		for _, c := range companies {
 			names[c.ID] = c.Name
 		}

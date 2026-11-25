@@ -667,7 +667,7 @@ func (a *App) uiSSODomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var n int64
-	a.s.in(q.Org.ID).Model(&SSODomain{}).Count(&n)
+	logged(a.s.in(q.Org.ID).Model(&SSODomain{}).Count(&n))
 	if n >= maxSSODomains {
 		fail(w, fmt.Errorf("an organisation can have %d domains", maxSSODomains), http.StatusBadRequest)
 		return
