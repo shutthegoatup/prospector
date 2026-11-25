@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -246,7 +247,10 @@ func Open(dsn string) (*Store, error) {
 	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
 		dialector = postgres.Open(dsn)
 	} else {
-		dialector = sqlite.Open(dsn + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
+		// A transaction takes the write lock as it begins and waits for it. One that began
+		// by reading would be refused outright, however long it was willing to wait, if
+		// someone else had written by the time it wrote.
+		dialector = sqlite.Open(dsn + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_txlock=immediate")
 	}
 	db, err := gorm.Open(dialector, &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
@@ -259,6 +263,7 @@ func Open(dsn string) (*Store, error) {
 		return nil, err
 	}
 	s := &Store{db: db}
+	s.oneNameWhateverItsCapitals()
 	s.indexSearch()
 	return s, nil
 }
@@ -267,6 +272,29 @@ func (s *Store) postgres() bool { return s.db.Dialector.Name() == "postgres" }
 
 // in scopes a query to one organisation. Every read and write of org data goes through it.
 func (s *Store) in(org int64) *gorm.DB { return s.db.Where("org_id = ?", org) }
+
+// holdOrg and hold make a transaction wait its turn on one row, so a rule that is
+// checked by reading and then kept by writing ("add it unless it is already here")
+// holds when two callers arrive together. Taken before the first read; an organisation
+// before anything in it. On SQLite a write that opens the transaction also keeps it
+// from being refused for writing after someone else has.
+func holdOrg(tx *gorm.DB, org int64) error {
+	return tx.Exec("update orgs set id = id where id = ?", org).Error
+}
+
+func hold(tx *gorm.DB, model any, org, id int64) error {
+	return tx.Model(model).Where("org_id = ? and id = ?", org, id).Update("id", gorm.Expr("id")).Error
+}
+
+// oneNameWhateverItsCapitals backs ensureCompany's look-up with an index. Companies
+// that already differ only in capitals keep it from being built, which costs the
+// check its backing and nothing else, so the server still starts.
+func (s *Store) oneNameWhateverItsCapitals() {
+	err := s.db.Exec("create unique index if not exists idx_companies_org_name_folded on companies (org_id, lower(name))").Error
+	if err != nil {
+		log.Printf("companies in one organisation share a name but for its capitals, so nothing but the look-up keeps another out: %v", err)
+	}
+}
 
 func today() string { return time.Now().Format("2006-01-02") }
 
