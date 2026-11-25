@@ -125,7 +125,10 @@ func addTool[In, Out any](s *mcp.Server, t *mcp.Tool, h mcp.ToolHandlerFor[In, O
 
 func statusOf(err error) int {
 	var missing notFound
+	var away notSent
 	switch {
+	case errors.As(err, &away):
+		return http.StatusBadGateway
 	case errors.As(err, &missing), errors.Is(err, gorm.ErrRecordNotFound):
 		return http.StatusNotFound
 	case errors.Is(err, errErased):

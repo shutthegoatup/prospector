@@ -138,6 +138,27 @@ type AgentSettings struct {
 	ToolsUrl string `json:"tools_url,omitempty"`
 }
 
+// EnquiryMessage defines model for EnquiryMessage.
+type EnquiryMessage struct {
+	// By Who sent the reply, or recorded their answer.
+	By        string    `json:"by"`
+	CreatedAt time.Time `json:"created_at"`
+	EnquiryId int64     `json:"enquiry_id"`
+	Id        int64     `json:"id"`
+
+	// Ours True for a reply sent from here, false for what they said back.
+	Ours bool `json:"ours"`
+
+	// SentAt When a reply of ours left.
+	SentAt *time.Time `json:"sent_at"`
+	Text   string     `json:"text"`
+}
+
+// EnquiryText defines model for EnquiryText.
+type EnquiryText struct {
+	Text string `json:"text"`
+}
+
 // Problem defines model for Problem.
 type Problem struct {
 	Detail string `json:"detail,omitempty"`
@@ -202,6 +223,12 @@ type CreateAgentJSONRequestBody = AgentSettings
 // UpdateAgentJSONRequestBody defines body for UpdateAgent for application/json ContentType.
 type UpdateAgentJSONRequestBody = AgentSettings
 
+// RecordEnquiryAnswerJSONRequestBody defines body for RecordEnquiryAnswer for application/json ContentType.
+type RecordEnquiryAnswerJSONRequestBody = EnquiryText
+
+// ReplyToEnquiryJSONRequestBody defines body for ReplyToEnquiry for application/json ContentType.
+type ReplyToEnquiryJSONRequestBody = EnquiryText
+
 // StartRunJSONRequestBody defines body for StartRun for application/json ContentType.
 type StartRunJSONRequestBody StartRunJSONBody
 
@@ -222,6 +249,15 @@ type ServerInterface interface {
 	// UpdateAgent Change an agent
 	// (PUT /o/{org}/api/v1/agents/{id})
 	UpdateAgent(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// RecordEnquiryAnswer Record what they said back
+	// (POST /o/{org}/api/v1/enquiries/{id}/answers)
+	RecordEnquiryAnswer(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ListEnquiryMessages What has been said in answering an enquiry
+	// (GET /o/{org}/api/v1/enquiries/{id}/messages)
+	ListEnquiryMessages(w http.ResponseWriter, r *http.Request, org Org, id Id)
+	// ReplyToEnquiry Email a reply to whoever wrote in
+	// (POST /o/{org}/api/v1/enquiries/{id}/replies)
+	ReplyToEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id)
 	// StopRun Stop a run
 	// (POST /o/{org}/api/v1/runs/{id}/stop)
 	StopRun(w http.ResponseWriter, r *http.Request, org Org, id Id)
@@ -390,6 +426,111 @@ func (siw *ServerInterfaceWrapper) UpdateAgent(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAgent(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RecordEnquiryAnswer operation middleware
+func (siw *ServerInterfaceWrapper) RecordEnquiryAnswer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RecordEnquiryAnswer(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListEnquiryMessages operation middleware
+func (siw *ServerInterfaceWrapper) ListEnquiryMessages(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListEnquiryMessages(w, r, org, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReplyToEnquiry operation middleware
+func (siw *ServerInterfaceWrapper) ReplyToEnquiry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "org" -------------
+	var org Org
+
+	err = runtime.BindStyledParameterWithOptions("simple", "org", r.PathValue("org"), &org, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "org", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReplyToEnquiry(w, r, org, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -632,6 +773,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/o/{org}/api/v1/tasks/{task}/runs", wrapper.ListRuns)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/tasks/{task}/runs", wrapper.StartRun)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/runs/{id}/stop", wrapper.StopRun)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/o/{org}/api/v1/enquiries/{id}/messages", wrapper.ListEnquiryMessages)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/enquiries/{id}/replies", wrapper.ReplyToEnquiry)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/o/{org}/api/v1/enquiries/{id}/answers", wrapper.RecordEnquiryAnswer)
 
 	return m
 }
@@ -832,6 +976,128 @@ func (response UpdateAgentdefaultApplicationProblemPlusJSONResponse) VisitUpdate
 	return err
 }
 
+type RecordEnquiryAnswerRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *RecordEnquiryAnswerJSONRequestBody
+}
+
+type RecordEnquiryAnswerResponseObject interface {
+	VisitRecordEnquiryAnswerResponse(w http.ResponseWriter) error
+}
+
+type RecordEnquiryAnswer201JSONResponse EnquiryMessage
+
+func (response RecordEnquiryAnswer201JSONResponse) VisitRecordEnquiryAnswerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordEnquiryAnswerdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response RecordEnquiryAnswerdefaultApplicationProblemPlusJSONResponse) VisitRecordEnquiryAnswerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiryMessagesRequestObject struct {
+	Org Org `json:"org"`
+	Id  Id  `json:"id"`
+}
+
+type ListEnquiryMessagesResponseObject interface {
+	VisitListEnquiryMessagesResponse(w http.ResponseWriter) error
+}
+
+type ListEnquiryMessages200JSONResponse []EnquiryMessage
+
+func (response ListEnquiryMessages200JSONResponse) VisitListEnquiryMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiryMessagesdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListEnquiryMessagesdefaultApplicationProblemPlusJSONResponse) VisitListEnquiryMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplyToEnquiryRequestObject struct {
+	Org  Org `json:"org"`
+	Id   Id  `json:"id"`
+	Body *ReplyToEnquiryJSONRequestBody
+}
+
+type ReplyToEnquiryResponseObject interface {
+	VisitReplyToEnquiryResponse(w http.ResponseWriter) error
+}
+
+type ReplyToEnquiry201JSONResponse EnquiryMessage
+
+func (response ReplyToEnquiry201JSONResponse) VisitReplyToEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplyToEnquirydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ReplyToEnquirydefaultApplicationProblemPlusJSONResponse) VisitReplyToEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type StopRunRequestObject struct {
 	Org Org `json:"org"`
 	Id  Id  `json:"id"`
@@ -964,6 +1230,15 @@ type StrictServerInterface interface {
 	// UpdateAgent Change an agent
 	// (PUT /o/{org}/api/v1/agents/{id})
 	UpdateAgent(ctx context.Context, request UpdateAgentRequestObject) (UpdateAgentResponseObject, error)
+	// RecordEnquiryAnswer Record what they said back
+	// (POST /o/{org}/api/v1/enquiries/{id}/answers)
+	RecordEnquiryAnswer(ctx context.Context, request RecordEnquiryAnswerRequestObject) (RecordEnquiryAnswerResponseObject, error)
+	// ListEnquiryMessages What has been said in answering an enquiry
+	// (GET /o/{org}/api/v1/enquiries/{id}/messages)
+	ListEnquiryMessages(ctx context.Context, request ListEnquiryMessagesRequestObject) (ListEnquiryMessagesResponseObject, error)
+	// ReplyToEnquiry Email a reply to whoever wrote in
+	// (POST /o/{org}/api/v1/enquiries/{id}/replies)
+	ReplyToEnquiry(ctx context.Context, request ReplyToEnquiryRequestObject) (ReplyToEnquiryResponseObject, error)
 	// StopRun Stop a run
 	// (POST /o/{org}/api/v1/runs/{id}/stop)
 	StopRun(ctx context.Context, request StopRunRequestObject) (StopRunResponseObject, error)
@@ -1164,6 +1439,101 @@ func (sh *strictHandler) UpdateAgent(w http.ResponseWriter, r *http.Request, org
 	}
 }
 
+// RecordEnquiryAnswer operation middleware
+func (sh *strictHandler) RecordEnquiryAnswer(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request RecordEnquiryAnswerRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body RecordEnquiryAnswerJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.RecordEnquiryAnswer(ctx, request.(RecordEnquiryAnswerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RecordEnquiryAnswer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RecordEnquiryAnswerResponseObject); ok {
+		if err := validResponse.VisitRecordEnquiryAnswerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListEnquiryMessages operation middleware
+func (sh *strictHandler) ListEnquiryMessages(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ListEnquiryMessagesRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ListEnquiryMessages(ctx, request.(ListEnquiryMessagesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListEnquiryMessages")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListEnquiryMessagesResponseObject); ok {
+		if err := validResponse.VisitListEnquiryMessagesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReplyToEnquiry operation middleware
+func (sh *strictHandler) ReplyToEnquiry(w http.ResponseWriter, r *http.Request, org Org, id Id) {
+	var request ReplyToEnquiryRequestObject
+
+	request.Org = org
+	request.Id = id
+
+	var body ReplyToEnquiryJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ReplyToEnquiry(ctx, request.(ReplyToEnquiryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReplyToEnquiry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReplyToEnquiryResponseObject); ok {
+		if err := validResponse.VisitReplyToEnquiryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // StopRun operation middleware
 func (sh *strictHandler) StopRun(w http.ResponseWriter, r *http.Request, org Org, id Id) {
 	var request StopRunRequestObject
@@ -1257,50 +1627,61 @@ func (sh *strictHandler) StartRun(w http.ResponseWriter, r *http.Request, org Or
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"WoT1JGl60lw4fP3OAJScv/WonH93t/vPAA==",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

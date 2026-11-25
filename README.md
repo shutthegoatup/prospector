@@ -214,6 +214,7 @@ The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml),
 | `import` | `push` and `pull`: a full sync, for a person's own files rather than an agent |
 | `outcomes:write` | `mark`: record an outcome (sent, accepted, called, replied, declined, hold), shown as the agent's |
 | `enquiries:write` | `POST /api/v1/enquiries`: record an enquiry or sign-up from your own product or site backend |
+| `enquiries:reply` | `POST /api/v1/enquiries/{id}/replies` emails a reply to whoever sent an enquiry, through your mail server; `…/answers` records what they said back |
 | `agents:run` | Start and stop Prospector's own agents on a task, and list a task's runs |
 | `agents:configure` | Add, change and delete Prospector's own agents: endpoint, key, model, tools and fallback. Owner-level: a signed-in member needs to be an owner |
 
@@ -262,7 +263,9 @@ What leaves the server: the task's brief and requests, and what Prospector's too
 
 Enquiries is the inbox for what people send you: a help request, a feature request, a sales question, a demo request or a sign-up. Each is kept as sent, and tied to the person and company already here when the email address or its domain matches.
 
-Each new enquiry waits to be answered. "Start a conversation" puts whoever sent it on the Conversations board, adding them first if they are new to you. Give it an owner, mark it as waiting on them once you have replied, and close it when it is done; you can keep a note of your own beside it. Nothing sends that note, but it is held against the person who wrote in, so it is part of their export if they ask what you hold on them: write it as something they may read. Ones still to answer are counted in the sidebar and on Today. You answer from your own mail: Prospector sends nothing. Enquiries that arrived before this was tracked are left as they were, and what marks as spam is never asked to be answered.
+Each new enquiry waits to be answered. "Start a conversation" puts whoever sent it on the Conversations board, adding them first if they are new to you. Give it an owner, mark it as waiting on them once you have replied, and close it when it is done; you can keep a note of your own beside it. Nothing sends that note, but it is held against the person who wrote in, so it is part of their export if they ask what you hold on them: write it as something they may read. Ones still to answer are counted in the sidebar and on Today. Enquiries that arrived before this was tracked are left as they were, and what marks as spam is never asked to be answered.
+
+**Replying.** With a mail server set (the organisation's own, in Settings, or the server's) you can reply to an enquiry from its card. The reply is emailed to the address the enquiry gave and kept under it; the enquiry then waits on them, and is yours if it had no owner. Only what you type is sent: nothing from their message is quoted back, because anyone can put someone else's address in a form. Their answer goes to your own mailbox, not here (a reply sent by an API key is answered to the mail server's address), so paste it under the enquiry with "Record their answer" to keep the thread whole; that sends nothing and makes the enquiry yours to answer again. Spam, and anyone on the never-contact list, can't be replied to. The thread is in the person's export and goes with the enquiry when it is deleted or they are erased.
 
 **From a form on your site.** In Settings, list the sites whose forms may post (`https://www.example.com`, one per line). A page on one of them then posts JSON straight from the browser, with no key:
 
