@@ -244,7 +244,14 @@ func TestSealedSecretsOutliveAKeyChange(t *testing.T) {
 	}
 
 	moved, _ := promoted.seal("s3cret-value")
-	tampered := moved[:len(moved)-2] + "AA"
+	// A character of the tag that carries six bits, changed to one it isn't: the last
+	// two can already read "AA", and the final one holds only two bits.
+	at := len(moved) - 3
+	swap := byte('A')
+	if moved[at] == swap {
+		swap = 'B'
+	}
+	tampered := moved[:at] + string(swap) + moved[at+1:]
 	if _, err := promoted.open(tampered); err == nil {
 		t.Fatal("a tampered value opened")
 	}
