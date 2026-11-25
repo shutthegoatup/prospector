@@ -145,19 +145,22 @@ func (s *Store) EnsureFrontOrg(base string) error {
 	if _, err := s.OrgBySlug(frontOrgSlug); !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
-	o, err := s.CreateOrg(frontOrgSlug, "Prospector")
+	// Made and given its site together: one left without would never be given it.
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		o, err := createOrg(tx, frontOrgSlug, "Prospector")
+		if err != nil || base == "" {
+			return err
+		}
+		o.Settings.EnquirySites = browserOrigin(base)
+		return tx.Model(o).Select("settings").Updates(o).Error
+	})
 	if err != nil {
 		// Another server on the same database may have just made it.
 		if _, found := s.OrgBySlug(frontOrgSlug); found == nil {
 			return nil
 		}
-		return err
 	}
-	if base == "" {
-		return nil
-	}
-	o.Settings.EnquirySites = browserOrigin(base)
-	return s.SaveOrg(o)
+	return err
 }
 
 // CreateOrgWithOwner makes the organisation and its first owner together, so a failure
