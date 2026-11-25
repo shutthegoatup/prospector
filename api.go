@@ -158,9 +158,11 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		return a.mcpServer(reqOf(r))
 	}, nil)
-	// The SDK ties each session to this id, so one key can't drive another key's session.
+	// The SDK ties each session to this id, so one key can't drive another key's session,
+	// and a key whose scopes change can't keep a session holding the old scopes' tools.
 	sameKey := auth.RequireBearerToken(func(_ context.Context, _ string, r *http.Request) (*auth.TokenInfo, error) {
-		return &auth.TokenInfo{UserID: strconv.FormatInt(reqOf(r).Key.ID, 10)}, nil
+		k := reqOf(r).Key
+		return &auth.TokenInfo{UserID: strconv.FormatInt(k.ID, 10) + " " + k.Scopes}, nil
 	}, &auth.RequireBearerTokenOptions{AllowMissingExpiration: true})
 	mux.Handle("/o/{org}/mcp", a.agent("", streaming(sameKey(mcpHandler))))
 }
@@ -195,11 +197,16 @@ type factAdded struct {
 // mcpServer is built once per API key, with only the tools its scopes allow. The
 // key is checked again on every request, so revoking it cuts off its sessions, and
 // a session answers only to the key that opened it.
+type builtMCP struct {
+	scopes string
+	*mcp.Server
+}
+
 func (a *App) mcpServer(q *Req) *mcp.Server {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if s, found := a.mcp[q.Key.ID]; found {
-		return s
+	if b, found := a.mcp[q.Key.ID]; found && b.scopes == q.Key.Scopes {
+		return b.Server
 	}
 	org, actor, k := q.Org, q.Agent(), q.Key
 	// Each session holds its own claims, so two clients sharing a key take different requests.
@@ -310,9 +317,9 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 			})
 	}
 	if a.mcp == nil {
-		a.mcp = map[int64]*mcp.Server{}
+		a.mcp = map[int64]builtMCP{}
 	}
-	a.mcp[k.ID] = s
+	a.mcp[k.ID] = builtMCP{k.Scopes, s}
 	return s
 }
 

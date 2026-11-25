@@ -238,11 +238,34 @@ func (s *Store) AddMember(org, user int64, role, callerName string) error {
 		if err != nil {
 			return err
 		}
-		if m.Role == "owner" && role != "owner" && lastOwner(tx, org) {
-			return errLastOwner
-		}
-		return tx.Model(&m).Update("role", role).Error
+		return setRole(tx, org, &m, role)
 	})
+}
+
+// SetRole changes the role of someone already in the organisation.
+func (s *Store) SetRole(org, user int64, role string) error {
+	if role != "owner" && role != "member" {
+		return fmt.Errorf("a role is owner or member, not %q", role)
+	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockOrg(tx, org); err != nil {
+			return err
+		}
+		var m Membership
+		if err := tx.Where("org_id = ? and user_id = ?", org, user).First(&m).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("that person isn't in this organisation")
+		} else if err != nil {
+			return err
+		}
+		return setRole(tx, org, &m, role)
+	})
+}
+
+func setRole(tx *gorm.DB, org int64, m *Membership, role string) error {
+	if m.Role == "owner" && role != "owner" && lastOwner(tx, org) {
+		return errLastOwner
+	}
+	return tx.Model(m).Update("role", role).Error
 }
 
 // lockOrg makes changes to one organisation's members take turns, so two owners
@@ -456,13 +479,8 @@ func (s *Store) CreateKey(org int64, name string, scopes []string, by string) (s
 	if name == "" {
 		return "", nil, errors.New("give the key a name")
 	}
-	for _, sc := range scopes {
-		if !validScope(sc) {
-			return "", nil, fmt.Errorf("unknown scope %q", sc)
-		}
-	}
-	if len(scopes) == 0 {
-		return "", nil, errors.New("pick at least one scope")
+	if err := checkScopes(scopes); err != nil {
+		return "", nil, err
 	}
 	secret := "pk_" + randomToken(24)
 	k := &APIKey{OrgID: org, Name: name, Prefix: secret[:7], Hash: s.keys.lookup(apiKeys, secret), Scopes: strings.Join(scopes, " "), CreatedBy: by}
@@ -491,6 +509,35 @@ func (s *Store) KeyFor(secret string) (*APIKey, error) {
 func (s *Store) Keys(org int64) ([]APIKey, error) {
 	var keys []APIKey
 	return keys, s.in(org).Where("revoked_at is null").Order("created_at desc").Find(&keys).Error
+}
+
+func checkScopes(scopes []string) error {
+	for _, sc := range scopes {
+		if !validScope(sc) {
+			return fmt.Errorf("unknown scope %q", sc)
+		}
+	}
+	if len(scopes) == 0 {
+		return errors.New("pick at least one scope")
+	}
+	return nil
+}
+
+var errBuiltinKey = errors.New("this key belongs to one of Prospector's own agents, which change on the agent itself")
+
+// SetKeyScopes changes what a key may do without changing its secret.
+func (s *Store) SetKeyScopes(org, id int64, scopes []string) error {
+	if err := checkScopes(scopes); err != nil {
+		return err
+	}
+	var k APIKey
+	if err := s.in(org).Where("id = ? and revoked_at is null", id).First(&k).Error; err != nil {
+		return err
+	}
+	if k.Prefix == builtinPrefix {
+		return errBuiltinKey
+	}
+	return s.in(org).Model(&APIKey{}).Where("id = ? and revoked_at is null", id).Update("scopes", strings.Join(scopes, " ")).Error
 }
 
 func (s *Store) RevokeKey(org, id int64) error {
