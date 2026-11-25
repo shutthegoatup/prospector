@@ -288,7 +288,7 @@ func oneGoingRunPerAgent(db *gorm.DB) error {
 	var def string
 	lookup := "select coalesce(sql, '') from sqlite_master where type = 'index' and name = ?"
 	if db.Dialector.Name() == "postgres" {
-		lookup = "select indexdef from pg_indexes where indexname = ?"
+		lookup = "select indexdef from pg_indexes where indexname = ? and tablename = 'agent_runs' and schemaname = current_schema()"
 	}
 	if err := db.Raw(lookup, name).Scan(&def).Error; err != nil {
 		return err

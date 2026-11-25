@@ -121,7 +121,10 @@ func migrateAgentConfigs(db *gorm.DB) error {
 	for _, c := range old {
 		err := db.Transaction(func(tx *gorm.DB) error {
 			var key APIKey
-			if err := tx.Where("org_id = ? and prefix = ? and revoked_at is null", c.OrgID, builtinPrefix).Order("id").Limit(1).Find(&key).Error; err != nil {
+			// Only a key no agent holds: one held is another agent's record, renamed or
+			// added since the move. Without one, its first run makes it a key of its own.
+			if err := tx.Where("org_id = ? and prefix = ? and revoked_at is null and id not in (?)", c.OrgID, builtinPrefix,
+				tx.Model(&Agent{}).Select("key_id").Where("org_id = ?", c.OrgID)).Order("id").Limit(1).Find(&key).Error; err != nil {
 				return err
 			}
 			if c.BaseURL != "" {

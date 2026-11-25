@@ -481,6 +481,45 @@ func TestGoingBackAReleaseAndForwardAgainStillStarts(t *testing.T) {
 	}
 }
 
+func TestAMovedAgentNeverTakesAKeyAnotherAgentHolds(t *testing.T) {
+	fake := newFakeEndpoint(t)
+	r := newRunSetup(t, fake)
+	s := r.s
+	// Prospector, moved and given its key, then renamed Claude.
+	claude := must(s.AgentByID(r.o.ID, r.agent))
+	key := must(s.agentKey(claude))
+	if _, err := r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{ID: claude.ID, Name: "Claude", BaseURL: fake.srv.URL + "/v1",
+		APIKey: agentTestKey, Model: "router/auto"}, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	// Back a release, the agent entered again there, and forward once more.
+	if err := s.db.Exec(`create table agent_configs (org_id integer primary key, base_url text not null default '', api_key text not null default '',
+		model text not null default '', tools_url text not null default '', models text not null default '[]', tools text not null default '[]',
+		allowed text not null default '[]', problem text not null default '', checked_at timestamp, updated_by text not null default '', updated_at timestamp)`).Error; err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.db.Exec("drop table if exists agent_configs") })
+	if err := s.db.Exec("insert into agent_configs (org_id, base_url, api_key, model, updated_at) values (?, ?, ?, ?, ?)",
+		r.o.ID, fake.srv.URL+"/v1", must(s.keys.seal(agentTestKey)), "qwen/qwen-small", time.Now()).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := migrateAgentConfigs(s.db); err != nil {
+		t.Fatal(err)
+	}
+	moved := must(s.agentNamed(r.o.ID, "Prospector"))
+	if moved.KeyID == key.ID {
+		t.Fatal("the agent entered again was given the key Claude holds, so their records and claims would be one")
+	}
+	var claudesKey APIKey
+	s.db.First(&claudesKey, key.ID)
+	if claudesKey.Name != "Claude (built in)" {
+		t.Fatalf("Claude's key was renamed: %q", claudesKey.Name)
+	}
+	if own := must(s.agentKey(moved)); own.ID == key.ID || own.Name != "Prospector (built in)" {
+		t.Fatalf("its first run should make it a key of its own: %+v", own)
+	}
+}
+
 func TestAnAgentDeletedWhileSavingStaysDeleted(t *testing.T) {
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
