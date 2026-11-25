@@ -361,7 +361,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /password", a.member(a.changePassword))
 
 	mux.HandleFunc("GET /o/{org}/{$}", a.member(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, reqOf(r).Base()+"today", http.StatusSeeOther)
+		q := reqOf(r)
+		http.Redirect(w, r, q.Base()+landing(q.Member), http.StatusSeeOther)
 	}))
 	mux.HandleFunc("GET /o/{org}/today", a.member(a.today))
 	mux.HandleFunc("GET /o/{org}/research", a.member(a.research))
@@ -584,7 +585,8 @@ func browserOrigin(address string) string {
 func (a *App) home(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	if len(q.Orgs) > 0 {
-		http.Redirect(w, r, "/o/"+q.Orgs[0].Slug+"/today", http.StatusSeeOther)
+		m, _ := a.s.Membership(q.Orgs[0].ID, q.User.ID)
+		http.Redirect(w, r, "/o/"+q.Orgs[0].Slug+"/"+landing(m), http.StatusSeeOther)
 		return
 	}
 	// A session an organisation's provider began, whose day has run out, opens nothing.

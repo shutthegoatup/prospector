@@ -537,7 +537,8 @@ func (a *App) finishSSO(w http.ResponseWriter, r *http.Request, att attempt, ref
 	}
 	next := safeNext(att.Next)
 	if !strings.HasPrefix(next, "/o/"+org.Slug+"/") {
-		next = "/o/" + org.Slug + "/today"
+		m, _ := a.s.Membership(org.ID, u.ID)
+		next = "/o/" + org.Slug + "/" + landing(m)
 	}
 	http.Redirect(w, r, next, http.StatusSeeOther)
 }

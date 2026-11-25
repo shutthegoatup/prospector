@@ -70,7 +70,7 @@ templ Layout(n Nav, content templ.Component) {
 						<div class="absolute inset-x-0 top-full z-20 mt-2 flex flex-col gap-0.5 rounded-xl border border-border bg-card p-2 shadow-2xl">
 							<p class="px-2 py-1 font-mono text-xs text-muted-foreground">{ n.User.Email }</p>
 							for _, o := range n.Orgs {
-								<a href={ templ.SafeURL("/o/" + o.Slug + "/today") } class="flex items-center gap-3 rounded-lg px-2 py-2 text-sm text-foreground hover:bg-secondary">
+								<a href={ templ.SafeURL("/o/" + o.Slug + "/") } class="flex items-center gap-3 rounded-lg px-2 py-2 text-sm text-foreground hover:bg-secondary">
 									@OrgMark(o.Name, o.Color, "size-7 text-sm")
 									<span class="flex-1">{ o.Name }<span class="block font-mono text-xs text-muted-foreground">{ o.Role }</span></span>
 									if o.ID == n.Org.ID {
