@@ -43,11 +43,17 @@ func (s apiServer) onboardings(org, company int64) ([]api.Onboarding, error) {
 }
 
 func (s apiServer) ListOnboardings(ctx context.Context, in api.ListOnboardingsRequestObject) (api.ListOnboardingsResponseObject, error) {
-	out, err := s.onboardings(reqFrom(ctx).Org.ID, in.Params.Company)
+	all, err := s.onboardings(reqFrom(ctx).Org.ID, in.Params.Company)
 	if err != nil {
 		return nil, err
 	}
-	return api.ListOnboardings200JSONResponse(out), nil
+	page, next, err := listPage(all, in.Params.Limit, in.Params.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListOnboardings200JSONResponse{Headers: api.ListOnboardings200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out.Body.Items, out.Body.NextCursor = append([]api.Onboarding{}, page...), next
+	return out, nil
 }
 
 func (s apiServer) StartOnboarding(ctx context.Context, in api.StartOnboardingRequestObject) (api.StartOnboardingResponseObject, error) {

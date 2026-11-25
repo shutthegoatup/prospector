@@ -34,9 +34,14 @@ func (s apiServer) ListSubscriptions(ctx context.Context, in api.ListSubscriptio
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListSubscriptions200JSONResponse{}
+	rows, next, err := listPage(rows, in.Params.Limit, in.Params.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListSubscriptions200JSONResponse{Headers: api.ListSubscriptions200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out.Body.Items, out.Body.NextCursor = []api.Subscription{}, next
 	for _, r := range rows {
-		out = append(out, subscriptionOut(r))
+		out.Body.Items = append(out.Body.Items, subscriptionOut(r))
 	}
 	return out, nil
 }

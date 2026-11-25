@@ -678,6 +678,31 @@ func (a *App) uiKey(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"message": "Copy this key now; it isn't shown again: " + secret, "secret": secret})
 }
 
+func (a *App) uiKeyScopes(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ID     int64    `json:"id"`
+		Scopes []string `json:"scopes"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if err := a.s.SetKeyScopes(reqOf(r).Org.ID, in.ID, in.Scopes); err != nil {
+		fail(w, err, http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]string{"message": "Saved ✓ Agents connected over MCP have to reconnect."})
+}
+
+func (a *App) uiMemberRole(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		UserID int64  `json:"user_id"`
+		Role   string `json:"role"`
+	}
+	if decode(w, r, &in) {
+		done(w, a.s.SetRole(reqOf(r).Org.ID, in.UserID, in.Role))
+	}
+}
+
 func (a *App) uiRevoke(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		ID int64 `json:"id"`

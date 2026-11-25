@@ -62,6 +62,26 @@ templ AgentsView(q *Req, d AgentsData) {
 								}
 							}
 						</span>
+						if q.Owner() && k.Prefix != builtinPrefix {
+							<details class="w-full text-sm">
+								<summary class="cursor-pointer text-muted-foreground">Change scopes</summary>
+								<form data-form="ui/keys/scopes" data-refresh="true" class="mt-2 flex flex-col gap-1.5 rounded-lg bg-muted p-4">
+									<input type="hidden" name="id" value={ fmt.Sprint(k.ID) } data-number="true"/>
+									for _, s := range Scopes {
+										<label class="flex items-start gap-2.5 text-sm">
+											<input type="checkbox" name="scopes" value={ s.Name } data-multi="true" checked?={ k.Has(s.Name) } class="mt-1 size-4 accent-[var(--primary)]"/>
+											<span><span class="font-mono text-xs text-mark">{ s.Name }</span> <span class="text-muted-foreground">{ s.What }</span></span>
+										</label>
+									}
+									<div>
+										@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+											Save scopes
+										}
+									</div>
+									<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
+								</form>
+							</details>
+						}
 					</div>
 				}
 				if q.Owner() {

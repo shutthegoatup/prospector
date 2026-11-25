@@ -263,23 +263,47 @@ const enquiryPageSize = 50
 
 // Enquiries lists one page of the enquiries a filter matches, newest first.
 func (s *Store) Enquiries(org int64, f EnquiryFilter, page int) ([]Enquiry, Page, error) {
-	matching := func() *gorm.DB {
-		q := s.in(org).Model(&Enquiry{}).Where("spam = ?", f.Spam)
-		if f.Kind != "" {
-			q = q.Where("kind = ?", f.Kind)
-		}
-		if f.State != "" {
-			q = q.Where("state = ?", f.State)
-		}
-		return q
-	}
 	var total int64
-	if err := matching().Count(&total).Error; err != nil {
+	if err := s.enquiriesMatching(org, f).Count(&total).Error; err != nil {
 		return nil, Page{}, err
 	}
 	pg := pageOf(page, enquiryPageSize, int(total))
 	var rows []Enquiry
-	return rows, pg, matching().Order("created_at desc, id desc").Limit(pg.Size).Offset(pg.offset()).Find(&rows).Error
+	err := s.enquiriesMatching(org, f).Order("created_at desc, id desc").Limit(pg.Size).Offset(pg.offset()).Find(&rows).Error
+	return rows, pg, err
+}
+
+func (s *Store) enquiriesMatching(org int64, f EnquiryFilter) *gorm.DB {
+	q := s.in(org).Model(&Enquiry{}).Where("spam = ?", f.Spam)
+	if f.Kind != "" {
+		q = q.Where("kind = ?", f.Kind)
+	}
+	if f.State != "" {
+		q = q.Where("state = ?", f.State)
+	}
+	return q
+}
+
+// enquiriesBefore is a page of the enquiries a filter matches, newest first, after
+// the one a cursor names. The cursor is that enquiry's id, so one answered or marked
+// as spam while the list is walked, or one arriving, moves no other between pages.
+func (s *Store) enquiriesBefore(org int64, f EnquiryFilter, page PageIn) (rows []Enquiry, next string, err error) {
+	at, err := page.at(1)
+	if err != nil {
+		return nil, "", err
+	}
+	q := s.enquiriesMatching(org, f).Order("id desc").Limit(page.size() + 1)
+	if at[0] > 0 {
+		q = q.Where("id < ?", at[0])
+	}
+	if err := q.Find(&rows).Error; err != nil {
+		return nil, "", err
+	}
+	if len(rows) > page.size() {
+		rows = rows[:page.size()]
+		next = cursorOf(rows[len(rows)-1].ID)
+	}
+	return rows, next, nil
 }
 
 // EnquiryCounts is how many enquiries there are of each kind, with spam under "spam"
