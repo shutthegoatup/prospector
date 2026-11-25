@@ -10,6 +10,15 @@ import (
 	"strconv"
 )
 
+func stageLabel(key string) string {
+	for _, s := range Stages {
+		if s.Key == key {
+			return s.Label
+		}
+	}
+	return "Replied"
+}
+
 func stepLabel(key string) string {
 	for _, s := range Steps {
 		if s.Key == key {
@@ -23,6 +32,7 @@ templ TodayView(q *Req, d TodayData) {
 	@PageHead("Today") {
 		<span class="font-mono text-xs text-muted-foreground">{ d.Now }</span>
 	}
+	@Whose(areaSales, "Outreach is")
 	<div class="flex flex-wrap items-start gap-8">
 		<section class="flex min-w-0 flex-[999_1_560px] flex-col gap-4">
 			<p class="text-sm text-muted-foreground">
@@ -90,9 +100,11 @@ templ Stat(n int64, label string) {
 func id(c Card) string { return strconv.FormatInt(c.ID, 10) }
 
 templ Mark(c Card, step, text string, primary bool) {
-	@button.Button(button.Props{Size: button.SizeSm, Variant: markVariant(primary),
-		Attributes: templ.Attributes{"data-mark": step, "data-id": id(c), "data-next": strconv.FormatInt(c.Next, 10), "data-key": markKey(c.Step, step)}}) {
-		{ text }
+	if canDo(ctx, areaSales) {
+		@button.Button(button.Props{Size: button.SizeSm, Variant: markVariant(primary),
+			Attributes: templ.Attributes{"data-mark": step, "data-id": id(c), "data-next": strconv.FormatInt(c.Next, 10), "data-key": markKey(c.Step, step)}}) {
+			{ text }
+		}
 	}
 }
 
@@ -124,7 +136,9 @@ templ CopyButton(text, copy, open, key string) {
 
 templ Field(id, name, text, value string, multi bool) {
 	@Label(text)
-	if multi {
+	if !canDo(ctx, areaSales) {
+		@Shown(value, "—")
+	} else if multi {
 		@textarea.Textarea(textarea.Props{Value: value, Placeholder: text, Rows: 3, Class: "bg-muted",
 			Attributes: templ.Attributes{"data-field": name, "data-id": id}})
 	} else {
@@ -170,7 +184,7 @@ templ Item(q *Req, c Card, i int) {
 					<span class="shrink-0 rounded-md border-2 border-foreground bg-primary px-2 py-0.5 font-mono text-xs font-medium text-primary-foreground" title="Fit">{ deref(c.Fit) }</span>
 				}
 			</div>
-			if len(c.People) > 1 {
+			if len(c.People) > 1 && canDo(ctx, areaSales) {
 				<label class="flex items-center gap-3">
 					@Label("Send to")
 					@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Class: "flex-1",
@@ -267,8 +281,13 @@ templ StepBody(c Card) {
 				@Mark(c, "declined", "Not interested", false)
 			}
 		case "linkedin":
-			@textarea.Textarea(textarea.Props{ID: "note-" + id(c), Value: c.Text, Rows: 5, Class: "bg-muted text-[15px] leading-relaxed",
-				Attributes: templ.Attributes{"data-field": "note", "data-id": id(c)}})
+			if canDo(ctx, areaSales) {
+				@textarea.Textarea(textarea.Props{ID: "note-" + id(c), Value: c.Text, Rows: 5, Class: "bg-muted text-[15px] leading-relaxed",
+					Attributes: templ.Attributes{"data-field": "note", "data-id": id(c)}})
+			} else {
+				@Quote(c.Text)
+				<textarea id={ "note-" + id(c) } hidden readonly>{ c.Text }</textarea>
+			}
 			@Actions() {
 				@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-copy-from": "note-" + id(c), "data-open": profileHref(c.Contact), "data-key": "o"}}) {
 					{ openLabel(c.Contact) }
@@ -281,8 +300,13 @@ templ StepBody(c Card) {
 			}
 		case "accepted":
 			@Meta(acceptedMeta(c))
-			@textarea.Textarea(textarea.Props{ID: "message-" + id(c), Value: c.Text, Rows: 10, Class: "bg-muted text-[15px] leading-relaxed",
-				Attributes: templ.Attributes{"data-field": "message", "data-id": id(c)}})
+			if canDo(ctx, areaSales) {
+				@textarea.Textarea(textarea.Props{ID: "message-" + id(c), Value: c.Text, Rows: 10, Class: "bg-muted text-[15px] leading-relaxed",
+					Attributes: templ.Attributes{"data-field": "message", "data-id": id(c)}})
+			} else {
+				@Quote(c.Text)
+				<textarea id={ "message-" + id(c) } hidden readonly>{ c.Text }</textarea>
+			}
 			@Actions() {
 				@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-copy-from": "message-" + id(c), "data-open": profileHref(c.Contact)}}) {
 					{ openLabel(c.Contact) }
@@ -295,8 +319,12 @@ templ StepBody(c Card) {
 			<div class="grid grid-cols-[5.5rem_1fr] items-center gap-x-3 gap-y-2 text-sm">
 				@Field(id(c), "next_step", "Next step", c.NextStep, false)
 				@Label("By")
-				@input.Input(input.Props{Type: "date", Value: deref(c.NextDate), Class: "h-8 w-44 bg-muted",
-					Attributes: templ.Attributes{"data-field": "next_date", "data-id": id(c)}})
+				if canDo(ctx, areaSales) {
+					@input.Input(input.Props{Type: "date", Value: deref(c.NextDate), Class: "h-8 w-44 bg-muted",
+						Attributes: templ.Attributes{"data-field": "next_date", "data-id": id(c)}})
+				} else {
+					@Shown(deref(c.NextDate), "No date")
+				}
 			</div>
 			@Actions() {
 				@StageSelect(c.Contact)
@@ -316,6 +344,17 @@ templ StepBody(c Card) {
 }
 
 templ StageSelect(c Contact) {
+	if canDo(ctx, areaSales) {
+		@stageSelect(c)
+	} else {
+		<span class="flex items-center gap-2">
+			@Label("Stage")
+			@Shown(stageLabel(c.Stage), "")
+		</span>
+	}
+}
+
+templ stageSelect(c Contact) {
 	<label class="flex items-center gap-2">
 		@Label("Stage")
 		@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm,

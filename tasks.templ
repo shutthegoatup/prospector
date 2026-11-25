@@ -14,7 +14,7 @@ type TasksData struct {
 	Closed bool
 	// Open and All count every task, not only those on this page.
 	Open, All int
-	Now    time.Time
+	Now       time.Time
 }
 
 type TaskPage struct {
@@ -152,6 +152,7 @@ templ TaskStatus(status string) {
 templ TasksView(q *Req, d TasksData) {
 	@PageHead("Tasks")
 	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">Write what you want found. An agent picks it up, and what it finds waits in Research for you. Anyone can ask for more later, and a different agent can carry on from what is already here.</p>
+	@Whose(areaSales, "Tasks for agents are")
 	<div class="flex flex-wrap items-start gap-8">
 		<div class="flex min-w-0 flex-[999_1_480px] flex-col gap-3">
 			<div class="flex flex-wrap gap-2">
@@ -178,26 +179,32 @@ templ TasksView(q *Req, d TasksData) {
 			}
 			@Pager(d.Page, func(n int) string { return pageLink(q.Base()+"tasks", n, "closed", taskClosedParam(d.Closed)) })
 		</div>
-		<aside class="flex min-w-0 flex-[1_1_280px] flex-col gap-3 panel p-5 text-sm">
-			<form data-form="api/v1/tasks" data-go="tasks/{id}" class="flex flex-col gap-4">
-				<label class="flex flex-col gap-1.5">
-					@Label("What should be found?")
-					<textarea name="brief" rows="7" required maxlength="4000" placeholder="Heads of procurement at UK kitchen makers with their own showrooms. About twenty, with the page that shows each one's role." class="rounded-lg border border-input bg-muted px-3 py-2 text-sm leading-relaxed"></textarea>
-				</label>
-				<label class="flex flex-col gap-1.5">
-					@Label("Short name (optional)")
-					<input name="title" maxlength="60" class="h-10 rounded-lg border border-input bg-muted px-3 text-sm"/>
-				</label>
-				<div class="flex flex-wrap items-center gap-3">
-					@button.Button(button.Props{Type: button.TypeSubmit}) {
-						Create task
-					}
-					<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
-				</div>
-			</form>
-			<p class="text-muted-foreground">Agents can read the brief and everyone's requests. Don't put anything in them you wouldn't put in a note to a colleague.</p>
-		</aside>
+		if canDo(ctx, areaSales) {
+			@taskCreate()
+		}
 	</div>
+}
+
+templ taskCreate() {
+	<aside class="flex min-w-0 flex-[1_1_280px] flex-col gap-3 panel p-5 text-sm">
+		<form data-form="api/v1/tasks" data-go="tasks/{id}" class="flex flex-col gap-4">
+			<label class="flex flex-col gap-1.5">
+				@Label("What should be found?")
+				<textarea name="brief" rows="7" required maxlength="4000" placeholder="Heads of procurement at UK kitchen makers with their own showrooms. About twenty, with the page that shows each one's role." class="rounded-lg border border-input bg-muted px-3 py-2 text-sm leading-relaxed"></textarea>
+			</label>
+			<label class="flex flex-col gap-1.5">
+				@Label("Short name (optional)")
+				<input name="title" maxlength="60" class="h-10 rounded-lg border border-input bg-muted px-3 text-sm"/>
+			</label>
+			<div class="flex flex-wrap items-center gap-3">
+				@button.Button(button.Props{Type: button.TypeSubmit}) {
+					Create task
+				}
+				<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
+			</div>
+		</form>
+		<p class="text-muted-foreground">Agents can read the brief and everyone's requests. Don't put anything in them you wouldn't put in a note to a colleague.</p>
+	</aside>
 }
 
 templ TaskDetailView(q *Req, d TaskPage) {
@@ -218,7 +225,7 @@ templ TaskDetailView(q *Req, d TaskPage) {
 							} else {
 								@Meta(r.AskedBy + " · " + r.AskedAt.Format("2 Jan 15:04") + " · added since: " + taskFound(r.Companies, r.People) + heldText(r))
 							}
-							if d.ClosedAt == nil {
+							if d.ClosedAt == nil && canDo(ctx, areaSales) {
 								if r.DoneAt != nil {
 									@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/task-requests/" + strconv.FormatInt(r.ID, 10), "data-method": "PATCH", "data-body": jsonBody("done", false)}}) {
 										Reopen
@@ -232,7 +239,7 @@ templ TaskDetailView(q *Req, d TaskPage) {
 						</div>
 					</div>
 				}
-				if d.ClosedAt == nil {
+				if d.ClosedAt == nil && canDo(ctx, areaSales) {
 					<form data-form={ "api/v1/tasks/" + strconv.FormatInt(d.ID, 10) + "/requests" } data-reset="true" data-refresh="true" class="flex flex-col gap-3">
 						<label class="flex flex-col gap-1.5">
 							@Label("Ask for more")
@@ -277,15 +284,17 @@ templ TaskDetailView(q *Req, d TaskPage) {
 							<div class="flex flex-col gap-1.5 border-b border-dashed border-border py-2 text-sm">
 								<span><b>{ run.AgentName }</b> · { agentRunState(run) }</span>
 								@Meta(agentRunText(run))
-								<div>
-									@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/runs/" + strconv.FormatInt(run.ID, 10) + "/stop"}}) {
-										{ "Stop " + run.AgentName }
-									}
-								</div>
+								if canDo(ctx, areaSales) {
+									<div>
+										@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/runs/" + strconv.FormatInt(run.ID, 10) + "/stop"}}) {
+											{ "Stop " + run.AgentName }
+										}
+									</div>
+								}
 							</div>
 						}
 					}
-					if d.ClosedAt == nil {
+					if d.ClosedAt == nil && canDo(ctx, areaSales) {
 						<div class="flex flex-wrap gap-2">
 							for _, agent := range d.Agents {
 								if !agentGoing(d.AgentRuns, agent.ID) {
@@ -329,18 +338,24 @@ templ TaskDetailView(q *Req, d TaskPage) {
 				}
 				@Pager(d.WorkPage, func(n int) string { return pageHref(string(taskHref(q, d.ID)), d.Query, "work", n) })
 			}
-			<div>
-				if d.ClosedAt == nil {
-					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/tasks/" + strconv.FormatInt(d.ID, 10), "data-method": "PATCH", "data-body": jsonBody("closed", true), "data-confirm": "Close this task? Agents stop seeing it; what was found stays."}}) {
-						Close task
-					}
-				} else {
-					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/tasks/" + strconv.FormatInt(d.ID, 10), "data-method": "PATCH", "data-body": jsonBody("closed", false)}}) {
-						Reopen task
-					}
-				}
-			</div>
+			if canDo(ctx, areaSales) {
+				@taskClose(d)
+			}
 		</aside>
+	</div>
+}
+
+templ taskClose(d TaskPage) {
+	<div>
+		if d.ClosedAt == nil {
+			@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/tasks/" + strconv.FormatInt(d.ID, 10), "data-method": "PATCH", "data-body": jsonBody("closed", true), "data-confirm": "Close this task? Agents stop seeing it; what was found stays."}}) {
+				Close task
+			}
+		} else {
+			@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/tasks/" + strconv.FormatInt(d.ID, 10), "data-method": "PATCH", "data-body": jsonBody("closed", false)}}) {
+				Reopen task
+			}
+		}
 	</div>
 }
 
@@ -357,8 +372,10 @@ templ Notes(q *Req, notes []NoteView) {
 						<a href={ companyHref(q, n.CompanyID) } class="font-mono text-xs text-mark underline">{ n.Company }</a>
 					}
 				</span>
-				@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/note/delete", "data-body": jsonBody("id", n.ID), "data-confirm": "Delete this note?"}}) {
-					Delete
+				if canDo(ctx, areaSales) {
+					@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/note/delete", "data-body": jsonBody("id", n.ID), "data-confirm": "Delete this note?"}}) {
+						Delete
+					}
 				}
 			</div>
 			<p class="whitespace-pre-wrap">{ n.Text }</p>

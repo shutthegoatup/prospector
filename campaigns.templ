@@ -16,6 +16,19 @@ templ CampaignsView(q *Req, cards []CampaignCard, postal string) {
 	if postal == "" {
 		<p class="mb-5 max-w-[70ch] rounded-lg border border-border bg-muted px-3 py-2 text-sm">A campaign will need your postal address at its foot. An owner sets it in Settings.</p>
 	}
+	@Whose(areaSales, "Campaigns are")
+	if canDo(ctx, areaSales) {
+		@campaignStart()
+	}
+	if len(cards) == 0 {
+		@Empty("No campaigns yet", "Start a draft above, then see who it would go to.")
+	}
+	for _, c := range cards {
+		@CampaignDraftCard(c)
+	}
+}
+
+templ campaignStart() {
 	<form data-form="api/v1/campaigns" data-refresh="true" data-reset="true" class="mb-5 flex flex-wrap items-center gap-2">
 		<input name="name" required maxlength="120" placeholder="e.g. Spring price list" aria-label="Name of the campaign" class="h-9 min-w-[220px] flex-1 rounded-lg border border-input bg-muted px-3 text-sm"/>
 		<select name="audience" aria-label="Who it is for" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
@@ -28,26 +41,31 @@ templ CampaignsView(q *Req, cards []CampaignCard, postal string) {
 		}
 		<span data-result class="font-mono text-xs text-muted-foreground"></span>
 	</form>
-	if len(cards) == 0 {
-		@Empty("No campaigns yet", "Start a draft above, then see who it would go to.")
-	}
-	for _, c := range cards {
-		@CampaignDraftCard(c)
-	}
 }
 
 templ CampaignDraftCard(c CampaignCard) {
 	<article class="mb-4 flex flex-col gap-3 panel p-4 text-sm" data-campaign-card={ strconv.FormatInt(c.ID, 10) }>
-		<div class="flex flex-wrap items-center justify-between gap-2">
-			<input value={ c.Name } maxlength="120" aria-label="Name" class="h-9 min-w-[220px] flex-1 rounded-lg border border-input bg-muted px-3 font-bold" { campaignInput(c.Campaign, "name")... }/>
-			<select aria-label="Who it is for" class="h-9 rounded-lg border border-input bg-muted px-2" { campaignInput(c.Campaign, "audience")... }>
-				for _, a := range CampaignAudiences {
-					<option value={ a.Key } selected?={ a.Key == c.Audience }>{ a.Label }</option>
-				}
-			</select>
-		</div>
-		<input value={ c.Subject } maxlength="200" placeholder="Subject" aria-label="Subject" class="h-9 rounded-lg border border-input bg-muted px-3" { campaignInput(c.Campaign, "subject")... }/>
-		<textarea rows="8" maxlength="20000" placeholder="What it says, as plain text. Your postal address and an unsubscribe link are added at the foot." aria-label="What it says" class="rounded-lg border border-input bg-muted px-3 py-2 leading-relaxed" { campaignInput(c.Campaign, "body")... }>{ c.Body }</textarea>
+		if canDo(ctx, areaSales) {
+			<div class="flex flex-wrap items-center justify-between gap-2">
+				<input value={ c.Name } maxlength="120" aria-label="Name" class="h-9 min-w-[220px] flex-1 rounded-lg border border-input bg-muted px-3 font-bold" { campaignInput(c.Campaign, "name")... }/>
+				<select aria-label="Who it is for" class="h-9 rounded-lg border border-input bg-muted px-2" { campaignInput(c.Campaign, "audience")... }>
+					for _, a := range CampaignAudiences {
+						<option value={ a.Key } selected?={ a.Key == c.Audience }>{ a.Label }</option>
+					}
+				</select>
+			</div>
+			<input value={ c.Subject } maxlength="200" placeholder="Subject" aria-label="Subject" class="h-9 rounded-lg border border-input bg-muted px-3" { campaignInput(c.Campaign, "subject")... }/>
+			<textarea rows="8" maxlength="20000" placeholder="What it says, as plain text. Your postal address and an unsubscribe link are added at the foot." aria-label="What it says" class="rounded-lg border border-input bg-muted px-3 py-2 leading-relaxed" { campaignInput(c.Campaign, "body")... }>{ c.Body }</textarea>
+		} else {
+			<div class="flex flex-wrap items-baseline justify-between gap-2">
+				<b class="text-base">{ c.Name }</b>
+				@Meta(audienceLabel(c.Audience))
+			</div>
+			@Shown(c.Subject, "No subject yet")
+			if c.Body != "" {
+				@Quote(c.Body)
+			}
+		}
 		<details>
 			<summary class="cursor-pointer font-mono text-xs text-muted-foreground">{ "Would go to " + plural(c.Going, "person") + "; " + strconv.Itoa(c.LeftOut) + " left out" }</summary>
 			<div class="mt-2 flex flex-col">
@@ -64,10 +82,12 @@ templ CampaignDraftCard(c CampaignCard) {
 				}
 			</div>
 		</details>
-		<div class="flex justify-end">
-			@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/campaigns/" + strconv.FormatInt(c.ID, 10), "data-method": "DELETE", "data-confirm": "Remove the draft " + c.Name + "?"}}) {
-				Remove draft
-			}
-		</div>
+		if canDo(ctx, areaSales) {
+			<div class="flex justify-end">
+				@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/campaigns/" + strconv.FormatInt(c.ID, 10), "data-method": "DELETE", "data-confirm": "Remove the draft " + c.Name + "?"}}) {
+					Remove draft
+				}
+			</div>
+		}
 	</article>
 }

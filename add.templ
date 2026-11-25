@@ -3,6 +3,14 @@ package main
 import "github.com/shutthegoatup/prospector/components/button"
 
 templ AddForm(q *Req, in QuickAdd, popup bool) {
+	if canDo(ctx, areaSales) {
+		@addForm(q, in, popup)
+	} else {
+		<p class="font-mono text-xs text-mark">Adding people is sales work. An owner can add sales to you on the Team list in Settings.</p>
+	}
+}
+
+templ addForm(q *Req, in QuickAdd, popup bool) {
 	<form data-form="ui/add" data-reset="true" data-close={ boolAttr(popup) } class="flex flex-col gap-4">
 		<label class="flex flex-col gap-1.5">
 			@Label("LinkedIn profile")
