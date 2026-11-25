@@ -83,6 +83,9 @@ func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddComp
 	}
 	var out AddCompanyOut
 	err = s.db.Transaction(func(tx *gorm.DB) error {
+		if err := holdOrg(tx, org); err != nil {
+			return err
+		}
 		domain := bareDomain(in.Domain)
 		var c *Company
 		var named int64
@@ -102,6 +105,9 @@ func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddComp
 			}
 		}
 		out = AddCompanyOut{ID: c.ID, Name: c.Name, Existed: !created, Stage: c.Stage}
+		if err := hold(tx, &Company{}, org, c.ID); err != nil {
+			return err
+		}
 		added := 0
 		for _, f := range in.Facts {
 			_, had, err := addFact(tx, org, c.ID, f, who.Name)
@@ -155,6 +161,9 @@ func (s *Store) AgentAddFact(org int64, who Actor, in AddFactIn) (*AddFactOut, e
 	}
 	var out AddFactOut
 	err = s.db.Transaction(func(tx *gorm.DB) error {
+		if err := hold(tx, &Company{}, org, c.ID); err != nil {
+			return err
+		}
 		f, had, err := addFact(tx, org, c.ID, in.FactIn, who.Name)
 		if err != nil {
 			return err
@@ -236,6 +245,13 @@ func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContact
 	first := firstField(in.Name)
 	var out AddContactOut
 	err = s.db.Transaction(func(tx *gorm.DB) error {
+		// The organisation too: a contact's key is one of a kind across it.
+		if err := holdOrg(tx, o.ID); err != nil {
+			return err
+		}
+		if err := hold(tx, &Company{}, o.ID, c.ID); err != nil {
+			return err
+		}
 		var people []Contact
 		if err := tx.Where("org_id = ? and company_id = ? and key not like 'org:%'", o.ID, c.ID).Order("id").Find(&people).Error; err != nil {
 			return err
@@ -315,6 +331,10 @@ func (s *Store) AgentDraft(org int64, who Actor, in DraftIn) error {
 		return errors.New("LinkedIn notes are 300 characters at most")
 	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		// A person's edit made meanwhile is then either seen below or lands on top of this.
+		if err := hold(tx, &Contact{}, org, in.ContactID); err != nil {
+			return err
+		}
 		var c Contact
 		if err := tx.Where("org_id = ? and id = ?", org, in.ContactID).First(&c).Error; err != nil {
 			return fmt.Errorf("no contact %d", in.ContactID)
