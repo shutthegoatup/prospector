@@ -71,7 +71,7 @@ func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
 	if code, body := decide(pending[1].ID, SuggestionDismissed); code != http.StatusOK {
 		t.Fatalf("dismiss: %d %s", code, body)
 	}
-	if code, _ := decide(pending[0].ID, SuggestionDismissed); code != http.StatusBadRequest {
+	if code, _ := decide(pending[0].ID, SuggestionDismissed); code != http.StatusConflict {
 		t.Fatalf("a settled suggestion was settled again: %d", code)
 	}
 	if c := person(); deref(c.Email) != "hannah.pryce@larkmoor.example" || c.EmailStatus != "guess" || deref(c.Phone) != "+44 20 7946 0000" {

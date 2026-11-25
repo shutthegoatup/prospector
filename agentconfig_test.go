@@ -209,7 +209,7 @@ func TestAnOrganisationHasSeveralAgents(t *testing.T) {
 	if code, body := add(map[string]any{"name": " claude ", "model": "router/auto"}); code != http.StatusOK {
 		t.Fatalf("names are told apart as typed, trimmed: %d %s", code, body)
 	}
-	if code, body := add(map[string]any{"name": "Claude", "model": "router/auto"}); code != http.StatusBadRequest || !strings.Contains(body, "already") {
+	if code, body := add(map[string]any{"name": "Claude", "model": "router/auto"}); code != http.StatusConflict || !strings.Contains(body, "already") {
 		t.Fatalf("a second agent with a name already taken: %d %s", code, body)
 	}
 	if code, _ := add(map[string]any{"name": "", "model": "router/auto"}); code != http.StatusBadRequest {

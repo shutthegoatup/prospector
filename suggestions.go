@@ -179,7 +179,7 @@ func (s *Store) DecideSuggestion(org, id int64, decision, actor string) error {
 			return missing(err, "no suggestion %d", id)
 		}
 		if sg.Decision != "" {
-			return errors.New("that suggestion was already " + sg.Decision + " by " + sg.DecidedBy)
+			return conflict("that suggestion was already " + sg.Decision + " by " + sg.DecidedBy)
 		}
 		now := time.Now()
 		res := tx.Model(&Suggestion{}).Where("id = ? and decision = ''", sg.ID).

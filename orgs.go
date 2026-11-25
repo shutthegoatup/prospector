@@ -187,7 +187,7 @@ func createOrg(tx *gorm.DB, slug, name string) (*Org, error) {
 	if !slugRe.MatchString(slug) {
 		return nil, fmt.Errorf("%q can't be used in a URL: use a-z, 0-9 and -", slug)
 	}
-	inUse := taken(fmt.Sprintf("another organisation already has the address /o/%s: choose a different name", slug))
+	inUse := conflict(fmt.Sprintf("another organisation already has the address /o/%s: choose a different name", slug))
 	var same, n int64
 	if err := tx.Model(&Org{}).Where("slug = ?", slug).Count(&same).Error; err != nil {
 		return nil, err

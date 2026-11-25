@@ -605,7 +605,7 @@ func (s *Store) StartRenewal(org, subscription, contact int64, actor string) (*D
 			return err
 		}
 		if open > 0 {
-			return errors.New("a renewal for it is already under way on the Conversations board")
+			return conflict("a renewal for it is already under way on the Conversations board")
 		}
 		var last int
 		if err := tx.Model(&Deal{}).Where("org_id = ? and contact_id = ?", org, contact).

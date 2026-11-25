@@ -366,7 +366,7 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 	if code, body := start(ada, agents[1].ID); code != http.StatusCreated {
 		t.Fatalf("a second agent on the same task: %d %s", code, body)
 	}
-	if code, body := start(ada, agents[0].ID); code != http.StatusBadRequest || !strings.Contains(body, "Claude is already working") {
+	if code, body := start(ada, agents[0].ID); code != http.StatusConflict || !strings.Contains(body, "Claude is already working") {
 		t.Fatalf("the same agent twice on one task: %d %s", code, body)
 	}
 	if _, body := call(t, ada, "GET", page, "", nil); !strings.Contains(body, "Stop Claude") || !strings.Contains(body, "Stop Gateway") || strings.Contains(body, "Run Claude") {

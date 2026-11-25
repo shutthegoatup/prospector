@@ -427,7 +427,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 		return nil, err
 	}
 	if taken > 0 {
-		return nil, fmt.Errorf("there is already an agent called %q", name)
+		return nil, conflict(fmt.Sprintf("there is already an agent called %q", name))
 	}
 	renamed := c.ID != 0 && c.Name != name
 	c.Name = name
