@@ -180,6 +180,50 @@ func TestTheAgentWaitsOutAnEndpointsLimit(t *testing.T) {
 	}
 }
 
+func TestTheAgentWorksThroughOutagesButNotAWrongModel(t *testing.T) {
+	fake := newFakeEndpoint(t)
+	r := newRunSetup(t, fake)
+	fake.chat = func(n int, _ map[string]any) (int, string) {
+		switch n {
+		case 0:
+			return http.StatusServiceUnavailable, `{"error":{"code":503,"message":"upstream away"}}`
+		case 1:
+			return http.StatusBadGateway, `{"error":{"code":502,"message":"upstream away"}}`
+		case 2:
+			return 200, `not json at all`
+		}
+		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
+	}
+	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	if got.Status != RunFinished {
+		t.Fatalf("a run should outlast an endpoint that is away for a while: %+v", got)
+	}
+	var waited []time.Duration
+	for _, d := range r.sleeps {
+		waited = append(waited, d.Round(time.Second))
+	}
+	if fmt.Sprint(waited) != "[10s 20s 40s]" {
+		t.Fatalf("it should back off, doubling: %v", r.sleeps)
+	}
+
+	fake.mu.Lock()
+	fake.chats = 0
+	fake.mu.Unlock()
+	fake.chat = func(int, map[string]any) (int, string) {
+		return http.StatusBadRequest, `{"error":{"code":400,"message":"no such model: router/auto"}}`
+	}
+	if err := r.s.SetRequestDone(r.o.ID, r.brief, false, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	got = r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, "Ada Lovelace")).ID)
+	if got.Status != RunFailed || !strings.Contains(got.StopReason, "no such model") || fake.chats != 1 {
+		t.Fatalf("a refusal that waiting won't fix should end the run, saying why: %+v after %d calls", got, fake.chats)
+	}
+	if backoff(20) != 5*time.Minute {
+		t.Fatalf("the back-off should stop growing at 5 minutes, got %s", backoff(20))
+	}
+}
+
 func TestAPersonStopsTheAgent(t *testing.T) {
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)

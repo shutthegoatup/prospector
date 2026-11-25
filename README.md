@@ -210,7 +210,7 @@ Any member can then press "Run Prospector's agent" on a task. The run:
 - gets Prospector's research tools (`get_task`, `search`, `get_company`, `add_company`, `add_fact`, `add_contact`, `task_note`, `finish_request`) and the allowed MCP tools. It can't draft, mark or send anything, and what it finds waits in Research;
 - has every fact and contact checked against the pages its tools showed it in that run: a source it wasn't shown is refused, and it is told why;
 - treats what tools return as content from the web, never as instructions;
-- goes on until the request is done or someone presses Stop. When the endpoint answers 429 or 503 it waits as long as `Retry-After` says, however long, and carries on;
+- goes on until the request is done or someone presses Stop. When the endpoint, or a tool behind the same limits, answers 429 it waits as long as `Retry-After` says, however long. When the endpoint is away, slow or erroring, it waits 10 seconds, doubling to 5 minutes at most, and tries again for as long as it takes. Only a refusal that waiting won't fix, such as a wrong key or model, ends the run;
 - starts its conversation afresh from `get_task` every 30 turns, or once the conversation grows long, so it can run for as long as there is work with a bounded context;
 - is carried on after a restart or deploy, by whichever server sees its hold lapse first, unless someone stopped it.
 

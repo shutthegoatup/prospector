@@ -350,7 +350,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 			{Role: "system", Content: runInstructions(o, bk)},
 			{Role: "user", Content: taskPrompt(o, Task{ID: task.ID, Title: task.Title}) + "\n\nThis is what get_task returned just now, so you needn't call it first:\n" + brief},
 		}
-		idle := 0
+		idle, failures := 0, 0
 		for turn := 0; turn < episodeTurns; turn++ {
 			if goOn, err := a.hold(ctx, run, RunWorking, nil); err != nil || !goOn {
 				return a.ended(ctx, run, err)
@@ -361,9 +361,15 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 				return RunStopped, "its key was revoked on the Agents page"
 			}
 			reply, err := a.complete(ctx, cfg, key, run, messages, tools)
-			var refused *endpointError
-			if errors.As(err, &refused) && (refused.Status == http.StatusTooManyRequests || refused.Status == http.StatusServiceUnavailable) {
-				if err := a.wait(ctx, run, refused.RetryAfter); err != nil {
+			if err != nil && ctx.Err() == nil && passing(err) {
+				// Limits and outages are waited out, however long, until someone stops it.
+				until := time.Now().Add(backoff(failures))
+				var refused *endpointError
+				if errors.As(err, &refused) && !refused.RetryAfter.IsZero() {
+					until = refused.RetryAfter
+				}
+				failures++
+				if err := a.wait(ctx, run, until); err != nil {
 					return a.ended(ctx, run, err)
 				}
 				turn--
@@ -372,6 +378,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 			if err != nil {
 				return a.ended(ctx, run, err)
 			}
+			failures = 0
 			run.Turns++
 			run.TokensIn += reply.Usage.PromptTokens
 			run.TokensOut += reply.Usage.CompletionTokens
@@ -431,8 +438,9 @@ func (a *App) ended(ctx context.Context, run *AgentRun, err error) (string, stri
 // wait sits out an endpoint's limit, however long, holding the run all the while and
 // giving up only if a person stops it or another server takes it over.
 func (a *App) wait(ctx context.Context, run *AgentRun, until time.Time) error {
-	if until.IsZero() || time.Until(until) < 30*time.Second {
-		until = time.Now().Add(time.Minute)
+	// As long as the endpoint says, even a few seconds, but never not at all.
+	if time.Until(until) < time.Second {
+		until = time.Now().Add(time.Second)
 	}
 	if goOn, err := a.hold(ctx, run, RunWaiting, &until); err != nil || !goOn {
 		return errors.Join(err, errors.New("stopped while waiting"))
@@ -608,11 +616,22 @@ func (t *turnState) call(ctx context.Context, name, rawArgs string) (string, err
 	if session == nil {
 		return "", fmt.Errorf("there is no tool called %s", name)
 	}
-	callCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-	res, err := session.CallTool(callCtx, &mcp.CallToolParams{Name: name, Arguments: args})
-	if err != nil {
-		return "", err
+	var res *mcp.CallToolResult
+	for failures := 0; ; failures++ {
+		callCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+		var err error
+		res, err = session.CallTool(callCtx, &mcp.CallToolParams{Name: name, Arguments: args})
+		cancel()
+		if err == nil {
+			break
+		}
+		// A tool server behind the same limits as the model is waited out the same way.
+		if ctx.Err() != nil || !strings.Contains(err.Error(), "Too Many Requests") {
+			return "", err
+		}
+		if err := t.app.wait(ctx, t.run, time.Now().Add(backoff(failures))); err != nil {
+			return "", err
+		}
 	}
 	text := toolText(res)
 	if res.IsError {
@@ -693,21 +712,23 @@ func (a *App) complete(ctx context.Context, cfg *AgentConfig, key string, run *A
 	if err != nil {
 		return nil, err
 	}
-	var last error
-	for attempt, backoff := range []time.Duration{0, 10 * time.Second, 30 * time.Second, 90 * time.Second} {
-		if attempt > 0 {
-			if err := a.pause(ctx, backoff); err != nil {
-				return nil, err
-			}
-		}
-		reply, err := a.completeOnce(ctx, cfg.BaseURL, key, body)
-		var refused *endpointError
-		if err == nil || ctx.Err() != nil || (errors.As(err, &refused) && refused.Status < 500) {
-			return reply, err
-		}
-		last = err
+	return a.completeOnce(ctx, cfg.BaseURL, key, body)
+}
+
+// passing is a failure the endpoint will get over: a limit, or it being away or slow.
+// Anything else it said no to, such as a wrong key or model, won't pass by waiting.
+func passing(err error) bool {
+	var refused *endpointError
+	if errors.As(err, &refused) {
+		return refused.Status == http.StatusTooManyRequests || refused.Status == http.StatusRequestTimeout || refused.Status >= 500
 	}
-	return nil, last
+	return err != nil
+}
+
+// backoff is how long to wait after n failures in a row: from 10 seconds, doubling,
+// to 5 minutes at most, so a run outlasts an outage without hammering the endpoint.
+func backoff(n int) time.Duration {
+	return min(10*time.Second<<min(n, 5), 5*time.Minute)
 }
 
 func (a *App) completeOnce(ctx context.Context, base, key string, body []byte) (*chatReply, error) {
