@@ -365,6 +365,12 @@ func TestARobotWorksOnboardingAsItsScopesAllow(t *testing.T) {
 		t.Errorf("reopening a step: %d %s", code, body)
 	}
 
+	// With no start given, steps are dated from today.
+	if code, body := asKey(t, "POST", base+"onboardings", writer, map[string]any{"company": *hannah.CompanyID, "name": "Second site"}); code != http.StatusCreated || !strings.Contains(body, `"start":"`+today()+`"`) {
+		t.Errorf("starting an onboarding with no start: %d %s", code, body)
+	} else if err := s.db.Where("name = ?", "Second site").Delete(&Onboarding{}).Error; err != nil {
+		t.Fatal(err)
+	}
 	// Mailing a customer is a scope of its own.
 	invites := base + "onboardings/" + itoa(row.ID) + "/invites"
 	if code, body := asKey(t, "POST", invites, writer, map[string]any{"contact": hannah.ID}); code != http.StatusForbidden || !strings.Contains(body, "customers:invite") {

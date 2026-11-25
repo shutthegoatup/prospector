@@ -55,7 +55,11 @@ func (s apiServer) StartOnboarding(ctx context.Context, in api.StartOnboardingRe
 		return nil, errors.New("say which company: {\"company\": id}")
 	}
 	q := reqFrom(ctx)
-	ob, err := s.a.s.StartOnboarding(q.Org.ID, OnboardingIn{Company: in.Body.Company, Name: in.Body.Name, Start: in.Body.Start}, q.Actor())
+	start := in.Body.Start
+	if start == "" {
+		start = today()
+	}
+	ob, err := s.a.s.StartOnboarding(q.Org.ID, OnboardingIn{Company: in.Body.Company, Name: in.Body.Name, Start: start}, q.Actor())
 	if err != nil {
 		return nil, err
 	}

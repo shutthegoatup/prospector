@@ -12,7 +12,7 @@ info:
     `enquiries:reply` to email a reply to an enquiry and record its answer;
     `customers:write` to start, change and remove onboardings; `customers:invite` to email a
     customer a link to their steps and withdraw it. A signed-in
-    member may read and run; configuring needs an owner.
+    member may do all of these except configuring, which needs an owner.
 servers:
   - url: /
 security:
@@ -282,7 +282,7 @@ paths:
         - bearer: [read]
       responses:
         "200":
-          description: Those still going first, then by when they started.
+          description: "Late ones first, then the rest still going, then those that are live; newest start first within each."
           content:
             application/json:
               schema:
@@ -568,7 +568,7 @@ components:
       required: [company]
       properties:
         company: { type: integer, format: int64 }
-        name: { type: string, maxLength: 80, description: "Which one, when a company has several: a site, a product." }
+        name: { type: string, maxLength: 200, description: "Which one, when a company has several: a site, a product." }
         start: { type: string, description: "The day steps are dated from, YYYY-MM-DD; empty is today." }
 
     Onboarding:
