@@ -24,16 +24,25 @@ type fakeEndpoint struct {
 	modelAuth []string
 	toolAuth  []string
 	limited   bool
+	// chat answers the nth chat completion (from 0), given the request's body.
+	chat    func(n int, body map[string]any) (int, string)
+	chats   int
+	bodies  []map[string]any
+	toolUse []string
 }
 
 func newFakeEndpoint(t *testing.T) *fakeEndpoint {
 	t.Helper()
 	f := &fakeEndpoint{}
 	tools := mcp.NewServer(&mcp.Implementation{Name: "fake-tools", Version: "1"}, nil)
-	handle := func(context.Context, *mcp.CallToolRequest, struct {
+	handle := func(_ context.Context, r *mcp.CallToolRequest, _ struct {
 		Query string `json:"query"`
 	}) (*mcp.CallToolResult, struct{}, error) {
-		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "nothing"}}}, struct{}{}, nil
+		f.mu.Lock()
+		f.toolUse = append(f.toolUse, r.Params.Name)
+		f.mu.Unlock()
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{
+			Text: "1. Larkmoor Yachts: day cruisers, with a configurator. https://larkmoor.example/build"}}}, struct{}{}, nil
 	}
 	mcp.AddTool(tools, &mcp.Tool{Name: "brave-search_brave_web_search", Description: strings.Repeat("Search the web. ", 60)}, handle)
 	mcp.AddTool(tools, &mcp.Tool{Name: "fetch_fetch", Description: "Read a page."}, handle)
@@ -55,6 +64,26 @@ func newFakeEndpoint(t *testing.T) *fakeEndpoint {
 			return
 		}
 		w.Write([]byte(`{"object":"list","data":[{"id":"router/auto"},{"id":"qwen/qwen-small"},{"id":"router/auto"}]}`))
+	})
+	mux.HandleFunc("POST /v1/chat/completions", func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		json.NewDecoder(r.Body).Decode(&body)
+		f.mu.Lock()
+		n := f.chats
+		f.chats++
+		f.bodies = append(f.bodies, body)
+		chat := f.chat
+		f.mu.Unlock()
+		if r.Header.Get("Authorization") != "Bearer "+agentTestKey || chat == nil {
+			http.Error(w, `{"error":{"code":401,"message":"bad key"}}`, http.StatusUnauthorized)
+			return
+		}
+		status, reply := chat(n, body)
+		if status == http.StatusTooManyRequests {
+			w.Header().Set("Retry-After", "3600")
+		}
+		w.WriteHeader(status)
+		w.Write([]byte(reply))
 	})
 	mux.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()

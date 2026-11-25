@@ -52,6 +52,9 @@ type App struct {
 	// agentClient reaches an organisation's model endpoint and tool server; nil means
 	// one that refuses private addresses unless the operator allows them.
 	agentClient *http.Client
+	runs        agentRuns
+	// sleep stands in for waiting in tests; nil is the clock.
+	sleep func(ctx context.Context, d time.Duration) error
 }
 
 const (
@@ -653,6 +656,8 @@ func serve(a *App, addr string) error {
 	if a.mail != nil && a.base == "" {
 		log.Print("PROSPECTOR_URL isn't set: mail is off, because an emailed link needs the address to point at")
 	}
+	// Runs a stopped server left going are carried on, here or by another server.
+	go a.keepRunsGoing(context.Background(), 30*time.Second)
 	srv := &http.Server{Addr: addr, Handler: a.Routes(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
 	log.Printf("listening on http://%s", addr)
 	return srv.ListenAndServe()
