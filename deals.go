@@ -223,8 +223,9 @@ func (d Deal) needsNextStep(day string) bool {
 	return d.NextStep == "" || (d.NextDate != nil && *d.NextDate <= day)
 }
 
-// OtherDeals are the renewals, expansions and further deals with people in conversation,
-// by the stage each stands at.
+// OtherDeals are the renewals, expansions and further deals, by the stage each stands
+// at. One stays on the board when its person later declines, unlike their conversation:
+// it has a value and an outcome of its own, and somebody has to close it.
 func (s *Store) OtherDeals(org int64) (map[string][]OtherDeal, error) {
 	var deals []Deal
 	if err := s.in(org).Where("seq > 0").Order("next_date nulls first, id").Find(&deals).Error; err != nil {
@@ -234,7 +235,7 @@ func (s *Store) OtherDeals(org int64) (map[string][]OtherDeal, error) {
 		return map[string][]OtherDeal{}, nil
 	}
 	var people []Contact
-	if err := s.in(org).Where(inConversation).Find(&people).Error; err != nil {
+	if err := s.in(org).Where("id in (?)", s.in(org).Model(&Deal{}).Select("contact_id").Where("seq > 0")).Find(&people).Error; err != nil {
 		return nil, err
 	}
 	with := make(map[int64]Contact, len(people))
@@ -258,11 +259,15 @@ func (s *Store) StartDeal(org, contact int64, kind, actor string) (*Deal, error)
 	}
 	var d Deal
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// Held, so two started together are numbered one after the other.
+		if err := hold(tx, &Contact{}, org, contact); err != nil {
+			return err
+		}
 		var c Contact
 		if err := tx.Where("org_id = ? and id = ?", org, contact).First(&c).Error; err != nil {
 			return missing(err, "no contact %d", contact)
 		}
-		if c.Replied == nil || c.Declined != nil {
+		if c.Replied == nil || c.Declined != nil || c.Status == ContactSuggested {
 			return errors.New("another deal is for someone you are in conversation with")
 		}
 		var o Org
@@ -344,8 +349,5 @@ func (s *Store) RemoveDeal(org, id int64, actor string) error {
 // allowSeveralDeals drops the index that held a contact to one deal. The release before
 // this one stopped declaring it, so going back to that one doesn't bring it back.
 func allowSeveralDeals(db *gorm.DB) error {
-	if !db.Migrator().HasIndex(&Deal{}, "idx_deal_contact") {
-		return nil
-	}
-	return db.Migrator().DropIndex(&Deal{}, "idx_deal_contact")
+	return db.Exec("drop index if exists idx_deal_contact").Error
 }

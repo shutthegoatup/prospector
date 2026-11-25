@@ -390,6 +390,23 @@ func TestAnotherDealWithSomeoneInConversation(t *testing.T) {
 		t.Errorf("the history of the two deals: %+v", said)
 	}
 
+	// Someone who later declines leaves the conversations, but their deals stay to be closed.
+	if err := s.Mark(o.ID, c.ID, "declined", time.Now().Format("2006-01-02"), "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if left := must(s.OtherDeals(o.ID)); len(left["proposal"]) != 1 || len(left["replied"]) != 1 {
+		t.Errorf("the deals of someone who declined left the board with nothing to close them from: %+v", left)
+	}
+	if _, err := s.StartDeal(o.ID, c.ID, "renewal", "Ada Lovelace"); err == nil {
+		t.Error("another deal was started with someone who declined")
+	}
+	if err := change("stage", "lost"); err != nil {
+		t.Errorf("closing the deal of someone who declined: %v", err)
+	}
+	if err := change("stage", "proposal"); err != nil {
+		t.Fatal(err)
+	}
+
 	other := mustOrg(t, s, "beta")
 	if err := s.ChangeDeal(other.ID, renewal.ID, "amount", "1", "Eve"); err == nil {
 		t.Error("another organisation changed the renewal")
