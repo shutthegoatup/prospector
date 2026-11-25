@@ -775,6 +775,104 @@ export interface paths {
         patch: operations["changeTaskRequest"];
         trace?: never;
     };
+    "/o/{org}/api/v1/campaigns/{id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a draft
+         * @description Fixes who it goes to, as its audience stands now, and sends it a few dozen a minute
+         *     through the organisation's own mail server. Each mail is checked again as it goes,
+         *     so someone who unsubscribes meanwhile gets nothing. Each carries the organisation's
+         *     postal address and a one-click unsubscribe link. Refused without the organisation's
+         *     own mail server (one signed in to, with a username, not port 25), a postal address,
+         *     or this server's https address, and for a draft
+         *     with no subject, no body or nobody to go to. Nobody is mailed twice, even if the
+         *     server stops mid-send: a mail that may have gone is marked `unknown` and not sent again.
+         *     An organisation sends at most 2,000 campaign mails a day.
+         */
+        post: operations["sendCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/campaigns/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop a campaign that is sending or paused
+         * @description Mails that went stay recorded; the rest are not sent.
+         */
+        post: operations["cancelCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/campaigns/{id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set a paused campaign going again */
+        post: operations["resumeCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/campaigns/{id}/mail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /** Each mail of a sent campaign, and how it went */
+        get: operations["listCampaignMail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/notes": {
         parameters: {
             query?: never;
@@ -1367,16 +1465,31 @@ export interface components {
             subject: string;
             body: string;
             /**
-             * @description Every campaign is a draft until sending arrives.
+             * @description `draft` until it is sent; `sending` while its mails go out; `paused` when sending stopped by itself, with the reason in `paused`; `sent` once every mail has been dealt with; `cancelled` when someone stopped it.
              * @enum {string}
              */
-            status: "draft";
+            status: "draft" | "sending" | "paused" | "sent" | "cancelled";
             created_by: string;
             updated_by: string;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
             updated_at: string;
+            /** @description Who sent it; empty for a draft. */
+            queued_by: string;
+            /** Format: date-time */
+            queued_at: string | null;
+            /**
+             * Format: date-time
+             * @description When the last of its mails went.
+             */
+            sent_at: string | null;
+            /** @description Why sending stopped by itself; empty unless it is paused. */
+            paused: string;
+            /** @description How many of its mails stand each way. Empty for a draft. */
+            mail: {
+                [key: string]: number;
+            };
         };
         Recipient: {
             /** Format: int64 */
@@ -1386,6 +1499,27 @@ export interface components {
             address: string;
             /** @description Empty for someone it goes to; otherwise why it doesn't. */
             left_out: string;
+        };
+        CampaignMail: {
+            /** Format: int64 */
+            id: number;
+            /** @description Who it was to; `erased:` and a number once that person was erased. */
+            address: string;
+            /**
+             * Format: int64
+             * @description 0 once that person was erased, or a restore dropped them.
+             */
+            contact_id: number;
+            name: string;
+            /**
+             * @description `unknown`: the mail server stopped answering while it was being sent, so it may have gone; it is not sent again.
+             * @enum {string}
+             */
+            status: "queued" | "sending" | "sent" | "failed" | "unknown" | "skipped" | "cancelled";
+            /** @description Why it wasn't sent, or may not have been. */
+            reason: string;
+            /** Format: date-time */
+            sent_at: string | null;
         };
     };
     responses: {
@@ -2755,6 +2889,115 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskRequest"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    sendCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sending. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    cancelCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The campaign, cancelled. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    resumeCampaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The campaign, sending. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCampaignMail: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description In the order they were queued. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CampaignMail"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
                 };
             };
             default: components["responses"]["Problem"];

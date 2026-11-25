@@ -15,7 +15,7 @@ info:
     and say where answering an enquiry stands; `enquiries:triage` to say where answering an
     enquiry stands and put its sender on the board, without deals; `enquiries:delete` to delete an enquiry;
     `campaigns:write` to write campaigns and keep the list of addresses marketing mail
-    never goes to. A
+    never goes to; `campaigns:send` to send, cancel and resume a campaign. A
     signed-in member may do all of these except configuring agents and deleting enquiries,
     which need an owner.
 
@@ -1159,6 +1159,105 @@ paths:
               schema: { $ref: "#/components/schemas/TaskRequest" }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/campaigns/{id}/send:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: sendCampaign
+      tags: [mail]
+      summary: Send a draft
+      description: |
+        Fixes who it goes to, as its audience stands now, and sends it a few dozen a minute
+        through the organisation's own mail server. Each mail is checked again as it goes,
+        so someone who unsubscribes meanwhile gets nothing. Each carries the organisation's
+        postal address and a one-click unsubscribe link. Refused without the organisation's
+        own mail server (one signed in to, with a username, not port 25), a postal address,
+        or this server's https address, and for a draft
+        with no subject, no body or nobody to go to. Nobody is mailed twice, even if the
+        server stops mid-send: a mail that may have gone is marked `unknown` and not sent again.
+        An organisation sends at most 2,000 campaign mails a day.
+      security:
+        - session: []
+        - bearer: ["campaigns:send"]
+      responses:
+        "202":
+          description: Sending.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Campaign" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/campaigns/{id}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: cancelCampaign
+      tags: [mail]
+      summary: Stop a campaign that is sending or paused
+      description: Mails that went stay recorded; the rest are not sent.
+      security:
+        - session: []
+        - bearer: ["campaigns:send"]
+      responses:
+        "200":
+          description: The campaign, cancelled.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Campaign" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/campaigns/{id}/resume:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: resumeCampaign
+      tags: [mail]
+      summary: Set a paused campaign going again
+      security:
+        - session: []
+        - bearer: ["campaigns:send"]
+      responses:
+        "200":
+          description: The campaign, sending.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Campaign" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/campaigns/{id}/mail:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listCampaignMail
+      tags: [mail]
+      summary: Each mail of a sent campaign, and how it went
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: In the order they were queued.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/CampaignMail" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
   /o/{org}/api/v1/notes:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -1755,18 +1854,26 @@ components:
 
     Campaign:
       type: object
-      required: [id, name, audience, subject, body, status, created_by, updated_by, created_at, updated_at]
+      required: [id, name, audience, subject, body, status, created_by, updated_by, created_at, updated_at, queued_by, queued_at, sent_at, paused, mail]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
         audience: { $ref: "#/components/schemas/CampaignAudience" }
         subject: { type: string }
         body: { type: string }
-        status: { type: string, enum: [draft], description: "Every campaign is a draft until sending arrives." }
+        status: { type: string, enum: [draft, sending, paused, sent, cancelled], description: "`draft` until it is sent; `sending` while its mails go out; `paused` when sending stopped by itself, with the reason in `paused`; `sent` once every mail has been dealt with; `cancelled` when someone stopped it." }
         created_by: { type: string }
         updated_by: { type: string }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+        queued_by: { type: string, description: Who sent it; empty for a draft. }
+        queued_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
+        sent_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false, description: When the last of its mails went. }
+        paused: { type: string, description: "Why sending stopped by itself; empty unless it is paused." }
+        mail:
+          type: object
+          description: How many of its mails stand each way. Empty for a draft.
+          additionalProperties: { type: integer }
 
     Recipient:
       type: object
@@ -1777,3 +1884,15 @@ components:
         company: { type: string }
         address: { type: string }
         left_out: { type: string, description: "Empty for someone it goes to; otherwise why it doesn't." }
+
+    CampaignMail:
+      type: object
+      required: [id, address, contact_id, name, status, reason, sent_at]
+      properties:
+        id: { type: integer, format: int64 }
+        address: { type: string, description: "Who it was to; `erased:` and a number once that person was erased." }
+        contact_id: { type: integer, format: int64, description: "0 once that person was erased, or a restore dropped them." }
+        name: { type: string }
+        status: { type: string, enum: [queued, sending, sent, failed, unknown, skipped, cancelled], description: "`unknown`: the mail server stopped answering while it was being sent, so it may have gone; it is not sent again." }
+        reason: { type: string, description: "Why it wasn't sent, or may not have been." }
+        sent_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }

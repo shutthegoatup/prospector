@@ -134,6 +134,17 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if err := forgetAddresses(tx, org, emails); err != nil {
 			return err
 		}
+		// The mails a campaign sent them stay counted, and say nothing of who they were.
+		recipients := tx.Model(&CampaignRecipient{}).Where("org_id = ? and contact_id = ?", org, id)
+		if len(emails) > 0 {
+			recipients = tx.Model(&CampaignRecipient{}).Where("org_id = ? and (contact_id = ? or address in ?)", org, id, emails)
+		}
+		// One still waiting is not sent at all.
+		if err := recipients.Updates(map[string]any{"contact_id": nil, "address": gorm.Expr("'erased:' || id"), "name": "",
+			"status": gorm.Expr("case when status = ? then ? else status end", MailQueued, MailSkipped),
+			"reason": gorm.Expr("case when status = ? then ? else reason end", MailQueued, "erased on request")}).Error; err != nil {
+			return err
+		}
 		// With what was said in answering them: their words, and ours to them.
 		if err := tx.Where("org_id = ? and enquiry_id in (?)", org, gone.Session(&gorm.Session{}).Model(&Enquiry{}).Select("id")).Delete(&EnquiryMessage{}).Error; err != nil {
 			return err

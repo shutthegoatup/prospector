@@ -129,7 +129,7 @@ templ LandingPage(intake, origin string) {
 					<div class="lp-section-head">
 						<p class="lp-label">After it's won</p>
 						<h2>The customer stays on the same record.</h2>
-						<p>Deals, what they're on, getting them live and what they write in about, on the company you prospected.</p>
+						<p>Deals, what they're on, getting them live, what they write in about and what you write to them all, on the company you prospected. Each has its operations in the published API.</p>
 					</div>
 					<div class="lp-grid">
 						<div class="lp-cell is-coral"><h3>Deals with a value</h3><p>Each conversation carries what it's worth, who has it and when it should close. Start a second one for a renewal or an expansion.</p></div>
@@ -137,7 +137,7 @@ templ LandingPage(intake, origin string) {
 						<div class="lp-cell is-green"><h3>Onboarding to go-live</h3><p>Your steps and theirs, dated from the start. A won deal offers to start one, and late steps come back to Today.</p></div>
 						<div class="lp-cell is-violet"><h3>A page for the customer</h3><p>Invite someone at the company to a page of their own steps, opened from an emailed link with no password. They mark theirs done.</p></div>
 						<div class="lp-cell is-coral"><h3>Enquiries answered</h3><p>Site forms and your product's sign-ups arrive open on the card, to be given an owner. Reply by email from it, and paste their answer into the thread.</p></div>
-						<div class="lp-cell is-gold"><h3>All of it in the API</h3><p>Deals, subscriptions, onboarding and enquiries are in the published API, so a script or an agent with the right key can do nearly all of what a person can with them.</p></div>
+						<div class="lp-cell is-gold"><h3>Campaigns to people you know</h3><p>Write once to everyone in conversation or at a current customer, never to cold prospects. It goes through your own mail server with your postal address and a one-click unsubscribe, and nobody is mailed twice.</p></div>
 					</div>
 				</div>
 			</section>
@@ -173,6 +173,7 @@ templ LandingPage(intake, origin string) {
 									<li>Record subscriptions and work customers' onboarding<code>customers:write</code></li>
 									<li>Email a reply to someone who wrote in<code>enquiries:reply</code></li>
 									<li>Email a customer the link to their onboarding steps<code>customers:invite</code></li>
+									<li>Send a campaign to everyone in conversation or at a customer, through your own mail server, each with an unsubscribe link<code>campaigns:send</code></li>
 								</ul>
 							</div>
 							<div>
