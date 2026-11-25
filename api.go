@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -26,6 +28,33 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET "+v1+"due", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
 		items, err := a.s.AgentDue(reqOf(r).Org)
 		respond(w, items, err)
+	}))
+	mux.HandleFunc("GET "+v1+"tasks", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
+		tasks, err := a.s.AgentTasks(reqOf(r).Org.ID, reqOf(r).Agent())
+		respond(w, tasksOut{tasks}, err)
+	}))
+	mux.HandleFunc("GET "+v1+"tasks/{id}", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
+		t, err := a.s.AgentTask(reqOf(r).Org.ID, reqOf(r).Agent(), idParam(r, "id"))
+		if err != nil {
+			fail(w, err, http.StatusNotFound)
+			return
+		}
+		writeJSON(w, t)
+	}))
+	mux.HandleFunc("POST "+v1+"notes", a.agent("research:write", func(w http.ResponseWriter, r *http.Request) {
+		var in NoteIn
+		if decode(w, r, &in) {
+			q := reqOf(r)
+			out, err := a.s.AgentNote(q.Org.ID, q.Agent(), in)
+			respond(w, out, err)
+		}
+	}))
+	mux.HandleFunc("POST "+v1+"requests/finish", a.agent("research:write", func(w http.ResponseWriter, r *http.Request) {
+		var in FinishIn
+		if decode(w, r, &in) {
+			q := reqOf(r)
+			respond(w, map[string]bool{"ok": true}, a.s.AgentFinish(q.Org.ID, q.Agent(), in))
+		}
 	}))
 	mux.HandleFunc("POST "+v1+"companies", a.agent("research:write", func(w http.ResponseWriter, r *http.Request) {
 		var in AddCompanyIn
@@ -113,6 +142,14 @@ type ok struct {
 	OK bool `json:"ok"`
 }
 
+type tasksOut struct {
+	Tasks []TaskBrief `json:"tasks"`
+}
+
+type taskRef struct {
+	ID int64 `json:"id" jsonschema:"the task's number"`
+}
+
 type factAdded struct {
 	OK      bool `json:"ok"`
 	Existed bool `json:"existed" jsonschema:"true if the company already had this fact from this page"`
@@ -158,8 +195,39 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 				items, err := a.s.AgentDue(o)
 				return nil, items, err
 			})
+		mcp.AddTool(s, &mcp.Tool{Name: "list_tasks", Description: "The open tasks people have written for agents: what each asks for, what is still unfinished, and whether another agent is on it now."},
+			func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, tasksOut, error) {
+				tasks, err := a.s.AgentTasks(org.ID, actor)
+				return nil, tasksOut{tasks}, err
+			})
+		mcp.AddTool(s, &mcp.Tool{Name: "get_task", Description: "Everything needed to carry a task on: the brief in the person's words, what has been asked since, the companies and people already found, and the notes other agents left. Read it before working a task; people see that you picked it up."},
+			func(_ context.Context, _ *mcp.CallToolRequest, in taskRef) (*mcp.CallToolResult, *TaskOut, error) {
+				out, err := a.s.AgentTask(org.ID, actor, in.ID)
+				return nil, out, err
+			})
+		s.AddPrompt(&mcp.Prompt{Name: "work_task", Description: "Start on a task a person wrote in Prospector.",
+			Arguments: []*mcp.PromptArgument{{Name: "id", Description: "the task's number, from its page or list_tasks", Required: true}}},
+			func(_ context.Context, r *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+				id, _ := strconv.ParseInt(strings.TrimSpace(r.Params.Arguments["id"]), 10, 64)
+				t, err := a.s.Task(org.ID, id, time.Now())
+				if err != nil {
+					return nil, err
+				}
+				return &mcp.GetPromptResult{Description: t.Title, Messages: []*mcp.PromptMessage{
+					{Role: "user", Content: &mcp.TextContent{Text: taskPrompt(org, t.Task)}}}}, nil
+			})
 	}
 	if k.Has("research:write") {
+		mcp.AddTool(s, &mcp.Tool{Name: "task_note", Description: "Leave a short working note on a task or a company for whoever comes next: what you skipped and why, where you found nothing, or what you would do next. Not a fact, and not for naming people."},
+			func(_ context.Context, _ *mcp.CallToolRequest, in NoteIn) (*mcp.CallToolResult, ok, error) {
+				_, err := a.s.AgentNote(org.ID, actor, in)
+				return nil, ok{err == nil}, err
+			})
+		mcp.AddTool(s, &mcp.Tool{Name: "finish_request", Description: "Say that an open request on a task is done. A person can reopen it."},
+			func(_ context.Context, _ *mcp.CallToolRequest, in FinishIn) (*mcp.CallToolResult, ok, error) {
+				err := a.s.AgentFinish(org.ID, actor, in)
+				return nil, ok{err == nil}, err
+			})
 		mcp.AddTool(s, &mcp.Tool{Name: "add_company", Description: "Add a company to Research for a person to review, with facts and their sources. If its name or domain is already known, the facts it lacks are added to that company."},
 			func(_ context.Context, _ *mcp.CallToolRequest, in AddCompanyIn) (*mcp.CallToolResult, *AddCompanyOut, error) {
 				out, err := a.s.AgentAddCompany(org.ID, actor, in)

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
@@ -300,5 +301,24 @@ func TestARestoreDropsSuggestionsForPeopleItDrops(t *testing.T) {
 	s.db.Model(&Suggestion{}).Count(&n)
 	if n != 0 {
 		t.Fatalf("%d suggestions wait for someone the restore removed", n)
+	}
+}
+
+// "Now get their phone numbers": the number waits for a person, and the task shows who it was found for.
+func TestADetailFoundForATaskWaitsAndCountsTowardsTheTask(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	scout := Actor{Name: "agent:scout", KeyID: 1}
+	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	hannah := must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}))
+	task := must(s.CreateTask(o.ID, "Phones", "Find phone numbers for the people at Larkmoor.", "Ada Lovelace"))
+	got := must(s.AgentAddContact(o, scout, AddContactIn{Task: task.ID, Company: "Larkmoor Yachts", Name: "Hannah Pryce",
+		Phone: "+44 20 7946 0000", SourceURL: "https://larkmoor.example/contact"}))
+	if !got.Existed || strings.Join(got.Suggested, " ") != "phone" {
+		t.Fatalf("the number should wait as a suggestion: %+v", got)
+	}
+	view := must(s.Task(o.ID, task.ID, time.Now()))
+	if len(view.People) != 1 || view.People[0].ID != hannah.ID {
+		t.Fatalf("the task should show who the number was found for: %+v", view.People)
 	}
 }
