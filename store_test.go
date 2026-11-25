@@ -324,12 +324,12 @@ func TestUI(t *testing.T) {
 	if code, _ := call(t, client, "GET", srv.URL+"/o/nope/today", "", nil); code != http.StatusNotFound {
 		t.Fatalf("an org you don't belong to: %d", code)
 	}
-	if code, _ := call(t, client, "POST", base+"ui/add", "text/plain", QuickAdd{Name: "X"}); code != http.StatusUnsupportedMediaType {
+	if code, _ := call(t, client, "POST", base+"api/v1/people", "text/plain", QuickAdd{Name: "X"}); code != http.StatusUnsupportedMediaType {
 		t.Fatalf("non-JSON POST got %d", code)
 	}
-	code, body := call(t, client, "POST", base+"ui/add", "application/json",
+	code, body := call(t, client, "POST", base+"api/v1/people", "application/json",
 		QuickAdd{Linkedin: "https://www.linkedin.com/in/hannah-pryce", Name: "Hannah Pryce", Title: "Head of Marketing", Company: "Larkmoor Yachts"})
-	if code != http.StatusOK || !strings.Contains(body, "LinkedIn queue") {
+	if code != http.StatusCreated || !strings.Contains(body, "LinkedIn queue") {
 		t.Fatalf("quick add: %d %s", code, body)
 	}
 	if _, body := call(t, client, "GET", base+"today?step=linkedin", "", nil); !strings.Contains(body, "Hannah Pryce") || !strings.Contains(body, `data-key="o"`) || !strings.Contains(body, "Open + copy") {

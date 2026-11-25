@@ -33,8 +33,8 @@ func TestNULEscapesAreDroppedFromJSON(t *testing.T) {
 // person sends is kept without them, on both databases alike.
 func TestTextArrivesWithoutWhatPostgresWontKeep(t *testing.T) {
 	s, o, srv, client := signedIn(t)
-	if code, body := call(t, client, "POST", srv.URL+"/o/alpha/ui/add", "application/json",
-		json.RawMessage(`{"name":"Hannah\u0000 Pryce","company":"Larkmoor\u0000 Yachts"}`)); code != http.StatusOK {
+	if code, body := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/people", "application/json",
+		json.RawMessage(`{"name":"Hannah\u0000 Pryce","company":"Larkmoor\u0000 Yachts"}`)); code != http.StatusCreated {
 		t.Fatalf("adding someone whose name holds a NUL: %d %s", code, body)
 	}
 	c, err := s.FindOne(o.ID, "Hannah Pryce")

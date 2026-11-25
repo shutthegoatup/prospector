@@ -55,20 +55,20 @@ func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
 	page := "/o/alpha/companies/" + strconv.FormatInt(co.ID, 10)
 	for _, at := range []string{page, "/o/alpha/research?f=details"} {
 		if _, body := call(t, client, "GET", srv.URL+at, "", nil); !strings.Contains(body, "hannah.pryce@larkmoor.example") ||
-			!strings.Contains(body, "a guess") || !strings.Contains(body, "in place of +44 20 7946 0000") || !strings.Contains(body, `data-post="ui/suggestion"`) {
+			!strings.Contains(body, "a guess") || !strings.Contains(body, "in place of +44 20 7946 0000") || !strings.Contains(body, `data-post="api/v1/suggestions/`) {
 			t.Fatalf("%s doesn't offer the suggestions", at)
 		}
 	}
 	decide := func(id int64, decision string) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/suggestion", "application/json", map[string]any{"id": id, "decision": decision})
+		return call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/suggestions/"+strconv.FormatInt(id, 10), "application/json", map[string]any{"decision": decision})
 	}
 	if err := s.DecideSuggestion(other.ID, pending[0].ID, SuggestionAccepted, "mallory"); err == nil {
 		t.Fatal("another organisation settled this one's suggestion")
 	}
-	if code, body := decide(pending[0].ID, SuggestionAccepted); code != http.StatusOK {
+	if code, body := decide(pending[0].ID, SuggestionAccepted); code != http.StatusNoContent {
 		t.Fatalf("accept: %d %s", code, body)
 	}
-	if code, body := decide(pending[1].ID, SuggestionDismissed); code != http.StatusOK {
+	if code, body := decide(pending[1].ID, SuggestionDismissed); code != http.StatusNoContent {
 		t.Fatalf("dismiss: %d %s", code, body)
 	}
 	if code, _ := decide(pending[0].ID, SuggestionDismissed); code != http.StatusConflict {
@@ -77,7 +77,7 @@ func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
 	if c := person(); deref(c.Email) != "hannah.pryce@larkmoor.example" || c.EmailStatus != "guess" || deref(c.Phone) != "+44 20 7946 0000" {
 		t.Fatalf("accepted email %q (%s), dismissed number left her with %q", deref(c.Email), c.EmailStatus, deref(c.Phone))
 	}
-	if _, body := call(t, client, "GET", srv.URL+page, "", nil); strings.Contains(body, `data-post="ui/suggestion"`) {
+	if _, body := call(t, client, "GET", srv.URL+page, "", nil); strings.Contains(body, `data-post="api/v1/suggestions/`) {
 		t.Fatal("settled suggestions are still offered")
 	}
 	if rows, _, _ := s.Research(o.ID, "details", 1); len(rows) != 0 {

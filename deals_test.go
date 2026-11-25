@@ -229,7 +229,17 @@ func TestTheBoardShowsWhatAStageIsWorth(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	first, second := repliedPerson(t, s, o, "Hannah Pryce"), repliedPerson(t, s, o, "Tom Ellery")
 	update := func(id int64, field, value string) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/update", "application/json", map[string]any{"id": id, "field": field, "value": value})
+		of, isDeal := strings.CutPrefix(field, "deal_")
+		path := srv.URL + "/o/alpha/api/v1/contacts/" + strconv.FormatInt(id, 10)
+		if isDeal {
+			path += "/deal"
+			field = of
+		}
+		code, body := call(t, client, "PATCH", path, "application/json", map[string]any{field: value})
+		if code == http.StatusNoContent {
+			code = http.StatusOK
+		}
+		return code, body
 	}
 	if code, body := update(first.ID, "deal_amount", "14,000"); code != http.StatusOK {
 		t.Fatalf("valuing a deal: %d %s", code, body)

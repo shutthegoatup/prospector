@@ -91,12 +91,12 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 			<div class="flex flex-[1_1_220px] flex-wrap items-center justify-end gap-2">
 				if r.Stage != CompanyQualified {
 					@FitPicker(r.Company)
-					@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "ui/company", "data-body": jsonBody("id", r.ID, "stage", CompanyQualified), "data-with-fit": "fit-" + strconv.FormatInt(r.ID, 10)}}) {
+					@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "api/v1/companies/" + strconv.FormatInt(r.ID, 10), "data-method": "PATCH", "data-body": jsonBody("stage", CompanyQualified), "data-with-fit": "fit-" + strconv.FormatInt(r.ID, 10)}}) {
 						Qualify
 					}
 				}
 				if r.Stage != CompanyRejected {
-					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/company", "data-body": jsonBody("id", r.ID, "stage", CompanyRejected)}}) {
+					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/companies/" + strconv.FormatInt(r.ID, 10), "data-method": "PATCH", "data-body": jsonBody("stage", CompanyRejected)}}) {
 						Reject
 					}
 				}
@@ -141,7 +141,7 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 							</div>
 							if p.Status == ContactSuggested {
 								<div>
-									@button.Button(button.Props{Size: button.SizeXs, Attributes: templ.Attributes{"data-post": "ui/pick", "data-body": jsonBody("id", p.ID)}}) {
+									@button.Button(button.Props{Size: button.SizeXs, Attributes: templ.Attributes{"data-post": "api/v1/contacts/" + strconv.FormatInt(p.ID, 10) + "/pick"}}) {
 										Pick: start outreach
 									}
 								</div>
@@ -215,10 +215,10 @@ templ SuggestedDetails(list []PendingDetail) {
 					}
 				</span>
 			</span>
-			@button.Button(button.Props{Size: button.SizeXs, Attributes: templ.Attributes{"data-post": "ui/suggestion", "data-body": jsonBody("id", d.ID, "decision", SuggestionAccepted)}}) {
+			@button.Button(button.Props{Size: button.SizeXs, Attributes: templ.Attributes{"data-post": "api/v1/suggestions/" + strconv.FormatInt(d.ID, 10), "data-method": "PATCH", "data-body": jsonBody("decision", SuggestionAccepted)}}) {
 				Accept
 			}
-			@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/suggestion", "data-body": jsonBody("id", d.ID, "decision", SuggestionDismissed)}}) {
+			@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "api/v1/suggestions/" + strconv.FormatInt(d.ID, 10), "data-method": "PATCH", "data-body": jsonBody("decision", SuggestionDismissed)}}) {
 				Dismiss
 			}
 		</div>

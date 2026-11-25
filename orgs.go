@@ -487,6 +487,8 @@ var Scopes = []struct{ Name, What string }{
 	{"campaigns:write", "write campaigns, see who they would go to, and keep the list of addresses marketing mail never goes to"},
 	{"campaigns:send", "send a campaign to everyone in conversation or at a customer, through your own mail server, and cancel or resume one"},
 	{"customers:invite", "email a customer a link to their onboarding steps, through your mail server, and withdraw it"},
+	{"contacts:write", "add people straight to outreach and change their details and where their conversation stands"},
+	{"research:review", "qualify and reject companies, pick suggested people for outreach, and accept or dismiss details agents found: the review a person otherwise does"},
 	{"tasks:write", "start tasks, ask them for more, mark their requests done or not, and close and reopen them"},
 	{"agents:run", "start and stop Prospector's own agents on tasks"},
 	{"agents:configure", "add, change and delete Prospector's own agents, their endpoints, keys and tools"},

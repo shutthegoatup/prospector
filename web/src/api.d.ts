@@ -920,10 +920,181 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a person straight to outreach
+         * @description For someone you found yourself. They go into the LinkedIn queue, or, marked `added`, straight on to the email that follows. The never-contact list applies.
+         */
+        post: operations["addPerson"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/contacts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change a person's details, or where their conversation stands
+         * @description Send only what changes; they are saved together or not at all. An empty value clears a field. An email or profile on the never-contact list, or of someone erased on request, is refused.
+         */
+        patch: operations["changeContact"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/contacts/{id}/pick": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pick a suggested person for outreach
+         * @description Takes someone an agent suggested out of Research and into the LinkedIn queue.
+         */
+        post: operations["pickContact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/companies/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Qualify a company, reject it, or put it back for review
+         * @description A rejected company is one agents are told not to suggest again.
+         */
+        patch: operations["reviewCompany"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/suggestions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Accept or dismiss a detail an agent found for someone already stored
+         * @description Accepting fills the detail in; one dismissed isn't raised again.
+         */
+        patch: operations["decideSuggestion"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ContactChange: {
+            /** @description Their name. */
+            person?: string | null;
+            title?: string | null;
+            email?: string | null;
+            /** @description Their profile's address. */
+            linkedin?: string | null;
+            /** @description Setting it also guesses their time zone. */
+            phone?: string | null;
+            /** @description Their time zone, as an IANA name. */
+            tz?: string | null;
+            sources?: string | null;
+            call_notes?: string | null;
+            send_to?: string | null;
+            message?: string | null;
+            note?: string | null;
+            subject?: string | null;
+            body?: string | null;
+            followup?: string | null;
+            /** @description Where their conversation stands on the board. */
+            stage?: string | null;
+            next_step?: string | null;
+            /** @description YYYY-MM-DD, or empty for none. */
+            next_date?: string | null;
+            lost_reason?: string | null;
+        };
+        CompanyReview: {
+            /** @enum {string} */
+            stage: "review" | "qualified" | "rejected";
+            /** @description Why, in a few words; kept with the company. Empty leaves it as it was. */
+            fit?: string;
+        };
+        PersonNew: {
+            name: string;
+            /** @description Their profile's address. */
+            linkedin?: string;
+            title?: string;
+            /** @description The company's name; one not yet stored is added. */
+            company?: string;
+            email?: string;
+            /** @description The note to send them with the connection request. */
+            note?: string;
+            /** @description Already connected on LinkedIn: their email comes up next. */
+            added?: boolean;
+        };
+        PersonAdded: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /** @description Where they went, for a person. */
+            message: string;
+        };
         TaskCounts: {
             companies: number;
             people: number;
@@ -3063,6 +3234,141 @@ export interface operations {
                         ok: boolean;
                     };
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addPerson: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PersonNew"];
+            };
+        };
+        responses: {
+            /** @description The person, added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonAdded"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changeContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactChange"];
+            };
+        };
+        responses: {
+            /** @description Changed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    pickContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Picked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    reviewCompany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyReview"];
+            };
+        };
+        responses: {
+            /** @description Changed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    decideSuggestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "accepted" | "dismissed";
+                };
+            };
+        };
+        responses: {
+            /** @description Decided. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };

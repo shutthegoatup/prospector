@@ -33,6 +33,7 @@ var opArea = map[string]string{
 	"StartRun": areaSales, "StopRun": areaSales,
 	"CreateTask": areaSales, "ChangeTask": areaSales, "AskTask": areaSales, "ChangeTaskRequest": areaSales,
 	"AddNote": areaSales, "FinishRequest": areaSales,
+	"AddPerson": areaSales, "ChangeContact": areaSales, "PickContact": areaSales, "ReviewCompany": areaSales, "DecideSuggestion": areaSales,
 	"ConverseEnquiry": areaAny, "AddSuppression": areaAny, "RemoveSuppression": areaSales,
 	"CreateCampaign": areaSales, "ChangeCampaign": areaSales, "RemoveCampaign": areaSales,
 	"SendCampaign": areaSales, "CancelCampaign": areaSales, "ResumeCampaign": areaSales,
