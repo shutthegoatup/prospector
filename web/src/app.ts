@@ -2,6 +2,7 @@
 // is generated from api/openapi.yaml, so a call the spec doesn't have fails to compile.
 import createClient from "openapi-fetch";
 import type { components, paths } from "./api";
+import { problemText } from "./problem.ts";
 
 type Schemas = components["schemas"];
 type Json = Record<string, unknown>;
@@ -36,10 +37,7 @@ async function send(path: string, data: unknown, method = "POST"): Promise<Json>
 // answered turns a typed API call's outcome into its data, or the problem it reported.
 function answered<T>(r: { data?: T; error?: unknown; response: Response }): T {
   if (r.response.status === 401) signIn();
-  if (r.error !== undefined || !r.response.ok) {
-    const problem = r.error as Partial<Schemas["Problem"]> | undefined;
-    throw new Error(problem?.detail || r.response.statusText);
-  }
+  if (r.error !== undefined || !r.response.ok) throw new Error(problemText(r.error, r.response.statusText, r.response.status));
   return r.data as T;
 }
 

@@ -477,6 +477,13 @@
     return url2;
   }
 
+  // src/problem.ts
+  function problemText(body, statusText, status) {
+    if (typeof body === "string" && body.trim() !== "") return body.trim();
+    if (body && typeof body === "object" && "detail" in body && typeof body.detail === "string" && body.detail !== "") return body.detail;
+    return statusText || `The server answered ${status}.`;
+  }
+
   // src/app.ts
   var base = document.body.dataset.base || "/";
   var content = document.getElementById("content");
@@ -499,10 +506,7 @@
   }
   function answered(r) {
     if (r.response.status === 401) signIn();
-    if (r.error !== void 0 || !r.response.ok) {
-      const problem = r.error;
-      throw new Error(problem?.detail || r.response.statusText);
-    }
+    if (r.error !== void 0 || !r.response.ok) throw new Error(problemText(r.error, r.response.statusText, r.response.status));
     return r.data;
   }
   function save(data, name) {
