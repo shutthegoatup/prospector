@@ -460,6 +460,9 @@ components:
           description: Sealed when saved and never returned. Empty keeps the saved key.
         model: { type: string, maxLength: 200 }
         tools_url: { type: string, description: An MCP server whose tools the agent may use. }
+        search_url:
+          type: string
+          description: A SearXNG instance, with `json` among its `search.formats`, that the built-in `web_search` asks. Empty, the agent has no search of its own; it can still read pages with `fetch_page`.
         tools:
           type: array
           items: { type: string }
@@ -474,7 +477,7 @@ components:
 
     Agent:
       type: object
-      required: [id, name, kind, base_url, model, tools_url, models, tools, allowed_tools, fallback, fallback_minutes, problem, checked_at, has_key, ready, updated_by, updated_at]
+      required: [id, name, kind, base_url, model, tools_url, search_url, models, tools, allowed_tools, fallback, fallback_minutes, problem, checked_at, has_key, ready, updated_by, updated_at]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
@@ -482,6 +485,7 @@ components:
         base_url: { type: string }
         model: { type: string }
         tools_url: { type: string }
+        search_url: { type: string }
         models:
           type: array
           items: { type: string }
