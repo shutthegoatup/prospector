@@ -236,6 +236,8 @@ type CompanyPage struct {
 	Pending map[int64][]PendingDetail
 	History []HistoryItem
 	Notes   []NoteView
+	Subs    []SubscriptionRow
+	Day     string
 }
 
 func (a *App) company(w http.ResponseWriter, r *http.Request) {
@@ -247,7 +249,9 @@ func (a *App) company(w http.ResponseWriter, r *http.Request) {
 	}
 	p := CompanyPage{Company: *c}
 	// Half a company's page would read as the whole of it, so any part failing fails the page.
-	var failed [5]error
+	var failed [6]error
+	p.Day = today()
+	p.Subs, failed[5] = a.s.Subscriptions(q.Org.ID, c.ID, p.Day)
 	p.Facts, failed[0] = a.s.Facts(q.Org.ID, c.ID)
 	p.People, failed[1] = a.s.People(q.Org.ID, c.ID)
 	p.Pending, failed[2] = a.s.Pending(q.Org.ID, p.People)

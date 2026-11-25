@@ -1,0 +1,176 @@
+package main
+
+import (
+	"github.com/shutthegoatup/prospector/components/button"
+	"github.com/shutthegoatup/prospector/components/input"
+	"github.com/shutthegoatup/prospector/components/nativeselect"
+	"strconv"
+)
+
+func termText(s Subscription) string {
+	if s.TermMonths == 0 {
+		return "no commitment, a " + s.Per + " at a time"
+	}
+	text := plural(s.TermMonths, "month")
+	for _, t := range SubscriptionThens {
+		if t.Key == s.Then {
+			text += ", then " + t.Label
+		}
+	}
+	return text
+}
+
+// standingText says the dates that matter for a subscription on day.
+func standingText(r SubscriptionRow, day string) string {
+	switch {
+	case r.Status == SubEnded:
+		return "ended " + r.Ends
+	case r.Status == SubScheduled:
+		return "starts " + r.Start
+	case r.Ends != "":
+		return "ends " + r.Ends
+	case r.Missed(day):
+		return "term ends " + r.TermEnd + " · the day to cancel by, " + r.CancelBy + ", has passed"
+	}
+	return "term ends " + r.TermEnd + " · cancel by " + r.CancelBy
+}
+
+func subscriptionState(r SubscriptionRow) string {
+	switch r.Status {
+	case SubActive:
+		return "ok"
+	case SubNotice:
+		return "warn"
+	}
+	return ""
+}
+
+func subField(s Subscription, field string) templ.Attributes {
+	return templ.Attributes{"data-field": field, "data-sub": strconv.FormatInt(s.ID, 10), "data-refresh": "true"}
+}
+
+templ SubscriptionsView(q *Req, rows []SubscriptionRow, day string) {
+	@PageHead("Subscriptions") {
+		if worth := contracted(rows); worth != "" {
+			<span class="font-mono text-xs text-muted-foreground">{ worth + " a year contracted" }</span>
+		}
+	}
+	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">What each customer is on, and until when. The one that needs someone soonest comes first: a day to cancel by, a renewal or an end. Record one from a company's page. Prospector notes what was agreed and when it's due; it takes no payment and sends no invoice.</p>
+	if len(rows) == 0 {
+		@Empty("No subscriptions yet", "Open a company and record what they are on.")
+	} else {
+		<div class="overflow-hidden panel">
+			for _, r := range rows {
+				@SubscriptionLine(q, r, day, true)
+			}
+		</div>
+	}
+}
+
+// SubscriptionLine is one subscription with its dates and the form that changes it.
+templ SubscriptionLine(q *Req, r SubscriptionRow, day string, named bool) {
+	<div class="border-b border-border px-4 py-3 text-sm last:border-0" data-subscription={ strconv.FormatInt(r.ID, 10) }>
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<span class="min-w-0">
+				if named {
+					<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(r.CompanyID, 10)) } class="font-bold text-foreground hover:text-mark">{ r.Company }</a>
+					<span class="text-muted-foreground">{ " · " + r.Name }</span>
+				} else {
+					<b>{ r.Name }</b>
+				}
+				<span class="block font-mono text-xs text-muted-foreground">{ joinNonEmpty(" · ", r.Price(), termText(r.Subscription), standingText(r, day)) }</span>
+			</span>
+			@Pill(r.Status, subscriptionState(r))
+		</div>
+		<details class="mt-1 text-sm">
+			<summary class="cursor-pointer font-mono text-xs text-muted-foreground">Update</summary>
+			<div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[170px_1fr]">
+				@Label("What they're on")
+				@input.Input(input.Props{Value: r.Name, Class: "h-8 bg-muted", Attributes: subField(r.Subscription, "name")})
+				@Label("Price")
+				<span class="flex items-center gap-2">
+					@input.Input(input.Props{Value: r.Figure(), Placeholder: "e.g. 14,000", Class: "h-8 w-44 bg-muted", Attributes: subField(r.Subscription, "amount")})
+					@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: subField(r.Subscription, "per")}) {
+						@nativeselect.Option(nativeselect.OptionProps{Value: PerYear, Selected: r.Per != PerMonth}) {
+							a year
+						}
+						@nativeselect.Option(nativeselect.OptionProps{Value: PerMonth, Selected: r.Per == PerMonth}) {
+							a month
+						}
+					}
+				</span>
+				@Label("Started")
+				@input.Input(input.Props{Type: "date", Value: r.Start, Class: "h-8 w-44 bg-muted", Attributes: subField(r.Subscription, "start")})
+				@Label("Committed for, months")
+				@input.Input(input.Props{Type: "number", Value: strconv.Itoa(r.TermMonths), Class: "h-8 w-24 bg-muted", Attributes: subField(r.Subscription, "term_months")})
+				@Label("At the end of the term")
+				@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: subField(r.Subscription, "then")}) {
+					for _, t := range SubscriptionThens {
+						@nativeselect.Option(nativeselect.OptionProps{Value: t.Key, Selected: t.Key == r.Then}) {
+							{ t.Label }
+						}
+					}
+				}
+				@Label("Notice to end, days")
+				@input.Input(input.Props{Type: "number", Value: strconv.Itoa(r.NoticeDays), Class: "h-8 w-24 bg-muted", Attributes: subField(r.Subscription, "notice_days")})
+				@Label("Notice given on")
+				@input.Input(input.Props{Type: "date", Value: deref(r.NoticeOn), Class: "h-8 w-44 bg-muted", Attributes: subField(r.Subscription, "notice_on")})
+				@Label("Ended early on")
+				@input.Input(input.Props{Type: "date", Value: deref(r.EndedOn), Class: "h-8 w-44 bg-muted", Attributes: subField(r.Subscription, "ended_on")})
+			</div>
+			<form data-form="ui/subscription/remove" data-refresh="true" class="mt-2 flex items-center gap-2 border-t border-border pt-2">
+				<input type="number" name="id" value={ strconv.FormatInt(r.ID, 10) } hidden/>
+				@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Type: button.TypeSubmit}) {
+					Remove: recorded by mistake
+				}
+				<span class="font-mono text-xs text-muted-foreground" data-result></span>
+			</form>
+		</details>
+	</div>
+}
+
+// SubscriptionForm records a new subscription for a company.
+templ SubscriptionForm(company int64, day string) {
+	<form data-form="ui/subscription" data-refresh="true" data-reset="true" class="mt-2 flex flex-wrap items-end gap-2">
+		<input type="number" name="company" value={ strconv.FormatInt(company, 10) } hidden/>
+		<label class="flex min-w-[220px] flex-1 flex-col gap-1">
+			@Label("What they're on")
+			<input name="name" required placeholder="e.g. Standard plan, 2 sites" class="h-9 rounded-lg border border-input bg-muted px-3 text-sm"/>
+		</label>
+		<label class="flex flex-col gap-1">
+			@Label("Price")
+			<input name="amount" placeholder="e.g. 14,000" class="h-9 w-44 rounded-lg border border-input bg-muted px-3 text-sm"/>
+		</label>
+		<label class="flex flex-col gap-1">
+			@Label("For")
+			<select name="per" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
+				<option value={ PerYear }>a year</option>
+				<option value={ PerMonth }>a month</option>
+			</select>
+		</label>
+		<label class="flex flex-col gap-1">
+			@Label("Starts")
+			<input name="start" type="date" required value={ day } class="h-9 rounded-lg border border-input bg-muted px-3 text-sm"/>
+		</label>
+		<label class="flex flex-col gap-1">
+			@Label("Months committed")
+			<input name="term_months" type="number" min="0" max="120" value="12" class="h-9 w-24 rounded-lg border border-input bg-muted px-3 text-sm"/>
+		</label>
+		<label class="flex flex-col gap-1">
+			@Label("Then")
+			<select name="then" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
+				for _, t := range SubscriptionThens {
+					<option value={ t.Key }>{ t.Label }</option>
+				}
+			</select>
+		</label>
+		<label class="flex flex-col gap-1">
+			@Label("Days' notice")
+			<input name="notice_days" type="number" min="0" max="730" value="30" class="h-9 w-24 rounded-lg border border-input bg-muted px-3 text-sm"/>
+		</label>
+		@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Class: "h-9"}) {
+			Record
+		}
+		<span class="font-mono text-xs text-muted-foreground" data-result></span>
+	</form>
+}

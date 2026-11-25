@@ -96,6 +96,7 @@ type OrgExport struct {
 	Facts        []Fact         `json:"facts"`
 	Contacts     []Contact      `json:"contacts"`
 	Deals        []Deal         `json:"deals"`
+	Subs         []Subscription `json:"subscriptions"`
 	Enquiries    []Enquiry      `json:"enquiries"`
 	Suggested    []Suggestion   `json:"suggested_details"`
 	Tasks        []Task         `json:"tasks"`
@@ -212,7 +213,7 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			out.Agents = append(out.Agents, ExportAgent{Name: a.Name, Kind: a.Kind, Endpoint: a.BaseURL, Model: a.Model, ToolsURL: a.ToolsURL, Tools: a.AllowedTools()})
 		}
 		mine := func() *gorm.DB { return tx.Where("org_id = ?", org).Order("id") }
-		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Enquiries, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
+		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Enquiries, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes} {
 			if err := mine().Find(rows).Error; err != nil {
 				return err
 			}

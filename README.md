@@ -61,6 +61,12 @@ Each organisation has an MCP endpoint and a REST API, with scoped keys. Agents c
 
 ![Agents & API: the MCP endpoint, REST calls and the tools each key gets](docs/images/agents.png)
 
+### Subscriptions: what a customer is on
+
+Once a company is a customer, record what they are on from its page: what it is, the price for a month or a year, when it starts, how many months they committed for, what happens when that is up (it renews, rolls on a period at a time, or ends) and how many days' notice ends it. A company can have several, each with its own dates.
+
+Subscriptions lists them all, the one that needs someone soonest first, with the day the term ends and the last day to give notice, and what is contracted for the year. Notice given, or an early end, is recorded on the subscription and it works out the day it stops. Nothing here takes payment or sends an invoice, and a subscription belongs to the company, so erasing a person leaves it.
+
 ### Also
 
 - **Companies:** search, plus each company's people, facts and full history: who did what, people and agents alike.

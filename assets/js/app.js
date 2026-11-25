@@ -106,6 +106,7 @@ document.addEventListener("change", async (e) => {
   try {
     // A deal after the conversation's own is changed by its own id, not its person's.
     if (f.dataset.deal) await post("ui/deal", { id: +f.dataset.deal, field: f.dataset.field, value: f.value });
+    else if (f.dataset.sub) await post("ui/subscription/change", { id: +f.dataset.sub, field: f.dataset.field, value: f.value });
     else await post("ui/update", { id: +f.dataset.id, field: f.dataset.field, value: f.value });
     if (f.dataset.refresh || f.dataset.field === "phone") refresh();
   } catch (err) {
