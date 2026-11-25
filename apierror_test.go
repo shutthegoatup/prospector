@@ -9,6 +9,9 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgconn"
+	"gorm.io/gorm"
 )
 
 func TestAnAPIErrorSaysWhoseFaultItIs(t *testing.T) {
@@ -88,6 +91,13 @@ func TestStatusOf(t *testing.T) {
 		{errErased, 409},
 		{context.DeadlineExceeded, 500},
 		{fmt.Errorf("query: %w", context.Canceled), 500},
+		{missing(gorm.ErrRecordNotFound, "no task %d", 3), 404},
+		// A look-up that failed says nothing about whether the thing is there.
+		{missing(context.DeadlineExceeded, "no task %d", 3), 500},
+		{missing(&pgconn.PgError{Code: "08006"}, "no task %d", 3), 500},
+		// A character Postgres won't store is the caller's to take out.
+		{&pgconn.PgError{Code: "22021"}, 400},
+		{&pgconn.PgError{Code: "23505"}, 400},
 	} {
 		if got := statusOf(c.err); got != c.code {
 			t.Errorf("%v: %d, want %d", c.err, got, c.code)

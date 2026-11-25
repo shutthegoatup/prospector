@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 
 	sqlite "github.com/glebarez/go-sqlite"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -23,6 +24,15 @@ func (e notFound) Error() string { return string(e) }
 
 func noSuch(format string, args ...any) error { return notFound(fmt.Sprintf(format, args...)) }
 
+// missing is what a failed look-up means: nothing there, unless the look-up itself
+// failed, which mustn't read as the thing being gone.
+func missing(err error, format string, args ...any) error {
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	return noSuch(format, args...)
+}
+
 // ours reports a failure that is the server's rather than the caller's: the database,
 // the network, or the request running out of time. Everything else the store returns
 // says what the caller got wrong.
@@ -30,7 +40,12 @@ func ours(err error) bool {
 	var pg *pgconn.PgError
 	var lite *sqlite.Error
 	var network net.Error
-	return errors.As(err, &pg) || errors.As(err, &lite) || errors.As(err, &network) ||
+	if errors.As(err, &pg) {
+		// Classes 22 and 23 are the data's fault: a character Postgres won't store, or a
+		// row that breaks a rule. Trying again with the same request can't help.
+		return !strings.HasPrefix(pg.Code, "22") && !strings.HasPrefix(pg.Code, "23")
+	}
+	return errors.As(err, &lite) || errors.As(err, &network) ||
 		errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
 		errors.Is(err, sql.ErrConnDone) || errors.Is(err, sql.ErrTxDone) || errors.Is(err, driver.ErrBadConn) ||
 		errors.Is(err, gorm.ErrInvalidTransaction) || errors.Is(err, gorm.ErrInvalidDB)
