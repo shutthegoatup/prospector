@@ -75,12 +75,18 @@ func dealChanges(b *api.DealChange) []Change {
 	return out
 }
 
-func (s apiServer) ListDeals(ctx context.Context, _ api.ListDealsRequestObject) (api.ListDealsResponseObject, error) {
-	out, err := s.deals(reqFrom(ctx).Org.ID)
+func (s apiServer) ListDeals(ctx context.Context, in api.ListDealsRequestObject) (api.ListDealsResponseObject, error) {
+	all, err := s.deals(reqFrom(ctx).Org.ID)
 	if err != nil {
 		return nil, err
 	}
-	return api.ListDeals200JSONResponse(out), nil
+	page, next, err := listPage(all, in.Params.Limit, in.Params.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListDeals200JSONResponse{Headers: api.ListDeals200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out.Body.Items, out.Body.NextCursor = append([]api.Deal{}, page...), next
+	return out, nil
 }
 
 func (s apiServer) StartDeal(ctx context.Context, in api.StartDealRequestObject) (api.StartDealResponseObject, error) {
@@ -158,13 +164,23 @@ func enquiryOut(e Enquiry) api.Enquiry {
 
 func (s apiServer) ListEnquiries(ctx context.Context, in api.ListEnquiriesRequestObject) (api.ListEnquiriesResponseObject, error) {
 	p := in.Params
-	rows, page, err := s.a.s.Enquiries(reqFrom(ctx).Org.ID, EnquiryFilter{Kind: p.Kind, Spam: p.Spam, State: p.State}, p.Page)
+	page := PageIn{Limit: p.Limit, Cursor: p.Cursor}
+	at, err := page.at(1)
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListEnquiries200JSONResponse{Enquiries: []api.Enquiry{}, Page: page.N, Pages: page.Pages(), Total: page.Total}
+	rows, total, err := s.a.s.enquiriesFrom(reqFrom(ctx).Org.ID, EnquiryFilter{Kind: p.Kind, Spam: p.Spam, State: p.State}, int(at[0]), page.size())
+	if err != nil {
+		return nil, err
+	}
+	next := ""
+	if to := int(at[0]) + len(rows); to < total {
+		next = cursorOf(int64(to))
+	}
+	out := api.ListEnquiries200JSONResponse{Headers: api.ListEnquiries200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out.Body.Items, out.Body.NextCursor = []api.Enquiry{}, next
 	for _, e := range rows {
-		out.Enquiries = append(out.Enquiries, enquiryOut(e))
+		out.Body.Items = append(out.Body.Items, enquiryOut(e))
 	}
 	return out, nil
 }

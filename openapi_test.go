@@ -52,7 +52,7 @@ func TestARobotWorksAgentsThroughTheAPIAsItsScopesAllow(t *testing.T) {
 	if code, body := asKey(t, "GET", agents, "", nil); code != http.StatusUnauthorized || !strings.Contains(body, "API key") {
 		t.Fatalf("nobody at all: %d %s", code, body)
 	}
-	if code, body := asKey(t, "GET", agents, reader, nil); code != http.StatusOK || body != "[]\n" {
+	if code, body := asKey(t, "GET", agents, reader, nil); code != http.StatusOK || body != "{\"items\":[]}\n" {
 		t.Fatalf("a read key listing no agents: %d %s", code, body)
 	}
 	settings := map[string]any{"name": "Gateway", "base_url": fake.srv.URL + "/v1", "api_key": agentTestKey, "model": "router/auto"}

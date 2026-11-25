@@ -263,23 +263,36 @@ const enquiryPageSize = 50
 
 // Enquiries lists one page of the enquiries a filter matches, newest first.
 func (s *Store) Enquiries(org int64, f EnquiryFilter, page int) ([]Enquiry, Page, error) {
-	matching := func() *gorm.DB {
-		q := s.in(org).Model(&Enquiry{}).Where("spam = ?", f.Spam)
-		if f.Kind != "" {
-			q = q.Where("kind = ?", f.Kind)
-		}
-		if f.State != "" {
-			q = q.Where("state = ?", f.State)
-		}
-		return q
-	}
 	var total int64
-	if err := matching().Count(&total).Error; err != nil {
+	if err := s.enquiriesMatching(org, f).Count(&total).Error; err != nil {
 		return nil, Page{}, err
 	}
 	pg := pageOf(page, enquiryPageSize, int(total))
+	rows, _, err := s.enquiriesFrom(org, f, pg.offset(), pg.Size)
+	return rows, pg, err
+}
+
+func (s *Store) enquiriesMatching(org int64, f EnquiryFilter) *gorm.DB {
+	q := s.in(org).Model(&Enquiry{}).Where("spam = ?", f.Spam)
+	if f.Kind != "" {
+		q = q.Where("kind = ?", f.Kind)
+	}
+	if f.State != "" {
+		q = q.Where("state = ?", f.State)
+	}
+	return q
+}
+
+// enquiriesFrom is size enquiries a filter matches, newest first, from the one offset
+// down, and how many it matches in all.
+func (s *Store) enquiriesFrom(org int64, f EnquiryFilter, offset, size int) ([]Enquiry, int, error) {
+	var total int64
+	if err := s.enquiriesMatching(org, f).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	var rows []Enquiry
-	return rows, pg, matching().Order("created_at desc, id desc").Limit(pg.Size).Offset(pg.offset()).Find(&rows).Error
+	err := s.enquiriesMatching(org, f).Order("created_at desc, id desc").Limit(size).Offset(offset).Find(&rows).Error
+	return rows, int(total), err
 }
 
 // EnquiryCounts is how many enquiries there are of each kind, with spam under "spam"
