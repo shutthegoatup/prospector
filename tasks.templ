@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/shutthegoatup/prospector/components/button"
+	"net/url"
 	"strconv"
 	"time"
 )
@@ -23,6 +24,10 @@ type TaskPage struct {
 	// Agents are the organisation's own agents that are set up to run.
 	Agents    []Agent
 	AgentRuns []AgentRun
+	// Each list the page shows a page of, and the address's query, which each one's
+	// pager keeps the others' place in.
+	NotesPage, EndedPage, WorkPage Page
+	Query                          url.Values
 }
 
 func agentGoing(runs []AgentRun, agent int64) bool {
@@ -261,6 +266,7 @@ templ TaskDetailView(q *Req, d TaskPage) {
 			}
 			@Section("Agents' notes", "What they skipped or couldn't find, in their words. Not checked by anyone.") {
 				@Notes(q, d.Notes)
+				@Pager(d.NotesPage, func(n int) string { return pageHref(string(taskHref(q, d.ID)), d.Query, "notes", n) })
 			}
 		</div>
 		<aside class="flex min-w-0 flex-[1_1_280px] flex-col gap-5">
@@ -298,6 +304,7 @@ templ TaskDetailView(q *Req, d TaskPage) {
 							</div>
 						}
 					}
+					@Pager(d.EndedPage, func(n int) string { return pageHref(string(taskHref(q, d.ID)), d.Query, "runs", n) })
 				}
 			}
 			if d.ClosedAt == nil {
@@ -320,6 +327,7 @@ templ TaskDetailView(q *Req, d TaskPage) {
 						<span class="block text-muted-foreground">{ runText(r, d.Now) }</span>
 					</div>
 				}
+				@Pager(d.WorkPage, func(n int) string { return pageHref(string(taskHref(q, d.ID)), d.Query, "work", n) })
 			}
 			<div>
 				if d.ClosedAt == nil {

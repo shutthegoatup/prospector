@@ -253,7 +253,46 @@ func (s *Store) DeleteNote(org, id int64) error {
 	return res.Error
 }
 
-const companyNotesPageSize = 20
+const (
+	companyNotesPageSize = 20
+	taskNotesPageSize    = 20
+	taskRunsPageSize     = 10
+)
+
+// TaskNotesPage is one page of the notes agents left on a task, newest first, each
+// with the name of the company it is about.
+func (s *Store) TaskNotesPage(org, task int64, page int) ([]NoteView, Page, error) {
+	theirs := func() *gorm.DB { return s.in(org).Model(&TaskNote{}).Where("task_id = ?", task) }
+	var total int64
+	if err := theirs().Count(&total).Error; err != nil {
+		return nil, Page{}, err
+	}
+	pg := pageOf(page, taskNotesPageSize, int(total))
+	var notes []TaskNote
+	if err := theirs().Order("id desc").Limit(pg.Size).Offset(pg.offset()).Find(&notes).Error; err != nil {
+		return nil, Page{}, err
+	}
+	names := map[int64]string{}
+	for _, n := range notes {
+		if n.CompanyID != 0 {
+			names[n.CompanyID] = ""
+		}
+	}
+	if len(names) > 0 {
+		var companies []Company
+		if err := s.in(org).Where("id in ?", slices.Collect(maps.Keys(names))).Find(&companies).Error; err != nil {
+			return nil, Page{}, err
+		}
+		for _, c := range companies {
+			names[c.ID] = c.Name
+		}
+	}
+	out := make([]NoteView, len(notes))
+	for i, n := range notes {
+		out[i] = NoteView{TaskNote: n, Company: names[n.CompanyID]}
+	}
+	return out, pg, nil
+}
 
 // CompanyNotesPage is one page of the notes agents left about a company, newest first.
 func (s *Store) CompanyNotesPage(org, company int64, page int) ([]TaskNote, Page, error) {
