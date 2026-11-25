@@ -19,6 +19,8 @@ var acrossOrganisations = map[string]bool{
 	"ResetToken": true, "InviteToken": true, "PasswordTokenUser": true, "RedeemPasswordToken": true,
 	"CreateOrg": true, "CreateOrgWithOwner": true, "EnsureFrontOrg": true, "OrgByID": true, "OrgBySlug": true, "OrgsFor": true,
 	"KeyFor": true, "Reseal": true, "SSOOrgsFor": true, "SocialUser": true, "SSOUser": true,
+	// Finds a customer by the secret in their link or cookie, which is all they have.
+	"CustomerByToken": true,
 	// These take a row that already names its organisation, which their callers read with it.
 	"SaveOrgMail": true, "SaveSSO": true,
 }
@@ -326,7 +328,7 @@ var saysNothingBack = map[string]bool{
 	"AskTask": true, "SetRequestDone": true, "SetTaskClosed": true, "DeleteNote": true, "DeleteEnquiry": true,
 	"StartDeal": true, "ChangeDeal": true, "RemoveDeal": true,
 	"AddSubscription": true, "ChangeSubscription": true, "RemoveSubscription": true, "StartRenewal": true, "SetEnquiry": true, "ConverseEnquiry": true,
-	"StartOnboarding": true, "SetOnboardingStep": true, "RemoveOnboarding": true,
+	"StartOnboarding": true, "SetOnboardingStep": true, "RemoveOnboarding": true, "InviteCustomer": true, "RevokeCustomer": true,
 	"ErasePerson": true, "Import": true, "ImportLegacy": true, "Restore": true,
 	"ResearchCount": true, "ResearchCounts": true, "EnquiryCounts": true, "Week": true, "AgentMarks": true, "Touches": true,
 	"AddEnquiry": true, "AgentNote": true, "CreateKey": true, "CreateTask": true, "QuickAddPerson": true,

@@ -344,6 +344,11 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /login/sso", a.ssoPage)
 	mux.HandleFunc("GET /login/sso/start", a.ssoStart)
 	mux.HandleFunc("GET /login/callback", a.loginCallback)
+	mux.HandleFunc("GET /c", a.customerPage)
+	mux.HandleFunc("POST /c/leave", a.customerLeave)
+	mux.HandleFunc("GET /c/{token}", a.customerLinkPage)
+	mux.HandleFunc("POST /c/{token}", a.customerOpen)
+	mux.HandleFunc("POST /c/{token}/again", a.customerAgain)
 	mux.HandleFunc("GET /{$}", a.front)
 	mux.HandleFunc("GET /api", a.apiDocPage())
 	mux.HandleFunc("POST /orgs", a.member(a.newOrg))
@@ -380,6 +385,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /o/{org}/ui/onboarding", a.member(a.uiOnboardingStart))
 	mux.HandleFunc("POST /o/{org}/ui/onboarding/step", a.member(a.uiOnboardingStep))
 	mux.HandleFunc("POST /o/{org}/ui/onboarding/remove", a.member(a.uiOnboardingRemove))
+	mux.HandleFunc("POST /o/{org}/ui/onboarding/invite", a.member(a.uiCustomerInvite))
+	mux.HandleFunc("POST /o/{org}/ui/onboarding/revoke", a.member(a.uiCustomerRevoke))
 	mux.HandleFunc("POST /o/{org}/ui/company", a.member(a.uiCompany))
 	mux.HandleFunc("POST /o/{org}/ui/pick", a.member(a.uiPick))
 	mux.HandleFunc("POST /o/{org}/ui/suggestion", a.member(a.uiSuggestion))
@@ -456,7 +463,7 @@ func (a *App) Routes() http.Handler {
 
 // signedOutForm is a plain HTML form somebody with no session posts.
 func signedOutForm(path string) bool {
-	return path == "/login" || path == "/logout" || path == "/forgot" || strings.HasPrefix(path, "/reset/")
+	return path == "/login" || path == "/logout" || path == "/forgot" || strings.HasPrefix(path, "/reset/") || strings.HasPrefix(path, "/c/")
 }
 
 func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {

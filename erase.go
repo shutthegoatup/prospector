@@ -98,6 +98,10 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Delete(&Deal{}).Error; err != nil {
 			return err
 		}
+		// Their page closes in every browser, and the record that they could open it goes.
+		if err := dropCustomerGrants(tx, org, tx.Where("org_id = ? and contact_id = ?", org, id), false); err != nil {
+			return err
+		}
 		// An address or profile suggested for them identifies them too, unless someone
 		// dismissed it as not theirs.
 		var suggested []Suggestion

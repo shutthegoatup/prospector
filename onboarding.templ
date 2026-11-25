@@ -96,6 +96,46 @@ templ OnboardingCard(q *Req, r OnboardingRow, day string, named bool) {
 				</div>
 			}
 		</div>
+		<div class="flex flex-col gap-2 border-t border-border pt-2">
+			@Label("Their page")
+			@Meta("Someone you invite is emailed a link to a page showing the steps that are theirs, and nothing else. It needs no password and opens in one browser at a time.")
+			for _, inv := range r.Invites {
+				<div class="flex flex-wrap items-center justify-between gap-2">
+					<span>
+						<b>{ inv.Name }</b>
+						<span class="font-mono text-xs text-muted-foreground">{ " " + inv.Email }</span>
+					</span>
+					if inv.RevokedAt != nil {
+						@Pill("withdrawn", "")
+					} else {
+						<span class="flex items-center gap-2">
+							@Pill("can open it", "ok")
+							@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/onboarding/revoke", "data-body": jsonBody("id", inv.ID), "data-confirm": "Withdraw " + inv.Name + "'s access? Their page closes in every browser at once."}}) {
+								Withdraw
+							}
+						</span>
+					}
+				</div>
+			}
+			if !r.MailOn {
+				@Meta("To invite anyone, an owner sets a mail server in Settings and the server needs its public address (PROSPECTOR_URL).")
+			} else if len(r.Invitable) == 0 {
+				@Meta("Nobody at this company has an email address here to send a link to.")
+			} else {
+				<form data-form="ui/onboarding/invite" data-refresh="true" class="flex flex-wrap items-center gap-2">
+					<input type="number" name="id" value={ strconv.FormatInt(r.ID, 10) } hidden/>
+					<select name="contact" aria-label="Who to invite" class="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
+						for _, p := range r.Invitable {
+							<option value={ strconv.FormatInt(p.ID, 10) }>{ displayName(p) + " · " + deref(p.Email) }</option>
+						}
+					</select>
+					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Type: button.TypeSubmit}) {
+						Email them a link
+					}
+					<span class="font-mono text-xs text-muted-foreground" data-result></span>
+				</form>
+			}
+		</div>
 		<div class="flex justify-end">
 			@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/onboarding/remove", "data-body": jsonBody("id", r.ID), "data-confirm": "Remove this onboarding and its steps? Use this for one started by mistake."}}) {
 				Remove

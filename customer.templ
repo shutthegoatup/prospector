@@ -1,0 +1,93 @@
+package main
+
+import (
+	"github.com/shutthegoatup/prospector/components/button"
+	"strconv"
+)
+
+func customerStepMeta(st OnboardingStep, day string) string {
+	switch {
+	case st.DoneOn != nil:
+		return "done " + *st.DoneOn
+	case st.Due != nil && *st.Due < day:
+		return "was due " + *st.Due
+	case st.Due != nil:
+		return "due " + *st.Due
+	}
+	return ""
+}
+
+func customerTitle(v CustomerView) string {
+	if v.Org != "" {
+		return v.Org + " · your onboarding"
+	}
+	return "Your onboarding"
+}
+
+// CustomerPage is everything someone outside the organisation is ever shown. It has
+// none of the members' layout: no sidebar, no names of teammates, no links into the app.
+templ CustomerPage(v CustomerView) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			@Head(customerTitle(v))
+			<meta name="robots" content="noindex, nofollow"/>
+		</head>
+		<body class="queue-backdrop min-h-svh font-sans text-[15px] leading-relaxed antialiased">
+			<main class="mx-auto flex max-w-3xl flex-col gap-5 px-4 pb-16 pt-10">
+				switch v.State {
+					case "open":
+						<h1 class="font-heading text-3xl font-bold tracking-tight">{ v.Org } set up a page for you<span class="text-coral">.</span></h1>
+						<p class="text-sm text-muted-foreground">It shows the steps that are yours while they set you up. Opening it here keeps it open in this browser for 30 days. The link works once.</p>
+						<form method="post" action={ templ.SafeURL("/c/" + v.Token) }>
+							@button.Button(button.Props{Type: button.TypeSubmit}) {
+								Open my steps
+							}
+						</form>
+					case "again":
+						<h1 class="font-heading text-3xl font-bold tracking-tight">This link has been used or has run out<span class="text-coral">.</span></h1>
+						<p class="text-sm text-muted-foreground">A link opens the page once, in one browser. We can send a fresh one to the address this one was sent to.</p>
+						<form method="post" action={ templ.SafeURL("/c/" + v.Token + "/again") }>
+							@button.Button(button.Props{Type: button.TypeSubmit}) {
+								Send me a new link
+							}
+						</form>
+					case "sent":
+						<h1 class="font-heading text-3xl font-bold tracking-tight">Check your email<span class="text-coral">.</span></h1>
+						<p class="text-sm text-muted-foreground">If that link was yours, a new one is on its way to the address it was sent to. It can take a minute, and only one is sent every few minutes.</p>
+					case "steps":
+						<header class="flex flex-wrap items-baseline justify-between gap-3">
+							<h1 class="font-heading text-3xl font-bold tracking-tight">Getting you set up<span class="text-coral">.</span></h1>
+							<span class="font-mono text-xs text-muted-foreground">{ v.Org }</span>
+						</header>
+						if len(v.Steps) == 0 {
+							<p class="text-sm text-muted-foreground">There is nothing for you to do at the moment.</p>
+						} else {
+							<p class="text-sm text-muted-foreground">{ strconv.Itoa(v.Done) + " of " + strconv.Itoa(len(v.Steps)) + " of your steps are done. When you have done one, tell your contact and they will mark it." }</p>
+							<div class="overflow-hidden panel">
+								for _, st := range v.Steps {
+									<div class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 text-sm last:border-0">
+										if st.DoneOn != nil {
+											<span class="text-muted-foreground">{ st.Name }</span>
+										} else {
+											<b>{ st.Name }</b>
+										}
+										<span class="font-mono text-xs text-muted-foreground">{ customerStepMeta(st, v.Day) }</span>
+									</div>
+								}
+							</div>
+						}
+						<form method="post" action="/c/leave" class="flex flex-wrap items-center gap-3">
+							<span class="font-mono text-xs text-muted-foreground">{ "This page is open for " + v.Email + " in this browser." }</span>
+							@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantOutline}) {
+								Close it here
+							}
+						</form>
+					default:
+						<h1 class="font-heading text-3xl font-bold tracking-tight">Nothing to show here<span class="text-coral">.</span></h1>
+						<p class="text-sm text-muted-foreground">This page opens from a link in an email. If yours has stopped working, open it again and ask for a new one, or ask whoever is setting you up.</p>
+				}
+			</main>
+		</body>
+	</html>
+}
