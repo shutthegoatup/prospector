@@ -653,23 +653,34 @@ func brief(v TaskView, who Actor) TaskBrief {
 	return b
 }
 
-func (s *Store) AgentTasks(org int64, who Actor) (briefs []TaskBrief, more bool, err error) {
-	tasks, err := s.Tasks(org, false, time.Now())
+// AgentTasks lists a page of the open tasks, newest first. The cursor is the last
+// task listed, so one opened meanwhile doesn't shift the pages after it.
+func (s *Store) AgentTasks(org int64, who Actor, page PageIn) (briefs []TaskBrief, next string, err error) {
+	at, err := page.at(1)
 	if err != nil {
-		return nil, false, err
+		return nil, "", err
+	}
+	q := s.in(org).Where("closed_at is null").Order("id desc").Limit(page.size() + 1)
+	if at[0] > 0 {
+		q = q.Where("id < ?", at[0])
+	}
+	var tasks []Task
+	if err := q.Find(&tasks).Error; err != nil {
+		return nil, "", err
+	}
+	if len(tasks) > page.size() {
+		tasks = tasks[:page.size()]
+		next = cursorOf(tasks[len(tasks)-1].ID)
+	}
+	views, err := s.taskViews(s.db, org, tasks, time.Now())
+	if err != nil {
+		return nil, "", err
 	}
 	briefs = []TaskBrief{}
-	for _, v := range tasks {
+	for _, v := range views {
 		briefs = append(briefs, brief(v, who))
 	}
-	if len(tasks) == tasksShown {
-		var open int64
-		if err := s.in(org).Model(&Task{}).Where("closed_at is null").Count(&open).Error; err != nil {
-			return nil, false, err
-		}
-		more = open > tasksShown
-	}
-	return briefs, more, nil
+	return briefs, next, nil
 }
 
 // tasksShown is how many tasks a list holds, newest first.

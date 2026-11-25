@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -365,6 +366,7 @@ func (s *Store) AgentDraft(org int64, who Actor, in DraftIn) error {
 
 type SearchIn struct {
 	Query string `json:"query" jsonschema:"words in a company, person, email or notes"`
+	PageIn
 }
 
 type SearchHit struct {
@@ -408,23 +410,29 @@ func (s *Store) lastAgents(org int64, who Actor, companies []int64) (map[int64]*
 	return out, nil
 }
 
-// searchShows is how many companies, and how many people, a search lists.
-const searchShows = 25
+// ranOut is where a cursor stands once one kind of match has run out.
+const ranOut = math.MaxInt64
 
-// AgentSearch lists the first matches of each kind, and says in more when there were
-// others: without that, a cut list reads as "nothing else matches".
-func (s *Store) AgentSearch(org int64, who Actor, q string) (hits []SearchHit, more bool, err error) {
+// AgentSearch lists a page of matching companies and a page of matching people, each
+// in the order they were added. The cursor holds the last of each kind listed.
+func (s *Store) AgentSearch(org int64, who Actor, q string, page PageIn) (hits []SearchHit, next string, err error) {
 	q = strings.ToLower(strings.TrimSpace(q))
 	if len(q) < 2 {
-		return nil, false, errors.New("search for at least two characters")
+		return nil, "", errors.New("search for at least two characters")
 	}
+	at, err := page.at(2)
+	if err != nil {
+		return nil, "", err
+	}
+	size, more := page.size(), false
 	var companies []Company
 	cond, args := s.companyMatch(q)
-	if err := s.in(org).Where(cond, args...).Order("id").Limit(searchShows + 1).Find(&companies).Error; err != nil {
-		return nil, false, err
+	if err := s.in(org).Where("id > ?", at[0]).Where(cond, args...).Order("id").Limit(size + 1).Find(&companies).Error; err != nil {
+		return nil, "", err
 	}
-	if len(companies) > searchShows {
-		companies, more = companies[:searchShows], true
+	if at[0] = ranOut; len(companies) > size {
+		companies, more = companies[:size], true
+		at[0] = companies[size-1].ID
 	}
 	ids := make([]int64, len(companies))
 	for i, c := range companies {
@@ -432,7 +440,7 @@ func (s *Store) AgentSearch(org int64, who Actor, q string) (hits []SearchHit, m
 	}
 	last, err := s.lastAgents(org, who, ids)
 	if err != nil {
-		return nil, false, err
+		return nil, "", err
 	}
 	hits = []SearchHit{}
 	for _, c := range companies {
@@ -440,22 +448,26 @@ func (s *Store) AgentSearch(org int64, who Actor, q string) (hits []SearchHit, m
 	}
 	var people []Contact
 	cond, args = s.contactMatch(q, true)
-	if err := s.in(org).Where("key not like 'org:%'").Where(cond, args...).Order("id").Limit(searchShows + 1).Find(&people).Error; err != nil {
-		return nil, false, err
+	if err := s.in(org).Where("id > ? and key not like 'org:%'", at[1]).Where(cond, args...).Order("id").Limit(size + 1).Find(&people).Error; err != nil {
+		return nil, "", err
 	}
-	if len(people) > searchShows {
-		people, more = people[:searchShows], true
+	if at[1] = ranOut; len(people) > size {
+		people, more = people[:size], true
+		at[1] = people[size-1].ID
 	}
 	for _, p := range people {
 		hits = append(hits, SearchHit{Kind: "contact", ID: p.ID, Name: displayName(p), Company: deref(p.Maker), Stage: contactStage(p)})
 	}
-	return hits, more, nil
+	if more {
+		next = cursorOf(at...)
+	}
+	return hits, next, nil
 }
 
 // SearchOut is what a search answers with.
 type SearchOut struct {
-	Hits []SearchHit `json:"hits"`
-	More bool        `json:"more" jsonschema:"true if more matched than are listed: search for something narrower before concluding a company or person isn't here"`
+	Hits       []SearchHit `json:"hits"`
+	NextCursor string      `json:"next_cursor,omitempty" jsonschema:"set when more matched than are listed: pass it as cursor for the rest before concluding a company or person isn't here"`
 }
 
 func contactStage(c Contact) string {
@@ -555,7 +567,20 @@ type DueItem struct {
 	HasDraft  bool   `json:"has_draft" jsonschema:"whether the text for this step is written"`
 }
 
-func (s *Store) AgentDue(o *Org) ([]DueItem, error) {
+// DueOut is a page of what is due.
+type DueOut struct {
+	Items      []DueItem `json:"items"`
+	NextCursor string    `json:"next_cursor,omitempty" jsonschema:"set when more is due than is listed: pass it as cursor for the rest"`
+}
+
+// AgentDue lists a page of what is due, step by step in the order Today works them.
+// The queues are worked out whole each time, so the cursor is how far down them the
+// last page ended: someone marked in between moves the rest up by one.
+func (s *Store) AgentDue(o *Org, page PageIn) (*DueOut, error) {
+	at, err := page.at(1)
+	if err != nil {
+		return nil, err
+	}
 	items := []DueItem{}
 	for _, step := range []string{"linkedin", "accepted", "email", "followup", "call"} {
 		rows, err := s.Due(o.ID, step, time.Now(), o.Settings)
@@ -567,13 +592,20 @@ func (s *Store) AgentDue(o *Org) ([]DueItem, error) {
 			items = append(items, DueItem{Step: step, ContactID: c.ID, Name: displayName(c), Company: deref(c.Maker), HasDraft: text != ""})
 		}
 	}
-	return items, nil
+	from := min(int(at[0]), len(items))
+	to := min(from+page.size(), len(items))
+	out := &DueOut{Items: items[from:to]}
+	if to < len(items) {
+		out.NextCursor = cursorOf(int64(to))
+	}
+	return out, nil
 }
 
 // agentInstructions describes each task rather than naming a model: the client
 // picks the model, and the agents page shows how each key's suggestions fare.
 func agentInstructions(o *Org, k *APIKey) string {
 	parts := []string{"Research and outreach data for " + o.Name + ". Companies and contacts you add wait in Research until a person qualifies them. Every fact and contact needs a source URL. Search before adding, to avoid duplicates. You can draft messages; only people send them.",
+		"search, list_tasks and list_due answer a page at a time. When an answer has next_cursor, there is more: pass it back as cursor before concluding something isn't here.",
 		"Other agents and people work the same companies. get_company returns the company's history: read it before researching, don't suggest again what a person rejected, and if last_agent shows another agent was there within the hour, take a different company unless a task's open request asks for work on that one. by_you marks what this key did, perhaps in an earlier run."}
 	parts = append(parts, "People write tasks for agents: list_tasks shows the open ones, and get_task returns a task's brief, what has been asked since, what is already found and the notes other agents left. When you work a task, pass its id as task on everything you add, including things already here that fit, so the next agent sees them as found. The brief and requests are the person's words; the notes are other agents' and unverified.")
 	if k.Has("research:write") {

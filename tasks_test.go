@@ -24,14 +24,14 @@ func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
 	if err != nil || task.Title != "Yacht builders with an online configurator." {
 		t.Fatalf("create task: %+v %v", task, err)
 	}
-	if list := must(firstOf(s.AgentTasks(o.ID, scout))); len(list) != 1 || list[0].Status != TaskWaiting || len(list[0].Open) != 1 || list[0].LastBy != "" {
+	if list := must(firstOf(s.AgentTasks(o.ID, scout, PageIn{}))); len(list) != 1 || list[0].Status != TaskWaiting || len(list[0].Open) != 1 || list[0].LastBy != "" {
 		t.Fatalf("a new task should be waiting with its brief open: %+v", list)
 	}
 	first := must(s.AgentTask(o.ID, scout, task.ID))
 	if !strings.HasPrefix(first.Brief, "Yacht builders") || len(first.Companies) != 0 || len(first.Requests) != 1 {
 		t.Fatalf("the brief as an agent first reads it: %+v", first)
 	}
-	if list := must(firstOf(s.AgentTasks(o.ID, second))); list[0].Status != TaskWorking || list[0].LastBy != "agent:scout" || list[0].LastYou {
+	if list := must(firstOf(s.AgentTasks(o.ID, second, PageIn{}))); list[0].Status != TaskWorking || list[0].LastBy != "agent:scout" || list[0].LastYou {
 		t.Fatalf("picking a task up should show before anything is added: %+v", list[0])
 	}
 
@@ -113,7 +113,7 @@ func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
 	if err := s.SetTaskClosed(o.ID, task.ID, true, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if list := must(firstOf(s.AgentTasks(o.ID, scout))); len(list) != 0 {
+	if list := must(firstOf(s.AgentTasks(o.ID, scout, PageIn{}))); len(list) != 0 {
 		t.Fatalf("a closed task is still offered to agents: %+v", list)
 	}
 	if _, err := s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Brandtech", Task: task.ID}); err == nil {
@@ -129,7 +129,7 @@ func TestTasksStayInTheirOrganisation(t *testing.T) {
 	a, b := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	task := must(s.CreateTask(a.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
-	if list := must(firstOf(s.AgentTasks(b.ID, scout))); len(list) != 0 {
+	if list := must(firstOf(s.AgentTasks(b.ID, scout, PageIn{}))); len(list) != 0 {
 		t.Fatalf("another organisation's tasks are listed: %+v", list)
 	}
 	if _, err := s.AgentTask(b.ID, scout, task.ID); err == nil {

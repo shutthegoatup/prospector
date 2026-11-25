@@ -17,7 +17,7 @@ func TestAKeyThatCanOnlyReadDoesNotPickATaskUp(t *testing.T) {
 	}
 	var events int64
 	s.in(o.ID).Model(&Event{}).Where(`"user" = ?`, reader.Name).Count(&events)
-	if list := must(firstOf(s.AgentTasks(o.ID, reader))); events != 0 || list[0].Status != TaskWaiting {
+	if list := must(firstOf(s.AgentTasks(o.ID, reader, PageIn{}))); events != 0 || list[0].Status != TaskWaiting {
 		t.Fatalf("a key that can add nothing made the task look worked on: %d events, %s", events, list[0].Status)
 	}
 }
@@ -62,7 +62,7 @@ func TestPickingUpATaskIsRecordedOnceARun(t *testing.T) {
 	if err := s.SetTaskClosed(o.ID, task.ID, false, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if list := must(firstOf(s.AgentTasks(o.ID, scout))); len(list) != 1 || list[0].Status != TaskWorking {
+	if list := must(firstOf(s.AgentTasks(o.ID, scout, PageIn{}))); len(list) != 1 || list[0].Status != TaskWorking {
 		t.Fatalf("a reopened task is offered to agents again: %+v", list)
 	}
 }
