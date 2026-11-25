@@ -92,7 +92,7 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 			rows[i].ID = hannah.ID
 		}
 	}
-	if _, err := s.replaceContacts(o.ID, rows); err != nil {
+	if _, err := s.replaceContacts(o.ID, rows, nil); err != nil {
 		t.Fatal(err)
 	}
 	if now := must(s.FindOne(o.ID, "Hannah")); now.ID != jonas.ID {
@@ -114,7 +114,7 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 			rows[i].Key, rows[i].Person = "omar-haddad", str("Omar Haddad")
 		}
 	}
-	if _, err := s.replaceContacts(o.ID, rows); err != nil {
+	if _, err := s.replaceContacts(o.ID, rows, nil); err != nil {
 		t.Fatal(err)
 	}
 	if h := history(jonas.ID); len(h) != 0 {
