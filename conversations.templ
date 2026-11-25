@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/shutthegoatup/prospector/components/button"
 	"github.com/shutthegoatup/prospector/components/input"
 	"github.com/shutthegoatup/prospector/components/nativeselect"
 	"sort"
@@ -10,9 +11,33 @@ import (
 
 // Board is the conversations by stage, with each one's deal and who may own it.
 type Board struct {
-	Convs   map[string][]Contact
-	Deals   map[int64]Deal
+	Convs map[string][]Contact
+	Deals map[int64]Deal
+	// Others are the deals after a conversation's own: renewals, expansions.
+	Others  map[string][]OtherDeal
 	Members []Member
+}
+
+func (b Board) count(stage string) int {
+	return len(b.Convs[stage]) + len(b.Others[stage])
+}
+
+func dealKindLabel(kind string) string {
+	for _, k := range DealKinds {
+		if k.Key == kind {
+			return k.Label
+		}
+	}
+	return kind
+}
+
+func otherField(d Deal, field string) templ.Attributes {
+	return templ.Attributes{"data-field": field, "data-deal": strconv.FormatInt(d.ID, 10), "data-refresh": "true"}
+}
+
+// standing is a deal's stage and next step as a conversation's, for the helpers that read those.
+func (d Deal) standing() Contact {
+	return Contact{Stage: d.Stage, NextStep: d.NextStep, NextDate: d.NextDate}
 }
 
 // worth is what a stage's deals add up to, a sum for each currency they were valued in.
@@ -21,6 +46,11 @@ func (b Board) worth(stage string) string {
 	for _, c := range b.Convs[stage] {
 		if d := b.Deals[c.ID]; d.Amount != 0 {
 			sums[d.Currency] += d.Amount
+		}
+	}
+	for _, o := range b.Others[stage] {
+		if o.Amount != 0 {
+			sums[o.Currency] += o.Amount
 		}
 	}
 	var parts []string
@@ -91,7 +121,7 @@ func nextText(c Contact, day string) (string, string) {
 templ ConversationsView(q *Req, b Board, day string) {
 	{{ convs := b.Convs }}
 	@PageHead("Conversations")
-	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">Everyone who replied, until it's won or lost. Each needs a next step with a date; ones without, or due today, also show on Today. Give one a value and each stage shows what it is worth.</p>
+	<p class="mb-5 max-w-[70ch] text-sm text-muted-foreground">Everyone who replied, until it's won or lost. Each needs a next step with a date; ones without, or due today, also show on Today. Give one a value and each stage shows what it is worth. A renewal or an expansion with someone already here is a deal of its own, started from their card.</p>
 	<div class="overflow-x-auto pb-4">
 		<div class="flex min-w-max gap-4">
 			for _, st := range Stages {
@@ -99,17 +129,20 @@ templ ConversationsView(q *Req, b Board, day string) {
 					<div class="flex items-baseline justify-between border-b-2 border-border px-1 pb-1.5">
 						<h2 class="font-heading text-base font-semibold">{ st.Label }</h2>
 						<span class="font-mono text-xs text-muted-foreground">
-							{ strconv.Itoa(len(convs[st.Key])) }
+							{ strconv.Itoa(b.count(st.Key)) }
 							if worth := b.worth(st.Key); worth != "" {
 								{ " · " + worth }
 							}
 						</span>
 					</div>
-					if len(convs[st.Key]) == 0 {
+					if b.count(st.Key) == 0 {
 						<p class="rounded-xl border border-dashed border-border p-3.5 font-mono text-xs text-muted-foreground">None</p>
 					}
 					for _, c := range convs[st.Key] {
 						@DealCard(q, c, b.Deals[c.ID], b.Members, day)
+					}
+					for _, o := range b.Others[st.Key] {
+						@OtherDealCard(q, o, b.Members, day)
 					}
 				</section>
 			}
@@ -155,42 +188,7 @@ templ DealCard(q *Req, c Contact, d Deal, members []Member, day string) {
 					@input.Input(input.Props{Type: "date", Value: deref(c.NextDate), Class: "h-8 bg-muted",
 						Attributes: templ.Attributes{"data-field": "next_date", "data-id": strconv.FormatInt(c.ID, 10), "data-refresh": "true"}})
 				</label>
-				<label class="flex flex-col gap-1">
-					@Label("Value")
-					@input.Input(input.Props{Value: d.Value(), Placeholder: "e.g. 14,000", Class: "h-8 bg-muted", Attributes: dealField(c, "amount")})
-				</label>
-				<label class="flex flex-col gap-1">
-					@Label("Expected to close")
-					@input.Input(input.Props{Type: "date", Value: deref(d.CloseDate), Class: "h-8 bg-muted", Attributes: dealField(c, "close_date")})
-				</label>
-				<label class="flex items-center gap-2">
-					@Label("Kind")
-					@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: dealField(c, "kind")}) {
-						for _, k := range DealKinds {
-							@nativeselect.Option(nativeselect.OptionProps{Value: k.Key, Selected: k.Key == d.Kind || (d.Kind == "" && k.Key == DealNew)}) {
-								{ k.Label }
-							}
-						}
-					}
-				</label>
-				<label class="flex items-center gap-2">
-					@Label("Owner")
-					@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: dealField(c, "owner")}) {
-						@nativeselect.Option(nativeselect.OptionProps{Value: "", Selected: d.Owner == ""}) {
-							Nobody yet
-						}
-						if ownerLeft(d, members) {
-							@nativeselect.Option(nativeselect.OptionProps{Value: d.Owner, Selected: true}) {
-								{ d.Owner + " (left)" }
-							}
-						}
-						for _, m := range members {
-							@nativeselect.Option(nativeselect.OptionProps{Value: m.Name, Selected: m.Name == d.Owner}) {
-								{ m.Name }
-							}
-						}
-					}
-				</label>
+				@DealFields(d, members, func(field string) templ.Attributes { return dealField(c, field) })
 				if c.Stage == "lost" {
 					<label class="flex flex-col gap-1">
 						@Label("Why lost")
@@ -198,6 +196,124 @@ templ DealCard(q *Req, c Contact, d Deal, members []Member, day string) {
 							Attributes: templ.Attributes{"data-field": "lost_reason", "data-id": strconv.FormatInt(c.ID, 10)}})
 					</label>
 				}
+				<form data-form="ui/deal/start" data-refresh="true" class="flex items-center gap-2 border-t border-border pt-2">
+					<input type="number" name="contact" value={ strconv.FormatInt(c.ID, 10) } hidden/>
+					@Label("Another deal")
+					@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: templ.Attributes{"name": "kind", "aria-label": "Kind of deal"}}) {
+						for _, k := range DealKinds {
+							@nativeselect.Option(nativeselect.OptionProps{Value: k.Key, Selected: k.Key == "renewal"}) {
+								{ k.Label }
+							}
+						}
+					}
+					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Type: button.TypeSubmit}) {
+						Start
+					}
+				</form>
+			</div>
+		</details>
+	</article>
+}
+
+// DealFields are a deal's value, close date, kind and owner, saved as at says.
+templ DealFields(d Deal, members []Member, at func(string) templ.Attributes) {
+	<label class="flex flex-col gap-1">
+		@Label("Value")
+		@input.Input(input.Props{Value: d.Value(), Placeholder: "e.g. 14,000", Class: "h-8 bg-muted", Attributes: at("amount")})
+	</label>
+	<label class="flex flex-col gap-1">
+		@Label("Expected to close")
+		@input.Input(input.Props{Type: "date", Value: deref(d.CloseDate), Class: "h-8 bg-muted", Attributes: at("close_date")})
+	</label>
+	<label class="flex items-center gap-2">
+		@Label("Kind")
+		@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: at("kind")}) {
+			for _, k := range DealKinds {
+				@nativeselect.Option(nativeselect.OptionProps{Value: k.Key, Selected: k.Key == d.Kind || (d.Kind == "" && k.Key == DealNew)}) {
+					{ k.Label }
+				}
+			}
+		}
+	</label>
+	<label class="flex items-center gap-2">
+		@Label("Owner")
+		@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: at("owner")}) {
+			@nativeselect.Option(nativeselect.OptionProps{Value: "", Selected: d.Owner == ""}) {
+				Nobody yet
+			}
+			if ownerLeft(d, members) {
+				@nativeselect.Option(nativeselect.OptionProps{Value: d.Owner, Selected: true}) {
+					{ d.Owner + " (left)" }
+				}
+			}
+			for _, m := range members {
+				@nativeselect.Option(nativeselect.OptionProps{Value: m.Name, Selected: m.Name == d.Owner}) {
+					{ m.Name }
+				}
+			}
+		}
+	</label>
+}
+
+// OtherDealCard is a renewal, an expansion or a further deal with someone in conversation.
+templ OtherDealCard(q *Req, o OtherDeal, members []Member, day string) {
+	{{ d := o.Deal }}
+	<article class={ "flex flex-col gap-2.5 rounded-xl border bg-card p-3.5 text-sm", dealClass(d.standing(), day) } data-deal-card={ strconv.FormatInt(d.ID, 10) }>
+		<div>
+			<b>{ dealKindLabel(d.Kind) }</b>
+			<span class="text-muted-foreground">{ " with " + displayName(o.With) }</span>
+			if o.With.CompanyID != nil {
+				<a href={ templ.SafeURL(q.Base() + "companies/" + strconv.FormatInt(*o.With.CompanyID, 10)) } class="font-mono text-xs text-muted-foreground hover:text-mark">{ " · " + companyName(deref(o.With.Maker)) }</a>
+			}
+		</div>
+		if d.Value() != "" || d.CloseDate != nil || d.Owner != "" {
+			<p class="font-mono text-xs text-muted-foreground">
+				if d.Value() != "" {
+					<b class="text-foreground">{ d.Value() }</b>
+					{ " " }
+				}
+				{ dealMeta(Deal{Kind: DealNew, CloseDate: d.CloseDate, Owner: d.Owner}) }
+			</p>
+		}
+		{{ text, state := nextText(d.standing(), day) }}
+		if text != "" {
+			<div>@Pill(text, state)</div>
+		}
+		<details class="text-sm">
+			<summary class="cursor-pointer font-mono text-xs text-muted-foreground">Update</summary>
+			<div class="mt-2 flex flex-col gap-2">
+				<label class="flex items-center gap-2">
+					@Label("Stage")
+					@nativeselect.NativeSelect(nativeselect.Props{Size: nativeselect.SizeSm, Attributes: otherField(d, "stage")}) {
+						for _, s := range Stages {
+							@nativeselect.Option(nativeselect.OptionProps{Value: s.Key, Selected: s.Key == d.Stage}) {
+								{ s.Label }
+							}
+						}
+					}
+				</label>
+				<label class="flex flex-col gap-1">
+					@Label("Next step")
+					@input.Input(input.Props{Value: d.NextStep, Placeholder: "e.g. send renewal terms", Class: "h-8 bg-muted", Attributes: otherField(d, "next_step")})
+				</label>
+				<label class="flex flex-col gap-1">
+					@Label("By")
+					@input.Input(input.Props{Type: "date", Value: deref(d.NextDate), Class: "h-8 bg-muted", Attributes: otherField(d, "next_date")})
+				</label>
+				@DealFields(d, members, func(field string) templ.Attributes { return otherField(d, field) })
+				if d.Stage == "lost" {
+					<label class="flex flex-col gap-1">
+						@Label("Why lost")
+						@input.Input(input.Props{Value: d.LostReason, Class: "h-8 bg-muted", Attributes: otherField(d, "lost_reason")})
+					</label>
+				}
+				<form data-form="ui/deal/remove" data-refresh="true" class="flex items-center gap-2 border-t border-border pt-2">
+					<input type="number" name="id" value={ strconv.FormatInt(d.ID, 10) } hidden/>
+					@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Type: button.TypeSubmit}) {
+						Remove this deal
+					}
+					<span class="font-mono text-xs text-muted-foreground" data-result></span>
+				</form>
 			</div>
 		</details>
 	</article>

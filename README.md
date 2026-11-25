@@ -51,6 +51,8 @@ Replies move across a board: replied, meeting, proposal, won, lost. Each needs a
 
 A conversation can carry a deal: what it's worth, when you expect it to close, whether it's new business, a renewal or an expansion, and which teammate owns it. Each stage then shows what its deals add up to. Values are in the currency set in Settings (GBP unless you change it).
 
+A renewal or an expansion with someone already on the board is a deal of its own: start one from their card and it gets its own card, stage, next step and value, beside the first. One started by mistake can be removed; one that ran its course is marked won or lost.
+
 ![Conversations: a board from replied to won](docs/images/conversations.png)
 
 ### Agents and API
