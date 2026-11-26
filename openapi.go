@@ -27,11 +27,14 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 	if err != nil {
 		log.Fatalf("the API spec: %v", err)
 	}
-	scopes := map[string][]string{}
-	for _, item := range spec.Paths.Map() {
-		for _, op := range item.Operations() {
+	scopes, account := map[string][]string{}, map[string]bool{}
+	for path, item := range spec.Paths.Map() {
+		for method, op := range item.Operations() {
 			if s := opScopes(op); len(s) > 0 {
 				scopes[op.OperationID] = s
+			}
+			if slices.Contains(op.Tags, "account") {
+				account[method+" "+path] = true
 			}
 		}
 	}
@@ -52,7 +55,7 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 	})
 	api.HandlerWithOptions(strict, api.StdHTTPServerOptions{
 		BaseRouter:  mux,
-		Middlewares: []api.MiddlewareFunc{a.apiCaller, noEmptyLink},
+		Middlewares: []api.MiddlewareFunc{a.apiCaller(account), noEmptyLink},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeProblem(w, http.StatusBadRequest, err.Error())
 		},
@@ -60,8 +63,13 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 }
 
 // apiCaller works out who is asking: a key, or a signed-in member of the organisation.
-func (a *App) apiCaller(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// The account operations, named by route, are asked by whoever is there.
+func (a *App) apiCaller(account map[string]bool) api.MiddlewareFunc {
+	return func(next http.Handler) http.Handler { return a.caller(account, next) }
+}
+
+func (a *App) caller(account map[string]bool, next http.Handler) http.Handler {
+	member := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if hasKey(r) && r.PathValue("org") == "" {
 			writeProblem(w, http.StatusForbidden, "a key belongs to one organisation and can't start another: sign in to do that")
 			return
@@ -71,10 +79,19 @@ func (a *App) apiCaller(next http.Handler) http.Handler {
 			return
 		}
 		if _, u := a.session(r); u == nil {
-			challenge(w, http.StatusUnauthorized, "", "", "sign in, or send an API key: Authorization: Bearer pk_…")
+			w.Header().Set("WWW-Authenticate", `Bearer realm="prospector"`)
+			writeCoded(w, http.StatusUnauthorized, api.SignedOut, "sign in, or send an API key: Authorization: Bearer pk_…")
 			return
 		}
 		a.member(next.ServeHTTP)(w, r)
+	})
+	anyone := a.accountCaller(next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if account[r.Pattern] {
+			anyone.ServeHTTP(w, r)
+			return
+		}
+		member.ServeHTTP(w, r)
 	})
 }
 
