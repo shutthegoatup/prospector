@@ -203,7 +203,7 @@ var problemTitles = map[api.ProblemType]string{
 	api.ProblemTypeSignedOut:          "Signed out",
 	api.ProblemTypeSessionLimited:     "Signed in for another organisation",
 	api.ProblemTypeWrongLogin:         "Wrong email or password",
-	api.ProblemTypeThrottled:          "Too many tries",
+	api.ProblemTypeThrottled:          "Slow down",
 	api.ProblemTypeLinkUsed:           "Link no longer works",
 	api.ProblemTypeMustChangePassword: "Choose your own password",
 	api.ProblemTypeSsoRequired:        "Single sign-on required",

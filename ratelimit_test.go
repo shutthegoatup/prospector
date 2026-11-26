@@ -65,6 +65,11 @@ func TestACallerPastItsBurstWaitsAndOthersDont(t *testing.T) {
 	if code, body := asKey(t, "GET", srv.URL+"/o/alpha/api/v1/snapshot", busy, nil); code != http.StatusTooManyRequests {
 		t.Fatalf("a key's routes outside the spec share its bucket: %d %s", code, body)
 	}
+	initialize := map[string]any{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": map[string]any{
+		"protocolVersion": "2025-06-18", "capabilities": map[string]any{}, "clientInfo": map[string]any{"name": "test", "version": "1"}}}
+	if code, body := asKey(t, "POST", srv.URL+"/o/alpha/mcp", busy, initialize); code != http.StatusTooManyRequests || !strings.Contains(body, "try again in 1 second") {
+		t.Fatalf("so does its MCP endpoint: %d %s", code, body)
+	}
 
 	if code, body := asKey(t, "GET", agents, quiet, nil); code != http.StatusOK {
 		t.Fatalf("another key of the same organisation: %d %s", code, body)
