@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, Meta, PageHead, Pill, type Tone, useRefresh, Whose } from "@/components/app";
+import { Bar, Loading, placeholders } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
 import { actor, plural } from "@/lib/format";
 import { useSession } from "@/session";
@@ -36,6 +37,8 @@ export function OnboardingPage() {
   const settings = $api.useQuery("get", "/o/{org}/api/v1/settings", { params: { path: { org } } });
   const planned = (settings.data?.onboarding_steps ?? "").split("\n").filter((l) => l.trim()).length;
   const day = today();
+  // The cards wait for the settings too, as "No steps written yet" would go above them.
+  const loading = (!list.data || settings.isPending) && !list.error && !settings.error;
   return (
     <>
       <PageHead title="Onboarding" />
@@ -44,29 +47,59 @@ export function OnboardingPage() {
         Settings later leaves the ones running as they are. Start one from a company's page. Ones running late come first.
       </p>
       <Whose area="support" work="Onboarding is" can={support} />
-      {settings.data && planned === 0 && (
+      {!loading && settings.data && planned === 0 && (
         <Empty title="No steps written yet" hint="An owner writes the steps under Settings, one a line. Then start an onboarding from a company's page." />
       )}
-      {settings.data && planned > 0 && list.data && list.data.items.length === 0 && (
+      {!loading && settings.data && planned > 0 && list.data && list.data.items.length === 0 && (
         <Empty title="Nobody is being onboarded" hint="Open a company and start one." />
       )}
-      <div className="flex max-w-3xl flex-col gap-3">
-        {list.data?.items.map((o) => <OnboardingCard key={o.id} o={o} day={day} />)}
-      </div>
+      {loading ? (
+        <Loading busy className="flex max-w-3xl flex-col gap-3">
+          {Array.from({ length: placeholders }, (_, i) => (
+            <OnboardingCard key={i} day={day} />
+          ))}
+        </Loading>
+      ) : (
+        <div className="flex max-w-3xl flex-col gap-3">
+          {list.data?.items.map((o) => <OnboardingCard key={o.id} o={o} day={day} />)}
+        </div>
+      )}
     </>
   );
 }
 
-// OnboardingCard is one onboarding; on its company's own page it goes unnamed.
-export function OnboardingCard({ o, day, named = true }: { o: Onboarding; day: string; named?: boolean }) {
+// OnboardingCard is one onboarding, or its outline while the list loads; on its
+// company's own page it goes unnamed.
+export function OnboardingCard({ o, day, named = true }: { o?: Onboarding; day: string; named?: boolean }) {
   const { org, support } = useSession();
   const refresh = useRefresh();
-  const [text, tone] = standing(o, day);
   const step = $api.useMutation("patch", "/o/{org}/api/v1/onboarding-steps/{id}", { onSuccess: refresh });
   const invite = $api.useMutation("post", "/o/{org}/api/v1/onboardings/{id}/invites", { onSuccess: refresh });
   const withdraw = $api.useMutation("delete", "/o/{org}/api/v1/onboarding-invites/{id}", { onSuccess: refresh });
   const remove = $api.useMutation("delete", "/o/{org}/api/v1/onboardings/{id}", { onSuccess: refresh });
-  const [who, setWho] = useState<number | undefined>(o.invitable[0]?.id);
+  const [who, setWho] = useState<number | undefined>(o?.invitable[0]?.id);
+  if (!o) {
+    return (
+      <article className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span>
+            {named && (
+              <b>
+                <Bar w="14ch" />
+              </b>
+            )}
+            <span className="block font-mono text-xs">
+              <Bar w="20ch" />
+            </span>
+          </span>
+          <Pill>
+            <Bar w="7ch" />
+          </Pill>
+        </div>
+      </article>
+    );
+  }
+  const [text, tone] = standing(o, day);
 
   return (
     <article className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 text-sm">

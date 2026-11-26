@@ -3,6 +3,7 @@ import { type ReactNode, useEffect } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, PageHead, Pill, type Tone, useRefresh, Whose } from "@/components/app";
+import { Bar, Loading } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/session";
@@ -88,12 +89,12 @@ function useBoard() {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
   const pages = board.data?.pages ?? [];
-  return { cards: pages.flatMap((p) => p.items), planned: pages[0]?.onboarding_steps ?? 0, error: board.error };
+  return { cards: pages.flatMap((p) => p.items), planned: pages[0]?.onboarding_steps ?? 0, loading: !board.data && !board.error, error: board.error };
 }
 
 export function ConversationsPage() {
   const { org, sales } = useSession();
-  const { cards, planned, error } = useBoard();
+  const { cards, planned, loading, error } = useBoard();
   const members = $api.useQuery("get", "/o/{org}/api/v1/members", { params: { path: { org }, query: { limit: 200 } } });
   const names = (members.data?.items ?? []).map((m) => m.name);
   const day = today();
@@ -108,7 +109,7 @@ export function ConversationsPage() {
       <Whose area="sales" work="Deals are" can={sales} />
       <Failed errors={[error, members.error]} />
       <div className="overflow-x-auto pb-4">
-        <div className="flex min-w-max gap-4">
+        <Loading busy={loading} className="flex min-w-max gap-4">
           {stages.map((st) => {
             const here = cards.filter((c) => c.stage === st.key);
             const sum = worth(here);
@@ -117,11 +118,18 @@ export function ConversationsPage() {
                 <div className="flex items-baseline justify-between border-b-2 border-border px-1 pb-1.5">
                   <h2 className="font-heading text-base font-semibold">{st.label}</h2>
                   <span className="font-mono text-xs text-muted-foreground">
-                    {here.length}
-                    {sum && " · " + sum}
+                    {loading ? (
+                      <Bar w="2ch" />
+                    ) : (
+                      <>
+                        {here.length}
+                        {sum && " · " + sum}
+                      </>
+                    )}
                   </span>
                 </div>
-                {here.length === 0 && <p className="rounded-xl border border-dashed border-border p-3.5 font-mono text-xs text-muted-foreground">None</p>}
+                {loading && Array.from({ length: 3 }, (_, i) => <DealCard key={i} />)}
+                {!loading && here.length === 0 && <p className="rounded-xl border border-dashed border-border p-3.5 font-mono text-xs text-muted-foreground">None</p>}
                 {here.map((c) =>
                   c.seq === 0 ? (
                     <DealCard key={"c" + c.contact_id} c={c} members={names} planned={planned} day={day} />
@@ -132,7 +140,7 @@ export function ConversationsPage() {
               </section>
             );
           })}
-        </div>
+        </Loading>
       </div>
     </>
   );
@@ -285,12 +293,30 @@ function StageChoice({ value, save }: { value: string; save: (v: string) => void
 
 type CardProps = { c: Card; members: string[]; planned: number; day: string };
 
-function DealCard({ c, members, planned, day }: CardProps) {
+// DealCard is someone in conversation, or their card's outline while the board loads.
+function DealCard({ c, members = [], planned = 0, day = "" }: Partial<CardProps>) {
   const { org, sales } = useSession();
   const refresh = useRefresh();
   const contact = $api.useMutation("patch", "/o/{org}/api/v1/contacts/{id}", { onSuccess: refresh });
   const deal = $api.useMutation("patch", "/o/{org}/api/v1/contacts/{id}/deal", { onSuccess: refresh });
   const another = $api.useMutation("post", "/o/{org}/api/v1/deals", { onSuccess: refresh });
+  if (!c) {
+    return (
+      <article className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 text-sm">
+        <div>
+          <b>
+            <Bar w="10ch" />
+          </b>
+          <span className="font-mono text-xs"> <Bar w="12ch" /></span>
+        </div>
+        {sales && (
+          <p className="font-mono text-xs">
+            <Bar w="7ch" />
+          </p>
+        )}
+      </article>
+    );
+  }
   const path = { org, id: c.contact_id };
   const person = (body: components["schemas"]["ContactChange"]) => contact.mutate({ params: { path }, body });
   return (

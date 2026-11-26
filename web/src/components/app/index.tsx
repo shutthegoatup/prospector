@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { Text } from "./skeleton";
 
 export type Tone = "ok" | "warn" | "stop" | "agent" | "";
 
@@ -41,7 +42,7 @@ export function Pill({ tone = "", children }: { tone?: Tone; children: ReactNode
 }
 
 // Section is one of a page's panels, with the ink edge every panel shares.
-export function Section({ title, hint, children, className }: { title?: string; hint?: string; children: ReactNode; className?: string }) {
+export function Section({ title, hint, children, className }: { title?: string; hint?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <Card className={cn("panel gap-4 p-6 shadow-none", className)}>
       {(title || hint) && (
@@ -69,7 +70,8 @@ export function Meta({ children, className }: { children: ReactNode; className?:
   return <p className={cn("font-mono text-xs text-muted-foreground", className)}>{children}</p>;
 }
 
-type ChipProps = Omit<ComponentProps<"a">, "children"> & { label: string; count: number; on: boolean };
+// Without a count yet, the chip keeps its place and its count pulses.
+type ChipProps = Omit<ComponentProps<"a">, "children"> & { label: string; count?: number; on: boolean };
 
 function Chip({ label, count, on, className, ref, ...props }: ChipProps) {
   return (
@@ -83,7 +85,9 @@ function Chip({ label, count, on, className, ref, ...props }: ChipProps) {
       )}
     >
       {label}
-      <span className="font-mono text-xs opacity-70">{count}</span>
+      <span className="font-mono text-xs opacity-70">
+        <Text value={count} w="2ch" />
+      </span>
     </a>
   );
 }
@@ -130,7 +134,7 @@ export function Empty({ title, hint }: { title: string; hint?: string }) {
 }
 
 // PageHead is a page's title, with the coral full stop, and anything beside it.
-export function PageHead({ title, children }: { title: string; children?: ReactNode }) {
+export function PageHead({ title, children }: { title: ReactNode; children?: ReactNode }) {
   return (
     <header className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
       <h1 className="font-heading text-4xl font-bold tracking-tight">

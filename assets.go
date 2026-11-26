@@ -51,8 +51,9 @@ func assetHandler() http.Handler {
 			w.Header().Set("Content-Security-Policy", pdfPolicy)
 		}
 		// Embedded files carry no date to revalidate against, so anything not cached
-		// for good is fetched again on every page. A font that changes gets a new name.
-		if strings.HasPrefix(r.URL.Path, "fonts/") || r.URL.Query().Get("v") == assetVersion {
+		// for good is fetched again on every page. A font that changes gets a new name, and
+		// so does each of the app's chunks, named for its content when it is built.
+		if strings.HasPrefix(r.URL.Path, "fonts/") || strings.HasPrefix(r.URL.Path, "app/chunks/") || r.URL.Query().Get("v") == assetVersion {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		} else {
 			w.Header().Set("Cache-Control", "no-cache")

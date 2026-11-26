@@ -165,7 +165,7 @@ export function CompaniesPage() {
       </form>
       <Failed errors={[list.error, segments.error]} />
       {list.data && list.data.items.length === 0 && <Empty title="No companies match" hint="Clear the filters, or add companies through Research or an agent." />}
-      {!list.data && (
+      {!list.data && !list.error && (
         <Loading busy className="divide-y divide-border overflow-hidden panel">
           {Array.from({ length: placeholders }, (_, i) => (
             <CompanyRow key={i} />

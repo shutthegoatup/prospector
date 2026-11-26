@@ -1,8 +1,10 @@
-import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
+import { type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api, fetchClient } from "@/client";
 import { ActionButton, Eyebrow, Failed, Meta, PageHead, useRefresh, Whose } from "@/components/app";
+import { Bar, Loading, Text } from "@/components/app/skeleton";
+import { cn } from "@/lib/utils";
 import { useSession } from "@/session";
 
 type Field = components["schemas"]["AgreementFieldIn"];
@@ -73,7 +75,22 @@ export function PreparePage() {
   };
 
   if (agreement.error) return <Failed errors={[agreement.error]} />;
-  if (!a) return <Meta>Reading the agreement…</Meta>;
+  const head = (
+    <>
+      <Link to="/o/$org/companies/$id" params={{ org, id: a?.company_id ?? 0 }} disabled={!a} className="font-mono text-xs text-mark">
+        ← <Text value={a?.company} w="14ch" />
+      </Link>
+      <PageHead title="Prepare for signing">
+        <Meta>
+          <Text value={a && `${a.name} · ${a.file_name} · ${a.page_count} pages`} w="32ch" />
+        </Meta>
+      </PageHead>
+      <Whose area="sales" work="Preparing agreements is" can={sales} />
+    </>
+  );
+  // What follows depends on the agreement, so it appears below rather than pushing the head down.
+  if (!a) return <Loading busy>{head}</Loading>;
+  const known = recipients.data !== undefined;
   const signed = new Set((fields ?? []).filter((f) => f.kind === "signature").map((f) => f.recipient_id));
   const missing = [
     ...(a.file_hash ? [] : ["Upload the PDF."]),
@@ -83,15 +100,7 @@ export function PreparePage() {
 
   return (
     <>
-      <Link to="/o/$org/companies/$id" params={{ org, id: a.company_id }} className="font-mono text-xs text-mark">
-        ← {a.company}
-      </Link>
-      <PageHead title="Prepare for signing">
-        <Meta>
-          {a.name} · {a.file_name} · {a.page_count} pages
-        </Meta>
-      </PageHead>
-      <Whose area="sales" work="Preparing agreements is" can={sales} />
+      {head}
       {a.problem && (
         <p className="mb-4 text-sm text-[var(--stop)]" role="alert">
           {a.problem}
@@ -101,19 +110,18 @@ export function PreparePage() {
         <div className="flex max-w-full flex-[1_1_240px] flex-col gap-4 md:max-w-[260px]">
           <section className="flex flex-col gap-2 panel p-3.5">
             <Eyebrow>Signers</Eyebrow>
-            {signers.length === 0 && <Meta>Nobody yet.</Meta>}
+            {known && signers.length === 0 && <Meta>Nobody yet.</Meta>}
+            {!known && (
+              <Loading busy className="flex flex-col gap-2">
+                {[0, 1].map((i) => (
+                  <SignerRow key={`loading-${i}`} edit={edit} />
+                ))}
+              </Loading>
+            )}
             {signers.map((s, i) => {
               const r = all.find((x) => x.id === s.id) as Recipient;
               return (
-                <div key={s.id} className="flex flex-col gap-1.5 rounded-lg border border-border p-2 text-sm">
-                  <label className="flex items-center gap-2">
-                    {edit && <input type="radio" name="placing" checked={placing?.id === s.id} onChange={() => setPicked(s.id)} />}
-                    <span className="shrink-0 rounded-sm" style={{ width: 10, height: 10, background: s.colour }} />
-                    <b>
-                      {i + 1} · {s.name}
-                    </b>
-                  </label>
-                  <Meta>{partyLine(r)}</Meta>
+                <SignerRow key={s.id} edit={edit} s={s} n={i + 1} r={r} placing={placing?.id === s.id} onPlace={() => setPicked(s.id)}>
                   {edit && (
                     <div className="flex flex-wrap gap-1.5">
                       {i > 0 && (
@@ -138,7 +146,7 @@ export function PreparePage() {
                       </ActionButton>
                     </div>
                   )}
-                </div>
+                </SignerRow>
               );
             })}
             {edit ? (
@@ -152,12 +160,14 @@ export function PreparePage() {
           </section>
           <section className="flex flex-col gap-2 panel p-3.5">
             <Eyebrow>Gets a copy</Eyebrow>
-            {copies.length === 0 && <Meta>Nobody. Everyone who signs gets one anyway.</Meta>}
+            {known && copies.length === 0 && <Meta>Nobody. Everyone who signs gets one anyway.</Meta>}
+            {!known && (
+              <Loading busy>
+                <CopyRow />
+              </Loading>
+            )}
             {copies.map((r) => (
-              <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <span>
-                  {r.name} <span className="font-mono text-xs text-muted-foreground">{partyLine(r)}</span>
-                </span>
+              <CopyRow key={r.id} r={r}>
                 {edit && (
                   <span className="flex gap-1.5">
                     <ActionButton quiet size="xs" onClick={() => change.mutate({ params: { path: { org, id, recipient: r.id } }, body: { role: "signer" } })}>
@@ -168,7 +178,7 @@ export function PreparePage() {
                     </ActionButton>
                   </span>
                 )}
-              </div>
+              </CopyRow>
             ))}
           </section>
           {edit && (
@@ -182,15 +192,15 @@ export function PreparePage() {
           )}
           <section className="flex flex-col gap-1.5 panel p-3.5">
             <Eyebrow>Before it can be sent</Eyebrow>
-            {missing.length === 0 && <p className="font-mono text-xs text-[var(--ok)]">✓ Every signer has a signature field.</p>}
-            {missing.map((m) => (
+            {known && fields && missing.length === 0 && <p className="font-mono text-xs text-[var(--ok)]">✓ Every signer has a signature field.</p>}
+            {known && fields && missing.map((m) => (
               <Meta key={m}>· {m}</Meta>
             ))}
             <Meta>Sending it for signature comes in the next release. Until then nothing here leaves Prospector.</Meta>
           </section>
         </div>
         <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-3">
-          {edit && signers.length > 0 && (
+          {known && edit && signers.length > 0 && (
             <>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs text-muted-foreground">Place for {placing?.name}:</span>
@@ -212,8 +222,8 @@ export function PreparePage() {
               <Failed errors={[saveError]} />
             </>
           )}
-          {edit && signers.length === 0 && <Meta>Add someone to sign it, then place their fields on the pages.</Meta>}
-          {a.file_hash && fields && (
+          {known && edit && signers.length === 0 && <Meta>Add someone to sign it, then place their fields on the pages.</Meta>}
+          {known && a.file_hash && fields && (
             <Pages
               id={id}
               hash={a.file_hash}
@@ -227,6 +237,53 @@ export function PreparePage() {
         </div>
       </div>
     </>
+  );
+}
+
+// SignerRow is one signer, or their outline while the recipients load.
+function SignerRow({
+  edit,
+  s,
+  n,
+  r,
+  placing,
+  onPlace,
+  children,
+}: {
+  edit: boolean;
+  s?: Signer;
+  n?: number;
+  r?: Recipient;
+  placing?: boolean;
+  onPlace?: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border border-border p-2 text-sm">
+      <label className="flex items-center gap-2">
+        {edit && <input type="radio" name="placing" checked={placing ?? false} disabled={!s} onChange={onPlace} />}
+        <span className={cn("shrink-0 rounded-sm", !s && "animate-pulse bg-accent")} style={{ width: 10, height: 10, background: s?.colour }} />
+        <b>{s ? `${n} · ${s.name}` : <Bar w="12ch" />}</b>
+      </label>
+      <Meta>
+        <Text value={r && partyLine(r)} w="20ch" />
+      </Meta>
+      {children}
+    </div>
+  );
+}
+
+function CopyRow({ r, children }: { r?: Recipient; children?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+      <span>
+        <Text value={r?.name} w="10ch" />{" "}
+        <span className="font-mono text-xs text-muted-foreground">
+          <Text value={r && partyLine(r)} w="18ch" />
+        </span>
+      </span>
+      {children}
+    </div>
   );
 }
 

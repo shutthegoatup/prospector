@@ -19,7 +19,7 @@ export default defineConfig({
       input: fileURLToPath(new URL("./index.html", import.meta.url)),
       output: {
         entryFileNames: "main.js",
-        chunkFileNames: "chunks/[name].js",
+        chunkFileNames: "chunks/[name]-[hash].js",
         assetFileNames: "[name][extname]",
       },
     },
