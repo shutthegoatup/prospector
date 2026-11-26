@@ -252,7 +252,7 @@ func TestTheBoardShowsWhatAStageIsWorth(t *testing.T) {
 	}
 
 	settings := func(currency string) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/settings", "application/json", map[string]any{"name": "Alpha", "color": "#56c5f4", "currency": currency})
+		return call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/settings", "application/json", map[string]any{"name": "Alpha", "color": "#56c5f4", "currency": currency})
 	}
 	if code, body := settings("euros"); code != http.StatusBadRequest || !strings.Contains(body, "three letters") {
 		t.Errorf("a currency that isn't a code was saved: %d %s", code, body)

@@ -71,7 +71,7 @@ templ SettingsView(q *Req, d SettingsData) {
 		} else {
 			@Section("Your sign-in", "You sign in through a provider, so there is no password here to change. Whoever runs this server can give you one.")
 		}
-		<form data-form="ui/settings" data-refresh="true">
+		<form data-form="api/v1/settings" data-method="PATCH" data-refresh="true">
 			@Section("Organisation", ownerHint(q)) {
 				<fieldset disabled?={ !q.Owner() } class="flex flex-col gap-4">
 					@Row("Name") {

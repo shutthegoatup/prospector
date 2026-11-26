@@ -57,7 +57,7 @@ A renewal or an expansion with someone already on the board is a deal of its own
 
 ### Agents and API
 
-Each organisation has an MCP endpoint and a REST API, with scoped keys. Agents can search, add companies, facts and suggested contacts, and draft messages. They can't send anything or change settings.
+Each organisation has an MCP endpoint and a REST API, with scoped keys. Agents can search, add companies, facts and suggested contacts, and draft messages. They send mail or change settings only with a scope that says so.
 
 ![Agents & API: the MCP endpoint, REST calls and the tools each key gets](docs/images/agents.png)
 
@@ -244,6 +244,7 @@ The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml),
 | `tasks:write` | Start tasks, ask them for more, mark their requests done or not, and close and reopen them, through `/api/v1/tasks` and `/api/v1/task-requests` |
 | `agents:run` | Start and stop Prospector's own agents on a task, and list a task's runs |
 | `agents:configure` | Add, change and delete Prospector's own agents: endpoint, key, model, tools and fallback. Owner-level: a signed-in member needs to be an owner |
+| `settings:write` | `PATCH /api/v1/settings`: change the organisation's settings, from its waits and wording to its never-contact list and enquiry sites; send only what changes. Owner-level, like `agents:configure`. `GET /api/v1/settings` reads them with `read` |
 
 - **Every list comes a page at a time.** Each list in `/api/openapi.json` (agents, runs, deals, enquiries and their messages, onboardings, subscriptions), `search`, `tasks` and `due`, and the lists inside one company (`companies/<id>`: facts, people, history, notes) and one task (`tasks/<id>`: companies, people, notes), take `limit` (50 if left out, 200 at most) and `cursor`. When there is more, the answer has `next_cursor` to pass back as `cursor`, and the HTTP response names the next page in a `Link` header with `rel="next"` ([RFC 8288](https://www.rfc-editor.org/rfc/rfc8288)). A cursor is only good for the list that gave it out. The MCP tools take and return the same two fields.
 - **Errors from the JSON API** come as `application/problem+json` ([RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)), with what went wrong in `detail`. `400` is something to fix in the request, `404` a company, contact or task that isn't in this organisation, `409` something that clashes with what is already here, or a person who was erased on request, and `500` the server's own failure, which is worth retrying. A `401` or `403` about the key says which in `WWW-Authenticate`: `invalid_token` for a key to replace, `insufficient_scope` for one that can't do this.

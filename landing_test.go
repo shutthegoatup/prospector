@@ -242,4 +242,7 @@ func TestTheFrontPageTellsTheTruthAboutKeys(t *testing.T) {
 	if strings.Contains(body, "Send anything") {
 		t.Error("the front page still says no key can send anything")
 	}
+	if strings.Contains(body, "organisation's settings or members") || !strings.Contains(body, "<code>settings:write</code>") {
+		t.Error("the front page still says no key can change settings")
+	}
 }

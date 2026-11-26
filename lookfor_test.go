@@ -20,7 +20,7 @@ func TestLookForAssets(t *testing.T) {
 
 	s, o, srv, client := signedIn(t)
 	save := func(lookFor string) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/settings", "application/json",
+		return call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/settings", "application/json",
 			map[string]any{"name": "Alpha", "color": "#56c5f4", "look_for": lookFor})
 	}
 	if code, body := save(": a jobs page"); code != http.StatusBadRequest || !strings.Contains(body, "needs a name") {

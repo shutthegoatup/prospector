@@ -1,0 +1,63 @@
+package main
+
+import (
+	"encoding/json"
+	"net/http"
+	"strings"
+	"testing"
+
+	"github.com/shutthegoatup/prospector/api"
+)
+
+func TestSettingsChangeThroughTheAPIOnlyWhatIsSent(t *testing.T) {
+	s, o, srv, ada := signedIn(t)
+	o.Settings.Pitch, o.Settings.NeverContact = "We help {company}.", "rival.example"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	url := srv.URL + "/o/alpha/api/v1/settings"
+	key := func(scopes ...string) string {
+		secret, _, err := s.CreateKey(o.ID, "robot", scopes, "Ada Lovelace")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return secret
+	}
+	reader, writer := key("read"), key("settings:write")
+
+	if code, body := asKey(t, "PATCH", url, reader, map[string]any{"enquiry_sites": "https://www.alpha.example"}); code != http.StatusForbidden || !strings.Contains(body, "settings:write") {
+		t.Fatalf("a read key changed settings: %d %s", code, body)
+	}
+	code, body := asKey(t, "PATCH", url, writer, map[string]any{"enquiry_sites": "https://www.alpha.example"})
+	var got api.Settings
+	if json.Unmarshal([]byte(body), &got); code != http.StatusOK || got.EnquirySites != "https://www.alpha.example" || got.Pitch != "We help {company}." || got.Name == "" {
+		t.Fatalf("changing only the enquiry sites: %d %s", code, body)
+	}
+	saved := must(s.OrgBySlug("alpha"))
+	if !saved.Settings.takesEnquiriesFrom("https://www.alpha.example") || saved.Settings.NeverContact != "rival.example" {
+		t.Fatalf("what was left out should stay as it was: %+v", saved.Settings)
+	}
+
+	if code, body := asKey(t, "PATCH", url, writer, map[string]any{"enquiry_sites": "alpha.example", "pitch": "changed"}); code != http.StatusBadRequest || !strings.Contains(body, "isn't a site address") {
+		t.Fatalf("a site without a scheme was saved: %d %s", code, body)
+	}
+	if must(s.OrgBySlug("alpha")).Settings.Pitch != "We help {company}." {
+		t.Fatal("a refused change saved part of itself")
+	}
+	if code, body := asKey(t, "PATCH", url, writer, map[string]any{"name": "  "}); code != http.StatusBadRequest || !strings.Contains(body, "needs a name") {
+		t.Fatalf("the name was emptied: %d %s", code, body)
+	}
+
+	if code, body := asKey(t, "GET", url, reader, nil); code != http.StatusOK || !strings.Contains(body, `"email_after_days":2`) {
+		t.Fatalf("reading settings shows them with defaults: %d %s", code, body)
+	}
+
+	mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
+	grace := signInAs(t, srv, "grace@example.com", "correct horse battery")
+	if code, body := call(t, grace, "PATCH", url, "application/json", map[string]any{"pitch": "Grace's"}); code != http.StatusForbidden || !strings.Contains(body, "owner") {
+		t.Fatalf("a member who isn't an owner changed settings: %d %s", code, body)
+	}
+	if code, body := call(t, ada, "PATCH", url, "application/json", map[string]any{"currency": "eur"}); code != http.StatusOK || !strings.Contains(body, `"currency":"EUR"`) {
+		t.Fatalf("an owner changing the currency: %d %s", code, body)
+	}
+}

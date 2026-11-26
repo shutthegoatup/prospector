@@ -1115,10 +1115,111 @@ export interface paths {
         patch: operations["decideSuggestion"];
         trace?: never;
     };
+    "/o/{org}/api/v1/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The organisation's settings
+         * @description As they are in effect, with defaults where none were saved.
+         */
+        get: operations["getSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change the organisation's settings
+         * @description Send only what changes; the rest stay as they are, and all are saved together or
+         *     not at all. Agents connected now are given the new guidance, wording and
+         *     never-contact list on their next call. For a member, only an owner.
+         */
+        patch: operations["changeSettings"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Settings: {
+            /** @description The organisation's name; never empty. */
+            name: string;
+            /** @description Its colour, like `#56c5f4`. */
+            color: string;
+            /**
+             * Format: int32
+             * @description Days without a LinkedIn accept before the email is due, up to 60; 0 is the default, 2.
+             */
+            email_after_days: number;
+            /**
+             * Format: int32
+             * @description Days without a reply before the follow-up is due, up to 60; 0 is the default, 6.
+             */
+            followup_after_days: number;
+            /** @description The connection note. `{first}`, `{company}` and `{org}` are filled in. */
+            note_template: string;
+            /** @description The call script's pitch line. `{company}` is filled in. */
+            pitch: string;
+            /** @description Domains, email addresses and LinkedIn profiles never to contact, one per line. */
+            never_contact: string;
+            /** @description What makes a company a fit, one `name: what counts` per line. */
+            look_for: string;
+            /** @description Sent to every agent when it connects. */
+            agent_guidance: string;
+            /** @description Sites whose forms may post enquiries, one address per line, like `https://www.example.com`. Empty takes none. */
+            enquiry_sites: string;
+            /** @description What a new customer goes through, one step a line. */
+            onboarding_steps: string;
+            /** @description The three-letter code deals are valued in. */
+            currency: string;
+            /** @description Where the organisation can be written to; 300 characters at most. */
+            postal_address: string;
+            /** @description Email only incorporated companies. */
+            incorporated_only: boolean;
+        };
+        SettingsChange: {
+            /** @description The organisation's name; never empty. */
+            name?: string | null;
+            /** @description Its colour, like `#56c5f4`. */
+            color?: string | null;
+            /**
+             * Format: int32
+             * @description Days without a LinkedIn accept before the email is due, up to 60; 0 is the default, 2.
+             */
+            email_after_days?: number | null;
+            /**
+             * Format: int32
+             * @description Days without a reply before the follow-up is due, up to 60; 0 is the default, 6.
+             */
+            followup_after_days?: number | null;
+            /** @description The connection note. `{first}`, `{company}` and `{org}` are filled in. */
+            note_template?: string | null;
+            /** @description The call script's pitch line. `{company}` is filled in. */
+            pitch?: string | null;
+            /** @description Domains, email addresses and LinkedIn profiles never to contact, one per line. */
+            never_contact?: string | null;
+            /** @description What makes a company a fit, one `name: what counts` per line. */
+            look_for?: string | null;
+            /** @description Sent to every agent when it connects. */
+            agent_guidance?: string | null;
+            /** @description Sites whose forms may post enquiries, one address per line, like `https://www.example.com`. Empty takes none. */
+            enquiry_sites?: string | null;
+            /** @description What a new customer goes through, one step a line. */
+            onboarding_steps?: string | null;
+            /** @description The three-letter code deals are valued in. */
+            currency?: string | null;
+            /** @description Where the organisation can be written to; 300 characters at most. */
+            postal_address?: string | null;
+            /** @description Email only incorporated companies. */
+            incorporated_only?: boolean | null;
+        };
         ContactChange: {
             /** @description Their name. */
             person?: string | null;
@@ -3665,6 +3766,58 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Settings"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changeSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsChange"];
+            };
+        };
+        responses: {
+            /** @description The settings as they now are. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Settings"];
+                };
             };
             default: components["responses"]["Problem"];
         };
