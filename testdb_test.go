@@ -8,8 +8,10 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"golang.org/x/crypto/bcrypt"
@@ -55,9 +57,12 @@ func withDatabases(run func() int) int {
 	defer admin.Close()
 	testDB.admin, testDB.server = admin, server
 
+	clearStaleDatabases()
+	// Named for when the run began, so a later run can tell this one's leftovers from
+	// another run still going.
 	id := make([]byte, 4)
 	rand.Read(id)
-	runName := "prospector_test_" + hex.EncodeToString(id)
+	runName := fmt.Sprintf("%s%d_%s", testDBPrefix, time.Now().Unix(), hex.EncodeToString(id))
 	var made []string
 	defer func() {
 		for _, name := range made {
@@ -112,6 +117,32 @@ func withDatabases(run func() int) int {
 	return run()
 }
 
+const testDBPrefix = "prospector_test_"
+
+// clearStaleDatabases drops what runs killed by a timeout or a panic left behind. Only
+// those begun over an hour ago: a newer one may belong to a run in another session.
+func clearStaleDatabases() {
+	rows, err := testDB.admin.Query("select datname from pg_database where datname like $1", testDBPrefix+"%")
+	if err != nil {
+		return
+	}
+	var stale []string
+	for rows.Next() {
+		var name string
+		if rows.Scan(&name) != nil {
+			continue
+		}
+		began, _, _ := strings.Cut(strings.TrimPrefix(name, testDBPrefix), "_")
+		if at, err := strconv.ParseInt(began, 10, 64); err == nil && time.Since(time.Unix(at, 0)) > time.Hour {
+			stale = append(stale, name)
+		}
+	}
+	rows.Close()
+	for _, name := range stale {
+		dropDatabase(name)
+	}
+}
+
 func databaseURL(name string) string {
 	u := *testDB.server
 	u.Path = "/" + name
@@ -124,19 +155,23 @@ func dropDatabase(name string) {
 	}
 }
 
-// tempStore lends the test an empty, migrated database for as long as it runs.
+// tempStore lends the test an empty, migrated database for as long as it runs. With
+// none free it makes another rather than wait: a test holding one while it waits for a
+// second could otherwise wait for good.
 func tempStore(t *testing.T) *Store {
 	t.Helper()
-	name := <-testDB.pool
+	var name string
+	select {
+	case name = <-testDB.pool:
+	default:
+		return ownStore(t)
+	}
 	s, err := connect(databaseURL(name))
 	if err != nil {
 		testDB.pool <- name
 		t.Fatal(err)
 	}
-	limitConnections(s)
-	if s.keys, err = parseKeys("1:" + testKey); err != nil {
-		t.Fatal(err)
-	}
+	lent(t, s)
 	t.Cleanup(func() {
 		defer func() { testDB.pool <- name }()
 		closeStore(s)
@@ -148,6 +183,29 @@ func tempStore(t *testing.T) *Store {
 			}
 		}
 	})
+	return s
+}
+
+// ownStore is a store on a database no other test will borrow, for a test that changes
+// the schema.
+func ownStore(t *testing.T) *Store {
+	t.Helper()
+	s, err := connect(freshDatabase(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return lent(t, s)
+}
+
+// lent readies a store for a test and closes it when the test ends.
+func lent(t *testing.T, s *Store) *Store {
+	t.Helper()
+	limitConnections(s)
+	var err error
+	if s.keys, err = parseKeys("1:" + testKey); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { closeStore(s) })
 	return s
 }
 

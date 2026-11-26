@@ -105,7 +105,8 @@ func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
 
 func TestTheDatabaseKeepsACompanyNameToOneSpelling(t *testing.T) {
 	t.Parallel()
-	s := tempStore(t)
+	// It drops the index, so on a database no other test will borrow.
+	s := ownStore(t)
 	o := mustOrg(t, s, "alpha")
 	if err := s.db.Create(&Company{OrgID: o.ID, Name: "Larkmoor", Stage: CompanyReview}).Error; err != nil {
 		t.Fatal(err)
