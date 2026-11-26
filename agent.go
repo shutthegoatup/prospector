@@ -185,7 +185,7 @@ type AddContactIn struct {
 	Name        string `json:"name"`
 	Title       string `json:"title,omitempty"`
 	Email       string `json:"email,omitempty"`
-	EmailStatus string `json:"email_status,omitempty" jsonschema:"verified, guess or empty"`
+	EmailStatus string `json:"email_status,omitempty" jsonschema:"verified when a page you cite shows the address, guess when inferred from a pattern, else empty"`
 	Linkedin    string `json:"linkedin,omitempty" jsonschema:"profile URL, found by search, never scraped"`
 	Phone       string `json:"phone,omitempty"`
 	SourceURL   string `json:"source_url" jsonschema:"page that shows this person has this role (required)"`
@@ -232,6 +232,9 @@ func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContact
 		return nil, errors.New("linkedin must be an https link")
 	}
 	if err := s.allowed(o, in.Email, in.Linkedin); err != nil {
+		return nil, err
+	}
+	if err := s.checkMailDomains(in.Email); err != nil {
 		return nil, err
 	}
 	c, err := s.companyRef(o.ID, in.Company)
@@ -657,7 +660,7 @@ func agentInstructions(o *Org, k *APIKey) string {
 		parts = append(parts,
 			"Companies and facts are high volume with simple judgement, so a small, fast model does them well. One claim per fact, from the page that shows it.",
 			lookForGuidance(o),
-			"Contacts need care more than speed, so use a capable model. Pick the person who owns the decision, not a general inbox. Confirm they hold the role now on a current page: an old bio, press release or speaker listing isn't enough. Set email_status to guess for any address inferred from a pattern. If you can't confirm someone, don't add them; add a team_page fact so a person can look. To add an email, phone or profile for someone already here, call add_contact for them again with it: it waits for a person to accept, so don't send it twice.")
+			"Contacts need care more than speed, so use a capable model. Pick the person who owns the decision, not a general inbox. Confirm they hold the role now on a current page: an old bio, press release or speaker listing isn't enough. Set email_status to verified only when a page you cite shows that address for this person, and to guess for any address inferred from a pattern. An address whose domain takes no mail is turned away. If you can't confirm someone, don't add them; add a team_page fact so a person can look. To add an email, phone or profile for someone already here, call add_contact for them again with it: it waits for a person to accept, so don't send it twice.")
 	}
 	if k.Has("outcomes:write") {
 		parts = append(parts,
