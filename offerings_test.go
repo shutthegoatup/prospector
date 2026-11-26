@@ -21,6 +21,7 @@ func dueNames(t *testing.T, s *Store, o *Org) map[string]bool {
 }
 
 func TestACompanyIsJudgedForEachOfferingOnItsOwn(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	key := func(scopes ...string) string {
 		secret, _, err := s.CreateKey(o.ID, "robot", scopes, "Ada Lovelace")

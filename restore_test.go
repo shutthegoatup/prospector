@@ -6,6 +6,7 @@ import (
 )
 
 func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	do := func(err error) {

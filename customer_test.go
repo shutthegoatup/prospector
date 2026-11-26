@@ -55,6 +55,7 @@ func ageCustomerLinks(t *testing.T, s *Store) {
 }
 
 func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
+	t.Parallel()
 	s, srv, member, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	o.Settings.OnboardingSteps = "them: Send your product files, 7 days\nus: Internal credit check, 3 days\nthem: Approve the first renders\nus: Go live"
@@ -213,6 +214,7 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 }
 
 func TestErasingAPersonClosesTheirPage(t *testing.T) {
+	t.Parallel()
 	s, srv, member, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	o.Settings.OnboardingSteps = "them: Send your product files"
@@ -246,6 +248,7 @@ func TestErasingAPersonClosesTheirPage(t *testing.T) {
 
 // A link runs out, and so does a browser; neither opens anything afterwards.
 func TestACustomersLinkAndBrowserRunOut(t *testing.T) {
+	t.Parallel()
 	s, srv, member, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	o.Settings.OnboardingSteps = "them: Send your product files"
@@ -296,6 +299,7 @@ func TestACustomersLinkAndBrowserRunOut(t *testing.T) {
 // Without a mail server and a public address nobody can be invited: access with no way
 // to send the link is no use, and a link is never built from a request's own host.
 func TestNobodyIsInvitedWithoutMail(t *testing.T) {
+	t.Parallel()
 	s, o, srv, member := signedIn(t)
 	o.Settings.OnboardingSteps = "them: Send your product files"
 	if err := s.SaveOrg(o); err != nil {
@@ -318,6 +322,7 @@ func TestNobodyIsInvitedWithoutMail(t *testing.T) {
 
 // What made someone invitable has to hold each time, not only on the day they were invited.
 func TestACustomersPageClosesWhenTheyNoLongerQualify(t *testing.T) {
+	t.Parallel()
 	s, srv, member, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	o.Settings.OnboardingSteps = "them: Send your product files"
@@ -434,6 +439,7 @@ func TestACustomersPageClosesWhenTheyNoLongerQualify(t *testing.T) {
 // A customer marks their own steps, and only those: not ours, not another onboarding's,
 // and not over a mark a member made.
 func TestACustomerMarksTheirOwnSteps(t *testing.T) {
+	t.Parallel()
 	s, srv, member, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	o.Settings.OnboardingSteps = "them: Send your product files\nus: Internal credit check\nthem: Approve the first renders"
@@ -550,6 +556,7 @@ func TestACustomerMarksTheirOwnSteps(t *testing.T) {
 // leaves the history as it was, a press that changes nothing writes nothing, and the
 // buttons answer only to the page's own forms.
 func TestACustomersMarksKeepTheHistoryHonest(t *testing.T) {
+	t.Parallel()
 	s, srv, member, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	o.Settings.OnboardingSteps = "them: Send your product files\nus: Internal credit check"
@@ -619,6 +626,7 @@ func TestACustomersMarksKeepTheHistoryHonest(t *testing.T) {
 }
 
 func TestTakingBackAMarkRemovesOnlyThatMarksEntry(t *testing.T) {
+	t.Parallel()
 	s, srv, member, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	o.Settings.OnboardingSteps = "them: Send your product files"
@@ -702,6 +710,7 @@ func TestTakingBackAMarkRemovesOnlyThatMarksEntry(t *testing.T) {
 }
 
 func TestStepsMarkedBeforeTheEntryColumnSurviveIt(t *testing.T) {
+	t.Parallel()
 	s, srv, member, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	o.Settings.OnboardingSteps = "them: Send your product files"

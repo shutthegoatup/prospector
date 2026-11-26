@@ -28,6 +28,7 @@ func get(t *testing.T, client *http.Client, u string) (*http.Response, string) {
 }
 
 func TestTheAppIsOneShellAtEveryPage(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	c := repliedPerson(t, s, o, "Hannah Pryce")
 	task := must(s.CreateTask(o.ID, "Kitchen makers", "Heads of procurement", "Ada Lovelace"))
@@ -84,6 +85,7 @@ func TestTheAppIsOneShellAtEveryPage(t *testing.T) {
 }
 
 func TestTheOldAppAddressesMoveToTheRealOnes(t *testing.T) {
+	t.Parallel()
 	_, _, srv, _ := signedIn(t)
 	client := signInAs(t, srv, "ada@example.com", "correct horse battery")
 	client.CheckRedirect = noRedirects().CheckRedirect
@@ -103,6 +105,7 @@ func TestTheOldAppAddressesMoveToTheRealOnes(t *testing.T) {
 }
 
 func TestTheNavSaysWhatTheSidebarShows(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	repliedPerson(t, s, o, "Hannah Pryce")
 	must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "support", Name: "Edsger Dijkstra", Email: "edsger@eindhoven.example", Message: "Colours look pale on phones"}))
@@ -171,6 +174,7 @@ func TestTheNavSaysWhatTheSidebarShows(t *testing.T) {
 }
 
 func TestStartingAnOrganisationThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	code, body := call(t, client, "POST", srv.URL+"/api/v1/orgs", "application/json", map[string]string{"name": "Gamma Works"})
 	var made api.OrgSummary
@@ -212,6 +216,7 @@ func TestStartingAnOrganisationThroughTheAPI(t *testing.T) {
 }
 
 func TestReactAddPerson(t *testing.T) {
+	t.Parallel()
 	_, _, srv, client := signedIn(t)
 
 	// What a LinkedIn profile gives the form, as the templ page read it.
@@ -234,6 +239,7 @@ func TestReactAddPerson(t *testing.T) {
 }
 
 func TestCampaignsSayWhyNothingCanBeSent(t *testing.T) {
+	t.Parallel()
 	_, _, srv, client := signedIn(t)
 	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/campaigns", "", nil); !strings.Contains(body, `"not_ready":"`) || strings.Contains(body, `"not_ready":""`) {
 		t.Errorf("campaigns should say why nothing can be sent yet: %s", body)

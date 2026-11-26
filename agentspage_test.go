@@ -25,6 +25,7 @@ func agentCard(t *testing.T, listed []api.Agent, name string) (string, string) {
 }
 
 func TestTheAgentsPageSaysWhichAgentsAreReady(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	s, srv, ada := agentSite(t, fake)
 	o := must(s.OrgBySlug("alpha"))
@@ -115,6 +116,7 @@ func TestTheAgentsPageSaysWhichAgentsAreReady(t *testing.T) {
 }
 
 func TestAnAgentWithThinkingOffAsksItsModelNotToThink(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	first := must(r.s.AgentByID(r.o.ID, r.agent))
@@ -157,6 +159,7 @@ func TestAnAgentWithThinkingOffAsksItsModelNotToThink(t *testing.T) {
 
 // A database from before thinking could be turned off has agents, and they keep thinking.
 func TestAgentsFromBeforeThinkingOffStillThink(t *testing.T) {
+	t.Parallel()
 	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {

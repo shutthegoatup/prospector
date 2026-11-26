@@ -81,6 +81,7 @@ func (f *fakeProspeo) last() map[string]any {
 }
 
 func TestProspeoFindsAMobileAnEmailAndAProfile(t *testing.T) {
+	t.Parallel()
 	f := newFakeProspeo(t)
 	s, o, api, client := vendorsAt(t, f.srv)
 	nell := atCompany(t, s, o, "Nell Achterberg", "Wrenfield Kitchens", "wrenfield.example")
@@ -136,6 +137,7 @@ func TestProspeoFindsAMobileAnEmailAndAProfile(t *testing.T) {
 }
 
 func TestProspeoMissesFailuresAndMaskedFinds(t *testing.T) {
+	t.Parallel()
 	f := newFakeProspeo(t)
 	s, o, api, client := vendorsAt(t, f.srv)
 	call(t, client, "PUT", api+"/enrichers", "application/json", map[string]any{"kind": "prospeo", "api_key": prospeoTestKey, "monthly_limit": 10})
@@ -179,6 +181,7 @@ func TestProspeoMissesFailuresAndMaskedFinds(t *testing.T) {
 }
 
 func TestAVendorThatFindsNothingGivesWayToTheNext(t *testing.T) {
+	t.Parallel()
 	f := newFakeProspeo(t)
 	s, o, api, client := vendorsAt(t, f.srv)
 	call(t, client, "PUT", api+"/enrichers", "application/json", map[string]any{"kind": "hunter", "api_key": hunterTestKey, "position": 0, "monthly_limit": 10})

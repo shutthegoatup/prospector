@@ -23,6 +23,7 @@ func link(t *testing.T, s *Store, org int64, address string) string {
 }
 
 func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	hannah := link(t, s, o.ID, "Hannah@Larkmoor.example")
@@ -104,6 +105,7 @@ func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
 }
 
 func TestTheListIsKeptByMembersAndKeys(t *testing.T) {
+	t.Parallel()
 	s, o, srv, member := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	key := func(org int64, scopes ...string) string {
@@ -194,6 +196,7 @@ func TestTheListIsKeptByMembersAndKeys(t *testing.T) {
 // Never-contact and erasure keep an address from marketing mail too, and erasing
 // someone takes their address off the list while still keeping them unmailed.
 func TestErasureAndNeverContactKeepAnAddressUnmailed(t *testing.T) {
+	t.Parallel()
 	s, o, _, _ := signedIn(t)
 	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	if err := s.UnsubscribeByToken(strings.TrimPrefix(link(t, s, o.ID, "hannah@larkmoor.example"), "/u/")); err != nil {
@@ -231,6 +234,7 @@ func TestErasureAndNeverContactKeepAnAddressUnmailed(t *testing.T) {
 }
 
 func TestAMarketingMailCarriesItsOneClickHeaders(t *testing.T) {
+	t.Parallel()
 	from, to := &mail.Address{Address: "news@alpha.example"}, &mail.Address{Address: "hannah@larkmoor.example"}
 	wire := func(unsubscribe string) string {
 		return string(compose(from, to, Message{Subject: "News", Body: "Hello", Unsubscribe: unsubscribe}, time.Now()))
@@ -249,6 +253,7 @@ func TestAMarketingMailCarriesItsOneClickHeaders(t *testing.T) {
 // What the review of the list found: a path aimed at another route, a delete racing an
 // unsubscribe, an address ending in a dot, and an address suggested for someone.
 func TestTheListHoldsAtItsEdges(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	visitor := &http.Client{}
 	for _, aimed := range []string{"/u/..%2Flogout", "/u/..%2F..%2Fc%2Fsteps%2F1%2Fdone", "/u/short", "/u/" + strings.Repeat("a", 42) + "%2F"} {

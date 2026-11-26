@@ -8,6 +8,7 @@ import (
 )
 
 func TestHistoryKeepsNoPersonalDetails(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	do := func(err error) {
@@ -68,6 +69,7 @@ func TestHistoryKeepsNoPersonalDetails(t *testing.T) {
 }
 
 func TestAgentsSeeWhatHappenedAtACompany(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}

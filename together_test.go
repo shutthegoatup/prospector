@@ -45,6 +45,7 @@ const atOnce = 8
 // it in the same moment either. SQLite takes writers one at a time, so it is the
 // Postgres run that tries these.
 func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := func(i int) Actor { return Actor{Name: fmt.Sprintf("agent:scout-%d", i), KeyID: int64(i + 1)} }
@@ -103,6 +104,7 @@ func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
 }
 
 func TestTheDatabaseKeepsACompanyNameToOneSpelling(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	if err := s.db.Create(&Company{OrgID: o.ID, Name: "Larkmoor", Stage: CompanyReview}).Error; err != nil {
@@ -131,6 +133,7 @@ func TestTheDatabaseKeepsACompanyNameToOneSpelling(t *testing.T) {
 }
 
 func TestAnEnquirySentTwiceAtOnceIsKeptOnce(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	together(t, atOnce, func(int) error {
@@ -145,6 +148,7 @@ func TestAnEnquirySentTwiceAtOnceIsKeptOnce(t *testing.T) {
 // Whichever comes first, the person's words are what is left: an agent that drafts
 // before the edit is overwritten by it, and one that drafts after is refused.
 func TestAnAgentDraftingDuringAnEditLeavesThePersonsWords(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	agent := Actor{Name: "agent:scout", KeyID: 1}

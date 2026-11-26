@@ -376,6 +376,7 @@ var saysNothingBack = map[string]bool{
 }
 
 func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	first := seedFirst(t, s)
 	before := holdings(t, s, first.ID)

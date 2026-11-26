@@ -10,6 +10,7 @@ import (
 )
 
 func TestLookForAssets(t *testing.T) {
+	t.Parallel()
 	got, err := OrgSettings{LookFor: "Careers page: a jobs page on their site\n\nats\ncareers-page: again"}.Assets()
 	if err != nil || len(got) != 2 || got[0] != (Asset{Field: "careers_page", Hint: "a jobs page on their site"}) || got[1] != (Asset{Field: "ats"}) {
 		t.Fatalf("assets: %+v %v", got, err)
@@ -57,6 +58,7 @@ func TestLookForAssets(t *testing.T) {
 }
 
 func TestOlderAgentsConfiguratorBecomesFacts(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	out, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, AddCompanyIn{Name: "Larkmoor Yachts",
@@ -85,6 +87,7 @@ func TestOlderAgentsConfiguratorBecomesFacts(t *testing.T) {
 // TestConfiguratorColumnsMove starts from a database written before assets were the
 // organisation's to name, with the configurator columns filled in.
 func TestConfiguratorColumnsMove(t *testing.T) {
+	t.Parallel()
 	dsn := freshDatabase(t)
 	s, err := Open(dsn)
 	if err != nil {
@@ -170,6 +173,7 @@ func (s *Store) companyFacts(t *testing.T, org, company int64) map[string]string
 }
 
 func TestImportedConfiguratorsShow(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	if _, err := s.Import(o.ID, readFixtures(t)); err != nil {

@@ -41,6 +41,7 @@ func items[T any](t *testing.T, body string) []T {
 }
 
 func TestAnAgreementsSignersAreItsCompanysPeopleOrItsMembers(t *testing.T) {
+	t.Parallel()
 	s, o, base, member, a, hannah, theo := preparing(t)
 	recipients := base + "/recipients"
 	ada := must(s.UserByEmail("ada@example.com"))
@@ -97,6 +98,7 @@ func TestAnAgreementsSignersAreItsCompanysPeopleOrItsMembers(t *testing.T) {
 }
 
 func TestFieldsLieOnTheDocumentForItsSigners(t *testing.T) {
+	t.Parallel()
 	s, o, base, member, a, hannah, theo := preparing(t)
 	signer := must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
 	copied := must(s.AddRecipient(o, a.ID, RecipientCopy, &theo.ID, nil, "Ada Lovelace"))
@@ -157,6 +159,7 @@ func TestFieldsLieOnTheDocumentForItsSigners(t *testing.T) {
 // Once an agreement has gone out, who it went to is part of its record: erasing them,
 // removing a member or a restore without them detaches them and leaves the row.
 func TestAnAgreementThatWentOutKeepsWhoItWentTo(t *testing.T) {
+	t.Parallel()
 	s, o, _, _, a, hannah, _ := preparing(t)
 	grace := must(s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
 	if err := s.AddMember(o.ID, grace.ID, "member", "Ada Lovelace"); err != nil {
@@ -196,6 +199,7 @@ func TestAnAgreementThatWentOutKeepsWhoItWentTo(t *testing.T) {
 // An operation that names no key scope is for people signed in: a key is refused,
 // whatever scopes it has.
 func TestAnOperationWithoutAKeyScopeRefusesKeys(t *testing.T) {
+	t.Parallel()
 	a := &App{s: tempStore(t)}
 	ran := false
 	handler := a.apiScope(map[string][]string{})(func(context.Context, http.ResponseWriter, *http.Request, any) (any, error) {
@@ -217,6 +221,7 @@ func TestAnOperationWithoutAKeyScopeRefusesKeys(t *testing.T) {
 }
 
 func TestAnAgreementsRecipientsGoWithWhoTheyStandFor(t *testing.T) {
+	t.Parallel()
 	s, o, _, _, a, hannah, theo := preparing(t)
 	grace := must(s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
 	if err := s.AddMember(o.ID, grace.ID, "member", "Ada Lovelace"); err != nil {
@@ -259,6 +264,7 @@ func TestAnAgreementsRecipientsGoWithWhoTheyStandFor(t *testing.T) {
 }
 
 func TestAKeyPreparesAnAgreementWithTheWriteScope(t *testing.T) {
+	t.Parallel()
 	s, o, base, _, _, hannah, _ := preparing(t)
 	key := func(scopes ...string) string {
 		secret, _, err := s.CreateKey(o.ID, "robot "+strings.Join(scopes, "+"), scopes, "Ada Lovelace")
@@ -287,6 +293,7 @@ func TestAKeyPreparesAnAgreementWithTheWriteScope(t *testing.T) {
 // The Prepare page lists who signs and lets sales change it; someone in support only
 // reads it. It is the app's shell, and pdf.js's worker is served as script.
 func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
+	t.Parallel()
 	s, o, base, member, a, hannah, theo := preparing(t)
 	must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
 	must(s.AddRecipient(o, a.ID, RecipientCopy, &theo.ID, nil, "Ada Lovelace"))
@@ -383,6 +390,7 @@ func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
 // rounds, order or a page count, some with documents only their first bytes were
 // checked on. They come through as round 1, signed in order, pages counted when needed.
 func TestAgreementsFromBeforeSigningArePreparedAfterTheUpgrade(t *testing.T) {
+	t.Parallel()
 	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
@@ -438,6 +446,7 @@ func TestAgreementsFromBeforeSigningArePreparedAfterTheUpgrade(t *testing.T) {
 // Real PDFs break rules of their own version that don't stop them being filled in: one
 // claiming 1.3 with an annotation 1.4 brought is taken, its pages counted.
 func TestAnAgreementTakesAPDFThatBendsItsVersionsRules(t *testing.T) {
+	t.Parallel()
 	s, o, base, member, a, _, _ := preparing(t)
 	bent := buildPDF("1.3", 3, "", "/Annots [<< /Type /Annot /Subtype /Caret /Rect [10 10 20 20] >>] ")
 	if code, body, _ := upload(t, member, base+"/document?name=form.pdf", "", "application/pdf", bent); code != http.StatusOK {
@@ -452,6 +461,7 @@ func TestAnAgreementTakesAPDFThatBendsItsVersionsRules(t *testing.T) {
 // any problem with its document, and who could still be added. It is served with the
 // policy pdf.js needs; other React pages keep the strict one.
 func TestTheReactPreparePageReadsItsAgreementThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, base, member, a, hannah, theo := preparing(t)
 	must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
 	srv := strings.TrimSuffix(base, "/o/alpha/api/v1/agreements/"+itoa(a.ID))
@@ -514,6 +524,7 @@ func TestTheReactPreparePageReadsItsAgreementThroughTheAPI(t *testing.T) {
 
 // A PDF Prospector couldn't later fill in and seal is refused when it is uploaded.
 func TestAnAgreementRefusesAPDFItCouldntSeal(t *testing.T) {
+	t.Parallel()
 	_, _, base, member, _, _, _ := preparing(t)
 	signed := testPDF(1, "<< /Type /Sig /ByteRange [0 10 20 30] >>")
 	var encrypted bytes.Buffer

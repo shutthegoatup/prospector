@@ -286,6 +286,7 @@ func identities(t *testing.T, s *Store) int64 {
 }
 
 func TestSocialSignIn(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	mustUser(t, s, o, "ada@example.com", "Ada Lovelace", "owner")
@@ -400,6 +401,7 @@ func TestSocialSignIn(t *testing.T) {
 }
 
 func TestMicrosoftVouchesOnlyThroughItsDomainOwnerClaim(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	mustUser(t, s, o, "ada@example.com", "Ada Lovelace", "owner")
@@ -423,6 +425,7 @@ func TestMicrosoftVouchesOnlyThroughItsDomainOwnerClaim(t *testing.T) {
 }
 
 func TestLinkedInSignIn(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	mustUser(t, s, o, "ada@example.com", "Ada Lovelace", "owner")
@@ -479,6 +482,7 @@ func connected(t *testing.T, srv *httptest.Server, dns map[string][]string, s *S
 }
 
 func TestOrganisationSingleSignOn(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	alpha, beta := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
 	mustUser(t, s, alpha, "ada@alpha.example", "Ada Lovelace", "owner")
@@ -574,6 +578,7 @@ func TestOrganisationSingleSignOn(t *testing.T) {
 }
 
 func TestRequiredSingleSignOn(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	alpha, beta := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
 	mustUser(t, s, alpha, "ada@alpha.example", "Ada Lovelace", "owner")
@@ -659,6 +664,7 @@ func TestRequiredSingleSignOn(t *testing.T) {
 }
 
 func TestPeopleJoinThroughSingleSignOn(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	alpha := mustOrg(t, s, "alpha")
 	mustUser(t, s, alpha, "ada@alpha.example", "Ada Lovelace", "owner")
@@ -711,6 +717,7 @@ func TestPeopleJoinThroughSingleSignOn(t *testing.T) {
 }
 
 func TestInvitersPasswordEndsAtAProviderSignIn(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	alpha := mustOrg(t, s, "alpha")
 	mustUser(t, s, alpha, "ada@alpha.example", "Ada Lovelace", "owner")
@@ -747,6 +754,7 @@ func TestInvitersPasswordEndsAtAProviderSignIn(t *testing.T) {
 }
 
 func TestSingleSignOnSettings(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	alpha := mustOrg(t, s, "alpha")
 	mustUser(t, s, alpha, "ada@alpha.example", "Ada Lovelace", "owner")
@@ -937,6 +945,7 @@ func TestGoogleWorkspaceMustHoldTheAddress(t *testing.T) {
 }
 
 func TestSessionsSurviveTheSingleSignOnColumns(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	if _, err := s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery"); err != nil {
 		t.Fatal(err)
@@ -970,6 +979,7 @@ func TestSessionsSurviveTheSingleSignOnColumns(t *testing.T) {
 }
 
 func TestSingleSignOnIsAskedAgainAfterADay(t *testing.T) {
+	t.Parallel()
 	sess := &Session{Limited: true}
 	sess.prove(3, time.Now().Add(-proofLife-time.Minute))
 	sess.prove(7, time.Now().Add(-time.Hour))
@@ -986,6 +996,7 @@ func TestSingleSignOnIsAskedAgainAfterADay(t *testing.T) {
 }
 
 func TestAnAccountWithNoPasswordIsRefusedAsSlowlyAsAnyOther(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	if err := s.db.Create(&User{Email: "dan@example.com", Name: "Dan Okafor", PasswordHash: unusableHash()}).Error; err != nil {
 		t.Fatal(err)
@@ -1004,6 +1015,7 @@ func TestAnAccountWithNoPasswordIsRefusedAsSlowlyAsAnyOther(t *testing.T) {
 }
 
 func TestSocialProvidersComeFromTheEnvironment(t *testing.T) {
+	t.Parallel()
 	env := map[string]string{"PROSPECTOR_GOOGLE_CLIENT_ID": "g", "PROSPECTOR_GOOGLE_CLIENT_SECRET": "gs",
 		"PROSPECTOR_LINKEDIN_CLIENT_ID": "l", "PROSPECTOR_LINKEDIN_CLIENT_SECRET": "ls"}
 	ways, err := socialFromEnv(func(k string) string { return env[k] })
@@ -1032,6 +1044,7 @@ func TestSocialProvidersComeFromTheEnvironment(t *testing.T) {
 }
 
 func TestProvidersInsideTheNetworkAreNeverReached(t *testing.T) {
+	t.Parallel()
 	for addr, want := range map[string]bool{"8.8.8.8": true, "2606:4700::1111": true, "127.0.0.1": false, "10.1.2.3": false,
 		"169.254.169.254": false, "192.168.1.1": false, "100.64.0.1": false, "::1": false, "fd00::1": false, "fe80::1": false,
 		"::ffff:127.0.0.1": false, "0.0.0.0": false, "172.16.0.1": false} {
@@ -1057,6 +1070,7 @@ func TestProvidersInsideTheNetworkAreNeverReached(t *testing.T) {
 }
 
 func TestSSOTokensAreJSONBooleansOrStrings(t *testing.T) {
+	t.Parallel()
 	var c outsiderClaims
 	if err := json.Unmarshal([]byte(`{"email_verified":"true","xms_edov":"1"}`), &c); err != nil || !bool(*c.Verified) || !bool(*c.DomainOwner) {
 		t.Fatalf("flags written as strings: %+v %v", c, err)
@@ -1069,6 +1083,7 @@ func TestSSOTokensAreJSONBooleansOrStrings(t *testing.T) {
 // A sign-in through a provider that can't go ahead is said on a page of the server's
 // own, never in an address someone else could write, and leads back to signing in.
 func TestASignInThatCantGoAheadSaysSoOnItsOwnPage(t *testing.T) {
+	t.Parallel()
 	_, srv := ssoServer(t, tempStore(t), map[string][]string{})
 	b := newBrowser(t, srv.URL)
 	b.askedFor("ada@nowhere.example", "")

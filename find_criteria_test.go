@@ -39,6 +39,7 @@ func (q researchQueue) names() []string {
 const criteriaLookFor = "configurator (must): a product configurator on their site\npayments: takes payment online\ncrm: which CRM they run"
 
 func TestEachCriterionIsMetNotMetOrNotFound(t *testing.T) {
+	t.Parallel()
 	assets := must(OrgSettings{LookFor: criteriaLookFor}.Assets())
 	if len(assets) != 3 || !assets[0].Must || assets[0].Field != "configurator" || assets[1].Must {
 		t.Fatalf("a (must) after the name marks a must: %+v", assets)
@@ -116,6 +117,7 @@ func TestEachCriterionIsMetNotMetOrNotFound(t *testing.T) {
 }
 
 func TestASearchRanksItsCompaniesByFit(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	if code, body := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/settings", "application/json",
 		map[string]any{"name": "Alpha", "color": "#56c5f4", "look_for": criteriaLookFor}); code != http.StatusOK {
@@ -165,6 +167,7 @@ func TestASearchRanksItsCompaniesByFit(t *testing.T) {
 
 // A database from before answers has facts, and each still says the company has it.
 func TestFactsFromBeforeAnswersStillCount(t *testing.T) {
+	t.Parallel()
 	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {

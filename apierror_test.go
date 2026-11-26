@@ -20,6 +20,7 @@ import (
 
 // An agent is told what it got wrong in the store's words, and nothing of the database's.
 func TestAgentToolsDontPassDatabaseErrorsOn(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	key, _, _ := s.CreateKey(o.ID, "claude", []string{"read", "research:write"}, "test")
 	session := mcpSession(t, srv.URL, key)
@@ -52,6 +53,7 @@ func TestAgentToolsDontPassDatabaseErrorsOn(t *testing.T) {
 // Two people asking for the same new address at once both find it free; the one the
 // database stops is told the same as if they had come second.
 func TestALostRaceForAnAddressReadsAsTaken(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	mustOrg(t, s, "alpha")
 	clash := s.db.Create(&Org{Slug: "alpha", Name: "Alpha", Color: "#56c5f4"}).Error
@@ -72,6 +74,7 @@ func TestALostRaceForAnAddressReadsAsTaken(t *testing.T) {
 
 // Nobody is shown the database's own words: not a page's script, not an API caller.
 func TestNoRawDatabaseErrorsGoOut(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	mustOrg(t, s, "alpha")
 	clash := s.db.Create(&Org{Slug: "alpha", Name: "Alpha", Color: "#56c5f4"}).Error
@@ -128,6 +131,7 @@ func TestNoRawDatabaseErrorsGoOut(t *testing.T) {
 }
 
 func TestAnAPIErrorSaysWhoseFaultItIs(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	reader, _, _ := s.CreateKey(o.ID, "reader", []string{"read"}, "test")
 	writer, _, _ := s.CreateKey(o.ID, "bot", []string{"read", "research:write"}, "test")
@@ -194,6 +198,7 @@ func TestAnAPIErrorSaysWhoseFaultItIs(t *testing.T) {
 }
 
 func TestStatusOf(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		err  error
 		code int
@@ -222,6 +227,7 @@ func TestStatusOf(t *testing.T) {
 // network's own error. It is told as the server's failure unless a handler has said it
 // is another server's, as a sign-in provider that couldn't be reached is.
 func TestALostConnectionIsTheServersFailure(t *testing.T) {
+	t.Parallel()
 	s, _, srv, client := signedIn(t)
 	lostMidway := func() error {
 		return &net.OpError{Op: "read", Net: "tcp", Addr: &net.TCPAddr{IP: net.IPv4(10, 0, 0, 9), Port: 5432}, Err: errors.New("connection reset by peer")}
@@ -257,6 +263,7 @@ func TestALostConnectionIsTheServersFailure(t *testing.T) {
 // A database that can't be asked says nothing about a password or a domain, so neither
 // failure reads as the person's: not a wrong password, and not a domain already listed.
 func TestAnOutageDoesNotReadAsThePersonsMistake(t *testing.T) {
+	t.Parallel()
 	s, _, srv, client := signedIn(t)
 	// Postgres hands back a connection lost part-way through a query as the network's
 	// own error, addresses and all, which nothing tells from any other.

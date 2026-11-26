@@ -8,6 +8,7 @@ import (
 )
 
 func TestSomeoneInSupportOnlyStartsOnEnquiries(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	starts := func(c *http.Client, path string) string {
 		t.Helper()

@@ -60,6 +60,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestEveryOperationNamesItsErrors(t *testing.T) {
+	t.Parallel()
 	spec, err := api.GetSwagger()
 	if err != nil {
 		t.Fatal(err)
@@ -84,6 +85,7 @@ func TestEveryOperationNamesItsErrors(t *testing.T) {
 }
 
 func TestAProblemToActOnLinksToWhatItMeans(t *testing.T) {
+	t.Parallel()
 	_, _, srv, _ := signedIn(t)
 	res := asBrowser(t, freshBrowser(), "GET", srv.URL+"/api/v1/session", nil)
 	p := problemOf(t, res)
@@ -122,6 +124,7 @@ func TestAProblemToActOnLinksToWhatItMeans(t *testing.T) {
 }
 
 func TestEveryProblemTypeHasItsTitle(t *testing.T) {
+	t.Parallel()
 	spec, err := api.GetSwagger()
 	if err != nil {
 		t.Fatal(err)
@@ -135,6 +138,7 @@ func TestEveryProblemTypeHasItsTitle(t *testing.T) {
 }
 
 func TestFindingSingleSignOnWithoutAnAddressIsNotHere(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer((&App{s: tempStore(t)}).Routes())
 	t.Cleanup(srv.Close)
 	res := asBrowser(t, freshBrowser(), "POST", srv.URL+"/api/v1/sign-in/sso", api.FindSingleSignOnJSONRequestBody{Email: "ada@alpha.example"})
@@ -144,6 +148,7 @@ func TestFindingSingleSignOnWithoutAnAddressIsNotHere(t *testing.T) {
 }
 
 func TestAnAPICallRefusedBeforeItsOperationIsStillAProblem(t *testing.T) {
+	t.Parallel()
 	_, _, srv, client := signedIn(t)
 	for name, c := range map[string]struct {
 		path, contentType string

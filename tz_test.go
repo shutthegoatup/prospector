@@ -30,6 +30,7 @@ func sameClock(t *testing.T, a, b string) bool {
 }
 
 func TestGuessTZ(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct{ phone, maker, want string }{
 		{"+44 20 7946 0000", "", "Europe/London"},
 		{"+1 832 555 0100 / +1 855-555-0100", "Prairie Motors (US)", "America/Chicago"},

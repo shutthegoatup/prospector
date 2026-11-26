@@ -7,6 +7,7 @@ import (
 )
 
 func TestATriageKeyWorksEnquiriesButNotDeals(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	c := repliedPerson(t, s, o, "Hannah Pryce")
 	help := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "support", Name: "Edsger Dijkstra", Email: "edsger@eindhoven.example", Message: "Colours look pale on phones"}))

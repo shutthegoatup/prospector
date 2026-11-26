@@ -14,6 +14,7 @@ import (
 )
 
 func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
@@ -125,6 +126,7 @@ func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
 }
 
 func TestTasksStayInTheirOrganisation(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	a, b := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
@@ -158,6 +160,7 @@ func TestTasksStayInTheirOrganisation(t *testing.T) {
 }
 
 func TestNotesAreShortAndAboutSomething(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
@@ -189,6 +192,7 @@ func TestNotesAreShortAndAboutSomething(t *testing.T) {
 }
 
 func TestErasingAPersonTakesTheNotesAroundThem(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
@@ -223,6 +227,7 @@ func TestErasingAPersonTakesTheNotesAroundThem(t *testing.T) {
 }
 
 func TestExistingHistorySurvivesTheTaskColumn(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 4}
@@ -249,6 +254,7 @@ func TestExistingHistorySurvivesTheTaskColumn(t *testing.T) {
 }
 
 func TestRunsSplitOnAQuietHalfHour(t *testing.T) {
+	t.Parallel()
 	at := time.Date(2026, 11, 24, 9, 0, 0, 0, time.UTC)
 	one, two := int64(1), int64(2)
 	event := func(mins int, user string, key int64, action string, company *int64, task int64) Event {
@@ -283,6 +289,7 @@ func TestRunsSplitOnAQuietHalfHour(t *testing.T) {
 }
 
 func TestTasksOverMCPAndThePages(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	key, _, _ := s.CreateKey(o.ID, "claude", []string{"read", "research:write"}, "test")
 	reader, _, _ := s.CreateKey(o.ID, "reader", []string{"read"}, "test")

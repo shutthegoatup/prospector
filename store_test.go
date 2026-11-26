@@ -37,6 +37,7 @@ func readFixtures(t *testing.T) *ImportPayload {
 }
 
 func TestFixturesParse(t *testing.T) {
+	t.Parallel()
 	p := readFixtures(t)
 	byKey := map[string]Draft{}
 	for _, d := range p.Drafts {
@@ -55,6 +56,7 @@ func TestFixturesParse(t *testing.T) {
 }
 
 func TestSnapshotRoundTrip(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "acme")
 	if _, err := s.Import(o.ID, readFixtures(t)); err != nil {
@@ -88,6 +90,7 @@ func TestSnapshotRoundTrip(t *testing.T) {
 }
 
 func TestImportLegacy(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "outreach.sqlite")
 	old, err := Open(path)
 	if err != nil {
@@ -111,6 +114,7 @@ func TestImportLegacy(t *testing.T) {
 }
 
 func TestImportKeepsRecordedDates(t *testing.T) {
+	t.Parallel()
 	p := readFixtures(t)
 	s := tempStore(t)
 	o := mustOrg(t, s, "acme")
@@ -135,6 +139,7 @@ func TestImportKeepsRecordedDates(t *testing.T) {
 }
 
 func TestOrganisationsAreIsolated(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	a, b := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
 	if _, err := s.QuickAddPerson(a, QuickAdd{Name: "Ada Lovelace", Company: "Analytical Engines"}, "test"); err != nil {
@@ -169,6 +174,7 @@ func mustSearch(t *testing.T, s *Store, org int64, q string) []SearchHit {
 }
 
 func TestAgentResearchToOutreach(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	o.Settings.NeverContact = "blocked.example"
@@ -223,6 +229,7 @@ func TestAgentResearchToOutreach(t *testing.T) {
 }
 
 func TestParseLinkedIn(t *testing.T) {
+	t.Parallel()
 	name, role, company := ParseLinkedIn("(3) Hannah Pryce | LinkedIn", "Head of Marketing at Larkmoor Yachts | Boats")
 	if name != "Hannah Pryce" || role != "Head of Marketing" || company != "Larkmoor Yachts" {
 		t.Fatalf("got %q %q %q", name, role, company)
@@ -285,6 +292,7 @@ func call(t *testing.T, client *http.Client, method, u, ctype string, body any) 
 }
 
 func TestUI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	base := srv.URL + "/o/alpha/"
 	for _, page := range []string{"today", "research", "conversations", "companies", "add", "settings", "agents", "tasks", "today?step=linkedin"} {
@@ -339,6 +347,7 @@ func TestUI(t *testing.T) {
 }
 
 func TestAPIKeys(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	readOnly, _, _ := s.CreateKey(o.ID, "reader", []string{"read"}, "test")
@@ -382,6 +391,7 @@ type roundTrip func(*http.Request) (*http.Response, error)
 func (f roundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestMCP(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	o.Settings.AgentGuidance = "Never suggest anyone at Brandtech."
 	if err := s.SaveOrg(o); err != nil {
@@ -447,6 +457,7 @@ func TestMCP(t *testing.T) {
 }
 
 func TestAgentMarks(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	if _, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, AddCompanyIn{Name: "Larkmoor Yachts",
