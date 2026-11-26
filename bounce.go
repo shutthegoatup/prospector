@@ -93,7 +93,7 @@ func (a *App) postmarkHook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var b postmarkBounce
-	if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&b); err != nil || b.RecordType == "" {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&b); err != nil || b.RecordType == "" {
 		http.Error(w, "that isn't a Postmark webhook", http.StatusBadRequest)
 		return
 	}
@@ -120,15 +120,19 @@ func (a *App) postmarkHook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// mailFailed puts an address on the list. A bounce also says so on the last mail that
-// went to it; a complaint is about a mail that arrived, which stays sent.
+// mailFailed puts an address on the list. A bounce is kept beside any reason it already
+// had, and says so on the last mail that went to it; a complaint is about a mail that
+// arrived, which stays sent.
 func (s *Store) mailFailed(org int64, addr, reason, said string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		if _, err := s.suppress(tx, org, addr, reason, bounceBy); err != nil {
 			return err
 		}
-		if said == "" {
+		if reason != SuppressBounced {
 			return nil
+		}
+		if err := tx.Model(&Suppression{}).Where("org_id = ? and address = ?", org, addr).Update("bounced_at", time.Now()).Error; err != nil {
+			return err
 		}
 		var last CampaignRecipient
 		found := tx.Where("org_id = ? and address = ? and status = ?", org, addr, MailSent).Order("sent_at desc, id desc").Limit(1).Find(&last)

@@ -26600,6 +26600,18 @@
      "required": true
     },
     {
+     "name": "bounced_at",
+     "type": {
+      "name": "date-time?"
+     },
+     "about": [
+      {
+       "text": "When mail to it last came back for good, whatever the reason it is here."
+      }
+     ],
+     "required": true
+    },
+    {
      "name": "by",
      "type": {
       "name": "string"
@@ -26655,18 +26667,18 @@
        "text": " when they marked one as spam; "
       },
       {
-       "text": "bounced",
-       "code": true
-      },
-      {
-       "text": " when mail to it came back for good; "
-      },
-      {
        "text": "added",
        "code": true
       },
       {
-       "text": " when a member or key put them here. Only "
+       "text": " when a member or key put them here; "
+      },
+      {
+       "text": "bounced",
+       "code": true
+      },
+      {
+       "text": " when it is here only because mail to it came back for good. Only "
       },
       {
        "text": "added",
@@ -26680,7 +26692,14 @@
        "code": true
       },
       {
-       "text": " can be taken off, and a bounced or complained address gets no service notices either."
+       "text": " can be taken off. A complained address, or one with "
+      },
+      {
+       "text": "bounced_at",
+       "code": true
+      },
+      {
+       "text": ", gets no service notices either."
       }
      ],
      "required": true

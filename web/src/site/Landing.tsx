@@ -194,7 +194,7 @@ export function Landing() {
             <Feature tone="gold" title="Campaigns to people you know">
               Write once to everyone in conversation or at a current customer, never to cold prospects. It goes through your own mail server with your postal
               address and a one-click unsubscribe, and nobody is mailed twice. A service notice, such as a price change, reaches customers who unsubscribed from
-              marketing.
+              marketing. With Postmark, an address that bounces or calls a mail spam gets no more.
             </Feature>
           </div>
         </Wrap>

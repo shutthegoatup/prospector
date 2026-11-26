@@ -20,11 +20,15 @@ type Suppression struct {
 	OrgID   int64  `gorm:"uniqueIndex:idx_suppression_address,priority:1;not null" json:"-"`
 	Address string `gorm:"uniqueIndex:idx_suppression_address,priority:2;not null" json:"address"`
 	// Reason is "unsubscribed" when they asked, by a link in a mail; "complained" when
-	// they marked one as spam; "bounced" when mail to it came back for good; and "added"
-	// when a member or key put them here. Only an added or bounced one can be taken off.
+	// they marked one as spam; "added" when a member or key put them here; and "bounced"
+	// when it is here only because mail to it came back for good. Only an added or
+	// bounced one can be taken off.
 	Reason    string    `gorm:"not null;default:'added'" json:"reason"`
 	By        string    `gorm:"not null;default:''" json:"by"`
 	CreatedAt time.Time `json:"created_at"`
+	// BouncedAt is when mail to it last came back for good, whatever the reason: a bounce
+	// is about the address, not their wishes, so it is kept beside them.
+	BouncedAt *time.Time `json:"bounced_at"`
 }
 
 const (
@@ -63,8 +67,8 @@ func (s *Store) Suppress(org int64, address, actor string) (*Suppression, error)
 }
 
 // suppressRank orders the reasons: a stronger one replaces a weaker, never the other
-// way. Their own word outranks a bounce, which outranks a member's.
-var suppressRank = map[string]int{SuppressAdded: 0, SuppressBounced: 1, SuppressUnsubscribed: 2, SuppressComplained: 3}
+// way. Their own word outranks a member's, which outranks a bounce alone.
+var suppressRank = map[string]int{SuppressBounced: 0, SuppressAdded: 1, SuppressUnsubscribed: 2, SuppressComplained: 3}
 
 func (s *Store) suppress(tx *gorm.DB, org int64, addr, reason, actor string) (*Suppression, error) {
 	// A row a member is taking off at the same moment is put back, not lost: each round
@@ -161,22 +165,22 @@ var (
 // so a whole audience is checked without a query a person.
 type mailGate struct {
 	o          *Org
-	suppressed map[string]string // the reason each address is on the list
+	suppressed map[string]Suppression
 	erased     map[string]bool
 }
 
 func (s *Store) gate(tx *gorm.DB, o *Org) (*mailGate, error) {
-	g := &mailGate{o: o, suppressed: map[string]string{}, erased: map[string]bool{}}
+	g := &mailGate{o: o, suppressed: map[string]Suppression{}, erased: map[string]bool{}}
 	var listed []Suppression
 	var hashes []string
-	if err := tx.Model(&Suppression{}).Select("address", "reason").Where("org_id = ?", o.ID).Find(&listed).Error; err != nil {
+	if err := tx.Model(&Suppression{}).Select("address", "reason", "bounced_at").Where("org_id = ?", o.ID).Find(&listed).Error; err != nil {
 		return nil, err
 	}
 	if err := tx.Model(&Erasure{}).Where("org_id = ?", o.ID).Pluck("hash", &hashes).Error; err != nil {
 		return nil, err
 	}
 	for _, l := range listed {
-		g.suppressed[l.Address] = l.Reason
+		g.suppressed[l.Address] = l
 	}
 	for _, h := range hashes {
 		g.erased[h] = true
@@ -197,16 +201,14 @@ func (g *mailGate) whyFor(kind, address, link string) error {
 		return err
 	}
 	// Mail that can't arrive, or that they called spam, stops service notices too.
-	switch g.suppressed[addr] {
-	case "":
-	case SuppressBounced:
-		return errBounced
-	case SuppressComplained:
+	switch l, listed := g.suppressed[addr]; {
+	case !listed:
+	case l.Reason == SuppressComplained:
 		return errComplained
-	default:
-		if kind != KindService {
-			return errSuppressed
-		}
+	case l.BouncedAt != nil:
+		return errBounced
+	case kind != KindService:
+		return errSuppressed
 	}
 	if err := g.o.Settings.listed(addr, link); err != nil {
 		return fmt.Errorf("%w: %v", errNeverContact, err)

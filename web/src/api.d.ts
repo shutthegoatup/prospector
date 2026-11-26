@@ -4027,10 +4027,15 @@ export interface components {
             id: number;
             address: string;
             /**
-             * @description `unsubscribed` when they asked, by a link in a mail; `complained` when they marked one as spam; `bounced` when mail to it came back for good; `added` when a member or key put them here. Only `added` and `bounced` can be taken off, and a bounced or complained address gets no service notices either.
+             * @description `unsubscribed` when they asked, by a link in a mail; `complained` when they marked one as spam; `added` when a member or key put them here; `bounced` when it is here only because mail to it came back for good. Only `added` and `bounced` can be taken off. A complained address, or one with `bounced_at`, gets no service notices either.
              * @enum {string}
              */
             reason: "unsubscribed" | "complained" | "bounced" | "added";
+            /**
+             * Format: date-time
+             * @description When mail to it last came back for good, whatever the reason it is here.
+             */
+            bounced_at: string | null;
             /** @description Who added it: `Postmark` for a bounce or complaint; empty when they unsubscribed themselves. */
             by: string;
             /** Format: date-time */

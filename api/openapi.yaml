@@ -5981,11 +5981,12 @@ components:
 
     Suppression:
       type: object
-      required: [id, address, reason, by, created_at]
+      required: [id, address, reason, by, created_at, bounced_at]
       properties:
         id: { type: integer, format: int64 }
         address: { type: string }
-        reason: { type: string, enum: [unsubscribed, complained, bounced, added], description: "`unsubscribed` when they asked, by a link in a mail; `complained` when they marked one as spam; `bounced` when mail to it came back for good; `added` when a member or key put them here. Only `added` and `bounced` can be taken off, and a bounced or complained address gets no service notices either." }
+        reason: { type: string, enum: [unsubscribed, complained, bounced, added], description: "`unsubscribed` when they asked, by a link in a mail; `complained` when they marked one as spam; `added` when a member or key put them here; `bounced` when it is here only because mail to it came back for good. Only `added` and `bounced` can be taken off. A complained address, or one with `bounced_at`, gets no service notices either." }
+        bounced_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false, description: "When mail to it last came back for good, whatever the reason it is here." }
         by: { type: string, description: "Who added it: `Postmark` for a bounce or complaint; empty when they unsubscribed themselves." }
         created_at: { type: string, format: date-time }
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"maps"
 	"net/http"
 	"strings"
 	"testing"
@@ -147,26 +148,52 @@ func TestPostmarkBouncesAndComplaintsStopEveryCampaign(t *testing.T) {
 	}
 }
 
-func TestTheirOwnWordOutranksABounce(t *testing.T) {
+// A bounce is about the address and their own word is about their wishes, so neither
+// hides the other, whichever comes first.
+func TestABounceIsKeptBesideWhyTheyAreOnTheList(t *testing.T) {
 	t.Parallel()
 	s, o, _, _ := signedIn(t)
-	if _, err := s.suppress(s.db, o.ID, "a@larkmoor.example", SuppressUnsubscribed, ""); err != nil {
-		t.Fatal(err)
+	unsubscribe := func(addr string) {
+		t.Helper()
+		if _, err := s.suppress(s.db, o.ID, addr, SuppressUnsubscribed, ""); err != nil {
+			t.Fatal(err)
+		}
 	}
-	must(s.Suppress(o.ID, "b@larkmoor.example", "Ada Lovelace"))
-	for _, addr := range []string{"a@larkmoor.example", "b@larkmoor.example"} {
+	bounces := func(addr string) {
+		t.Helper()
 		if err := s.mailFailed(o.ID, addr, SuppressBounced, "it bounced (HardBounce)"); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := s.mailFailed(o.ID, "b@larkmoor.example", SuppressComplained, ""); err != nil {
+	unsubscribe("first@larkmoor.example")
+	bounces("first@larkmoor.example")
+	bounces("then@larkmoor.example")
+	unsubscribe("then@larkmoor.example")
+	must(s.Suppress(o.ID, "added@larkmoor.example", "Ada Lovelace"))
+	bounces("added@larkmoor.example")
+	bounces("spam@larkmoor.example")
+	if err := s.mailFailed(o.ID, "spam@larkmoor.example", SuppressComplained, ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.suppress(s.db, o.ID, "b@larkmoor.example", SuppressUnsubscribed, ""); err != nil {
-		t.Fatal(err)
-	}
+	unsubscribe("spam@larkmoor.example")
+
 	got := reasons(t, s, o.ID)
-	if got["a@larkmoor.example"] != "unsubscribed by " || got["b@larkmoor.example"] != "complained by Postmark" {
-		t.Errorf("the list: %v", got)
+	want := map[string]string{
+		"first@larkmoor.example": "unsubscribed by ",
+		"then@larkmoor.example":  "unsubscribed by ",
+		"added@larkmoor.example": "added by Ada Lovelace",
+		"spam@larkmoor.example":  "complained by Postmark",
+	}
+	if !maps.Equal(got, want) {
+		t.Errorf("the list:\n got %v\nwant %v", got, want)
+	}
+	g := must(s.gate(s.db, o))
+	for _, addr := range []string{"first@larkmoor.example", "then@larkmoor.example", "added@larkmoor.example"} {
+		if err := g.whyFor(KindService, addr, ""); err != errBounced {
+			t.Errorf("a service notice to %s, which bounced: %v", addr, err)
+		}
+	}
+	if err := g.whyFor(KindService, "spam@larkmoor.example", ""); err != errComplained {
+		t.Errorf("a service notice to someone who complained: %v", err)
 	}
 }
