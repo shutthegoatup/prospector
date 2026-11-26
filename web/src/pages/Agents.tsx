@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { actor, plural, stamp } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { month, vendorKinds, vendorName } from "@/lib/vendors";
+import { detailNames, month, vendorCosts, vendorKinds, vendorName, vendorTold } from "@/lib/vendors";
 import { useSession } from "@/session";
 
 type Agent = components["schemas"]["Agent"];
@@ -749,7 +749,7 @@ function DataVendors() {
   return (
     <Section
       title="Data vendors"
-      hint="When research can't find someone's email, you, and agents whose key has enrich:spend, can ask these, top first, on your own account with each. What they find waits in Research for a person to accept."
+      hint="When research can't find someone's email, mobile or LinkedIn profile, you, and agents whose key has enrich:spend, can ask these, top first, on your own account with each. What they find waits in Research for a person to accept."
     >
       <div className="flex flex-col gap-4">
         {list.data && vendors.length === 0 && <p className="text-sm text-muted-foreground">No vendors yet.</p>}
@@ -811,7 +811,7 @@ function VendorCard({ vendor: e, n, up, down }: { vendor: Enricher; n: number; u
               {vendorName(e.kind)}
               {e.fields.map((f) => (
                 <Tag key={f} quiet>
-                  finds {f}
+                  finds {detailNames[f] ?? f}
                 </Tag>
               ))}
             </span>
@@ -873,7 +873,7 @@ function VendorCard({ vendor: e, n, up, down }: { vendor: Enricher; n: number; u
           </Meta>
         )}
         <p className="text-xs text-muted-foreground">
-          {vendorName(e.kind)} is told each person's name and their company's domain. You are bound by its terms for what it returns, and it may keep
+          {vendorTold[e.kind]} {vendorCosts[e.kind]} You are bound by its terms for what it returns, and it may keep
           what it finds in your account with it.
         </p>
       </div>

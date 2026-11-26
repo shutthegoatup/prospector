@@ -13123,7 +13123,14 @@
           "code": true
          },
          {
-          "text": " is Hunter.io, which finds work emails."
+          "text": " is Hunter.io, which finds work emails; "
+         },
+         {
+          "text": "prospeo",
+          "code": true
+         },
+         {
+          "text": " is Prospeo, which finds work emails, mobiles and LinkedIn profiles."
          }
         ],
         "required": true
@@ -20473,7 +20480,14 @@
        "code": true
       },
       {
-       "text": " is Hunter.io, which finds work emails."
+       "text": " is Hunter.io, which finds work emails; "
+      },
+      {
+       "text": "prospeo",
+       "code": true
+      },
+      {
+       "text": " is Prospeo, which finds work emails, mobiles and LinkedIn profiles."
       }
      ],
      "required": true
@@ -20532,11 +20546,19 @@
      "code": true
     },
     {
-     "text": " is Hunter.io, which finds work emails."
+     "text": " is Hunter.io, which finds work emails; "
+    },
+    {
+     "text": "prospeo",
+     "code": true
+    },
+    {
+     "text": " is Prospeo, which finds work emails, mobiles and LinkedIn profiles."
     }
    ],
    "enum": [
-    "hunter"
+    "hunter",
+    "prospeo"
    ],
    "fields": []
   },
@@ -20561,7 +20583,14 @@
        "code": true
       },
       {
-       "text": " is Hunter.io, which finds work emails."
+       "text": " is Hunter.io, which finds work emails; "
+      },
+      {
+       "text": "prospeo",
+       "code": true
+      },
+      {
+       "text": " is Prospeo, which finds work emails, mobiles and LinkedIn profiles."
       }
      ],
      "required": true
@@ -20974,7 +21003,14 @@
        "code": true
       },
       {
-       "text": " is Hunter.io, which finds work emails."
+       "text": " is Hunter.io, which finds work emails; "
+      },
+      {
+       "text": "prospeo",
+       "code": true
+      },
+      {
+       "text": " is Prospeo, which finds work emails, mobiles and LinkedIn profiles."
       }
      ],
      "required": true
@@ -23023,6 +23059,14 @@
     },
     {
      "name": "has_email",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "has_phone",
      "type": {
       "name": "boolean"
      },

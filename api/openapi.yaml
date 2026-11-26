@@ -5015,13 +5015,14 @@ components:
 
     ResearchPerson:
       type: object
-      required: [id, name, title, status, has_email, email_status, linkedin, source_url, pending, lookups]
+      required: [id, name, title, status, has_email, has_phone, email_status, linkedin, source_url, pending, lookups]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
         title: { type: string }
         status: { type: string, description: "`suggested` until someone picks them." }
         has_email: { type: boolean }
+        has_phone: { type: boolean }
         email_status: { type: string, description: "`verified`, `guess`, or empty." }
         linkedin: { type: string }
         source_url: { type: string, description: The first page that shows them. }
@@ -5480,8 +5481,8 @@ components:
 
     EnricherKind:
       type: string
-      enum: [hunter]
-      description: "The vendors Prospector can ask. `hunter` is Hunter.io, which finds work emails."
+      enum: [hunter, prospeo]
+      description: "The vendors Prospector can ask. `hunter` is Hunter.io, which finds work emails; `prospeo` is Prospeo, which finds work emails, mobiles and LinkedIn profiles."
 
     EnricherSettings:
       type: object

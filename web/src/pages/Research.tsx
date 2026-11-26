@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/session";
-import { month, vendorName } from "@/lib/vendors";
+import { detailNames, month, vendorName } from "@/lib/vendors";
 import { type Offering, useOfferings } from "@/lib/offerings";
 import { cn } from "@/lib/utils";
 
@@ -721,7 +721,7 @@ function CompanyCard({ company: c, open, enrichers, offering }: { company: Compa
                     )}
                   </div>
                 ))}
-                <EmailLookup person={p} enrichers={enrichers} />
+                <Lookups person={p} enrichers={enrichers} />
               </div>
             ))}
           </div>
@@ -731,44 +731,63 @@ function CompanyCard({ company: c, open, enrichers, offering }: { company: Compa
   );
 }
 
-const notFound: Record<components["schemas"]["Lookup"]["outcome"], string> = {
+type Detail = "email" | "phone" | "linkedin";
+
+const details: Detail[] = ["email", "phone", "linkedin"];
+
+const has = (p: Person, field: Detail) => (field === "email" ? p.has_email : field === "phone" ? p.has_phone : !!p.linkedin);
+
+const missed: Record<components["schemas"]["Lookup"]["outcome"], string> = {
   found: "",
-  none: "found no email",
-  not_kept: "found an email that can't be kept",
+  none: "found no",
+  not_kept: "found one that can't be kept:",
 };
 
-// EmailLookup asks the organisation's vendors for an email nobody has found, and says
-// when one that found nothing can be asked again.
-function EmailLookup({ person: p, enrichers }: { person: Person; enrichers: Enricher[] }) {
+// Lookups ask the organisation's vendors for an email, mobile or profile nobody has
+// found, and say when one that found nothing can be asked again.
+function Lookups({ person: p, enrichers }: { person: Person; enrichers: Enricher[] }) {
   const { org, sales } = useSession();
   const refresh = useRefresh();
   const ask = $api.useMutation("post", "/o/{org}/api/v1/contacts/{id}/enrich", { onSuccess: refresh });
-  const asked = p.lookups.filter((l) => l.field === "email");
-  const misses = asked.filter((l) => l.outcome !== "found");
-  if (p.has_email || p.pending.some((d) => d.field === "email")) return null;
-  const next = enrichers.find(
-    (e) => e.fields.includes("email") && e.has_key && e.used_this_month < e.monthly_limit && !asked.some((l) => l.vendor === e.kind),
-  );
+  const wanted = details.filter((f) => !has(p, f) && !p.pending.some((d) => d.field === f));
+  const misses = p.lookups.filter((l) => l.outcome !== "found" && wanted.includes(l.field as Detail));
+  // The vendor each detail would go to next: the first, in order, not asked lately and with lookups left.
+  const next = wanted.flatMap((field) => {
+    const e = enrichers.find(
+      (e) =>
+        e.fields.includes(field) &&
+        e.has_key &&
+        e.used_this_month < e.monthly_limit &&
+        !p.lookups.some((l) => l.field === field && l.vendor === e.kind),
+    );
+    return e ? [{ field, vendor: e }] : [];
+  });
+  const asking = [...new Map(next.map((n) => [n.vendor.kind, n.vendor])).values()];
   const answer = ask.data?.results.find((r) => r.outcome === "failed" || r.outcome === "skipped");
   return (
     <>
       {misses.map((l) => (
-        <Meta key={l.vendor}>
-          {vendorName(l.vendor)} {notFound[l.outcome]} on {day(l.at)} · it can be asked again from {day(l.again_at)}
+        <Meta key={l.field + l.vendor}>
+          {vendorName(l.vendor)} {missed[l.outcome]} {detailNames[l.field]} on {day(l.at)} · it can be asked again from {day(l.again_at)}
         </Meta>
       ))}
-      {sales && next && (
-        <div className="flex flex-wrap items-center gap-2">
-          <ActionButton
-            quiet
-            size="xs"
-            disabled={ask.isPending}
-            onClick={() => ask.mutate({ params: { path: { org, id: p.id } }, body: { fields: ["email"] } })}
-          >
-            Look up email
-          </ActionButton>
+      {sales && next.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {next.map(({ field }) => (
+              <ActionButton
+                key={field}
+                quiet
+                size="xs"
+                disabled={ask.isPending}
+                onClick={() => ask.mutate({ params: { path: { org, id: p.id } }, body: { fields: [field] } })}
+              >
+                Look up {field === "linkedin" ? "LinkedIn" : detailNames[field]}
+              </ActionButton>
+            ))}
+          </div>
           <Meta>
-            asks {vendorName(next.kind)} · {next.monthly_limit - next.used_this_month} of {next.monthly_limit} left in {month()}
+            asks {asking.map((e) => `${vendorName(e.kind)} (${e.monthly_limit - e.used_this_month} of ${e.monthly_limit} left)`).join(" or ")} in {month()}
           </Meta>
         </div>
       )}

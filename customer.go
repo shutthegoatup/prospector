@@ -551,26 +551,26 @@ func (s *Store) customerSetStep(a *CustomerAccess, step int64, done bool) error 
 		case done && st.DoneOn != nil, !done && (st.DoneOn == nil || st.DoneBy != customerActor):
 			return nil
 		case !done:
-			updates = map[string]any{"done_on": nil, "done_by": ""}
+			updates = map[string]any{"done_on": nil, "done_by": "", "done_entry": 0}
 		}
-		marked := tx.Model(&OnboardingStep{}).Where("id = ? and org_id = ? and done_by = ?", st.ID, org, st.DoneBy).Updates(updates)
+		marked := tx.Model(&OnboardingStep{}).Where("id = ? and org_id = ? and done_by = ? and done_entry = ?", st.ID, org, st.DoneBy, st.DoneEntry).Updates(updates)
 		if marked.Error != nil || marked.RowsAffected == 0 {
 			return marked.Error
 		}
 		if done {
-			return s.log(tx, org, a.Contact.ID, &a.Onboarding.CompanyID, customerActor, action, nonEmpty(st.Name))
+			entry := Event{OrgID: org, ContactID: a.Contact.ID, CompanyID: &a.Onboarding.CompanyID, User: customerActor, Action: action, Value: nonEmpty(st.Name), At: time.Now()}
+			if err := tx.Create(&entry).Error; err != nil {
+				return err
+			}
+			return tx.Model(&OnboardingStep{}).Where("id = ?", st.ID).Update("done_entry", entry.ID).Error
 		}
-		// Taking a mark back removes its entry, not adds one: someone outside pressing the
-		// two buttons in turn can't fill the company's history.
-		var entry Event
-		err := tx.Where("org_id = ? and company_id = ? and \"user\" = ? and action = ? and value = ?", org, a.Onboarding.CompanyID, customerActor, "onboard:done", st.Name).Order("id desc").First(&entry).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		// Taking a mark back removes the entry it wrote, not adds one: someone outside
+		// pressing the two buttons in turn can't fill the company's history. A mark made
+		// before steps kept their entry leaves it, since which one is theirs isn't known.
+		if st.DoneEntry == 0 {
 			return nil
 		}
-		if err != nil {
-			return err
-		}
-		return tx.Delete(&entry).Error
+		return tx.Where("org_id = ? and id = ? and action = ?", org, st.DoneEntry, "onboard:done").Delete(&Event{}).Error
 	})
 }
 

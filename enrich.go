@@ -286,6 +286,9 @@ func (a *App) keepFind(o *Org, who Actor, c Contact, field, kind, value, status 
 	if err := erased(s.db, o.ID, "", "", email, link); err != nil {
 		return EnrichAsked{Field: field, Vendor: kind, Outcome: "skipped", Detail: "it belongs to someone erased on request"}
 	}
+	if field == "phone" && phoneLooksWrong(value) {
+		return EnrichAsked{Field: field, Vendor: kind, Outcome: "skipped", Detail: "it isn't a number that can be called"}
+	}
 	if field == "email" && s.takesMail(context.Background(), mailDomainOf(value)) == mailRefused {
 		return EnrichAsked{Field: field, Vendor: kind, Outcome: "skipped", Detail: "its domain takes no mail"}
 	}
