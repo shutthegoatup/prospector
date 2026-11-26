@@ -333,7 +333,8 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 		}
 		// What it says back of what it was sent isn't a leak; anything else of theirs is.
 		for _, sent := range named {
-			said = strings.ReplaceAll(said, sent.(string), "")
+			// A look-for list says back each line's name as the field it reads it into.
+			said = strings.ReplaceAll(strings.ReplaceAll(said, sent.(string), ""), assetKey(sent.(string)), "")
 		}
 		// A part of one, quoted back by a form that reads several from one field.
 		said = strings.ReplaceAll(strings.ReplaceAll(said, `"`+theirs+`"`, ""), `\"`+theirs+`\"`, "")

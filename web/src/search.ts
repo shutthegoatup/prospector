@@ -46,6 +46,8 @@ export const todaySearch = z.object({ step: oneOf(todaySteps) });
 export const researchSearch = z.object({
   f: oneOf(researchFilters),
   task: id,
+  // The offering whose queue this is; left out, the organisation's own.
+  of: id,
 });
 
 export const enquiriesSearch = z.object({ state: oneOf(enquiryStates), kind: oneOf(enquiryKinds), spam: flag });

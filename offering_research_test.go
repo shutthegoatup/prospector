@@ -56,6 +56,21 @@ func TestEachOfferingHasAResearchQueueOfItsOwn(t *testing.T) {
 	if code != http.StatusOK || len(theirs.Items) != 1 || !ok || theirs.Counts["review"] != 1 {
 		t.Fatalf("the offering's review: %d %+v", code, theirs)
 	}
+	code, body := asKey(t, "GET", srv.URL+"/o/alpha/api/v1/companies/"+itoa(north.Id)+"/overview", secret, nil)
+	var overview api.CompanyOverview
+	if json.Unmarshal([]byte(body), &overview); code != http.StatusOK || overview.FoundFor != roles.ID {
+		t.Fatalf("the company's page should say what it was found for: %d %s", code, body)
+	}
+	code, body = asKey(t, "GET", srv.URL+"/o/alpha/api/v1/tasks", secret, nil)
+	var tasks struct{ Items []api.TaskBrief }
+	if json.Unmarshal([]byte(body), &tasks); code != http.StatusOK || len(tasks.Items) != 1 || tasks.Items[0].OfferingId != roles.ID {
+		t.Fatalf("the task list should say what each task is for: %d %s", code, body)
+	}
+	code, body = asKey(t, "GET", srv.URL+"/o/alpha/api/v1/offerings", secret, nil)
+	var offerings struct{ Items []api.Offering }
+	if json.Unmarshal([]byte(body), &offerings); code != http.StatusOK || len(offerings.Items) != 1 || len(offerings.Items[0].LookingFor) != 1 || offerings.Items[0].LookingFor[0].Field != "ir35" {
+		t.Fatalf("an offering's look-for fields, read: %d %s", code, body)
+	}
 	if north.Fit.Of != 1 || north.Fit.Met != 1 || len(north.Criteria) != 1 || north.Criteria[0].Field != "ir35" {
 		t.Fatalf("fit for an offering should be judged against its own look-for fields: %+v", north)
 	}

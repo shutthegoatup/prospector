@@ -800,15 +800,16 @@ func (s *Store) Tasks(org int64, closed bool, page int, now time.Time) ([]TaskVi
 // What agents see and do.
 
 type TaskBrief struct {
-	ID      int64      `json:"id"`
-	Title   string     `json:"title"`
-	Status  string     `json:"status" jsonschema:"waiting (nobody is on it), working (an agent changed something in the last half hour, or holds an open request) or done"`
-	Open    []AskedOut `json:"open_requests" jsonschema:"what people have asked for that nobody has finished"`
-	Found   TaskCounts `json:"found"`
-	LastBy  string     `json:"last_agent,omitempty"`
-	LastAt  *time.Time `json:"last_agent_at,omitempty"`
-	LastDid string     `json:"last_agent_action,omitempty" jsonschema:"what that agent last did: task:pickup when it only picked the task up"`
-	LastYou bool       `json:"last_agent_was_you,omitempty"`
+	ID         int64      `json:"id"`
+	Title      string     `json:"title"`
+	Status     string     `json:"status" jsonschema:"waiting (nobody is on it), working (an agent changed something in the last half hour, or holds an open request) or done"`
+	Open       []AskedOut `json:"open_requests" jsonschema:"what people have asked for that nobody has finished"`
+	Found      TaskCounts `json:"found"`
+	LastBy     string     `json:"last_agent,omitempty"`
+	LastAt     *time.Time `json:"last_agent_at,omitempty"`
+	LastDid    string     `json:"last_agent_action,omitempty" jsonschema:"what that agent last did: task:pickup when it only picked the task up"`
+	LastYou    bool       `json:"last_agent_was_you,omitempty"`
+	OfferingID int64      `json:"offering_id" jsonschema:"what the task finds companies for; 0 is the organisation's own offering"`
 }
 
 type TaskCounts struct {
@@ -871,7 +872,7 @@ func asked(r RequestView, who Actor) AskedOut {
 }
 
 func brief(v TaskView, who Actor) TaskBrief {
-	b := TaskBrief{ID: v.ID, Title: v.Title, Status: v.Status, Open: []AskedOut{}, Found: TaskCounts{len(v.Companies), len(v.People)}}
+	b := TaskBrief{ID: v.ID, Title: v.Title, Status: v.Status, Open: []AskedOut{}, Found: TaskCounts{len(v.Companies), len(v.People)}, OfferingID: v.OfferingID}
 	for _, r := range v.Open() {
 		b.Open = append(b.Open, asked(r, who))
 	}

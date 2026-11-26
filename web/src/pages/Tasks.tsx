@@ -7,6 +7,7 @@ import { Pager } from "@/components/app/more";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { actor, ago, plural } from "@/lib/format";
+import { useOfferings } from "@/lib/offerings";
 import { useSession } from "@/session";
 
 type TaskBrief = components["schemas"]["TaskBrief"];
@@ -38,6 +39,7 @@ export function TasksPage() {
   const [cursor, setCursor] = useState<string | undefined>();
   useEffect(() => setCursor(undefined), [closed]);
   const tasks = $api.useQuery("get", "/o/{org}/api/v1/tasks", { params: { path: { org }, query: { closed, limit: 30, cursor } } });
+  const offerings = useOfferings();
 
   return (
     <>
@@ -65,9 +67,12 @@ export function TasksPage() {
                   <Link to="/o/$org/tasks/$id" params={{ org, id: t.id }} className="font-medium underline">
                     {t.title}
                   </Link>
-                  <TaskStatus status={t.status} />
+                  <span className="flex items-center gap-2">
+                    {t.offering_id !== 0 && <Pill>For {offerings.find((o) => o.id === t.offering_id)?.name ?? "a removed offering"}</Pill>}
+                    <TaskStatus status={t.status} />
+                  </span>
                 </div>
-                {latest && <p className="text-muted-foreground">{latest.text.split("\n")[0]}</p>}
+                {latest &&<p className="text-muted-foreground">{latest.text.split("\n")[0]}</p>}
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <Meta>{taskLast(t)}</Meta>
                   <Meta>{taskFound(t.found.companies, t.found.people)}</Meta>
@@ -88,6 +93,8 @@ function TaskCreate() {
   const navigate = useNavigate();
   const [brief, setBrief] = useState("");
   const [title, setTitle] = useState("");
+  const [offering, setOffering] = useState(0);
+  const offerings = useOfferings();
   const create = $api.useMutation("post", "/o/{org}/api/v1/tasks", { onSuccess: (t) => navigate({ to: "/o/$org/tasks/$id", params: { org, id: t.id } }) });
 
   return (
@@ -96,7 +103,7 @@ function TaskCreate() {
         className="flex flex-col gap-4"
         onSubmit={(e) => {
           e.preventDefault();
-          create.mutate({ params: { path: { org } }, body: { title, brief } });
+          create.mutate({ params: { path: { org } }, body: { title, brief, offering: offering || undefined } });
         }}
       >
         <label className="flex flex-col gap-1.5">
@@ -111,6 +118,20 @@ function TaskCreate() {
             className="rounded-lg border-input bg-muted text-sm leading-relaxed"
           />
         </label>
+        {offerings.length > 0 && (
+          <label className="flex flex-col gap-1.5">
+            <Eyebrow>For</Eyebrow>
+            <select value={offering} onChange={(e) => setOffering(Number(e.target.value))} className="h-10 rounded-lg border border-input bg-muted px-3 text-sm">
+              <option value={0}>Your own offering</option>
+              {offerings.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+            <Meta>Agents get its look-for fields, and what they find waits in its review.</Meta>
+          </label>
+        )}
         <label className="flex flex-col gap-1.5">
           <Eyebrow>Short name (optional)</Eyebrow>
           <Input maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} className="h-10 rounded-lg border-input bg-muted text-sm" />

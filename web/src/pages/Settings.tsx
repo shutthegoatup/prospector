@@ -15,6 +15,7 @@ type Member = components["schemas"]["Member"];
 type MailServer = components["schemas"]["MailServer"];
 type SSO = components["schemas"]["SSO"];
 type Suppression = components["schemas"]["Suppression"];
+type Offering = components["schemas"]["Offering"];
 
 const field = "h-10 rounded-lg border border-input bg-muted px-3 text-sm disabled:opacity-60";
 const area = "rounded-lg border border-input bg-muted px-3 py-2 text-sm leading-relaxed disabled:opacity-60";
@@ -87,6 +88,7 @@ export function SettingsPage() {
         {me.data && <Voice me={me.data} />}
         {me.data && <Password me={me.data} />}
         {settings.data && <Organisation settings={settings.data} />}
+        {settings.data && <WhatYouSell orgName={name} />}
         {owner && settings.data && <OutgoingMail orgName={name} />}
         {owner && (
           <Section title="Agents">
@@ -457,6 +459,132 @@ function Sequence({ settings: set }: { settings: Settings }) {
 function suppressionMeta(r: Suppression) {
   if (r.reason === "unsubscribed") return "unsubscribed " + longDay(r.created_at);
   return "added by " + actor(r.by) + " " + longDay(r.created_at);
+}
+
+function OfferingFields({ o }: { o?: Offering }) {
+  return (
+    <>
+      <Row label="Name">
+        <Input name="name" required maxLength={60} defaultValue={o?.name} placeholder="Contract roles" className={field} />
+      </Row>
+      <Row label="What you look for">
+        <Textarea name="look_for" rows={4} defaultValue={o?.look_for} placeholder={"ir35: outside IR35, or not stated\nopen_roles (must): a contract role open now"} className={area} />
+        <Meta>As above, one per line. Agents on a task for this offering check these in place of the organisation's own.</Meta>
+      </Row>
+      <Row label="What you do">
+        <Textarea name="pitch" rows={2} defaultValue={o?.pitch} className={area} />
+        <Meta>{"The call script's pitch line for people reached for it. Empty uses the organisation's."}</Meta>
+      </Row>
+      <Row label="Connection note">
+        <Textarea name="note_template" rows={3} defaultValue={o?.note_template} className={area} />
+        <Meta>{"For people picked for it. Empty uses the organisation's. {first} {company} {org} are filled in."}</Meta>
+      </Row>
+    </>
+  );
+}
+
+function offeringBody(form: HTMLFormElement) {
+  const f = new FormData(form);
+  return { name: text(f, "name"), look_for: text(f, "look_for"), pitch: text(f, "pitch"), note_template: text(f, "note_template") };
+}
+
+function WhatYouSell({ orgName }: { orgName: string }) {
+  const { org, owner } = useSession();
+  const refresh = useRefresh();
+  const list = $api.useQuery("get", "/o/{org}/api/v1/offerings", { params: { path: { org }, query: { limit: 200 } } });
+  const add = $api.useMutation("post", "/o/{org}/api/v1/offerings", { onSuccess: refresh });
+  const [adding, setAdding] = useState(false);
+  const rows = list.data?.items ?? [];
+  return (
+    <Section
+      title="What you sell"
+      hint={`Everything above is ${orgName}'s own offering. Add another when you sell something else to companies you already know: each one is reviewed for on its own, with its own look-for fields, pitch and note, while facts and people are shared.`}
+    >
+      {list.data && rows.length === 0 && <p className="text-sm text-muted-foreground">Only {orgName}'s own.</p>}
+      {rows.map((o) => (
+        <OfferingRow key={o.id} o={o} />
+      ))}
+      {owner &&
+        (adding ? (
+          <form
+            className="flex flex-col gap-4 rounded-lg border border-border p-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              add.mutate({ params: { path: { org } }, body: offeringBody(e.currentTarget) }, { onSuccess: () => setAdding(false) });
+            }}
+          >
+            <OfferingFields />
+            <div className="flex items-center gap-2">
+              <ActionButton type="submit" size="sm" disabled={add.isPending}>
+                Add
+              </ActionButton>
+              <ActionButton quiet type="button" size="sm" onClick={() => setAdding(false)}>
+                Cancel
+              </ActionButton>
+            </div>
+          </form>
+        ) : (
+          <div>
+            <ActionButton quiet size="sm" onClick={() => setAdding(true)}>
+              + Add an offering
+            </ActionButton>
+          </div>
+        ))}
+      <Failed errors={[list.error, add.error]} />
+    </Section>
+  );
+}
+
+function OfferingRow({ o }: { o: Offering }) {
+  const { org, owner } = useSession();
+  const refresh = useRefresh();
+  const change = $api.useMutation("patch", "/o/{org}/api/v1/offerings/{id}", { onSuccess: refresh });
+  const remove = $api.useMutation("delete", "/o/{org}/api/v1/offerings/{id}", { onSuccess: refresh });
+  const fields = o.looking_for.map((a) => a.field);
+  return (
+    <details className="group rounded-lg border border-border">
+      <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3">
+        <span className="font-heading font-semibold">{o.name}</span>
+        <span className="min-w-0 font-mono text-xs text-muted-foreground">
+          {fields.length === 0 ? "nothing to look for yet" : fields.slice(0, 4).join(" · ") + (fields.length > 4 ? ` · +${fields.length - 4} more` : "")}
+        </span>
+        <span className="ml-auto font-mono text-xs text-muted-foreground">{owner ? "Edit ›" : "›"}</span>
+      </summary>
+      <form
+        className="flex flex-col gap-4 border-t border-border px-4 py-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          change.mutate({ params: { path: { org, id: o.id } }, body: offeringBody(e.currentTarget) });
+        }}
+      >
+        <fieldset key={o.updated_at} disabled={!owner} className="flex flex-col gap-4">
+          <OfferingFields o={o} />
+          {owner && (
+            <div className="flex flex-wrap items-center gap-2">
+              <ActionButton type="submit" size="sm" disabled={change.isPending}>
+                Save
+              </ActionButton>
+              {change.isSuccess && <Said>{saved}</Said>}
+              <ActionButton
+                quiet
+                type="button"
+                size="sm"
+                className="ml-auto"
+                onClick={() =>
+                  window.confirm(`Remove ${o.name}? Where companies stand for it is forgotten, though their history keeps it, and people reached for it are then reached for the organisation's own.`) &&
+                  remove.mutate({ params: { path: { org, id: o.id } } })
+                }
+              >
+                Remove
+              </ActionButton>
+            </div>
+          )}
+          <Meta>Changed by {actor(o.updated_by)}</Meta>
+        </fieldset>
+        <Failed errors={[change.error, remove.error]} />
+      </form>
+    </details>
+  );
 }
 
 function NotToBeMailed() {

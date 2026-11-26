@@ -8,6 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/session";
 import { month, vendorName } from "@/lib/vendors";
+import { type Offering, useOfferings } from "@/lib/offerings";
+import { cn } from "@/lib/utils";
 
 type Company = components["schemas"]["ResearchCompany"];
 type Criterion = components["schemas"]["Criterion"];
@@ -36,15 +38,17 @@ const empty: Record<Filter, [string, string]> = {
 
 export function ResearchPage() {
   const { org, sales } = useSession();
-  const { f: filter = "review", task } = useSearch({ from: "/o/$org/research" });
+  const { f: filter = "review", task, of } = useSearch({ from: "/o/$org/research" });
   const navigate = useNavigate();
   const [cursor, setCursor] = useState<string | undefined>();
-  // A cursor is a place in one list: another filter or search starts at its top.
-  useEffect(() => setCursor(undefined), [filter, task]);
+  // A cursor is a place in one list: another filter, search or offering starts at its top.
+  useEffect(() => setCursor(undefined), [filter, task, of]);
 
+  // A search is for one offering, so its queue is that offering's.
   const research = $api.useQuery("get", "/o/{org}/api/v1/research", {
-    params: { path: { org }, query: { filter, task, cursor } },
+    params: { path: { org }, query: { filter, task, offering: task ? undefined : of, cursor } },
   });
+  const offerings = useOfferings();
   const settings = $api.useQuery("get", "/o/{org}/api/v1/settings", { params: { path: { org } } });
   const tasks = $api.useQuery("get", "/o/{org}/api/v1/tasks", { params: { path: { org }, query: { limit: 5 } } });
   const agents = $api.useQuery("get", "/o/{org}/api/v1/agents", { params: { path: { org } } });
@@ -52,6 +56,10 @@ export function ResearchPage() {
   const ready = (agents.data?.items ?? []).filter((a) => a.ready);
   // The same query SearchPanel makes, so the search is read once; closed searches aren't in tasks.
   const chosen = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}", { params: { path: { org, id: task ?? 0 }, query: { limit: 3 } } }, { enabled: !!task }).data;
+  const sellingId = task ? (chosen?.offering_id ?? 0) : (of ?? 0);
+  const selling = offerings.find((o) => o.id === sellingId);
+  const label = (key: Filter, text: string) => (key === "rejected" && selling ? "Junked" : text);
+  const searches = (tasks.data?.items ?? []).filter((t) => t.offering_id === sellingId);
 
 
   return (
@@ -77,7 +85,7 @@ export function ResearchPage() {
       </p>
 
       <Whose area="sales" work="Research is" can={sales} />
-      {sales && <FindBox agents={ready} lookingFor={settings.data?.looking_for ?? []} />}
+      {sales && <FindBox agents={ready} selling={selling} lookingFor={selling ? selling.looking_for : (settings.data?.looking_for ?? [])} />}
 
       <div className="mb-5 flex flex-col gap-2" aria-label="Searches">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -86,22 +94,42 @@ export function ResearchPage() {
             Every search, closed ones too
           </Link>
         </div>
-        {(tasks.data?.items ?? []).map((t) => (
+        {searches.map((t) => (
           <SearchStrip key={t.id} id={t.id} title={t.title} found={t.found.companies} agents={ready} chosen={t.id === task} />
         ))}
-        {tasks.data && tasks.data.items.length === 0 && <p className="text-sm text-muted-foreground">No search open.</p>}
+        {tasks.data && searches.length === 0 && <p className="text-sm text-muted-foreground">No search open.</p>}
       </div>
 
       <div className="flex flex-wrap items-start gap-6">
         <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-3">
+          {offerings.length > 0 && (
+            <nav className="flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-border bg-muted px-2.5 py-2" aria-label="Selling">
+              <span className="mr-1 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Selling</span>
+              {[{ id: 0, name: settings.data?.name ?? "Your own" }, ...offerings].map((o) => (
+                <Link
+                  key={o.id}
+                  to="/o/$org/research"
+                  params={{ org }}
+                  search={{ f: filter === "review" ? undefined : filter, of: o.id || undefined }}
+                  aria-current={o.id === sellingId ? "true" : undefined}
+                  className={cn(
+                    "rounded-md border px-2.5 py-1 text-[13px] font-medium text-foreground no-underline",
+                    o.id === sellingId ? "border-ink bg-card" : "border-transparent hover:border-border",
+                  )}
+                >
+                  {o.name}
+                </Link>
+              ))}
+            </nav>
+          )}
           <nav className="flex flex-wrap items-center gap-2" aria-label="Filter">
             {filters.map((f) => (
-              <FilterChip key={f.key} to="/o/$org/research" params={{ org }} search={{ f: f.key === "review" ? undefined : f.key, task }} label={f.label} count={research.data?.counts[f.key] ?? 0} on={f.key === filter} />
+              <FilterChip key={f.key} to="/o/$org/research" params={{ org }} search={{ f: f.key === "review" ? undefined : f.key, task, of }} label={label(f.key, f.label)} count={research.data?.counts[f.key] ?? 0} on={f.key === filter} />
             ))}
             {task && (
               <span className="inline-flex items-center gap-1">
                 <Pill tone="agent">From “{chosen?.title ?? `search ${task}`}”</Pill>
-                <Link to="/o/$org/research" params={{ org }} search={{ f: filter === "review" ? undefined : filter }} className="px-1 text-sm text-muted-foreground no-underline" aria-label="Show every search">
+                <Link to="/o/$org/research" params={{ org }} search={{ f: filter === "review" ? undefined : filter, of: sellingId || undefined }} className="px-1 text-sm text-muted-foreground no-underline" aria-label="Show every search">
                   ×
                 </Link>
               </span>
@@ -118,7 +146,7 @@ export function ResearchPage() {
           )}
           {research.error && <p className="text-sm text-[var(--stop)]">The queue couldn't be read. Reload to try again.</p>}
           <div className="flex flex-col gap-3">
-            {research.data?.items.map((c, i) => <CompanyCard key={c.id} company={c} open={i === 0} enrichers={enrichers} />)}
+            {research.data?.items.map((c, i) => <CompanyCard key={c.id} company={c} open={i === 0} enrichers={enrichers} offering={selling?.id} />)}
           </div>
           <nav className="flex justify-between gap-3">
             <span>
@@ -147,7 +175,7 @@ export function ResearchPage() {
   );
 }
 
-function FindBox({ agents, lookingFor }: { agents: Agent[]; lookingFor: components["schemas"]["LookFor"][] }) {
+function FindBox({ agents, selling, lookingFor }: { agents: Agent[]; selling?: Offering; lookingFor: components["schemas"]["LookFor"][] }) {
   const { org } = useSession();
   const navigate = useNavigate();
   const [brief, setBrief] = useState("");
@@ -162,12 +190,12 @@ function FindBox({ agents, lookingFor }: { agents: Agent[]; lookingFor: componen
       className="panel mb-5 overflow-hidden shadow-[4px_4px_0_var(--edge)]"
       onSubmit={(e) => {
         e.preventDefault();
-        create.mutate({ params: { path: { org } }, body: { title: "", brief, agents: send } });
+        create.mutate({ params: { path: { org } }, body: { title: "", brief, agents: send, offering: selling?.id } });
       }}
     >
       <div className="flex flex-col gap-2.5 px-5 py-4">
         <label htmlFor="find-brief">
-          <Eyebrow>Who are you looking for?</Eyebrow>
+          <Eyebrow>{selling ? `Who are you looking for, for ${selling.name}?` : "Who are you looking for?"}</Eyebrow>
         </label>
         <Textarea
           id="find-brief"
@@ -224,8 +252,8 @@ function FindBox({ agents, lookingFor }: { agents: Agent[]; lookingFor: componen
         ))}
         <p className="w-full text-[13px] text-muted-foreground">
           {lookingFor.length === 0
-            ? "Agents look for what you write. Settings › What you look for adds what they check at every company. "
-            : "Agents check each of these, from Settings › What you look for, and record what they find as a fact with its source. "}
+            ? `Agents look for what you write. Settings › ${selling ? "What you sell" : "What you look for"} adds what they check at every company. `
+            : `Agents check each of these, from Settings › ${selling ? `What you sell › ${selling.name}` : "What you look for"}, and record what they find as a fact with its source. `}
           <Link to="/o/$org/settings" params={{ org }} className="text-mark underline">
             Change them
           </Link>
@@ -427,11 +455,13 @@ function SourceLink({ href, children }: { href: string; children: React.ReactNod
   );
 }
 
-function CompanyCard({ company: c, open, enrichers }: { company: Company; open: boolean; enrichers: Enricher[] }) {
+// A card is reviewed for the offering in view; offering is left out for the organisation's own.
+function CompanyCard({ company: c, open, enrichers, offering }: { company: Company; open: boolean; enrichers: Enricher[]; offering?: number }) {
   const { org, sales } = useSession();
   const refresh = useRefresh();
   const [grade, setGrade] = useState(c.grade || "B");
-  const review = $api.useMutation("patch", "/o/{org}/api/v1/companies/{id}", { onSuccess: refresh });
+  const patch = $api.useMutation("patch", "/o/{org}/api/v1/companies/{id}", { onSuccess: refresh });
+  const review = { mutate: (v: { params: { path: { org: string; id: number } }; body: { stage: "review" | "qualified" | "rejected"; fit?: string } }) => patch.mutate({ ...v, body: { ...v.body, offering } }) };
   const pick = $api.useMutation("post", "/o/{org}/api/v1/contacts/{id}/pick", { onSuccess: refresh });
   const decide = $api.useMutation("patch", "/o/{org}/api/v1/suggestions/{id}", { onSuccess: refresh });
 
@@ -478,13 +508,19 @@ function CompanyCard({ company: c, open, enrichers }: { company: Company; open: 
                 </ActionButton>
               </>
             )}
-            {c.stage !== "rejected" && (
+            {c.stage === "rejected" ? (
+              <ActionButton quiet size="sm" onClick={() => review.mutate({ params: { path: { org, id: c.id } }, body: { stage: "review" } })}>
+                Put back
+              </ActionButton>
+            ) : (
+              // For another offering it is binned quietly; nothing is sent to anyone.
               <ActionButton quiet size="sm" onClick={() => review.mutate({ params: { path: { org, id: c.id } }, body: { stage: "rejected" } })}>
-                Reject
+                {offering ? "Junk" : "Reject"}
               </ActionButton>
             )}
           </div>
         )}
+        <Failed errors={[patch.error, pick.error]} />
       </div>
       {c.criteria.map((cr) => (
         <CriterionRow key={cr.field} c={cr} />
@@ -533,7 +569,7 @@ function CompanyCard({ company: c, open, enrichers }: { company: Company; open: 
                 </div>
                 {p.status === "suggested" && sales && (
                   <div>
-                    <ActionButton size="xs" onClick={() => pick.mutate({ params: { path: { org, id: p.id } } })}>
+                    <ActionButton size="xs" onClick={() => pick.mutate({ params: { path: { org, id: p.id }, query: { offering } } })}>
                       Pick
                     </ActionButton>
                   </div>
