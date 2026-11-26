@@ -33,12 +33,10 @@ func (hunter) Find(ctx context.Context, c *http.Client, base, key string, p enri
 	default:
 		return vendorFind{}, errors.New("it needs the company's domain or name")
 	}
-	if p.First == "" || p.Last == "" {
-		q.Set("full_name", p.Full)
-	} else {
-		q.Set("first_name", p.First)
-		q.Set("last_name", p.Last)
+	if strings.TrimSpace(p.Name) == "" {
+		return vendorFind{}, errors.New("it needs the person's name")
 	}
+	q.Set("full_name", p.Name)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/v2/email-finder?"+q.Encode(), nil)
 	if err != nil {
 		return vendorFind{}, err

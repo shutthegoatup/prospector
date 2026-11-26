@@ -40,7 +40,7 @@ type EnrichUsage struct {
 
 // enrichPerson is what a vendor is told about someone: no more than it needs to find them.
 type enrichPerson struct {
-	First, Last, Full, Domain, Company, Linkedin string
+	Name, Domain, Company, Linkedin string
 }
 
 // vendorFind is what a vendor found for one field; an empty Value is a miss.
@@ -67,6 +67,7 @@ func vendorKinds() []string {
 }
 
 const (
+	enrichAgain     = 30 * 24 * time.Hour
 	enrichLookupFor = 20 * time.Second
 	maxMonthlyLimit = 100_000
 )
@@ -191,9 +192,7 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 			return nil, conflict(err.Error())
 		}
 	}
-	name := displayName(c)
-	first, last := splitName(name)
-	person := enrichPerson{First: first, Last: last, Full: name, Domain: domain, Company: co.Name, Linkedin: deref(c.Linkedin)}
+	person := enrichPerson{Name: displayName(c), Domain: domain, Company: co.Name, Linkedin: deref(c.Linkedin)}
 	enrichers, err := s.Enrichers(o.ID)
 	if err != nil {
 		return nil, err
@@ -204,7 +203,7 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 		if !slices.Contains(suggestable, field) {
 			return nil, fmt.Errorf("unknown field %q: email, phone or linkedin", field)
 		}
-		if detailOf(c, field) != "" && !(field == "email" && c.EmailStatus == "guess") {
+		if detailOf(c, field) != "" {
 			out = append(out, EnrichAsked{Field: field, Outcome: "has"})
 			continue
 		}
@@ -220,6 +219,12 @@ func (a *App) enrichField(ctx context.Context, o *Org, who Actor, c Contact, p e
 	for _, e := range enrichers {
 		v := vendors[e.Kind]
 		if v == nil || !slices.Contains(v.Fields(), field) || e.APIKey == "" {
+			continue
+		}
+		if when := s.askedLately(o.ID, c.ID, field, e.Kind); when != nil {
+			if !tried {
+				asked.Detail = v.Name() + " was asked on " + when.Format("2 Jan 2006") + "; it is asked again after " + fmt.Sprint(enrichAgain.Hours()/24) + " days"
+			}
 			continue
 		}
 		if !tried {
@@ -298,6 +303,18 @@ func (a *App) keepFind(o *Org, who Actor, c Contact, field, kind, value, status 
 	return asked
 }
 
+// askedLately is when a vendor was last asked for this field of this person, if it
+// was recently enough that asking again would only spend a lookup.
+func (s *Store) askedLately(org, contact int64, field, kind string) *time.Time {
+	var e Event
+	res := s.db.Where("org_id = ? and contact_id = ? and action = ? and value like ? and at > ?", org, contact, "enrich:"+field, kind+":%", time.Now().Add(-enrichAgain)).
+		Order("at desc").Limit(1).Find(&e)
+	if logged(res) != nil || res.RowsAffected == 0 {
+		return nil
+	}
+	return &e.At
+}
+
 func (a *App) logEnrich(org int64, who Actor, c Contact, field, value string) {
 	logged(a.s.db.Create(&Event{OrgID: org, ContactID: c.ID, CompanyID: c.CompanyID, User: who.Name, KeyID: who.KeyID, TaskID: who.Task,
 		Action: "enrich:" + field, Value: &value, At: time.Now()}))
@@ -310,28 +327,7 @@ func (a *App) vendorHTTP() *http.Client {
 	return publicClient(false)
 }
 
-// splitName takes the first word as the given name and the last as the family name,
-// which is what vendors match on.
-func splitName(name string) (first, last string) {
-	words := strings.Fields(name)
-	switch len(words) {
-	case 0:
-		return "", ""
-	case 1:
-		return words[0], ""
-	}
-	return words[0], words[len(words)-1]
-}
-
 // EnrichOut is what came of each field asked for.
 type EnrichOut struct {
 	Results []EnrichAsked `json:"results"`
-}
-
-// vendorName is how a vendor is named to people.
-func vendorName(kind string) string {
-	if v := vendors[kind]; v != nil {
-		return v.Name()
-	}
-	return kind
 }

@@ -1183,7 +1183,7 @@ export interface paths {
          * @description For each field, the vendors that look for it are asked in order until one finds it,
          *     each lookup counting toward that vendor's month. What is found waits under Details to
          *     check for a person to accept, marked with the vendor that found it. A field they already
-         *     have is not looked for, except an email that is a guess. Nobody on the never-contact
+         *     have is not looked for, nor one a vendor was asked about in the last 30 days. Nobody on the never-contact
          *     list, at a domain on it, or who declined is looked up, and a find that belongs to
          *     someone erased or on the list is dropped.
          */

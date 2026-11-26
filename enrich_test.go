@@ -1,15 +1,20 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // fakeHunter answers Email Finder from a table of "first last@domain" to address.
@@ -35,7 +40,7 @@ func newFakeHunter(t *testing.T) *fakeHunter {
 			return
 		}
 		q := r.URL.Query()
-		email, ok := f.found[q.Get("first_name")+" "+q.Get("last_name")+"@"+q.Get("domain")]
+		email, ok := f.found[q.Get("full_name")+"@"+q.Get("domain")]
 		if !ok {
 			w.Write([]byte(`{"data":{"email":null,"score":null,"verification":{"status":null}}}`))
 			return
@@ -151,12 +156,17 @@ func TestAVendorsFindWaitsForAPersonMarkedWithTheVendor(t *testing.T) {
 	if len(events) != 1 || deref(events[0].Value) != "hunter: found" {
 		t.Errorf("the history: %+v", events)
 	}
-	// Asked again, the same find isn't raised twice, but it is counted.
-	if _, out := enrich(t, client, api, hannah.ID, "email"); out.Results[0].Outcome != "has" {
+	// Asked again soon after, the vendor isn't asked and nothing is spent.
+	if _, out := enrich(t, client, api, hannah.ID, "email"); out.Results[0].Outcome != "skipped" || !strings.Contains(out.Results[0].Detail, "Hunter was asked on") {
 		t.Errorf("asked twice: %+v", out)
 	}
-	if used := s.EnricherUsed(o.ID, "hunter", time.Now()); used != 2 {
-		t.Errorf("%d lookups counted, want 2", used)
+	if used := s.EnricherUsed(o.ID, "hunter", time.Now()); used != 1 || f.calls() != 1 {
+		t.Errorf("%d lookups counted and %d made, want 1", used, f.calls())
+	}
+	// Long enough after, it is.
+	s.db.Model(&Event{}).Where("contact_id = ? and action = ?", hannah.ID, "enrich:email").Update("at", time.Now().Add(-enrichAgain-time.Hour))
+	if _, out := enrich(t, client, api, hannah.ID, "email"); out.Results[0].Outcome != "has" || f.calls() != 2 {
+		t.Errorf("asked a month later: %+v after %d calls", out, f.calls())
 	}
 	if err := s.DecideSuggestion(o.ID, sg.ID, SuggestionAccepted, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
@@ -257,4 +267,86 @@ func reread(t *testing.T, s *Store, id int64) *Contact {
 		t.Fatal(err)
 	}
 	return &c
+}
+
+func TestAVendorIsToldTheWholeNameOfSomeoneAnAgentAdded(t *testing.T) {
+	s, o, api, client, f := enrichSignedIn(t)
+	call(t, client, "PUT", api+"/enrichers", "application/json", map[string]any{"kind": "hunter", "api_key": hunterTestKey, "monthly_limit": 10})
+	must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "Bergholm", Domain: "bergholm.example"}))
+	added := must(s.AgentAddContact(o, Actor{Name: "agent:scout"}, AddContactIn{Company: "Bergholm", Name: "Dr. Kai van der Berg", Title: "Head of Digital",
+		SourceURL: "https://bergholm.example/team"}))
+	f.found["Dr. Kai van der Berg@bergholm.example"] = "kai.vanderberg@bergholm.example"
+	if _, out := enrich(t, client, api, added.ID, "email"); out.Results[0].Outcome != "suggested" {
+		t.Errorf("%+v", out)
+	}
+	if q := f.asked[0]; q.Get("full_name") != "Dr. Kai van der Berg" || q.Get("domain") != "bergholm.example" || q.Has("first_name") || q.Has("api_key") {
+		t.Errorf("Hunter was asked %v", q)
+	}
+}
+
+func TestAnAgentWithTheScopeCanEnrichThroughMCP(t *testing.T) {
+	s, o, api, client, f := enrichSignedIn(t)
+	call(t, client, "PUT", api+"/enrichers", "application/json", map[string]any{"kind": "hunter", "api_key": hunterTestKey, "monthly_limit": 10})
+	c := atCompany(t, s, o, "Hannah Pryce", "Larkmoor Yachts", "larkmoor.example")
+	f.found["Hannah Pryce@larkmoor.example"] = "hannah.pryce@larkmoor.example"
+	site := strings.TrimSuffix(api, "/o/alpha/api/v1")
+	research, _, _ := s.CreateKey(o.ID, "researcher", []string{"read", "research:write"}, "Ada Lovelace")
+	tools := must(mcpSession(t, site, research).ListTools(context.Background(), nil))
+	for _, tool := range tools.Tools {
+		if tool.Name == "enrich_contact" {
+			t.Error("a key without enrich:spend is offered enrich_contact")
+		}
+	}
+	key, _, _ := s.CreateKey(o.ID, "enricher", []string{"read", "enrich:spend"}, "Ada Lovelace")
+	res, err := mcpSession(t, site, key).CallTool(context.Background(), &mcp.CallToolParams{Name: "enrich_contact",
+		Arguments: map[string]any{"contact_id": c.ID, "fields": []string{"email"}}})
+	if err != nil || res.IsError {
+		t.Fatalf("calling: %v %+v", err, res)
+	}
+	var sg Suggestion
+	if s.db.Where("contact_id = ?", c.ID).First(&sg); sg.Vendor != "hunter" || sg.By != "agent:enricher" {
+		t.Errorf("the suggestion: %+v", sg)
+	}
+}
+
+func TestADatabaseFromBeforeVendorsOpens(t *testing.T) {
+	dsn := filepath.Join(t.TempDir(), "old.sqlite")
+	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
+		dsn = pg
+	}
+	old := must(Open(dsn))
+	if err := old.db.Migrator().DropTable(models...); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.db.AutoMigrate(models...); err != nil {
+		t.Fatal(err)
+	}
+	o := mustOrg(t, old, "alpha")
+	c := person(t, old, o, "Hannah Pryce", "Larkmoor Yachts", "", false)
+	if err := old.db.Create(&Suggestion{OrgID: o.ID, ContactID: c.ID, Field: "phone", Value: "+44 20 7946 0111", By: "agent:scout"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := old.db.Migrator().DropColumn(&Suggestion{}, "vendor"); err != nil {
+		t.Fatal(err)
+	}
+	for _, gone := range []any{&Enricher{}, &EnrichUsage{}} {
+		if err := old.db.Migrator().DropTable(gone); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s := must(Open(dsn))
+	var sg Suggestion
+	if err := s.db.Where("contact_id = ?", c.ID).First(&sg).Error; err != nil || sg.Vendor != "" || sg.Value != "+44 20 7946 0111" {
+		t.Errorf("a suggestion from before: %+v %v", sg, err)
+	}
+	if err := s.db.Create(&Suggestion{OrgID: o.ID, ContactID: c.ID, Field: "email", Value: "hannah@larkmoor.example", Vendor: "hunter", By: "Ada Lovelace"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.Create(&Enricher{OrgID: o.ID, Kind: "hunter", MonthlyLimit: 5}).Error; err != nil {
+		t.Errorf("a vendor after the upgrade: %v", err)
+	}
+	var kinds []string
+	if s.db.Model(&Suggestion{}).Where("contact_id = ?", c.ID).Order("id").Pluck("vendor", &kinds); len(kinds) != 2 || kinds[1] != "hunter" {
+		t.Errorf("vendors after the upgrade: %v", kinds)
+	}
 }
