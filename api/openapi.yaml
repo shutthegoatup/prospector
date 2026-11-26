@@ -735,11 +735,62 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, can_reply]
                 properties:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/Enquiry" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  can_reply: { type: boolean, description: "Whether a reply can be emailed from here: the organisation has a mail server. Their answers can be recorded either way." }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/enquiry-counts:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: countEnquiries
+      tags: [enquiries]
+      summary: How many enquiries there are of each kind and state
+      description: Spam is counted on its own and left out of the rest.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The counts.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnquiryCounts" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/members:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listMembers
+      tags: [settings]
+      summary: Who is in the organisation, by name
+      description: The names that can own a deal or an enquiry, in order.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of them.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/MemberName" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
 
@@ -2717,7 +2768,7 @@ components:
 
     Enquiry:
       type: object
-      required: [id, kind, name, email, company, phone, message, site, page, via, spam, contact_id, company_id, created_at, state, owner, note]
+      required: [id, kind, name, email, company, phone, message, site, page, via, spam, contact_id, company_id, created_at, state, owner, note, company_name, in_conversation, thread]
       properties:
         id: { type: integer, format: int64 }
         kind: { type: string }
@@ -2736,6 +2787,33 @@ components:
         state: { type: string, description: "`open`, `waiting` or `closed`; empty for one from before answering was tracked." }
         owner: { type: string }
         note: { type: string }
+        company_name: { type: string, description: "The name of the company it was matched to; empty for none." }
+        in_conversation: { type: boolean, description: "Whether whoever sent it is on the Conversations board already." }
+        thread:
+          type: array
+          items: { $ref: "#/components/schemas/EnquiryMessage" }
+          description: What has been said in answering it, oldest first, as its messages list gives it.
+
+    EnquiryCounts:
+      type: object
+      required: [all, spam, kinds, states]
+      properties:
+        all: { type: integer, description: Every enquiry that isn't spam. }
+        spam: { type: integer }
+        kinds:
+          type: object
+          additionalProperties: { type: integer }
+          description: "Those that aren't spam, by kind: `sales`, `demo`, `signup`, `support`, `feature` or `other`. A kind with none is left out."
+        states:
+          type: object
+          additionalProperties: { type: integer }
+          description: "Those that aren't spam, by `open`, `waiting` or `closed`. A state with none is left out."
+
+    MemberName:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
 
     Suppression:
       type: object

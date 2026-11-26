@@ -156,10 +156,15 @@ func (s apiServer) ChangeOwnDeal(ctx context.Context, in api.ChangeOwnDealReques
 	return api.ChangeOwnDeal200JSONResponse(dealOut(d, c, true)), nil
 }
 
-func enquiryOut(e Enquiry) api.Enquiry {
-	return api.Enquiry{Id: e.ID, Kind: e.Kind, Name: e.Name, Email: e.Email, Company: e.Company, Phone: e.Phone, Message: e.Message, Site: e.Site,
+func enquiryOut(e Enquiry, around enquiriesAround) api.Enquiry {
+	out := api.Enquiry{Id: e.ID, Kind: e.Kind, Name: e.Name, Email: e.Email, Company: e.Company, Phone: e.Phone, Message: e.Message, Site: e.Site,
 		Page: e.Page, Via: e.Via, Spam: e.Spam, ContactId: idOf(e.ContactID), CompanyId: idOf(e.CompanyID), CreatedAt: e.CreatedAt,
-		State: e.State, Owner: e.Owner, Note: e.Note}
+		State: e.State, Owner: e.Owner, Note: e.Note, CompanyName: around.Companies[idOf(e.CompanyID)],
+		InConversation: e.ContactID != nil && around.Talking[*e.ContactID], Thread: []api.EnquiryMessage{}}
+	for _, m := range around.Threads[e.ID] {
+		out.Thread = append(out.Thread, messageOut(m))
+	}
+	return out
 }
 
 func (s apiServer) ListEnquiries(ctx context.Context, in api.ListEnquiriesRequestObject) (api.ListEnquiriesResponseObject, error) {
@@ -168,14 +173,20 @@ func (s apiServer) ListEnquiries(ctx context.Context, in api.ListEnquiriesReques
 	if err != nil {
 		return nil, err
 	}
-	rows, next, err := s.a.s.enquiriesBefore(reqFrom(ctx).Org.ID, EnquiryFilter{Kind: p.Kind, Spam: p.Spam, State: p.State}, page)
+	org := reqFrom(ctx).Org.ID
+	rows, next, err := s.a.s.enquiriesBefore(org, EnquiryFilter{Kind: p.Kind, Spam: p.Spam, State: p.State}, page)
 	if err != nil {
 		return nil, err
 	}
+	around, err := s.a.s.aroundEnquiries(org, rows)
+	if err != nil {
+		return nil, err
+	}
+	via, _ := s.a.mailFor(org)
 	out := api.ListEnquiries200JSONResponse{Headers: api.ListEnquiries200ResponseHeaders{Link: nextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor = []api.Enquiry{}, next
+	out.Body.Items, out.Body.NextCursor, out.Body.CanReply = []api.Enquiry{}, next, via != nil
 	for _, e := range rows {
-		out.Body.Items = append(out.Body.Items, enquiryOut(e))
+		out.Body.Items = append(out.Body.Items, enquiryOut(e, around))
 	}
 	return out, nil
 }
@@ -203,7 +214,11 @@ func (s apiServer) ChangeEnquiry(ctx context.Context, in api.ChangeEnquiryReques
 	if err := s.a.s.in(q.Org.ID).Where("id = ?", in.Id).First(&e).Error; err != nil {
 		return nil, missing(err, "no enquiry %d", in.Id)
 	}
-	return api.ChangeEnquiry200JSONResponse(enquiryOut(e)), nil
+	around, err := s.a.s.aroundEnquiries(q.Org.ID, []Enquiry{e})
+	if err != nil {
+		return nil, err
+	}
+	return api.ChangeEnquiry200JSONResponse(enquiryOut(e, around)), nil
 }
 
 func (s apiServer) DeleteEnquiry(ctx context.Context, in api.DeleteEnquiryRequestObject) (api.DeleteEnquiryResponseObject, error) {
