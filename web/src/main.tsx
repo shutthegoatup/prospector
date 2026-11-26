@@ -6,6 +6,8 @@ import { CampaignsPage } from "@/pages/Campaigns";
 import { EnquiriesPage } from "@/pages/Enquiries";
 import { OnboardingPage } from "@/pages/Onboarding";
 import { ResearchPage } from "@/pages/Research";
+import { TaskPage } from "@/pages/Task";
+import { TasksPage } from "@/pages/Tasks";
 import { SubscriptionsPage } from "@/pages/Subscriptions";
 import { SessionContext } from "@/session";
 
@@ -22,6 +24,8 @@ if (mount) {
               <Route path="research" element={<ResearchPage />} />
               <Route path="campaigns" element={<CampaignsPage />} />
               <Route path="onboarding" element={<OnboardingPage />} />
+              <Route path="tasks" element={<TasksPage />} />
+              <Route path="tasks/:id" element={<TaskPage />} />
               <Route path="enquiries" element={<EnquiriesPage />} />
               <Route path="subscriptions" element={<SubscriptionsPage />} />
             </Routes>
