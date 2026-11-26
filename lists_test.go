@@ -31,6 +31,7 @@ func seedContact(t *testing.T, s *Store, c Contact) Contact {
 }
 
 func TestCompaniesArePaged(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	seedCompanies(t, s, o.ID, 620, CompanyQualified, "Yachts & boats")
 
@@ -72,6 +73,7 @@ func TestCompaniesArePaged(t *testing.T) {
 }
 
 func TestPipelineInSQL(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	day := str("2026-01-05")
@@ -150,6 +152,7 @@ func TestPipelineInSQL(t *testing.T) {
 }
 
 func TestStageFilterPagesInSQL(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	// Every tenth company is in outreach, so the filter's matches are spread far past one page.
@@ -168,6 +171,7 @@ func TestStageFilterPagesInSQL(t *testing.T) {
 }
 
 func TestResearchIsPaged(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	seeded := seedCompanies(t, s, o.ID, 230, CompanyReview, "")
 	for _, i := range []int{0, 229} {
@@ -225,6 +229,7 @@ func names(rows []CompanyListRow) string {
 }
 
 func TestSearch(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	a, b := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
 	if !s.postgres() && !s.fts {
@@ -310,6 +315,7 @@ func TestSearch(t *testing.T) {
 
 // A database from before the index existed gets one, filled from the rows already there.
 func TestSearchIndexIsBuiltForExistingRows(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	if _, err := s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "test"); err != nil {

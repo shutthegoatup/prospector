@@ -8,6 +8,7 @@ import (
 // Runs are worked out from events, so a page of them ends where a run does, and a run
 // the page before showed isn't shown again in part on the next.
 func TestRecentRunsHavePages(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	start := time.Now().Add(-48 * time.Hour).Truncate(time.Second)
 	var events []Event
@@ -93,6 +94,7 @@ func TestRecentRunsHavePages(t *testing.T) {
 // A page is worked out from at most runsRead events; the run they cut short is left
 // for the next page, where it is whole.
 func TestARunCutShortByWhatIsReadWaitsForTheNextPage(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	const runs, each = 40, 60

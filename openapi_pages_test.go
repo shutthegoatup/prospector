@@ -13,6 +13,7 @@ import (
 // Every list in the spec comes a page at a time, the same way: a list operation added
 // later that answers a bare array, or forgets limit and cursor, fails here.
 func TestEveryListInTheSpecComesInPages(t *testing.T) {
+	t.Parallel()
 	spec, err := api.Spec()
 	if err != nil {
 		t.Fatal(err)
@@ -60,6 +61,7 @@ func TestEveryListInTheSpecComesInPages(t *testing.T) {
 }
 
 func TestAListLeftWholeComesOutAPageAtATime(t *testing.T) {
+	t.Parallel()
 	all := []int{1, 2, 3, 4, 5}
 	var got []int
 	cursor, pages := "", 0
@@ -92,6 +94,7 @@ func reader(key string) string { return key }
 
 // Following next_cursor, or the Link header, through a list reaches every row once.
 func TestTheAPIsListsWalkToTheirEnd(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	key, _, err := s.CreateKey(o.ID, "reader", []string{"read"}, "test")
 	if err != nil {

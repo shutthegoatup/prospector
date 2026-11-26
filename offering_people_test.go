@@ -6,6 +6,7 @@ import (
 )
 
 func TestPeopleAreReachedForTheOfferingTheyWerePickedFor(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO", NoteTemplate: "Hi {first}, about technology leadership at {company}.",
@@ -88,6 +89,7 @@ func TestPeopleAreReachedForTheOfferingTheyWerePickedFor(t *testing.T) {
 }
 
 func TestPickingForAnOfferingLeavesTheCompanysOwnStage(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	o.Settings.NoteTemplate, o.Settings.Pitch = "Hello {first} from {org}.", "Our own pitch for {company}."
@@ -125,6 +127,7 @@ func scriptText(lines []Line) string {
 }
 
 func TestExistingPeopleAreReachedForTheOrganisationsOwnOffering(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	old := must(s.QuickAddPerson(o, QuickAdd{Name: "Cleo Marsh", Company: "Larkmoor"}, "Ada"))

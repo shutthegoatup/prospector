@@ -6,6 +6,7 @@ import (
 )
 
 func TestRepeatedAgentWorkAddsNothing(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
@@ -85,6 +86,7 @@ func TestRepeatedAgentWorkAddsNothing(t *testing.T) {
 }
 
 func TestASharedSiteNamesNoCompany(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
@@ -123,6 +125,7 @@ func TestASharedSiteNamesNoCompany(t *testing.T) {
 }
 
 func TestANoteTypedWhenAddingSomeoneIsTheirs(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	c, err := s.QuickAddPerson(o, QuickAdd{Linkedin: "https://www.linkedin.com/in/hannah-pryce", Name: "Hannah Pryce",
@@ -143,6 +146,7 @@ func TestANoteTypedWhenAddingSomeoneIsTheirs(t *testing.T) {
 }
 
 func TestAgentsLeaveAPersonsWordsAlone(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
@@ -198,6 +202,7 @@ func TestAgentsLeaveAPersonsWordsAlone(t *testing.T) {
 }
 
 func TestExistingHistorySurvivesTheKeyColumn(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	if _, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:scout", KeyID: 4}, AddCompanyIn{Name: "Larkmoor Yachts"}); err != nil {

@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -14,6 +12,7 @@ import (
 // Find asks for about so many companies: the searches list shows how far it has got
 // and how many wait for review, and agents are told the number.
 func TestASearchAsksForAboutSoManyCompanies(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	for _, want := range []int{-1, 501} {
 		if code, body := call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/tasks", "application/json",
@@ -63,10 +62,8 @@ func TestASearchAsksForAboutSoManyCompanies(t *testing.T) {
 
 // A database from before searches asked for a number has tasks, and they ask for none.
 func TestTasksFromBeforeANumberAskForNone(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	t.Parallel()
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)

@@ -25,6 +25,7 @@ import (
 )
 
 func TestSafeNext(t *testing.T) {
+	t.Parallel()
 	for next, want := range map[string]string{
 		"/o/alpha/today":             "/o/alpha/today",
 		"/o/alpha/add?popup=1&url=x": "/o/alpha/add?popup=1&url=x",
@@ -43,6 +44,7 @@ func TestSafeNext(t *testing.T) {
 }
 
 func TestLoginSlowsGuessing(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	if _, err := s.CreateUser("ada@example.com", "Ada", "correct horse battery"); err != nil {
 		t.Fatal(err)
@@ -152,6 +154,7 @@ func TestLoginSlowsGuessing(t *testing.T) {
 }
 
 func TestChangePassword(t *testing.T) {
+	t.Parallel()
 	s, _, srv, client := signedIn(t)
 	elsewhere, _, err := s.Login("ada@example.com", "correct horse battery")
 	if err != nil {
@@ -210,6 +213,7 @@ func TestChangePassword(t *testing.T) {
 }
 
 func TestNeverContactCatchesMistakes(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	p := readFixtures(t)
@@ -262,6 +266,7 @@ func TestNeverContactCatchesMistakes(t *testing.T) {
 }
 
 func TestMCPSessionsBelongToOneKey(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	owner, _, err := s.CreateKey(o.ID, "claude", []string{"read", "research:write"}, "test")
 	if err != nil {
@@ -337,6 +342,7 @@ func TestMCPSessionsBelongToOneKey(t *testing.T) {
 }
 
 func TestOnlyAssetsAreKeptByABrowser(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	key, _, err := s.CreateKey(o.ID, "bot", []string{"read"}, "test")
 	if err != nil {
@@ -370,6 +376,7 @@ func TestOnlyAssetsAreKeptByABrowser(t *testing.T) {
 }
 
 func TestTransportHeaders(t *testing.T) {
+	t.Parallel()
 	_, _, srv, _ := signedIn(t)
 	get := func(proto string) http.Header {
 		req, _ := http.NewRequest("GET", srv.URL+"/healthz", nil)
@@ -392,6 +399,7 @@ func TestTransportHeaders(t *testing.T) {
 }
 
 func TestLoginRedirects(t *testing.T) {
+	t.Parallel()
 	_, _, srv, _ := signedIn(t)
 	stay := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	wanted := "/o/alpha/add?popup=1&url=https%3A%2F%2Fwww.linkedin.com%2Fin%2Fhannah-pryce&name=Hannah"
@@ -416,6 +424,7 @@ func TestLoginRedirects(t *testing.T) {
 }
 
 func TestRemoveMember(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	join := func(email string, org *Org, role string) (*User, *http.Client) {
@@ -510,6 +519,7 @@ func TestRemoveMember(t *testing.T) {
 }
 
 func TestNeverContactLeavesTheQueue(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	c, err := s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah.pryce@larkmoor.example",
 		Linkedin: "https://www.linkedin.com/in/hannah-pryce"}, "test")
@@ -606,6 +616,7 @@ func TestNeverContactLeavesTheQueue(t *testing.T) {
 }
 
 func TestNeverContactEntries(t *testing.T) {
+	t.Parallel()
 	const email, profile = "hannah.pryce@larkmoor.example", "https://www.linkedin.com/in/hannah-pryce?trk=x"
 	search := "https://www.linkedin.com/search/results/people/?keywords=Hannah%20Pryce%20Larkmoor"
 	for _, c := range []struct {
@@ -642,6 +653,7 @@ func TestNeverContactEntries(t *testing.T) {
 }
 
 func TestContentPolicy(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	if _, err := s.Import(o.ID, readFixtures(t)); err != nil {
 		t.Fatal(err)
@@ -709,6 +721,7 @@ func TestContentPolicy(t *testing.T) {
 }
 
 func TestOrgIsCreatedWithItsOwner(t *testing.T) {
+	t.Parallel()
 	s, _, srv, client := signedIn(t)
 	ada, err := s.UserByEmail("ada@example.com")
 	if err != nil {
@@ -756,6 +769,7 @@ func TestOrgIsCreatedWithItsOwner(t *testing.T) {
 // Someone in no organisation is offered the page that starts one through the API, and
 // lands on its settings.
 func TestTheFirstOrganisationIsStartedThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, _, srv, _ := signedIn(t)
 	if _, err := s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"); err != nil {
 		t.Fatal(err)
@@ -778,6 +792,7 @@ func TestTheFirstOrganisationIsStartedThroughTheAPI(t *testing.T) {
 }
 
 func TestHistoryNamesPeopleInFull(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct{ name, email, want string }{
 		{"Sam Reed", "sam.reed@example.com", "Sam Reed"},
 		{"  Sam Hale ", "sam.hale@example.com", "Sam Hale"},
@@ -817,6 +832,7 @@ func TestHistoryNamesPeopleInFull(t *testing.T) {
 }
 
 func TestFirstPasswordMustBeChanged(t *testing.T) {
+	t.Parallel()
 	s, _, srv, ada := signedIn(t)
 	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json",
 		map[string]string{"email": "bob@example.com", "name": "Bob Stone", "role": "member"})
@@ -898,6 +914,7 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 }
 
 func TestExistingAccountsSurviveTheNewColumn(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	if _, err := s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery"); err != nil {
 		t.Fatal(err)
@@ -919,6 +936,7 @@ func TestExistingAccountsSurviveTheNewColumn(t *testing.T) {
 }
 
 func TestOtherSitesCantPost(t *testing.T) {
+	t.Parallel()
 	s, _, srv, client := signedIn(t)
 	host := strings.TrimPrefix(srv.URL, "http://")
 	signedInAs := func() bool {
@@ -996,6 +1014,7 @@ func TestOtherSitesCantPost(t *testing.T) {
 }
 
 func TestPublicURL(t *testing.T) {
+	t.Parallel()
 	for raw, want := range map[string]string{
 		"":                                 "",
 		"https://prospector.example.com":   "https://prospector.example.com",
@@ -1110,6 +1129,7 @@ func TestPublicURL(t *testing.T) {
 }
 
 func TestProblemsLookLikeTheApp(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	get := func(c *http.Client, method, path string, headers map[string]string) (int, string, string) {
 		t.Helper()
@@ -1256,6 +1276,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 }
 
 func TestRequestsHaveDeadlines(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	key, _, err := s.CreateKey(o.ID, "bot", []string{"read", "research:write"}, "test")
@@ -1365,6 +1386,7 @@ func TestRequestsHaveDeadlines(t *testing.T) {
 }
 
 func TestFontsAreServedFromHere(t *testing.T) {
+	t.Parallel()
 	_, _, srv, client := signedIn(t)
 	fetch := func(path string) (http.Header, []byte) {
 		t.Helper()
@@ -1420,6 +1442,7 @@ func TestFontsAreServedFromHere(t *testing.T) {
 }
 
 func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	for _, email := range []string{"ada@example.com", "bob@example.com"} {
 		if _, err := s.CreateUser(email, "Someone", "correct horse battery"); err != nil {

@@ -14,6 +14,7 @@ import (
 // sales and support flags. Hiding another area's controls is only worth having if those
 // flags say exactly what the API lets each person do.
 func TestTheNavOffersOnlyWorkTheAPIAllows(t *testing.T) {
+	t.Parallel()
 	s, o, srv, owner := signedIn(t)
 	c := repliedPerson(t, s, o, "Hannah Pryce")
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders with a configurator.", "Ada Lovelace"))

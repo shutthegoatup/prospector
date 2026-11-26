@@ -8,6 +8,7 @@ import (
 )
 
 func TestAKeyThatCanOnlyReadDoesNotPickATaskUp(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
@@ -23,6 +24,7 @@ func TestAKeyThatCanOnlyReadDoesNotPickATaskUp(t *testing.T) {
 }
 
 func TestOpenTasksAreListedBeforeClosedOnes(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	older := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
@@ -37,6 +39,7 @@ func TestOpenTasksAreListedBeforeClosedOnes(t *testing.T) {
 }
 
 func TestPickingUpATaskIsRecordedOnceARun(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
@@ -68,6 +71,7 @@ func TestPickingUpATaskIsRecordedOnceARun(t *testing.T) {
 }
 
 func TestACompanyNotedOnATaskCanStillBeFoundForIt(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
@@ -81,6 +85,7 @@ func TestACompanyNotedOnATaskCanStillBeFoundForIt(t *testing.T) {
 }
 
 func TestErasingSomeoneWithNoCompanyTakesTheirTasksNotes(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}

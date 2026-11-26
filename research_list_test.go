@@ -40,6 +40,7 @@ type researchPage struct {
 }
 
 func TestTheResearchQueueIsInTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	if code, body := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/settings", "application/json",
 		map[string]any{"name": "Alpha", "color": "#56c5f4", "look_for": criteriaLookFor}); code != http.StatusOK {

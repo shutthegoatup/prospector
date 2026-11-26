@@ -12,6 +12,7 @@ import (
 // A column added to Contact has to be carried by the snapshot, or be named here as
 // one a restore works out again.
 func TestASnapshotCarriesEveryContactColumn(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	rebuilt := []string{"org_id", "company_id"}
 	stmt := &gorm.Statement{DB: s.db}
@@ -63,6 +64,7 @@ func contactsOf(t *testing.T, s *Store, org int64) []Contact {
 }
 
 func TestRestoreBringsBackEveryColumn(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	suggested, _ := suggestedAndWorked(t, s, o)
@@ -94,6 +96,7 @@ func TestRestoreBringsBackEveryColumn(t *testing.T) {
 // A snapshot written before the later columns were carried says nothing about them,
 // so it mustn't clear them for someone who is still here.
 func TestAnOlderSnapshotLeavesLaterColumnsAlone(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	suggestedAndWorked(t, s, o)

@@ -9,7 +9,6 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -32,6 +31,7 @@ func mustKeys(t *testing.T, spec string) *keyring {
 }
 
 func TestSecretKeysAreRefusedWhenMalformed(t *testing.T) {
+	t.Parallel()
 	for what, spec := range map[string]string{
 		"no version":               oldKey,
 		"a version that isn't one": "one:" + oldKey,
@@ -67,6 +67,7 @@ func TestSecretKeysAreRefusedWhenMalformed(t *testing.T) {
 }
 
 func TestTokensAreFoundByAKeyedLookup(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	alpha := mustOrg(t, s, "alpha")
 	u := mustUser(t, s, alpha, "ada@alpha.example", "Ada Lovelace", "owner")
@@ -138,6 +139,7 @@ func TestTokensAreFoundByAKeyedLookup(t *testing.T) {
 }
 
 func TestAnAgentsKeyOutlivesTheServerBeingGivenASecretKey(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	alpha := mustOrg(t, s, "alpha")
 	u := mustUser(t, s, alpha, "ada@alpha.example", "Ada Lovelace", "owner")
@@ -205,6 +207,7 @@ func TestAnAgentsKeyOutlivesTheServerBeingGivenASecretKey(t *testing.T) {
 }
 
 func TestAClearSecretIsSealedWhateverItLooksLike(t *testing.T) {
+	t.Parallel()
 	// A secret kept in clear that happens to look like a token's lookup is still in clear.
 	k := mustKeys(t, "1:"+oldKey)
 	for _, clear := range []string{"k7:abc", "k12345", "kept-in-clear"} {
@@ -218,6 +221,7 @@ func TestAClearSecretIsSealedWhateverItLooksLike(t *testing.T) {
 }
 
 func TestSealedSecretsOutliveAKeyChange(t *testing.T) {
+	t.Parallel()
 	before := mustKeys(t, "1:"+oldKey)
 	stored, err := before.seal("s3cret-value")
 	if err != nil || !sealed(stored) || strings.Contains(stored, "s3cret") {
@@ -269,6 +273,7 @@ func TestSealedSecretsOutliveAKeyChange(t *testing.T) {
 }
 
 func TestEachJobHasAKeyOfItsOwnDerivedFromTheMaster(t *testing.T) {
+	t.Parallel()
 	k := mustKeys(t, "1:"+oldKey)
 	master, _ := hex.DecodeString(oldKey)
 	seen := map[string]purpose{hex.EncodeToString(master): "the master key"}
@@ -308,7 +313,7 @@ func TestEachJobHasAKeyOfItsOwnDerivedFromTheMaster(t *testing.T) {
 }
 
 func TestTheServerSealsWhatItFindsWhenItStartsWithAKey(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "p.sqlite")
+	path := freshDatabase(t)
 	seed, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -354,6 +359,7 @@ func clientSecret(t *testing.T, s *Store, org int64) string {
 }
 
 func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	alpha := mustOrg(t, s, "alpha")
 	mustUser(t, s, alpha, "ada@alpha.example", "Ada Lovelace", "owner")
@@ -463,6 +469,7 @@ func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
 }
 
 func TestASecretKeptInClearIsSealedOnceThereIsAKey(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	alpha := mustOrg(t, s, "alpha")
 	mustUser(t, s, alpha, "ada@alpha.example", "Ada Lovelace", "owner")

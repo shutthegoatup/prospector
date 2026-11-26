@@ -66,7 +66,7 @@ func (s *Store) newUser(email, name, password string, mustChange bool) (*User, e
 	if len(password) < 10 {
 		return nil, errors.New("passwords need at least 10 characters")
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), passwordCost)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (s *Store) SetPassword(email, password string) error {
 	if len(password) < 10 {
 		return errors.New("passwords need at least 10 characters")
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), passwordCost)
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (s *Store) ChangePassword(u *User, current, password, keepToken string) err
 	if password == current {
 		return errors.New("choose a password different from the current one")
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), passwordCost)
 	if err != nil {
 		return err
 	}

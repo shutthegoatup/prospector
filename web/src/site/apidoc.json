@@ -23158,6 +23158,18 @@
      },
      "about": [],
      "required": true
+    },
+    {
+     "name": "unlookable",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Why nothing about them may be sent to a data vendor (they declined, or they or their company is on the never-contact list), or empty if they can be looked up."
+      }
+     ],
+     "required": true
     }
    ]
   },

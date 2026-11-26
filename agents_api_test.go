@@ -12,6 +12,7 @@ import (
 
 // The React Agents page draws each card from the API, so the API says what the card says.
 func TestTheAPISaysWhatEachAgentsCardSays(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	s, srv, ada := agentSite(t, fake)
 	o := must(s.OrgBySlug("alpha"))
@@ -76,6 +77,7 @@ func TestTheAPISaysWhatEachAgentsCardSays(t *testing.T) {
 }
 
 func TestWhatAgentsDidIsInTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	scout, _, err := s.CreateKey(o.ID, "scout", []string{"read", "research:write"}, "Ada Lovelace")
 	if err != nil {
@@ -132,6 +134,7 @@ func TestWhatAgentsDidIsInTheAPI(t *testing.T) {
 }
 
 func TestOnlyASignedInOwnerMakesKeysThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	keys := srv.URL + "/o/alpha/api/v1/keys"
 

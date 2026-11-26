@@ -8,6 +8,7 @@ import (
 )
 
 func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	task := must(s.CreateTask(o.ID, "", "Find makers of garden rooms", "Nia"))

@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,6 +10,7 @@ import (
 )
 
 func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	u := must(s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery"))
@@ -98,6 +97,7 @@ func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
 }
 
 func TestEnquiriesAreAnsweredFromTheirPage(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	help := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "support", Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Message: "Colours look pale on phones"}))
 	// Today's summary and the sidebar's count both say how many wait to be answered.
@@ -152,10 +152,8 @@ func TestEnquiriesAreAnsweredFromTheirPage(t *testing.T) {
 
 // A database from before enquiries were tracked has them without a state, owner or note.
 func TestEnquiriesFromBeforeTheyWereTrackedStayAsTheyWere(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	t.Parallel()
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)
@@ -188,6 +186,7 @@ func TestEnquiriesFromBeforeTheyWereTrackedStayAsTheyWere(t *testing.T) {
 }
 
 func TestAnEnquiryBecomesAConversation(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	converse := func(id int64) (int, string) {
 		return call(t, client, "POST", srv.URL+"/o/alpha/api/v1/enquiries/"+itoa(id)+"/conversation", "application/json", map[string]any{})

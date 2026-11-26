@@ -79,6 +79,7 @@ func (s shown) undoable(id int64) bool {
 // Whatever the page carries stays inside its attribute, and the app's scripts are the
 // only ones on it.
 func TestAServedPageStaysInItsAttribute(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	odd := `"></div><script>alert(1)</script><div a="&amp;`
 	writeShell(w, http.StatusTeapot, problemShown{"problem", 418, odd, "it's <b>odd</b> & \"quoted\"", "/"}, "fallback")
@@ -96,6 +97,7 @@ func TestAServedPageStaysInItsAttribute(t *testing.T) {
 
 // A customer's page says which steps they marked, never who else marked one.
 func TestACustomersPageNamesNoMember(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 	on := "2026-11-20"
 	a := &App{}

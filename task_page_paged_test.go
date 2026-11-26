@@ -7,6 +7,7 @@ import (
 )
 
 func TestATasksPageHasPagesOfEachList(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	task := must(s.CreateTask(o.ID, "", "Find makers of garden rooms", "Nia"))
 	co := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "Larkmoor"}))

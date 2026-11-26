@@ -11,6 +11,7 @@ import (
 )
 
 func TestARobotAddsPeopleAndReviewsResearchAsItsScopesAllow(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	key := func(name string, scopes ...string) (string, *APIKey) {
 		secret, k, err := s.CreateKey(o.ID, name, scopes, "Ada Lovelace")

@@ -11,6 +11,7 @@ import (
 )
 
 func TestFindStartsTheChosenAgentsOnANewSearch(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	fake.chat = func(int, map[string]any) (int, string) { return 200, chatText("Nothing more to add.") }
 	var app *App
@@ -81,6 +82,7 @@ func TestFindStartsTheChosenAgentsOnANewSearch(t *testing.T) {
 }
 
 func TestResearchNarrowsToWhatOneSearchFound(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	yachts := must(s.CreateTask(o.ID, "Yachts", "Yacht builders with a configurator.", "Ada Lovelace"))
 	key, _, err := s.CreateKey(o.ID, "scout", []string{"read", "research:write"}, "Ada Lovelace")

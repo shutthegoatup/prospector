@@ -13,6 +13,7 @@ import (
 )
 
 func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
@@ -69,6 +70,7 @@ func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
 }
 
 func TestAClaimLapsesUnlessTheHolderKeepsAdding(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
@@ -113,6 +115,7 @@ func TestAClaimLapsesUnlessTheHolderKeepsAdding(t *testing.T) {
 }
 
 func TestOnlyOneOfManyAgentsWinsARequest(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
@@ -164,6 +167,7 @@ func mcpSession(t *testing.T, site, secret string) *mcp.ClientSession {
 }
 
 func TestTwoClientsOnOneKeyTakeDifferentRequests(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	key, _, _ := s.CreateKey(o.ID, "claude", []string{"read", "research:write"}, "test")
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
@@ -194,6 +198,7 @@ func TestTwoClientsOnOneKeyTakeDifferentRequests(t *testing.T) {
 }
 
 func TestAClaimIsntTakenOnAFinishedRequestOrShownOnAClosedTask(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
