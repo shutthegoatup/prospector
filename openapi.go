@@ -62,6 +62,10 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 // apiCaller works out who is asking: a key, or a signed-in member of the organisation.
 func (a *App) apiCaller(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if accountPath(r.URL.Path) {
+			notYet(w)
+			return
+		}
 		if hasKey(r) {
 			a.agent("", next.ServeHTTP)(w, r)
 			return

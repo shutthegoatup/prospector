@@ -160,6 +160,12 @@ func TestTheSpecIsServedAndEveryOperationNamesAScopeAKeyCanHave(t *testing.T) {
 		for method, op := range item.Operations() {
 			ops++
 			scopes := opScopes(op)
+			if accountPath(path) {
+				if len(scopes) > 0 || op.Security == nil {
+					t.Errorf("%s %s is an account's: it should say its security, and offer a key none", method, path)
+				}
+				continue
+			}
 			if len(scopes) == 0 {
 				t.Errorf("%s %s names no scope a key can be given", method, path)
 			}

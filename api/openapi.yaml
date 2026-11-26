@@ -24,6 +24,10 @@ info:
     configuring agents, deleting enquiries, exporting and erasing people and changing
     settings, which need an owner.
 
+    Signing in, signing out and passwords are account-wide, under `/api/v1/` rather than
+    an organisation's address, and only for a browser: a key is refused them. A refusal
+    a client should act on carries a `code`.
+
     Every list comes a page at a time: it takes `limit` and `cursor`, and answers
     `{"items": [...], "next_cursor": "..."}`. When `next_cursor` is there, pass it back
     as `cursor` for the next page; the `Link` header names that page too.
@@ -61,10 +65,215 @@ tags:
     description: The things an organisation sells besides what its settings describe, each with what to look for at a company, and where each company stands for each.
   - name: enrichment
     description: Data vendors the organisation pays, under its own keys, to find an email, phone or profile its research couldn't.
+  - name: account
+    description: Signing in and out, and your own password. Account-wide rather than an organisation's, and for a browser only; an API key is refused.
   - name: settings
     description: How the organisation works, from its waits and wording to its never-contact list and the sites it takes enquiries from.
 
 paths:
+  /api/v1/session:
+    get:
+      operationId: getSession
+      tags: [account]
+      summary: Who is signed in
+      description: |
+        The person this browser is signed in as and the organisations the session opens.
+        An organisation's own sign-on may still stand in the way of one of them: its
+        `sso_required` says so. Answers even while `must_change_password` holds, which is
+        all a new member can do until they have chosen their own.
+      security:
+        - session: []
+      responses:
+        "200":
+          description: The session.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Session" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: signIn
+      tags: [account]
+      summary: Sign in with a password
+      description: |
+        Sets the session cookie and answers what `getSession` would. A wrong address or
+        password is `wrong_login` either way, so nobody learns which accounts exist; too
+        many tries is `throttled`, with `Retry-After`. An address whose organisation
+        requires its own sign-on is signed in all the same, and that organisation then
+        shows `sso_required`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SignIn" }
+      responses:
+        "200":
+          description: Signed in.
+          headers:
+            Set-Cookie: { schema: { type: string }, description: "The session cookie, HttpOnly." }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Session" }
+        "429":
+          description: Too many tries; `code` is `throttled`.
+          headers:
+            Retry-After: { schema: { type: integer }, description: Seconds until the next try counts. }
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: signOut
+      tags: [account]
+      summary: Sign out
+      description: Ends this browser's session and clears its cookie. Signed out already is no error.
+      security: []
+      responses:
+        "204": { description: Signed out. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/password:
+    put:
+      operationId: changePassword
+      tags: [account]
+      summary: Change your password
+      description: |
+        Signs out every other session of yours. Works while `must_change_password` holds,
+        and clears it. A wrong `current` counts against you like a wrong sign-in, and too
+        many is `throttled`.
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current, new]
+              properties:
+                current: { type: string }
+                new: { type: string, minLength: 10 }
+      responses:
+        "204": { description: Changed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/sign-in:
+    get:
+      operationId: getSignInWays
+      tags: [account]
+      summary: The ways to sign in here
+      description: What the sign-in page offers on this server. Says nothing about any account.
+      security: []
+      responses:
+        "200":
+          description: The ways.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SignInWays" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/sign-in/sso:
+    post:
+      operationId: findSingleSignOn
+      tags: [account]
+      summary: The organisations whose sign-on speaks for an address
+      description: |
+        Worked out from the address's domain alone, so it says nothing about whether the
+        account exists. Also marks this browser as having asked, which the `start_url`s
+        need: a link from another site can't walk anyone through a provider. Go to a
+        `start_url` as a page, not with fetch; the provider sends the browser back to
+        `/login/callback`, which signs it in. 404 when this server has no address of its
+        own for providers to send people back to.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string }
+                next: { type: string, description: A path on this site to land on afterwards. }
+      responses:
+        "200":
+          description: The organisations, none when nobody's sign-on covers the domain.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [orgs]
+                properties:
+                  orgs:
+                    type: array
+                    items: { $ref: "#/components/schemas/SingleSignOnOrg" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/password-resets:
+    post:
+      operationId: requestPasswordReset
+      tags: [account]
+      summary: Email a link to choose a new password
+      description: |
+        Answers the same whether or not the address has an account, and the link lasts an
+        hour. 404 when this server sends no mail.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string }
+      responses:
+        "202": { description: "If the address has an account, a link is on its way." }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/password-resets/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema: { type: string }
+        description: The secret in the emailed link.
+    get:
+      operationId: getPasswordReset
+      tags: [account]
+      summary: Whose password a link resets
+      description: 410, with `code` `link_used`, once the link is used, out of date or replaced.
+      security: []
+      responses:
+        "200":
+          description: The account.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [email]
+                properties:
+                  email: { type: string }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: resetPassword
+      tags: [account]
+      summary: Choose a new password from a link
+      description: Uses the link up and signs the account out everywhere. Sign in afterwards with the new password.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, minLength: 10 }
+      responses:
+        "204": { description: Saved. }
+        default: { $ref: "#/components/responses/Problem" }
+
   /o/{org}/api/v1/agents:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -3356,6 +3565,10 @@ components:
         title: { type: string }
         status: { type: integer }
         detail: { type: string }
+        code:
+          type: string
+          description: What a client can act on without reading `detail`. Absent when there is nothing to do but show it.
+          enum: [wrong_login, throttled, link_used, signed_out, must_change_password, sso_required, session_limited]
 
     AgentKind:
       type: string
@@ -4045,3 +4258,65 @@ components:
           properties:
             id: { type: integer, format: int64 }
             round: { type: integer }
+
+    Session:
+      type: object
+      required: [user, must_change_password, limited, orgs]
+      properties:
+        user: { $ref: "#/components/schemas/SessionUser" }
+        must_change_password: { type: boolean, description: "Still on a password someone else saw: nothing opens until `changePassword`." }
+        limited:
+          type: boolean
+          description: Began at one organisation's own sign-on, so it opens that organisation alone and can't start another.
+        orgs:
+          type: array
+          description: Every organisation this session opens, the one to land on first.
+          items: { $ref: "#/components/schemas/SessionOrg" }
+    SessionUser:
+      type: object
+      required: [id, name, email, has_password]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        email: { type: string }
+        has_password: { type: boolean, description: "False for someone who signs in only through a provider." }
+    SessionOrg:
+      type: object
+      required: [slug, name, role, sso_required]
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        role: { type: string, enum: [member, owner] }
+        sso_required:
+          type: boolean
+          description: The organisation wants its own sign-on first; `findSingleSignOn` gives the way there.
+    SignIn:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+    SignInWays:
+      type: object
+      required: [password, forgot, sso, social]
+      properties:
+        password: { type: boolean, description: Signing in with a password. Always offered. }
+        forgot: { type: boolean, description: "`requestPasswordReset` works: this server sends mail." }
+        sso: { type: boolean, description: "`findSingleSignOn` works: organisations here may have their own sign-on." }
+        social:
+          type: array
+          items: { $ref: "#/components/schemas/SocialWay" }
+    SocialWay:
+      type: object
+      required: [key, label, start_url]
+      properties:
+        key: { type: string, description: "Like `google`." }
+        label: { type: string, description: "Like `Google`." }
+        start_url: { type: string, description: "Where to go, as a page, to sign in this way. Add `?next=` for where to land." }
+    SingleSignOnOrg:
+      type: object
+      required: [slug, name, start_url]
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        start_url: { type: string, description: "Where to go, as a page, to sign in through this organisation's provider." }
