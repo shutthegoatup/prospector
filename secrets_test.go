@@ -374,7 +374,7 @@ func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
 
 	// A sign-in in flight when the key changes still comes back to a server that knows it.
 	b := newBrowser(t, srv.URL)
-	b.get("/login/sso")
+	b.askedForLink(start)
 	_, _, sentTo := b.get(start)
 	s.keys = mustKeys(t, "2:"+newKey+",1:"+oldKey)
 	if code, _, _ := b.get("/login/callback?" + okta.approve(sentTo).Encode()); code != http.StatusSeeOther {

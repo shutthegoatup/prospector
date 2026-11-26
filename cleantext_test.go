@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"testing"
 	"testing/iotest"
@@ -70,7 +69,7 @@ func TestTextArrivesWithoutWhatPostgresWontKeep(t *testing.T) {
 	}
 
 	// A form post: the sign-in page, with a NUL in the address.
-	res, err = http.PostForm(srv.URL+"/login", url.Values{"email": {"ada@example.com\x00"}, "password": {"correct horse battery"}})
+	res, err = signInWith(http.DefaultClient, srv.URL, "ada@example.com\x00", "correct horse battery")
 	if err != nil {
 		t.Fatal(err)
 	}

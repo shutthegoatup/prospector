@@ -108,7 +108,7 @@ func (s apiServer) GetCompanyOverview(ctx context.Context, in api.GetCompanyOver
 		planned = len(plan)
 	}
 	out := api.CompanyOverview{Id: c.ID, Name: c.Name, Domain: c.Domain, Country: c.Country, Segment: c.Segment, Grade: c.Fit, Why: c.Why,
-		Stage: api.CompanyOverviewStage(c.Stage), FoundBy: c.FoundBy, CreatedAt: c.CreatedAt, Pipeline: api.Pipeline(pipeline(*c, people)),
+		Stage: api.CompanyOverviewStage(c.Stage), FoundFor: c.FoundFor, FoundBy: c.FoundBy, CreatedAt: c.CreatedAt, Pipeline: api.Pipeline(pipeline(*c, people)),
 		Touches: touches, LookingFor: criteriaOut(assetsFound(q.Org.Settings, facts)), Facts: []api.ResearchFact{}, People: []api.CompanyPerson{},
 		Onboardings: onboardings, PlannedSteps: planned, Subscriptions: []api.Subscription{}, Agreements: []api.Agreement{}}
 	for _, f := range facts {
@@ -243,7 +243,7 @@ func historyText(h HistoryItem) string {
 		"add:facts": "added facts", "add:fact": "added a fact", "add:contact": "suggested a contact",
 		"add:person": "added", "pick": "picked for outreach", "company:qualified": "qualified the company",
 		"company:rejected": "rejected the company", "company:review": "sent back to review",
-		"verdict:qualified": "qualified it for an offering", "verdict:rejected": "rejected it for an offering", "verdict:review": "sent it back to review for an offering",
+		"verdict:qualified": "qualified it for an offering", "verdict:rejected": "junked it for an offering", "verdict:review": "sent it back to review for an offering",
 		"offering:added": "added an offering", "offering:changed": "changed an offering", "offering:removed": "removed an offering",
 		"erase": "erased a person on request", "enquiry": "sent an enquiry",
 		"suggest:email": "suggested an email", "suggest:phone": "suggested a phone number", "suggest:linkedin": "suggested a LinkedIn profile",
