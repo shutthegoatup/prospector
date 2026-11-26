@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"gorm.io/gorm"
 	"time"
 )
 
@@ -281,8 +283,16 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			if err != nil {
 				return err
 			}
-			_, err = s.PutAgreementFields(first.ID, a.ID, []AgreementField{{RecipientID: r.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.1, W: 0.3, H: 0.05}})
-			return err
+			if _, err = s.PutAgreementFields(first.ID, a.ID, []AgreementField{{RecipientID: r.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.1, W: 0.3, H: 0.05}}); err != nil {
+				return err
+			}
+			if _, _, err := s.sealKey(first); err != nil {
+				return err
+			}
+			return s.db.Transaction(func(tx *gorm.DB) error {
+				_, err := recordAgreementEvent(tx, AgreementEvent{OrgID: first.ID, AgreementID: a.ID, Round: 1, Kind: EventSent, Actor: "Owner One", Detail: theirs + " sent", IP: "203.0.113.9"})
+				return err
+			})
 		},
 		func() error {
 			_, err := s.CreateTask(first.ID, theirs+" task", theirs+" brief", "Owner One")
@@ -351,7 +361,7 @@ var saysNothingBack = map[string]bool{
 	"AddSubscription": true, "ChangeSubscription": true, "ChangeSubscriptionFields": true, "RemoveSubscription": true, "StartRenewal": true, "SetEnquiry": true, "ConverseEnquiry": true, "SetEnquiryFields": true, "ChangeDealFields": true, "SetDealFields": true, "HearEnquiry": true,
 	"StartOnboarding": true, "SetOnboardingStep": true, "RemoveOnboarding": true, "InviteCustomer": true, "RevokeCustomer": true, "Suppress": true, "Unsuppress": true, "AddCampaign": true, "Audience": true, "RemoveCampaign": true, "ResumeCampaign": true, "AddAgreement": true, "PutAgreementFile": true, "RemoveAgreement": true,
 	// Recipients and fields come back as ids, places and kinds; who they are is AgreementRecipients'.
-	"AddRecipient": true, "ChangeRecipient": true, "RemoveRecipient": true, "PutAgreementFields": true, "AgreementFields": true, "Readiness": true,
+	"AddRecipient": true, "ChangeRecipient": true, "TrySeal": true, "RemoveRecipient": true, "PutAgreementFields": true, "AgreementFields": true, "Readiness": true,
 	"ErasePerson": true, "Import": true, "ImportLegacy": true, "Restore": true,
 	"ResearchCount": true, "ResearchCounts": true, "EnquiryCounts": true, "Week": true, "AgentMarks": true, "Touches": true,
 	"AddEnquiry": true, "AgentNote": true, "CreateKey": true, "CreateTask": true, "QuickAddPerson": true,
