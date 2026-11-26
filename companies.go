@@ -204,7 +204,10 @@ func (p Page) offset() int { return (p.N - 1) * p.Size }
 
 const researchPageSize = 30
 
-func (s *Store) researchQuery(org int64, filter string, task int64) (*gorm.DB, string, error) {
+// researchQuery is the companies under one of Research's filters, for one offering, 0
+// being the organisation's own: its stages are the companies' own, another's are its
+// verdicts. People count towards the offering they are being reached for.
+func (s *Store) researchQuery(org, offering int64, filter string, task int64) (*gorm.DB, string, error) {
 	q := s.in(org).Model(&Company{})
 	if task != 0 {
 		// What a task found is what was done for it, or noted for it, at a company.
@@ -212,24 +215,34 @@ func (s *Store) researchQuery(org int64, filter string, task int64) (*gorm.DB, s
 		noted := s.db.Model(&TaskNote{}).Select("company_id").Where("org_id = ? and task_id = ?", org, task)
 		q = q.Where("(id in (?) or id in (?))", done, noted)
 	}
+	people := s.db.Model(&Contact{}).Select("company_id").Where("org_id = ? and company_id is not null and offering_id = ?", org, offering)
+	staged := func(stage string) *gorm.DB {
+		if offering == 0 {
+			return q.Where("stage = ?", stage)
+		}
+		return q.Where("id in (?)", s.db.Model(&Verdict{}).Select("company_id").Where("org_id = ? and offering_id = ? and stage = ?", org, offering, stage))
+	}
 	switch filter {
 	case "review":
-		return q.Where("stage = ?", CompanyReview), "created_at desc, id desc", nil
+		if offering == 0 {
+			return q.Where("stage = ? and found_for = 0", CompanyReview), "created_at desc, id desc", nil
+		}
+		return staged(CompanyReview), "created_at desc, id desc", nil
 	case "contact":
-		withPeople := s.db.Model(&Contact{}).Select("company_id").
-			Where("org_id = ? and company_id is not null and key not like 'org:%' and status <> 'suggested'", org)
-		return q.Where("stage = ? and hold is null and id not in (?)", CompanyQualified, withPeople), "fit, name, id", nil
+		picked := people.Where("key not like 'org:%' and status <> 'suggested'")
+		return staged(CompanyQualified).Where("hold is null and id not in (?)", picked), "fit, name, id", nil
 	case "verify":
-		guess := s.db.Model(&Contact{}).Select("company_id").
-			Where("org_id = ? and company_id is not null and (email_status = 'guess' or flags like '%INFERRED%') and email_sent is null and hold is null", org)
+		guess := people.Where("(email_status = 'guess' or flags like '%INFERRED%') and email_sent is null and hold is null")
 		return q.Where("id in (?)", guess), "name, id", nil
 	case "details":
-		waiting := s.db.Model(&Contact{}).Select("company_id").
-			Where("org_id = ? and company_id is not null and id in (?)", org,
-				s.db.Model(&Suggestion{}).Select("contact_id").Where("org_id = ? and decision = ''", org))
+		waiting := people.Where("id in (?)", s.db.Model(&Suggestion{}).Select("contact_id").Where("org_id = ? and decision = ''", org))
 		return q.Where("id in (?)", waiting), "name, id", nil
 	case "rejected":
-		return q.Where("stage = ?", CompanyRejected), "updated_at desc, id desc", nil
+		if offering == 0 {
+			return staged(CompanyRejected), "updated_at desc, id desc", nil
+		}
+		latest := fmt.Sprintf("(select v.updated_at from verdicts v where v.org_id = companies.org_id and v.company_id = companies.id and v.offering_id = %d) desc, id desc", offering)
+		return staged(CompanyRejected), latest, nil
 	}
 	return nil, "", fmt.Errorf("unknown filter %q", filter)
 }
@@ -286,8 +299,8 @@ func (s *Store) researchRows(org int64, companies []Company) ([]ResearchRow, err
 
 // detailsToCheck can't be paged in SQL: whether a suggestion still needs checking
 // depends on comparing it with what the person holds now, the way a person would.
-func (s *Store) detailsToCheck(org, task int64) ([]ResearchRow, error) {
-	q, order, err := s.researchQuery(org, "details", task)
+func (s *Store) detailsToCheck(org, offering, task int64) ([]ResearchRow, error) {
+	q, order, err := s.researchQuery(org, offering, "details", task)
 	if err != nil {
 		return nil, err
 	}
@@ -304,17 +317,19 @@ func (s *Store) Research(org int64, filter string, page int) ([]ResearchRow, Pag
 	return s.researchFor(org, filter, page, 0)
 }
 
-// researchFor is Research narrowed to what one task found, or all of it for task 0.
+// researchFor is Research for the organisation's own offering, narrowed to what one task
+// found, or all of it for task 0.
 func (s *Store) researchFor(org int64, filter string, page int, task int64) ([]ResearchRow, Page, error) {
+	const offering = 0
 	if filter == "details" {
-		rows, err := s.detailsToCheck(org, task)
+		rows, err := s.detailsToCheck(org, offering, task)
 		if err != nil {
 			return nil, Page{}, err
 		}
 		pg := pageOf(page, researchPageSize, len(rows))
 		return rows[pg.offset():min(len(rows), pg.offset()+pg.Size)], pg, nil
 	}
-	q, order, err := s.researchQuery(org, filter, task)
+	q, order, err := s.researchQuery(org, offering, filter, task)
 	if err != nil {
 		return nil, Page{}, err
 	}
@@ -338,8 +353,8 @@ const searchFitCap = 500
 // rankedRows are all of one search's companies to review, best fit first: fit is worked
 // out from facts, so they are ranked here rather than in SQL. A search with more than
 // searchFitCap gives none, and false.
-func (s *Store) rankedRows(org int64, set OrgSettings, task int64) ([]ResearchRow, bool, error) {
-	q, order, err := s.researchQuery(org, "review", task)
+func (s *Store) rankedRows(org, offering int64, set OrgSettings, task int64) ([]ResearchRow, bool, error) {
+	q, order, err := s.researchQuery(org, offering, "review", task)
 	if err != nil {
 		return nil, false, err
 	}
@@ -376,10 +391,10 @@ func (s *Store) rankedRows(org int64, set OrgSettings, task int64) ([]ResearchRo
 
 // researchList is a page of the Research queue for the API: the rows the page shows, in
 // its order, with a cursor rather than a page number.
-func (s *Store) researchList(org int64, set OrgSettings, filter string, task int64, in PageIn) ([]ResearchRow, bool, string, error) {
+func (s *Store) researchList(org, offering int64, set OrgSettings, filter string, task int64, in PageIn) ([]ResearchRow, bool, string, error) {
 	switch {
 	case filter == "review" && task != 0:
-		rows, ranked, err := s.rankedRows(org, set, task)
+		rows, ranked, err := s.rankedRows(org, offering, set, task)
 		if err != nil {
 			return nil, false, "", err
 		}
@@ -388,7 +403,7 @@ func (s *Store) researchList(org int64, set OrgSettings, filter string, task int
 			return page, true, next, err
 		}
 	case filter == "details":
-		rows, err := s.detailsToCheck(org, task)
+		rows, err := s.detailsToCheck(org, offering, task)
 		if err != nil {
 			return nil, false, "", err
 		}
@@ -399,7 +414,7 @@ func (s *Store) researchList(org int64, set OrgSettings, filter string, task int
 	if err != nil {
 		return nil, false, "", err
 	}
-	q, order, err := s.researchQuery(org, filter, task)
+	q, order, err := s.researchQuery(org, offering, filter, task)
 	if err != nil {
 		return nil, false, "", err
 	}
@@ -416,15 +431,15 @@ func (s *Store) researchList(org int64, set OrgSettings, filter string, task int
 }
 
 func (s *Store) ResearchCount(org int64, filter string) int {
-	return s.researchCount(org, filter, 0)
+	return s.researchCount(org, 0, filter, 0)
 }
 
-func (s *Store) researchCount(org int64, filter string, task int64) int {
+func (s *Store) researchCount(org, offering int64, filter string, task int64) int {
 	if filter == "details" {
-		rows, _ := s.detailsToCheck(org, task)
+		rows, _ := s.detailsToCheck(org, offering, task)
 		return len(rows)
 	}
-	q, _, err := s.researchQuery(org, filter, task)
+	q, _, err := s.researchQuery(org, offering, filter, task)
 	if err != nil {
 		return 0
 	}
@@ -434,13 +449,13 @@ func (s *Store) researchCount(org int64, filter string, task int64) int {
 }
 
 func (s *Store) ResearchCounts(org int64) map[string]int {
-	return s.researchCountsFor(org, 0)
+	return s.researchCountsFor(org, 0, 0)
 }
 
-func (s *Store) researchCountsFor(org, task int64) map[string]int {
+func (s *Store) researchCountsFor(org, offering, task int64) map[string]int {
 	out := map[string]int{}
 	for _, f := range ResearchFilters {
-		out[f.Key] = s.researchCount(org, f.Key, task)
+		out[f.Key] = s.researchCount(org, offering, f.Key, task)
 	}
 	return out
 }
@@ -450,7 +465,7 @@ func (s *Store) SetCompanyStage(org, id int64, stage, fit, actor string) error {
 		return fmt.Errorf("unknown stage %q", stage)
 	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		updates := map[string]any{"stage": stage}
+		updates := map[string]any{"stage": stage, "found_for": 0}
 		if fit != "" {
 			updates["fit"] = fit
 		}
@@ -464,10 +479,23 @@ func (s *Store) SetCompanyStage(org, id int64, stage, fit, actor string) error {
 
 // PickContact moves a suggested person into outreach, with a note from the org's template.
 func (s *Store) PickContact(org int64, o *Org, id int64, actor string) error {
+	return s.PickContactFor(org, o, id, nil, actor)
+}
+
+// PickContactFor picks someone for an offering, whatever they were suggested for, or for
+// what they were suggested for when it is nil.
+func (s *Store) PickContactFor(org int64, o *Org, id int64, offeringID *int64, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		var c Contact
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
 			return missing(err, "no contact %d", id)
+		}
+		updates := map[string]any{"status": ""}
+		if offeringID != nil && *offeringID != c.OfferingID {
+			if c.Status != ContactSuggested {
+				return conflict(fmt.Sprintf("%s is already being reached for another offering", displayName(c)))
+			}
+			c.OfferingID, updates["offering_id"] = *offeringID, *offeringID
 		}
 		template := o.Settings.withDefaults().NoteTemplate
 		var offering *Offering
@@ -480,7 +508,6 @@ func (s *Store) PickContact(org int64, o *Org, id int64, actor string) error {
 				template = offering.NoteTemplate
 			}
 		}
-		updates := map[string]any{"status": ""}
 		if deref(c.Note) == "" {
 			updates["note"] = fill(template, deref(c.First), companyName(deref(c.Maker)), o.Name)
 		}
@@ -492,6 +519,9 @@ func (s *Store) PickContact(org int64, o *Org, id int64, actor string) error {
 				return err
 			}
 		} else if c.CompanyID != nil {
+			if err := foundForOwn(tx, org, *c.CompanyID); err != nil {
+				return err
+			}
 			res := tx.Model(&Company{}).Where("org_id = ? and id = ? and stage = ?", org, *c.CompanyID, CompanyReview).Update("stage", CompanyQualified)
 			if res.Error != nil {
 				return res.Error

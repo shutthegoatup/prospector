@@ -149,7 +149,8 @@ func nameFree(tx *gorm.DB, org, id int64, name string) error {
 }
 
 // RemoveOffering deletes an offering and every verdict made for it; the history keeps
-// what was decided. People being reached for it are then reached for the organisation's own.
+// what was decided. People being reached for it are then reached for the organisation's
+// own, and companies found only for it come up in the organisation's own review.
 func (s *Store) RemoveOffering(org, id int64, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		o, err := heldOffering(tx, org, id)
@@ -167,6 +168,9 @@ func (s *Store) RemoveOffering(org, id int64, actor string) error {
 			return err
 		}
 		if err := tx.Model(&Contact{}).Where("org_id = ? and offering_id = ?", org, id).Update("offering_id", 0).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&Company{}).Where("org_id = ? and found_for = ?", org, id).Update("found_for", 0).Error; err != nil {
 			return err
 		}
 		if err := tx.Delete(o).Error; err != nil {
@@ -250,13 +254,18 @@ func qualifyFor(tx *gorm.DB, org int64, o *Offering, company int64, actor string
 
 // forOffering puts a company an agent works on for a task up for review by the task's
 // offering, if it is for one. The company is held already, so the offering comes second
-// here as everywhere.
+// here as everywhere. Work for the organisation's own brings it into the organisation's
+// own review, if it was found for another offering.
 func forOffering(tx *gorm.DB, org int64, who Actor, company int64) error {
 	if who.Offering == 0 {
-		return nil
+		return foundForOwn(tx, org, company)
 	}
 	_, err := putUpForReview(tx, org, who.Offering, company, who.Name)
 	return err
+}
+
+func foundForOwn(tx *gorm.DB, org, company int64) error {
+	return tx.Model(&Company{}).Where("org_id = ? and id = ? and found_for <> 0", org, company).Update("found_for", 0).Error
 }
 
 // offeringStages is where each of these companies stands for an offering; one not yet
@@ -277,6 +286,41 @@ func offeringStages(tx *gorm.DB, org, offering int64, companies []int64) (map[in
 		out[v.CompanyID] = v.Stage
 	}
 	return out, nil
+}
+
+// ToReview is how many companies wait for review, counting each offering's queue.
+func (s *Store) ToReview(org int64) int {
+	var n int64
+	logged(s.in(org).Model(&Verdict{}).Where("stage = ?", CompanyReview).Count(&n))
+	return s.ResearchCount(org, "review") + int(n)
+}
+
+// withVerdicts shows Research rows as they stand for an offering: its stage, and its
+// grade where a person gave one.
+func (s *Store) withVerdicts(org, offering int64, rows []ResearchRow) error {
+	ids := make([]int64, len(rows))
+	for i, r := range rows {
+		ids[i] = r.ID
+	}
+	var verdicts []Verdict
+	if err := s.in(org).Where("offering_id = ? and company_id in ?", offering, ids).Find(&verdicts).Error; err != nil {
+		return err
+	}
+	by := map[int64]Verdict{}
+	for _, v := range verdicts {
+		by[v.CompanyID] = v
+	}
+	for i := range rows {
+		v, ok := by[rows[i].ID]
+		rows[i].Stage = CompanyReview
+		if ok {
+			rows[i].Stage = v.Stage
+		}
+		if v.Fit != "" {
+			rows[i].Fit = v.Fit
+		}
+	}
+	return nil
 }
 
 func (s *Store) standing(org, company int64) ([]OfferingStanding, error) {

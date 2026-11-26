@@ -43,7 +43,7 @@ func (a *App) nav(q *Req) Nav {
 	for _, list := range a.dueByStep(q, time.Now()) {
 		n.Today += len(list)
 	}
-	n.Research = a.s.ResearchCount(q.Org.ID, "review")
+	n.Research = a.s.ToReview(q.Org.ID)
 	n.Enquiries = a.s.EnquiryCounts(q.Org.ID)["state:"+EnquiryOpen]
 	convs, _ := a.s.Conversations(q.Org.ID)
 	for k, list := range convs {
@@ -80,7 +80,7 @@ type TodayData struct {
 
 // todayElsewhere is the work Today points to on other pages, and the last seven days.
 func (a *App) todayElsewhere(org int64, now time.Time, d *TodayData) error {
-	d.Review, d.Week = a.s.ResearchCount(org, "review"), a.s.Week(org, now)
+	d.Review, d.Week = a.s.ToReview(org), a.s.Week(org, now)
 	others, err := a.s.OtherDeals(org)
 	if err != nil {
 		return err

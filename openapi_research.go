@@ -65,7 +65,7 @@ func (s apiServer) ChangeContact(ctx context.Context, in api.ChangeContactReques
 
 func (s apiServer) PickContact(ctx context.Context, in api.PickContactRequestObject) (api.PickContactResponseObject, error) {
 	q := reqFrom(ctx)
-	if err := s.a.s.PickContact(q.Org.ID, q.Org, in.Id, q.Actor()); err != nil {
+	if err := s.a.s.PickContactFor(q.Org.ID, q.Org, in.Id, in.Params.Offering, q.Actor()); err != nil {
 		return nil, err
 	}
 	return api.PickContact204Response{}, nil
