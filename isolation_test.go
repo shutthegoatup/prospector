@@ -366,7 +366,7 @@ var saysNothingBack = map[string]bool{
 	"AddRecipient": true, "ChangeRecipient": true, "TrySeal": true, "RemoveRecipient": true, "PutAgreementFields": true, "AgreementFields": true, "Readiness": true,
 	"ErasePerson": true, "Import": true, "ImportLegacy": true, "Restore": true,
 	"ResearchCount": true, "ResearchCounts": true, "EnquiryCounts": true, "Week": true, "AgentMarks": true, "Touches": true,
-	"AddEnquiry": true, "AgentNote": true, "CreateKey": true, "CreateTask": true, "CreateTaskFor": true, "QuickAddPerson": true,
+	"AddEnquiry": true, "AgentNote": true, "CreateKey": true, "CreateTask": true, "CreateTaskFor": true, "CreateTaskWanting": true, "QuickAddPerson": true,
 	// FindOne answers only when one person matches, and Find makes its query. NeverContactCovers reads the organisation it is handed.
 	"FindOne": true, "NeverContactCovers": true,
 	// A vendor saved or removed, and a count, carry nothing of the organisation's data.
