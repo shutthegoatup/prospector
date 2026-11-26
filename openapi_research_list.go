@@ -34,6 +34,10 @@ func (s apiServer) ListResearch(ctx context.Context, in api.ListResearchRequestO
 	return out, nil
 }
 
+var lookupOut = map[string]api.LookupOutcome{
+	lookupFound: api.LookupOutcomeFound, lookupNone: api.LookupOutcomeNone, lookupNotKept: api.LookupOutcomeNotKept,
+}
+
 func lookingFor(set OrgSettings) []api.LookFor {
 	out := []api.LookFor{}
 	assets, _ := set.Assets()
@@ -62,10 +66,15 @@ func researchOut(set OrgSettings, r ResearchRow) api.ResearchCompany {
 			Answer: factAnswerOut(f.Answer), Inferred: f.Inferred, By: f.Actor, At: f.CreatedAt})
 	}
 	for _, p := range r.People {
-		person := api.ResearchPerson{Id: p.ID, Name: displayName(p), Title: p.Title, Status: p.Status, EmailStatus: p.EmailStatus,
-			Linkedin: deref(p.Linkedin), SourceUrl: firstLine(deref(p.Sources)), Pending: []api.PendingDetail{}}
+		person := api.ResearchPerson{Id: p.ID, Name: displayName(p), Title: p.Title, Status: p.Status, HasEmail: deref(p.Email) != "",
+			EmailStatus: p.EmailStatus, Linkedin: deref(p.Linkedin), SourceUrl: firstLine(deref(p.Sources)),
+			Pending: []api.PendingDetail{}, Lookups: []api.Lookup{}}
 		for _, d := range r.Pending[p.ID] {
 			person.Pending = append(person.Pending, pendingOut(d))
+		}
+		for _, l := range r.Lookups[p.ID] {
+			person.Lookups = append(person.Lookups, api.Lookup{Field: l.Field, Vendor: api.EnricherKind(l.Vendor),
+				Outcome: lookupOut[l.Outcome], At: l.At, AgainAt: l.At.Add(enrichAgain)})
 		}
 		c.People = append(c.People, person)
 	}
