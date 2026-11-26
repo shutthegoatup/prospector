@@ -46,7 +46,7 @@ func TestLookForAssets(t *testing.T) {
 	if len(queue.Items) != 1 || !strings.Contains(queue.body, "Lists 14 open roles") || queue.Items[0].Fit.Text != "1 of 2 · 1 unchecked" {
 		t.Errorf("Research doesn't show the careers page the company has, and how it fits: %s", queue.body)
 	}
-	if c := queue.Items[0].Criteria; len(c) != 2 || c[0].Field != "careers_page" || c[0].State != api.Met || c[1].Field != "ats" || c[1].State != api.Unchecked {
+	if c := queue.Items[0].Criteria; len(c) != 2 || c[0].Field != "careers_page" || c[0].State != api.CriterionStateMet || c[1].Field != "ats" || c[1].State != api.CriterionStateUnchecked {
 		t.Errorf("Research doesn't show the tracking system wasn't checked: %+v", c)
 	}
 	if strings.Contains(queue.body, "onfigurator") {

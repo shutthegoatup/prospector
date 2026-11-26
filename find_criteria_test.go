@@ -156,7 +156,7 @@ func TestASearchRanksItsCompaniesByFit(t *testing.T) {
 		}
 	}
 	anchor := ranked.Items[2].Criteria[0]
-	if anchor.Field != "configurator" || !anchor.Must || anchor.State != api.NotMet {
+	if anchor.Field != "configurator" || !anchor.Must || anchor.State != api.CriterionStateNotMet {
 		t.Errorf("the must Anchor Works misses: %+v", anchor)
 	}
 	all := readResearch(t, client, srv.URL+"/o/alpha/api/v1/research")
