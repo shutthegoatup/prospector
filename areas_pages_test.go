@@ -79,3 +79,9 @@ func TestTheNavOffersOnlyWorkTheAPIAllows(t *testing.T) {
 		}
 	}
 }
+
+// pageArea is the area whose work a page in the sidebar is.
+var pageArea = map[string]string{
+	"today": areaSales, "research": areaSales, "conversations": areaSales, "campaigns": areaSales, "tasks": areaSales,
+	"enquiries": areaSupport, "onboarding": areaSupport, "subscriptions": areaSupport,
+}

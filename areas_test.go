@@ -61,7 +61,7 @@ func TestEachAreaChangesOnlyItsOwnWork(t *testing.T) {
 	}
 	areas := func(to ...string) {
 		t.Helper()
-		if code, body := call(t, ada, "POST", base+"ui/member/areas", "application/json", map[string]any{"user_id": grace.ID, "areas": to}); code != http.StatusOK {
+		if code, body := call(t, ada, "PATCH", base+"api/v1/members/"+itoa(grace.ID), "application/json", map[string]any{"areas": append([]string{}, to...)}); code != http.StatusOK {
 			t.Fatalf("set areas %v: %d %s", to, code, body)
 		}
 	}
@@ -69,7 +69,7 @@ func TestEachAreaChangesOnlyItsOwnWork(t *testing.T) {
 	if m := must(s.Membership(o.ID, grace.ID)); m.Areas != "sales support" {
 		t.Fatalf("someone added to a team starts with %q, want every area", m.Areas)
 	}
-	if code, _ := call(t, asGrace, "POST", base+"ui/member/areas", "application/json", map[string]any{"user_id": grace.ID, "areas": []string{"sales"}}); code != http.StatusForbidden {
+	if code, _ := call(t, asGrace, "PATCH", base+"api/v1/members/"+itoa(grace.ID), "application/json", map[string]any{"areas": []string{"sales"}}); code != http.StatusForbidden {
 		t.Fatalf("a member changed their own areas: %d", code)
 	}
 
@@ -156,11 +156,11 @@ func TestEachAreaChangesOnlyItsOwnWork(t *testing.T) {
 		t.Errorf("a key is held to an area rather than its scopes: %d %s", code, body)
 	}
 
-	if code, _ := call(t, ada, "POST", base+"ui/member/areas", "application/json", map[string]any{"user_id": grace.ID, "areas": []string{"marketing"}}); code != http.StatusBadRequest {
+	if code, _ := call(t, ada, "PATCH", base+"api/v1/members/"+itoa(grace.ID), "application/json", map[string]any{"areas": []string{"marketing"}}); code != http.StatusBadRequest {
 		t.Errorf("an unknown area was accepted: %d", code)
 	}
 	outsider := must(s.CreateUser("carol@example.com", "Carol Outsider", "correct horse battery"))
-	if code, _ := call(t, ada, "POST", base+"ui/member/areas", "application/json", map[string]any{"user_id": outsider.ID, "areas": []string{"sales"}}); code != http.StatusBadRequest {
+	if code, _ := call(t, ada, "PATCH", base+"api/v1/members/"+itoa(outsider.ID), "application/json", map[string]any{"areas": []string{"sales"}}); code != http.StatusNotFound {
 		t.Errorf("someone outside the organisation was given an area: %d", code)
 	}
 	if err := s.SetAreas(o.ID, grace.ID, []string{"support"}); err != nil {

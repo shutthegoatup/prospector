@@ -12,7 +12,7 @@ import (
 // wantsPage is a person's browser opening a page or submitting a form, as opposed to
 // the page script, the CLI or an agent, which read an error as plain text.
 func wantsPage(r *http.Request) bool {
-	return strings.Contains(r.Header.Get("Accept"), "text/html") && r.Header.Get("X-Fragment") == "" && !hasKey(r)
+	return strings.Contains(r.Header.Get("Accept"), "text/html") && !hasKey(r)
 }
 
 // hasKey is a request carrying an API key. A browser never attaches a Bearer header by

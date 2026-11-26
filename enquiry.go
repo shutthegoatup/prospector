@@ -251,14 +251,6 @@ type EnquiryFilter struct {
 	State string
 }
 
-// enquirySpamParam is the filter's spam choice as the page's link carries it.
-func enquirySpamParam(f EnquiryFilter) string {
-	if f.Spam {
-		return "1"
-	}
-	return ""
-}
-
 const enquiryPageSize = 50
 
 // Enquiries lists one page of the enquiries a filter matches, newest first.
@@ -455,42 +447,6 @@ func (a *App) intake(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, ok{true})
-}
-
-type EnquiriesData struct {
-	Filter    EnquiryFilter
-	Rows      []Enquiry
-	Page      Page
-	Counts    map[string]int
-	Companies map[int64]string
-	Members   []Member
-	// Talking are the contacts, among those who sent these, already on the Conversations board.
-	Talking map[int64]bool
-	// Threads is what has been said in answering each, and MailOn whether a reply can be sent from here.
-	Threads map[int64][]EnquiryMessage
-	MailOn  bool
-}
-
-func (a *App) enquiriesPage(w http.ResponseWriter, r *http.Request) {
-	q := reqOf(r)
-	f := EnquiryFilter{Kind: r.URL.Query().Get("kind"), Spam: r.URL.Query().Get("spam") != "", State: r.URL.Query().Get("state")}
-	rows, pg, err := a.s.Enquiries(q.Org.ID, f, pageParam(r))
-	if err != nil {
-		fail(w, err, http.StatusInternalServerError)
-		return
-	}
-	members, err := a.s.Members(q.Org.ID)
-	if err != nil {
-		fail(w, err, http.StatusInternalServerError)
-		return
-	}
-	around, err := a.s.aroundEnquiries(q.Org.ID, rows)
-	if err != nil {
-		fail(w, err, http.StatusInternalServerError)
-		return
-	}
-	via, _ := a.mailFor(q.Org.ID)
-	a.page(w, r, "enquiries", EnquiriesView(q, EnquiriesData{Filter: f, Rows: rows, Page: pg, Counts: a.s.EnquiryCounts(q.Org.ID), Companies: around.Companies, Members: members, Talking: around.Talking, Threads: around.Threads, MailOn: via != nil}))
 }
 
 // enquiriesAround is what is shown beside a page of enquiries: the companies they

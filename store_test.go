@@ -351,14 +351,14 @@ func TestUI(t *testing.T) {
 	if _, err := s.AgentAddContact(o, Actor{Name: "agent:x"}, AddContactIn{Company: "Larkmoor Yachts", Name: "Eve", Linkedin: "javascript:alert(1)", SourceURL: "https://x.example"}); err == nil {
 		t.Fatal("agent stored a javascript: link")
 	}
-	if code, _ := call(t, client, "POST", base+"ui/mark", "application/json", map[string]any{"id": c.ID, "step": "replied"}); code != http.StatusOK {
+	if code, _ := call(t, client, "POST", base+"api/v1/marks", "application/json", map[string]any{"contact_id": c.ID, "step": "replied"}); code != http.StatusOK {
 		t.Fatal("mark replied")
 	}
 	if _, body := call(t, client, "GET", base+"api/v1/conversations", "", nil); !strings.Contains(body, "Hannah Pryce") || !strings.Contains(body, `"next_step":""`) {
 		t.Fatalf("a reply without a next step isn't flagged: %s", body)
 	}
-	code, body = call(t, client, "POST", base+"ui/keys", "application/json", map[string]any{"name": "bot", "scopes": []string{"read"}})
-	if code != http.StatusOK || !strings.Contains(body, "pk_") {
+	code, body = call(t, client, "POST", base+"api/v1/keys", "application/json", map[string]any{"name": "bot", "scopes": []string{"read"}})
+	if code != http.StatusCreated || !strings.Contains(body, "pk_") {
 		t.Fatalf("create key: %d %s", code, body)
 	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -18,6 +19,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/shutthegoatup/prospector/api"
 )
 
@@ -39,14 +41,12 @@ func sourceFiles(t *testing.T) (names []string) {
 // wrongField reads, from a refused body, the field that was the wrong kind of value.
 var wrongField = regexp.MustCompile(`cannot unmarshal \w+ into Go (?:struct field|value of type) \S*?\.?([a-z_]+) of type`)
 
-var pathParam = regexp.MustCompile(`\{(?:id|task|user|recipient|domain)\}`)
+var pathParam = regexp.MustCompile(`\{(?:[a-z_]+)\}`)
 
-var routeRe = regexp.MustCompile(`mux\.HandleFunc\("(GET|POST) (/o/\{org\}/[^"]*)"`)
-
-// orgRoutes reads every page and form of an organisation out of the source, and every
-// read the app's pages make out of the API's spec, so a route or operation added later
-// is tried without anyone remembering to list it. The pages themselves are one shell
-// that shows nothing until it reads the API.
+// orgRoutes reads every read and every change of an organisation's out of the API's
+// spec, so an operation added later is tried without anyone remembering to list it. The
+// pages themselves are one shell that shows nothing until it reads the API. A change
+// is its method and path.
 func orgRoutes(t *testing.T) (gets, posts []string) {
 	t.Helper()
 	spec, err := api.Spec()
@@ -54,23 +54,20 @@ func orgRoutes(t *testing.T) (gets, posts []string) {
 		t.Fatal(err)
 	}
 	for path, item := range spec.Paths.Map() {
-		if item.Get != nil && strings.HasPrefix(path, "/o/{org}/") {
-			gets = append(gets, pathParam.ReplaceAllString(path, "{id}"))
+		if !strings.HasPrefix(path, "/o/{org}/") {
+			continue
 		}
-	}
-	for _, name := range sourceFiles(t) {
-		text, err := os.ReadFile(name)
-		if err != nil {
-			t.Fatal(err)
+		path = strings.Replace(pathParam.ReplaceAllString(path, "{id}"), "/o/{id}/", "/o/{org}/", 1)
+		if item.Get != nil {
+			gets = append(gets, path)
 		}
-		for _, m := range routeRe.FindAllStringSubmatch(string(text), -1) {
-			if m[1] == "GET" {
-				gets = append(gets, m[2])
-			} else {
-				posts = append(posts, m[2])
+		for method, op := range map[string]*openapi3.Operation{"POST": item.Post, "PUT": item.Put, "PATCH": item.Patch, "DELETE": item.Delete} {
+			if op != nil {
+				posts = append(posts, method+" "+path)
 			}
 		}
 	}
+	slices.Sort(posts)
 	return gets, posts
 }
 
@@ -81,7 +78,7 @@ func bodyFields(t *testing.T) (numbers, texts, flags, lists map[string]bool) {
 	t.Helper()
 	numbers, texts, flags, lists = map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
 	fset := token.NewFileSet()
-	for _, name := range sourceFiles(t) {
+	for _, name := range append(sourceFiles(t), "api/api.gen.go") {
 		file, err := parser.ParseFile(fset, name, nil, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -112,6 +109,15 @@ func bodyFields(t *testing.T) (numbers, texts, flags, lists map[string]bool) {
 					texts[tag[1]] = true
 				case "bool":
 					flags[tag[1]] = true
+				default:
+					// The API's own kinds of text, such as a role or a step.
+					if id.Obj != nil {
+						if spec, ok := id.Obj.Decl.(*ast.TypeSpec); ok {
+							if under, ok := spec.Type.(*ast.Ident); ok && under.Name == "string" {
+								texts[tag[1]] = true
+							}
+						}
+					}
 				}
 			}
 			return true
@@ -121,13 +127,35 @@ func bodyFields(t *testing.T) (numbers, texts, flags, lists map[string]bool) {
 }
 
 // formWords are tryWords and the choices a form checks before it looks anything up.
-var formWords = append([]string{"new", "renewal", "month", "year", "openai", "anthropic", "read", "owner", "sales", "https://intruder.example"}, tryWords...)
+var formWords = append([]string{"new", "renewal", "month", "year", "openai", "anthropic", "read", "owner", "sales", "hunter", "https://intruder.example"}, tryWords...)
 
-// stopsShort are the forms that never answer yes to these bodies, and why: each is
+// stopsShort are the changes that never answer yes to these bodies, and why: each is
 // refused for what it was sent before or after it looked for a row, which the test
 // can't tell apart.
 var stopsShort = map[string]string{
-	"/o/{org}/ui/mail/test": "needs a mail server to send through",
+	"PATCH /o/{org}/api/v1/contacts/1/deal":        "takes only a deal's own fields, and every field is sent",
+	"PATCH /o/{org}/api/v1/settings":               "every text field is sent, and a site address is one",
+	"POST /o/{org}/api/v1/agents":                  "the same word is never both a kind of agent and its address",
+	"POST /o/{org}/api/v1/agreements/1/recipients": "names a contact or a member, and both are sent",
+	"POST /o/{org}/api/v1/campaigns":               "the same word is never both a kind and an audience",
+	"POST /o/{org}/api/v1/campaigns/1/resume":      "needs a mail server to send through",
+	"POST /o/{org}/api/v1/campaigns/1/send":        "needs a mail server to send through",
+	"POST /o/{org}/api/v1/enquiries/1/replies":     "needs a mail server to send through",
+	"POST /o/{org}/api/v1/onboardings/1/invites":   "needs a mail server to send through",
+	"POST /o/{org}/api/v1/mail-server/test":        "needs a mail server to send through",
+	"POST /o/{org}/api/v1/me/password":             "needs the current password",
+	"POST /o/{org}/api/v1/subscriptions":           "a price's period is a word no other field takes",
+	"PUT /o/{org}/api/v1/agreements/1/document":    "takes a PDF, not JSON",
+	"PUT /o/{org}/api/v1/agreements/1/fields":      "takes a list, not an object",
+}
+
+// problemDetail is what an API refusal says, or the answer as it came when it isn't one.
+func problemDetail(said string) string {
+	var p struct{ Detail string }
+	if json.Unmarshal([]byte(said), &p) == nil && p.Detail != "" {
+		return p.Detail
+	}
+	return said
 }
 
 // looked matches a refusal that says the form went looking for a row and found none
@@ -176,7 +204,7 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 
 	gets, posts := orgRoutes(t)
 	if len(gets) < 10 || len(posts) < 19 {
-		t.Fatalf("found only %d pages and %d forms in the source: has the way routes are written changed?", len(gets), len(posts))
+		t.Fatalf("found only %d reads and %d changes in the API spec: has the way it is read changed?", len(gets), len(posts))
 	}
 	unchanged := func(after string) {
 		t.Helper()
@@ -217,6 +245,8 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 
 	numbers, texts, flags, lists := bodyFields(t)
 	for _, route := range posts {
+		method, route, _ := strings.Cut(route, " ")
+		route = strings.ReplaceAll(route, "{id}", "1")
 		heard, answers := false, map[string]bool{}
 		for _, word := range formWords {
 			for _, preferNumbers := range []bool{true, false} {
@@ -245,7 +275,7 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 					var said string
 					// A field this form reads as something else (a list, say) is left out and the form tried again.
 					for range 8 {
-						code, said = call(t, intruder, "POST", srv.URL+strings.Replace(route, "{org}", "beta", 1), "application/json", body)
+						code, said = call(t, intruder, method, srv.URL+strings.Replace(route, "{org}", "beta", 1), "application/json", body)
 						wrong := wrongField.FindStringSubmatch(said)
 						if wrong == nil {
 							break
@@ -258,31 +288,33 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 						}
 					}
 					if strings.Contains(said, theirs) {
-						t.Errorf("POST %s as another organisation's owner answered with the first one's rows: %.200s", route, said)
+						t.Errorf("%s %s as another organisation's owner answered with the first one's rows: %.200s", method, route, said)
 					}
-					answers[fmt.Sprintf("%d %.60s", code, strings.TrimSpace(said))] = true
+					answers[fmt.Sprintf("%d %.80s", code, strings.TrimSpace(problemDetail(said)))] = true
 					// A yes, or a no that names the row it looked for, shows the form got as far as looking.
-					if code == http.StatusOK || looked.MatchString(said) {
+					if code < 300 || looked.MatchString(problemDetail(said)) {
 						heard = true
 					}
 				}
 			}
 		}
-		if !heard && stopsShort[route] == "" {
-			t.Errorf("POST %s was never answered with a yes, or a no naming the row it looked for, so nothing was learnt about it: "+
-				"give formWords what it checks for, or name it in stopsShort with why. It answered: %v", route, slices.Sorted(maps.Keys(answers)))
+		if !heard && stopsShort[method+" "+route] == "" {
+			t.Errorf("%s %s was never answered with a yes, or a no naming the row it looked for, so nothing was learnt about it: "+
+				"give formWords what it checks for, or name it in stopsShort with why. It answered: %v", method, route, slices.Sorted(maps.Keys(answers)))
 		}
-		if heard && stopsShort[route] != "" {
-			t.Errorf("POST %s is in stopsShort and did answer: take it out", route)
+		if heard && stopsShort[method+" "+route] != "" {
+			t.Errorf("%s %s is in stopsShort and did answer: take it out", method, route)
 		}
-		unchanged("POST " + route)
-		if code, _ := call(t, intruder, "POST", srv.URL+strings.Replace(route, "{org}", "alpha", 1), "application/json", map[string]any{"id": 1}); code != http.StatusNotFound {
-			t.Errorf("POST %s in the first organisation, by someone who isn't in it: %d", route, code)
+		unchanged(method + " " + route)
+		if code, _ := call(t, intruder, method, srv.URL+strings.Replace(route, "{org}", "alpha", 1), "application/json", map[string]any{"id": 1}); code != http.StatusNotFound {
+			t.Errorf("%s %s in the first organisation, by someone who isn't in it: %d", method, route, code)
 		}
 	}
 	unchanged("every form")
 
 	for _, route := range posts {
+		method, route, _ := strings.Cut(route, " ")
+		route = strings.ReplaceAll(route, "{id}", "1")
 		// Once more with the first organisation's own values, as its rows hold them, for
 		// a form that finds a row by its text. The answer may say them back, so only what
 		// changed is looked at.
@@ -292,7 +324,7 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 		}
 		said := ""
 		for range 8 {
-			_, said = call(t, intruder, "POST", srv.URL+strings.Replace(route, "{org}", "beta", 1), "application/json", named)
+			_, said = call(t, intruder, method, srv.URL+strings.Replace(route, "{org}", "beta", 1), "application/json", named)
 			wrong := wrongField.FindStringSubmatch(said)
 			if wrong == nil {
 				break
@@ -304,11 +336,11 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 			said = strings.ReplaceAll(said, sent.(string), "")
 		}
 		// A part of one, quoted back by a form that reads several from one field.
-		said = strings.ReplaceAll(said, `"`+theirs+`"`, "")
+		said = strings.ReplaceAll(strings.ReplaceAll(said, `"`+theirs+`"`, ""), `\"`+theirs+`\"`, "")
 		if strings.Contains(said, theirs) {
-			t.Errorf("POST %s with the first organisation's own values answered with more of them: %.200s", route, said)
+			t.Errorf("%s %s with the first organisation's own values answered with more of them: %.200s", method, route, said)
 		}
-		unchanged("POST " + route + " with the first organisation's own values")
+		unchanged(method + " " + route + " with the first organisation's own values")
 	}
 	// None of that signed the visitor out, which would have made every answer after it a refusal.
 	if code, body := call(t, intruder, "GET", srv.URL+"/o/beta/api/v1/nav", "", nil); code != http.StatusOK || !strings.Contains(body, `"slug":"beta"`) {
