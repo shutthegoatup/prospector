@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/shutthegoatup/prospector/api"
 )
@@ -237,5 +238,16 @@ func TestCampaignsSayWhyNothingCanBeSent(t *testing.T) {
 	_, _, srv, client := signedIn(t)
 	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/campaigns", "", nil); !strings.Contains(body, `"not_ready":"`) || strings.Contains(body, `"not_ready":""`) {
 		t.Errorf("campaigns should say why nothing can be sent yet: %s", body)
+	}
+}
+
+func TestServeRefusesABinaryBuiltWithoutTheWebApp(t *testing.T) {
+	if err := webBuilt(assetFS); err != nil {
+		t.Fatalf("this test binary: %v", err)
+	}
+	unbuilt := fstest.MapFS{"assets/css/output.css": {}, "assets/app/index.html": {}}
+	err := webBuilt(unbuilt)
+	if err == nil || !strings.Contains(err.Error(), "npm run build") {
+		t.Fatalf("got %v, want a refusal that says how to build the app", err)
 	}
 }

@@ -1,5 +1,5 @@
 // Writes the public site's pages, rendered by React when the app is built, into the
-// committed assets/app: the front page (site.html) and the /api reference (api.html).
+// embedded assets/app: the front page (site.html) and the /api reference (api.html).
 // Search engines, link previews and readers without script get the whole page; the
 // front page's script only adds its enquiry form.
 import { writeFile } from "node:fs/promises";

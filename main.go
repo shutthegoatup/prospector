@@ -191,6 +191,9 @@ func run(args []string) error {
 	s.dns = net.DefaultResolver
 	switch cmd {
 	case "serve":
+		if err := webBuilt(assetFS); err != nil {
+			return err
+		}
 		addr := "127.0.0.1:8766"
 		if port := os.Getenv("PORT"); port != "" {
 			addr = ":" + port

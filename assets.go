@@ -4,13 +4,26 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"strings"
 )
 
-//go:embed assets/css/output.css assets/css/fonts.css assets/css/landing.css assets/css/api.css assets/js assets/app assets/fonts assets/img
+// The whole directory, so Go builds before web/ has written assets/app and assets/js.
+//
+//go:embed assets
 var assetFS embed.FS
+
+// webBuilt reports whether the binary was built after the web app, which writes these.
+func webBuilt(fsys fs.FS) error {
+	for _, name := range []string{"app/index.html", "app/main.js", "app/site.html", "app/site.js", "app/api.html", "js/pdf.worker.min.mjs"} {
+		if _, err := fs.Stat(fsys, "assets/"+name); err != nil {
+			return fmt.Errorf("built without the web app (no assets/%s): run `npm ci && npm run build` in web/, then build again", name)
+		}
+	}
+	return nil
+}
 
 // assetVersion busts caches for the unhashed files (output.css, the app) on each build.
 var assetVersion = func() string {

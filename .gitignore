@@ -15,3 +15,6 @@
 node_modules/
 .playwright-mcp/
 /web/site-build/
+# Written by the web build (npm run build in web/), which goreleaser and the Dockerfile run.
+/assets/app/
+/assets/js/

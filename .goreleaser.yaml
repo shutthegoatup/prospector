@@ -2,6 +2,12 @@ version: 2
 
 project_name: prospector
 
+# The binary embeds the React app, so it is built first.
+before:
+  hooks:
+    - npm ci --prefix web --no-audit --no-fund
+    - npm run build --prefix web
+
 builds:
   - main: .
     binary: prospector
