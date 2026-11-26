@@ -492,10 +492,23 @@ func (s *Store) PickContactFor(org int64, o *Org, id int64, offeringID *int64, a
 		}
 		updates := map[string]any{"status": ""}
 		if offeringID != nil && *offeringID != c.OfferingID {
-			if c.Status != ContactSuggested {
+			// The offering is held before the person, as an agent adding them holds it.
+			if *offeringID != 0 {
+				if _, err := heldOffering(tx, org, *offeringID); err != nil {
+					return err
+				}
+			}
+			// Only while still suggested, checked as it is written, so two picks for different
+			// offerings can't both land.
+			res := tx.Model(&Contact{}).Where("org_id = ? and id = ? and status = ? and offering_id = ?", org, id, ContactSuggested, c.OfferingID).
+				Update("offering_id", *offeringID)
+			if res.Error != nil {
+				return res.Error
+			}
+			if res.RowsAffected == 0 {
 				return conflict(fmt.Sprintf("%s is already being reached for another offering", displayName(c)))
 			}
-			c.OfferingID, updates["offering_id"] = *offeringID, *offeringID
+			c.OfferingID = *offeringID
 		}
 		template := o.Settings.withDefaults().NoteTemplate
 		var offering *Offering

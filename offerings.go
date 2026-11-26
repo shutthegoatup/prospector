@@ -153,6 +153,14 @@ func nameFree(tx *gorm.DB, org, id int64, name string) error {
 // own, and companies found only for it come up in the organisation's own review.
 func (s *Store) RemoveOffering(org, id int64, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		// Companies are held before the offering, as everywhere; holding the organisation
+		// keeps any more from being found for it meanwhile.
+		if err := holdOrg(tx, org); err != nil {
+			return err
+		}
+		if err := tx.Model(&Company{}).Where("org_id = ? and found_for = ?", org, id).Update("found_for", 0).Error; err != nil {
+			return err
+		}
 		o, err := heldOffering(tx, org, id)
 		if err != nil {
 			return err
@@ -168,9 +176,6 @@ func (s *Store) RemoveOffering(org, id int64, actor string) error {
 			return err
 		}
 		if err := tx.Model(&Contact{}).Where("org_id = ? and offering_id = ?", org, id).Update("offering_id", 0).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&Company{}).Where("org_id = ? and found_for = ?", org, id).Update("found_for", 0).Error; err != nil {
 			return err
 		}
 		if err := tx.Delete(o).Error; err != nil {

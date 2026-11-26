@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/shutthegoatup/prospector/api"
@@ -27,6 +28,12 @@ func (s apiServer) ListResearch(ctx context.Context, in api.ListResearchRequestO
 			return nil, fmt.Errorf("task %d finds companies for another offering", t.ID)
 		}
 		offering = t.OfferingID
+		// A closed task can outlive its offering, whose finds are then the organisation's own.
+		if offering != 0 {
+			if _, err := s.a.s.Offering(q.Org.ID, offering); errors.As(err, new(notFound)) {
+				offering = 0
+			}
+		}
 	}
 	set := q.Org.Settings
 	if offering != 0 {

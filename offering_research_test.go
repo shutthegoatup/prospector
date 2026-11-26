@@ -120,8 +120,7 @@ func TestEachOfferingHasAResearchQueueOfItsOwn(t *testing.T) {
 }
 
 func TestRemovingAnOfferingBringsWhatItFoundIntoTheOrganisationsOwnReview(t *testing.T) {
-	s := tempStore(t)
-	o := mustOrg(t, s, "alpha")
+	s, o, srv, _ := signedIn(t)
 	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO"}, "Ada"))
 	task := must(s.CreateTaskFor(o.ID, cto.ID, "", "Find scale-ups", "Ada"))
 	must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "Harbour Analytics", Task: task.ID}))
@@ -144,6 +143,13 @@ func TestRemovingAnOfferingBringsWhatItFoundIntoTheOrganisationsOwnReview(t *tes
 	}
 	if n := s.ResearchCount(o.ID, "review"); n != 2 {
 		t.Fatalf("a company found for a removed offering should come up in the organisation's own review: %d", n)
+	}
+	secret, _, err := s.CreateKey(o.ID, "robot", []string{"read"}, "Ada Lovelace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, page := queueAt(t, srv.URL+"/o/alpha/api/v1/research?task="+itoa(task.ID), secret); code != http.StatusOK || len(page.Items) != 2 {
+		t.Fatalf("a closed task's search, after its offering was removed: %d %+v", code, page)
 	}
 }
 
