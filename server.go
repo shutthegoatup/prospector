@@ -277,16 +277,6 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (a *App) owner(next http.HandlerFunc) http.HandlerFunc {
-	return a.member(func(w http.ResponseWriter, r *http.Request) {
-		if !reqOf(r).Owner() {
-			http.Error(w, "only an owner of this organisation can change that", http.StatusForbidden)
-			return
-		}
-		next(w, r)
-	})
-}
-
 // agent authenticates an API key for the organisation in the URL and checks its scope.
 func (a *App) agent(scope string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -376,28 +366,8 @@ func (a *App) Routes() http.Handler {
 	}))
 	a.appRoutes(mux)
 	mux.HandleFunc("GET /o/{org}/agreements/{id}/prepare", a.member(a.prepareAgreement))
-	a.taskRoutes(mux)
 	mux.HandleFunc("OPTIONS "+intakePattern, a.intakePreflight)
 	mux.HandleFunc("POST "+intakePattern, a.intake)
-
-	mux.HandleFunc("POST /o/{org}/ui/mark", a.works(areaSales, a.uiMark))
-	mux.HandleFunc("POST /o/{org}/ui/voice", a.member(a.uiVoice))
-	mux.HandleFunc("POST /o/{org}/ui/member", a.owner(a.uiMember))
-	mux.HandleFunc("POST /o/{org}/ui/member/remove", a.owner(a.uiRemoveMember))
-	mux.HandleFunc("POST /o/{org}/ui/mail", a.owner(a.uiMail))
-	mux.HandleFunc("POST /o/{org}/ui/mail/test", a.owner(a.uiMailTest))
-	mux.HandleFunc("POST /o/{org}/ui/sso", a.owner(a.uiSSO))
-	mux.HandleFunc("POST /o/{org}/ui/sso/domain", a.owner(a.uiSSODomain))
-	mux.HandleFunc("POST /o/{org}/ui/sso/domain/remove", a.owner(a.uiSSODomainRemove))
-	mux.HandleFunc("POST /o/{org}/ui/sso/verify", a.owner(a.uiSSOVerify))
-	mux.HandleFunc("POST /o/{org}/ui/export", a.owner(a.uiExport))
-	mux.HandleFunc("POST /o/{org}/ui/export-org", a.owner(a.uiExportOrg))
-	mux.HandleFunc("POST /o/{org}/ui/erase", a.owner(a.uiErase))
-	mux.HandleFunc("POST /o/{org}/ui/keys", a.owner(a.uiKey))
-	mux.HandleFunc("POST /o/{org}/ui/keys/revoke", a.owner(a.uiRevoke))
-	mux.HandleFunc("POST /o/{org}/ui/keys/scopes", a.owner(a.uiKeyScopes))
-	mux.HandleFunc("POST /o/{org}/ui/member/role", a.owner(a.uiMemberRole))
-	mux.HandleFunc("POST /o/{org}/ui/member/areas", a.owner(a.uiMemberAreas))
 
 	a.apiRoutes(mux)
 	a.routeAPI(mux)

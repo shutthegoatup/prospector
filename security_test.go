@@ -453,7 +453,7 @@ func TestRemoveMember(t *testing.T) {
 		t.Fatal(err)
 	}
 	remove := func(client *http.Client, user int64) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/member/remove", "application/json", map[string]int64{"user_id": user})
+		return call(t, client, "DELETE", srv.URL+"/o/alpha/api/v1/members/"+itoa(user), "application/json", nil)
 	}
 
 	if code, _ := remove(bobClient, adaUser.ID); code != http.StatusForbidden {
@@ -462,7 +462,7 @@ func TestRemoveMember(t *testing.T) {
 	if code, _ := remove(ada, adaUser.ID); code != http.StatusBadRequest {
 		t.Fatalf("the last owner left: %d", code)
 	}
-	if code, _ := call(t, ada, "POST", srv.URL+"/o/alpha/ui/member", "application/json",
+	if code, _ := call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json",
 		map[string]string{"email": "ada@example.com", "role": "member"}); code != http.StatusBadRequest {
 		t.Fatalf("the last owner was demoted: %d", code)
 	}
@@ -480,7 +480,7 @@ func TestRemoveMember(t *testing.T) {
 	if code, body := call(t, bobClient, "GET", srv.URL+"/o/alpha/api/v1/nav", "", nil); code != http.StatusOK || !strings.Contains(body, `"owner":false`) {
 		t.Fatalf("a member is offered Remove: %d %s", code, body)
 	}
-	if code, _ := remove(ada, bob.ID); code != http.StatusOK {
+	if code, _ := remove(ada, bob.ID); code != http.StatusNoContent {
 		t.Fatalf("remove: %d", code)
 	}
 	if code, _ := call(t, bobClient, "GET", srv.URL+"/o/alpha/today", "", nil); code != http.StatusNotFound {
@@ -494,8 +494,7 @@ func TestRemoveMember(t *testing.T) {
 	}
 
 	join("carol@example.com", o, "owner")
-	code, body := remove(ada, adaUser.ID)
-	if code != http.StatusOK || !strings.Contains(body, `"go":"/"`) {
+	if code, body := remove(ada, adaUser.ID); code != http.StatusNoContent {
 		t.Fatalf("an owner leaving with another owner in place: %d %s", code, body)
 	}
 	if code, _ := call(t, ada, "GET", srv.URL+"/o/alpha/today", "", nil); code != http.StatusNotFound {
@@ -723,8 +722,8 @@ func TestOrgIsCreatedWithItsOwner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, body := call(t, client, "POST", srv.URL+"/orgs", "application/json", map[string]string{"name": "Gamma Boats"})
-	if code != http.StatusOK || !strings.Contains(body, "/o/gamma-boats/settings") {
+	code, body := call(t, client, "POST", srv.URL+"/api/v1/orgs", "application/json", map[string]string{"name": "Gamma Boats"})
+	if code != http.StatusCreated || !strings.Contains(body, `"slug":"gamma-boats"`) {
 		t.Fatalf("new organisation: %d %s", code, body)
 	}
 	gamma, err := s.OrgBySlug("gamma-boats")
@@ -752,12 +751,12 @@ func TestOrgIsCreatedWithItsOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"Prospector", "gamma boats"} {
-		code, body := call(t, client, "POST", srv.URL+"/orgs", "application/json", map[string]string{"name": name})
+		code, body := call(t, client, "POST", srv.URL+"/api/v1/orgs", "application/json", map[string]string{"name": name})
 		if code != http.StatusConflict || !strings.Contains(body, "already has the address /o/"+slugify(name)) || regexp.MustCompile(`(?i)unique|constraint|duplicate`).MatchString(body) {
 			t.Errorf("a second organisation named %q: %d %s", name, code, body)
 		}
 	}
-	if code, _ := call(t, client, "POST", srv.URL+"/orgs", "application/json", map[string]string{"name": "!!!"}); code != http.StatusBadRequest {
+	if code, _ := call(t, client, "POST", srv.URL+"/api/v1/orgs", "application/json", map[string]string{"name": "!!!"}); code != http.StatusBadRequest {
 		t.Fatalf("a name with no usable characters: %d", code)
 	}
 }
@@ -803,10 +802,10 @@ func TestHistoryNamesPeopleInFull(t *testing.T) {
 
 func TestFirstPasswordMustBeChanged(t *testing.T) {
 	s, _, srv, ada := signedIn(t)
-	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/member", "application/json",
+	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json",
 		map[string]string{"email": "bob@example.com", "name": "Bob Stone", "role": "member"})
 	_, after, found := strings.Cut(body, "shown once: ")
-	if code != http.StatusOK || !found {
+	if code != http.StatusCreated || !found {
 		t.Fatalf("invite: %d %s", code, body)
 	}
 	given := strings.Fields(after)[0]
@@ -836,7 +835,7 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 	if code, _ := call(t, bob, "POST", srv.URL+"/o/alpha/api/v1/people", "application/json", QuickAdd{Name: "Hannah Pryce"}); code != http.StatusForbidden {
 		t.Fatalf("an action before the first password is changed: %d", code)
 	}
-	if code, _ := call(t, bob, "POST", srv.URL+"/orgs", "application/json", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
+	if code, _ := call(t, bob, "POST", srv.URL+"/api/v1/orgs", "application/json", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
 		t.Fatalf("a new organisation before the first password is changed: %d", code)
 	}
 	fragment, _ := http.NewRequest("GET", srv.URL+"/o/alpha/today", nil)
@@ -880,8 +879,8 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 	if err := s.AddMember(other.ID, adaUser.ID, "owner", adaUser.Name); err != nil {
 		t.Fatal(err)
 	}
-	if code, body := call(t, ada, "POST", srv.URL+"/o/beta/ui/member", "application/json",
-		map[string]string{"email": "bob@example.com", "role": "member"}); code != http.StatusOK || strings.Contains(body, "shown once") {
+	if code, body := call(t, ada, "POST", srv.URL+"/o/beta/api/v1/members", "application/json",
+		map[string]string{"email": "bob@example.com", "role": "member"}); code != http.StatusCreated || strings.Contains(body, "shown once") {
 		t.Fatalf("adding an existing account: %d %s", code, body)
 	}
 	if body := page("/o/beta/settings"); !strings.Contains(body, `<div id="app"></div>`) || strings.Contains(body, "Choose your own password") {
@@ -1165,7 +1164,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 		method, path string
 		headers      map[string]string
 	}{
-		"the page script":  {"POST", "/o/alpha/ui/mark", map[string]string{"content-type": "application/json", "Accept": "*/*"}},
+		"the page script":  {"POST", "/password", map[string]string{"content-type": "application/json", "Accept": "*/*"}},
 		"a page refresh":   {"GET", "/o/nope/today", map[string]string{"Accept": "text/html", "X-Fragment": "1"}},
 		"no Accept header": {"GET", "/o/nope/today", nil},
 	} {

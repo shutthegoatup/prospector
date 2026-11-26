@@ -587,18 +587,6 @@ type ssoIn struct {
 	AutoJoin bool   `json:"auto_join"`
 }
 
-func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
-	var in ssoIn
-	if !decode(w, r, &in) {
-		return
-	}
-	if err := a.saveSSO(r.Context(), reqOf(r), in); err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	done(w, nil)
-}
-
 func (a *App) saveSSO(ctx context.Context, q *Req, in ssoIn) error {
 	sso, err := a.s.SSO(q.Org.ID)
 	if err != nil {
@@ -658,22 +646,6 @@ func (a *App) saveSSO(ctx context.Context, q *Req, in ssoIn) error {
 	return a.s.SaveSSO(&c, q.Actor())
 }
 
-type domainIn struct {
-	Domain string `json:"domain"`
-}
-
-func (a *App) uiSSODomain(w http.ResponseWriter, r *http.Request) {
-	var in domainIn
-	if !decode(w, r, &in) {
-		return
-	}
-	if _, err := a.addSSODomain(reqOf(r).Org.ID, in.Domain); err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	done(w, nil)
-}
-
 func (a *App) addSSODomain(org int64, raw string) (*SSODomain, error) {
 	domain := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(raw)), "@")
 	if !domainRe.MatchString(domain) {
@@ -692,14 +664,6 @@ func (a *App) addSSODomain(org int64, raw string) (*SSODomain, error) {
 		return nil, err
 	}
 	return d, nil
-}
-
-func (a *App) uiSSODomainRemove(w http.ResponseWriter, r *http.Request) {
-	var in domainIn
-	if !decode(w, r, &in) {
-		return
-	}
-	done(w, a.removeSSODomain(reqOf(r).Org.ID, in.Domain))
 }
 
 func (a *App) removeSSODomain(org int64, domain string) error {
@@ -726,15 +690,6 @@ func (a *App) lookupTXT(ctx context.Context, name string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	return net.DefaultResolver.LookupTXT(ctx, name)
-}
-
-func (a *App) uiSSOVerify(w http.ResponseWriter, r *http.Request) {
-	var in domainIn
-	if !decode(w, r, &in) {
-		return
-	}
-	_, err := a.verifySSODomain(r.Context(), reqOf(r).Org.ID, in.Domain)
-	done(w, err)
 }
 
 func (a *App) verifySSODomain(ctx context.Context, org int64, domain string) (*SSODomain, error) {

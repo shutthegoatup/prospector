@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"slices"
 	"strings"
 )
@@ -88,17 +87,6 @@ func areaRefusal(area string) string {
 	return "that's " + area + " work, which you don't do here: an owner can add " + area + " to you on the Team list in Settings"
 }
 
-// works holds a page's write to the people of one area.
-func (a *App) works(area string, next http.HandlerFunc) http.HandlerFunc {
-	return a.member(func(w http.ResponseWriter, r *http.Request) {
-		if !reqOf(r).Member.Works(area) {
-			http.Error(w, areaRefusal(area), http.StatusForbidden)
-			return
-		}
-		next(w, r)
-	})
-}
-
 // SetAreas says what someone works on. None leaves them reading only.
 func (s *Store) SetAreas(org, user int64, areas []string) error {
 	for _, ar := range areas {
@@ -118,13 +106,12 @@ func (s *Store) SetAreas(org, user int64, areas []string) error {
 	}
 	return res.Error
 }
-
-func (a *App) uiMemberAreas(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		UserID int64    `json:"user_id"`
-		Areas  []string `json:"areas"`
+func memberWork(m Membership) string {
+	if m.Role == "owner" {
+		return "owner"
 	}
-	if decode(w, r, &in) {
-		done(w, a.s.SetAreas(reqOf(r).Org.ID, in.UserID, in.Areas))
+	if m.Areas == "" {
+		return "member · reads only"
 	}
+	return "member · " + strings.ReplaceAll(m.Areas, " ", ", ")
 }

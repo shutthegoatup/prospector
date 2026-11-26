@@ -209,7 +209,12 @@ func (b *browser) get(path string) (code int, body, location string) {
 
 func (b *browser) post(path string, body any) (int, string) {
 	b.t.Helper()
-	return call(b.t, b.c, "POST", b.base+path, "application/json", body)
+	return b.send("POST", path, body)
+}
+
+func (b *browser) send(method, path string, body any) (int, string) {
+	b.t.Helper()
+	return call(b.t, b.c, method, b.base+path, "application/json", body)
 }
 
 func (b *browser) login(email, password string) {
@@ -430,22 +435,22 @@ func connected(t *testing.T, srv *httptest.Server, dns map[string][]string, s *S
 			break
 		}
 	}
-	base := "/o/" + slug + "/ui/sso"
-	if code, body := owner.post(base+"/domain", map[string]string{"domain": domain}); code != http.StatusOK {
+	base := "/o/" + slug + "/api/v1/sso"
+	if code, body := owner.post(base+"/domains", map[string]string{"domain": domain}); code != http.StatusCreated {
 		t.Fatalf("adding %s: %d %s", domain, code, body)
 	}
 	sso, _ := s.SSO(o.ID)
 	for _, d := range sso.Domains {
 		dns[d.Record()] = []string{d.Token}
 	}
-	if code, body := owner.post(base+"/verify", map[string]string{"domain": domain}); code != http.StatusOK {
+	if code, body := owner.post(base+"/domains/"+domain+"/verify", nil); code != http.StatusOK {
 		t.Fatalf("verifying %s: %d %s", domain, code, body)
 	}
 	in := map[string]any{"issuer": p.srv.URL, "client_id": "client", "client_secret": "secret"}
 	for k, v := range rules {
 		in[k] = v
 	}
-	if code, body := owner.post(base, in); code != http.StatusOK {
+	if code, body := owner.send("PUT", base, in); code != http.StatusOK {
 		t.Fatalf("saving the connection: %d %s", code, body)
 	}
 }
@@ -744,7 +749,7 @@ func TestSingleSignOnSettings(t *testing.T) {
 		"no client secret":                         {with("client_secret", ""), "both needed"},
 		"an issuer that can't be read":             {with("issuer", okta.srv.URL+"/nowhere"), "couldn't be read"},
 	} {
-		if code, body := owner.post("/o/alpha/ui/sso", c.in); code != http.StatusBadRequest || !strings.Contains(body, c.want) {
+		if code, body := owner.send("PUT", "/o/alpha/api/v1/sso", c.in); code != http.StatusBadRequest || !strings.Contains(body, c.want) {
 			t.Errorf("%s: %d %s", what, code, body)
 		}
 	}
@@ -752,17 +757,17 @@ func TestSingleSignOnSettings(t *testing.T) {
 		t.Fatal("a refused connection was saved")
 	}
 
-	if code, body := owner.post("/o/alpha/ui/sso/domain", map[string]string{"domain": "not a domain"}); code != http.StatusBadRequest {
+	if code, body := owner.post("/o/alpha/api/v1/sso/domains", map[string]string{"domain": "not a domain"}); code != http.StatusBadRequest {
 		t.Errorf("a domain that isn't one: %d %s", code, body)
 	}
-	if code, body := owner.post("/o/alpha/ui/sso/domain", map[string]string{"domain": "@Alpha.Example"}); code != http.StatusOK {
+	if code, body := owner.post("/o/alpha/api/v1/sso/domains", map[string]string{"domain": "@Alpha.Example"}); code != http.StatusCreated {
 		t.Fatalf("adding a domain: %d %s", code, body)
 	}
-	if code, body := owner.post("/o/alpha/ui/sso/verify", map[string]string{"domain": "alpha.example"}); code != http.StatusBadRequest || !strings.Contains(body, "_prospector-challenge.alpha.example") {
+	if code, body := owner.post("/o/alpha/api/v1/sso/domains/alpha.example/verify", nil); code != http.StatusBadRequest || !strings.Contains(body, "_prospector-challenge.alpha.example") {
 		t.Fatalf("verifying a domain whose DNS says nothing: %d %s", code, body)
 	}
 	dns["_prospector-challenge.alpha.example"] = []string{"somebody else's value"}
-	if code, _ := owner.post("/o/alpha/ui/sso/verify", map[string]string{"domain": "alpha.example"}); code != http.StatusBadRequest {
+	if code, _ := owner.post("/o/alpha/api/v1/sso/domains/alpha.example/verify", nil); code != http.StatusBadRequest {
 		t.Fatalf("verifying a domain whose DNS holds another value: %d", code)
 	}
 	sso, _ := s.SSO(alpha.ID)
@@ -770,7 +775,7 @@ func TestSingleSignOnSettings(t *testing.T) {
 		t.Fatal("an unverified domain is believed")
 	}
 	dns["_prospector-challenge.alpha.example"] = []string{sso.Domains[0].Token}
-	if code, body := owner.post("/o/alpha/ui/sso/verify", map[string]string{"domain": "alpha.example"}); code != http.StatusOK {
+	if code, body := owner.post("/o/alpha/api/v1/sso/domains/alpha.example/verify", nil); code != http.StatusOK {
 		t.Fatalf("verifying a domain: %d %s", code, body)
 	}
 	sso, _ = s.SSO(alpha.ID)
@@ -778,11 +783,11 @@ func TestSingleSignOnSettings(t *testing.T) {
 		t.Fatal("a verified domain should cover its own addresses and no others")
 	}
 
-	if code, body := owner.post("/o/alpha/ui/sso", with("required", true)); code != http.StatusOK {
+	if code, body := owner.send("PUT", "/o/alpha/api/v1/sso", with("required", true)); code != http.StatusOK {
 		t.Fatalf("saving the connection: %d %s", code, body)
 	}
 	// Saving again without retyping the secret keeps it.
-	if code, body := owner.post("/o/alpha/ui/sso", with("client_secret", "")); code != http.StatusOK {
+	if code, body := owner.send("PUT", "/o/alpha/api/v1/sso", with("client_secret", "")); code != http.StatusOK {
 		t.Fatalf("saving without the secret: %d %s", code, body)
 	}
 	sso, _ = s.SSO(alpha.ID)
@@ -800,12 +805,12 @@ func TestSingleSignOnSettings(t *testing.T) {
 		"another client": {"issuer": okta.srv.URL, "client_id": "another"},
 		"another issuer": {"issuer": other.srv.URL, "client_id": "client"},
 	} {
-		if code, body := owner.post("/o/alpha/ui/sso", in); code != http.StatusBadRequest || !strings.Contains(body, "secret again") {
+		if code, body := owner.send("PUT", "/o/alpha/api/v1/sso", in); code != http.StatusBadRequest || !strings.Contains(body, "secret again") {
 			t.Errorf("the kept secret with %s: %d %s", what, code, body)
 		}
 	}
 	// A provider that signs in every tenant under one registration pins nobody to this organisation.
-	if code, body := owner.post("/o/alpha/ui/sso", with("issuer", newIdP(t, "any-tenant", false).srv.URL)); code != http.StatusBadRequest || !strings.Contains(body, "every tenant") {
+	if code, body := owner.send("PUT", "/o/alpha/api/v1/sso", with("issuer", newIdP(t, "any-tenant", false).srv.URL)); code != http.StatusBadRequest || !strings.Contains(body, "every tenant") {
 		t.Errorf("an issuer for every tenant, at an address of its own: %d %s", code, body)
 	}
 	if sso, _ := s.SSO(alpha.ID); sso.Issuer != okta.srv.URL || sso.ClientID != "client" {
@@ -839,10 +844,10 @@ func TestSingleSignOnSettings(t *testing.T) {
 		}
 	}
 
-	if code, body := owner.post("/o/alpha/ui/sso", with("required", true)); code != http.StatusOK {
+	if code, body := owner.send("PUT", "/o/alpha/api/v1/sso", with("required", true)); code != http.StatusOK {
 		t.Fatalf("requiring it: %d %s", code, body)
 	}
-	if code, body := owner.post("/o/alpha/ui/sso/domain/remove", map[string]string{"domain": "alpha.example"}); code != http.StatusBadRequest || !strings.Contains(body, "last verified domain") {
+	if code, body := owner.send("DELETE", "/o/alpha/api/v1/sso/domains/alpha.example", nil); code != http.StatusBadRequest || !strings.Contains(body, "last verified domain") {
 		t.Fatalf("removing the last verified domain while it is required: %d %s", code, body)
 	}
 
@@ -851,9 +856,9 @@ func TestSingleSignOnSettings(t *testing.T) {
 	if err := ssoCommand(s, []string{"off", "alpha"}); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"", "/domain", "/domain/remove", "/verify"} {
-		if code, _ := member.post("/o/alpha/ui/sso"+path, map[string]string{"domain": "alpha.example"}); code != http.StatusForbidden {
-			t.Errorf("a member changing single sign-on at %q: %d", path, code)
+	for _, change := range []struct{ method, path string }{{"PUT", ""}, {"POST", "/domains"}, {"DELETE", "/domains/alpha.example"}, {"POST", "/domains/alpha.example/verify"}} {
+		if code, _ := member.send(change.method, "/o/alpha/api/v1/sso"+change.path, map[string]string{"domain": "alpha.example"}); code != http.StatusForbidden {
+			t.Errorf("a member changing single sign-on at %s %q: %d", change.method, change.path, code)
 		}
 	}
 	// Settings shows single sign-on only to an owner, and the API reads it only for one.
@@ -864,7 +869,7 @@ func TestSingleSignOnSettings(t *testing.T) {
 		t.Errorf("a member reads the single sign-on settings: %d", code)
 	}
 
-	if code, body := owner.post("/o/alpha/ui/sso", map[string]any{"issuer": ""}); code != http.StatusOK {
+	if code, body := owner.send("PUT", "/o/alpha/api/v1/sso", map[string]any{"issuer": ""}); code != http.StatusOK {
 		t.Fatalf("turning it off: %d %s", code, body)
 	}
 	if sso, _ := s.SSO(alpha.ID); sso.On() || len(sso.Domains) != 1 {
@@ -1017,7 +1022,7 @@ func TestProvidersInsideTheNetworkAreNeverReached(t *testing.T) {
 	app.outbound = nil
 	owner := newBrowser(t, srv.URL)
 	owner.login("ada@alpha.example", "correct horse battery")
-	code, body := owner.post("/o/alpha/ui/sso", map[string]any{"issuer": inside.URL, "client_id": "client", "client_secret": "secret"})
+	code, body := owner.send("PUT", "/o/alpha/api/v1/sso", map[string]any{"issuer": inside.URL, "client_id": "client", "client_secret": "secret"})
 	if code != http.StatusBadRequest || !strings.Contains(body, "isn't a public address") || asked {
 		t.Fatalf("an issuer on this machine: %d %s (reached: %v)", code, body, asked)
 	}

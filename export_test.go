@@ -54,7 +54,7 @@ func TestExportPerson(t *testing.T) {
 
 	companyHistory := srv.URL + "/o/alpha/api/v1/companies/" + strconv.FormatInt(*hannah.CompanyID, 10) + "/history"
 	export := func(client *http.Client, id int64) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/export", "application/json", map[string]int64{"id": id})
+		return call(t, client, "POST", srv.URL+"/o/alpha/api/v1/contacts/"+strconv.FormatInt(id, 10)+"/export", "application/json", struct{}{})
 	}
 	if code, _ := export(bob, hannah.ID); code != http.StatusForbidden {
 		t.Fatalf("a member who isn't an owner exported someone: %d", code)
@@ -69,7 +69,7 @@ func TestExportPerson(t *testing.T) {
 		t.Fatal("an agent's key exported someone")
 	}
 	// A link on another site can send an owner's browser anywhere a GET reaches.
-	if code, _ := call(t, ada, "GET", srv.URL+"/o/alpha/ui/export?id="+strconv.FormatInt(hannah.ID, 10), "", nil); code == http.StatusOK {
+	if code, _ := call(t, ada, "GET", srv.URL+"/o/alpha/api/v1/contacts/"+strconv.FormatInt(hannah.ID, 10)+"/export", "", nil); code == http.StatusOK {
 		t.Fatal("following a link exported someone")
 	}
 	for what, id := range map[string]int64{"a company's placeholder row": placeholder.ID, "someone in another organisation": theirs.ID, "nobody": 999999} {

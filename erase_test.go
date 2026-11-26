@@ -58,13 +58,13 @@ func TestErasePerson(t *testing.T) {
 	}
 	res.Body.Close()
 	erase := func(client *http.Client, id int64) int {
-		code, _ := call(t, client, "POST", srv.URL+"/o/alpha/ui/erase", "application/json", map[string]int64{"id": id})
+		code, _ := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/contacts/"+strconv.FormatInt(id, 10)+"/erase", "application/json", struct{}{})
 		return code
 	}
 	if code := erase(bob, hannah.ID); code != http.StatusForbidden {
 		t.Fatalf("a member who isn't an owner erased someone: %d", code)
 	}
-	if code := erase(ada, placeholder.ID); code == http.StatusOK {
+	if code := erase(ada, placeholder.ID); code < 300 {
 		t.Fatal("a company's placeholder row was erased as if it were a person")
 	}
 	// The company page offers erasing to whoever the nav says is an owner.
@@ -74,7 +74,7 @@ func TestErasePerson(t *testing.T) {
 	if code, _ := call(t, bob, "POST", srv.URL+"/o/alpha/api/v1/contacts/"+strconv.FormatInt(hannah.ID, 10)+"/erase", "application/json", struct{}{}); code != http.StatusForbidden {
 		t.Fatalf("a member who isn't an owner erased someone through the API: %d", code)
 	}
-	if code := erase(ada, hannah.ID); code != http.StatusOK {
+	if code := erase(ada, hannah.ID); code != http.StatusNoContent {
 		t.Fatalf("erase: %d", code)
 	}
 

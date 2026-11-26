@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -369,63 +368,6 @@ func (s *Store) companyNames(org int64, people []Contact) (map[int64]string, err
 		names[c.ID] = c.Name
 	}
 	return names, nil
-}
-
-// CampaignCard is a campaign as its page shows it, with who it would go to now.
-type CampaignCard struct {
-	Campaign
-	Going, LeftOut int
-	// Shown is the start of the audience, those it goes to first.
-	Shown []Recipient
-	// Mail counts a sent campaign's mails by how they went.
-	Mail map[string]int
-}
-
-const campaignShown = 30
-
-func (a *App) campaignsPage(w http.ResponseWriter, r *http.Request) {
-	q := reqOf(r)
-	list, err := a.s.Campaigns(q.Org.ID)
-	if err != nil {
-		fail(w, err, http.StatusInternalServerError)
-		return
-	}
-	cards := make([]CampaignCard, 0, len(list))
-	work, err := a.s.audienceWork(q.Org)
-	if err != nil {
-		fail(w, err, http.StatusInternalServerError)
-		return
-	}
-	ids := make([]int64, 0, len(list))
-	for _, c := range list {
-		ids = append(ids, c.ID)
-	}
-	tally, err := a.s.CampaignTally(q.Org.ID, ids)
-	if err != nil {
-		fail(w, err, http.StatusInternalServerError)
-		return
-	}
-	for _, c := range list {
-		card := CampaignCard{Campaign: c, Mail: tally[c.ID]}
-		// Once sent, who it went to is in its mail, not in who it would go to now.
-		if c.Status == CampaignDraft {
-			people, err := a.s.audience(q.Org, c, work)
-			if err != nil {
-				fail(w, err, http.StatusInternalServerError)
-				return
-			}
-			card.Shown = people[:min(len(people), campaignShown)]
-			for _, p := range people {
-				if p.LeftOut == "" {
-					card.Going++
-				} else {
-					card.LeftOut++
-				}
-			}
-		}
-		cards = append(cards, card)
-	}
-	a.page(w, r, "campaigns", CampaignsView(q, cards, a.sendable(q.Org)))
 }
 
 // fits is whether a campaign's kind and audience go together: a service notice is for
