@@ -147,12 +147,35 @@ type EnquiryChange = PatchBody<"/o/{org}/api/v1/enquiries/{id}">;
 const subscriptionFields = ["name", "amount", "per", "start", "term_months", "then", "notice_days", "notice_on", "ended_on"] as const satisfies readonly (keyof Schemas["SubscriptionChange"])[];
 const dealFields = ["kind", "amount", "close_date", "owner", "stage", "next_step", "next_date", "lost_reason"] as const satisfies readonly (keyof Schemas["DealChange"])[];
 const enquiryFields = ["state", "owner", "note"] as const satisfies readonly (keyof EnquiryChange)[];
+const contactFields = ["person", "title", "email", "linkedin", "phone", "tz", "sources", "call_notes", "send_to", "message", "note", "subject", "body", "followup", "stage", "next_step", "next_date", "lost_reason"] as const satisfies readonly (keyof Schemas["ContactChange"])[];
 const campaignFields = ["name", "kind", "audience", "subject", "body"] as const satisfies readonly (keyof Schemas["CampaignChange"])[];
 
 function oneOf<T extends string>(list: readonly T[], f: string, what: string): T {
   if (!(list as readonly string[]).includes(f)) throw new Error(`${what} has no ${f}.`);
   return f as T;
 }
+
+// A file chosen for an agreement goes up as the PDF it is, the body of a PUT.
+document.addEventListener("change", async (e) => {
+  const input = (e.target as Element).closest<HTMLInputElement>("input[type=file][data-upload]");
+  const file = input?.files?.[0];
+  if (!input || !file) return;
+  try {
+    answered(
+      await api.PUT("/o/{org}/api/v1/agreements/{id}/document", {
+        params: { path: { org, id: +(input.dataset.upload || 0) }, query: { name: file.name } },
+        // The spec's binary body is typed as a string; the File is sent as it is.
+        body: file as unknown as string,
+        bodySerializer: (b) => b,
+        headers: { "content-type": "application/pdf" },
+      }),
+    );
+    refresh();
+  } catch (err) {
+    input.value = "";
+    report(err);
+  }
+});
 
 document.addEventListener("change", async (e) => {
   const f = (e.target as Element).closest<Field>("[data-field]");
@@ -179,7 +202,14 @@ document.addEventListener("change", async (e) => {
     } else if (f.dataset.step) {
       if (field !== "due") throw new Error(`A step's ${field} is changed another way.`);
       answered(await api.PATCH("/o/{org}/api/v1/onboarding-steps/{id}", { params: { path: { org, id: +f.dataset.step } }, body: { due: f.value } }));
-    } else await send("ui/update", { id: +(f.dataset.id || 0), field, value: f.value });
+    } else if (field.startsWith("deal_")) {
+      // The deal a conversation carries, changed through its person.
+      const change: Schemas["DealChange"] = { [oneOf(dealFields, field.slice(5), "A deal")]: f.value };
+      answered(await api.PATCH("/o/{org}/api/v1/contacts/{id}/deal", { params: { path: { org, id: +(f.dataset.id || 0) } }, body: change }));
+    } else {
+      const change: Schemas["ContactChange"] = { [oneOf(contactFields, field, "A person")]: f.value };
+      answered(await api.PATCH("/o/{org}/api/v1/contacts/{id}", { params: { path: { org, id: +(f.dataset.id || 0) } }, body: change }));
+    }
     if (f.dataset.refresh || field === "phone") refresh();
   } catch (err) {
     report(err);

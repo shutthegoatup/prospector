@@ -775,9 +775,9 @@ func TestHistoryNamesPeopleInFull(t *testing.T) {
 	}
 
 	s, o, srv, client := signedIn(t)
-	code, _ := call(t, client, "POST", srv.URL+"/o/alpha/ui/add", "application/json",
+	code, _ := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/people", "application/json",
 		QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Linkedin: "https://www.linkedin.com/in/hannah-pryce"})
-	if code != http.StatusOK {
+	if code != http.StatusCreated {
 		t.Fatalf("quick add: %d", code)
 	}
 	c, err := s.FindOne(o.ID, "Hannah")
@@ -828,7 +828,7 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 			t.Fatalf("%s is open before the first password is changed", path)
 		}
 	}
-	if code, _ := call(t, bob, "POST", srv.URL+"/o/alpha/ui/add", "application/json", QuickAdd{Name: "Hannah Pryce"}); code != http.StatusForbidden {
+	if code, _ := call(t, bob, "POST", srv.URL+"/o/alpha/api/v1/people", "application/json", QuickAdd{Name: "Hannah Pryce"}); code != http.StatusForbidden {
 		t.Fatalf("an action before the first password is changed: %d", code)
 	}
 	if code, _ := call(t, bob, "POST", srv.URL+"/orgs", "application/json", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
@@ -955,11 +955,11 @@ func TestOtherSitesCantPost(t *testing.T) {
 	if got := post(client, "/logout", "", form, cross); got != http.StatusForbidden || !signedInAs() {
 		t.Fatalf("sign-out from another site: %d, still signed in: %v", got, signedInAs())
 	}
-	if got := post(client, "/o/alpha/ui/add", `{"name":"Mallory"}`, "application/json", cross); got != http.StatusForbidden {
+	if got := post(client, "/o/alpha/api/v1/people", `{"name":"Mallory"}`, "application/json", cross); got != http.StatusForbidden {
 		t.Fatalf("an action from another site: %d", got)
 	}
-	if got := post(client, "/o/alpha/ui/add", `{"name":"Hannah Pryce"}`, "application/json",
-		map[string]string{"Sec-Fetch-Site": "same-origin", "Origin": srv.URL}); got != http.StatusOK {
+	if got := post(client, "/o/alpha/api/v1/people", `{"name":"Hannah Pryce"}`, "application/json",
+		map[string]string{"Sec-Fetch-Site": "same-origin", "Origin": srv.URL}); got != http.StatusCreated {
 		t.Fatalf("an action from this site: %d", got)
 	}
 
@@ -1212,7 +1212,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 		t.Fatalf("a cross-site post carrying a proxy's Basic sign-in: %d", code)
 	}
 	basic["Sec-Fetch-Site"] = "same-origin"
-	if code, _, _ := get(client, "POST", "/o/alpha/ui/add", basic); code != http.StatusUnsupportedMediaType {
+	if code, _, _ := get(client, "POST", "/o/alpha/api/v1/people", basic); code != http.StatusUnsupportedMediaType {
 		t.Fatalf("a form post carrying a proxy's Basic sign-in skipped the JSON rule: %d", code)
 	}
 

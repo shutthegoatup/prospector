@@ -15,7 +15,8 @@ info:
     and say where answering an enquiry stands; `enquiries:triage` to say where answering an
     enquiry stands and put its sender on the board, without deals; `enquiries:delete` to delete an enquiry;
     `campaigns:write` to write campaigns and keep the list of addresses marketing mail
-    never goes to; `campaigns:send` to send, cancel and resume a campaign. A
+    never goes to; `campaigns:send` to send, cancel and resume a campaign;
+    `agreements:write` to start agreements and upload their documents. A
     signed-in member may do all of these except configuring agents and deleting enquiries,
     which need an owner.
 
@@ -32,6 +33,10 @@ tags:
     description: Prospector's own agents, each a model behind an endpoint with tools from an MCP server.
   - name: runs
     description: An agent working a task.
+  - name: people
+    description: The people you are in touch with, and their conversations.
+  - name: research
+    description: Reviewing what agents found before anyone is contacted.
   - name: tasks
     description: Briefs that agents and people work together, each a list of requests.
   - name: enquiries
@@ -42,6 +47,8 @@ tags:
     description: What a customer is on, its term and notice, and its renewal.
   - name: deals
     description: What each conversation is worth, who has it and when it should close.
+  - name: agreements
+    description: Contracts a company is to sign, each a PDF frozen by its hash.
   - name: mail
     description: Marketing mail, and the one list of addresses it never goes to.
 
@@ -1316,6 +1323,260 @@ paths:
                   ok: { type: boolean }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/agreements:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listAgreements
+      tags: [agreements]
+      summary: Agreements, newest first
+      parameters:
+        - name: company
+          in: query
+          description: Only this company's.
+          schema: { type: integer, format: int64 }
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: Newest first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Agreement" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: createAgreement
+      tags: [agreements]
+      summary: Start an agreement for a company
+      description: A draft, to which a PDF of the agreement is then uploaded. Signing comes in a later release.
+      security:
+        - session: []
+        - bearer: ["agreements:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [company, name]
+              properties:
+                company: { type: integer, format: int64 }
+                name: { type: string, maxLength: 120 }
+      responses:
+        "201":
+          description: The draft.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Agreement" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agreements/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: renameAgreement
+      tags: [agreements]
+      summary: Rename a draft agreement
+      security:
+        - session: []
+        - bearer: ["agreements:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 120 }
+      responses:
+        "200":
+          description: The draft as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Agreement" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: removeAgreement
+      tags: [agreements]
+      summary: Remove a draft agreement and its document
+      security:
+        - session: []
+        - bearer: ["agreements:write"]
+      responses:
+        "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agreements/{id}/document:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    put:
+      operationId: putAgreementDocument
+      tags: [agreements]
+      summary: Upload a draft's document
+      description: |
+        The agreement as a PDF, 10 MB at most, replacing any uploaded before. Its SHA-256 is
+        kept with it, and checked whenever it is read back. Prospector doesn't read what it
+        says, and it is not for deeds or anything that must be witnessed or notarised.
+      parameters:
+        - name: name
+          in: query
+          description: The file's name, to give it back by.
+          schema: { type: string }
+      security:
+        - session: []
+        - bearer: ["agreements:write"]
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: The agreement with its document.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Agreement" }
+        default: { $ref: "#/components/responses/Problem" }
+    get:
+      operationId: getAgreementDocument
+      tags: [agreements]
+      summary: Download a draft's document
+      description: Always as a download, never shown in the page.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The PDF, exactly as uploaded.
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/people:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    post:
+      operationId: addPerson
+      tags: [people]
+      summary: Add a person straight to outreach
+      description: For someone you found yourself. They go into the LinkedIn queue, or, marked `added`, straight on to the email that follows. The never-contact list applies.
+      security:
+        - session: []
+        - bearer: ["contacts:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PersonNew" }
+      responses:
+        "201":
+          description: The person, added.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PersonAdded" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/contacts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeContact
+      tags: [people]
+      summary: Change a person's details, or where their conversation stands
+      description: Send only what changes; they are saved together or not at all. An empty value clears a field. An email or profile on the never-contact list, or of someone erased on request, is refused.
+      security:
+        - session: []
+        - bearer: ["contacts:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContactChange" }
+      responses:
+        "204": { description: Changed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/contacts/{id}/pick:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: pickContact
+      tags: [research]
+      summary: Pick a suggested person for outreach
+      description: Takes someone an agent suggested out of Research and into the LinkedIn queue.
+      security:
+        - session: []
+        - bearer: ["research:review"]
+      responses:
+        "204": { description: Picked. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/companies/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: reviewCompany
+      tags: [research]
+      summary: Qualify a company, reject it, or put it back for review
+      description: A rejected company is one agents are told not to suggest again.
+      security:
+        - session: []
+        - bearer: ["research:review"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompanyReview" }
+      responses:
+        "204": { description: Changed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/suggestions/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: decideSuggestion
+      tags: [research]
+      summary: Accept or dismiss a detail an agent found for someone already stored
+      description: Accepting fills the detail in; one dismissed isn't raised again.
+      security:
+        - session: []
+        - bearer: ["research:review"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [accepted, dismissed] }
+      responses:
+        "204": { description: Decided. }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -1364,6 +1625,55 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
 
   schemas:
+    ContactChange:
+      type: object
+      properties:
+        person: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Their name." }
+        title: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        email: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        linkedin: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Their profile's address." }
+        phone: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Setting it also guesses their time zone." }
+        tz: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Their time zone, as an IANA name." }
+        sources: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        call_notes: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        send_to: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        message: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        note: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        subject: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        body: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        followup: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        stage: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Where their conversation stands on the board." }
+        next_step: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        next_date: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "YYYY-MM-DD, or empty for none." }
+        lost_reason: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+
+    CompanyReview:
+      type: object
+      required: [stage]
+      properties:
+        stage: { type: string, enum: [review, qualified, rejected] }
+        fit: { type: string, description: "Why, in a few words; kept with the company. Empty leaves it as it was." }
+
+    PersonNew:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        linkedin: { type: string, description: "Their profile's address." }
+        title: { type: string }
+        company: { type: string, description: "The company's name; one not yet stored is added." }
+        email: { type: string }
+        note: { type: string, description: "The note to send them with the connection request." }
+        added: { type: boolean, description: "Already connected on LinkedIn: their email comes up next." }
+
+    PersonAdded:
+      type: object
+      required: [id, name, message]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        message: { type: string, description: "Where they went, for a person." }
+
     TaskCounts:
       type: object
       required: [companies, people]
@@ -1909,3 +2219,18 @@ components:
         or terms change: it goes only to customers, reaches people who unsubscribed from
         marketing, and carries no unsubscribe link. Never anyone on the never-contact list
         or erased. Anything promotional in it makes it marketing, whatever it is called.
+    Agreement:
+      type: object
+      required: [id, company_id, name, status, file_name, file_size, file_hash, created_by, updated_by, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        company_id: { type: integer, format: int64 }
+        name: { type: string }
+        status: { type: string, enum: [draft], description: "Every agreement is a draft until signing arrives." }
+        file_name: { type: string, description: "Empty until a document is uploaded." }
+        file_size: { type: integer, format: int64, description: In bytes. }
+        file_hash: { type: string, description: "The document's SHA-256, in hex; empty until one is uploaded." }
+        created_by: { type: string }
+        updated_by: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }

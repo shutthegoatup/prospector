@@ -294,6 +294,7 @@ type CompanyPage struct {
 	HistoryPage, NotesPage Page
 	Touches                int
 	Subs                   []SubscriptionRow
+	Agreements             []Agreement
 	Onboard                []OnboardingRow
 	Planned                int
 	Day                    string
@@ -308,7 +309,7 @@ func (a *App) company(w http.ResponseWriter, r *http.Request) {
 	}
 	p := CompanyPage{Company: *c}
 	// Half a company's page would read as the whole of it, so any part failing fails the page.
-	var failed [8]error
+	var failed [9]error
 	p.Onboard, failed[6] = a.s.Onboardings(q.Org.ID, c.ID, today())
 	if failed[6] == nil {
 		failed[6] = a.customerControls(q.Org.ID, p.Onboard)
@@ -318,6 +319,7 @@ func (a *App) company(w http.ResponseWriter, r *http.Request) {
 	}
 	p.Day = today()
 	p.Subs, failed[5] = a.s.Subscriptions(q.Org.ID, c.ID, p.Day)
+	p.Agreements, failed[8] = a.s.Agreements(q.Org.ID, c.ID)
 	p.Facts, failed[0] = a.s.Facts(q.Org.ID, c.ID)
 	p.People, failed[1] = a.s.People(q.Org.ID, c.ID)
 	p.Pending, failed[2] = a.s.Pending(q.Org.ID, p.People)
@@ -469,69 +471,6 @@ func (a *App) uiMark(w http.ResponseWriter, r *http.Request) {
 		q := reqOf(r)
 		done(w, a.s.Mark(q.Org.ID, in.ID, in.Step, today(), q.Actor()))
 	}
-}
-
-func (a *App) uiUpdate(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID    int64  `json:"id"`
-		Field string `json:"field"`
-		Value string `json:"value"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.Update(q.Org.ID, in.ID, in.Field, in.Value, q.Actor()))
-	}
-}
-
-func (a *App) uiCompany(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID    int64  `json:"id"`
-		Stage string `json:"stage"`
-		Fit   string `json:"fit"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.SetCompanyStage(q.Org.ID, in.ID, in.Stage, in.Fit, q.Actor()))
-	}
-}
-
-func (a *App) uiPick(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID int64 `json:"id"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.PickContact(q.Org.ID, q.Org, in.ID, q.Actor()))
-	}
-}
-
-func (a *App) uiSuggestion(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID       int64  `json:"id"`
-		Decision string `json:"decision"`
-	}
-	if decode(w, r, &in) {
-		q := reqOf(r)
-		done(w, a.s.DecideSuggestion(q.Org.ID, in.ID, in.Decision, q.Actor()))
-	}
-}
-
-func (a *App) uiAdd(w http.ResponseWriter, r *http.Request) {
-	var in QuickAdd
-	if !decode(w, r, &in) {
-		return
-	}
-	q := reqOf(r)
-	c, err := a.s.QuickAddPerson(q.Org, in, q.Actor())
-	if err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	where := "is in the LinkedIn queue"
-	if in.Added {
-		where = "is marked added; their email comes up in " + plural(q.Org.Settings.withDefaults().EmailAfterDays, "day")
-	}
-	writeJSON(w, map[string]string{"message": displayName(*c) + " " + where + "."})
 }
 
 func (a *App) uiVoice(w http.ResponseWriter, r *http.Request) {

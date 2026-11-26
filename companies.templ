@@ -139,7 +139,7 @@ templ CompanyView(q *Req, p CompanyPage) {
 			<div class="flex items-center gap-2">
 				@StageTag(pipeline(p.Company, p.People))
 				if p.Company.Stage != CompanyQualified && canDo(ctx, areaSales) {
-					@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "ui/company", "data-body": jsonBody("id", p.Company.ID, "stage", CompanyQualified)}}) {
+					@button.Button(button.Props{Size: button.SizeSm, Attributes: templ.Attributes{"data-post": "api/v1/companies/" + strconv.FormatInt(p.Company.ID, 10), "data-method": "PATCH", "data-body": jsonBody("stage", CompanyQualified)}}) {
 						Qualify
 					}
 				}
@@ -239,6 +239,7 @@ templ CompanyView(q *Req, p CompanyPage) {
 				</details>
 			}
 		</div>
+		@AgreementsBlock(q, p.Company.ID, p.Agreements)
 		if len(p.Facts) > 0 {
 			<div>
 				@Label("Facts")

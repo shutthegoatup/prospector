@@ -530,7 +530,7 @@ func TestOrganisationSingleSignOn(t *testing.T) {
 	if code, _ := b.post("/orgs", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
 		t.Fatalf("starting an organisation on a limited session: %d", code)
 	}
-	if code, _ := b.post("/o/beta/ui/add", QuickAdd{Name: "Hannah Pryce"}); code != http.StatusUnauthorized {
+	if code, _ := b.post("/o/beta/api/v1/people", QuickAdd{Name: "Hannah Pryce"}); code != http.StatusUnauthorized {
 		t.Fatalf("acting in another organisation on a limited session: %d", code)
 	}
 
@@ -571,7 +571,7 @@ func TestRequiredSingleSignOn(t *testing.T) {
 		t.Fatalf("the page a required sign-on sends a member to: %s", asked)
 	}
 	location = strings.ReplaceAll(link[0][1], "&amp;", "&")
-	if code, body := b.post("/o/alpha/ui/add", QuickAdd{Name: "Hannah Pryce"}); code != http.StatusForbidden || !strings.Contains(body, "requires its single sign-on") {
+	if code, body := b.post("/o/alpha/api/v1/people", QuickAdd{Name: "Hannah Pryce"}); code != http.StatusForbidden || !strings.Contains(body, "requires its single sign-on") {
 		t.Fatalf("acting on a password session: %d %s", code, body)
 	}
 	if code, _, _ := b.get("/o/beta/today"); code != http.StatusOK {

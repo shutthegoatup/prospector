@@ -50,6 +50,8 @@ var orgExportHolds = map[string]string{
 	"suppressions":        "not_to_be_mailed",
 	"unsubscribe_links":   "not exported: the hash of the secret in one mail's unsubscribe link, which can only unsubscribe that address",
 	"campaigns":           "campaigns",
+	"agreements":          "agreements",
+	"agreement_files":     "not exported: the documents themselves, downloaded from each agreement; the export carries each one's SHA-256",
 	"campaign_recipients": "campaign_mail",
 	"suggestions":         "suggested_details",
 	"tasks":               "tasks",
