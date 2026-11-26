@@ -180,6 +180,25 @@
   ],
   [
    {
+    "text": "Requests are rate limited per API key and per signed-in person, as a token bucket: a key may make 1000 at once and then 100 a second, a person 2000 at once and then 200 a second. Past that an operation answers 429 "
+   },
+   {
+    "text": "throttled",
+    "code": true
+   },
+   {
+    "text": " with "
+   },
+   {
+    "text": "Retry-After",
+    "code": true
+   },
+   {
+    "text": ", the whole seconds until it would be let through; a refused request costs nothing."
+   }
+  ],
+  [
+   {
     "text": "Every list comes a page at a time: it takes "
    },
    {
@@ -441,6 +460,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -534,6 +562,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -639,6 +676,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -728,6 +774,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -1034,6 +1089,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -1103,6 +1167,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -1416,6 +1489,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -1501,6 +1583,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -1565,6 +1656,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -1664,6 +1764,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -1783,6 +1892,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -1884,6 +2002,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -1963,6 +2090,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -2066,6 +2202,15 @@
        "code": "415",
        "bad": true,
        "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -2179,6 +2324,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -2282,6 +2436,15 @@
        "code": "415",
        "bad": true,
        "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -2540,6 +2703,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -2628,6 +2800,15 @@
        "code": "415",
        "bad": true,
        "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -2725,6 +2906,15 @@
        "code": "415",
        "bad": true,
        "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -2900,6 +3090,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -3030,6 +3229,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -3188,6 +3396,15 @@
        "code": "415",
        "bad": true,
        "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -3353,6 +3570,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -3417,6 +3643,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -3566,6 +3801,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -3663,6 +3907,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -3776,6 +4029,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -3849,6 +4111,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -3944,6 +4215,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -4093,6 +4373,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -4191,6 +4480,15 @@
        "code": "415",
        "bad": true,
        "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -4375,6 +4673,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -4465,6 +4772,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -4641,6 +4957,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -4715,6 +5040,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -4831,6 +5165,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -4925,6 +5268,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -5053,6 +5405,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -5233,6 +5594,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -5348,6 +5718,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -5446,6 +5825,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -5566,6 +5954,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -5680,6 +6077,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -5759,6 +6165,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -5878,6 +6293,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -5979,6 +6403,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -6144,6 +6577,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -6283,6 +6725,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -6362,6 +6813,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -6488,6 +6948,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -6578,6 +7047,15 @@
        "code": "415",
        "bad": true,
        "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -6685,6 +7163,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -6818,6 +7305,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -6891,6 +7387,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -6985,6 +7490,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -7119,6 +7633,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -7219,6 +7742,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -7358,6 +7890,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -7436,6 +7977,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -7545,6 +8095,15 @@
        "code": "415",
        "bad": true,
        "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -7670,6 +8229,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -7922,6 +8490,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -8089,6 +8666,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -8167,6 +8753,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -8279,6 +8874,15 @@
        "code": "415",
        "bad": true,
        "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -8485,6 +9089,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -8585,6 +9198,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -8705,6 +9327,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -8837,6 +9468,15 @@
        "code": "415",
        "bad": true,
        "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -9033,6 +9673,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -9111,6 +9760,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -9233,6 +9891,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -9341,6 +10008,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -9414,6 +10090,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -9526,6 +10211,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -9606,6 +10300,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -9678,6 +10381,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -9801,6 +10513,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -9904,6 +10625,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -9998,6 +10728,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -10105,6 +10844,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -10238,6 +10986,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -10356,6 +11113,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -10438,6 +11204,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -10543,6 +11318,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -10736,6 +11520,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -10882,6 +11675,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -10960,6 +11762,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -11073,6 +11884,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -11164,6 +11984,15 @@
        "code": "415",
        "bad": true,
        "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -11273,6 +12102,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -11360,6 +12198,15 @@
        "code": "415",
        "bad": true,
        "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -11470,6 +12317,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -11563,6 +12419,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -11673,6 +12538,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -11751,6 +12625,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -11879,6 +12762,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -12028,6 +12920,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -12135,6 +13036,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -12228,6 +13138,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -12367,6 +13286,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -12499,6 +13427,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -12578,6 +13515,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -12696,6 +13642,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -12832,6 +13787,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -12961,6 +13925,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -13050,6 +14023,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -13226,6 +14208,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -13301,6 +14292,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -13416,7 +14416,7 @@
       {
        "code": "429",
        "bad": true,
-       "about": "`throttled`: too many tries.",
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -13882,7 +14882,7 @@
       {
        "code": "429",
        "bad": true,
-       "about": "`throttled`: too many tries.",
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -14182,6 +15182,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -14270,6 +15279,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -14335,6 +15353,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -14484,6 +15511,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -14573,6 +15609,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -14646,6 +15691,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -14747,6 +15801,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -14869,7 +15932,7 @@
       {
        "code": "429",
        "bad": true,
-       "about": "`throttled`: too many tries.",
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -14965,6 +16028,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -15090,6 +16162,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -15205,6 +16286,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -15294,6 +16384,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -15358,6 +16457,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -15463,6 +16571,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -15527,6 +16644,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -15824,6 +16950,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -15889,6 +17024,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -16035,6 +17179,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -16125,6 +17278,15 @@
        "code": "404",
        "bad": true,
        "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -16236,6 +17398,15 @@
        }
       },
       {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
        "code": "500",
        "bad": true,
        "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
@@ -16319,6 +17490,15 @@
        "code": "409",
        "bad": true,
        "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -16421,6 +17601,15 @@
        "code": "415",
        "bad": true,
        "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
        "type": {
         "name": "Problem",
         "link": "#schema-Problem"
@@ -26243,7 +27432,7 @@
    "type": "/api/problems/throttled",
    "about": [
     {
-     "text": "429: too many tries. Wait "
+     "text": "429: too many tries, or too many requests. Wait "
     },
     {
      "text": "Retry-After",
