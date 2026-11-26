@@ -9,7 +9,6 @@ import (
 
 type Nav struct {
 	*Req
-	Active                                    string
 	Today, Research, Conversations, Companies int
 	// Enquiries is how many are waiting for an answer from us.
 	Enquiries int
@@ -39,8 +38,8 @@ func (a *App) dueByStep(q *Req, now time.Time) map[string][]Contact {
 	return out
 }
 
-func (a *App) nav(q *Req, active string) Nav {
-	n := Nav{Req: q, Active: active}
+func (a *App) nav(q *Req) Nav {
+	n := Nav{Req: q}
 	for _, list := range a.dueByStep(q, time.Now()) {
 		n.Today += len(list)
 	}
