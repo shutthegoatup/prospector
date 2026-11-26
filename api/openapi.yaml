@@ -1545,8 +1545,9 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items, ranked, counts]
+                required: [items, ranked, counts, offering_id]
                 properties:
+                  offering_id: { type: integer, format: int64, description: "The offering whose queue this is: the one asked for, or a task's. 0 is the organisation's own, as is a closed task's whose offering was removed." }
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/ResearchCompany" }
@@ -1574,6 +1575,10 @@ paths:
           in: query
           schema: { type: boolean, default: false }
           description: Closed tasks too, after the open ones.
+        - name: offering
+          in: query
+          schema: { type: integer, format: int64, x-go-type-skip-optional-pointer: false }
+          description: Only the tasks finding companies for this offering; 0 for the organisation's own. Left out, every task.
         - $ref: "#/components/parameters/limit"
         - $ref: "#/components/parameters/cursor"
       security:
@@ -3694,11 +3699,15 @@ components:
 
     Offering:
       type: object
-      required: [id, name, look_for, pitch, note_template, updated_by, created_at, updated_at]
+      required: [id, name, look_for, looking_for, pitch, note_template, updated_by, created_at, updated_at]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
         look_for: { type: string, description: "What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list." }
+        looking_for:
+          type: array
+          items: { $ref: "#/components/schemas/LookFor" }
+          description: "`look_for`, read into its fields."
         pitch: { type: string, description: "The call script's pitch line for people reached for it; empty uses the organisation's. `{company}` is filled in." }
         note_template: { type: string, description: "The connection note for people picked for it; empty uses the organisation's. `{first}`, `{company}` and `{org}` are filled in." }
         updated_by: { type: string }
@@ -3920,10 +3929,11 @@ components:
 
     TaskBrief:
       type: object
-      required: [id, title, status, open_requests, found]
+      required: [id, title, status, open_requests, found, offering_id]
       properties:
         id: { type: integer, format: int64 }
         title: { type: string }
+        offering_id: { type: integer, format: int64, description: "What the task finds companies for; 0 is the organisation's own offering." }
         status: { type: string, description: "`waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request), `done` or `closed`." }
         open_requests:
           type: array
@@ -3974,6 +3984,15 @@ components:
           required: [brief, requests, companies, people, notes]
           properties:
             brief: { type: string, description: "What the person asked for, in their words." }
+            offering:
+              type: object
+              x-go-type-skip-optional-pointer: false
+              description: What the task finds companies for, when it isn't the organisation's own offering.
+              required: [id, name, guidance]
+              properties:
+                id: { type: integer, format: int64 }
+                name: { type: string }
+                guidance: { type: string, description: "What agents are told to look for and how to judge companies for it, in place of the organisation's own look-for list." }
             requests:
               type: array
               description: "Everything asked on this task, oldest first; the first is the brief."
@@ -4151,7 +4170,7 @@ components:
 
     CompanyOverview:
       type: object
-      required: [id, name, domain, country, segment, grade, why, stage, found_by, created_at, pipeline, touches, looking_for, facts, people, onboardings, planned_steps, subscriptions, agreements]
+      required: [id, name, domain, country, segment, grade, why, stage, found_for, found_by, created_at, pipeline, touches, looking_for, facts, people, onboardings, planned_steps, subscriptions, agreements]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
@@ -4160,7 +4179,8 @@ components:
         segment: { type: string }
         grade: { type: string, description: "The fit grade a person or agent gave, A, B or C; empty for none." }
         why: { type: string, description: "Why it fits, in the words of whoever added it; empty for none." }
-        stage: { type: string, enum: [review, qualified, rejected] }
+        stage: { type: string, enum: [review, qualified, rejected], description: "Where it stands for the organisation's own offering; `listCompanyVerdicts` has the others." }
+        found_for: { type: integer, format: int64, description: "The offering it was found for, while nothing has been done there for the organisation's own: until then it stays out of the organisation's own review. 0 otherwise." }
         found_by: { type: string }
         created_at: { type: string, format: date-time }
         pipeline: { $ref: "#/components/schemas/Pipeline" }
