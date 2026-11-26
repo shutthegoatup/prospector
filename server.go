@@ -59,6 +59,10 @@ type App struct {
 	// agentClient reaches an organisation's model endpoint and tool server; nil means
 	// one that refuses private addresses unless the operator allows them.
 	agentClient *http.Client
+	// vendorClient and vendorBase stand in for enrichment vendors in tests: a client,
+	// and an address every vendor is reached at in place of its own.
+	vendorClient *http.Client
+	vendorBase   string
 	// pageClient reads the pages an agent asks for; tests stand in their own.
 	pageClient *http.Client
 	runs       agentRuns
