@@ -668,6 +668,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/research": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The Research queue, as the page shows it
+         * @description Companies waiting on a person, under one of the page's filters, each with its
+         *     answer to everything the organisation looks for and its fit. Narrowed to one
+         *     task's search, the companies to review come best fit first (`ranked`): none
+         *     missing a must, then most met, then fewest left unknown. Otherwise newest first,
+         *     or as each filter orders them.
+         */
+        get: operations["listResearch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/tasks": {
         parameters: {
             query?: never;
@@ -1335,6 +1362,8 @@ export interface components {
             never_contact: string;
             /** @description What makes a company a fit, one `name: what counts` per line. */
             look_for: string;
+            /** @description `look_for` read: each thing in order, with its hint and whether it is a must (`(must)` after its name). */
+            readonly looking_for: components["schemas"]["LookFor"][];
             /** @description Sent to every agent when it connects. */
             agent_guidance: string;
             /** @description Sites whose forms may post enquiries, one address per line, like `https://www.example.com`. Empty takes none. */
@@ -1552,6 +1581,103 @@ export interface components {
             brief: string;
             /** @description Prospector's own agents to start on the task, each on its own request. */
             agents?: number[];
+        };
+        ResearchCompany: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            domain: string;
+            country: string;
+            segment: string;
+            /** @enum {string} */
+            stage: "review" | "qualified" | "rejected";
+            /** @description The fit grade a person or agent gave, A, B or C; empty for none. */
+            grade: string;
+            found_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** @description Each thing the organisation looks for, in its order, with the latest answer. */
+            criteria: components["schemas"]["Criterion"][];
+            fit: components["schemas"]["Fit"];
+            /** @description Why it fits, in the words of whoever added it; empty for none. */
+            why: string;
+            /** @description The facts besides the answers, older answers among them, oldest first. */
+            facts: components["schemas"]["ResearchFact"][];
+            people: components["schemas"]["ResearchPerson"][];
+        };
+        LookFor: {
+            field: string;
+            hint: string;
+            must: boolean;
+        };
+        ResearchFact: {
+            /** Format: int64 */
+            id: number;
+            field: string;
+            value: string;
+            source_url: string;
+            /** @enum {string} */
+            answer: "yes" | "no" | "unknown";
+            inferred: boolean;
+            by: string;
+            /** Format: date-time */
+            at: string;
+        };
+        ResearchPerson: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            title: string;
+            /** @description `suggested` until someone picks them. */
+            status: string;
+            /** @description `verified`, `guess`, or empty. */
+            email_status: string;
+            linkedin: string;
+            /** @description The first page that shows them. */
+            source_url: string;
+            /** @description New details an agent found for them, waiting to be accepted. */
+            pending: components["schemas"]["PendingDetail"][];
+        };
+        PendingDetail: {
+            /**
+             * Format: int64
+             * @description The suggestion: decide it at /api/v1/suggestions/{id}.
+             */
+            id: number;
+            field: string;
+            value: string;
+            /** @description What the person holds now; empty for nothing. */
+            current: string;
+            source_url: string;
+            by: string;
+            /** Format: date-time */
+            at: string;
+        };
+        Criterion: {
+            field: string;
+            must: boolean;
+            /** @enum {string} */
+            state: "met" | "not_met" | "not_found" | "unchecked";
+            /** @description The answer in a sentence; for not_found, where the agent looked. */
+            value?: string;
+            source_url?: string;
+            /** @description Read from a job advert, a third party or an old page. */
+            inferred?: boolean;
+            by?: string;
+            /**
+             * Format: date-time
+             * @description When the answer was given; null when unchecked.
+             */
+            at?: string | null;
+        };
+        Fit: {
+            of: number;
+            met: number;
+            not_found: number;
+            unchecked: number;
+            musts_missed: number;
+            /** @description As the page says it, such as "3 of 4 · 1 not found". */
+            text: string;
         };
         TaskStarted: components["schemas"]["Task"] & {
             runs: components["schemas"]["Run"][];
@@ -3356,6 +3482,50 @@ export interface operations {
                         going: number;
                         /** @description How many are left out. */
                         left_out: number;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listResearch: {
+        parameters: {
+            query?: {
+                /** @description `review` to qualify or reject, `contact` qualified with nobody picked, `verify` with a guessed email, `details` with a new detail for someone to accept, `rejected`. */
+                filter?: "review" | "contact" | "verify" | "details" | "rejected";
+                /** @description Only what this task's search found. */
+                task?: number;
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of the queue. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ResearchCompany"][];
+                        /** @description Whether the companies come best fit first. A search with more than 500 to review comes newest first. */
+                        ranked: boolean;
+                        /** @description How many each filter holds, narrowed to the task when one is given. What the organisation looks for is in the settings, as looking_for. */
+                        counts: {
+                            [key: string]: number;
+                        };
+                        /** @description Set when there is more: pass it as cursor for the rest. */
+                        next_cursor?: string;
                     };
                 };
             };
