@@ -81,10 +81,11 @@ func (a *App) apiScope(scopes map[string][]string) api.StrictMiddlewareFunc {
 		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error) {
 			q, need := reqFrom(ctx), scopes[op]
 			switch {
-			case q.Key != nil && keyless[op]:
+			// One that names no key scope is for people signed in, never a key.
+			case q.Key != nil && (keyless[op] || len(need) == 0):
 				refuseKeys(w)
 				return nil, nil
-			case q.Key != nil && len(need) > 0 && !slices.ContainsFunc(need, q.Key.Has):
+			case q.Key != nil && !slices.ContainsFunc(need, q.Key.Has):
 				challenge(w, http.StatusForbidden, "insufficient_scope", need[0], "this key lacks the "+strings.Join(need, " or ")+" scope")
 				return nil, nil
 			case q.Key == nil && slices.ContainsFunc(need, ownersOnly) && !q.Owner():

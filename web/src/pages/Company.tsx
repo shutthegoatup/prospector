@@ -713,11 +713,11 @@ function Agreements({ c }: { c: Overview }) {
         <div key={a.id} className="mt-1 flex flex-col gap-2 rounded-lg border border-border p-3 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <b>{a.name}</b>
-            <span className="font-mono text-xs text-muted-foreground">draft · by {actor(a.created_by)}</span>
+            <span className="font-mono text-xs text-muted-foreground">{a.status} · by {actor(a.created_by)}</span>
           </div>
           <Meta>{fileLine(a)}</Meta>
           <div className="flex flex-wrap items-center gap-2">
-            {a.file_hash && sales ? (
+            {a.file_hash && sales && a.status === "draft" ? (
               <ActionButton size="xs" asChild>
                 <Link to={`/agreements/${a.id}/prepare`}>Prepare for signing</Link>
               </ActionButton>
@@ -733,7 +733,7 @@ function Agreements({ c }: { c: Overview }) {
                 Download
               </a>
             )}
-            {sales && (
+            {sales && a.status === "draft" && (
               <>
                 <label className="font-mono text-xs text-muted-foreground">
                   {a.file_hash ? "Replace the PDF" : "Upload the PDF"}
