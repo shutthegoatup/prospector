@@ -223,28 +223,28 @@ func (a *App) sessionCookie(r *http.Request, token string) *http.Cookie {
 // member resolves the signed-in user and, for /o/{org}/ routes, their membership.
 func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// A page is sent where it can go on; an API caller is told, with a code to act on.
-		refuse := func(status int, code api.ProblemCode, text, to string) {
+		// A page is sent where it can go on; an API caller is told, with a type to act on.
+		refuse := func(status int, kind api.ProblemType, text, to string) {
 			switch {
-			case strings.Contains(r.URL.Path, "/api/v1/"):
-				writeCoded(w, status, code, text)
+			case forAPI(r):
+				writeTyped(w, status, kind, text)
 			case r.Method == http.MethodGet:
 				http.Redirect(w, r, to, http.StatusSeeOther)
 			default:
 				http.Error(w, text, status)
 			}
 		}
-		signedOut := func(code api.ProblemCode) {
-			refuse(http.StatusUnauthorized, code, "signed out", "/login?next="+url.QueryEscape(r.URL.RequestURI()))
+		signedOut := func(kind api.ProblemType) {
+			refuse(http.StatusUnauthorized, kind, "signed out", "/login?next="+url.QueryEscape(r.URL.RequestURI()))
 		}
 		sess, u := a.session(r)
 		if u == nil {
-			signedOut(api.SignedOut)
+			signedOut(api.ProblemTypeSignedOut)
 			return
 		}
 		// Someone still on a password their inviter saw can only go and choose their own.
 		if u.MustChangePassword && r.URL.Path != "/password" {
-			refuse(http.StatusForbidden, api.MustChangePassword, "choose your own password first", "/password")
+			refuse(http.StatusForbidden, api.ProblemTypeMustChangePassword, "choose your own password first", "/password")
 			return
 		}
 		q := &Req{User: u, Session: sess}
@@ -261,16 +261,16 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 				m, err = a.s.Membership(org.ID, u.ID)
 			}
 			if err != nil {
-				http.NotFound(w, r)
+				refuseAs(w, r, http.StatusNotFound, "no organisation "+slug+" of yours")
 				return
 			}
 			// A session another organisation's provider began is no sign-in here.
 			if !sess.Opens(org.ID) {
-				signedOut(api.SessionLimited)
+				signedOut(api.ProblemTypeSessionLimited)
 				return
 			}
 			if a.ssoRequired(org, u, m, sess) {
-				refuse(http.StatusForbidden, api.SsoRequired, org.Name+" requires its single sign-on: reload the page to go through it",
+				refuse(http.StatusForbidden, api.ProblemTypeSsoRequired, org.Name+" requires its single sign-on: reload the page to go through it",
 					ssoPageURL(org, u.Email, r.URL.RequestURI()))
 				return
 			}
@@ -335,6 +335,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /c/{token}/again", a.customerAgain)
 	mux.HandleFunc("GET /{$}", a.front)
 	mux.HandleFunc("GET /api", a.apiDocPage)
+	mux.HandleFunc("GET /api/problems/{name}", a.apiProblem())
 
 	mux.HandleFunc("GET /o/{org}/{$}", a.member(func(w http.ResponseWriter, r *http.Request) {
 		q := reqOf(r)
@@ -365,7 +366,7 @@ func (a *App) Routes() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a.setDeadlines(w, r)
 		if !cleanRequest(r) {
-			http.NotFound(w, r)
+			refuseAs(w, r, http.StatusNotFound, "404 page not found")
 			return
 		}
 		if wantsPage(r) {
@@ -388,7 +389,7 @@ func (a *App) Routes() http.Handler {
 		// and the CLI send neither header and carry a key, so they pass.
 		if !hasKey(r) {
 			if err := sameOrigin.Check(r); err != nil {
-				http.Error(w, "this request came from another site", http.StatusForbidden)
+				refuseAs(w, r, http.StatusForbidden, "this request came from another site")
 				return
 			}
 		}
@@ -397,7 +398,7 @@ func (a *App) Routes() http.Handler {
 		// organisation lists. The signed-out forms and the API key routes are exempt.
 		if r.Method == http.MethodPost && !signedOutForm(r.URL.Path) &&
 			!hasKey(r) && !strings.HasPrefix(r.Header.Get("content-type"), "application/json") {
-			http.Error(w, "POST bodies must be application/json", http.StatusUnsupportedMediaType)
+			refuseAs(w, r, http.StatusUnsupportedMediaType, "POST bodies must be application/json")
 			return
 		}
 		mux.ServeHTTP(w, r)

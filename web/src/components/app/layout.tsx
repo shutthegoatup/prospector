@@ -3,6 +3,7 @@ import { type CSSProperties, useEffect, useState } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { cn } from "@/lib/utils";
+import { mustGoFirst } from "@/problem";
 import { SessionContext } from "@/session";
 
 type Nav = components["schemas"]["Nav"];
@@ -62,7 +63,7 @@ export function AppLayout() {
     if (typeof failed !== "object" || failed === null) return;
     if ("status" in failed && failed.status === 401) {
       window.location.assign("/login?next=" + encodeURIComponent(window.location.pathname + window.location.search));
-    } else if ("code" in failed && (failed.code === "must_change_password" || failed.code === "sso_required")) {
+    } else if (mustGoFirst(failed)) {
       // Loaded as a page, this address takes the browser where it has to go first.
       window.location.reload();
     }

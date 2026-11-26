@@ -17,6 +17,15 @@ type docView struct {
 	Scopes  []docScope  `json:"scopes"`
 	Groups  []docGroup  `json:"groups"`
 	Schemas []docSchema `json:"schemas"`
+	// Problems are the problem types, each with the anchor its /api/problems/ link
+	// lands on.
+	Problems []docProblem `json:"problems"`
+}
+
+type docProblem struct {
+	Anchor string    `json:"anchor"`
+	Type   string    `json:"type"`
+	About  []docSpan `json:"about"`
 }
 
 type docSpan struct {
@@ -121,7 +130,7 @@ func docViewOf(doc APIDoc) docView {
 				}
 			}
 			for _, r := range o.Responses {
-				dr := docResponse{Code: r.Code, Bad: r.Code == "4xx · 5xx", About: r.About}
+				dr := docResponse{Code: r.Code, Bad: r.Code >= "400", About: r.About}
 				if r.Type != "" {
 					t := typ(r.Type)
 					dr.Type = &t
@@ -134,6 +143,10 @@ func docViewOf(doc APIDoc) docView {
 	}
 	for _, s := range doc.Schemas {
 		v.Schemas = append(v.Schemas, docSchema{schemaAnchor(s.Name), s.Name, spans(s.About), append([]string{}, s.Enum...), fields(s.Fields)})
+	}
+	v.Problems = []docProblem{}
+	for _, p := range doc.Problems {
+		v.Problems = append(v.Problems, docProblem{problemAnchor(p.Name), p.Type, spans(p.About)})
 	}
 	return v
 }

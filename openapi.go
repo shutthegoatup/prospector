@@ -53,14 +53,22 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 		},
 		ResponseErrorHandlerFunc: apiFail,
 	})
+	var router api.ServeMux = mux
+	if watchAPI != nil {
+		router = watchAPI(mux)
+	}
 	api.HandlerWithOptions(strict, api.StdHTTPServerOptions{
-		BaseRouter:  mux,
+		BaseRouter:  router,
 		Middlewares: []api.MiddlewareFunc{a.apiCaller(account), noEmptyLink},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeProblem(w, http.StatusBadRequest, err.Error())
 		},
 	})
 }
+
+// watchAPI, when set, wraps the router the operations go on, so the tests can hold
+// the spec to what the server really answers.
+var watchAPI func(*http.ServeMux) api.ServeMux
 
 // apiCaller works out who is asking: a key, or a signed-in member of the organisation.
 // The account operations, named by route, are asked by whoever is there.
@@ -80,7 +88,7 @@ func (a *App) caller(account map[string]bool, next http.Handler) http.Handler {
 		}
 		if _, u := a.session(r); u == nil {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="prospector"`)
-			writeCoded(w, http.StatusUnauthorized, api.SignedOut, "sign in, or send an API key: Authorization: Bearer pk_…")
+			writeTyped(w, http.StatusUnauthorized, api.ProblemTypeSignedOut, "sign in, or send an API key: Authorization: Bearer pk_…")
 			return
 		}
 		a.member(next.ServeHTTP)(w, r)

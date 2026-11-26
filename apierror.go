@@ -191,49 +191,64 @@ func statusOf(err error) int {
 
 // problem is an API error as RFC 9457 lays one out.
 type problem struct {
-	Type   string `json:"type"`
-	Title  string `json:"title"`
-	Status int    `json:"status"`
-	Detail string `json:"detail,omitempty"`
-	Code   string `json:"code,omitempty"`
+	Type   api.ProblemType `json:"type"`
+	Title  string          `json:"title"`
+	Status int             `json:"status"`
+	Detail string          `json:"detail,omitempty"`
 }
 
-func writeProblem(w http.ResponseWriter, code int, detail string) {
-	writeCoded(w, code, "", detail)
+// problemTitles are the titles of the problems a client acts on, one for each type as
+// RFC 9457 asks.
+var problemTitles = map[api.ProblemType]string{
+	api.ProblemTypeSignedOut:          "Signed out",
+	api.ProblemTypeSessionLimited:     "Signed in for another organisation",
+	api.ProblemTypeWrongLogin:         "Wrong email or password",
+	api.ProblemTypeThrottled:          "Too many tries",
+	api.ProblemTypeLinkUsed:           "Link no longer works",
+	api.ProblemTypeMustChangePassword: "Choose your own password",
+	api.ProblemTypeSsoRequired:        "Single sign-on required",
 }
 
-func writeCoded(w http.ResponseWriter, status int, code api.ProblemCode, detail string) {
+func writeProblem(w http.ResponseWriter, status int, detail string) {
+	writeTyped(w, status, api.ProblemTypeUntyped, detail)
+}
+
+func writeTyped(w http.ResponseWriter, status int, kind api.ProblemType, detail string) {
+	title, ok := problemTitles[kind]
+	if !ok {
+		kind, title = api.ProblemTypeUntyped, http.StatusText(status)
+	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(problem{Type: "about:blank", Title: http.StatusText(status), Status: status, Detail: detail, Code: string(code)}); err != nil {
+	if err := json.NewEncoder(w).Encode(problem{Type: kind, Title: title, Status: status, Detail: detail}); err != nil {
 		log.Print(err)
 	}
 }
 
-// coded is a refusal a client acts on by its code rather than by reading it.
-type coded struct {
+// typed is a refusal a client acts on by its type rather than by reading it.
+type typed struct {
 	status int
-	code   api.ProblemCode
+	kind   api.ProblemType
 	detail string
 	// retry is the seconds to wait, for a throttled one.
 	retry int
 }
 
-func (e coded) Error() string { return e.detail }
+func (e typed) Error() string { return e.detail }
 
-func throttledFor(seconds int) coded {
-	return coded{http.StatusTooManyRequests, api.Throttled, "too many attempts: try again in " + plural(seconds, "second"), seconds}
+func throttledFor(seconds int) typed {
+	return typed{http.StatusTooManyRequests, api.ProblemTypeThrottled, "too many attempts: try again in " + plural(seconds, "second"), seconds}
 }
 
 // apiFail answers an API caller with what went wrong. A failure of the server's own is
 // logged and not described: its text can carry internals.
 func apiFail(w http.ResponseWriter, r *http.Request, err error) {
-	var c coded
-	if errors.As(err, &c) {
-		if c.retry > 0 {
-			w.Header().Set("Retry-After", strconv.Itoa(c.retry))
+	var t typed
+	if errors.As(err, &t) {
+		if t.retry > 0 {
+			w.Header().Set("Retry-After", strconv.Itoa(t.retry))
 		}
-		writeCoded(w, c.status, c.code, c.detail)
+		writeTyped(w, t.status, t.kind, t.detail)
 		return
 	}
 	code, detail := telling(r.Method+" "+r.URL.Path, err, statusOf(err))

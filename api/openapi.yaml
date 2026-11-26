@@ -29,7 +29,7 @@ info:
 
     Signing in, signing out and passwords are account-wide, under `/api/v1/` rather than
     an organisation's address, and only for a browser: a key is refused them. A refusal
-    a client should act on carries a `code`.
+    a client should act on carries a `type` that names it (see `Problem`).
 
     Every list comes a page at a time: it takes `limit` and `cursor`, and answers
     `{"items": [...], "next_cursor": "..."}`. When `next_cursor` is there, pass it back
@@ -94,7 +94,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Session" }
-        default: { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: signIn
       tags: [account]
@@ -117,14 +119,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Session" }
-        "429":
-          description: Too many tries; `code` is `throttled`.
-          headers:
-            Retry-After: { schema: { type: integer }, description: Seconds until the next try counts. }
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Problem" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: signOut
       tags: [account]
@@ -133,7 +133,8 @@ paths:
       security: []
       responses:
         "204": { description: Signed out. }
-        default: { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /api/v1/password:
     put:
@@ -158,7 +159,11 @@ paths:
                 new: { type: string, minLength: 10 }
       responses:
         "204": { description: Changed. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /api/v1/sign-in:
     get:
@@ -173,7 +178,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SignInWays" }
-        default: { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /api/v1/sign-in/sso:
     post:
@@ -210,7 +216,11 @@ paths:
                   orgs:
                     type: array
                     items: { $ref: "#/components/schemas/SingleSignOnOrg" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /api/v1/password-resets:
     post:
@@ -232,7 +242,11 @@ paths:
                 email: { type: string }
       responses:
         "202": { description: "If the address has an account, a link is on its way." }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /api/v1/password-resets/{token}:
     parameters:
@@ -245,7 +259,7 @@ paths:
       operationId: getPasswordReset
       tags: [account]
       summary: Whose password a link resets
-      description: 410, with `code` `link_used`, once the link is used, out of date or replaced.
+      description: 410, of type `/api/problems/link_used`, once the link is used, out of date or replaced.
       security: []
       responses:
         "200":
@@ -257,7 +271,11 @@ paths:
                 required: [email]
                 properties:
                   email: { type: string }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { $ref: "#/components/responses/Gone" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: resetPassword
       tags: [account]
@@ -275,7 +293,12 @@ paths:
                 password: { type: string, minLength: 10 }
       responses:
         "204": { description: Saved. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { $ref: "#/components/responses/Gone" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agents:
     parameters:
@@ -305,7 +328,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Agent" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: createAgent
       tags: [agents]
@@ -327,7 +354,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgentSaved" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agents/{id}:
     parameters:
@@ -346,7 +379,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Agent" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     put:
       operationId: updateAgent
       tags: [agents]
@@ -368,7 +405,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgentSaved" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: deleteAgent
       tags: [agents]
@@ -379,7 +421,12 @@ paths:
         - bearer: ["agents:configure"]
       responses:
         "204": { description: Deleted. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks/{task}/runs:
     parameters:
@@ -414,7 +461,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Run" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: startRun
       tags: [runs]
@@ -437,7 +488,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Run" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/runs/{id}/stop:
     parameters:
@@ -453,7 +510,13 @@ paths:
         - bearer: ["agents:run"]
       responses:
         "204": { description: Asked to stop. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/connect:
     parameters:
@@ -472,7 +535,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Connect" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/keys:
     parameters:
@@ -503,7 +570,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/APIKey" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: createKey
       tags: [agents]
@@ -525,7 +596,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/KeyMade" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/keys/{id}:
     parameters:
@@ -558,7 +635,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/KeyChanged" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: revokeKey
       tags: [agents]
@@ -569,7 +651,12 @@ paths:
         - bearer: ["agents:configure"]
       responses:
         "204": { description: Revoked. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agent-scores:
     parameters:
@@ -600,7 +687,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/AgentScore" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agent-work:
     parameters:
@@ -633,7 +724,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/AgentWork" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agent-activity:
     parameters:
@@ -665,7 +760,11 @@ paths:
                     items: { $ref: "#/components/schemas/AgentEvent" }
                   total: { type: integer, description: How many there are in all. }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enquiries/{id}/messages:
     parameters:
@@ -697,7 +796,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/EnquiryMessage" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enquiries/{id}/replies:
     parameters:
@@ -728,7 +831,14 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EnquiryMessage" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
+        "502": { $ref: "#/components/responses/NotSent" }
 
   /o/{org}/api/v1/enquiries/{id}/answers:
     parameters:
@@ -753,7 +863,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EnquiryMessage" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/onboardings:
     parameters:
@@ -787,7 +903,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Onboarding" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: startOnboarding
       tags: [onboarding]
@@ -807,7 +927,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Onboarding" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/onboardings/{id}:
     parameters:
@@ -823,7 +949,12 @@ paths:
         - bearer: ["customers:write"]
       responses:
         "204": { description: Removed. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/onboarding-steps/{id}:
     parameters:
@@ -848,7 +979,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/OnboardingStep" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/onboardings/{id}/invites:
     parameters:
@@ -877,7 +1013,14 @@ paths:
                 contact: { type: integer, format: int64, description: The contact to invite. }
       responses:
         "204": { description: "Let in, and the link sent." }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
+        "502": { $ref: "#/components/responses/NotSent" }
 
   /o/{org}/api/v1/onboarding-invites/{id}:
     parameters:
@@ -893,7 +1036,12 @@ paths:
         - bearer: ["customers:invite"]
       responses:
         "204": { description: Withdrawn. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/subscriptions:
     parameters:
@@ -928,7 +1076,11 @@ paths:
                     items: { $ref: "#/components/schemas/Subscription" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
                   contracted: { type: string, description: "What those still running come to for a year at today's prices, every page of them, a sum for each currency joined with ` + `, such as £14,000 + €5,000; empty when nothing is." }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: addSubscription
       tags: [subscriptions]
@@ -947,7 +1099,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Subscription" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/subscriptions/{id}:
     parameters:
@@ -972,7 +1130,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Subscription" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: removeSubscription
       tags: [subscriptions]
@@ -983,7 +1146,12 @@ paths:
         - bearer: ["customers:write"]
       responses:
         "204": { description: Removed. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/subscriptions/{id}/renewals:
     parameters:
@@ -1017,7 +1185,13 @@ paths:
                 properties:
                   deal: { type: integer, format: int64 }
                   contact: { type: integer, format: int64 }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/deals:
     parameters:
@@ -1051,7 +1225,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Deal" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: startDeal
       tags: [deals]
@@ -1075,7 +1253,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Deal" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/deals/{id}:
     parameters:
@@ -1100,7 +1284,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Deal" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: removeDeal
       tags: [deals]
@@ -1111,7 +1300,12 @@ paths:
         - bearer: ["pipeline:write"]
       responses:
         "204": { description: Removed. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/contacts/{id}/deal:
     parameters:
@@ -1139,7 +1333,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Deal" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/conversations:
     parameters:
@@ -1174,7 +1373,11 @@ paths:
                     items: { $ref: "#/components/schemas/DealCard" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
                   onboarding_steps: { type: integer, description: "How many steps an onboarding started now would have: 0 until an owner writes them in Settings, and until then a won deal offers none." }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enquiries:
     parameters:
@@ -1208,7 +1411,11 @@ paths:
                     items: { $ref: "#/components/schemas/Enquiry" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
                   can_reply: { type: boolean, description: "Whether a reply can be emailed from here: the organisation has a mail server. Their answers can be recorded either way." }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enquiry-counts:
     parameters:
@@ -1227,7 +1434,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EnquiryCounts" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enquiries/{id}:
     parameters:
@@ -1258,7 +1469,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Enquiry" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: deleteEnquiry
       tags: [enquiries]
@@ -1269,7 +1485,12 @@ paths:
         - bearer: ["enquiries:delete"]
       responses:
         "204": { description: Deleted. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enquiries/{id}/conversation:
     parameters:
@@ -1294,7 +1515,13 @@ paths:
                 required: [contact]
                 properties:
                   contact: { type: integer, format: int64 }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/suppressions:
     parameters:
@@ -1328,7 +1555,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Suppression" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: addSuppression
       tags: [mail]
@@ -1352,7 +1583,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Suppression" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/suppressions/{id}:
     parameters:
@@ -1368,7 +1605,12 @@ paths:
         - bearer: ["campaigns:write"]
       responses:
         "204": { description: Taken off. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/campaigns:
     parameters:
@@ -1399,7 +1641,11 @@ paths:
                     items: { $ref: "#/components/schemas/Campaign" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
                   not_ready: { type: string, description: "Why nothing can be sent yet (the organisation's own mail server, a postal address or the site's address missing); empty when a campaign can be sent." }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: createCampaign
       tags: [mail]
@@ -1422,7 +1668,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Campaign" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/campaigns/{id}:
     parameters:
@@ -1447,7 +1699,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Campaign" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: removeCampaign
       tags: [mail]
@@ -1458,7 +1715,12 @@ paths:
         - bearer: ["campaigns:write"]
       responses:
         "204": { description: Removed. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/campaigns/{id}/audience:
     parameters:
@@ -1497,7 +1759,11 @@ paths:
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
                   going: { type: integer, description: How many it would go to. }
                   left_out: { type: integer, description: How many are left out. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/research:
     parameters:
@@ -1557,7 +1823,11 @@ paths:
                     additionalProperties: { type: integer }
                     description: How many each filter holds, narrowed to the task when one is given. What the organisation looks for is in the settings, as looking_for.
                   next_cursor: { type: string, description: "Set when there is more: pass it as cursor for the rest." }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks:
     parameters:
@@ -1601,7 +1871,11 @@ paths:
                   next_cursor: { type: string, description: "Set when there are more tasks than are listed: pass it as cursor for the rest." }
                   open: { type: integer, description: "How many tasks are open, on every page together." }
                   all: { type: integer, description: "How many tasks there are, closed ones too." }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: createTask
       tags: [tasks]
@@ -1625,7 +1899,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TaskStarted" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks/{id}/left-out:
     parameters:
@@ -1675,7 +1955,11 @@ paths:
                   listed: { type: integer, description: "Companies whose domain the never-contact list covers: kept, never up for review." }
                   never_contact: { type: integer, description: Times a person on the never-contact list was refused. }
                   erased: { type: integer, description: Times a person erased on request was refused. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks/{id}:
     parameters:
@@ -1704,7 +1988,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TaskOut" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     patch:
       operationId: changeTask
       tags: [tasks]
@@ -1724,7 +2012,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Task" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks/{id}/prompt:
     parameters:
@@ -1748,7 +2041,11 @@ paths:
                 required: [prompt]
                 properties:
                   prompt: { type: string }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks/{id}/notes:
     parameters:
@@ -1780,7 +2077,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/TaskNoteOut" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks/{id}/work:
     parameters:
@@ -1814,7 +2115,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/TaskWork" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks/{id}/requests:
     parameters:
@@ -1843,7 +2148,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TaskRequest" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/task-requests/{id}:
     parameters:
@@ -1872,7 +2183,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TaskRequest" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/campaigns/{id}/send:
     parameters:
@@ -1901,7 +2217,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Campaign" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/campaigns/{id}/cancel:
     parameters:
@@ -1921,7 +2243,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Campaign" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/campaigns/{id}/resume:
     parameters:
@@ -1940,7 +2268,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Campaign" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/campaigns/{id}/mail:
     parameters:
@@ -1971,7 +2305,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/CampaignMail" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/notes:
     parameters:
@@ -1997,7 +2335,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Note" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/notes/{id}:
     parameters:
@@ -2012,7 +2356,12 @@ paths:
         - bearer: ["tasks:write"]
       responses:
         "204": { description: Deleted. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/requests/finish:
     parameters:
@@ -2044,7 +2393,13 @@ paths:
                 required: [ok]
                 properties:
                   ok: { type: boolean }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agreements:
     parameters:
@@ -2078,7 +2433,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Agreement" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: createAgreement
       tags: [agreements]
@@ -2103,7 +2462,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Agreement" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agreements/{id}:
     parameters:
@@ -2126,7 +2491,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgreementOverview" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     patch:
       operationId: changeAgreement
       tags: [agreements]
@@ -2149,7 +2518,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Agreement" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: removeAgreement
       tags: [agreements]
@@ -2159,7 +2533,12 @@ paths:
         - bearer: ["agreements:write"]
       responses:
         "204": { description: Removed. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agreements/{id}/document:
     parameters:
@@ -2194,7 +2573,14 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Agreement" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
     get:
       operationId: getAgreementDocument
       tags: [agreements]
@@ -2211,7 +2597,11 @@ paths:
           content:
             application/pdf:
               schema: { type: string, format: binary }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agreements/{id}/recipients:
     parameters:
@@ -2243,7 +2633,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/AgreementRecipient" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: addAgreementRecipient
       tags: [agreements]
@@ -2272,7 +2666,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgreementRecipient" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agreements/{id}/recipients/{recipient}:
     parameters:
@@ -2305,7 +2705,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AgreementRecipient" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: removeAgreementRecipient
       tags: [agreements]
@@ -2315,7 +2720,12 @@ paths:
         - bearer: ["agreements:write"]
       responses:
         "204": { description: Removed. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agreements/{id}/fields:
     parameters:
@@ -2346,7 +2756,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/AgreementField" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     put:
       operationId: putAgreementFields
       tags: [agreements]
@@ -2382,7 +2796,12 @@ paths:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/AgreementField" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/today:
     parameters:
@@ -2430,7 +2849,11 @@ paths:
                   shown: { type: integer, description: "How many the filter holds, over every page." }
                   later_calls: { type: integer, description: Calls due where it isn't a good time to ring now. }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/today/summary:
     parameters:
@@ -2449,7 +2872,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TodaySummary" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/marks:
     parameters:
@@ -2481,7 +2908,13 @@ paths:
                 required: [ok]
                 properties:
                   ok: { type: boolean }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/people:
     parameters:
@@ -2505,7 +2938,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/PersonAdded" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/people/draft:
     parameters:
@@ -2541,7 +2980,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/PersonDraft" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/contacts/{id}:
     parameters:
@@ -2562,7 +3005,12 @@ paths:
             schema: { $ref: "#/components/schemas/ContactChange" }
       responses:
         "204": { description: Changed. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/contacts/{id}/pick:
     parameters:
@@ -2586,7 +3034,13 @@ paths:
         - bearer: ["research:review"]
       responses:
         "204": { description: Picked. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/companies/{id}:
     parameters:
@@ -2607,7 +3061,12 @@ paths:
             schema: { $ref: "#/components/schemas/CompanyReview" }
       responses:
         "204": { description: Changed. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/suggestions/{id}:
     parameters:
@@ -2632,7 +3091,12 @@ paths:
                 decision: { type: string, enum: [accepted, dismissed] }
       responses:
         "204": { description: Decided. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enrichers:
     parameters:
@@ -2662,7 +3126,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Enricher" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     put:
       operationId: saveEnricher
       tags: [enrichment]
@@ -2685,7 +3153,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Enricher" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enrichers/{id}:
     parameters:
@@ -2700,7 +3173,12 @@ paths:
         - bearer: ["settings:write"]
       responses:
         "204": { description: Removed. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/contacts/{id}/enrich:
     parameters:
@@ -2744,7 +3222,13 @@ paths:
                   results:
                     type: array
                     items: { $ref: "#/components/schemas/EnrichResult" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/settings:
     parameters:
@@ -2763,7 +3247,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Settings" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     patch:
       operationId: changeSettings
       tags: [settings]
@@ -2786,7 +3274,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Settings" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
 
   /o/{org}/api/v1/offerings:
@@ -2821,7 +3314,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Offering" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: addOffering
       tags: [offerings]
@@ -2841,7 +3338,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Offering" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/offerings/{id}:
     parameters:
@@ -2866,7 +3369,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Offering" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: removeOffering
       tags: [offerings]
@@ -2880,7 +3388,12 @@ paths:
         - bearer: ["settings:write"]
       responses:
         "204": { description: Removed. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/offerings/{id}/verdicts:
     parameters:
@@ -2918,7 +3431,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Verdict" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/companies/{id}/verdicts:
     parameters:
@@ -2950,7 +3467,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Verdict" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/companies/{id}/roles:
     parameters:
@@ -2987,7 +3508,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Role" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: addRole
       tags: [offerings]
@@ -3010,7 +3535,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Role" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/roles/{id}:
     parameters:
@@ -3038,7 +3569,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Role" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/companies:
     parameters:
@@ -3084,7 +3620,11 @@ paths:
                     items: { $ref: "#/components/schemas/CompanyRow" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
                   total: { type: integer, description: "How many match, on every page." }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/segments:
     parameters:
@@ -3114,7 +3654,11 @@ paths:
                     type: array
                     items: { type: string }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/companies/{id}/overview:
     parameters:
@@ -3138,7 +3682,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/CompanyOverview" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/companies/{id}/history:
     parameters:
@@ -3170,7 +3718,11 @@ paths:
                     items: { $ref: "#/components/schemas/HistoryEntry" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
                   total: { type: integer, description: "How much there is, on every page." }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/companies/{id}/notes:
     parameters:
@@ -3203,7 +3755,11 @@ paths:
                     items: { $ref: "#/components/schemas/Note" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
                   total: { type: integer, description: "How many there are, on every page." }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/contacts/{id}/export:
     parameters:
@@ -3226,7 +3782,13 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/contacts/{id}/erase:
     parameters:
@@ -3246,7 +3808,13 @@ paths:
         - bearer: ["people:privacy"]
       responses:
         "204": { description: Erased. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/never-contact/covers:
     parameters:
@@ -3278,7 +3846,11 @@ paths:
                     items: { type: string }
                   total: { type: integer, description: "How many the list keeps out, on every page." }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/me:
     parameters:
@@ -3297,7 +3869,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Me" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     patch:
       operationId: changeMe
       tags: [settings]
@@ -3319,7 +3895,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Me" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/nav:
     parameters:
@@ -3341,7 +3922,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Nav" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /api/v1/orgs:
     post:
@@ -3370,7 +3955,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/OrgSummary" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/me/password:
     parameters:
@@ -3402,14 +3992,14 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Said" }
-        "429":
-          description: Too many attempts; try again after `Retry-After` seconds.
-          headers:
-            Retry-After: { schema: { type: integer } }
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Problem" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/members:
     parameters:
@@ -3439,7 +4029,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Member" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: addMember
       tags: [settings]
@@ -3469,7 +4063,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Said" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/members/{user}:
     parameters:
@@ -3509,7 +4109,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Member" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: removeMember
       tags: [settings]
@@ -3520,7 +4125,12 @@ paths:
         - bearer: ["team:write"]
       responses:
         "204": { description: Removed. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/mail-server:
     parameters:
@@ -3539,7 +4149,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MailServer" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     put:
       operationId: saveMailServer
       tags: [settings]
@@ -3561,7 +4175,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MailServer" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/mail-server/test:
     parameters:
@@ -3580,7 +4199,14 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Said" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
+        "502": { $ref: "#/components/responses/NotSent" }
 
   /o/{org}/api/v1/sso:
     parameters:
@@ -3599,7 +4225,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SSO" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     put:
       operationId: saveSSO
       tags: [settings]
@@ -3623,7 +4253,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SSO" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/sso/domains:
     parameters:
@@ -3653,7 +4288,11 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/SSODomain" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: addSSODomain
       tags: [settings]
@@ -3677,7 +4316,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SSODomain" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/sso/domains/{domain}:
     parameters:
@@ -3693,7 +4338,12 @@ paths:
         - bearer: ["sso:configure"]
       responses:
         "204": { description: Removed. }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/sso/domains/{domain}/verify:
     parameters:
@@ -3713,7 +4363,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SSODomain" }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/export:
     parameters:
@@ -3737,7 +4393,13 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-        default: { $ref: "#/components/responses/Problem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "500": { $ref: "#/components/responses/ServerError" }
 
 components:
   securitySchemes:
@@ -3785,9 +4447,72 @@ components:
       description: 'The next page, as `<…>; rel="next"` (RFC 8288), when there is one.'
       schema: { type: string }
 
+  # Every error is a Problem (RFC 9457). Each operation lists the statuses it can answer
+  # with; a test holds the server to them.
   responses:
-    Problem:
-      description: What went wrong (RFC 9457).
+    BadRequest:
+      description: The request can't be done as sent; `detail` says what to change.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unauthorized:
+      description: |
+        No sign-in or key that holds here: `signed_out` with none, `session_limited` for a
+        session another organisation's single sign-on began, `wrong_login` from `signIn`.
+      headers:
+        WWW-Authenticate: { schema: { type: string }, description: "`Bearer realm=\"prospector\"`, with an `error` when a key was sent." }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: |
+        Not for this caller: a key without the scope, a member without the role or area, a
+        key on a browser-only operation, or a browser request from another site. Untyped,
+        except `must_change_password` and `sso_required`, which say what to do first.
+      headers:
+        WWW-Authenticate: { schema: { type: string }, description: "With `error=\"insufficient_scope\"` and the `scope` needed, for a key that lacks it." }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: Nothing here by that name or id, or nothing this caller may see.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Conflict:
+      description: It clashes with what is already here; asking again won't help until one of the two changes.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Gone:
+      description: "`link_used`: the link is used, out of date or replaced."
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    TooLarge:
+      description: The body is bigger than this operation takes.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotJSON:
+      description: A browser's body must be `application/json`, or what the operation names.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Throttled:
+      description: "`throttled`: too many tries."
+      headers:
+        Retry-After: { schema: { type: integer }, description: Seconds until the next try counts. }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    ServerError:
+      description: The server couldn't finish; try again in a moment. `detail` never says more.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotSent:
+      description: The mail server didn't take the message; `detail` says what was kept.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -4492,16 +5217,40 @@ components:
       description: There is more. Pass this back as `cursor` for the next page; it is left out on the last one.
     Problem:
       type: object
-      required: [title, status]
+      description: What went wrong, as RFC 9457 lays it out.
+      required: [type, title, status]
+      additionalProperties: false
       properties:
-        type: { type: string }
-        title: { type: string }
-        status: { type: integer }
-        detail: { type: string }
-        code:
-          type: string
-          description: What a client can act on without reading `detail`. Absent when there is nothing to do but show it.
-          enum: [wrong_login, throttled, link_used, signed_out, must_change_password, sso_required, session_limited]
+        type: { $ref: "#/components/schemas/ProblemType" }
+        title: { type: string, description: "The same for every problem of a type; the status's own name for `about:blank`." }
+        status: { type: integer, description: The HTTP status. }
+        detail: { type: string, description: "This one, in words to show a person." }
+
+    ProblemType:
+      type: string
+      description: |
+        Which problem it is, as a link to its entry on the reference page. `about:blank` is
+        any with nothing to do but show `detail`; the others a client acts on without
+        reading it.
+      enum:
+        - about:blank
+        - /api/problems/signed_out
+        - /api/problems/session_limited
+        - /api/problems/wrong_login
+        - /api/problems/throttled
+        - /api/problems/link_used
+        - /api/problems/must_change_password
+        - /api/problems/sso_required
+      x-enum-varnames: [Untyped, SignedOut, SessionLimited, WrongLogin, Throttled, LinkUsed, MustChangePassword, SsoRequired]
+      x-enum-descriptions:
+        - Nothing to do but show `detail`.
+        - "401: no session or key. Sign in."
+        - "401: this session began through another organisation's single sign-on. Sign in again."
+        - "401: that email and password don't match an account."
+        - "429: too many tries. Wait `Retry-After` seconds."
+        - "410: a reset link that is used, out of date or replaced. Ask for another."
+        - "403: still on a password someone else saw. Choose your own (`changePassword`) before anything else."
+        - "403: this organisation requires its single sign-on. Load one of its pages to go through it."
 
     AgentKind:
       type: string

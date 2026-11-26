@@ -310,22 +310,22 @@ func (e CompanyReviewStage) Valid() bool {
 
 // Defines values for CriterionState.
 const (
-	Met       CriterionState = "met"
-	NotFound  CriterionState = "not_found"
-	NotMet    CriterionState = "not_met"
-	Unchecked CriterionState = "unchecked"
+	CriterionStateMet       CriterionState = "met"
+	CriterionStateNotFound  CriterionState = "not_found"
+	CriterionStateNotMet    CriterionState = "not_met"
+	CriterionStateUnchecked CriterionState = "unchecked"
 )
 
 // Valid indicates whether the value is a known member of the CriterionState enum.
 func (e CriterionState) Valid() bool {
 	switch e {
-	case Met:
+	case CriterionStateMet:
 		return true
-	case NotFound:
+	case CriterionStateNotFound:
 		return true
-	case NotMet:
+	case CriterionStateNotMet:
 		return true
-	case Unchecked:
+	case CriterionStateUnchecked:
 		return true
 	default:
 		return false
@@ -674,33 +674,36 @@ func (e Pipeline) Valid() bool {
 	}
 }
 
-// Defines values for ProblemCode.
+// Defines values for ProblemType.
 const (
-	LinkUsed           ProblemCode = "link_used"
-	MustChangePassword ProblemCode = "must_change_password"
-	SessionLimited     ProblemCode = "session_limited"
-	SignedOut          ProblemCode = "signed_out"
-	SsoRequired        ProblemCode = "sso_required"
-	Throttled          ProblemCode = "throttled"
-	WrongLogin         ProblemCode = "wrong_login"
+	ProblemTypeLinkUsed           ProblemType = "/api/problems/link_used"
+	ProblemTypeMustChangePassword ProblemType = "/api/problems/must_change_password"
+	ProblemTypeSessionLimited     ProblemType = "/api/problems/session_limited"
+	ProblemTypeSignedOut          ProblemType = "/api/problems/signed_out"
+	ProblemTypeSsoRequired        ProblemType = "/api/problems/sso_required"
+	ProblemTypeThrottled          ProblemType = "/api/problems/throttled"
+	ProblemTypeUntyped            ProblemType = "about:blank"
+	ProblemTypeWrongLogin         ProblemType = "/api/problems/wrong_login"
 )
 
-// Valid indicates whether the value is a known member of the ProblemCode enum.
-func (e ProblemCode) Valid() bool {
+// Valid indicates whether the value is a known member of the ProblemType enum.
+func (e ProblemType) Valid() bool {
 	switch e {
-	case LinkUsed:
+	case ProblemTypeLinkUsed:
 		return true
-	case MustChangePassword:
+	case ProblemTypeMustChangePassword:
 		return true
-	case SessionLimited:
+	case ProblemTypeSessionLimited:
 		return true
-	case SignedOut:
+	case ProblemTypeSignedOut:
 		return true
-	case SsoRequired:
+	case ProblemTypeSsoRequired:
 		return true
-	case Throttled:
+	case ProblemTypeThrottled:
 		return true
-	case WrongLogin:
+	case ProblemTypeUntyped:
+		return true
+	case ProblemTypeWrongLogin:
 		return true
 	default:
 		return false
@@ -2544,18 +2547,27 @@ type PersonNew struct {
 // Pipeline Where a company stands, from its furthest contact: `research` until anyone there is reached, `rejected` for one turned down before then.
 type Pipeline string
 
-// Problem defines model for Problem.
+// Problem What went wrong, as RFC 9457 lays it out.
 type Problem struct {
-	// Code What a client can act on without reading `detail`. Absent when there is nothing to do but show it.
-	Code   ProblemCode `json:"code,omitempty"`
-	Detail string      `json:"detail,omitempty"`
-	Status int         `json:"status"`
-	Title  string      `json:"title"`
-	Type   string      `json:"type,omitempty"`
+	// Detail This one, in words to show a person.
+	Detail string `json:"detail,omitempty"`
+
+	// Status The HTTP status.
+	Status int `json:"status"`
+
+	// Title The same for every problem of a type; the status's own name for `about:blank`.
+	Title string `json:"title"`
+
+	// Type Which problem it is, as a link to its entry on the reference page. `about:blank` is
+	// any with nothing to do but show `detail`; the others a client acts on without
+	// reading it.
+	Type ProblemType `json:"type"`
 }
 
-// ProblemCode What a client can act on without reading `detail`. Absent when there is nothing to do but show it.
-type ProblemCode string
+// ProblemType Which problem it is, as a link to its entry on the reference page. `about:blank` is
+// any with nothing to do but show `detail`; the others a client acts on without
+// reading it.
+type ProblemType string
 
 // Recipient defines model for Recipient.
 type Recipient struct {
@@ -3363,6 +3375,39 @@ type Limit = int
 
 // Org defines model for org.
 type Org = string
+
+// BadRequest What went wrong, as RFC 9457 lays it out.
+type BadRequest = Problem
+
+// Conflict What went wrong, as RFC 9457 lays it out.
+type Conflict = Problem
+
+// Forbidden What went wrong, as RFC 9457 lays it out.
+type Forbidden = Problem
+
+// Gone What went wrong, as RFC 9457 lays it out.
+type Gone = Problem
+
+// NotFound What went wrong, as RFC 9457 lays it out.
+type NotFound = Problem
+
+// NotJSON What went wrong, as RFC 9457 lays it out.
+type NotJSON = Problem
+
+// NotSent What went wrong, as RFC 9457 lays it out.
+type NotSent = Problem
+
+// ServerError What went wrong, as RFC 9457 lays it out.
+type ServerError = Problem
+
+// Throttled What went wrong, as RFC 9457 lays it out.
+type Throttled = Problem
+
+// TooLarge What went wrong, as RFC 9457 lays it out.
+type TooLarge = Problem
+
+// Unauthorized What went wrong, as RFC 9457 lays it out.
+type Unauthorized = Problem
 
 // CreateOrgJSONBody defines body for CreateOrg for application/json ContentType.
 type CreateOrgJSONBody struct {
@@ -10488,7 +10533,48 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	return m
 }
 
-type ProblemApplicationProblemPlusJSONResponse Problem
+type BadRequestApplicationProblemPlusJSONResponse Problem
+
+type ConflictApplicationProblemPlusJSONResponse Problem
+
+type ForbiddenResponseHeaders struct {
+	WWWAuthenticate string
+}
+type ForbiddenApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers ForbiddenResponseHeaders
+}
+
+type GoneApplicationProblemPlusJSONResponse Problem
+
+type NotFoundApplicationProblemPlusJSONResponse Problem
+
+type NotJSONApplicationProblemPlusJSONResponse Problem
+
+type NotSentApplicationProblemPlusJSONResponse Problem
+
+type ServerErrorApplicationProblemPlusJSONResponse Problem
+
+type ThrottledResponseHeaders struct {
+	RetryAfter int
+}
+type ThrottledApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers ThrottledResponseHeaders
+}
+
+type TooLargeApplicationProblemPlusJSONResponse Problem
+
+type UnauthorizedResponseHeaders struct {
+	WWWAuthenticate string
+}
+type UnauthorizedApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers UnauthorizedResponseHeaders
+}
 
 type CreateOrgRequestObject struct {
 	Body *CreateOrgJSONRequestBody
@@ -10512,19 +10598,112 @@ func (response CreateOrg201JSONResponse) VisitCreateOrgResponse(w http.ResponseW
 	return err
 }
 
-type CreateOrgdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type CreateOrg400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response CreateOrgdefaultApplicationProblemPlusJSONResponse) VisitCreateOrgResponse(w http.ResponseWriter) error {
+func (response CreateOrg400ApplicationProblemPlusJSONResponse) VisitCreateOrgResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOrg401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateOrg401ApplicationProblemPlusJSONResponse) VisitCreateOrgResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOrg403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateOrg403ApplicationProblemPlusJSONResponse) VisitCreateOrgResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOrg409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateOrg409ApplicationProblemPlusJSONResponse) VisitCreateOrgResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOrg415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response CreateOrg415ApplicationProblemPlusJSONResponse) VisitCreateOrgResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOrg500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CreateOrg500ApplicationProblemPlusJSONResponse) VisitCreateOrgResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -10545,19 +10724,103 @@ func (response ChangePassword204Response) VisitChangePasswordResponse(w http.Res
 	return nil
 }
 
-type ChangePassworddefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangePassword400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangePassworddefaultApplicationProblemPlusJSONResponse) VisitChangePasswordResponse(w http.ResponseWriter) error {
+func (response ChangePassword400ApplicationProblemPlusJSONResponse) VisitChangePasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePassword401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangePassword401ApplicationProblemPlusJSONResponse) VisitChangePasswordResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePassword403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangePassword403ApplicationProblemPlusJSONResponse) VisitChangePasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePassword429ApplicationProblemPlusJSONResponse struct {
+	ThrottledApplicationProblemPlusJSONResponse
+}
+
+func (response ChangePassword429ApplicationProblemPlusJSONResponse) VisitChangePasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "Retry-After", response.Headers.RetryAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "integer", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header Retry-After: %w", err)
+		}
+		w.Header().Set("Retry-After", v)
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePassword500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangePassword500ApplicationProblemPlusJSONResponse) VisitChangePasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -10578,19 +10841,89 @@ func (response RequestPasswordReset202Response) VisitRequestPasswordResetRespons
 	return nil
 }
 
-type RequestPasswordResetdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type RequestPasswordReset400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response RequestPasswordResetdefaultApplicationProblemPlusJSONResponse) VisitRequestPasswordResetResponse(w http.ResponseWriter) error {
+func (response RequestPasswordReset400ApplicationProblemPlusJSONResponse) VisitRequestPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestPasswordReset403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RequestPasswordReset403ApplicationProblemPlusJSONResponse) VisitRequestPasswordResetResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestPasswordReset404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RequestPasswordReset404ApplicationProblemPlusJSONResponse) VisitRequestPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestPasswordReset415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response RequestPasswordReset415ApplicationProblemPlusJSONResponse) VisitRequestPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestPasswordReset500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RequestPasswordReset500ApplicationProblemPlusJSONResponse) VisitRequestPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -10619,19 +10952,89 @@ func (response GetPasswordReset200JSONResponse) VisitGetPasswordResetResponse(w 
 	return err
 }
 
-type GetPasswordResetdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetPasswordReset400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response GetPasswordResetdefaultApplicationProblemPlusJSONResponse) VisitGetPasswordResetResponse(w http.ResponseWriter) error {
+func (response GetPasswordReset400ApplicationProblemPlusJSONResponse) VisitGetPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPasswordReset403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetPasswordReset403ApplicationProblemPlusJSONResponse) VisitGetPasswordResetResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPasswordReset404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetPasswordReset404ApplicationProblemPlusJSONResponse) VisitGetPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPasswordReset410ApplicationProblemPlusJSONResponse struct {
+	GoneApplicationProblemPlusJSONResponse
+}
+
+func (response GetPasswordReset410ApplicationProblemPlusJSONResponse) VisitGetPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.GoneApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(410)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPasswordReset500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetPasswordReset500ApplicationProblemPlusJSONResponse) VisitGetPasswordResetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -10653,19 +11056,105 @@ func (response ResetPassword204Response) VisitResetPasswordResponse(w http.Respo
 	return nil
 }
 
-type ResetPassworddefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ResetPassword400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ResetPassworddefaultApplicationProblemPlusJSONResponse) VisitResetPasswordResponse(w http.ResponseWriter) error {
+func (response ResetPassword400ApplicationProblemPlusJSONResponse) VisitResetPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetPassword403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ResetPassword403ApplicationProblemPlusJSONResponse) VisitResetPasswordResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetPassword404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ResetPassword404ApplicationProblemPlusJSONResponse) VisitResetPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetPassword410ApplicationProblemPlusJSONResponse struct {
+	GoneApplicationProblemPlusJSONResponse
+}
+
+func (response ResetPassword410ApplicationProblemPlusJSONResponse) VisitResetPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.GoneApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(410)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetPassword415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response ResetPassword415ApplicationProblemPlusJSONResponse) VisitResetPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetPassword500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ResetPassword500ApplicationProblemPlusJSONResponse) VisitResetPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -10685,19 +11174,41 @@ func (response SignOut204Response) VisitSignOutResponse(w http.ResponseWriter) e
 	return nil
 }
 
-type SignOutdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type SignOut403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
 }
 
-func (response SignOutdefaultApplicationProblemPlusJSONResponse) VisitSignOutResponse(w http.ResponseWriter) error {
+func (response SignOut403ApplicationProblemPlusJSONResponse) VisitSignOutResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignOut500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response SignOut500ApplicationProblemPlusJSONResponse) VisitSignOutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -10723,19 +11234,64 @@ func (response GetSession200JSONResponse) VisitGetSessionResponse(w http.Respons
 	return err
 }
 
-type GetSessiondefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetSession401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
 }
 
-func (response GetSessiondefaultApplicationProblemPlusJSONResponse) VisitGetSessionResponse(w http.ResponseWriter) error {
+func (response GetSession401ApplicationProblemPlusJSONResponse) VisitGetSessionResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSession403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetSession403ApplicationProblemPlusJSONResponse) VisitGetSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSession500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetSession500ApplicationProblemPlusJSONResponse) VisitGetSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -10762,13 +11318,86 @@ func (response SignIn200JSONResponse) VisitSignInResponse(w http.ResponseWriter)
 	return err
 }
 
-type SignIn429ResponseHeaders struct {
-	RetryAfter int
+type SignIn400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SignIn400ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignIn401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SignIn401ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignIn403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SignIn403ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignIn415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response SignIn415ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type SignIn429ApplicationProblemPlusJSONResponse struct {
-	Body    Problem
-	Headers SignIn429ResponseHeaders
+	ThrottledApplicationProblemPlusJSONResponse
 }
 
 func (response SignIn429ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
@@ -10790,19 +11419,18 @@ func (response SignIn429ApplicationProblemPlusJSONResponse) VisitSignInResponse(
 	return err
 }
 
-type SignIndefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type SignIn500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
 }
 
-func (response SignIndefaultApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+func (response SignIn500ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -10828,19 +11456,41 @@ func (response GetSignInWays200JSONResponse) VisitGetSignInWaysResponse(w http.R
 	return err
 }
 
-type GetSignInWaysdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetSignInWays403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
 }
 
-func (response GetSignInWaysdefaultApplicationProblemPlusJSONResponse) VisitGetSignInWaysResponse(w http.ResponseWriter) error {
+func (response GetSignInWays403ApplicationProblemPlusJSONResponse) VisitGetSignInWaysResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSignInWays500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetSignInWays500ApplicationProblemPlusJSONResponse) VisitGetSignInWaysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -10869,19 +11519,89 @@ func (response FindSingleSignOn200JSONResponse) VisitFindSingleSignOnResponse(w 
 	return err
 }
 
-type FindSingleSignOndefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type FindSingleSignOn400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response FindSingleSignOndefaultApplicationProblemPlusJSONResponse) VisitFindSingleSignOnResponse(w http.ResponseWriter) error {
+func (response FindSingleSignOn400ApplicationProblemPlusJSONResponse) VisitFindSingleSignOnResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FindSingleSignOn403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response FindSingleSignOn403ApplicationProblemPlusJSONResponse) VisitFindSingleSignOnResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FindSingleSignOn404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response FindSingleSignOn404ApplicationProblemPlusJSONResponse) VisitFindSingleSignOnResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FindSingleSignOn415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response FindSingleSignOn415ApplicationProblemPlusJSONResponse) VisitFindSingleSignOnResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FindSingleSignOn500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response FindSingleSignOn500ApplicationProblemPlusJSONResponse) VisitFindSingleSignOnResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -10931,19 +11651,96 @@ func (response ListAgentActivity200JSONResponse) VisitListAgentActivityResponse(
 	return err
 }
 
-type ListAgentActivitydefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListAgentActivity400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListAgentActivitydefaultApplicationProblemPlusJSONResponse) VisitListAgentActivityResponse(w http.ResponseWriter) error {
+func (response ListAgentActivity400ApplicationProblemPlusJSONResponse) VisitListAgentActivityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentActivity401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgentActivity401ApplicationProblemPlusJSONResponse) VisitListAgentActivityResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentActivity403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgentActivity403ApplicationProblemPlusJSONResponse) VisitListAgentActivityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentActivity404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgentActivity404ApplicationProblemPlusJSONResponse) VisitListAgentActivityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentActivity500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgentActivity500ApplicationProblemPlusJSONResponse) VisitListAgentActivityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -10990,19 +11787,96 @@ func (response ListAgentScores200JSONResponse) VisitListAgentScoresResponse(w ht
 	return err
 }
 
-type ListAgentScoresdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListAgentScores400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListAgentScoresdefaultApplicationProblemPlusJSONResponse) VisitListAgentScoresResponse(w http.ResponseWriter) error {
+func (response ListAgentScores400ApplicationProblemPlusJSONResponse) VisitListAgentScoresResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentScores401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgentScores401ApplicationProblemPlusJSONResponse) VisitListAgentScoresResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentScores403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgentScores403ApplicationProblemPlusJSONResponse) VisitListAgentScoresResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentScores404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgentScores404ApplicationProblemPlusJSONResponse) VisitListAgentScoresResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentScores500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgentScores500ApplicationProblemPlusJSONResponse) VisitListAgentScoresResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11049,19 +11923,96 @@ func (response ListAgentWork200JSONResponse) VisitListAgentWorkResponse(w http.R
 	return err
 }
 
-type ListAgentWorkdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListAgentWork400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListAgentWorkdefaultApplicationProblemPlusJSONResponse) VisitListAgentWorkResponse(w http.ResponseWriter) error {
+func (response ListAgentWork400ApplicationProblemPlusJSONResponse) VisitListAgentWorkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentWork401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgentWork401ApplicationProblemPlusJSONResponse) VisitListAgentWorkResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentWork403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgentWork403ApplicationProblemPlusJSONResponse) VisitListAgentWorkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentWork404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgentWork404ApplicationProblemPlusJSONResponse) VisitListAgentWorkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgentWork500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgentWork500ApplicationProblemPlusJSONResponse) VisitListAgentWorkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11108,19 +12059,96 @@ func (response ListAgents200JSONResponse) VisitListAgentsResponse(w http.Respons
 	return err
 }
 
-type ListAgentsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListAgents400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListAgentsdefaultApplicationProblemPlusJSONResponse) VisitListAgentsResponse(w http.ResponseWriter) error {
+func (response ListAgents400ApplicationProblemPlusJSONResponse) VisitListAgentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgents401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgents401ApplicationProblemPlusJSONResponse) VisitListAgentsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgents403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgents403ApplicationProblemPlusJSONResponse) VisitListAgentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgents404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgents404ApplicationProblemPlusJSONResponse) VisitListAgentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgents500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgents500ApplicationProblemPlusJSONResponse) VisitListAgentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11148,19 +12176,128 @@ func (response CreateAgent201JSONResponse) VisitCreateAgentResponse(w http.Respo
 	return err
 }
 
-type CreateAgentdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type CreateAgent400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response CreateAgentdefaultApplicationProblemPlusJSONResponse) VisitCreateAgentResponse(w http.ResponseWriter) error {
+func (response CreateAgent400ApplicationProblemPlusJSONResponse) VisitCreateAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAgent401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAgent401ApplicationProblemPlusJSONResponse) VisitCreateAgentResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAgent403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAgent403ApplicationProblemPlusJSONResponse) VisitCreateAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAgent404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAgent404ApplicationProblemPlusJSONResponse) VisitCreateAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAgent409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAgent409ApplicationProblemPlusJSONResponse) VisitCreateAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAgent415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAgent415ApplicationProblemPlusJSONResponse) VisitCreateAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAgent500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAgent500ApplicationProblemPlusJSONResponse) VisitCreateAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11182,19 +12319,112 @@ func (response DeleteAgent204Response) VisitDeleteAgentResponse(w http.ResponseW
 	return nil
 }
 
-type DeleteAgentdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type DeleteAgent400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response DeleteAgentdefaultApplicationProblemPlusJSONResponse) VisitDeleteAgentResponse(w http.ResponseWriter) error {
+func (response DeleteAgent400ApplicationProblemPlusJSONResponse) VisitDeleteAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAgent401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAgent401ApplicationProblemPlusJSONResponse) VisitDeleteAgentResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAgent403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAgent403ApplicationProblemPlusJSONResponse) VisitDeleteAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAgent404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAgent404ApplicationProblemPlusJSONResponse) VisitDeleteAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAgent409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAgent409ApplicationProblemPlusJSONResponse) VisitDeleteAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAgent500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAgent500ApplicationProblemPlusJSONResponse) VisitDeleteAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11222,19 +12452,96 @@ func (response GetAgent200JSONResponse) VisitGetAgentResponse(w http.ResponseWri
 	return err
 }
 
-type GetAgentdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetAgent400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response GetAgentdefaultApplicationProblemPlusJSONResponse) VisitGetAgentResponse(w http.ResponseWriter) error {
+func (response GetAgent400ApplicationProblemPlusJSONResponse) VisitGetAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgent401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetAgent401ApplicationProblemPlusJSONResponse) VisitGetAgentResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgent403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetAgent403ApplicationProblemPlusJSONResponse) VisitGetAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgent404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetAgent404ApplicationProblemPlusJSONResponse) VisitGetAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgent500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetAgent500ApplicationProblemPlusJSONResponse) VisitGetAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11263,19 +12570,112 @@ func (response UpdateAgent200JSONResponse) VisitUpdateAgentResponse(w http.Respo
 	return err
 }
 
-type UpdateAgentdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type UpdateAgent400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response UpdateAgentdefaultApplicationProblemPlusJSONResponse) VisitUpdateAgentResponse(w http.ResponseWriter) error {
+func (response UpdateAgent400ApplicationProblemPlusJSONResponse) VisitUpdateAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAgent401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAgent401ApplicationProblemPlusJSONResponse) VisitUpdateAgentResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAgent403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAgent403ApplicationProblemPlusJSONResponse) VisitUpdateAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAgent404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAgent404ApplicationProblemPlusJSONResponse) VisitUpdateAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAgent409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAgent409ApplicationProblemPlusJSONResponse) VisitUpdateAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAgent500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAgent500ApplicationProblemPlusJSONResponse) VisitUpdateAgentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11322,19 +12722,96 @@ func (response ListAgreements200JSONResponse) VisitListAgreementsResponse(w http
 	return err
 }
 
-type ListAgreementsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListAgreements400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListAgreementsdefaultApplicationProblemPlusJSONResponse) VisitListAgreementsResponse(w http.ResponseWriter) error {
+func (response ListAgreements400ApplicationProblemPlusJSONResponse) VisitListAgreementsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgreements401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgreements401ApplicationProblemPlusJSONResponse) VisitListAgreementsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgreements403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgreements403ApplicationProblemPlusJSONResponse) VisitListAgreementsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgreements404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgreements404ApplicationProblemPlusJSONResponse) VisitListAgreementsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgreements500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgreements500ApplicationProblemPlusJSONResponse) VisitListAgreementsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11362,19 +12839,128 @@ func (response CreateAgreement201JSONResponse) VisitCreateAgreementResponse(w ht
 	return err
 }
 
-type CreateAgreementdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type CreateAgreement400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response CreateAgreementdefaultApplicationProblemPlusJSONResponse) VisitCreateAgreementResponse(w http.ResponseWriter) error {
+func (response CreateAgreement400ApplicationProblemPlusJSONResponse) VisitCreateAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAgreement401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAgreement401ApplicationProblemPlusJSONResponse) VisitCreateAgreementResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAgreement403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAgreement403ApplicationProblemPlusJSONResponse) VisitCreateAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAgreement404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAgreement404ApplicationProblemPlusJSONResponse) VisitCreateAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAgreement409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAgreement409ApplicationProblemPlusJSONResponse) VisitCreateAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAgreement415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAgreement415ApplicationProblemPlusJSONResponse) VisitCreateAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateAgreement500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CreateAgreement500ApplicationProblemPlusJSONResponse) VisitCreateAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11396,19 +12982,112 @@ func (response RemoveAgreement204Response) VisitRemoveAgreementResponse(w http.R
 	return nil
 }
 
-type RemoveAgreementdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type RemoveAgreement400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response RemoveAgreementdefaultApplicationProblemPlusJSONResponse) VisitRemoveAgreementResponse(w http.ResponseWriter) error {
+func (response RemoveAgreement400ApplicationProblemPlusJSONResponse) VisitRemoveAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveAgreement401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveAgreement401ApplicationProblemPlusJSONResponse) VisitRemoveAgreementResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveAgreement403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveAgreement403ApplicationProblemPlusJSONResponse) VisitRemoveAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveAgreement404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveAgreement404ApplicationProblemPlusJSONResponse) VisitRemoveAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveAgreement409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveAgreement409ApplicationProblemPlusJSONResponse) VisitRemoveAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveAgreement500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveAgreement500ApplicationProblemPlusJSONResponse) VisitRemoveAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11436,19 +13115,96 @@ func (response GetAgreement200JSONResponse) VisitGetAgreementResponse(w http.Res
 	return err
 }
 
-type GetAgreementdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetAgreement400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response GetAgreementdefaultApplicationProblemPlusJSONResponse) VisitGetAgreementResponse(w http.ResponseWriter) error {
+func (response GetAgreement400ApplicationProblemPlusJSONResponse) VisitGetAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgreement401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetAgreement401ApplicationProblemPlusJSONResponse) VisitGetAgreementResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgreement403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetAgreement403ApplicationProblemPlusJSONResponse) VisitGetAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgreement404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetAgreement404ApplicationProblemPlusJSONResponse) VisitGetAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgreement500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetAgreement500ApplicationProblemPlusJSONResponse) VisitGetAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11477,19 +13233,112 @@ func (response ChangeAgreement200JSONResponse) VisitChangeAgreementResponse(w ht
 	return err
 }
 
-type ChangeAgreementdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeAgreement400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeAgreementdefaultApplicationProblemPlusJSONResponse) VisitChangeAgreementResponse(w http.ResponseWriter) error {
+func (response ChangeAgreement400ApplicationProblemPlusJSONResponse) VisitChangeAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeAgreement401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeAgreement401ApplicationProblemPlusJSONResponse) VisitChangeAgreementResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeAgreement403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeAgreement403ApplicationProblemPlusJSONResponse) VisitChangeAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeAgreement404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeAgreement404ApplicationProblemPlusJSONResponse) VisitChangeAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeAgreement409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeAgreement409ApplicationProblemPlusJSONResponse) VisitChangeAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeAgreement500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeAgreement500ApplicationProblemPlusJSONResponse) VisitChangeAgreementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11535,19 +13384,96 @@ func (response GetAgreementDocument200ApplicationpdfResponse) VisitGetAgreementD
 	return err
 }
 
-type GetAgreementDocumentdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetAgreementDocument400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response GetAgreementDocumentdefaultApplicationProblemPlusJSONResponse) VisitGetAgreementDocumentResponse(w http.ResponseWriter) error {
+func (response GetAgreementDocument400ApplicationProblemPlusJSONResponse) VisitGetAgreementDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgreementDocument401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetAgreementDocument401ApplicationProblemPlusJSONResponse) VisitGetAgreementDocumentResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgreementDocument403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetAgreementDocument403ApplicationProblemPlusJSONResponse) VisitGetAgreementDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgreementDocument404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetAgreementDocument404ApplicationProblemPlusJSONResponse) VisitGetAgreementDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAgreementDocument500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetAgreementDocument500ApplicationProblemPlusJSONResponse) VisitGetAgreementDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11577,19 +13503,144 @@ func (response PutAgreementDocument200JSONResponse) VisitPutAgreementDocumentRes
 	return err
 }
 
-type PutAgreementDocumentdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type PutAgreementDocument400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response PutAgreementDocumentdefaultApplicationProblemPlusJSONResponse) VisitPutAgreementDocumentResponse(w http.ResponseWriter) error {
+func (response PutAgreementDocument400ApplicationProblemPlusJSONResponse) VisitPutAgreementDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutAgreementDocument401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PutAgreementDocument401ApplicationProblemPlusJSONResponse) VisitPutAgreementDocumentResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutAgreementDocument403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PutAgreementDocument403ApplicationProblemPlusJSONResponse) VisitPutAgreementDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutAgreementDocument404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PutAgreementDocument404ApplicationProblemPlusJSONResponse) VisitPutAgreementDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutAgreementDocument409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response PutAgreementDocument409ApplicationProblemPlusJSONResponse) VisitPutAgreementDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutAgreementDocument413ApplicationProblemPlusJSONResponse struct {
+	TooLargeApplicationProblemPlusJSONResponse
+}
+
+func (response PutAgreementDocument413ApplicationProblemPlusJSONResponse) VisitPutAgreementDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.TooLargeApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutAgreementDocument415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response PutAgreementDocument415ApplicationProblemPlusJSONResponse) VisitPutAgreementDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutAgreementDocument500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response PutAgreementDocument500ApplicationProblemPlusJSONResponse) VisitPutAgreementDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11637,19 +13688,96 @@ func (response ListAgreementFields200JSONResponse) VisitListAgreementFieldsRespo
 	return err
 }
 
-type ListAgreementFieldsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListAgreementFields400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListAgreementFieldsdefaultApplicationProblemPlusJSONResponse) VisitListAgreementFieldsResponse(w http.ResponseWriter) error {
+func (response ListAgreementFields400ApplicationProblemPlusJSONResponse) VisitListAgreementFieldsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgreementFields401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgreementFields401ApplicationProblemPlusJSONResponse) VisitListAgreementFieldsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgreementFields403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgreementFields403ApplicationProblemPlusJSONResponse) VisitListAgreementFieldsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgreementFields404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgreementFields404ApplicationProblemPlusJSONResponse) VisitListAgreementFieldsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgreementFields500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgreementFields500ApplicationProblemPlusJSONResponse) VisitListAgreementFieldsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11680,19 +13808,112 @@ func (response PutAgreementFields200JSONResponse) VisitPutAgreementFieldsRespons
 	return err
 }
 
-type PutAgreementFieldsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type PutAgreementFields400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response PutAgreementFieldsdefaultApplicationProblemPlusJSONResponse) VisitPutAgreementFieldsResponse(w http.ResponseWriter) error {
+func (response PutAgreementFields400ApplicationProblemPlusJSONResponse) VisitPutAgreementFieldsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutAgreementFields401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PutAgreementFields401ApplicationProblemPlusJSONResponse) VisitPutAgreementFieldsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutAgreementFields403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PutAgreementFields403ApplicationProblemPlusJSONResponse) VisitPutAgreementFieldsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutAgreementFields404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PutAgreementFields404ApplicationProblemPlusJSONResponse) VisitPutAgreementFieldsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutAgreementFields409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response PutAgreementFields409ApplicationProblemPlusJSONResponse) VisitPutAgreementFieldsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutAgreementFields500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response PutAgreementFields500ApplicationProblemPlusJSONResponse) VisitPutAgreementFieldsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11740,19 +13961,96 @@ func (response ListAgreementRecipients200JSONResponse) VisitListAgreementRecipie
 	return err
 }
 
-type ListAgreementRecipientsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListAgreementRecipients400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListAgreementRecipientsdefaultApplicationProblemPlusJSONResponse) VisitListAgreementRecipientsResponse(w http.ResponseWriter) error {
+func (response ListAgreementRecipients400ApplicationProblemPlusJSONResponse) VisitListAgreementRecipientsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgreementRecipients401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgreementRecipients401ApplicationProblemPlusJSONResponse) VisitListAgreementRecipientsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgreementRecipients403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgreementRecipients403ApplicationProblemPlusJSONResponse) VisitListAgreementRecipientsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgreementRecipients404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgreementRecipients404ApplicationProblemPlusJSONResponse) VisitListAgreementRecipientsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAgreementRecipients500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListAgreementRecipients500ApplicationProblemPlusJSONResponse) VisitListAgreementRecipientsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11781,19 +14079,128 @@ func (response AddAgreementRecipient201JSONResponse) VisitAddAgreementRecipientR
 	return err
 }
 
-type AddAgreementRecipientdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type AddAgreementRecipient400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response AddAgreementRecipientdefaultApplicationProblemPlusJSONResponse) VisitAddAgreementRecipientResponse(w http.ResponseWriter) error {
+func (response AddAgreementRecipient400ApplicationProblemPlusJSONResponse) VisitAddAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddAgreementRecipient401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AddAgreementRecipient401ApplicationProblemPlusJSONResponse) VisitAddAgreementRecipientResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddAgreementRecipient403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AddAgreementRecipient403ApplicationProblemPlusJSONResponse) VisitAddAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddAgreementRecipient404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AddAgreementRecipient404ApplicationProblemPlusJSONResponse) VisitAddAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddAgreementRecipient409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AddAgreementRecipient409ApplicationProblemPlusJSONResponse) VisitAddAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddAgreementRecipient415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response AddAgreementRecipient415ApplicationProblemPlusJSONResponse) VisitAddAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddAgreementRecipient500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AddAgreementRecipient500ApplicationProblemPlusJSONResponse) VisitAddAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11816,19 +14223,112 @@ func (response RemoveAgreementRecipient204Response) VisitRemoveAgreementRecipien
 	return nil
 }
 
-type RemoveAgreementRecipientdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type RemoveAgreementRecipient400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response RemoveAgreementRecipientdefaultApplicationProblemPlusJSONResponse) VisitRemoveAgreementRecipientResponse(w http.ResponseWriter) error {
+func (response RemoveAgreementRecipient400ApplicationProblemPlusJSONResponse) VisitRemoveAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveAgreementRecipient401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveAgreementRecipient401ApplicationProblemPlusJSONResponse) VisitRemoveAgreementRecipientResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveAgreementRecipient403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveAgreementRecipient403ApplicationProblemPlusJSONResponse) VisitRemoveAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveAgreementRecipient404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveAgreementRecipient404ApplicationProblemPlusJSONResponse) VisitRemoveAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveAgreementRecipient409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveAgreementRecipient409ApplicationProblemPlusJSONResponse) VisitRemoveAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveAgreementRecipient500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveAgreementRecipient500ApplicationProblemPlusJSONResponse) VisitRemoveAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11858,19 +14358,112 @@ func (response ChangeAgreementRecipient200JSONResponse) VisitChangeAgreementReci
 	return err
 }
 
-type ChangeAgreementRecipientdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeAgreementRecipient400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeAgreementRecipientdefaultApplicationProblemPlusJSONResponse) VisitChangeAgreementRecipientResponse(w http.ResponseWriter) error {
+func (response ChangeAgreementRecipient400ApplicationProblemPlusJSONResponse) VisitChangeAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeAgreementRecipient401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeAgreementRecipient401ApplicationProblemPlusJSONResponse) VisitChangeAgreementRecipientResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeAgreementRecipient403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeAgreementRecipient403ApplicationProblemPlusJSONResponse) VisitChangeAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeAgreementRecipient404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeAgreementRecipient404ApplicationProblemPlusJSONResponse) VisitChangeAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeAgreementRecipient409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeAgreementRecipient409ApplicationProblemPlusJSONResponse) VisitChangeAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeAgreementRecipient500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeAgreementRecipient500ApplicationProblemPlusJSONResponse) VisitChangeAgreementRecipientResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11920,19 +14513,96 @@ func (response ListCampaigns200JSONResponse) VisitListCampaignsResponse(w http.R
 	return err
 }
 
-type ListCampaignsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListCampaigns400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListCampaignsdefaultApplicationProblemPlusJSONResponse) VisitListCampaignsResponse(w http.ResponseWriter) error {
+func (response ListCampaigns400ApplicationProblemPlusJSONResponse) VisitListCampaignsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCampaigns401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListCampaigns401ApplicationProblemPlusJSONResponse) VisitListCampaignsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCampaigns403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListCampaigns403ApplicationProblemPlusJSONResponse) VisitListCampaignsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCampaigns404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListCampaigns404ApplicationProblemPlusJSONResponse) VisitListCampaignsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCampaigns500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListCampaigns500ApplicationProblemPlusJSONResponse) VisitListCampaignsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11960,19 +14630,128 @@ func (response CreateCampaign201JSONResponse) VisitCreateCampaignResponse(w http
 	return err
 }
 
-type CreateCampaigndefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type CreateCampaign400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response CreateCampaigndefaultApplicationProblemPlusJSONResponse) VisitCreateCampaignResponse(w http.ResponseWriter) error {
+func (response CreateCampaign400ApplicationProblemPlusJSONResponse) VisitCreateCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCampaign401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateCampaign401ApplicationProblemPlusJSONResponse) VisitCreateCampaignResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCampaign403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateCampaign403ApplicationProblemPlusJSONResponse) VisitCreateCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCampaign404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateCampaign404ApplicationProblemPlusJSONResponse) VisitCreateCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCampaign409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateCampaign409ApplicationProblemPlusJSONResponse) VisitCreateCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCampaign415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response CreateCampaign415ApplicationProblemPlusJSONResponse) VisitCreateCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCampaign500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CreateCampaign500ApplicationProblemPlusJSONResponse) VisitCreateCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11994,19 +14773,112 @@ func (response RemoveCampaign204Response) VisitRemoveCampaignResponse(w http.Res
 	return nil
 }
 
-type RemoveCampaigndefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type RemoveCampaign400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response RemoveCampaigndefaultApplicationProblemPlusJSONResponse) VisitRemoveCampaignResponse(w http.ResponseWriter) error {
+func (response RemoveCampaign400ApplicationProblemPlusJSONResponse) VisitRemoveCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveCampaign401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveCampaign401ApplicationProblemPlusJSONResponse) VisitRemoveCampaignResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveCampaign403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveCampaign403ApplicationProblemPlusJSONResponse) VisitRemoveCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveCampaign404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveCampaign404ApplicationProblemPlusJSONResponse) VisitRemoveCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveCampaign409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveCampaign409ApplicationProblemPlusJSONResponse) VisitRemoveCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveCampaign500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveCampaign500ApplicationProblemPlusJSONResponse) VisitRemoveCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12035,19 +14907,112 @@ func (response ChangeCampaign200JSONResponse) VisitChangeCampaignResponse(w http
 	return err
 }
 
-type ChangeCampaigndefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeCampaign400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeCampaigndefaultApplicationProblemPlusJSONResponse) VisitChangeCampaignResponse(w http.ResponseWriter) error {
+func (response ChangeCampaign400ApplicationProblemPlusJSONResponse) VisitChangeCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeCampaign401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeCampaign401ApplicationProblemPlusJSONResponse) VisitChangeCampaignResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeCampaign403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeCampaign403ApplicationProblemPlusJSONResponse) VisitChangeCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeCampaign404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeCampaign404ApplicationProblemPlusJSONResponse) VisitChangeCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeCampaign409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeCampaign409ApplicationProblemPlusJSONResponse) VisitChangeCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeCampaign500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeCampaign500ApplicationProblemPlusJSONResponse) VisitChangeCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12100,19 +15065,96 @@ func (response ListCampaignAudience200JSONResponse) VisitListCampaignAudienceRes
 	return err
 }
 
-type ListCampaignAudiencedefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListCampaignAudience400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListCampaignAudiencedefaultApplicationProblemPlusJSONResponse) VisitListCampaignAudienceResponse(w http.ResponseWriter) error {
+func (response ListCampaignAudience400ApplicationProblemPlusJSONResponse) VisitListCampaignAudienceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCampaignAudience401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListCampaignAudience401ApplicationProblemPlusJSONResponse) VisitListCampaignAudienceResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCampaignAudience403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListCampaignAudience403ApplicationProblemPlusJSONResponse) VisitListCampaignAudienceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCampaignAudience404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListCampaignAudience404ApplicationProblemPlusJSONResponse) VisitListCampaignAudienceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCampaignAudience500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListCampaignAudience500ApplicationProblemPlusJSONResponse) VisitListCampaignAudienceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12140,19 +15182,128 @@ func (response CancelCampaign200JSONResponse) VisitCancelCampaignResponse(w http
 	return err
 }
 
-type CancelCampaigndefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type CancelCampaign400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response CancelCampaigndefaultApplicationProblemPlusJSONResponse) VisitCancelCampaignResponse(w http.ResponseWriter) error {
+func (response CancelCampaign400ApplicationProblemPlusJSONResponse) VisitCancelCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelCampaign401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CancelCampaign401ApplicationProblemPlusJSONResponse) VisitCancelCampaignResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelCampaign403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CancelCampaign403ApplicationProblemPlusJSONResponse) VisitCancelCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelCampaign404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CancelCampaign404ApplicationProblemPlusJSONResponse) VisitCancelCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelCampaign409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CancelCampaign409ApplicationProblemPlusJSONResponse) VisitCancelCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelCampaign415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response CancelCampaign415ApplicationProblemPlusJSONResponse) VisitCancelCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelCampaign500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CancelCampaign500ApplicationProblemPlusJSONResponse) VisitCancelCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12200,19 +15351,96 @@ func (response ListCampaignMail200JSONResponse) VisitListCampaignMailResponse(w 
 	return err
 }
 
-type ListCampaignMaildefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListCampaignMail400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListCampaignMaildefaultApplicationProblemPlusJSONResponse) VisitListCampaignMailResponse(w http.ResponseWriter) error {
+func (response ListCampaignMail400ApplicationProblemPlusJSONResponse) VisitListCampaignMailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCampaignMail401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListCampaignMail401ApplicationProblemPlusJSONResponse) VisitListCampaignMailResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCampaignMail403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListCampaignMail403ApplicationProblemPlusJSONResponse) VisitListCampaignMailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCampaignMail404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListCampaignMail404ApplicationProblemPlusJSONResponse) VisitListCampaignMailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCampaignMail500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListCampaignMail500ApplicationProblemPlusJSONResponse) VisitListCampaignMailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12240,19 +15468,128 @@ func (response ResumeCampaign200JSONResponse) VisitResumeCampaignResponse(w http
 	return err
 }
 
-type ResumeCampaigndefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ResumeCampaign400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ResumeCampaigndefaultApplicationProblemPlusJSONResponse) VisitResumeCampaignResponse(w http.ResponseWriter) error {
+func (response ResumeCampaign400ApplicationProblemPlusJSONResponse) VisitResumeCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeCampaign401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ResumeCampaign401ApplicationProblemPlusJSONResponse) VisitResumeCampaignResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeCampaign403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ResumeCampaign403ApplicationProblemPlusJSONResponse) VisitResumeCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeCampaign404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ResumeCampaign404ApplicationProblemPlusJSONResponse) VisitResumeCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeCampaign409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ResumeCampaign409ApplicationProblemPlusJSONResponse) VisitResumeCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeCampaign415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response ResumeCampaign415ApplicationProblemPlusJSONResponse) VisitResumeCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeCampaign500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ResumeCampaign500ApplicationProblemPlusJSONResponse) VisitResumeCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12280,19 +15617,128 @@ func (response SendCampaign202JSONResponse) VisitSendCampaignResponse(w http.Res
 	return err
 }
 
-type SendCampaigndefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type SendCampaign400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response SendCampaigndefaultApplicationProblemPlusJSONResponse) VisitSendCampaignResponse(w http.ResponseWriter) error {
+func (response SendCampaign400ApplicationProblemPlusJSONResponse) VisitSendCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendCampaign401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SendCampaign401ApplicationProblemPlusJSONResponse) VisitSendCampaignResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendCampaign403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SendCampaign403ApplicationProblemPlusJSONResponse) VisitSendCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendCampaign404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SendCampaign404ApplicationProblemPlusJSONResponse) VisitSendCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendCampaign409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response SendCampaign409ApplicationProblemPlusJSONResponse) VisitSendCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendCampaign415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response SendCampaign415ApplicationProblemPlusJSONResponse) VisitSendCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendCampaign500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response SendCampaign500ApplicationProblemPlusJSONResponse) VisitSendCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12342,19 +15788,96 @@ func (response ListCompanies200JSONResponse) VisitListCompaniesResponse(w http.R
 	return err
 }
 
-type ListCompaniesdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListCompanies400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListCompaniesdefaultApplicationProblemPlusJSONResponse) VisitListCompaniesResponse(w http.ResponseWriter) error {
+func (response ListCompanies400ApplicationProblemPlusJSONResponse) VisitListCompaniesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanies401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanies401ApplicationProblemPlusJSONResponse) VisitListCompaniesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanies403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanies403ApplicationProblemPlusJSONResponse) VisitListCompaniesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanies404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanies404ApplicationProblemPlusJSONResponse) VisitListCompaniesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanies500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanies500ApplicationProblemPlusJSONResponse) VisitListCompaniesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12377,19 +15900,112 @@ func (response ReviewCompany204Response) VisitReviewCompanyResponse(w http.Respo
 	return nil
 }
 
-type ReviewCompanydefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ReviewCompany400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ReviewCompanydefaultApplicationProblemPlusJSONResponse) VisitReviewCompanyResponse(w http.ResponseWriter) error {
+func (response ReviewCompany400ApplicationProblemPlusJSONResponse) VisitReviewCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReviewCompany401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ReviewCompany401ApplicationProblemPlusJSONResponse) VisitReviewCompanyResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReviewCompany403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ReviewCompany403ApplicationProblemPlusJSONResponse) VisitReviewCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReviewCompany404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ReviewCompany404ApplicationProblemPlusJSONResponse) VisitReviewCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReviewCompany409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ReviewCompany409ApplicationProblemPlusJSONResponse) VisitReviewCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReviewCompany500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ReviewCompany500ApplicationProblemPlusJSONResponse) VisitReviewCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12440,19 +16056,96 @@ func (response ListCompanyHistory200JSONResponse) VisitListCompanyHistoryRespons
 	return err
 }
 
-type ListCompanyHistorydefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListCompanyHistory400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListCompanyHistorydefaultApplicationProblemPlusJSONResponse) VisitListCompanyHistoryResponse(w http.ResponseWriter) error {
+func (response ListCompanyHistory400ApplicationProblemPlusJSONResponse) VisitListCompanyHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyHistory401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyHistory401ApplicationProblemPlusJSONResponse) VisitListCompanyHistoryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyHistory403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyHistory403ApplicationProblemPlusJSONResponse) VisitListCompanyHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyHistory404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyHistory404ApplicationProblemPlusJSONResponse) VisitListCompanyHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyHistory500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyHistory500ApplicationProblemPlusJSONResponse) VisitListCompanyHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12503,19 +16196,96 @@ func (response ListCompanyNotes200JSONResponse) VisitListCompanyNotesResponse(w 
 	return err
 }
 
-type ListCompanyNotesdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListCompanyNotes400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListCompanyNotesdefaultApplicationProblemPlusJSONResponse) VisitListCompanyNotesResponse(w http.ResponseWriter) error {
+func (response ListCompanyNotes400ApplicationProblemPlusJSONResponse) VisitListCompanyNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyNotes401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyNotes401ApplicationProblemPlusJSONResponse) VisitListCompanyNotesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyNotes403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyNotes403ApplicationProblemPlusJSONResponse) VisitListCompanyNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyNotes404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyNotes404ApplicationProblemPlusJSONResponse) VisitListCompanyNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyNotes500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyNotes500ApplicationProblemPlusJSONResponse) VisitListCompanyNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12543,19 +16313,96 @@ func (response GetCompanyOverview200JSONResponse) VisitGetCompanyOverviewRespons
 	return err
 }
 
-type GetCompanyOverviewdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetCompanyOverview400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response GetCompanyOverviewdefaultApplicationProblemPlusJSONResponse) VisitGetCompanyOverviewResponse(w http.ResponseWriter) error {
+func (response GetCompanyOverview400ApplicationProblemPlusJSONResponse) VisitGetCompanyOverviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCompanyOverview401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetCompanyOverview401ApplicationProblemPlusJSONResponse) VisitGetCompanyOverviewResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCompanyOverview403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetCompanyOverview403ApplicationProblemPlusJSONResponse) VisitGetCompanyOverviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCompanyOverview404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetCompanyOverview404ApplicationProblemPlusJSONResponse) VisitGetCompanyOverviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCompanyOverview500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetCompanyOverview500ApplicationProblemPlusJSONResponse) VisitGetCompanyOverviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12603,19 +16450,96 @@ func (response ListCompanyRoles200JSONResponse) VisitListCompanyRolesResponse(w 
 	return err
 }
 
-type ListCompanyRolesdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListCompanyRoles400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListCompanyRolesdefaultApplicationProblemPlusJSONResponse) VisitListCompanyRolesResponse(w http.ResponseWriter) error {
+func (response ListCompanyRoles400ApplicationProblemPlusJSONResponse) VisitListCompanyRolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyRoles401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyRoles401ApplicationProblemPlusJSONResponse) VisitListCompanyRolesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyRoles403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyRoles403ApplicationProblemPlusJSONResponse) VisitListCompanyRolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyRoles404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyRoles404ApplicationProblemPlusJSONResponse) VisitListCompanyRolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyRoles500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyRoles500ApplicationProblemPlusJSONResponse) VisitListCompanyRolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12644,19 +16568,128 @@ func (response AddRole201JSONResponse) VisitAddRoleResponse(w http.ResponseWrite
 	return err
 }
 
-type AddRoledefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type AddRole400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response AddRoledefaultApplicationProblemPlusJSONResponse) VisitAddRoleResponse(w http.ResponseWriter) error {
+func (response AddRole400ApplicationProblemPlusJSONResponse) VisitAddRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddRole401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AddRole401ApplicationProblemPlusJSONResponse) VisitAddRoleResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddRole403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AddRole403ApplicationProblemPlusJSONResponse) VisitAddRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddRole404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AddRole404ApplicationProblemPlusJSONResponse) VisitAddRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddRole409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AddRole409ApplicationProblemPlusJSONResponse) VisitAddRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddRole415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response AddRole415ApplicationProblemPlusJSONResponse) VisitAddRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddRole500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AddRole500ApplicationProblemPlusJSONResponse) VisitAddRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12704,19 +16737,96 @@ func (response ListCompanyVerdicts200JSONResponse) VisitListCompanyVerdictsRespo
 	return err
 }
 
-type ListCompanyVerdictsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListCompanyVerdicts400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListCompanyVerdictsdefaultApplicationProblemPlusJSONResponse) VisitListCompanyVerdictsResponse(w http.ResponseWriter) error {
+func (response ListCompanyVerdicts400ApplicationProblemPlusJSONResponse) VisitListCompanyVerdictsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyVerdicts401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyVerdicts401ApplicationProblemPlusJSONResponse) VisitListCompanyVerdictsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyVerdicts403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyVerdicts403ApplicationProblemPlusJSONResponse) VisitListCompanyVerdictsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyVerdicts404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyVerdicts404ApplicationProblemPlusJSONResponse) VisitListCompanyVerdictsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanyVerdicts500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListCompanyVerdicts500ApplicationProblemPlusJSONResponse) VisitListCompanyVerdictsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12743,19 +16853,96 @@ func (response GetConnect200JSONResponse) VisitGetConnectResponse(w http.Respons
 	return err
 }
 
-type GetConnectdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetConnect400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response GetConnectdefaultApplicationProblemPlusJSONResponse) VisitGetConnectResponse(w http.ResponseWriter) error {
+func (response GetConnect400ApplicationProblemPlusJSONResponse) VisitGetConnectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConnect401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetConnect401ApplicationProblemPlusJSONResponse) VisitGetConnectResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConnect403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetConnect403ApplicationProblemPlusJSONResponse) VisitGetConnectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConnect404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetConnect404ApplicationProblemPlusJSONResponse) VisitGetConnectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConnect500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetConnect500ApplicationProblemPlusJSONResponse) VisitGetConnectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12778,19 +16965,112 @@ func (response ChangeContact204Response) VisitChangeContactResponse(w http.Respo
 	return nil
 }
 
-type ChangeContactdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeContact400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeContactdefaultApplicationProblemPlusJSONResponse) VisitChangeContactResponse(w http.ResponseWriter) error {
+func (response ChangeContact400ApplicationProblemPlusJSONResponse) VisitChangeContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeContact401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeContact401ApplicationProblemPlusJSONResponse) VisitChangeContactResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeContact403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeContact403ApplicationProblemPlusJSONResponse) VisitChangeContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeContact404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeContact404ApplicationProblemPlusJSONResponse) VisitChangeContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeContact409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeContact409ApplicationProblemPlusJSONResponse) VisitChangeContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeContact500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeContact500ApplicationProblemPlusJSONResponse) VisitChangeContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12819,19 +17099,112 @@ func (response ChangeOwnDeal200JSONResponse) VisitChangeOwnDealResponse(w http.R
 	return err
 }
 
-type ChangeOwnDealdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeOwnDeal400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeOwnDealdefaultApplicationProblemPlusJSONResponse) VisitChangeOwnDealResponse(w http.ResponseWriter) error {
+func (response ChangeOwnDeal400ApplicationProblemPlusJSONResponse) VisitChangeOwnDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOwnDeal401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeOwnDeal401ApplicationProblemPlusJSONResponse) VisitChangeOwnDealResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOwnDeal403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeOwnDeal403ApplicationProblemPlusJSONResponse) VisitChangeOwnDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOwnDeal404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeOwnDeal404ApplicationProblemPlusJSONResponse) VisitChangeOwnDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOwnDeal409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeOwnDeal409ApplicationProblemPlusJSONResponse) VisitChangeOwnDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOwnDeal500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeOwnDeal500ApplicationProblemPlusJSONResponse) VisitChangeOwnDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12862,19 +17235,128 @@ func (response EnrichContact200JSONResponse) VisitEnrichContactResponse(w http.R
 	return err
 }
 
-type EnrichContactdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type EnrichContact400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response EnrichContactdefaultApplicationProblemPlusJSONResponse) VisitEnrichContactResponse(w http.ResponseWriter) error {
+func (response EnrichContact400ApplicationProblemPlusJSONResponse) VisitEnrichContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnrichContact401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response EnrichContact401ApplicationProblemPlusJSONResponse) VisitEnrichContactResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnrichContact403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response EnrichContact403ApplicationProblemPlusJSONResponse) VisitEnrichContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnrichContact404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response EnrichContact404ApplicationProblemPlusJSONResponse) VisitEnrichContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnrichContact409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response EnrichContact409ApplicationProblemPlusJSONResponse) VisitEnrichContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnrichContact415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response EnrichContact415ApplicationProblemPlusJSONResponse) VisitEnrichContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnrichContact500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response EnrichContact500ApplicationProblemPlusJSONResponse) VisitEnrichContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12896,19 +17378,128 @@ func (response ErasePerson204Response) VisitErasePersonResponse(w http.ResponseW
 	return nil
 }
 
-type ErasePersondefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ErasePerson400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ErasePersondefaultApplicationProblemPlusJSONResponse) VisitErasePersonResponse(w http.ResponseWriter) error {
+func (response ErasePerson400ApplicationProblemPlusJSONResponse) VisitErasePersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ErasePerson401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ErasePerson401ApplicationProblemPlusJSONResponse) VisitErasePersonResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ErasePerson403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ErasePerson403ApplicationProblemPlusJSONResponse) VisitErasePersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ErasePerson404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ErasePerson404ApplicationProblemPlusJSONResponse) VisitErasePersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ErasePerson409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ErasePerson409ApplicationProblemPlusJSONResponse) VisitErasePersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ErasePerson415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response ErasePerson415ApplicationProblemPlusJSONResponse) VisitErasePersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ErasePerson500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ErasePerson500ApplicationProblemPlusJSONResponse) VisitErasePersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12936,19 +17527,128 @@ func (response ExportPerson200JSONResponse) VisitExportPersonResponse(w http.Res
 	return err
 }
 
-type ExportPersondefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ExportPerson400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ExportPersondefaultApplicationProblemPlusJSONResponse) VisitExportPersonResponse(w http.ResponseWriter) error {
+func (response ExportPerson400ApplicationProblemPlusJSONResponse) VisitExportPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportPerson401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ExportPerson401ApplicationProblemPlusJSONResponse) VisitExportPersonResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportPerson403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ExportPerson403ApplicationProblemPlusJSONResponse) VisitExportPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportPerson404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ExportPerson404ApplicationProblemPlusJSONResponse) VisitExportPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportPerson409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ExportPerson409ApplicationProblemPlusJSONResponse) VisitExportPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportPerson415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response ExportPerson415ApplicationProblemPlusJSONResponse) VisitExportPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportPerson500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ExportPerson500ApplicationProblemPlusJSONResponse) VisitExportPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -12971,19 +17671,128 @@ func (response PickContact204Response) VisitPickContactResponse(w http.ResponseW
 	return nil
 }
 
-type PickContactdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type PickContact400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response PickContactdefaultApplicationProblemPlusJSONResponse) VisitPickContactResponse(w http.ResponseWriter) error {
+func (response PickContact400ApplicationProblemPlusJSONResponse) VisitPickContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickContact401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PickContact401ApplicationProblemPlusJSONResponse) VisitPickContactResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickContact403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PickContact403ApplicationProblemPlusJSONResponse) VisitPickContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickContact404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PickContact404ApplicationProblemPlusJSONResponse) VisitPickContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickContact409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response PickContact409ApplicationProblemPlusJSONResponse) VisitPickContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickContact415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response PickContact415ApplicationProblemPlusJSONResponse) VisitPickContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickContact500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response PickContact500ApplicationProblemPlusJSONResponse) VisitPickContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13033,19 +17842,96 @@ func (response ListConversations200JSONResponse) VisitListConversationsResponse(
 	return err
 }
 
-type ListConversationsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListConversations400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListConversationsdefaultApplicationProblemPlusJSONResponse) VisitListConversationsResponse(w http.ResponseWriter) error {
+func (response ListConversations400ApplicationProblemPlusJSONResponse) VisitListConversationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConversations401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListConversations401ApplicationProblemPlusJSONResponse) VisitListConversationsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConversations403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListConversations403ApplicationProblemPlusJSONResponse) VisitListConversationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConversations404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListConversations404ApplicationProblemPlusJSONResponse) VisitListConversationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConversations500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListConversations500ApplicationProblemPlusJSONResponse) VisitListConversationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13092,19 +17978,96 @@ func (response ListDeals200JSONResponse) VisitListDealsResponse(w http.ResponseW
 	return err
 }
 
-type ListDealsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListDeals400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListDealsdefaultApplicationProblemPlusJSONResponse) VisitListDealsResponse(w http.ResponseWriter) error {
+func (response ListDeals400ApplicationProblemPlusJSONResponse) VisitListDealsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeals401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListDeals401ApplicationProblemPlusJSONResponse) VisitListDealsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeals403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListDeals403ApplicationProblemPlusJSONResponse) VisitListDealsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeals404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListDeals404ApplicationProblemPlusJSONResponse) VisitListDealsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeals500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListDeals500ApplicationProblemPlusJSONResponse) VisitListDealsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13132,19 +18095,128 @@ func (response StartDeal201JSONResponse) VisitStartDealResponse(w http.ResponseW
 	return err
 }
 
-type StartDealdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type StartDeal400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response StartDealdefaultApplicationProblemPlusJSONResponse) VisitStartDealResponse(w http.ResponseWriter) error {
+func (response StartDeal400ApplicationProblemPlusJSONResponse) VisitStartDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartDeal401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response StartDeal401ApplicationProblemPlusJSONResponse) VisitStartDealResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartDeal403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response StartDeal403ApplicationProblemPlusJSONResponse) VisitStartDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartDeal404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response StartDeal404ApplicationProblemPlusJSONResponse) VisitStartDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartDeal409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response StartDeal409ApplicationProblemPlusJSONResponse) VisitStartDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartDeal415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response StartDeal415ApplicationProblemPlusJSONResponse) VisitStartDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartDeal500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response StartDeal500ApplicationProblemPlusJSONResponse) VisitStartDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13166,19 +18238,112 @@ func (response RemoveDeal204Response) VisitRemoveDealResponse(w http.ResponseWri
 	return nil
 }
 
-type RemoveDealdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type RemoveDeal400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response RemoveDealdefaultApplicationProblemPlusJSONResponse) VisitRemoveDealResponse(w http.ResponseWriter) error {
+func (response RemoveDeal400ApplicationProblemPlusJSONResponse) VisitRemoveDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveDeal401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveDeal401ApplicationProblemPlusJSONResponse) VisitRemoveDealResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveDeal403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveDeal403ApplicationProblemPlusJSONResponse) VisitRemoveDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveDeal404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveDeal404ApplicationProblemPlusJSONResponse) VisitRemoveDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveDeal409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveDeal409ApplicationProblemPlusJSONResponse) VisitRemoveDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveDeal500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveDeal500ApplicationProblemPlusJSONResponse) VisitRemoveDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13207,19 +18372,112 @@ func (response ChangeDeal200JSONResponse) VisitChangeDealResponse(w http.Respons
 	return err
 }
 
-type ChangeDealdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeDeal400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeDealdefaultApplicationProblemPlusJSONResponse) VisitChangeDealResponse(w http.ResponseWriter) error {
+func (response ChangeDeal400ApplicationProblemPlusJSONResponse) VisitChangeDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDeal401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDeal401ApplicationProblemPlusJSONResponse) VisitChangeDealResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDeal403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDeal403ApplicationProblemPlusJSONResponse) VisitChangeDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDeal404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDeal404ApplicationProblemPlusJSONResponse) VisitChangeDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDeal409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDeal409ApplicationProblemPlusJSONResponse) VisitChangeDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeDeal500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeDeal500ApplicationProblemPlusJSONResponse) VisitChangeDealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13268,19 +18526,96 @@ func (response ListEnquiries200JSONResponse) VisitListEnquiriesResponse(w http.R
 	return err
 }
 
-type ListEnquiriesdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListEnquiries400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListEnquiriesdefaultApplicationProblemPlusJSONResponse) VisitListEnquiriesResponse(w http.ResponseWriter) error {
+func (response ListEnquiries400ApplicationProblemPlusJSONResponse) VisitListEnquiriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiries401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListEnquiries401ApplicationProblemPlusJSONResponse) VisitListEnquiriesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiries403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListEnquiries403ApplicationProblemPlusJSONResponse) VisitListEnquiriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiries404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListEnquiries404ApplicationProblemPlusJSONResponse) VisitListEnquiriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiries500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListEnquiries500ApplicationProblemPlusJSONResponse) VisitListEnquiriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13302,19 +18637,112 @@ func (response DeleteEnquiry204Response) VisitDeleteEnquiryResponse(w http.Respo
 	return nil
 }
 
-type DeleteEnquirydefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type DeleteEnquiry400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response DeleteEnquirydefaultApplicationProblemPlusJSONResponse) VisitDeleteEnquiryResponse(w http.ResponseWriter) error {
+func (response DeleteEnquiry400ApplicationProblemPlusJSONResponse) VisitDeleteEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEnquiry401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEnquiry401ApplicationProblemPlusJSONResponse) VisitDeleteEnquiryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEnquiry403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEnquiry403ApplicationProblemPlusJSONResponse) VisitDeleteEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEnquiry404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEnquiry404ApplicationProblemPlusJSONResponse) VisitDeleteEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEnquiry409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEnquiry409ApplicationProblemPlusJSONResponse) VisitDeleteEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEnquiry500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEnquiry500ApplicationProblemPlusJSONResponse) VisitDeleteEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13343,19 +18771,112 @@ func (response ChangeEnquiry200JSONResponse) VisitChangeEnquiryResponse(w http.R
 	return err
 }
 
-type ChangeEnquirydefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeEnquiry400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeEnquirydefaultApplicationProblemPlusJSONResponse) VisitChangeEnquiryResponse(w http.ResponseWriter) error {
+func (response ChangeEnquiry400ApplicationProblemPlusJSONResponse) VisitChangeEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeEnquiry401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeEnquiry401ApplicationProblemPlusJSONResponse) VisitChangeEnquiryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeEnquiry403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeEnquiry403ApplicationProblemPlusJSONResponse) VisitChangeEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeEnquiry404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeEnquiry404ApplicationProblemPlusJSONResponse) VisitChangeEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeEnquiry409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeEnquiry409ApplicationProblemPlusJSONResponse) VisitChangeEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeEnquiry500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeEnquiry500ApplicationProblemPlusJSONResponse) VisitChangeEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13384,19 +18905,128 @@ func (response RecordEnquiryAnswer201JSONResponse) VisitRecordEnquiryAnswerRespo
 	return err
 }
 
-type RecordEnquiryAnswerdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type RecordEnquiryAnswer400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response RecordEnquiryAnswerdefaultApplicationProblemPlusJSONResponse) VisitRecordEnquiryAnswerResponse(w http.ResponseWriter) error {
+func (response RecordEnquiryAnswer400ApplicationProblemPlusJSONResponse) VisitRecordEnquiryAnswerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordEnquiryAnswer401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RecordEnquiryAnswer401ApplicationProblemPlusJSONResponse) VisitRecordEnquiryAnswerResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordEnquiryAnswer403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RecordEnquiryAnswer403ApplicationProblemPlusJSONResponse) VisitRecordEnquiryAnswerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordEnquiryAnswer404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RecordEnquiryAnswer404ApplicationProblemPlusJSONResponse) VisitRecordEnquiryAnswerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordEnquiryAnswer409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RecordEnquiryAnswer409ApplicationProblemPlusJSONResponse) VisitRecordEnquiryAnswerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordEnquiryAnswer415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response RecordEnquiryAnswer415ApplicationProblemPlusJSONResponse) VisitRecordEnquiryAnswerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordEnquiryAnswer500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RecordEnquiryAnswer500ApplicationProblemPlusJSONResponse) VisitRecordEnquiryAnswerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13426,19 +19056,128 @@ func (response ConverseEnquiry201JSONResponse) VisitConverseEnquiryResponse(w ht
 	return err
 }
 
-type ConverseEnquirydefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ConverseEnquiry400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ConverseEnquirydefaultApplicationProblemPlusJSONResponse) VisitConverseEnquiryResponse(w http.ResponseWriter) error {
+func (response ConverseEnquiry400ApplicationProblemPlusJSONResponse) VisitConverseEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConverseEnquiry401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ConverseEnquiry401ApplicationProblemPlusJSONResponse) VisitConverseEnquiryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConverseEnquiry403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ConverseEnquiry403ApplicationProblemPlusJSONResponse) VisitConverseEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConverseEnquiry404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ConverseEnquiry404ApplicationProblemPlusJSONResponse) VisitConverseEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConverseEnquiry409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ConverseEnquiry409ApplicationProblemPlusJSONResponse) VisitConverseEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConverseEnquiry415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response ConverseEnquiry415ApplicationProblemPlusJSONResponse) VisitConverseEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConverseEnquiry500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ConverseEnquiry500ApplicationProblemPlusJSONResponse) VisitConverseEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13486,19 +19225,96 @@ func (response ListEnquiryMessages200JSONResponse) VisitListEnquiryMessagesRespo
 	return err
 }
 
-type ListEnquiryMessagesdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListEnquiryMessages400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListEnquiryMessagesdefaultApplicationProblemPlusJSONResponse) VisitListEnquiryMessagesResponse(w http.ResponseWriter) error {
+func (response ListEnquiryMessages400ApplicationProblemPlusJSONResponse) VisitListEnquiryMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiryMessages401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListEnquiryMessages401ApplicationProblemPlusJSONResponse) VisitListEnquiryMessagesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiryMessages403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListEnquiryMessages403ApplicationProblemPlusJSONResponse) VisitListEnquiryMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiryMessages404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListEnquiryMessages404ApplicationProblemPlusJSONResponse) VisitListEnquiryMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnquiryMessages500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListEnquiryMessages500ApplicationProblemPlusJSONResponse) VisitListEnquiryMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13527,19 +19343,144 @@ func (response ReplyToEnquiry201JSONResponse) VisitReplyToEnquiryResponse(w http
 	return err
 }
 
-type ReplyToEnquirydefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ReplyToEnquiry400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ReplyToEnquirydefaultApplicationProblemPlusJSONResponse) VisitReplyToEnquiryResponse(w http.ResponseWriter) error {
+func (response ReplyToEnquiry400ApplicationProblemPlusJSONResponse) VisitReplyToEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplyToEnquiry401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ReplyToEnquiry401ApplicationProblemPlusJSONResponse) VisitReplyToEnquiryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplyToEnquiry403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ReplyToEnquiry403ApplicationProblemPlusJSONResponse) VisitReplyToEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplyToEnquiry404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ReplyToEnquiry404ApplicationProblemPlusJSONResponse) VisitReplyToEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplyToEnquiry409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ReplyToEnquiry409ApplicationProblemPlusJSONResponse) VisitReplyToEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplyToEnquiry415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response ReplyToEnquiry415ApplicationProblemPlusJSONResponse) VisitReplyToEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplyToEnquiry500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ReplyToEnquiry500ApplicationProblemPlusJSONResponse) VisitReplyToEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReplyToEnquiry502ApplicationProblemPlusJSONResponse struct {
+	NotSentApplicationProblemPlusJSONResponse
+}
+
+func (response ReplyToEnquiry502ApplicationProblemPlusJSONResponse) VisitReplyToEnquiryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotSentApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(502)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13566,19 +19507,96 @@ func (response CountEnquiries200JSONResponse) VisitCountEnquiriesResponse(w http
 	return err
 }
 
-type CountEnquiriesdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type CountEnquiries400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response CountEnquiriesdefaultApplicationProblemPlusJSONResponse) VisitCountEnquiriesResponse(w http.ResponseWriter) error {
+func (response CountEnquiries400ApplicationProblemPlusJSONResponse) VisitCountEnquiriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CountEnquiries401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CountEnquiries401ApplicationProblemPlusJSONResponse) VisitCountEnquiriesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CountEnquiries403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CountEnquiries403ApplicationProblemPlusJSONResponse) VisitCountEnquiriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CountEnquiries404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CountEnquiries404ApplicationProblemPlusJSONResponse) VisitCountEnquiriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CountEnquiries500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CountEnquiries500ApplicationProblemPlusJSONResponse) VisitCountEnquiriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13625,19 +19643,96 @@ func (response ListEnrichers200JSONResponse) VisitListEnrichersResponse(w http.R
 	return err
 }
 
-type ListEnrichersdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListEnrichers400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListEnrichersdefaultApplicationProblemPlusJSONResponse) VisitListEnrichersResponse(w http.ResponseWriter) error {
+func (response ListEnrichers400ApplicationProblemPlusJSONResponse) VisitListEnrichersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnrichers401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListEnrichers401ApplicationProblemPlusJSONResponse) VisitListEnrichersResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnrichers403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListEnrichers403ApplicationProblemPlusJSONResponse) VisitListEnrichersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnrichers404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListEnrichers404ApplicationProblemPlusJSONResponse) VisitListEnrichersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnrichers500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListEnrichers500ApplicationProblemPlusJSONResponse) VisitListEnrichersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13665,19 +19760,112 @@ func (response SaveEnricher200JSONResponse) VisitSaveEnricherResponse(w http.Res
 	return err
 }
 
-type SaveEnricherdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type SaveEnricher400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response SaveEnricherdefaultApplicationProblemPlusJSONResponse) VisitSaveEnricherResponse(w http.ResponseWriter) error {
+func (response SaveEnricher400ApplicationProblemPlusJSONResponse) VisitSaveEnricherResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveEnricher401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SaveEnricher401ApplicationProblemPlusJSONResponse) VisitSaveEnricherResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveEnricher403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SaveEnricher403ApplicationProblemPlusJSONResponse) VisitSaveEnricherResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveEnricher404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SaveEnricher404ApplicationProblemPlusJSONResponse) VisitSaveEnricherResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveEnricher409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response SaveEnricher409ApplicationProblemPlusJSONResponse) VisitSaveEnricherResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveEnricher500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response SaveEnricher500ApplicationProblemPlusJSONResponse) VisitSaveEnricherResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13699,19 +19887,112 @@ func (response DeleteEnricher204Response) VisitDeleteEnricherResponse(w http.Res
 	return nil
 }
 
-type DeleteEnricherdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type DeleteEnricher400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response DeleteEnricherdefaultApplicationProblemPlusJSONResponse) VisitDeleteEnricherResponse(w http.ResponseWriter) error {
+func (response DeleteEnricher400ApplicationProblemPlusJSONResponse) VisitDeleteEnricherResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEnricher401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEnricher401ApplicationProblemPlusJSONResponse) VisitDeleteEnricherResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEnricher403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEnricher403ApplicationProblemPlusJSONResponse) VisitDeleteEnricherResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEnricher404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEnricher404ApplicationProblemPlusJSONResponse) VisitDeleteEnricherResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEnricher409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEnricher409ApplicationProblemPlusJSONResponse) VisitDeleteEnricherResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEnricher500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEnricher500ApplicationProblemPlusJSONResponse) VisitDeleteEnricherResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13752,19 +20033,128 @@ func (response ExportOrg200JSONResponse) VisitExportOrgResponse(w http.ResponseW
 	return err
 }
 
-type ExportOrgdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ExportOrg400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ExportOrgdefaultApplicationProblemPlusJSONResponse) VisitExportOrgResponse(w http.ResponseWriter) error {
+func (response ExportOrg400ApplicationProblemPlusJSONResponse) VisitExportOrgResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportOrg401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ExportOrg401ApplicationProblemPlusJSONResponse) VisitExportOrgResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportOrg403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ExportOrg403ApplicationProblemPlusJSONResponse) VisitExportOrgResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportOrg404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ExportOrg404ApplicationProblemPlusJSONResponse) VisitExportOrgResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportOrg409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ExportOrg409ApplicationProblemPlusJSONResponse) VisitExportOrgResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportOrg415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response ExportOrg415ApplicationProblemPlusJSONResponse) VisitExportOrgResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportOrg500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ExportOrg500ApplicationProblemPlusJSONResponse) VisitExportOrgResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13811,19 +20201,96 @@ func (response ListKeys200JSONResponse) VisitListKeysResponse(w http.ResponseWri
 	return err
 }
 
-type ListKeysdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListKeys400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListKeysdefaultApplicationProblemPlusJSONResponse) VisitListKeysResponse(w http.ResponseWriter) error {
+func (response ListKeys400ApplicationProblemPlusJSONResponse) VisitListKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListKeys401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListKeys401ApplicationProblemPlusJSONResponse) VisitListKeysResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListKeys403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListKeys403ApplicationProblemPlusJSONResponse) VisitListKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListKeys404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListKeys404ApplicationProblemPlusJSONResponse) VisitListKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListKeys500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListKeys500ApplicationProblemPlusJSONResponse) VisitListKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13851,19 +20318,128 @@ func (response CreateKey201JSONResponse) VisitCreateKeyResponse(w http.ResponseW
 	return err
 }
 
-type CreateKeydefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type CreateKey400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response CreateKeydefaultApplicationProblemPlusJSONResponse) VisitCreateKeyResponse(w http.ResponseWriter) error {
+func (response CreateKey400ApplicationProblemPlusJSONResponse) VisitCreateKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateKey401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateKey401ApplicationProblemPlusJSONResponse) VisitCreateKeyResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateKey403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateKey403ApplicationProblemPlusJSONResponse) VisitCreateKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateKey404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateKey404ApplicationProblemPlusJSONResponse) VisitCreateKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateKey409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateKey409ApplicationProblemPlusJSONResponse) VisitCreateKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateKey415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response CreateKey415ApplicationProblemPlusJSONResponse) VisitCreateKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateKey500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CreateKey500ApplicationProblemPlusJSONResponse) VisitCreateKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13885,19 +20461,112 @@ func (response RevokeKey204Response) VisitRevokeKeyResponse(w http.ResponseWrite
 	return nil
 }
 
-type RevokeKeydefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type RevokeKey400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response RevokeKeydefaultApplicationProblemPlusJSONResponse) VisitRevokeKeyResponse(w http.ResponseWriter) error {
+func (response RevokeKey400ApplicationProblemPlusJSONResponse) VisitRevokeKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeKey401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeKey401ApplicationProblemPlusJSONResponse) VisitRevokeKeyResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeKey403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeKey403ApplicationProblemPlusJSONResponse) VisitRevokeKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeKey404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeKey404ApplicationProblemPlusJSONResponse) VisitRevokeKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeKey409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeKey409ApplicationProblemPlusJSONResponse) VisitRevokeKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeKey500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeKey500ApplicationProblemPlusJSONResponse) VisitRevokeKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13926,19 +20595,112 @@ func (response ChangeKey200JSONResponse) VisitChangeKeyResponse(w http.ResponseW
 	return err
 }
 
-type ChangeKeydefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeKey400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeKeydefaultApplicationProblemPlusJSONResponse) VisitChangeKeyResponse(w http.ResponseWriter) error {
+func (response ChangeKey400ApplicationProblemPlusJSONResponse) VisitChangeKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeKey401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeKey401ApplicationProblemPlusJSONResponse) VisitChangeKeyResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeKey403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeKey403ApplicationProblemPlusJSONResponse) VisitChangeKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeKey404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeKey404ApplicationProblemPlusJSONResponse) VisitChangeKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeKey409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeKey409ApplicationProblemPlusJSONResponse) VisitChangeKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeKey500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeKey500ApplicationProblemPlusJSONResponse) VisitChangeKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13965,19 +20727,96 @@ func (response GetMailServer200JSONResponse) VisitGetMailServerResponse(w http.R
 	return err
 }
 
-type GetMailServerdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetMailServer400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response GetMailServerdefaultApplicationProblemPlusJSONResponse) VisitGetMailServerResponse(w http.ResponseWriter) error {
+func (response GetMailServer400ApplicationProblemPlusJSONResponse) VisitGetMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMailServer401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetMailServer401ApplicationProblemPlusJSONResponse) VisitGetMailServerResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMailServer403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetMailServer403ApplicationProblemPlusJSONResponse) VisitGetMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMailServer404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetMailServer404ApplicationProblemPlusJSONResponse) VisitGetMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMailServer500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetMailServer500ApplicationProblemPlusJSONResponse) VisitGetMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14005,19 +20844,112 @@ func (response SaveMailServer200JSONResponse) VisitSaveMailServerResponse(w http
 	return err
 }
 
-type SaveMailServerdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type SaveMailServer400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response SaveMailServerdefaultApplicationProblemPlusJSONResponse) VisitSaveMailServerResponse(w http.ResponseWriter) error {
+func (response SaveMailServer400ApplicationProblemPlusJSONResponse) VisitSaveMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveMailServer401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SaveMailServer401ApplicationProblemPlusJSONResponse) VisitSaveMailServerResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveMailServer403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SaveMailServer403ApplicationProblemPlusJSONResponse) VisitSaveMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveMailServer404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SaveMailServer404ApplicationProblemPlusJSONResponse) VisitSaveMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveMailServer409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response SaveMailServer409ApplicationProblemPlusJSONResponse) VisitSaveMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveMailServer500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response SaveMailServer500ApplicationProblemPlusJSONResponse) VisitSaveMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14044,19 +20976,144 @@ func (response TestMailServer200JSONResponse) VisitTestMailServerResponse(w http
 	return err
 }
 
-type TestMailServerdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type TestMailServer400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response TestMailServerdefaultApplicationProblemPlusJSONResponse) VisitTestMailServerResponse(w http.ResponseWriter) error {
+func (response TestMailServer400ApplicationProblemPlusJSONResponse) VisitTestMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestMailServer401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response TestMailServer401ApplicationProblemPlusJSONResponse) VisitTestMailServerResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestMailServer403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response TestMailServer403ApplicationProblemPlusJSONResponse) VisitTestMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestMailServer404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response TestMailServer404ApplicationProblemPlusJSONResponse) VisitTestMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestMailServer409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response TestMailServer409ApplicationProblemPlusJSONResponse) VisitTestMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestMailServer415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response TestMailServer415ApplicationProblemPlusJSONResponse) VisitTestMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestMailServer500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response TestMailServer500ApplicationProblemPlusJSONResponse) VisitTestMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestMailServer502ApplicationProblemPlusJSONResponse struct {
+	NotSentApplicationProblemPlusJSONResponse
+}
+
+func (response TestMailServer502ApplicationProblemPlusJSONResponse) VisitTestMailServerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotSentApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(502)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14086,19 +21143,128 @@ func (response MarkOutcome200JSONResponse) VisitMarkOutcomeResponse(w http.Respo
 	return err
 }
 
-type MarkOutcomedefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type MarkOutcome400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response MarkOutcomedefaultApplicationProblemPlusJSONResponse) VisitMarkOutcomeResponse(w http.ResponseWriter) error {
+func (response MarkOutcome400ApplicationProblemPlusJSONResponse) VisitMarkOutcomeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkOutcome401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response MarkOutcome401ApplicationProblemPlusJSONResponse) VisitMarkOutcomeResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkOutcome403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response MarkOutcome403ApplicationProblemPlusJSONResponse) VisitMarkOutcomeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkOutcome404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response MarkOutcome404ApplicationProblemPlusJSONResponse) VisitMarkOutcomeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkOutcome409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response MarkOutcome409ApplicationProblemPlusJSONResponse) VisitMarkOutcomeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkOutcome415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response MarkOutcome415ApplicationProblemPlusJSONResponse) VisitMarkOutcomeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkOutcome500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response MarkOutcome500ApplicationProblemPlusJSONResponse) VisitMarkOutcomeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14125,19 +21291,96 @@ func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) e
 	return err
 }
 
-type GetMedefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetMe400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response GetMedefaultApplicationProblemPlusJSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+func (response GetMe400ApplicationProblemPlusJSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMe401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetMe401ApplicationProblemPlusJSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMe403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetMe403ApplicationProblemPlusJSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMe404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetMe404ApplicationProblemPlusJSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMe500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetMe500ApplicationProblemPlusJSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14165,19 +21408,112 @@ func (response ChangeMe200JSONResponse) VisitChangeMeResponse(w http.ResponseWri
 	return err
 }
 
-type ChangeMedefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeMe400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeMedefaultApplicationProblemPlusJSONResponse) VisitChangeMeResponse(w http.ResponseWriter) error {
+func (response ChangeMe400ApplicationProblemPlusJSONResponse) VisitChangeMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMe401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMe401ApplicationProblemPlusJSONResponse) VisitChangeMeResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMe403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMe403ApplicationProblemPlusJSONResponse) VisitChangeMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMe404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMe404ApplicationProblemPlusJSONResponse) VisitChangeMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMe409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMe409ApplicationProblemPlusJSONResponse) VisitChangeMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMe500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMe500ApplicationProblemPlusJSONResponse) VisitChangeMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14205,13 +21541,118 @@ func (response ChangeMyPassword200JSONResponse) VisitChangeMyPasswordResponse(w 
 	return err
 }
 
-type ChangeMyPassword429ResponseHeaders struct {
-	RetryAfter int
+type ChangeMyPassword400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMyPassword400ApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMyPassword401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMyPassword401ApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMyPassword403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMyPassword403ApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMyPassword404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMyPassword404ApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMyPassword409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMyPassword409ApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMyPassword415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMyPassword415ApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ChangeMyPassword429ApplicationProblemPlusJSONResponse struct {
-	Body    Problem
-	Headers ChangeMyPassword429ResponseHeaders
+	ThrottledApplicationProblemPlusJSONResponse
 }
 
 func (response ChangeMyPassword429ApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
@@ -14233,19 +21674,18 @@ func (response ChangeMyPassword429ApplicationProblemPlusJSONResponse) VisitChang
 	return err
 }
 
-type ChangeMyPassworddefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeMyPassword500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeMyPassworddefaultApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
+func (response ChangeMyPassword500ApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14292,19 +21732,96 @@ func (response ListMembers200JSONResponse) VisitListMembersResponse(w http.Respo
 	return err
 }
 
-type ListMembersdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListMembers400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListMembersdefaultApplicationProblemPlusJSONResponse) VisitListMembersResponse(w http.ResponseWriter) error {
+func (response ListMembers400ApplicationProblemPlusJSONResponse) VisitListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMembers401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListMembers401ApplicationProblemPlusJSONResponse) VisitListMembersResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMembers403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListMembers403ApplicationProblemPlusJSONResponse) VisitListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMembers404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListMembers404ApplicationProblemPlusJSONResponse) VisitListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMembers500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListMembers500ApplicationProblemPlusJSONResponse) VisitListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14332,19 +21849,128 @@ func (response AddMember201JSONResponse) VisitAddMemberResponse(w http.ResponseW
 	return err
 }
 
-type AddMemberdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type AddMember400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response AddMemberdefaultApplicationProblemPlusJSONResponse) VisitAddMemberResponse(w http.ResponseWriter) error {
+func (response AddMember400ApplicationProblemPlusJSONResponse) VisitAddMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddMember401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AddMember401ApplicationProblemPlusJSONResponse) VisitAddMemberResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddMember403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AddMember403ApplicationProblemPlusJSONResponse) VisitAddMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddMember404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AddMember404ApplicationProblemPlusJSONResponse) VisitAddMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddMember409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AddMember409ApplicationProblemPlusJSONResponse) VisitAddMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddMember415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response AddMember415ApplicationProblemPlusJSONResponse) VisitAddMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddMember500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AddMember500ApplicationProblemPlusJSONResponse) VisitAddMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14366,19 +21992,112 @@ func (response RemoveMember204Response) VisitRemoveMemberResponse(w http.Respons
 	return nil
 }
 
-type RemoveMemberdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type RemoveMember400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response RemoveMemberdefaultApplicationProblemPlusJSONResponse) VisitRemoveMemberResponse(w http.ResponseWriter) error {
+func (response RemoveMember400ApplicationProblemPlusJSONResponse) VisitRemoveMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveMember401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveMember401ApplicationProblemPlusJSONResponse) VisitRemoveMemberResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveMember403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveMember403ApplicationProblemPlusJSONResponse) VisitRemoveMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveMember404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveMember404ApplicationProblemPlusJSONResponse) VisitRemoveMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveMember409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveMember409ApplicationProblemPlusJSONResponse) VisitRemoveMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveMember500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveMember500ApplicationProblemPlusJSONResponse) VisitRemoveMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14407,19 +22126,112 @@ func (response ChangeMember200JSONResponse) VisitChangeMemberResponse(w http.Res
 	return err
 }
 
-type ChangeMemberdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeMember400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeMemberdefaultApplicationProblemPlusJSONResponse) VisitChangeMemberResponse(w http.ResponseWriter) error {
+func (response ChangeMember400ApplicationProblemPlusJSONResponse) VisitChangeMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMember401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMember401ApplicationProblemPlusJSONResponse) VisitChangeMemberResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMember403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMember403ApplicationProblemPlusJSONResponse) VisitChangeMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMember404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMember404ApplicationProblemPlusJSONResponse) VisitChangeMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMember409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMember409ApplicationProblemPlusJSONResponse) VisitChangeMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMember500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMember500ApplicationProblemPlusJSONResponse) VisitChangeMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14446,19 +22258,96 @@ func (response GetNav200JSONResponse) VisitGetNavResponse(w http.ResponseWriter)
 	return err
 }
 
-type GetNavdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetNav400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response GetNavdefaultApplicationProblemPlusJSONResponse) VisitGetNavResponse(w http.ResponseWriter) error {
+func (response GetNav400ApplicationProblemPlusJSONResponse) VisitGetNavResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNav401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetNav401ApplicationProblemPlusJSONResponse) VisitGetNavResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNav403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetNav403ApplicationProblemPlusJSONResponse) VisitGetNavResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNav404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetNav404ApplicationProblemPlusJSONResponse) VisitGetNavResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNav500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetNav500ApplicationProblemPlusJSONResponse) VisitGetNavResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14508,19 +22397,96 @@ func (response ListNeverContactCovers200JSONResponse) VisitListNeverContactCover
 	return err
 }
 
-type ListNeverContactCoversdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListNeverContactCovers400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListNeverContactCoversdefaultApplicationProblemPlusJSONResponse) VisitListNeverContactCoversResponse(w http.ResponseWriter) error {
+func (response ListNeverContactCovers400ApplicationProblemPlusJSONResponse) VisitListNeverContactCoversResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNeverContactCovers401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListNeverContactCovers401ApplicationProblemPlusJSONResponse) VisitListNeverContactCoversResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNeverContactCovers403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListNeverContactCovers403ApplicationProblemPlusJSONResponse) VisitListNeverContactCoversResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNeverContactCovers404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListNeverContactCovers404ApplicationProblemPlusJSONResponse) VisitListNeverContactCoversResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNeverContactCovers500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListNeverContactCovers500ApplicationProblemPlusJSONResponse) VisitListNeverContactCoversResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14548,19 +22514,128 @@ func (response AddNote200JSONResponse) VisitAddNoteResponse(w http.ResponseWrite
 	return err
 }
 
-type AddNotedefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type AddNote400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response AddNotedefaultApplicationProblemPlusJSONResponse) VisitAddNoteResponse(w http.ResponseWriter) error {
+func (response AddNote400ApplicationProblemPlusJSONResponse) VisitAddNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddNote401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AddNote401ApplicationProblemPlusJSONResponse) VisitAddNoteResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddNote403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AddNote403ApplicationProblemPlusJSONResponse) VisitAddNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddNote404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AddNote404ApplicationProblemPlusJSONResponse) VisitAddNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddNote409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AddNote409ApplicationProblemPlusJSONResponse) VisitAddNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddNote415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response AddNote415ApplicationProblemPlusJSONResponse) VisitAddNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddNote500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AddNote500ApplicationProblemPlusJSONResponse) VisitAddNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14582,19 +22657,112 @@ func (response DeleteNote204Response) VisitDeleteNoteResponse(w http.ResponseWri
 	return nil
 }
 
-type DeleteNotedefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type DeleteNote400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response DeleteNotedefaultApplicationProblemPlusJSONResponse) VisitDeleteNoteResponse(w http.ResponseWriter) error {
+func (response DeleteNote400ApplicationProblemPlusJSONResponse) VisitDeleteNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteNote401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteNote401ApplicationProblemPlusJSONResponse) VisitDeleteNoteResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteNote403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteNote403ApplicationProblemPlusJSONResponse) VisitDeleteNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteNote404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteNote404ApplicationProblemPlusJSONResponse) VisitDeleteNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteNote409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteNote409ApplicationProblemPlusJSONResponse) VisitDeleteNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteNote500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteNote500ApplicationProblemPlusJSONResponse) VisitDeleteNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14641,19 +22809,96 @@ func (response ListOfferings200JSONResponse) VisitListOfferingsResponse(w http.R
 	return err
 }
 
-type ListOfferingsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListOfferings400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListOfferingsdefaultApplicationProblemPlusJSONResponse) VisitListOfferingsResponse(w http.ResponseWriter) error {
+func (response ListOfferings400ApplicationProblemPlusJSONResponse) VisitListOfferingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOfferings401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListOfferings401ApplicationProblemPlusJSONResponse) VisitListOfferingsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOfferings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListOfferings403ApplicationProblemPlusJSONResponse) VisitListOfferingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOfferings404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListOfferings404ApplicationProblemPlusJSONResponse) VisitListOfferingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOfferings500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListOfferings500ApplicationProblemPlusJSONResponse) VisitListOfferingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14681,19 +22926,128 @@ func (response AddOffering201JSONResponse) VisitAddOfferingResponse(w http.Respo
 	return err
 }
 
-type AddOfferingdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type AddOffering400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response AddOfferingdefaultApplicationProblemPlusJSONResponse) VisitAddOfferingResponse(w http.ResponseWriter) error {
+func (response AddOffering400ApplicationProblemPlusJSONResponse) VisitAddOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddOffering401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AddOffering401ApplicationProblemPlusJSONResponse) VisitAddOfferingResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddOffering403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AddOffering403ApplicationProblemPlusJSONResponse) VisitAddOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddOffering404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AddOffering404ApplicationProblemPlusJSONResponse) VisitAddOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddOffering409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AddOffering409ApplicationProblemPlusJSONResponse) VisitAddOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddOffering415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response AddOffering415ApplicationProblemPlusJSONResponse) VisitAddOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddOffering500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AddOffering500ApplicationProblemPlusJSONResponse) VisitAddOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14715,19 +23069,112 @@ func (response RemoveOffering204Response) VisitRemoveOfferingResponse(w http.Res
 	return nil
 }
 
-type RemoveOfferingdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type RemoveOffering400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response RemoveOfferingdefaultApplicationProblemPlusJSONResponse) VisitRemoveOfferingResponse(w http.ResponseWriter) error {
+func (response RemoveOffering400ApplicationProblemPlusJSONResponse) VisitRemoveOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveOffering401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveOffering401ApplicationProblemPlusJSONResponse) VisitRemoveOfferingResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveOffering403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveOffering403ApplicationProblemPlusJSONResponse) VisitRemoveOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveOffering404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveOffering404ApplicationProblemPlusJSONResponse) VisitRemoveOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveOffering409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveOffering409ApplicationProblemPlusJSONResponse) VisitRemoveOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveOffering500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveOffering500ApplicationProblemPlusJSONResponse) VisitRemoveOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14756,19 +23203,112 @@ func (response ChangeOffering200JSONResponse) VisitChangeOfferingResponse(w http
 	return err
 }
 
-type ChangeOfferingdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeOffering400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeOfferingdefaultApplicationProblemPlusJSONResponse) VisitChangeOfferingResponse(w http.ResponseWriter) error {
+func (response ChangeOffering400ApplicationProblemPlusJSONResponse) VisitChangeOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOffering401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeOffering401ApplicationProblemPlusJSONResponse) VisitChangeOfferingResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOffering403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeOffering403ApplicationProblemPlusJSONResponse) VisitChangeOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOffering404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeOffering404ApplicationProblemPlusJSONResponse) VisitChangeOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOffering409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeOffering409ApplicationProblemPlusJSONResponse) VisitChangeOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOffering500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeOffering500ApplicationProblemPlusJSONResponse) VisitChangeOfferingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14816,19 +23356,96 @@ func (response ListVerdicts200JSONResponse) VisitListVerdictsResponse(w http.Res
 	return err
 }
 
-type ListVerdictsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListVerdicts400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListVerdictsdefaultApplicationProblemPlusJSONResponse) VisitListVerdictsResponse(w http.ResponseWriter) error {
+func (response ListVerdicts400ApplicationProblemPlusJSONResponse) VisitListVerdictsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListVerdicts401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListVerdicts401ApplicationProblemPlusJSONResponse) VisitListVerdictsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListVerdicts403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListVerdicts403ApplicationProblemPlusJSONResponse) VisitListVerdictsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListVerdicts404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListVerdicts404ApplicationProblemPlusJSONResponse) VisitListVerdictsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListVerdicts500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListVerdicts500ApplicationProblemPlusJSONResponse) VisitListVerdictsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14850,19 +23467,112 @@ func (response WithdrawCustomerInvite204Response) VisitWithdrawCustomerInviteRes
 	return nil
 }
 
-type WithdrawCustomerInvitedefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type WithdrawCustomerInvite400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response WithdrawCustomerInvitedefaultApplicationProblemPlusJSONResponse) VisitWithdrawCustomerInviteResponse(w http.ResponseWriter) error {
+func (response WithdrawCustomerInvite400ApplicationProblemPlusJSONResponse) VisitWithdrawCustomerInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WithdrawCustomerInvite401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response WithdrawCustomerInvite401ApplicationProblemPlusJSONResponse) VisitWithdrawCustomerInviteResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WithdrawCustomerInvite403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response WithdrawCustomerInvite403ApplicationProblemPlusJSONResponse) VisitWithdrawCustomerInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WithdrawCustomerInvite404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response WithdrawCustomerInvite404ApplicationProblemPlusJSONResponse) VisitWithdrawCustomerInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WithdrawCustomerInvite409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response WithdrawCustomerInvite409ApplicationProblemPlusJSONResponse) VisitWithdrawCustomerInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WithdrawCustomerInvite500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response WithdrawCustomerInvite500ApplicationProblemPlusJSONResponse) VisitWithdrawCustomerInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14891,19 +23601,112 @@ func (response ChangeOnboardingStep200JSONResponse) VisitChangeOnboardingStepRes
 	return err
 }
 
-type ChangeOnboardingStepdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeOnboardingStep400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeOnboardingStepdefaultApplicationProblemPlusJSONResponse) VisitChangeOnboardingStepResponse(w http.ResponseWriter) error {
+func (response ChangeOnboardingStep400ApplicationProblemPlusJSONResponse) VisitChangeOnboardingStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOnboardingStep401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeOnboardingStep401ApplicationProblemPlusJSONResponse) VisitChangeOnboardingStepResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOnboardingStep403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeOnboardingStep403ApplicationProblemPlusJSONResponse) VisitChangeOnboardingStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOnboardingStep404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeOnboardingStep404ApplicationProblemPlusJSONResponse) VisitChangeOnboardingStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOnboardingStep409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeOnboardingStep409ApplicationProblemPlusJSONResponse) VisitChangeOnboardingStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeOnboardingStep500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeOnboardingStep500ApplicationProblemPlusJSONResponse) VisitChangeOnboardingStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14950,19 +23753,96 @@ func (response ListOnboardings200JSONResponse) VisitListOnboardingsResponse(w ht
 	return err
 }
 
-type ListOnboardingsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListOnboardings400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListOnboardingsdefaultApplicationProblemPlusJSONResponse) VisitListOnboardingsResponse(w http.ResponseWriter) error {
+func (response ListOnboardings400ApplicationProblemPlusJSONResponse) VisitListOnboardingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnboardings401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListOnboardings401ApplicationProblemPlusJSONResponse) VisitListOnboardingsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnboardings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListOnboardings403ApplicationProblemPlusJSONResponse) VisitListOnboardingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnboardings404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListOnboardings404ApplicationProblemPlusJSONResponse) VisitListOnboardingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOnboardings500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListOnboardings500ApplicationProblemPlusJSONResponse) VisitListOnboardingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -14990,19 +23870,128 @@ func (response StartOnboarding201JSONResponse) VisitStartOnboardingResponse(w ht
 	return err
 }
 
-type StartOnboardingdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type StartOnboarding400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response StartOnboardingdefaultApplicationProblemPlusJSONResponse) VisitStartOnboardingResponse(w http.ResponseWriter) error {
+func (response StartOnboarding400ApplicationProblemPlusJSONResponse) VisitStartOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOnboarding401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response StartOnboarding401ApplicationProblemPlusJSONResponse) VisitStartOnboardingResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOnboarding403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response StartOnboarding403ApplicationProblemPlusJSONResponse) VisitStartOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOnboarding404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response StartOnboarding404ApplicationProblemPlusJSONResponse) VisitStartOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOnboarding409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response StartOnboarding409ApplicationProblemPlusJSONResponse) VisitStartOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOnboarding415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response StartOnboarding415ApplicationProblemPlusJSONResponse) VisitStartOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOnboarding500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response StartOnboarding500ApplicationProblemPlusJSONResponse) VisitStartOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15024,19 +24013,112 @@ func (response RemoveOnboarding204Response) VisitRemoveOnboardingResponse(w http
 	return nil
 }
 
-type RemoveOnboardingdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type RemoveOnboarding400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response RemoveOnboardingdefaultApplicationProblemPlusJSONResponse) VisitRemoveOnboardingResponse(w http.ResponseWriter) error {
+func (response RemoveOnboarding400ApplicationProblemPlusJSONResponse) VisitRemoveOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveOnboarding401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveOnboarding401ApplicationProblemPlusJSONResponse) VisitRemoveOnboardingResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveOnboarding403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveOnboarding403ApplicationProblemPlusJSONResponse) VisitRemoveOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveOnboarding404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveOnboarding404ApplicationProblemPlusJSONResponse) VisitRemoveOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveOnboarding409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveOnboarding409ApplicationProblemPlusJSONResponse) VisitRemoveOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveOnboarding500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveOnboarding500ApplicationProblemPlusJSONResponse) VisitRemoveOnboardingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15059,19 +24141,144 @@ func (response InviteCustomer204Response) VisitInviteCustomerResponse(w http.Res
 	return nil
 }
 
-type InviteCustomerdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type InviteCustomer400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response InviteCustomerdefaultApplicationProblemPlusJSONResponse) VisitInviteCustomerResponse(w http.ResponseWriter) error {
+func (response InviteCustomer400ApplicationProblemPlusJSONResponse) VisitInviteCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteCustomer401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response InviteCustomer401ApplicationProblemPlusJSONResponse) VisitInviteCustomerResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteCustomer403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response InviteCustomer403ApplicationProblemPlusJSONResponse) VisitInviteCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteCustomer404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response InviteCustomer404ApplicationProblemPlusJSONResponse) VisitInviteCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteCustomer409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response InviteCustomer409ApplicationProblemPlusJSONResponse) VisitInviteCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteCustomer415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response InviteCustomer415ApplicationProblemPlusJSONResponse) VisitInviteCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteCustomer500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response InviteCustomer500ApplicationProblemPlusJSONResponse) VisitInviteCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteCustomer502ApplicationProblemPlusJSONResponse struct {
+	NotSentApplicationProblemPlusJSONResponse
+}
+
+func (response InviteCustomer502ApplicationProblemPlusJSONResponse) VisitInviteCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotSentApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(502)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15099,19 +24306,128 @@ func (response AddPerson201JSONResponse) VisitAddPersonResponse(w http.ResponseW
 	return err
 }
 
-type AddPersondefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type AddPerson400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response AddPersondefaultApplicationProblemPlusJSONResponse) VisitAddPersonResponse(w http.ResponseWriter) error {
+func (response AddPerson400ApplicationProblemPlusJSONResponse) VisitAddPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddPerson401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AddPerson401ApplicationProblemPlusJSONResponse) VisitAddPersonResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddPerson403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AddPerson403ApplicationProblemPlusJSONResponse) VisitAddPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddPerson404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AddPerson404ApplicationProblemPlusJSONResponse) VisitAddPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddPerson409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AddPerson409ApplicationProblemPlusJSONResponse) VisitAddPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddPerson415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response AddPerson415ApplicationProblemPlusJSONResponse) VisitAddPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddPerson500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AddPerson500ApplicationProblemPlusJSONResponse) VisitAddPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15139,19 +24455,96 @@ func (response DraftPerson200JSONResponse) VisitDraftPersonResponse(w http.Respo
 	return err
 }
 
-type DraftPersondefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type DraftPerson400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response DraftPersondefaultApplicationProblemPlusJSONResponse) VisitDraftPersonResponse(w http.ResponseWriter) error {
+func (response DraftPerson400ApplicationProblemPlusJSONResponse) VisitDraftPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DraftPerson401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DraftPerson401ApplicationProblemPlusJSONResponse) VisitDraftPersonResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DraftPerson403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DraftPerson403ApplicationProblemPlusJSONResponse) VisitDraftPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DraftPerson404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DraftPerson404ApplicationProblemPlusJSONResponse) VisitDraftPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DraftPerson500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response DraftPerson500ApplicationProblemPlusJSONResponse) VisitDraftPersonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15181,19 +24574,128 @@ func (response FinishRequest200JSONResponse) VisitFinishRequestResponse(w http.R
 	return err
 }
 
-type FinishRequestdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type FinishRequest400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response FinishRequestdefaultApplicationProblemPlusJSONResponse) VisitFinishRequestResponse(w http.ResponseWriter) error {
+func (response FinishRequest400ApplicationProblemPlusJSONResponse) VisitFinishRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FinishRequest401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response FinishRequest401ApplicationProblemPlusJSONResponse) VisitFinishRequestResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FinishRequest403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response FinishRequest403ApplicationProblemPlusJSONResponse) VisitFinishRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FinishRequest404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response FinishRequest404ApplicationProblemPlusJSONResponse) VisitFinishRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FinishRequest409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response FinishRequest409ApplicationProblemPlusJSONResponse) VisitFinishRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FinishRequest415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response FinishRequest415ApplicationProblemPlusJSONResponse) VisitFinishRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FinishRequest500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response FinishRequest500ApplicationProblemPlusJSONResponse) VisitFinishRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15248,19 +24750,96 @@ func (response ListResearch200JSONResponse) VisitListResearchResponse(w http.Res
 	return err
 }
 
-type ListResearchdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListResearch400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListResearchdefaultApplicationProblemPlusJSONResponse) VisitListResearchResponse(w http.ResponseWriter) error {
+func (response ListResearch400ApplicationProblemPlusJSONResponse) VisitListResearchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListResearch401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListResearch401ApplicationProblemPlusJSONResponse) VisitListResearchResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListResearch403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListResearch403ApplicationProblemPlusJSONResponse) VisitListResearchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListResearch404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListResearch404ApplicationProblemPlusJSONResponse) VisitListResearchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListResearch500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListResearch500ApplicationProblemPlusJSONResponse) VisitListResearchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15289,19 +24868,112 @@ func (response JudgeRole200JSONResponse) VisitJudgeRoleResponse(w http.ResponseW
 	return err
 }
 
-type JudgeRoledefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type JudgeRole400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response JudgeRoledefaultApplicationProblemPlusJSONResponse) VisitJudgeRoleResponse(w http.ResponseWriter) error {
+func (response JudgeRole400ApplicationProblemPlusJSONResponse) VisitJudgeRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type JudgeRole401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response JudgeRole401ApplicationProblemPlusJSONResponse) VisitJudgeRoleResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type JudgeRole403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response JudgeRole403ApplicationProblemPlusJSONResponse) VisitJudgeRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type JudgeRole404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response JudgeRole404ApplicationProblemPlusJSONResponse) VisitJudgeRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type JudgeRole409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response JudgeRole409ApplicationProblemPlusJSONResponse) VisitJudgeRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type JudgeRole500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response JudgeRole500ApplicationProblemPlusJSONResponse) VisitJudgeRoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15323,19 +24995,128 @@ func (response StopRun204Response) VisitStopRunResponse(w http.ResponseWriter) e
 	return nil
 }
 
-type StopRundefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type StopRun400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response StopRundefaultApplicationProblemPlusJSONResponse) VisitStopRunResponse(w http.ResponseWriter) error {
+func (response StopRun400ApplicationProblemPlusJSONResponse) VisitStopRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopRun401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response StopRun401ApplicationProblemPlusJSONResponse) VisitStopRunResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopRun403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response StopRun403ApplicationProblemPlusJSONResponse) VisitStopRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopRun404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response StopRun404ApplicationProblemPlusJSONResponse) VisitStopRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopRun409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response StopRun409ApplicationProblemPlusJSONResponse) VisitStopRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopRun415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response StopRun415ApplicationProblemPlusJSONResponse) VisitStopRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopRun500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response StopRun500ApplicationProblemPlusJSONResponse) VisitStopRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15382,19 +25163,96 @@ func (response ListSegments200JSONResponse) VisitListSegmentsResponse(w http.Res
 	return err
 }
 
-type ListSegmentsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListSegments400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListSegmentsdefaultApplicationProblemPlusJSONResponse) VisitListSegmentsResponse(w http.ResponseWriter) error {
+func (response ListSegments400ApplicationProblemPlusJSONResponse) VisitListSegmentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSegments401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListSegments401ApplicationProblemPlusJSONResponse) VisitListSegmentsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSegments403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListSegments403ApplicationProblemPlusJSONResponse) VisitListSegmentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSegments404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListSegments404ApplicationProblemPlusJSONResponse) VisitListSegmentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSegments500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListSegments500ApplicationProblemPlusJSONResponse) VisitListSegmentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15421,19 +25279,96 @@ func (response GetSettings200JSONResponse) VisitGetSettingsResponse(w http.Respo
 	return err
 }
 
-type GetSettingsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetSettings400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response GetSettingsdefaultApplicationProblemPlusJSONResponse) VisitGetSettingsResponse(w http.ResponseWriter) error {
+func (response GetSettings400ApplicationProblemPlusJSONResponse) VisitGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSettings401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetSettings401ApplicationProblemPlusJSONResponse) VisitGetSettingsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSettings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetSettings403ApplicationProblemPlusJSONResponse) VisitGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSettings404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetSettings404ApplicationProblemPlusJSONResponse) VisitGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSettings500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetSettings500ApplicationProblemPlusJSONResponse) VisitGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15461,19 +25396,112 @@ func (response ChangeSettings200JSONResponse) VisitChangeSettingsResponse(w http
 	return err
 }
 
-type ChangeSettingsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeSettings400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeSettingsdefaultApplicationProblemPlusJSONResponse) VisitChangeSettingsResponse(w http.ResponseWriter) error {
+func (response ChangeSettings400ApplicationProblemPlusJSONResponse) VisitChangeSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeSettings401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeSettings401ApplicationProblemPlusJSONResponse) VisitChangeSettingsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeSettings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeSettings403ApplicationProblemPlusJSONResponse) VisitChangeSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeSettings404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeSettings404ApplicationProblemPlusJSONResponse) VisitChangeSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeSettings409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeSettings409ApplicationProblemPlusJSONResponse) VisitChangeSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeSettings500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeSettings500ApplicationProblemPlusJSONResponse) VisitChangeSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15500,19 +25528,96 @@ func (response GetSSO200JSONResponse) VisitGetSSOResponse(w http.ResponseWriter)
 	return err
 }
 
-type GetSSOdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetSSO400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response GetSSOdefaultApplicationProblemPlusJSONResponse) VisitGetSSOResponse(w http.ResponseWriter) error {
+func (response GetSSO400ApplicationProblemPlusJSONResponse) VisitGetSSOResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSSO401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetSSO401ApplicationProblemPlusJSONResponse) VisitGetSSOResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSSO403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetSSO403ApplicationProblemPlusJSONResponse) VisitGetSSOResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSSO404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetSSO404ApplicationProblemPlusJSONResponse) VisitGetSSOResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSSO500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetSSO500ApplicationProblemPlusJSONResponse) VisitGetSSOResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15540,19 +25645,112 @@ func (response SaveSSO200JSONResponse) VisitSaveSSOResponse(w http.ResponseWrite
 	return err
 }
 
-type SaveSSOdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type SaveSSO400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response SaveSSOdefaultApplicationProblemPlusJSONResponse) VisitSaveSSOResponse(w http.ResponseWriter) error {
+func (response SaveSSO400ApplicationProblemPlusJSONResponse) VisitSaveSSOResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSSO401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSSO401ApplicationProblemPlusJSONResponse) VisitSaveSSOResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSSO403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSSO403ApplicationProblemPlusJSONResponse) VisitSaveSSOResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSSO404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSSO404ApplicationProblemPlusJSONResponse) VisitSaveSSOResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSSO409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSSO409ApplicationProblemPlusJSONResponse) VisitSaveSSOResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSSO500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response SaveSSO500ApplicationProblemPlusJSONResponse) VisitSaveSSOResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15599,19 +25797,96 @@ func (response ListSSODomains200JSONResponse) VisitListSSODomainsResponse(w http
 	return err
 }
 
-type ListSSODomainsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListSSODomains400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListSSODomainsdefaultApplicationProblemPlusJSONResponse) VisitListSSODomainsResponse(w http.ResponseWriter) error {
+func (response ListSSODomains400ApplicationProblemPlusJSONResponse) VisitListSSODomainsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSSODomains401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListSSODomains401ApplicationProblemPlusJSONResponse) VisitListSSODomainsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSSODomains403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListSSODomains403ApplicationProblemPlusJSONResponse) VisitListSSODomainsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSSODomains404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListSSODomains404ApplicationProblemPlusJSONResponse) VisitListSSODomainsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSSODomains500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListSSODomains500ApplicationProblemPlusJSONResponse) VisitListSSODomainsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15639,19 +25914,128 @@ func (response AddSSODomain201JSONResponse) VisitAddSSODomainResponse(w http.Res
 	return err
 }
 
-type AddSSODomaindefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type AddSSODomain400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response AddSSODomaindefaultApplicationProblemPlusJSONResponse) VisitAddSSODomainResponse(w http.ResponseWriter) error {
+func (response AddSSODomain400ApplicationProblemPlusJSONResponse) VisitAddSSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSSODomain401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AddSSODomain401ApplicationProblemPlusJSONResponse) VisitAddSSODomainResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSSODomain403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AddSSODomain403ApplicationProblemPlusJSONResponse) VisitAddSSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSSODomain404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AddSSODomain404ApplicationProblemPlusJSONResponse) VisitAddSSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSSODomain409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AddSSODomain409ApplicationProblemPlusJSONResponse) VisitAddSSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSSODomain415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response AddSSODomain415ApplicationProblemPlusJSONResponse) VisitAddSSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSSODomain500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AddSSODomain500ApplicationProblemPlusJSONResponse) VisitAddSSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15673,19 +26057,112 @@ func (response RemoveSSODomain204Response) VisitRemoveSSODomainResponse(w http.R
 	return nil
 }
 
-type RemoveSSODomaindefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type RemoveSSODomain400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response RemoveSSODomaindefaultApplicationProblemPlusJSONResponse) VisitRemoveSSODomainResponse(w http.ResponseWriter) error {
+func (response RemoveSSODomain400ApplicationProblemPlusJSONResponse) VisitRemoveSSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSSODomain401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveSSODomain401ApplicationProblemPlusJSONResponse) VisitRemoveSSODomainResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSSODomain403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveSSODomain403ApplicationProblemPlusJSONResponse) VisitRemoveSSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSSODomain404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveSSODomain404ApplicationProblemPlusJSONResponse) VisitRemoveSSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSSODomain409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveSSODomain409ApplicationProblemPlusJSONResponse) VisitRemoveSSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSSODomain500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveSSODomain500ApplicationProblemPlusJSONResponse) VisitRemoveSSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15713,19 +26190,128 @@ func (response VerifySSODomain200JSONResponse) VisitVerifySSODomainResponse(w ht
 	return err
 }
 
-type VerifySSODomaindefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type VerifySSODomain400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response VerifySSODomaindefaultApplicationProblemPlusJSONResponse) VisitVerifySSODomainResponse(w http.ResponseWriter) error {
+func (response VerifySSODomain400ApplicationProblemPlusJSONResponse) VisitVerifySSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifySSODomain401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response VerifySSODomain401ApplicationProblemPlusJSONResponse) VisitVerifySSODomainResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifySSODomain403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response VerifySSODomain403ApplicationProblemPlusJSONResponse) VisitVerifySSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifySSODomain404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response VerifySSODomain404ApplicationProblemPlusJSONResponse) VisitVerifySSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifySSODomain409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response VerifySSODomain409ApplicationProblemPlusJSONResponse) VisitVerifySSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifySSODomain415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response VerifySSODomain415ApplicationProblemPlusJSONResponse) VisitVerifySSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifySSODomain500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response VerifySSODomain500ApplicationProblemPlusJSONResponse) VisitVerifySSODomainResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15774,19 +26360,96 @@ func (response ListSubscriptions200JSONResponse) VisitListSubscriptionsResponse(
 	return err
 }
 
-type ListSubscriptionsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListSubscriptions400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListSubscriptionsdefaultApplicationProblemPlusJSONResponse) VisitListSubscriptionsResponse(w http.ResponseWriter) error {
+func (response ListSubscriptions400ApplicationProblemPlusJSONResponse) VisitListSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubscriptions401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListSubscriptions401ApplicationProblemPlusJSONResponse) VisitListSubscriptionsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubscriptions403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListSubscriptions403ApplicationProblemPlusJSONResponse) VisitListSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubscriptions404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListSubscriptions404ApplicationProblemPlusJSONResponse) VisitListSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubscriptions500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListSubscriptions500ApplicationProblemPlusJSONResponse) VisitListSubscriptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15814,19 +26477,128 @@ func (response AddSubscription201JSONResponse) VisitAddSubscriptionResponse(w ht
 	return err
 }
 
-type AddSubscriptiondefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type AddSubscription400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response AddSubscriptiondefaultApplicationProblemPlusJSONResponse) VisitAddSubscriptionResponse(w http.ResponseWriter) error {
+func (response AddSubscription400ApplicationProblemPlusJSONResponse) VisitAddSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSubscription401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AddSubscription401ApplicationProblemPlusJSONResponse) VisitAddSubscriptionResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSubscription403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AddSubscription403ApplicationProblemPlusJSONResponse) VisitAddSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSubscription404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AddSubscription404ApplicationProblemPlusJSONResponse) VisitAddSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSubscription409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AddSubscription409ApplicationProblemPlusJSONResponse) VisitAddSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSubscription415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response AddSubscription415ApplicationProblemPlusJSONResponse) VisitAddSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSubscription500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AddSubscription500ApplicationProblemPlusJSONResponse) VisitAddSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15848,19 +26620,112 @@ func (response RemoveSubscription204Response) VisitRemoveSubscriptionResponse(w 
 	return nil
 }
 
-type RemoveSubscriptiondefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type RemoveSubscription400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response RemoveSubscriptiondefaultApplicationProblemPlusJSONResponse) VisitRemoveSubscriptionResponse(w http.ResponseWriter) error {
+func (response RemoveSubscription400ApplicationProblemPlusJSONResponse) VisitRemoveSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSubscription401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveSubscription401ApplicationProblemPlusJSONResponse) VisitRemoveSubscriptionResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSubscription403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveSubscription403ApplicationProblemPlusJSONResponse) VisitRemoveSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSubscription404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveSubscription404ApplicationProblemPlusJSONResponse) VisitRemoveSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSubscription409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveSubscription409ApplicationProblemPlusJSONResponse) VisitRemoveSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSubscription500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveSubscription500ApplicationProblemPlusJSONResponse) VisitRemoveSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15889,19 +26754,112 @@ func (response ChangeSubscription200JSONResponse) VisitChangeSubscriptionRespons
 	return err
 }
 
-type ChangeSubscriptiondefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeSubscription400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeSubscriptiondefaultApplicationProblemPlusJSONResponse) VisitChangeSubscriptionResponse(w http.ResponseWriter) error {
+func (response ChangeSubscription400ApplicationProblemPlusJSONResponse) VisitChangeSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeSubscription401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeSubscription401ApplicationProblemPlusJSONResponse) VisitChangeSubscriptionResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeSubscription403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeSubscription403ApplicationProblemPlusJSONResponse) VisitChangeSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeSubscription404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeSubscription404ApplicationProblemPlusJSONResponse) VisitChangeSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeSubscription409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeSubscription409ApplicationProblemPlusJSONResponse) VisitChangeSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeSubscription500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeSubscription500ApplicationProblemPlusJSONResponse) VisitChangeSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15933,19 +26891,128 @@ func (response StartRenewal201JSONResponse) VisitStartRenewalResponse(w http.Res
 	return err
 }
 
-type StartRenewaldefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type StartRenewal400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response StartRenewaldefaultApplicationProblemPlusJSONResponse) VisitStartRenewalResponse(w http.ResponseWriter) error {
+func (response StartRenewal400ApplicationProblemPlusJSONResponse) VisitStartRenewalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRenewal401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response StartRenewal401ApplicationProblemPlusJSONResponse) VisitStartRenewalResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRenewal403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response StartRenewal403ApplicationProblemPlusJSONResponse) VisitStartRenewalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRenewal404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response StartRenewal404ApplicationProblemPlusJSONResponse) VisitStartRenewalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRenewal409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response StartRenewal409ApplicationProblemPlusJSONResponse) VisitStartRenewalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRenewal415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response StartRenewal415ApplicationProblemPlusJSONResponse) VisitStartRenewalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRenewal500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response StartRenewal500ApplicationProblemPlusJSONResponse) VisitStartRenewalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -15968,19 +27035,112 @@ func (response DecideSuggestion204Response) VisitDecideSuggestionResponse(w http
 	return nil
 }
 
-type DecideSuggestiondefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type DecideSuggestion400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response DecideSuggestiondefaultApplicationProblemPlusJSONResponse) VisitDecideSuggestionResponse(w http.ResponseWriter) error {
+func (response DecideSuggestion400ApplicationProblemPlusJSONResponse) VisitDecideSuggestionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideSuggestion401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DecideSuggestion401ApplicationProblemPlusJSONResponse) VisitDecideSuggestionResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideSuggestion403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DecideSuggestion403ApplicationProblemPlusJSONResponse) VisitDecideSuggestionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideSuggestion404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DecideSuggestion404ApplicationProblemPlusJSONResponse) VisitDecideSuggestionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideSuggestion409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DecideSuggestion409ApplicationProblemPlusJSONResponse) VisitDecideSuggestionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideSuggestion500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response DecideSuggestion500ApplicationProblemPlusJSONResponse) VisitDecideSuggestionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16027,19 +27187,96 @@ func (response ListSuppressions200JSONResponse) VisitListSuppressionsResponse(w 
 	return err
 }
 
-type ListSuppressionsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListSuppressions400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListSuppressionsdefaultApplicationProblemPlusJSONResponse) VisitListSuppressionsResponse(w http.ResponseWriter) error {
+func (response ListSuppressions400ApplicationProblemPlusJSONResponse) VisitListSuppressionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSuppressions401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListSuppressions401ApplicationProblemPlusJSONResponse) VisitListSuppressionsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSuppressions403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListSuppressions403ApplicationProblemPlusJSONResponse) VisitListSuppressionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSuppressions404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListSuppressions404ApplicationProblemPlusJSONResponse) VisitListSuppressionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSuppressions500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListSuppressions500ApplicationProblemPlusJSONResponse) VisitListSuppressionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16067,19 +27304,128 @@ func (response AddSuppression201JSONResponse) VisitAddSuppressionResponse(w http
 	return err
 }
 
-type AddSuppressiondefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type AddSuppression400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response AddSuppressiondefaultApplicationProblemPlusJSONResponse) VisitAddSuppressionResponse(w http.ResponseWriter) error {
+func (response AddSuppression400ApplicationProblemPlusJSONResponse) VisitAddSuppressionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSuppression401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AddSuppression401ApplicationProblemPlusJSONResponse) VisitAddSuppressionResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSuppression403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AddSuppression403ApplicationProblemPlusJSONResponse) VisitAddSuppressionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSuppression404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AddSuppression404ApplicationProblemPlusJSONResponse) VisitAddSuppressionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSuppression409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AddSuppression409ApplicationProblemPlusJSONResponse) VisitAddSuppressionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSuppression415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response AddSuppression415ApplicationProblemPlusJSONResponse) VisitAddSuppressionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddSuppression500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AddSuppression500ApplicationProblemPlusJSONResponse) VisitAddSuppressionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16101,19 +27447,112 @@ func (response RemoveSuppression204Response) VisitRemoveSuppressionResponse(w ht
 	return nil
 }
 
-type RemoveSuppressiondefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type RemoveSuppression400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response RemoveSuppressiondefaultApplicationProblemPlusJSONResponse) VisitRemoveSuppressionResponse(w http.ResponseWriter) error {
+func (response RemoveSuppression400ApplicationProblemPlusJSONResponse) VisitRemoveSuppressionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSuppression401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveSuppression401ApplicationProblemPlusJSONResponse) VisitRemoveSuppressionResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSuppression403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveSuppression403ApplicationProblemPlusJSONResponse) VisitRemoveSuppressionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSuppression404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveSuppression404ApplicationProblemPlusJSONResponse) VisitRemoveSuppressionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSuppression409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveSuppression409ApplicationProblemPlusJSONResponse) VisitRemoveSuppressionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveSuppression500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveSuppression500ApplicationProblemPlusJSONResponse) VisitRemoveSuppressionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16142,19 +27581,112 @@ func (response ChangeTaskRequest200JSONResponse) VisitChangeTaskRequestResponse(
 	return err
 }
 
-type ChangeTaskRequestdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeTaskRequest400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeTaskRequestdefaultApplicationProblemPlusJSONResponse) VisitChangeTaskRequestResponse(w http.ResponseWriter) error {
+func (response ChangeTaskRequest400ApplicationProblemPlusJSONResponse) VisitChangeTaskRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeTaskRequest401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeTaskRequest401ApplicationProblemPlusJSONResponse) VisitChangeTaskRequestResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeTaskRequest403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeTaskRequest403ApplicationProblemPlusJSONResponse) VisitChangeTaskRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeTaskRequest404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeTaskRequest404ApplicationProblemPlusJSONResponse) VisitChangeTaskRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeTaskRequest409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeTaskRequest409ApplicationProblemPlusJSONResponse) VisitChangeTaskRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeTaskRequest500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeTaskRequest500ApplicationProblemPlusJSONResponse) VisitChangeTaskRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16206,19 +27738,96 @@ func (response ListTasks200JSONResponse) VisitListTasksResponse(w http.ResponseW
 	return err
 }
 
-type ListTasksdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListTasks400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListTasksdefaultApplicationProblemPlusJSONResponse) VisitListTasksResponse(w http.ResponseWriter) error {
+func (response ListTasks400ApplicationProblemPlusJSONResponse) VisitListTasksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTasks401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListTasks401ApplicationProblemPlusJSONResponse) VisitListTasksResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTasks403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListTasks403ApplicationProblemPlusJSONResponse) VisitListTasksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTasks404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListTasks404ApplicationProblemPlusJSONResponse) VisitListTasksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTasks500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListTasks500ApplicationProblemPlusJSONResponse) VisitListTasksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16246,19 +27855,128 @@ func (response CreateTask201JSONResponse) VisitCreateTaskResponse(w http.Respons
 	return err
 }
 
-type CreateTaskdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type CreateTask400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response CreateTaskdefaultApplicationProblemPlusJSONResponse) VisitCreateTaskResponse(w http.ResponseWriter) error {
+func (response CreateTask400ApplicationProblemPlusJSONResponse) VisitCreateTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTask401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTask401ApplicationProblemPlusJSONResponse) VisitCreateTaskResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTask403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTask403ApplicationProblemPlusJSONResponse) VisitCreateTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTask404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTask404ApplicationProblemPlusJSONResponse) VisitCreateTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTask409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTask409ApplicationProblemPlusJSONResponse) VisitCreateTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTask415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTask415ApplicationProblemPlusJSONResponse) VisitCreateTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTask500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTask500ApplicationProblemPlusJSONResponse) VisitCreateTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16301,19 +28019,96 @@ func (response GetTask200JSONResponse) VisitGetTaskResponse(w http.ResponseWrite
 	return err
 }
 
-type GetTaskdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetTask400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response GetTaskdefaultApplicationProblemPlusJSONResponse) VisitGetTaskResponse(w http.ResponseWriter) error {
+func (response GetTask400ApplicationProblemPlusJSONResponse) VisitGetTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTask401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetTask401ApplicationProblemPlusJSONResponse) VisitGetTaskResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTask403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetTask403ApplicationProblemPlusJSONResponse) VisitGetTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTask404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetTask404ApplicationProblemPlusJSONResponse) VisitGetTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTask500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetTask500ApplicationProblemPlusJSONResponse) VisitGetTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16342,19 +28137,112 @@ func (response ChangeTask200JSONResponse) VisitChangeTaskResponse(w http.Respons
 	return err
 }
 
-type ChangeTaskdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ChangeTask400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ChangeTaskdefaultApplicationProblemPlusJSONResponse) VisitChangeTaskResponse(w http.ResponseWriter) error {
+func (response ChangeTask400ApplicationProblemPlusJSONResponse) VisitChangeTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeTask401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeTask401ApplicationProblemPlusJSONResponse) VisitChangeTaskResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeTask403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeTask403ApplicationProblemPlusJSONResponse) VisitChangeTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeTask404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeTask404ApplicationProblemPlusJSONResponse) VisitChangeTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeTask409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeTask409ApplicationProblemPlusJSONResponse) VisitChangeTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeTask500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeTask500ApplicationProblemPlusJSONResponse) VisitChangeTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16423,19 +28311,96 @@ func (response ListLeftOut200JSONResponse) VisitListLeftOutResponse(w http.Respo
 	return err
 }
 
-type ListLeftOutdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListLeftOut400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListLeftOutdefaultApplicationProblemPlusJSONResponse) VisitListLeftOutResponse(w http.ResponseWriter) error {
+func (response ListLeftOut400ApplicationProblemPlusJSONResponse) VisitListLeftOutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListLeftOut401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListLeftOut401ApplicationProblemPlusJSONResponse) VisitListLeftOutResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListLeftOut403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListLeftOut403ApplicationProblemPlusJSONResponse) VisitListLeftOutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListLeftOut404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListLeftOut404ApplicationProblemPlusJSONResponse) VisitListLeftOutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListLeftOut500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListLeftOut500ApplicationProblemPlusJSONResponse) VisitListLeftOutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16483,19 +28448,96 @@ func (response ListTaskNotes200JSONResponse) VisitListTaskNotesResponse(w http.R
 	return err
 }
 
-type ListTaskNotesdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListTaskNotes400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListTaskNotesdefaultApplicationProblemPlusJSONResponse) VisitListTaskNotesResponse(w http.ResponseWriter) error {
+func (response ListTaskNotes400ApplicationProblemPlusJSONResponse) VisitListTaskNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaskNotes401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaskNotes401ApplicationProblemPlusJSONResponse) VisitListTaskNotesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaskNotes403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaskNotes403ApplicationProblemPlusJSONResponse) VisitListTaskNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaskNotes404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaskNotes404ApplicationProblemPlusJSONResponse) VisitListTaskNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaskNotes500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaskNotes500ApplicationProblemPlusJSONResponse) VisitListTaskNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16525,19 +28567,96 @@ func (response GetTaskPrompt200JSONResponse) VisitGetTaskPromptResponse(w http.R
 	return err
 }
 
-type GetTaskPromptdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetTaskPrompt400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response GetTaskPromptdefaultApplicationProblemPlusJSONResponse) VisitGetTaskPromptResponse(w http.ResponseWriter) error {
+func (response GetTaskPrompt400ApplicationProblemPlusJSONResponse) VisitGetTaskPromptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaskPrompt401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaskPrompt401ApplicationProblemPlusJSONResponse) VisitGetTaskPromptResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaskPrompt403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaskPrompt403ApplicationProblemPlusJSONResponse) VisitGetTaskPromptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaskPrompt404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaskPrompt404ApplicationProblemPlusJSONResponse) VisitGetTaskPromptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaskPrompt500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaskPrompt500ApplicationProblemPlusJSONResponse) VisitGetTaskPromptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16566,19 +28685,128 @@ func (response AskTask201JSONResponse) VisitAskTaskResponse(w http.ResponseWrite
 	return err
 }
 
-type AskTaskdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type AskTask400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response AskTaskdefaultApplicationProblemPlusJSONResponse) VisitAskTaskResponse(w http.ResponseWriter) error {
+func (response AskTask400ApplicationProblemPlusJSONResponse) VisitAskTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AskTask401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AskTask401ApplicationProblemPlusJSONResponse) VisitAskTaskResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AskTask403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AskTask403ApplicationProblemPlusJSONResponse) VisitAskTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AskTask404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AskTask404ApplicationProblemPlusJSONResponse) VisitAskTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AskTask409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AskTask409ApplicationProblemPlusJSONResponse) VisitAskTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AskTask415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response AskTask415ApplicationProblemPlusJSONResponse) VisitAskTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AskTask500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AskTask500ApplicationProblemPlusJSONResponse) VisitAskTaskResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16626,19 +28854,96 @@ func (response ListTaskWork200JSONResponse) VisitListTaskWorkResponse(w http.Res
 	return err
 }
 
-type ListTaskWorkdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListTaskWork400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListTaskWorkdefaultApplicationProblemPlusJSONResponse) VisitListTaskWorkResponse(w http.ResponseWriter) error {
+func (response ListTaskWork400ApplicationProblemPlusJSONResponse) VisitListTaskWorkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaskWork401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaskWork401ApplicationProblemPlusJSONResponse) VisitListTaskWorkResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaskWork403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaskWork403ApplicationProblemPlusJSONResponse) VisitListTaskWorkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaskWork404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaskWork404ApplicationProblemPlusJSONResponse) VisitListTaskWorkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaskWork500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaskWork500ApplicationProblemPlusJSONResponse) VisitListTaskWorkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16686,19 +28991,96 @@ func (response ListRuns200JSONResponse) VisitListRunsResponse(w http.ResponseWri
 	return err
 }
 
-type ListRunsdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListRuns400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListRunsdefaultApplicationProblemPlusJSONResponse) VisitListRunsResponse(w http.ResponseWriter) error {
+func (response ListRuns400ApplicationProblemPlusJSONResponse) VisitListRunsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRuns401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListRuns401ApplicationProblemPlusJSONResponse) VisitListRunsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRuns403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListRuns403ApplicationProblemPlusJSONResponse) VisitListRunsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRuns404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListRuns404ApplicationProblemPlusJSONResponse) VisitListRunsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRuns500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListRuns500ApplicationProblemPlusJSONResponse) VisitListRunsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16727,19 +29109,128 @@ func (response StartRun201JSONResponse) VisitStartRunResponse(w http.ResponseWri
 	return err
 }
 
-type StartRundefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type StartRun400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response StartRundefaultApplicationProblemPlusJSONResponse) VisitStartRunResponse(w http.ResponseWriter) error {
+func (response StartRun400ApplicationProblemPlusJSONResponse) VisitStartRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRun401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response StartRun401ApplicationProblemPlusJSONResponse) VisitStartRunResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRun403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response StartRun403ApplicationProblemPlusJSONResponse) VisitStartRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRun404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response StartRun404ApplicationProblemPlusJSONResponse) VisitStartRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRun409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response StartRun409ApplicationProblemPlusJSONResponse) VisitStartRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRun415ApplicationProblemPlusJSONResponse struct {
+	NotJSONApplicationProblemPlusJSONResponse
+}
+
+func (response StartRun415ApplicationProblemPlusJSONResponse) VisitStartRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotJSONApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartRun500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response StartRun500ApplicationProblemPlusJSONResponse) VisitStartRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16797,19 +29288,96 @@ func (response ListToday200JSONResponse) VisitListTodayResponse(w http.ResponseW
 	return err
 }
 
-type ListTodaydefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type ListToday400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListTodaydefaultApplicationProblemPlusJSONResponse) VisitListTodayResponse(w http.ResponseWriter) error {
+func (response ListToday400ApplicationProblemPlusJSONResponse) VisitListTodayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListToday401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListToday401ApplicationProblemPlusJSONResponse) VisitListTodayResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListToday403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListToday403ApplicationProblemPlusJSONResponse) VisitListTodayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListToday404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListToday404ApplicationProblemPlusJSONResponse) VisitListTodayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListToday500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListToday500ApplicationProblemPlusJSONResponse) VisitListTodayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -16836,19 +29404,96 @@ func (response GetTodaySummary200JSONResponse) VisitGetTodaySummaryResponse(w ht
 	return err
 }
 
-type GetTodaySummarydefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	StatusCode int
+type GetTodaySummary400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response GetTodaySummarydefaultApplicationProblemPlusJSONResponse) VisitGetTodaySummaryResponse(w http.ResponseWriter) error {
+func (response GetTodaySummary400ApplicationProblemPlusJSONResponse) VisitGetTodaySummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTodaySummary401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetTodaySummary401ApplicationProblemPlusJSONResponse) VisitGetTodaySummaryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(response.StatusCode)
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTodaySummary403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetTodaySummary403ApplicationProblemPlusJSONResponse) VisitGetTodaySummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	{
+		v, err := runtime.StyleParamWithOptions("simple", false, "WWW-Authenticate", response.Headers.WWWAuthenticate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return fmt.Errorf("error styling response header WWW-Authenticate: %w", err)
+		}
+		w.Header().Set("WWW-Authenticate", v)
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTodaySummary404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetTodaySummary404ApplicationProblemPlusJSONResponse) VisitGetTodaySummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTodaySummary500ApplicationProblemPlusJSONResponse struct {
+	ServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetTodaySummary500ApplicationProblemPlusJSONResponse) VisitGetTodaySummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ServerErrorApplicationProblemPlusJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -21459,576 +34104,611 @@ func (sh *strictHandler) GetTodaySummary(w http.ResponseWriter, r *http.Request,
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

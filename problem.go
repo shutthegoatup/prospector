@@ -14,6 +14,21 @@ func wantsPage(r *http.Request) bool {
 	return strings.Contains(r.Header.Get("Accept"), "text/html") && !hasKey(r)
 }
 
+// forAPI is a call to the API, which is answered with a Problem whatever goes wrong.
+func forAPI(r *http.Request) bool {
+	return strings.Contains(r.URL.Path, "/api/v1/")
+}
+
+// refuseAs answers an API call with a Problem, and anything else as text, which a
+// browser is shown as a page.
+func refuseAs(w http.ResponseWriter, r *http.Request, status int, text string) {
+	if forAPI(r) {
+		writeProblem(w, status, text)
+		return
+	}
+	http.Error(w, text, status)
+}
+
 // hasKey is a request carrying an API key. A browser never attaches a Bearer header by
 // itself, unlike the Basic one it resends once a proxy in front has asked for it, so
 // only Bearer can stand in for the checks that guard a signed-in browser.
