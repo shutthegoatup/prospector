@@ -3,6 +3,7 @@ import { type ComponentProps, type ReactNode, useEffect, useRef, useState } from
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, PageHead, Pill, type Tone, useRefresh, Whose } from "@/components/app";
+import { Bar, Placeholders, placeholders, Text } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
 import { plural } from "@/lib/format";
 import { useSession } from "@/session";
@@ -47,7 +48,11 @@ export function SubscriptionsPage() {
   return (
     <>
       <PageHead title="Subscriptions">
-        {worth && <span className="font-mono text-xs text-muted-foreground">{worth} a year at today's prices</span>}
+        {(worth || (!list.data && !list.error)) && (
+          <span className="font-mono text-xs text-muted-foreground">
+            <Text value={worth && `${worth} a year at today's prices`} w="26ch" />
+          </span>
+        )}
       </PageHead>
       <p className="mb-5 max-w-[70ch] text-sm text-muted-foreground">
         What each customer is on, and until when. The one that needs someone soonest comes first: a day to cancel by, a renewal or an end.
@@ -56,6 +61,13 @@ export function SubscriptionsPage() {
       <Whose area="support" work="Subscriptions are" can={support} />
       <Failed errors={[list.error]} />
       {list.data && list.data.items.length === 0 && <Empty title="No subscriptions yet" hint="Open a company and record what they are on." />}
+      {!list.data && !list.error && (
+        <Placeholders className="overflow-hidden panel">
+          {Array.from({ length: placeholders }, (_, i) => (
+            <SubscriptionLine key={i} />
+          ))}
+        </Placeholders>
+      )}
       {list.data && list.data.items.length > 0 && (
         <div className="overflow-hidden panel">
           {list.data.items.map((s) => (
@@ -67,8 +79,35 @@ export function SubscriptionsPage() {
   );
 }
 
-function SubscriptionLine({ s }: { s: Subscription }) {
+// SubscriptionLine is one subscription, or its outline while the list loads.
+function SubscriptionLine({ s }: { s?: Subscription }) {
   const { org, support } = useSession();
+  if (!s) {
+    return (
+      <div className="border-b border-border px-4 py-3 text-sm last:border-0">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="min-w-0">
+            <b>
+              <Bar w="14ch" />
+            </b>
+            <span className="text-muted-foreground"> · </span>
+            <Bar w="10ch" />
+            <span className="block font-mono text-xs">
+              <Bar w="30ch" />
+            </span>
+          </span>
+          <Pill>
+            <Bar w="6ch" />
+          </Pill>
+        </div>
+        {support && (
+          <p className="mt-1 font-mono text-xs">
+            <Bar w="6ch" />
+          </p>
+        )}
+      </div>
+    );
+  }
   const price = s.figure ? `${s.figure} a ${s.per}` : "";
   return (
     <div className="border-b border-border px-4 py-3 text-sm last:border-0">

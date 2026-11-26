@@ -3,6 +3,7 @@ import { type FormEvent, type ReactNode, useState } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, Meta, PageHead, Section, useRefresh } from "@/components/app";
+import { Bar, Loading, Placeholders, placeholders, Settled, Text } from "@/components/app/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { actor, plural, stamp } from "@/lib/format";
@@ -37,52 +38,95 @@ export function AgentsPage() {
     <>
       <PageHead title="Agents & API" />
       <p className="mb-5 max-w-[72ch] text-sm text-muted-foreground">
-        Agents research, add and draft for <b className="text-foreground">{settings.data?.name}</b>. Some Prospector runs itself; others are your own
+        Agents research, add and draft for <b className="text-foreground">
+          <Text value={settings.data?.name ?? (settings.error ? "" : undefined)} w="8ch" />
+        </b>. Some Prospector runs itself; others are your own
         and connect with a key, which works for this organisation only. What any of them adds waits in Research for a person; agents can draft, but
         only people send.
       </p>
-      <div className="flex flex-wrap items-start gap-5">
+      {/* Its sections stack, and each list's length decides where the next one starts. */}
+      <Settled className="flex flex-wrap items-start gap-5">
         <div className="flex min-w-0 flex-[3_1_560px] flex-col gap-5">
-          {agents.data && keys.data && connect.data && <Roster agents={agents.data.items} keys={keys.data.items} connect={connect.data} />}
+          <Roster agents={agents.data?.items} keys={keys.data?.items} connect={connect.data} errors={[agents.error, keys.error, connect.error]} />
           <DataVendors />
         </div>
         <div className="flex min-w-0 flex-[2_1_340px] flex-col gap-5">
           <Scores />
           <Work />
           <Section title="Tools agents get" hint="Writes need a source URL, and go through this organisation's never-contact list.">
-            <div>
+            <Loading busy={!connect.data && !connect.error}>
+              {!connect.data && !connect.error && (
+                <Placeholders>
+                  {Array.from({ length: placeholders }, (_, i) => (
+                    <ToolRow key={`loading-${i}`} />
+                  ))}
+                </Placeholders>
+              )}
               {connect.data?.tools.map((t) => (
-                <div key={t.name} className="grid grid-cols-[120px_1fr] gap-3 border-b border-dashed border-border py-2 text-sm last:border-0">
-                  <code className="font-mono text-[13px] text-mark">{t.name}</code>
-                  <span>
-                    {t.what} <span className="font-mono text-[11px] text-muted-foreground">{t.scope}</span>
-                  </span>
-                </div>
+                <ToolRow key={t.name} t={t} />
               ))}
-            </div>
+            </Loading>
+            <Failed errors={[connect.error]} />
           </Section>
           <Activity />
         </div>
-      </div>
+      </Settled>
     </>
   );
 }
 
-// Roster is every agent in one list, each card's offset colour its state.
-function Roster({ agents, keys, connect }: { agents: Agent[]; keys: Key[]; connect: Connect }) {
+function ToolRow({ t }: { t?: Connect["tools"][number] }) {
+  return (
+    <div className="grid grid-cols-[120px_1fr] gap-3 border-b border-dashed border-border py-2 text-sm last:border-0">
+      <code className="font-mono text-[13px] text-mark">
+        <Text value={t?.name} w="10ch" />
+      </code>
+      <span>
+        {t ? (
+          <>
+            {t.what} <span className="font-mono text-[11px] text-muted-foreground">{t.scope}</span>
+          </>
+        ) : (
+          <Bar w="24ch" />
+        )}
+      </span>
+    </div>
+  );
+}
+
+// Roster is every agent in one list, each card's offset colour its state; while they load,
+// a tally and a couple of cards in outline.
+function Roster({
+  agents,
+  keys,
+  connect,
+  errors,
+}: {
+  agents?: Agent[];
+  keys?: Key[];
+  connect?: Connect;
+  errors: ({ detail?: string } | null | undefined)[];
+}) {
   const { owner } = useSession();
+  const loaded = agents && keys && connect ? { agents, keys, connect } : undefined;
+  const loading = !loaded && !errors.some(Boolean);
   // Each of Prospector's agents has a built-in key of its own, shown on its card instead.
-  const outside = keys.filter((k) => !k.builtin);
-  const tally = (rail: Rail) => agents.filter((a) => a.state.rail === rail).length;
-  const none = agents.length === 0 && outside.length === 0;
+  const outside = loaded?.keys.filter((k) => !k.builtin) ?? [];
+  const tally = (rail: Rail) => (loaded?.agents ?? []).filter((a) => a.state.rail === rail).length;
+  const none = loaded !== undefined && loaded.agents.length === 0 && outside.length === 0;
   return (
     <Section title="Who works here" hint="Every agent in one list: those Prospector runs and those that connect with a key. The colour behind each card is its state.">
-      {!connect.can_keep_keys && owner && (
+      {loaded && !loaded.connect.can_keep_keys && owner && (
         <p className="text-sm text-[var(--stop)]" role="alert">
           This server has no secret key, so it can't keep an API key: whoever runs it needs to set PROSPECTOR_SECRET_KEYS first.
         </p>
       )}
-      {agents.length > 0 && (
+      {loading && (
+        <Placeholders className="flex flex-wrap gap-2 font-mono text-xs">
+          <TallyChip text="ready" />
+        </Placeholders>
+      )}
+      {loaded && loaded.agents.length > 0 && (
         <div className="flex flex-wrap gap-2 font-mono text-xs" aria-label="Prospector's agents">
           <TallyChip rail="ok" n={tally("ok")} text="ready" />
           <TallyChip rail="warn" n={tally("warn")} text="missing something" />
@@ -91,14 +135,20 @@ function Roster({ agents, keys, connect }: { agents: Agent[]; keys: Key[]; conne
       )}
       <div className="flex flex-col gap-4">
         {none && <p className="text-sm text-muted-foreground">No agents yet.</p>}
-        {agents.map((a) => (
-          <AgentCard key={a.id} agent={a} agents={agents} connect={connect} />
+        {loading && (
+          <Placeholders className="flex flex-col gap-4">
+            {[0, 1].map((i) => (
+              <AgentCard key={`loading-${i}`} />
+            ))}
+          </Placeholders>
+        )}
+        {loaded?.agents.map((a) => (
+          <AgentCard key={a.id} agent={a} agents={loaded.agents} connect={loaded.connect} />
         ))}
-        {outside.map((k) => (
-          <KeyCard key={k.id} k={k} scopes={connect.scopes} />
-        ))}
-        <AddAgent none={none} agents={agents} connect={connect} />
+        {loaded && outside.map((k) => <KeyCard key={k.id} k={k} scopes={loaded.connect.scopes} />)}
+        {(loaded || loading) && <AddAgent none={none} agents={loaded?.agents} connect={loaded?.connect} />}
       </div>
+      <Failed errors={errors} />
       <p className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground">
         <span>
           <i className="mr-1.5 inline-block h-2.5 w-3.5 rounded-sm border border-ink bg-[var(--ok-fill)] align-[-1px]" />
@@ -117,12 +167,13 @@ function Roster({ agents, keys, connect }: { agents: Agent[]; keys: Key[]; conne
   );
 }
 
-function TallyChip({ rail, n, text }: { rail: Rail; n: number; text: string }) {
+// TallyChip without a count is its outline while the roster loads.
+function TallyChip({ rail, n, text }: { rail?: Rail; n?: number; text: string }) {
   if (n === 0) return null;
   return (
     <span className="rounded-full border-[1.5px] border-ink bg-card px-2.5 py-0.5">
-      <i className={cn("mr-1.5 inline-block size-2 rounded-full", fill[rail])} />
-      {n} {text}
+      <i className={cn("mr-1.5 inline-block size-2 rounded-full", rail ? fill[rail] : "animate-pulse bg-accent")} />
+      {n === undefined ? <Bar w="7ch" /> : `${n} ${text}`}
     </span>
   );
 }
@@ -135,49 +186,56 @@ function Tag({ quiet, children }: { quiet?: boolean; children: ReactNode }) {
   );
 }
 
-function AgentFact({ label, value, rail = "" }: { label: string; value: string; rail?: string }) {
+function AgentFact({ label, value, rail = "" }: { label: string; value?: string; rail?: string }) {
   return (
     <span className="flex min-w-0 flex-col gap-0.5 border-b border-dashed border-border px-4 py-2.5 sm:border-r sm:border-b-0 sm:last:border-r-0">
       <Eyebrow>{label}</Eyebrow>
-      <span className={cn("font-mono text-[13px] break-words", factText[rail])}>{value}</span>
+      <span className={cn("font-mono text-[13px] break-words", factText[rail])}>
+        <Text value={value} w="10ch" />
+      </span>
     </span>
   );
 }
 
-function AgentCard({ agent: v, agents, connect }: { agent: Agent; agents: Agent[]; connect: Connect }) {
+// AgentCard is one of Prospector's agents, or its outline while the roster loads.
+function AgentCard({ agent: v, agents, connect }: { agent?: Agent; agents?: Agent[]; connect?: Connect }) {
   const { owner } = useSession();
-  const st = v.state;
+  const st = v?.state;
   return (
-    <details className={cardClass} data-state={st.rail} id={`agent-${v.id}`}>
+    <details className={cardClass} data-state={st?.rail} id={v && `agent-${v.id}`}>
       <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         <span className="flex flex-wrap items-start justify-between gap-3 px-4 pt-4 pb-3">
           <span className="flex min-w-0 flex-col gap-0.5">
             <span className="flex flex-wrap items-center gap-2 font-heading text-[17px] font-bold">
-              {v.name}
+              <Text value={v?.name} w="10ch" />
               <Tag>Prospector runs it</Tag>
-              {v.thinking_off && <Tag quiet>thinking off</Tag>}
+              {v?.thinking_off && <Tag quiet>thinking off</Tag>}
             </span>
-            <span className={cn("font-mono text-xs", stateText[st.rail])}>{st.line}</span>
+            <span className={cn("font-mono text-xs", st && stateText[st.rail])}>
+              <Text value={st?.line} w="22ch" />
+            </span>
           </span>
           <span className="rounded-lg border-[1.5px] border-ink bg-card px-2.5 py-1 text-xs font-semibold">{owner ? "Setup" : "Details"}</span>
         </span>
         <span className="grid grid-cols-1 border-t border-dashed border-border sm:grid-cols-4">
-          <AgentFact label="Model" value={v.model || "none picked"} rail={v.model ? "" : "stop"} />
-          <AgentFact label="Search" value={v.search_text} rail={v.searches ? "" : "warn"} />
-          <AgentFact label="Tools" value={v.tools_text} />
-          <AgentFact label="Falls back to" value={v.fallback_text} rail={v.fallback === 0 ? "none" : ""} />
+          <AgentFact label="Model" value={v && (v.model || "none picked")} rail={!v || v.model ? "" : "stop"} />
+          <AgentFact label="Search" value={v?.search_text} rail={!v || v.searches ? "" : "warn"} />
+          <AgentFact label="Tools" value={v?.tools_text} />
+          <AgentFact label="Falls back to" value={v?.fallback_text} rail={v?.fallback === 0 ? "none" : ""} />
         </span>
-        {st.todo && (
+        {st?.todo && (
           <span className={cn("mx-4 mb-3 block rounded-lg border border-dashed border-current px-3 py-2 font-mono text-xs", stateText[st.rail])}>{st.todo}</span>
         )}
       </summary>
-      <div className="rounded-b-[12px] border-t-2 border-ink bg-muted px-4 py-4">
-        {owner ? (
-          <AgentSetup agent={v} others={agents.filter((o) => o.id !== v.id)} connect={connect} />
-        ) : (
-          <Meta>Reaches {v.base_url || "Anthropic's own API"}. Only an owner changes its setup.</Meta>
-        )}
-      </div>
+      {v && agents && connect && (
+        <div className="rounded-b-[12px] border-t-2 border-ink bg-muted px-4 py-4">
+          {owner ? (
+            <AgentSetup agent={v} others={agents.filter((o) => o.id !== v.id)} connect={connect} />
+          ) : (
+            <Meta>Reaches {v.base_url || "Anthropic's own API"}. Only an owner changes its setup.</Meta>
+          )}
+        </div>
+      )}
     </details>
   );
 }
@@ -274,9 +332,10 @@ function Code({ children }: { children: string }) {
 }
 
 // AddAgent offers both ways in: an agent Prospector runs, or one of your own with a key.
-function AddAgent({ none, agents, connect }: { none: boolean; agents: Agent[]; connect: Connect }) {
+// Its two ways in are drawn while the roster loads; what each holds waits for it.
+function AddAgent({ none, agents, connect }: { none: boolean; agents?: Agent[]; connect?: Connect }) {
   const { owner } = useSession();
-  const base = connect.base_url;
+  const base = connect?.base_url;
   const rest = [
     `GET  ${base}api/v1/search?q=…`,
     `GET  ${base}api/v1/companies/{id or name}`,
@@ -301,9 +360,11 @@ function AddAgent({ none, agents, connect }: { none: boolean; agents: Agent[]; c
               An OpenAI-compatible endpoint or Anthropic, a model and a key. It works the tasks you hand it, with search and the tools you allow.
             </span>
           </summary>
-          <div className="mt-3">
-            <AgentSetup others={agents} connect={connect} />
-          </div>
+          {agents && connect && (
+            <div className="mt-3">
+              <AgentSetup others={agents} connect={connect} />
+            </div>
+          )}
         </details>
       )}
       <details className="rounded-xl border-2 border-ink bg-card p-3.5">
@@ -314,21 +375,23 @@ function AddAgent({ none, agents, connect }: { none: boolean; agents: Agent[]; c
             and only one with settings:write can change settings.
           </span>
         </summary>
-        <div className="mt-3 flex flex-col gap-3">
-          <div>
-            <Eyebrow>MCP endpoint</Eyebrow>
-            <Code>{connect.mcp_url}</Code>
+        {connect && (
+          <div className="mt-3 flex flex-col gap-3">
+            <div>
+              <Eyebrow>MCP endpoint</Eyebrow>
+              <Code>{connect.mcp_url}</Code>
+            </div>
+            <div>
+              <Eyebrow>Claude Code</Eyebrow>
+              <Code>{`claude mcp add --transport http prospector ${connect.mcp_url} \\\n  --header "Authorization: Bearer $PROSPECTOR_KEY"`}</Code>
+            </div>
+            <div>
+              <Eyebrow>REST</Eyebrow>
+              <Code>{rest}</Code>
+            </div>
+            {owner ? <NewKey scopes={connect.scopes} /> : <Meta>An owner makes keys.</Meta>}
           </div>
-          <div>
-            <Eyebrow>Claude Code</Eyebrow>
-            <Code>{`claude mcp add --transport http prospector ${connect.mcp_url} \\\n  --header "Authorization: Bearer $PROSPECTOR_KEY"`}</Code>
-          </div>
-          <div>
-            <Eyebrow>REST</Eyebrow>
-            <Code>{rest}</Code>
-          </div>
-          {owner ? <NewKey scopes={connect.scopes} /> : <Meta>An owner makes keys.</Meta>}
-        </div>
+        )}
       </details>
     </div>
   );
@@ -602,16 +665,34 @@ function Scores() {
   const scores = $api.useQuery("get", "/o/{org}/api/v1/agent-scores", { params: { path: { org }, query: { limit: 200 } } });
   return (
     <Section title="How each agent is doing" hint="What people did with each agent's suggestions. Use one key per outside agent to compare them.">
-      <div>
+      <Loading busy={!scores.data && !scores.error}>
         {scores.data?.items.length === 0 && <p className="text-sm text-muted-foreground">Nothing suggested yet.</p>}
+        {!scores.data && !scores.error && (
+          <Placeholders>
+            {[0, 1].map((i) => (
+              <ScoreRow key={`loading-${i}`} />
+            ))}
+          </Placeholders>
+        )}
         {scores.data?.items.map((sc) => (
-          <div key={sc.agent} className="border-b border-dashed border-border py-2 text-sm last:border-0">
-            <b className="font-mono text-[13px] text-mark">{sc.agent}</b>
-            <span className="block text-muted-foreground">{sc.text}</span>
-          </div>
+          <ScoreRow key={sc.agent} sc={sc} />
         ))}
-      </div>
+      </Loading>
+      <Failed errors={[scores.error]} />
     </Section>
+  );
+}
+
+function ScoreRow({ sc }: { sc?: components["schemas"]["AgentScore"] }) {
+  return (
+    <div className="border-b border-dashed border-border py-2 text-sm last:border-0">
+      <b className="font-mono text-[13px] text-mark">
+        <Text value={sc?.agent} w="12ch" />
+      </b>
+      <span className="block text-muted-foreground">
+        <Text value={sc?.text} w="30ch" />
+      </span>
+    </div>
   );
 }
 
@@ -622,23 +703,20 @@ function Work() {
   const older = work.data?.next_cursor;
   return (
     <Section title="Recent agent work" hint="Each stretch of an agent's changes, and the task it was for. An agent that is only reading doesn't show.">
-      <div>
+      <Loading busy={!work.data && !work.error}>
         {work.data?.items.length === 0 && <p className="text-sm text-muted-foreground">None yet.</p>}
-        {work.data?.items.map((r, i) => (
-          <div key={`${i}-${r.actor}-${r.start}`} className="border-b border-dashed border-border py-2 text-sm last:border-0">
-            <b className="font-mono text-[13px] text-mark">{actor(r.actor)}</b>
-            {r.tasks.map((t) => (
-              <span key={t.id}>
-                {" "}
-                <Link to="/o/$org/tasks/$id" params={{ org, id: t.id }} className="font-mono text-xs text-mark underline">
-                  {t.title}
-                </Link>
-              </span>
+        {!work.data && !work.error && (
+          <Placeholders>
+            {[0, 1, 2].map((i) => (
+              <WorkRow key={`loading-${i}`} />
             ))}
-            <span className="block text-muted-foreground">{r.text}</span>
-          </div>
+          </Placeholders>
+        )}
+        {work.data?.items.map((r, i) => (
+          <WorkRow key={`${i}-${r.actor}-${r.start}`} r={r} />
         ))}
-      </div>
+      </Loading>
+      <Failed errors={[work.error]} />
       {(cursor || older) && (
         <nav className="mt-3 flex flex-wrap items-center justify-between gap-3" aria-label="Runs">
           <span>
@@ -661,6 +739,28 @@ function Work() {
   );
 }
 
+function WorkRow({ r }: { r?: components["schemas"]["AgentWork"] }) {
+  const { org } = useSession();
+  return (
+    <div className="border-b border-dashed border-border py-2 text-sm last:border-0">
+      <b className="font-mono text-[13px] text-mark">
+        <Text value={r && actor(r.actor)} w="12ch" />
+      </b>
+      {r?.tasks.map((t) => (
+        <span key={t.id}>
+          {" "}
+          <Link to="/o/$org/tasks/$id" params={{ org, id: t.id }} className="font-mono text-xs text-mark underline">
+            {t.title}
+          </Link>
+        </span>
+      ))}
+      <span className="block text-muted-foreground">
+        <Text value={r?.text} w="30ch" />
+      </span>
+    </div>
+  );
+}
+
 function Activity() {
   const { org } = useSession();
   // The cursors of the pages after the first that led here, so Previous goes back one.
@@ -673,16 +773,20 @@ function Activity() {
   const next = activity.data?.next_cursor;
   return (
     <Section title="Recent agent activity">
-      <div>
+      <Loading busy={!activity.data && !activity.error}>
         {activity.data?.items.length === 0 && <p className="text-sm text-muted-foreground">None yet.</p>}
+        {!activity.data && !activity.error && (
+          <Placeholders>
+            {Array.from({ length: placeholders }, (_, i) => (
+              <ActivityRow key={`loading-${i}`} />
+            ))}
+          </Placeholders>
+        )}
         {activity.data?.items.map((e, i) => (
-          <div key={`${e.at}-${i}`} className="grid grid-cols-[84px_110px_1fr] gap-2 border-b border-dashed border-border py-1.5 text-[13px]">
-            <span className="font-mono text-xs text-muted-foreground">{stamp(e.at)}</span>
-            <span className="truncate font-mono text-xs text-mark">{e.actor}</span>
-            <span>{e.text}</span>
-          </div>
+          <ActivityRow key={`${e.at}-${i}`} e={e} />
         ))}
-      </div>
+      </Loading>
+      <Failed errors={[activity.error]} />
       {pages > 1 && (
         <nav className="mt-3 flex flex-wrap items-center justify-between gap-3" aria-label="Pages">
           <span>
@@ -705,6 +809,22 @@ function Activity() {
         </nav>
       )}
     </Section>
+  );
+}
+
+function ActivityRow({ e }: { e?: components["schemas"]["AgentEvent"] }) {
+  return (
+    <div className="grid grid-cols-[84px_110px_1fr] gap-2 border-b border-dashed border-border py-1.5 text-[13px]">
+      <span className="font-mono text-xs text-muted-foreground">
+        <Text value={e && stamp(e.at)} w="9ch" />
+      </span>
+      <span className="truncate font-mono text-xs text-mark">
+        <Text value={e?.actor} w="10ch" />
+      </span>
+      <span>
+        <Text value={e?.text} w="24ch" />
+      </span>
+    </div>
   );
 }
 
@@ -753,6 +873,13 @@ function DataVendors() {
     >
       <div className="flex flex-col gap-4">
         {list.data && vendors.length === 0 && <p className="text-sm text-muted-foreground">No vendors yet.</p>}
+        {!list.data && !list.error && (
+          <Placeholders className="flex flex-col gap-4">
+            {[0, 1].map((i) => (
+              <VendorCard key={`loading-${i}`} n={i + 1} />
+            ))}
+          </Placeholders>
+        )}
         {vendors.map((e, i) => (
           <VendorCard
             key={e.id}
@@ -762,7 +889,7 @@ function DataVendors() {
             down={owner && i < vendors.length - 1 && !moving ? () => move(i, i + 1) : undefined}
           />
         ))}
-        {owner && <AddVendor vendors={vendors} />}
+        {owner && list.data && <AddVendor vendors={vendors} />}
       </div>
       <Failed errors={[list.error, save.error]} />
       {!owner && <Meta>Only an owner adds, changes or removes a vendor.</Meta>}
@@ -778,12 +905,13 @@ function DataVendors() {
   );
 }
 
-function VendorCard({ vendor: e, n, up, down }: { vendor: Enricher; n: number; up?: () => void; down?: () => void }) {
+// VendorCard is one vendor, or its outline while the list loads.
+function VendorCard({ vendor: e, n, up, down }: { vendor?: Enricher; n: number; up?: () => void; down?: () => void }) {
   const { org, owner } = useSession();
   const refresh = useRefresh();
-  const [rail, line] = vendorState(e);
+  const [rail, line] = e ? vendorState(e) : [undefined, undefined];
   const [key, setKey] = useState("");
-  const [limit, setLimit] = useState(String(e.monthly_limit));
+  const [limit, setLimit] = useState(String(e?.monthly_limit ?? ""));
   const save = $api.useMutation("put", "/o/{org}/api/v1/enrichers", {
     onSuccess: () => {
       setKey("");
@@ -791,9 +919,10 @@ function VendorCard({ vendor: e, n, up, down }: { vendor: Enricher; n: number; u
     },
   });
   const remove = $api.useMutation("delete", "/o/{org}/api/v1/enrichers/{id}", { onSuccess: refresh });
-  const used = e.monthly_limit > 0 ? Math.min(100, (e.used_this_month / e.monthly_limit) * 100) : 100;
+  const used = !e ? 0 : e.monthly_limit > 0 ? Math.min(100, (e.used_this_month / e.monthly_limit) * 100) : 100;
   const submit = (ev: FormEvent) => {
     ev.preventDefault();
+    if (!e) return;
     save.mutate({ params: { path: { org } }, body: { kind: e.kind, api_key: key, position: e.position, monthly_limit: Number(limit) } });
   };
   const button = (go: () => void) => (ev: React.MouseEvent) => {
@@ -808,22 +937,24 @@ function VendorCard({ vendor: e, n, up, down }: { vendor: Enricher; n: number; u
           <span className="flex min-w-0 flex-col gap-0.5">
             <span className="flex flex-wrap items-center gap-2 font-heading text-[17px] font-bold">
               <span className="font-mono text-xs font-normal text-muted-foreground">{n}</span>
-              {vendorName(e.kind)}
-              {e.fields.map((f) => (
+              <Text value={e && vendorName(e.kind)} w="9ch" />
+              {e?.fields.map((f) => (
                 <Tag key={f} quiet>
                   finds {detailNames[f] ?? f}
                 </Tag>
               ))}
             </span>
-            <span className={cn("font-mono text-xs", stateText[rail])}>{line}</span>
+            <span className={cn("font-mono text-xs", rail && stateText[rail])}>
+              <Text value={line} w="30ch" />
+            </span>
           </span>
           <span className="flex items-center gap-2">
-            {up && (
+            {e && up && (
               <ActionButton quiet size="xs" aria-label={`Ask ${vendorName(e.kind)} sooner`} onClick={button(up)}>
                 ↑
               </ActionButton>
             )}
-            {down && (
+            {e && down && (
               <ActionButton quiet size="xs" aria-label={`Ask ${vendorName(e.kind)} later`} onClick={button(down)}>
                 ↓
               </ActionButton>
@@ -833,50 +964,52 @@ function VendorCard({ vendor: e, n, up, down }: { vendor: Enricher; n: number; u
         </span>
         <span className="block px-4 pb-3">
           <span className="block overflow-hidden rounded-full bg-secondary" style={{ height: 6 }}>
-            <span className={cn("block rounded-full", fill[rail])} style={{ width: `${used}%`, height: "100%" }} />
+            <span className={cn("block rounded-full", rail && fill[rail])} style={{ width: `${used}%`, height: "100%" }} />
           </span>
         </span>
       </summary>
-      <div className="flex flex-col gap-3 rounded-b-[12px] border-t-2 border-ink bg-muted px-4 py-4">
-        {owner ? (
-          <form className="flex flex-col gap-3" onSubmit={submit}>
-            <label className="flex flex-col gap-1.5">
-              <Eyebrow>API key</Eyebrow>
-              <Input
-                type="password"
-                autoComplete="off"
-                value={key}
-                onChange={(ev) => setKey(ev.target.value)}
-                placeholder={e.has_key ? "saved: leave empty to keep it" : "the key from your account with them"}
-                className={fieldClass}
-              />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <Eyebrow>Lookups a month, at most</Eyebrow>
-              <Input type="number" min={0} max={100000} required value={limit} onChange={(ev) => setLimit(ev.target.value)} className={cn(fieldClass, "w-24")} />
-              <span className="text-xs text-muted-foreground">0 stops it being asked.</span>
-            </label>
-            <div className="flex flex-wrap items-center gap-2">
-              <ActionButton size="sm" type="submit" disabled={save.isPending}>
-                Save
-              </ActionButton>
-              <ActionButton quiet size="sm" type="button" disabled={remove.isPending} onClick={() => remove.mutate({ params: { path: { org, id: e.id } } })}>
-                Remove {vendorName(e.kind)}
-              </ActionButton>
-              {save.isSuccess && <span className="text-sm text-[var(--ok)]">Saved.</span>}
-            </div>
-            <Failed errors={[save.error, remove.error]} />
-          </form>
-        ) : (
-          <Meta>
-            Asked at most {plural(e.monthly_limit, "time")} a month. Changed by {actor(e.updated_by)}, {stamp(e.updated_at)}.
-          </Meta>
-        )}
-        <p className="text-xs text-muted-foreground">
-          {vendorTold[e.kind]} {vendorCosts[e.kind]} You are bound by its terms for what it returns, and it may keep
-          what it finds in your account with it.
-        </p>
-      </div>
+      {e && (
+        <div className="flex flex-col gap-3 rounded-b-[12px] border-t-2 border-ink bg-muted px-4 py-4">
+          {owner ? (
+            <form className="flex flex-col gap-3" onSubmit={submit}>
+              <label className="flex flex-col gap-1.5">
+                <Eyebrow>API key</Eyebrow>
+                <Input
+                  type="password"
+                  autoComplete="off"
+                  value={key}
+                  onChange={(ev) => setKey(ev.target.value)}
+                  placeholder={e.has_key ? "saved: leave empty to keep it" : "the key from your account with them"}
+                  className={fieldClass}
+                />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <Eyebrow>Lookups a month, at most</Eyebrow>
+                <Input type="number" min={0} max={100000} required value={limit} onChange={(ev) => setLimit(ev.target.value)} className={cn(fieldClass, "w-24")} />
+                <span className="text-xs text-muted-foreground">0 stops it being asked.</span>
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <ActionButton size="sm" type="submit" disabled={save.isPending}>
+                  Save
+                </ActionButton>
+                <ActionButton quiet size="sm" type="button" disabled={remove.isPending} onClick={() => remove.mutate({ params: { path: { org, id: e.id } } })}>
+                  Remove {vendorName(e.kind)}
+                </ActionButton>
+                {save.isSuccess && <span className="text-sm text-[var(--ok)]">Saved.</span>}
+              </div>
+              <Failed errors={[save.error, remove.error]} />
+            </form>
+          ) : (
+            <Meta>
+              Asked at most {plural(e.monthly_limit, "time")} a month. Changed by {actor(e.updated_by)}, {stamp(e.updated_at)}.
+            </Meta>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {vendorTold[e.kind]} {vendorCosts[e.kind]} You are bound by its terms for what it returns, and it may keep
+            what it finds in your account with it.
+          </p>
+        </div>
+      )}
     </details>
   );
 }

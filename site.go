@@ -16,6 +16,19 @@ import (
 
 var assetRef = regexp.MustCompile(`((?:src|href)="/assets/[^"?]+)"`)
 
+// hashedScript is a script Vite named for its content. It gets no version: its chunks
+// import it by that bare name, and the same script under two addresses would run twice.
+var hashedScript = regexp.MustCompile(`/assets/app/[^"]*-[A-Za-z0-9_-]{8}\.js"$`)
+
+func versioned(b []byte) []byte {
+	return assetRef.ReplaceAllFunc(b, func(ref []byte) []byte {
+		if hashedScript.Match(ref) {
+			return ref
+		}
+		return append(ref[:len(ref)-1:len(ref)-1], []byte(`?v=`+assetVersion+`"`)...)
+	})
+}
+
 // builtPage reads a page Vite or prerender.mjs wrote, with the version on each of its
 // files so a browser can keep them until the next release.
 func builtPage(name string, edit func([]byte) []byte) func() ([]byte, error) {
@@ -27,7 +40,7 @@ func builtPage(name string, edit func([]byte) []byte) func() ([]byte, error) {
 		if edit != nil {
 			b = edit(b)
 		}
-		return assetRef.ReplaceAll(b, []byte(`$1?v=`+assetVersion+`"`)), nil
+		return versioned(b), nil
 	})
 }
 

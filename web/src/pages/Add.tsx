@@ -2,10 +2,12 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
-import { ActionButton, Eyebrow, PageHead } from "@/components/app";
+import { ActionButton, Eyebrow, Failed, PageHead } from "@/components/app";
+import { Loading, Text } from "@/components/app/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { problemText } from "@/problem";
 import { useSession } from "@/session";
 
@@ -22,39 +24,49 @@ export function AddPage() {
   const query = { url, name, headline, company };
   const draft = $api.useQuery("get", "/o/{org}/api/v1/people/draft", { params: { path: { org }, query } });
   const settings = $api.useQuery("get", "/o/{org}/api/v1/settings", { params: { path: { org } } });
-  if (!draft.data || !settings.data) return null;
+  const ready = draft.data && settings.data ? { draft: draft.data, settings: settings.data } : undefined;
+  // A failed load shows its error in place of a form that could never fill.
+  const failed = !ready && (draft.error || settings.error);
 
-  const form = sales ? (
-    <AddForm draft={draft.data} settings={settings.data} popup={popup} />
+  // Keyed on the data arriving, so the fields start from the draft once there is one.
+  const form = failed ? null : sales ? (
+    <AddForm key={ready ? "ready" : "loading"} draft={ready?.draft} settings={ready?.settings} popup={popup} />
   ) : (
     <p className="font-mono text-xs text-mark">Adding people is sales work. An owner can add sales to you on the Team list in Settings.</p>
   );
   if (popup) {
     return (
-      <>
+      <Loading busy={!ready && !failed}>
         <div className="mb-4 flex items-center gap-2.5">
-          <OrgMark name={settings.data.name} color={settings.data.color} />
-          <h1 className="font-heading text-xl font-bold">Add to {settings.data.name}</h1>
+          <OrgMark name={settings.data?.name} color={settings.data?.color} />
+          <h1 className="font-heading text-xl font-bold">
+            Add to <Text value={settings.data?.name ?? (failed ? "" : undefined)} w="8ch" />
+          </h1>
         </div>
+        <Failed errors={[draft.error, settings.error]} />
         {form}
-      </>
+      </Loading>
     );
   }
   return (
     <>
       <PageHead title="Add person" />
-      <div className="flex flex-wrap items-start gap-8">
+      <Failed errors={[draft.error, settings.error]} />
+      <Loading busy={!ready && !failed} className="flex flex-wrap items-start gap-8">
         <section className="min-w-0 flex-[999_1_480px] panel p-6">{form}</section>
-        {sales && <Faster name={settings.data.name} bookmarklet={draft.data.bookmarklet} />}
-      </div>
+        {sales && !failed && <Faster name={settings.data?.name} bookmarklet={draft.data?.bookmarklet} />}
+      </Loading>
     </>
   );
 }
 
-function OrgMark({ name, color }: { name: string; color: string }) {
+function OrgMark({ name, color }: { name?: string; color?: string }) {
   return (
-    <span className="grid size-7 shrink-0 place-items-center rounded-md font-heading text-sm font-bold text-[#111]" style={{ background: color }}>
-      {[...name][0]?.toUpperCase() ?? "?"}
+    <span
+      className={cn("grid size-7 shrink-0 place-items-center rounded-md font-heading text-sm font-bold text-[#111]", name === undefined && "animate-pulse bg-accent")}
+      style={color === undefined ? undefined : { background: color }}
+    >
+      {name !== undefined && ([...name][0]?.toUpperCase() ?? "?")}
     </span>
   );
 }
@@ -70,9 +82,10 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 const blank = { linkedin: "", name: "", title: "", company: "", email: "", note: "" };
 
-function AddForm({ draft, settings, popup }: { draft: Draft; settings: Settings; popup: boolean }) {
+// AddForm is drawn before the draft and settings come, its fields empty, pulsing and disabled.
+function AddForm({ draft, settings, popup }: { draft?: Draft; settings?: Settings; popup: boolean }) {
   const { org } = useSession();
-  const [values, setValues] = useState({ ...blank, linkedin: draft.linkedin, name: draft.name, title: draft.title, company: draft.company });
+  const [values, setValues] = useState({ ...blank, linkedin: draft?.linkedin ?? "", name: draft?.name ?? "", title: draft?.title ?? "", company: draft?.company ?? "" });
   const [added, setAdded] = useState(false);
   const [result, setResult] = useState<{ text: string; failed: boolean } | null>(null);
   const first = useRef<HTMLInputElement>(null);
@@ -86,6 +99,8 @@ function AddForm({ draft, settings, popup }: { draft: Draft; settings: Settings;
     onError: (error) => setResult({ text: problemText(error, "", 0) || "That didn't work. Reload and try again.", failed: true }),
   });
   const set = (key: keyof typeof blank) => (e: { target: { value: string } }) => setValues({ ...values, [key]: e.target.value });
+  const loading = !draft || !settings;
+  const box = cn(field, loading && "animate-pulse");
 
   return (
     <form
@@ -101,23 +116,31 @@ function AddForm({ draft, settings, popup }: { draft: Draft; settings: Settings;
           type="url"
           value={values.linkedin}
           onChange={set("linkedin")}
-          autoFocus={draft.linkedin === ""}
+          autoFocus={draft?.linkedin === ""}
+          disabled={loading}
           placeholder="https://www.linkedin.com/in/…"
-          className={field}
+          className={box}
         />
       </Field>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Name">
-          <Input required value={values.name} onChange={set("name")} autoFocus={draft.linkedin !== "" && draft.name === ""} className={field} />
+          <Input
+            required
+            value={values.name}
+            onChange={set("name")}
+            autoFocus={draft !== undefined && draft.linkedin !== "" && draft.name === ""}
+            disabled={loading}
+            className={box}
+          />
         </Field>
         <Field label="Role">
-          <Input value={values.title} onChange={set("title")} placeholder="Head of Marketing" className={field} />
+          <Input value={values.title} onChange={set("title")} placeholder="Head of Marketing" disabled={loading} className={box} />
         </Field>
         <Field label="Company">
-          <Input value={values.company} onChange={set("company")} className={field} />
+          <Input value={values.company} onChange={set("company")} disabled={loading} className={box} />
         </Field>
         <Field label="Email (optional)">
-          <Input type="email" value={values.email} onChange={set("email")} className={field} />
+          <Input type="email" value={values.email} onChange={set("email")} disabled={loading} className={box} />
         </Field>
       </div>
       <Field label="Connection note">
@@ -126,17 +149,18 @@ function AddForm({ draft, settings, popup }: { draft: Draft; settings: Settings;
           maxLength={300}
           value={values.note}
           onChange={set("note")}
-          placeholder={"Leave empty to use your template:\n\n" + settings.note_template}
-          className="rounded-lg border-input bg-muted px-3 py-2 text-sm leading-relaxed"
+          placeholder={settings && "Leave empty to use your template:\n\n" + settings.note_template}
+          disabled={loading}
+          className={cn("rounded-lg border-input bg-muted px-3 py-2 text-sm leading-relaxed", loading && "animate-pulse")}
         />
       </Field>
       <label className="flex items-center gap-2.5 text-sm">
-        <Checkbox checked={added} onCheckedChange={(on) => setAdded(on === true)} />
+        <Checkbox checked={added} disabled={loading} onCheckedChange={(on) => setAdded(on === true)} />
         I've already sent the connection request
       </label>
       <div className="flex flex-wrap items-center gap-3">
-        <ActionButton type="submit" disabled={add.isPending}>
-          Add to {settings.name}
+        <ActionButton type="submit" disabled={loading || add.isPending}>
+          Add to <Text value={settings?.name} w="8ch" />
         </ActionButton>
         <p className={result?.failed ? "text-sm text-[var(--stop)]" : "text-sm text-[var(--ok)]"} role="status">
           {result?.text}
@@ -146,10 +170,12 @@ function AddForm({ draft, settings, popup }: { draft: Draft; settings: Settings;
   );
 }
 
-function Faster({ name, bookmarklet }: { name: string; bookmarklet: string }) {
+function Faster({ name, bookmarklet }: { name?: string; bookmarklet?: string }) {
   const link = useRef<HTMLAnchorElement>(null);
   // React refuses a javascript: href, which is all a bookmarklet is, so it is set here.
-  useEffect(() => link.current?.setAttribute("href", bookmarklet), [bookmarklet]);
+  useEffect(() => {
+    if (bookmarklet !== undefined) link.current?.setAttribute("href", bookmarklet);
+  }, [bookmarklet]);
   return (
     <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-3 panel p-5 text-sm">
       <Eyebrow>Faster: from LinkedIn itself</Eyebrow>
@@ -157,7 +183,7 @@ function Faster({ name, bookmarklet }: { name: string; bookmarklet: string }) {
         Drag this to your bookmarks bar. On someone's LinkedIn profile, click it: this form opens filled in with their name, role and company.
       </p>
       <a ref={link} className="self-start rounded-lg border border-dashed border-primary px-3 py-2 font-medium text-mark" data-bookmarklet draggable="true">
-        + {name}
+        + <Text value={name} w="8ch" />
       </a>
       <p className="text-muted-foreground">It reads only the profile's title and headline, when you click. Nothing runs on LinkedIn by itself.</p>
       <Eyebrow>Then</Eyebrow>

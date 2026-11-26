@@ -3,6 +3,7 @@ import { Link, useParams } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, Meta, Pill, type Tone, useRefresh } from "@/components/app";
+import { Placeholders, Text } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
 import { actor, plural, stamp } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -82,7 +83,18 @@ export function CompanyPage() {
     );
   }
   const c = overview.data;
-  if (!c || !history.data || !notes.data) return back;
+  if (!c || !history.data || !notes.data) {
+    // Only what every company's page starts with, where it will be: what follows depends
+    // on the company, and appears below rather than pushing this down.
+    return (
+      <>
+        {back}
+        <Placeholders className="mt-3 flex flex-col gap-5 panel p-6">
+          <Head />
+        </Placeholders>
+      </>
+    );
+  }
   return (
     <>
       {back}
@@ -165,19 +177,24 @@ export function CompanyPage() {
   );
 }
 
-function Head({ c }: { c: Overview }) {
+// Head is the company's name and where it stands, or their outline while the page loads.
+function Head({ c }: { c?: Overview }) {
   const { org, sales } = useSession();
   const refresh = useRefresh();
   const review = $api.useMutation("patch", "/o/{org}/api/v1/companies/{id}", { onSuccess: refresh });
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 className="font-heading text-3xl font-bold tracking-tight">{c.name}</h1>
-        <Meta>{[c.domain, c.country, c.segment, c.grade ? "fit " + c.grade : ""].filter((p) => p.trim()).join(" · ")}</Meta>
+        <h1 className="font-heading text-3xl font-bold tracking-tight">
+          <Text value={c?.name} w="12ch" />
+        </h1>
+        <Meta>
+          <Text value={c && [c.domain, c.country, c.segment, c.grade ? "fit " + c.grade : ""].filter((p) => p.trim()).join(" · ")} w="30ch" />
+        </Meta>
       </div>
-      <div className="flex items-center gap-2">
-        <StageTag stage={c.pipeline} />
-        {c.stage !== "qualified" && sales && (
+      <div className="flex min-h-8 items-center gap-2">
+        <StageTag stage={c?.pipeline} />
+        {c && c.stage !== "qualified" && sales && (
           <ActionButton size="sm" onClick={() => review.mutate({ params: { path: { org, id: c.id } }, body: { stage: "qualified" } })}>
             Qualify
           </ActionButton>

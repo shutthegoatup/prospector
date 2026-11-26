@@ -119,6 +119,11 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Room for the scrollbar from the start, so a page that grows past the window as its
+     data arrives doesn't narrow under what is already drawn. */
+  html {
+    scrollbar-gutter: stable;
+  }
   body {
     @apply bg-background text-foreground;
   }

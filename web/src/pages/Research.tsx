@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, FilterChip, Meta, Meter, Pill, Section, type Tone, useRefresh, Whose } from "@/components/app";
+import { Bar, Placeholders, placeholders, Text } from "@/components/app/skeleton";
 import { actor, day, stamp } from "@/lib/format";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -50,21 +52,37 @@ export function ResearchPage() {
   // A search is for one offering, so its queue is that offering's.
   const research = $api.useQuery("get", "/o/{org}/api/v1/research", {
     params: { path: { org }, query: { filter, task, offering: task ? undefined : of, cursor } },
-  });
+  }, { placeholderData: keepPreviousData });
+  // The queue in view as the server has said, not one kept on screen while another loads.
+  const settled = research.isPlaceholderData ? undefined : research.data;
   const offerings = useOfferings();
+  // The same query useOfferings makes, to know when the offerings have come.
+  const offered = $api.useQuery("get", "/o/{org}/api/v1/offerings", { params: { path: { org }, query: { limit: 200 } } });
   const settings = $api.useQuery("get", "/o/{org}/api/v1/settings", { params: { path: { org } } });
   const agents = $api.useQuery("get", "/o/{org}/api/v1/agents", { params: { path: { org } } });
-  const enrichers = $api.useQuery("get", "/o/{org}/api/v1/enrichers", { params: { path: { org } } }).data?.items ?? [];
+  const enrichersQuery = $api.useQuery("get", "/o/{org}/api/v1/enrichers", { params: { path: { org } } });
+  const enrichers = enrichersQuery.data?.items ?? [];
   const ready = (agents.data?.items ?? []).filter((a) => a.ready);
   // The same query SearchPanel makes, so the search is read once; closed searches aren't in tasks.
-  const chosen = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}", { params: { path: { org, id: task ?? 0 }, query: { limit: 3 } } }, { enabled: !!task }).data;
+  const chosenQuery = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}", { params: { path: { org, id: task ?? 0 }, query: { limit: 3 } } }, { enabled: !!task });
+  const chosen = chosenQuery.data;
+  // And the runs it lists, so what comes under it waits for them rather than being pushed down.
+  const chosenRuns = $api.useQuery("get", "/o/{org}/api/v1/tasks/{task}/runs", { params: { path: { org, task: task ?? 0 }, query: { limit: 3 } } }, { enabled: !!task });
   // Whose queue is shown is the server's to say: what is done on it goes to that offering,
   // whether or not the list of offerings has loaded yet.
   const sellingId = research.data?.offering_id ?? (task ? (chosen?.offering_id ?? 0) : (of ?? 0));
   const selling = offerings.find((o) => o.id === sellingId);
   const label = (key: Filter, text: string) => (key === "rejected" && sellingId ? "Junked" : text);
-  const tasks = $api.useQuery("get", "/o/{org}/api/v1/tasks", { params: { path: { org }, query: { limit: 5, offering: sellingId } } });
+  const tasks = $api.useQuery("get", "/o/{org}/api/v1/tasks", { params: { path: { org }, query: { limit: 5, offering: sellingId } } }, { placeholderData: keepPreviousData });
   const searches = tasks.data?.items ?? [];
+  // What sits above the queue is as tall as these make it, so it is drawn, and the queue's
+  // outline under it, only once they have all come; after that, picking another search
+  // changes it in place rather than taking the page away.
+  const [drawn, setDrawn] = useState(false);
+  const above = drawn || (!offered.isPending && !settings.isPending && !agents.isPending && !tasks.isPending && !tasks.isPlaceholderData && (!task || !chosenQuery.isPending));
+  if (above && !drawn) setDrawn(true);
+  const cardsReady = research.data && !enrichersQuery.isPending;
+  const ranked = settled ? settled.ranked && settled.items.length > 0 : !research.error && !!task && filter === "review";
 
 
   return (
@@ -90,93 +108,106 @@ export function ResearchPage() {
       </p>
 
       <Whose area="sales" work="Research is" can={sales} />
-      {sales && <FindBox agents={ready} offering={research.data?.offering_id} selling={selling} lookingFor={selling ? selling.looking_for : (settings.data?.looking_for ?? [])} />}
+      {above && (
+        <>
+          {sales && <FindBox agents={ready} offering={settled?.offering_id} selling={selling} lookingFor={selling ? selling.looking_for : (settings.data?.looking_for ?? [])} />}
 
-      <div className="mb-5 flex flex-col gap-2" aria-label="Searches">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <Eyebrow>Searches</Eyebrow>
-          <Link to="/o/$org/tasks" params={{ org }} className="text-[13px] text-mark underline">
-            Every search, closed ones too
-          </Link>
-        </div>
-        {searches.map((t) => (
-          <SearchStrip key={t.id} task={t} agents={ready} chosen={t.id === task} />
-        ))}
-        {tasks.data && searches.length === 0 && <p className="text-sm text-muted-foreground">No search open.</p>}
-      </div>
-
-      <div className="flex flex-wrap items-start gap-6">
-        <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-3">
-          {offerings.length > 0 && (
-            <nav className="flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-border bg-muted px-2.5 py-2" aria-label="Selling">
-              <span className="mr-1 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Selling</span>
-              {[{ id: 0, name: settings.data?.name ?? "Your own" }, ...offerings].map((o) => (
-                <Link
-                  key={o.id}
-                  to="/o/$org/research"
-                  params={{ org }}
-                  search={{ f: filter === "review" ? undefined : filter, of: o.id || undefined }}
-                  aria-current={o.id === sellingId ? "true" : undefined}
-                  className={cn(
-                    "rounded-md border px-2.5 py-1 text-[13px] font-medium text-foreground no-underline",
-                    o.id === sellingId ? "border-ink bg-card" : "border-transparent hover:border-border",
-                  )}
-                >
-                  {o.name}
-                </Link>
-              ))}
-            </nav>
-          )}
-          <nav className="flex flex-wrap items-center gap-2" aria-label="Filter">
-            {filters.map((f) => (
-              <FilterChip key={f.key} to="/o/$org/research" params={{ org }} search={{ f: f.key === "review" ? undefined : f.key, task, of }} label={label(f.key, f.label)} count={research.data?.counts[f.key] ?? 0} on={f.key === filter} />
-            ))}
-            {task && (
-              <span className="inline-flex items-center gap-1">
-                <Pill tone="agent">From “{chosen?.title ?? `search ${task}`}”</Pill>
-                <Link to="/o/$org/research" params={{ org }} search={{ f: filter === "review" ? undefined : filter, of: sellingId || undefined }} className="px-1 text-sm text-muted-foreground no-underline" aria-label="Show every search">
-                  ×
-                </Link>
-              </span>
-            )}
-          </nav>
-          {research.data?.ranked && research.data.items.length > 0 && (
-            <Meta>Best fit first: no must missed, then most met, then fewest left unknown.</Meta>
-          )}
-          {research.data && research.data.items.length === 0 && (
-            <div className="panel p-6 text-center">
-              <p className="font-heading font-semibold">{empty[filter][0]}</p>
-              <p className="text-sm text-muted-foreground">{empty[filter][1]}</p>
+          <div className="mb-5 flex flex-col gap-2" aria-label="Searches">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <Eyebrow>Searches</Eyebrow>
+              <Link to="/o/$org/tasks" params={{ org }} className="text-[13px] text-mark underline">
+                Every search, closed ones too
+              </Link>
             </div>
-          )}
-          {research.error && <p className="text-sm text-[var(--stop)]">The queue couldn't be read. Reload to try again.</p>}
-          <div className="flex flex-col gap-3">
-            {research.data?.items.map((c, i) => <CompanyCard key={`${sellingId}-${c.id}`} company={c} open={i === 0} enrichers={enrichers} offering={research.data?.offering_id ?? 0} />)}
+            {searches.map((t) => (
+              <SearchStrip key={t.id} task={t} agents={ready} chosen={t.id === task} />
+            ))}
+            {tasks.data && searches.length === 0 && <p className="text-sm text-muted-foreground">No search open.</p>}
           </div>
-          <nav className="flex justify-between gap-3">
-            <span>
-              {cursor && (
-                <ActionButton quiet size="sm" onClick={() => setCursor(undefined)}>
-                  ← First
-                </ActionButton>
+
+          <div className="flex flex-wrap items-start gap-6">
+            <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-3">
+              {offerings.length > 0 && (
+                <nav className="flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-border bg-muted px-2.5 py-2" aria-label="Selling">
+                  <span className="mr-1 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Selling</span>
+                  {[{ id: 0, name: settings.data?.name ?? "Your own" }, ...offerings].map((o) => (
+                    <Link
+                      key={o.id}
+                      to="/o/$org/research"
+                      params={{ org }}
+                      search={{ f: filter === "review" ? undefined : filter, of: o.id || undefined }}
+                      aria-current={o.id === sellingId ? "true" : undefined}
+                      className={cn(
+                        "rounded-md border px-2.5 py-1 text-[13px] font-medium text-foreground no-underline",
+                        o.id === sellingId ? "border-ink bg-card" : "border-transparent hover:border-border",
+                      )}
+                    >
+                      {o.name}
+                    </Link>
+                  ))}
+                </nav>
               )}
-            </span>
-            <span>
-              {research.data?.next_cursor && (
-                <ActionButton quiet size="sm" onClick={() => setCursor(research.data?.next_cursor)}>
-                  Older →
-                </ActionButton>
+              <nav className="flex flex-wrap items-center gap-2" aria-label="Filter">
+                {filters.map((f) => (
+                  <FilterChip key={f.key} to="/o/$org/research" params={{ org }} search={{ f: f.key === "review" ? undefined : f.key, task, of }} label={label(f.key, f.label)} count={research.data && (research.data.counts[f.key] ?? 0)} on={f.key === filter} />
+                ))}
+                {task && (
+                  <span className="inline-flex items-center gap-1">
+                    <Pill tone="agent">From “{chosen?.title ?? `search ${task}`}”</Pill>
+                    <Link to="/o/$org/research" params={{ org }} search={{ f: filter === "review" ? undefined : filter, of: sellingId || undefined }} className="px-1 text-sm text-muted-foreground no-underline" aria-label="Show every search">
+                      ×
+                    </Link>
+                  </span>
+                )}
+              </nav>
+              {ranked && (
+                <Meta>
+                  <Text value={settled && "Best fit first: no must missed, then most met, then fewest left unknown."} w="52ch" />
+                </Meta>
               )}
-            </span>
-          </nav>
-        </div>
-        {task && (
-          <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
-            <SearchPanel id={task} onGone={() => navigate({ to: "/o/$org/research", params: { org }, search: { of: sellingId || undefined } })} />
-            <LeftOutPanel id={task} />
-          </aside>
-        )}
-      </div>
+              {settled && settled.items.length === 0 && (
+                <div className="panel p-6 text-center">
+                  <p className="font-heading font-semibold">{empty[filter][0]}</p>
+                  <p className="text-sm text-muted-foreground">{empty[filter][1]}</p>
+                </div>
+              )}
+              {research.error && <p className="text-sm text-[var(--stop)]">The queue couldn't be read. Reload to try again.</p>}
+              {!cardsReady && !research.error && (
+                <Placeholders className="flex flex-col gap-3">
+                  {Array.from({ length: placeholders }, (_, i) => (
+                    <CompanyCard key={i} open={false} enrichers={[]} offering={0} />
+                  ))}
+                </Placeholders>
+              )}
+              <div className="flex flex-col gap-3">
+                {cardsReady && research.data?.items.map((c, i) => <CompanyCard key={`${sellingId}-${c.id}`} company={c} open={i === 0} enrichers={enrichers} offering={research.data?.offering_id ?? 0} />)}
+              </div>
+              <nav className="flex justify-between gap-3">
+                <span>
+                  {cursor && (
+                    <ActionButton quiet size="sm" onClick={() => setCursor(undefined)}>
+                      ← First
+                    </ActionButton>
+                  )}
+                </span>
+                <span>
+                  {research.data?.next_cursor && (
+                    <ActionButton quiet size="sm" onClick={() => setCursor(research.data?.next_cursor)}>
+                      Older →
+                    </ActionButton>
+                  )}
+                </span>
+              </nav>
+            </div>
+            {task && (
+              <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
+                <SearchPanel id={task} onGone={() => navigate({ to: "/o/$org/research", params: { org }, search: { of: sellingId || undefined } })} />
+                {!chosenRuns.isPending && <LeftOutPanel id={task} />}
+              </aside>
+            )}
+          </div>
+        </>
+      )}
     </>
   );
 }
@@ -374,64 +405,71 @@ function SearchPanel({ id, onGone }: { id: number; onGone: () => void }) {
   const t = task.data;
   return (
     <Section className="gap-2.5 p-5">
-      <Eyebrow>{t?.title}</Eyebrow>
-      <p className="text-sm">{t?.brief}</p>
-      {(runs.data?.items ?? []).map((r) => (
-        <div key={r.id} className="flex flex-col gap-0.5 border-t border-dashed border-border pt-2 text-sm">
-          <span>
-            <b>{r.agent_name}</b> · {runState(r)}
-          </span>
-          <Meta>
-            {r.started_by} · {stamp(r.started_at)}
-            {r.stop_reason ? ` · ${r.stop_reason}` : ""}
-          </Meta>
-        </div>
-      ))}
-      {t && t.notes.length > 0 && (
-        <div className="flex flex-col gap-2 border-t border-dashed border-border pt-2">
-          <Eyebrow>Agents' notes</Eyebrow>
-          {t.notes.map((n) => (
-            <p key={n.id} className="text-[13px]">
-              {n.text}
-              <span className="block font-mono text-xs text-muted-foreground">
-                {n.kind.replace("_", " ")} · {actor(n.actor)} · {stamp(n.at)}
+      <Eyebrow>
+        <Text value={t?.title} w="16ch" />
+      </Eyebrow>
+      {/* The brief runs to any number of lines, so it and all that follows come together. */}
+      {t && !runs.isPending && (
+        <>
+          <p className="text-sm">{t.brief}</p>
+          {(runs.data?.items ?? []).map((r) => (
+            <div key={r.id} className="flex flex-col gap-0.5 border-t border-dashed border-border pt-2 text-sm">
+              <span>
+                <b>{r.agent_name}</b> · {runState(r)}
               </span>
-            </p>
+              <Meta>
+                {r.started_by} · {stamp(r.started_at)}
+                {r.stop_reason ? ` · ${r.stop_reason}` : ""}
+              </Meta>
+            </div>
           ))}
-        </div>
-      )}
-      <Link to="/o/$org/tasks/$id" params={{ org, id }} className="text-[13px] text-mark underline">
-        Every request, note and run
-      </Link>
-      {sales && t && t.status !== "closed" && (
-        <form
-          className="flex flex-col gap-2 border-t border-dashed border-border pt-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            ask.mutate({ params: { path: { org, id } }, body: { text } });
-          }}
-        >
-          <label htmlFor="ask-more">
-            <Eyebrow>Ask for more</Eyebrow>
-          </label>
-          <Textarea
-            id="ask-more"
-            required
-            maxLength={2000}
-            rows={2}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Twenty more, in Scotland this time."
-            className="rounded-lg border-input bg-muted text-sm leading-relaxed"
-          />
-          <div className="flex items-center gap-3">
-            <ActionButton type="submit" size="sm" disabled={ask.isPending}>
-              Ask
-            </ActionButton>
-            {ask.isSuccess && <p className="text-sm text-[var(--ok)]">Asked.</p>}
-            <Failed errors={[ask.error]} />
-          </div>
-        </form>
+          {t && t.notes.length > 0 && (
+            <div className="flex flex-col gap-2 border-t border-dashed border-border pt-2">
+              <Eyebrow>Agents' notes</Eyebrow>
+              {t.notes.map((n) => (
+                <p key={n.id} className="text-[13px]">
+                  {n.text}
+                  <span className="block font-mono text-xs text-muted-foreground">
+                    {n.kind.replace("_", " ")} · {actor(n.actor)} · {stamp(n.at)}
+                  </span>
+                </p>
+              ))}
+            </div>
+          )}
+          <Link to="/o/$org/tasks/$id" params={{ org, id }} className="text-[13px] text-mark underline">
+            Every request, note and run
+          </Link>
+          {sales && t && t.status !== "closed" && (
+            <form
+              className="flex flex-col gap-2 border-t border-dashed border-border pt-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                ask.mutate({ params: { path: { org, id } }, body: { text } });
+              }}
+            >
+              <label htmlFor="ask-more">
+                <Eyebrow>Ask for more</Eyebrow>
+              </label>
+              <Textarea
+                id="ask-more"
+                required
+                maxLength={2000}
+                rows={2}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Twenty more, in Scotland this time."
+                className="rounded-lg border-input bg-muted text-sm leading-relaxed"
+              />
+              <div className="flex items-center gap-3">
+                <ActionButton type="submit" size="sm" disabled={ask.isPending}>
+                  Ask
+                </ActionButton>
+                {ask.isSuccess && <p className="text-sm text-[var(--ok)]">Asked.</p>}
+                <Failed errors={[ask.error]} />
+              </div>
+            </form>
+          )}
+        </>
       )}
     </Section>
   );
@@ -578,10 +616,11 @@ function SourceLink({ href, children }: { href: string; children: React.ReactNod
 }
 
 // A card is reviewed, and its people picked, for the offering in view; 0 is the organisation's own.
-function CompanyCard({ company: c, open, enrichers, offering }: { company: Company; open: boolean; enrichers: Enricher[]; offering: number }) {
+// Without a company it is the card's outline while the queue loads.
+function CompanyCard({ company: c, open, enrichers, offering }: { company?: Company; open: boolean; enrichers: Enricher[]; offering: number }) {
   const { org, sales } = useSession();
   const refresh = useRefresh();
-  const [grade, setGrade] = useState(c.grade || "B");
+  const [grade, setGrade] = useState(c?.grade || "B");
   const patch = $api.useMutation("patch", "/o/{org}/api/v1/companies/{id}", { onSuccess: refresh });
   const review = { mutate: (v: { params: { path: { org: string; id: number } }; body: { stage: "review" | "qualified" | "rejected"; fit?: string } }) => patch.mutate({ ...v, body: { ...v.body, offering: offering || undefined } }) };
   const pick = $api.useMutation("post", "/o/{org}/api/v1/contacts/{id}/pick", { onSuccess: refresh });
@@ -591,12 +630,20 @@ function CompanyCard({ company: c, open, enrichers, offering }: { company: Compa
     <article className="panel">
       <div className="flex flex-wrap items-start gap-x-6 gap-y-3 px-5 py-4">
         <div className="min-w-[200px] flex-[2_1_220px]">
-          <Link to="/o/$org/companies/$id" params={{ org, id: c.id }} className="font-heading text-lg font-semibold text-foreground hover:text-mark">
-            {c.name}
-          </Link>
-          <p className="font-mono text-xs text-muted-foreground">{[c.country, c.segment, c.domain].filter(Boolean).join(" · ")}</p>
+          {c ? (
+            <Link to="/o/$org/companies/$id" params={{ org, id: c.id }} className="font-heading text-lg font-semibold text-foreground hover:text-mark">
+              {c.name}
+            </Link>
+          ) : (
+            <span className="font-heading text-lg font-semibold">
+              <Bar w="16ch" />
+            </span>
+          )}
+          <p className="font-mono text-xs text-muted-foreground">
+            <Text value={c && [c.country, c.segment, c.domain].filter(Boolean).join(" · ")} w="24ch" />
+          </p>
         </div>
-        {c.criteria.length > 0 && (
+        {c && c.criteria.length > 0 && (
           <div className="flex flex-[1_1_180px] flex-col gap-1">
             <Eyebrow>Fit</Eyebrow>
             <span className="font-mono text-[13px] font-medium">{c.fit.text}</span>
@@ -605,11 +652,15 @@ function CompanyCard({ company: c, open, enrichers, offering }: { company: Compa
         <div className="flex flex-[1_1_150px] flex-col gap-1">
           <Eyebrow>Found by</Eyebrow>
           <div>
-            <Pill tone={c.found_by.startsWith("agent:") ? "agent" : ""}>{actor(c.found_by)}</Pill>
+            <Pill tone={c?.found_by.startsWith("agent:") ? "agent" : ""}>
+              <Text value={c && actor(c.found_by)} w="8ch" />
+            </Pill>
           </div>
-          <Meta>{stamp(c.created_at)}</Meta>
+          <Meta>
+            <Text value={c && stamp(c.created_at)} w="14ch" />
+          </Meta>
         </div>
-        {sales && (
+        {c && sales && (
           <div className="flex flex-[1_1_220px] flex-wrap items-center justify-end gap-2">
             {c.stage !== "qualified" && (
               <>
@@ -644,88 +695,93 @@ function CompanyCard({ company: c, open, enrichers, offering }: { company: Compa
         )}
         <Failed errors={[patch.error, pick.error]} />
       </div>
-      {c.criteria.map((cr) => (
+      {c?.criteria.map((cr) => (
         <CriterionRow key={cr.field} c={cr} />
       ))}
       <details className="group border-t border-border/70 bg-muted" open={open}>
         <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-2.5 font-mono text-xs text-muted-foreground hover:text-foreground">
           <span className="transition-transform group-open:rotate-90">›</span>
-          {c.facts.length} other {c.facts.length === 1 ? "fact" : "facts"} · {c.people.length} {c.people.length === 1 ? "person" : "people"}
+          <Text
+            value={c && `${c.facts.length} other ${c.facts.length === 1 ? "fact" : "facts"} · ${c.people.length} ${c.people.length === 1 ? "person" : "people"}`}
+            w="18ch"
+          />
         </summary>
-        <div className="flex flex-wrap gap-6 px-5 pb-5">
-          <div className="min-w-0 flex-[2_1_380px]">
-            <Eyebrow>Facts</Eyebrow>
-            {c.why && (
-              <div className="grid grid-cols-[130px_1fr] gap-3 border-b border-dashed border-border py-2 text-sm">
-                <span className="font-mono text-xs text-muted-foreground">why it fits</span>
-                <span>{c.why}</span>
-              </div>
-            )}
-            {c.facts.map((f) => (
-              <div key={f.id} className="grid grid-cols-[130px_1fr_auto] gap-3 border-b border-dashed border-border py-2 text-sm">
-                <span className="font-mono text-xs text-muted-foreground">{f.field}</span>
-                <span>{f.value}</span>
-                <SourceLink href={f.source_url}>source ↗</SourceLink>
-              </div>
-            ))}
-          </div>
-          <div className="min-w-0 flex-[1_1_260px]">
-            <Eyebrow>People</Eyebrow>
-            {c.people.length === 0 && (
-              <p className="py-2 text-sm text-muted-foreground">
-                None yet.{" "}
-                {sales && <Link to="/o/$org/add" params={{ org }} search={{ company: c.name }}>Add someone</Link>}
-              </p>
-            )}
-            {c.people.map((p) => (
-              <div key={p.id} className="flex flex-col gap-1.5 border-b border-dashed border-border py-2.5 text-sm">
-                <div>
-                  <b>{p.name}</b>
-                  <span className="text-muted-foreground">{p.title ? `, ${p.title}` : ""}</span>
+        {c && (
+          <div className="flex flex-wrap gap-6 px-5 pb-5">
+            <div className="min-w-0 flex-[2_1_380px]">
+              <Eyebrow>Facts</Eyebrow>
+              {c.why && (
+                <div className="grid grid-cols-[130px_1fr] gap-3 border-b border-dashed border-border py-2 text-sm">
+                  <span className="font-mono text-xs text-muted-foreground">why it fits</span>
+                  <span>{c.why}</span>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {p.email_status === "verified" && <Pill tone="ok">email verified</Pill>}
-                  {p.email_status === "guess" && <Pill tone="warn">email is a guess</Pill>}
-                  {p.linkedin && <SourceLink href={p.linkedin}>LinkedIn ↗</SourceLink>}
-                  {p.source_url && <SourceLink href={p.source_url}>source ↗</SourceLink>}
+              )}
+              {c.facts.map((f) => (
+                <div key={f.id} className="grid grid-cols-[130px_1fr_auto] gap-3 border-b border-dashed border-border py-2 text-sm">
+                  <span className="font-mono text-xs text-muted-foreground">{f.field}</span>
+                  <span>{f.value}</span>
+                  <SourceLink href={f.source_url}>source ↗</SourceLink>
                 </div>
-                {p.status === "suggested" && sales && (
+              ))}
+            </div>
+            <div className="min-w-0 flex-[1_1_260px]">
+              <Eyebrow>People</Eyebrow>
+              {c.people.length === 0 && (
+                <p className="py-2 text-sm text-muted-foreground">
+                  None yet.{" "}
+                  {sales && <Link to="/o/$org/add" params={{ org }} search={{ company: c.name }}>Add someone</Link>}
+                </p>
+              )}
+              {c.people.map((p) => (
+                <div key={p.id} className="flex flex-col gap-1.5 border-b border-dashed border-border py-2.5 text-sm">
                   <div>
-                    <ActionButton size="xs" onClick={() => pick.mutate({ params: { path: { org, id: p.id }, query: { offering } } })}>
-                      Pick
-                    </ActionButton>
+                    <b>{p.name}</b>
+                    <span className="text-muted-foreground">{p.title ? `, ${p.title}` : ""}</span>
                   </div>
-                )}
-                {p.status === "suggested" && !sales && <Meta>suggested</Meta>}
-                {p.pending.map((d) => (
-                  <div key={d.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-card px-3 py-2">
-                    <span className="font-mono text-xs text-muted-foreground">{d.field}</span>
-                    <span>{d.value}</span>
-                    {d.vendor && <Pill>found by {vendorName(d.vendor)}</Pill>}
-                    {d.current && <Meta>now {d.current}</Meta>}
-                    {d.source_url && <SourceLink href={d.source_url}>source ↗</SourceLink>}
-                    {d.vendor && d.email_status && (
-                      <Meta className="w-full">
-                        {d.email_status === "verified" ? `${vendorName(d.vendor)} checked it: valid` : `${vendorName(d.vendor)} couldn't confirm it: a guess`}
-                      </Meta>
-                    )}
-                    {sales && (
-                      <span className="ml-auto flex gap-2">
-                        <ActionButton size="xs" onClick={() => decide.mutate({ params: { path: { org, id: d.id } }, body: { decision: "accepted" } })}>
-                          Accept
-                        </ActionButton>
-                        <ActionButton quiet size="xs" onClick={() => decide.mutate({ params: { path: { org, id: d.id } }, body: { decision: "dismissed" } })}>
-                          Dismiss
-                        </ActionButton>
-                      </span>
-                    )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {p.email_status === "verified" && <Pill tone="ok">email verified</Pill>}
+                    {p.email_status === "guess" && <Pill tone="warn">email is a guess</Pill>}
+                    {p.linkedin && <SourceLink href={p.linkedin}>LinkedIn ↗</SourceLink>}
+                    {p.source_url && <SourceLink href={p.source_url}>source ↗</SourceLink>}
                   </div>
-                ))}
-                <Lookups person={p} enrichers={enrichers} />
-              </div>
-            ))}
+                  {p.status === "suggested" && sales && (
+                    <div>
+                      <ActionButton size="xs" onClick={() => pick.mutate({ params: { path: { org, id: p.id }, query: { offering } } })}>
+                        Pick
+                      </ActionButton>
+                    </div>
+                  )}
+                  {p.status === "suggested" && !sales && <Meta>suggested</Meta>}
+                  {p.pending.map((d) => (
+                    <div key={d.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-card px-3 py-2">
+                      <span className="font-mono text-xs text-muted-foreground">{d.field}</span>
+                      <span>{d.value}</span>
+                      {d.vendor && <Pill>found by {vendorName(d.vendor)}</Pill>}
+                      {d.current && <Meta>now {d.current}</Meta>}
+                      {d.source_url && <SourceLink href={d.source_url}>source ↗</SourceLink>}
+                      {d.vendor && d.email_status && (
+                        <Meta className="w-full">
+                          {d.email_status === "verified" ? `${vendorName(d.vendor)} checked it: valid` : `${vendorName(d.vendor)} couldn't confirm it: a guess`}
+                        </Meta>
+                      )}
+                      {sales && (
+                        <span className="ml-auto flex gap-2">
+                          <ActionButton size="xs" onClick={() => decide.mutate({ params: { path: { org, id: d.id } }, body: { decision: "accepted" } })}>
+                            Accept
+                          </ActionButton>
+                          <ActionButton quiet size="xs" onClick={() => decide.mutate({ params: { path: { org, id: d.id } }, body: { decision: "dismissed" } })}>
+                            Dismiss
+                          </ActionButton>
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                  <Lookups person={p} enrichers={enrichers} />
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </details>
     </article>
   );
