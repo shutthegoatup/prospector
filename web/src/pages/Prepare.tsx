@@ -3,7 +3,7 @@ import { Link, useParams } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api, fetchClient } from "@/client";
 import { ActionButton, Eyebrow, Failed, Meta, PageHead, useRefresh, Whose } from "@/components/app";
-import { Bar, Loading, Text } from "@/components/app/skeleton";
+import { Bar, Loading, Placeholders, Text } from "@/components/app/skeleton";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/session";
 
@@ -90,7 +90,7 @@ export function PreparePage() {
   );
   // What follows depends on the agreement, so it appears below rather than pushing the head down.
   if (!a) return <Loading busy>{head}</Loading>;
-  const known = recipients.data !== undefined;
+  const known = recipients.data !== undefined || Boolean(recipients.error);
   const signed = new Set((fields ?? []).filter((f) => f.kind === "signature").map((f) => f.recipient_id));
   const missing = [
     ...(a.file_hash ? [] : ["Upload the PDF."]),
@@ -106,17 +106,22 @@ export function PreparePage() {
           {a.problem}
         </p>
       )}
+      {(recipients.error || stored.error) && (
+        <div className="mb-4">
+          <Failed errors={[recipients.error, stored.error]} />
+        </div>
+      )}
       <div className="flex flex-wrap items-start gap-5">
         <div className="flex max-w-full flex-[1_1_240px] flex-col gap-4 md:max-w-[260px]">
           <section className="flex flex-col gap-2 panel p-3.5">
             <Eyebrow>Signers</Eyebrow>
             {known && signers.length === 0 && <Meta>Nobody yet.</Meta>}
             {!known && (
-              <Loading busy className="flex flex-col gap-2">
+              <Placeholders className="flex flex-col gap-2">
                 {[0, 1].map((i) => (
                   <SignerRow key={`loading-${i}`} edit={edit} />
                 ))}
-              </Loading>
+              </Placeholders>
             )}
             {signers.map((s, i) => {
               const r = all.find((x) => x.id === s.id) as Recipient;
@@ -162,9 +167,9 @@ export function PreparePage() {
             <Eyebrow>Gets a copy</Eyebrow>
             {known && copies.length === 0 && <Meta>Nobody. Everyone who signs gets one anyway.</Meta>}
             {!known && (
-              <Loading busy>
+              <Placeholders>
                 <CopyRow />
-              </Loading>
+              </Placeholders>
             )}
             {copies.map((r) => (
               <CopyRow key={r.id} r={r}>

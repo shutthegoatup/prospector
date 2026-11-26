@@ -25,20 +25,22 @@ export function AddPage() {
   const draft = $api.useQuery("get", "/o/{org}/api/v1/people/draft", { params: { path: { org }, query } });
   const settings = $api.useQuery("get", "/o/{org}/api/v1/settings", { params: { path: { org } } });
   const ready = draft.data && settings.data ? { draft: draft.data, settings: settings.data } : undefined;
+  // A failed load shows its error in place of a form that could never fill.
+  const failed = !ready && (draft.error || settings.error);
 
   // Keyed on the data arriving, so the fields start from the draft once there is one.
-  const form = sales ? (
+  const form = failed ? null : sales ? (
     <AddForm key={ready ? "ready" : "loading"} draft={ready?.draft} settings={ready?.settings} popup={popup} />
   ) : (
     <p className="font-mono text-xs text-mark">Adding people is sales work. An owner can add sales to you on the Team list in Settings.</p>
   );
   if (popup) {
     return (
-      <Loading busy={!ready}>
+      <Loading busy={!ready && !failed}>
         <div className="mb-4 flex items-center gap-2.5">
           <OrgMark name={settings.data?.name} color={settings.data?.color} />
           <h1 className="font-heading text-xl font-bold">
-            Add to <Text value={settings.data?.name} w="8ch" />
+            Add to <Text value={settings.data?.name ?? (failed ? "" : undefined)} w="8ch" />
           </h1>
         </div>
         <Failed errors={[draft.error, settings.error]} />
@@ -50,9 +52,9 @@ export function AddPage() {
     <>
       <PageHead title="Add person" />
       <Failed errors={[draft.error, settings.error]} />
-      <Loading busy={!ready} className="flex flex-wrap items-start gap-8">
+      <Loading busy={!ready && !failed} className="flex flex-wrap items-start gap-8">
         <section className="min-w-0 flex-[999_1_480px] panel p-6">{form}</section>
-        {sales && <Faster name={settings.data?.name} bookmarklet={draft.data?.bookmarklet} />}
+        {sales && !failed && <Faster name={settings.data?.name} bookmarklet={draft.data?.bookmarklet} />}
       </Loading>
     </>
   );

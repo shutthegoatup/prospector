@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Failed, Meta, PageHead } from "@/components/app";
-import { Loading, placeholders, Text } from "@/components/app/skeleton";
+import { Placeholders, placeholders, Text } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
 import { plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -166,11 +166,11 @@ export function CompaniesPage() {
       <Failed errors={[list.error, segments.error]} />
       {list.data && list.data.items.length === 0 && <Empty title="No companies match" hint="Clear the filters, or add companies through Research or an agent." />}
       {!list.data && !list.error && (
-        <Loading busy className="divide-y divide-border overflow-hidden panel">
+        <Placeholders className="divide-y divide-border overflow-hidden panel">
           {Array.from({ length: placeholders }, (_, i) => (
             <CompanyRow key={i} />
           ))}
-        </Loading>
+        </Placeholders>
       )}
       {list.data && list.data.items.length > 0 && (
         <div className="divide-y divide-border overflow-hidden panel">

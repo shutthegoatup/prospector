@@ -5,7 +5,7 @@ import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, Meta, Pill, Section, useRefresh } from "@/components/app";
 import { Pager, Quote } from "@/components/app/more";
-import { Loading, placeholders, Text } from "@/components/app/skeleton";
+import { Loading, Placeholders, placeholders, Text } from "@/components/app/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { actor, ago, clock, plural, stamp } from "@/lib/format";
 import { useSession } from "@/session";
@@ -257,11 +257,11 @@ function Notes({ id }: { id: number }) {
     <Section title="Agents' notes" hint="What they skipped or couldn't find, in their words. Not checked by anyone.">
       {notes.data && items.length === 0 && <p className="text-sm text-muted-foreground">None.</p>}
       {!notes.data && !notes.error && (
-        <Loading busy className="flex flex-col gap-3">
+        <Placeholders className="flex flex-col gap-3">
           {Array.from({ length: placeholders }, (_, i) => (
             <NoteRow key={i} />
           ))}
-        </Loading>
+        </Placeholders>
       )}
       {items.map((n) => (
         <NoteRow key={n.id} n={n} onDelete={() => window.confirm("Delete this note?") && remove.mutate({ params: { path: { org, id: n.id } } })} />
@@ -403,11 +403,11 @@ function WorkSoFar({ id }: { id: number }) {
     <Section title="Work so far" hint="Each stretch of an agent's changes. An agent that is only reading doesn't show.">
       {work.data && items.length === 0 && <p className="text-sm text-muted-foreground">None yet.</p>}
       {!work.data && !work.error && (
-        <Loading busy className="flex flex-col gap-3">
+        <Placeholders className="flex flex-col gap-3">
           {Array.from({ length: placeholders }, (_, i) => (
             <WorkRow key={i} />
           ))}
-        </Loading>
+        </Placeholders>
       )}
       {items.map((w) => (
         <WorkRow key={`${w.actor} ${w.start}`} w={w} />

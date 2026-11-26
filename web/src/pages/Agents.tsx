@@ -3,7 +3,7 @@ import { type FormEvent, type ReactNode, useState } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, Meta, PageHead, Section, useRefresh } from "@/components/app";
-import { Bar, Loading, placeholders, Settled, Text } from "@/components/app/skeleton";
+import { Bar, Loading, Placeholders, placeholders, Settled, Text } from "@/components/app/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { actor, plural, stamp } from "@/lib/format";
@@ -39,7 +39,7 @@ export function AgentsPage() {
       <PageHead title="Agents & API" />
       <p className="mb-5 max-w-[72ch] text-sm text-muted-foreground">
         Agents research, add and draft for <b className="text-foreground">
-          <Text value={settings.data?.name} w="8ch" />
+          <Text value={settings.data?.name ?? (settings.error ? "" : undefined)} w="8ch" />
         </b>. Some Prospector runs itself; others are your own
         and connect with a key, which works for this organisation only. What any of them adds waits in Research for a person; agents can draft, but
         only people send.
@@ -47,19 +47,26 @@ export function AgentsPage() {
       {/* Its sections stack, and each list's length decides where the next one starts. */}
       <Settled className="flex flex-wrap items-start gap-5">
         <div className="flex min-w-0 flex-[3_1_560px] flex-col gap-5">
-          <Roster agents={agents.data?.items} keys={keys.data?.items} connect={connect.data} />
+          <Roster agents={agents.data?.items} keys={keys.data?.items} connect={connect.data} errors={[agents.error, keys.error, connect.error]} />
           <DataVendors />
         </div>
         <div className="flex min-w-0 flex-[2_1_340px] flex-col gap-5">
           <Scores />
           <Work />
           <Section title="Tools agents get" hint="Writes need a source URL, and go through this organisation's never-contact list.">
-            <Loading busy={!connect.data}>
-              {!connect.data && Array.from({ length: placeholders }, (_, i) => <ToolRow key={`loading-${i}`} />)}
+            <Loading busy={!connect.data && !connect.error}>
+              {!connect.data && !connect.error && (
+                <Placeholders>
+                  {Array.from({ length: placeholders }, (_, i) => (
+                    <ToolRow key={`loading-${i}`} />
+                  ))}
+                </Placeholders>
+              )}
               {connect.data?.tools.map((t) => (
                 <ToolRow key={t.name} t={t} />
               ))}
             </Loading>
+            <Failed errors={[connect.error]} />
           </Section>
           <Activity />
         </div>
@@ -89,9 +96,20 @@ function ToolRow({ t }: { t?: Connect["tools"][number] }) {
 
 // Roster is every agent in one list, each card's offset colour its state; while they load,
 // a tally and a couple of cards in outline.
-function Roster({ agents, keys, connect }: { agents?: Agent[]; keys?: Key[]; connect?: Connect }) {
+function Roster({
+  agents,
+  keys,
+  connect,
+  errors,
+}: {
+  agents?: Agent[];
+  keys?: Key[];
+  connect?: Connect;
+  errors: ({ detail?: string } | null | undefined)[];
+}) {
   const { owner } = useSession();
   const loaded = agents && keys && connect ? { agents, keys, connect } : undefined;
+  const loading = !loaded && !errors.some(Boolean);
   // Each of Prospector's agents has a built-in key of its own, shown on its card instead.
   const outside = loaded?.keys.filter((k) => !k.builtin) ?? [];
   const tally = (rail: Rail) => (loaded?.agents ?? []).filter((a) => a.state.rail === rail).length;
@@ -103,10 +121,10 @@ function Roster({ agents, keys, connect }: { agents?: Agent[]; keys?: Key[]; con
           This server has no secret key, so it can't keep an API key: whoever runs it needs to set PROSPECTOR_SECRET_KEYS first.
         </p>
       )}
-      {!loaded && (
-        <div aria-busy className="flex flex-wrap gap-2 font-mono text-xs">
+      {loading && (
+        <Placeholders className="flex flex-wrap gap-2 font-mono text-xs">
           <TallyChip text="ready" />
-        </div>
+        </Placeholders>
       )}
       {loaded && loaded.agents.length > 0 && (
         <div className="flex flex-wrap gap-2 font-mono text-xs" aria-label="Prospector's agents">
@@ -117,19 +135,20 @@ function Roster({ agents, keys, connect }: { agents?: Agent[]; keys?: Key[]; con
       )}
       <div className="flex flex-col gap-4">
         {none && <p className="text-sm text-muted-foreground">No agents yet.</p>}
-        {!loaded && (
-          <Loading busy className="flex flex-col gap-4">
+        {loading && (
+          <Placeholders className="flex flex-col gap-4">
             {[0, 1].map((i) => (
               <AgentCard key={`loading-${i}`} />
             ))}
-          </Loading>
+          </Placeholders>
         )}
         {loaded?.agents.map((a) => (
           <AgentCard key={a.id} agent={a} agents={loaded.agents} connect={loaded.connect} />
         ))}
         {loaded && outside.map((k) => <KeyCard key={k.id} k={k} scopes={loaded.connect.scopes} />)}
-        <AddAgent none={none} agents={loaded?.agents} connect={loaded?.connect} />
+        {(loaded || loading) && <AddAgent none={none} agents={loaded?.agents} connect={loaded?.connect} />}
       </div>
+      <Failed errors={errors} />
       <p className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground">
         <span>
           <i className="mr-1.5 inline-block h-2.5 w-3.5 rounded-sm border border-ink bg-[var(--ok-fill)] align-[-1px]" />
@@ -646,13 +665,20 @@ function Scores() {
   const scores = $api.useQuery("get", "/o/{org}/api/v1/agent-scores", { params: { path: { org }, query: { limit: 200 } } });
   return (
     <Section title="How each agent is doing" hint="What people did with each agent's suggestions. Use one key per outside agent to compare them.">
-      <Loading busy={!scores.data}>
+      <Loading busy={!scores.data && !scores.error}>
         {scores.data?.items.length === 0 && <p className="text-sm text-muted-foreground">Nothing suggested yet.</p>}
-        {!scores.data && [0, 1].map((i) => <ScoreRow key={`loading-${i}`} />)}
+        {!scores.data && !scores.error && (
+          <Placeholders>
+            {[0, 1].map((i) => (
+              <ScoreRow key={`loading-${i}`} />
+            ))}
+          </Placeholders>
+        )}
         {scores.data?.items.map((sc) => (
           <ScoreRow key={sc.agent} sc={sc} />
         ))}
       </Loading>
+      <Failed errors={[scores.error]} />
     </Section>
   );
 }
@@ -677,13 +703,20 @@ function Work() {
   const older = work.data?.next_cursor;
   return (
     <Section title="Recent agent work" hint="Each stretch of an agent's changes, and the task it was for. An agent that is only reading doesn't show.">
-      <Loading busy={!work.data}>
+      <Loading busy={!work.data && !work.error}>
         {work.data?.items.length === 0 && <p className="text-sm text-muted-foreground">None yet.</p>}
-        {!work.data && [0, 1, 2].map((i) => <WorkRow key={`loading-${i}`} />)}
+        {!work.data && !work.error && (
+          <Placeholders>
+            {[0, 1, 2].map((i) => (
+              <WorkRow key={`loading-${i}`} />
+            ))}
+          </Placeholders>
+        )}
         {work.data?.items.map((r, i) => (
           <WorkRow key={`${i}-${r.actor}-${r.start}`} r={r} />
         ))}
       </Loading>
+      <Failed errors={[work.error]} />
       {(cursor || older) && (
         <nav className="mt-3 flex flex-wrap items-center justify-between gap-3" aria-label="Runs">
           <span>
@@ -740,13 +773,20 @@ function Activity() {
   const next = activity.data?.next_cursor;
   return (
     <Section title="Recent agent activity">
-      <Loading busy={!activity.data}>
+      <Loading busy={!activity.data && !activity.error}>
         {activity.data?.items.length === 0 && <p className="text-sm text-muted-foreground">None yet.</p>}
-        {!activity.data && Array.from({ length: placeholders }, (_, i) => <ActivityRow key={`loading-${i}`} />)}
+        {!activity.data && !activity.error && (
+          <Placeholders>
+            {Array.from({ length: placeholders }, (_, i) => (
+              <ActivityRow key={`loading-${i}`} />
+            ))}
+          </Placeholders>
+        )}
         {activity.data?.items.map((e, i) => (
           <ActivityRow key={`${e.at}-${i}`} e={e} />
         ))}
       </Loading>
+      <Failed errors={[activity.error]} />
       {pages > 1 && (
         <nav className="mt-3 flex flex-wrap items-center justify-between gap-3" aria-label="Pages">
           <span>
@@ -833,12 +873,12 @@ function DataVendors() {
     >
       <div className="flex flex-col gap-4">
         {list.data && vendors.length === 0 && <p className="text-sm text-muted-foreground">No vendors yet.</p>}
-        {!list.data && (
-          <Loading busy className="flex flex-col gap-4">
+        {!list.data && !list.error && (
+          <Placeholders className="flex flex-col gap-4">
             {[0, 1].map((i) => (
               <VendorCard key={`loading-${i}`} n={i + 1} />
             ))}
-          </Loading>
+          </Placeholders>
         )}
         {vendors.map((e, i) => (
           <VendorCard

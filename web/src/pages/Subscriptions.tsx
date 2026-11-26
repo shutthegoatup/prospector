@@ -3,7 +3,7 @@ import { type ComponentProps, type ReactNode, useEffect, useRef, useState } from
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, PageHead, Pill, type Tone, useRefresh, Whose } from "@/components/app";
-import { Bar, Loading, placeholders, Text } from "@/components/app/skeleton";
+import { Bar, Placeholders, placeholders, Text } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
 import { plural } from "@/lib/format";
 import { useSession } from "@/session";
@@ -48,7 +48,7 @@ export function SubscriptionsPage() {
   return (
     <>
       <PageHead title="Subscriptions">
-        {(worth || !list.data) && (
+        {(worth || (!list.data && !list.error)) && (
           <span className="font-mono text-xs text-muted-foreground">
             <Text value={worth && `${worth} a year at today's prices`} w="26ch" />
           </span>
@@ -62,11 +62,11 @@ export function SubscriptionsPage() {
       <Failed errors={[list.error]} />
       {list.data && list.data.items.length === 0 && <Empty title="No subscriptions yet" hint="Open a company and record what they are on." />}
       {!list.data && !list.error && (
-        <Loading busy className="overflow-hidden panel">
+        <Placeholders className="overflow-hidden panel">
           {Array.from({ length: placeholders }, (_, i) => (
             <SubscriptionLine key={i} />
           ))}
-        </Loading>
+        </Placeholders>
       )}
       {list.data && list.data.items.length > 0 && (
         <div className="overflow-hidden panel">

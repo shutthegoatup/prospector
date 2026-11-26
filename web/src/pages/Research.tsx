@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, FilterChip, Meta, Meter, Pill, Section, type Tone, useRefresh, Whose } from "@/components/app";
-import { Bar, Loading, placeholders, Text } from "@/components/app/skeleton";
+import { Bar, Placeholders, placeholders, Text } from "@/components/app/skeleton";
 import { actor, day, stamp } from "@/lib/format";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -173,11 +173,11 @@ export function ResearchPage() {
               )}
               {research.error && <p className="text-sm text-[var(--stop)]">The queue couldn't be read. Reload to try again.</p>}
               {!cardsReady && !research.error && (
-                <Loading busy className="flex flex-col gap-3">
+                <Placeholders className="flex flex-col gap-3">
                   {Array.from({ length: placeholders }, (_, i) => (
                     <CompanyCard key={i} open={false} enrichers={[]} offering={0} />
                   ))}
-                </Loading>
+                </Placeholders>
               )}
               <div className="flex flex-col gap-3">
                 {cardsReady && research.data?.items.map((c, i) => <CompanyCard key={`${sellingId}-${c.id}`} company={c} open={i === 0} enrichers={enrichers} offering={research.data?.offering_id ?? 0} />)}

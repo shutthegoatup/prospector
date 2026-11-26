@@ -3,7 +3,7 @@ import { type FormEvent, type ReactNode, useState } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, Meta, PageHead, Pill, Section, useRefresh } from "@/components/app";
-import { Bar, Loading, Text } from "@/components/app/skeleton";
+import { Bar, Placeholders, Text } from "@/components/app/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -76,35 +76,38 @@ export function SettingsPage() {
   const settings = $api.useQuery("get", "/o/{org}/api/v1/settings", { params: { path: { org } } });
   const me = $api.useQuery("get", "/o/{org}/api/v1/me", { params: { path: { org } } });
   const name = settings.data?.name ?? "";
+  const answered = (q: { data?: unknown; error?: unknown }) => q.data !== undefined || Boolean(q.error);
   // Each section holds back the ones under it until its own shape is known: Password's
   // depends on you, and What you sell's hint on the organisation's name.
   return (
     <>
       <PageHead title="Settings">
-        <span className="text-sm text-muted-foreground">
-          For{" "}
-          <b className="text-foreground">
-            <Text value={settings.data?.name} w="8ch" />
-          </b>{" "}
-          only
-        </span>
+        {(settings.data || !settings.error) && (
+          <span className="text-sm text-muted-foreground">
+            For{" "}
+            <b className="text-foreground">
+              <Text value={settings.data?.name} w="8ch" />
+            </b>{" "}
+            only
+          </span>
+        )}
       </PageHead>
       <div className="flex max-w-3xl flex-col gap-5">
-        <Failed errors={[settings.error, me.error]} />
-        <Voice me={me.data} />
+        <Failed errors={[settings.error]} />
+        <Voice me={me.data} error={me.error} />
         {me.data && <Password me={me.data} />}
-        {me.data && <Organisation settings={settings.data} />}
-        {me.data && settings.data && <Rest orgName={name} me={me.data} settings={settings.data} />}
+        {answered(me) && <Organisation settings={settings.data} failed={Boolean(settings.error)} />}
+        {answered(me) && answered(settings) && <Rest orgName={name} me={me.data} settings={settings.data} />}
       </div>
     </>
   );
 }
 
-function Rest({ orgName, me, settings }: { orgName: string; me: Me; settings: Settings }) {
+function Rest({ orgName, me, settings }: { orgName: string; me?: Me; settings?: Settings }) {
   const { org, owner } = useSession();
   return (
     <>
-      <WhatYouSell orgName={orgName} />
+      {settings && <WhatYouSell orgName={orgName} />}
       {owner && <OutgoingMail orgName={orgName} />}
       {owner && (
         <Section title="Agents">
@@ -117,17 +120,17 @@ function Rest({ orgName, me, settings }: { orgName: string; me: Me; settings: Se
           </p>
         </Section>
       )}
-      <Sequence settings={settings} />
+      {settings && <Sequence settings={settings} />}
       <NotToBeMailed />
       {owner && <SingleSignOn />}
-      <Team me={me} orgName={orgName} />
+      {me && <Team me={me} orgName={orgName || "this organisation"} />}
       {owner && <YourData />}
     </>
   );
 }
 
 // Voice is drawn before you are read, its fields empty, pulsing and disabled.
-function Voice({ me }: { me?: Me }) {
+function Voice({ me, error }: { me?: Me; error?: { detail?: string } | null }) {
   const { org } = useSession();
   const refresh = useRefresh();
   const save = $api.useMutation("patch", "/o/{org}/api/v1/me", { onSuccess: refresh });
@@ -137,21 +140,25 @@ function Voice({ me }: { me?: Me }) {
     save.mutate({ params: { path: { org } }, body: { caller_name: text(f, "caller_name"), signature: text(f, "signature") } });
   };
   return (
-    <form key={me ? "me" : "loading"} onSubmit={submit} aria-busy={!me || undefined}>
+    <form key={me ? "me" : "loading"} onSubmit={submit} aria-busy={(!me && !error) || undefined}>
       <Section title="Your voice" hint="Yours in this organisation: used in call scripts and added to copied emails.">
-        <Row label="Caller name">
-          <Input name="caller_name" defaultValue={me?.caller_name} placeholder={me?.name} disabled={!me} className={cn(field, !me && "animate-pulse")} />
-        </Row>
-        <Row label="Signature">
-          <Textarea name="signature" rows={4} defaultValue={me?.signature} disabled={!me} className={cn(area, !me && "animate-pulse")} />
-        </Row>
-        <div className="flex items-center gap-3">
-          <ActionButton type="submit" size="sm" disabled={!me || save.isPending}>
-            Save
-          </ActionButton>
-          {save.isSuccess && <Said>{saved}</Said>}
-        </div>
-        <Failed errors={[save.error]} />
+        {!me && error ? null : (
+          <>
+            <Row label="Caller name">
+              <Input name="caller_name" defaultValue={me?.caller_name} placeholder={me?.name} disabled={!me} className={cn(field, !me && "animate-pulse")} />
+            </Row>
+            <Row label="Signature">
+              <Textarea name="signature" rows={4} defaultValue={me?.signature} disabled={!me} className={cn(area, !me && "animate-pulse")} />
+            </Row>
+            <div className="flex items-center gap-3">
+              <ActionButton type="submit" size="sm" disabled={!me || save.isPending}>
+                Save
+              </ActionButton>
+              {save.isSuccess && <Said>{saved}</Said>}
+            </div>
+          </>
+        )}
+        <Failed errors={[error, save.error]} />
       </Section>
     </form>
   );
@@ -207,10 +214,11 @@ function neverContactHint(covered: string[], total: number) {
   return hint + more + ".";
 }
 
-// Organisation is drawn before the settings come, its fields empty, pulsing and disabled.
-function Organisation({ settings: set }: { settings?: Settings }) {
+// Organisation is drawn before the settings come, its fields empty, pulsing and disabled;
+// if they fail it stays disabled, as saving it would blank them.
+function Organisation({ settings: set, failed }: { settings?: Settings; failed: boolean }) {
   const { org, owner } = useSession();
-  const loading = !set;
+  const loading = !set && !failed;
   const box = cn(field, loading && "animate-pulse");
   const areaBox = cn(area, loading && "animate-pulse");
   const refresh = useRefresh();
@@ -243,7 +251,7 @@ function Organisation({ settings: set }: { settings?: Settings }) {
   return (
     <form onSubmit={submit}>
       <Section title="Organisation" hint={owner ? "Shared by everyone in this organisation." : "Only an owner can change these."}>
-        <fieldset key={JSON.stringify(set)} disabled={!owner || loading} aria-busy={loading || undefined} className="flex flex-col gap-4">
+        <fieldset key={JSON.stringify(set)} disabled={!owner || !set} aria-busy={loading || undefined} className="flex flex-col gap-4">
           <Row label="Name">
             <Input name="name" required defaultValue={set?.name} className={box} />
           </Row>
@@ -375,7 +383,8 @@ function OutgoingMail({ orgName }: { orgName: string }) {
   const save = $api.useMutation("put", "/o/{org}/api/v1/mail-server", { onSuccess: refresh });
   const test = $api.useMutation("post", "/o/{org}/api/v1/mail-server/test");
   const m = mail.data;
-  const box = cn(field, !m && "animate-pulse");
+  const loading = !m && !mail.error;
+  const box = cn(field, loading && "animate-pulse");
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -394,7 +403,7 @@ function OutgoingMail({ orgName }: { orgName: string }) {
     <>
       <form onSubmit={submit}>
         <Section title="Outgoing mail" hint={m && mailHint(m)}>
-          <fieldset key={JSON.stringify(m)} disabled={!m} aria-busy={!m || undefined} className="flex flex-col gap-4">
+          <fieldset key={JSON.stringify(m)} disabled={!m} aria-busy={loading || undefined} className="flex flex-col gap-4">
             <Row label="Server">
               <span className="flex items-center gap-2">
                 <Input name="host" defaultValue={m?.host} placeholder="smtp.example.com" className={`${box} min-w-[200px] flex-1`} />
@@ -521,10 +530,10 @@ function WhatYouSell({ orgName }: { orgName: string }) {
       hint={`Everything above is ${orgName}'s own offering. Add another when you sell something else to companies you already know: each one is reviewed for on its own, with its own look-for fields, pitch and note, while facts and people are shared.`}
     >
       {list.data && rows.length === 0 && <p className="text-sm text-muted-foreground">Only {orgName}'s own.</p>}
-      {!list.data && (
-        <Loading busy>
+      {!list.data && !list.error && (
+        <Placeholders>
           <OfferingRow />
-        </Loading>
+        </Placeholders>
       )}
       {rows.map((o) => (
         <OfferingRow key={o.id} o={o} />
@@ -633,12 +642,12 @@ function NotToBeMailed() {
       hint="Marketing mail never goes to these addresses. Someone who unsubscribes by the link in a mail lands here and stays: only they can undo it. Your never-contact list and anyone erased are kept out as well."
     >
       {list.data && rows.length === 0 && <p className="text-sm text-muted-foreground">Nobody yet.</p>}
-      {!list.data && (
-        <Loading busy>
+      {!list.data && !list.error && (
+        <Placeholders>
           {[0, 1, 2].map((i) => (
             <SuppressionRow key={`loading-${i}`} />
           ))}
-        </Loading>
+        </Placeholders>
       )}
       {rows.length > 0 && (
         <div>
@@ -726,8 +735,8 @@ function Domains() {
   return (
     <div className="flex flex-col gap-2">
       <Eyebrow>Your domains</Eyebrow>
-      {!list.data && (
-        <Loading busy>
+      {!list.data && !list.error && (
+        <Placeholders>
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-dashed border-border py-1.5 text-sm">
             <span className="flex items-center gap-2">
               <b>
@@ -735,7 +744,7 @@ function Domains() {
               </b>
             </span>
           </div>
-        </Loading>
+        </Placeholders>
       )}
       {list.data?.items.map((d) => (
         <div key={d.domain} className="flex flex-wrap items-center justify-between gap-2 border-b border-dashed border-border py-1.5 text-sm">
@@ -897,12 +906,20 @@ function Team({ me, orgName }: { me: Me; orgName: string }) {
   };
   return (
     <Section title="Team">
-      <Loading busy={!members.data}>
-        {!members.data && [0, 1, 2].map((i) => <TeamMember key={`loading-${i}`} me={me} orgName={orgName} />)}
-        {members.data?.items.map((m) => (
-          <TeamMember key={m.user_id} m={m} me={me} orgName={orgName} />
-        ))}
-      </Loading>
+      {!members.data && !members.error && (
+        <Placeholders>
+          {[0, 1, 2].map((i) => (
+            <TeamMember key={`loading-${i}`} me={me} orgName={orgName} />
+          ))}
+        </Placeholders>
+      )}
+      {members.data && (
+        <div>
+          {members.data.items.map((m) => (
+            <TeamMember key={m.user_id} m={m} me={me} orgName={orgName} />
+          ))}
+        </div>
+      )}
       <Failed errors={[members.error]} />
       {owner && (
         <form onSubmit={submit} className="flex flex-wrap gap-2">

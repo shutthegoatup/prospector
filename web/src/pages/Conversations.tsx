@@ -3,7 +3,7 @@ import { type ReactNode, useEffect } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, PageHead, Pill, type Tone, useRefresh, Whose } from "@/components/app";
-import { Bar, Loading } from "@/components/app/skeleton";
+import { Bar, Loading, Placeholders } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/session";
@@ -128,7 +128,13 @@ export function ConversationsPage() {
                     )}
                   </span>
                 </div>
-                {loading && Array.from({ length: 3 }, (_, i) => <DealCard key={i} />)}
+                {loading && (
+                  <Placeholders className="flex flex-col gap-2.5">
+                    {Array.from({ length: 3 }, (_, i) => (
+                      <DealCard key={i} />
+                    ))}
+                  </Placeholders>
+                )}
                 {!loading && here.length === 0 && <p className="rounded-xl border border-dashed border-border p-3.5 font-mono text-xs text-muted-foreground">None</p>}
                 {here.map((c) =>
                   c.seq === 0 ? (

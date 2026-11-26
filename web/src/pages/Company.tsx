@@ -3,7 +3,7 @@ import { Link, useParams } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, Meta, Pill, type Tone, useRefresh } from "@/components/app";
-import { Text } from "@/components/app/skeleton";
+import { Placeholders, Text } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
 import { actor, plural, stamp } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -89,9 +89,9 @@ export function CompanyPage() {
     return (
       <>
         {back}
-        <div aria-busy className="mt-3 flex flex-col gap-5 panel p-6">
+        <Placeholders className="mt-3 flex flex-col gap-5 panel p-6">
           <Head />
-        </div>
+        </Placeholders>
       </>
     );
   }

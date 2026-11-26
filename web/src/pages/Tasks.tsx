@@ -5,7 +5,7 @@ import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, FilterChip, Meta, PageHead, Pill, type Tone, Whose } from "@/components/app";
 import { Pager } from "@/components/app/more";
-import { Bar, Loading, placeholders, Text } from "@/components/app/skeleton";
+import { Bar, Placeholders, placeholders, Text } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { actor, ago, plural } from "@/lib/format";
@@ -72,11 +72,11 @@ export function TasksPage() {
             <Empty title="No tasks yet" hint="Write a brief and hand it to your agent with the prompt on its page." />
           )}
           {!tasks.data && !tasks.error && (
-            <Loading busy className="flex flex-col gap-3">
+            <Placeholders className="flex flex-col gap-3">
               {Array.from({ length: placeholders }, (_, i) => (
                 <TaskCard key={i} />
               ))}
-            </Loading>
+            </Placeholders>
           )}
           {tasks.data?.items.map((t) => <TaskCard key={t.id} t={t} />)}
           <Pager cursor={cursor} next={tasks.data?.next_cursor} go={setCursor} />

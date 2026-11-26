@@ -72,8 +72,13 @@ export function CampaignsPage() {
       {/* Whether it can send yet comes with the list and sits above everything else, so
           nothing below the introduction is drawn until then, rather than drawn and pushed down. */}
       {!list.data && !list.error && <Loading busy>{null}</Loading>}
-      {list.data && (
+      {(list.data || list.error) && (
         <>
+          {list.error && (
+            <div className="mb-5">
+              <Failed errors={[list.error]} />
+            </div>
+          )}
           {notReady && (
             <p className="mb-5 max-w-[70ch] rounded-lg border border-border bg-muted px-3 py-2 text-sm">Not yet ready to send: {notReady}.</p>
           )}
@@ -105,8 +110,8 @@ export function CampaignsPage() {
               <Failed errors={[create.error]} />
             </form>
           )}
-          {list.data.items.length === 0 && <Empty title="No campaigns yet" hint="Start a draft above, then see who it would go to." />}
-          {list.data.items.map((c) => (c.status === "draft" ? <DraftCard key={c.id} c={c} ready={!notReady} /> : <SentCard key={c.id} c={c} />))}
+          {list.data?.items.length === 0 && <Empty title="No campaigns yet" hint="Start a draft above, then see who it would go to." />}
+          {list.data?.items.map((c) => (c.status === "draft" ? <DraftCard key={c.id} c={c} ready={!notReady} /> : <SentCard key={c.id} c={c} />))}
         </>
       )}
     </>
@@ -184,6 +189,7 @@ function DraftCard({ c, ready }: { c: Campaign; ready: boolean }) {
   const going = audience.data?.going ?? 0;
   const leftOut = audience.data?.left_out ?? 0;
   const shown = audience.data?.items ?? [];
+  const counted = audience.data !== undefined || Boolean(audience.error);
 
   return (
     <article className="panel mb-4 flex flex-col gap-3 p-4 text-sm">
@@ -250,8 +256,8 @@ function DraftCard({ c, ready }: { c: Campaign; ready: boolean }) {
       )}
       <details>
         <summary className="cursor-pointer font-mono text-xs text-muted-foreground">
-          Would go to <Text value={audience.data && plural(going, "person", "people")} w="9ch" />;{" "}
-          <Text value={audience.data?.left_out} w="2ch" /> left out
+          Would go to <Text value={counted ? plural(going, "person", "people") : undefined} w="9ch" />;{" "}
+          <Text value={counted ? leftOut : undefined} w="2ch" /> left out
         </summary>
         <div className="mt-2 flex flex-col">
           {shown.map((p) => (
@@ -280,7 +286,7 @@ function DraftCard({ c, ready }: { c: Campaign; ready: boolean }) {
           )}
         </div>
       )}
-      <Failed errors={[change.error, remove.error, send.error]} />
+      <Failed errors={[audience.error, change.error, remove.error, send.error]} />
     </article>
   );
 }

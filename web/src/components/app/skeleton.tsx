@@ -29,6 +29,16 @@ export function Loading({ busy, children, className }: { busy: boolean; children
   );
 }
 
+// Placeholders holds rows drawn without their data: out of the tab order and unannounced,
+// as their links and disclosures lead nowhere yet.
+export function Placeholders({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div aria-busy inert aria-hidden className={className}>
+      {children}
+    </div>
+  );
+}
+
 // Settled keeps a region hidden until the queries under way when it appeared have all
 // answered, for parts stacked on each other whose sizes only the data decides: they
 // then show at once, in place, instead of pushing each other about as each arrives.

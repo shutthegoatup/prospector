@@ -4,7 +4,7 @@ import { Link, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, FilterChip, Meta, PageHead, Pill, RailCard, useRefresh, Whose } from "@/components/app";
-import { Bar, Loading, placeholders, Settled, Text } from "@/components/app/skeleton";
+import { Bar, Placeholders, placeholders, Settled, Text } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { actor, plural } from "@/lib/format";
@@ -88,9 +88,12 @@ export function TodayPage() {
   }, [client]);
 
   // On LinkedIn adds: o opens the first card's profile and copies its note, a marks it added, s skips.
+  // Until a changed filter's list comes, the first card is still the old list's.
+  const stale = useRef(false);
+  stale.current = list.isPlaceholderData;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || typing()) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || typing() || stale.current) return;
       const button = document.querySelector<HTMLElement>(`#today-cards > :first-child [data-shortcut="${e.key}"]`);
       if (button) {
         e.preventDefault();
@@ -164,11 +167,11 @@ export function TodayPage() {
             <Empty title="Nothing due here" hint="Add someone from LinkedIn, or check Research for companies waiting on you." />
           )}
           {!list.data && !list.error && (
-            <Loading busy className="flex flex-col gap-4">
+            <Placeholders className="flex flex-col gap-4">
               {Array.from({ length: placeholders }, (_, i) => (
                 <TodayCard key={i} index={i} />
               ))}
-            </Loading>
+            </Placeholders>
           )}
           <div id="today-cards" className="flex flex-col gap-4">
             {cards.map((c, i) => (

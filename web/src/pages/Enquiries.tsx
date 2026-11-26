@@ -4,7 +4,7 @@ import { Link, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, FilterChip, Meta, PageHead, Pill, Quote, type Tone, useRefresh, Whose } from "@/components/app";
-import { Bar, Loading, placeholders } from "@/components/app/skeleton";
+import { Bar, Placeholders, placeholders } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { actor, dated, stamp } from "@/lib/format";
@@ -126,11 +126,11 @@ export function EnquiriesPage() {
         <Empty title="Nothing yet" hint="Enquiries appear here once a site listed in Settings posts one, or a key with the enquiries:write scope does." />
       )}
       {!list.data && !list.error && (
-        <Loading busy className="flex max-w-3xl flex-col gap-3">
+        <Placeholders className="flex max-w-3xl flex-col gap-3">
           {Array.from({ length: placeholders }, (_, i) => (
             <EnquiryCard key={i} members={[]} canReply={false} />
           ))}
-        </Loading>
+        </Placeholders>
       )}
       <div className="flex max-w-3xl flex-col gap-3">
         {list.data?.items.map((e) => <EnquiryCard key={e.id} e={e} members={members.map((m) => m.name)} canReply={list.data.can_reply} />)}

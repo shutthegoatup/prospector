@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, Meta, PageHead, Pill, type Tone, useRefresh, Whose } from "@/components/app";
-import { Bar, Loading, placeholders } from "@/components/app/skeleton";
+import { Bar, Placeholders, placeholders } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
 import { actor, plural } from "@/lib/format";
 import { useSession } from "@/session";
@@ -54,11 +54,11 @@ export function OnboardingPage() {
         <Empty title="Nobody is being onboarded" hint="Open a company and start one." />
       )}
       {loading ? (
-        <Loading busy className="flex max-w-3xl flex-col gap-3">
+        <Placeholders className="flex max-w-3xl flex-col gap-3">
           {Array.from({ length: placeholders }, (_, i) => (
             <OnboardingCard key={i} day={day} />
           ))}
-        </Loading>
+        </Placeholders>
       ) : (
         <div className="flex max-w-3xl flex-col gap-3">
           {list.data?.items.map((o) => <OnboardingCard key={o.id} o={o} day={day} />)}
