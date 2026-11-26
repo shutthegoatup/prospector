@@ -418,7 +418,7 @@ const heldLabel: Record<NonNullable<TaskCompany["held"]>, string> = {
 function LeftOutPanel({ id }: { id: number }) {
   const { org, sales } = useSession();
   const refresh = useRefresh();
-  const left = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}/left-out", { params: { path: { org, id } } });
+  const left = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}/left-out", { params: { path: { org, id }, query: { limit: 200 } } });
   const again = $api.useMutation("patch", "/o/{org}/api/v1/companies/{id}", { onSuccess: refresh });
   const d = left.data;
   if (!d) return null;
@@ -450,7 +450,7 @@ function LeftOutPanel({ id }: { id: number }) {
           </Link>
           <span className="flex items-baseline gap-2">
             <Meta>{c.held ? heldLabel[c.held] : ""}</Meta>
-            {sales && c.held === "rejected" && (
+            {sales && c.held === "rejected" && c.stage === "rejected" && (
               <ActionButton
                 quiet
                 size="sm"
@@ -463,6 +463,11 @@ function LeftOutPanel({ id }: { id: number }) {
           </span>
         </div>
       ))}
+      {d.next_cursor && (
+        <Link to="/o/$org/tasks/$id" params={{ org, id }} className="text-[13px] text-mark underline">
+          {held - d.items.length} more on the search's own page
+        </Link>
+      )}
       {refused > 0 && (
         <div className="flex flex-col gap-1 border-t border-dashed border-border pt-2 text-sm">
           {d.never_contact > 0 && (

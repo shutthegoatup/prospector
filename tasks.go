@@ -567,14 +567,17 @@ type TaskView struct {
 }
 
 // LeftOut are the companies the task came to that were already held, and still aren't
-// up for review: what it found that isn't new.
+// up for review, oldest find first: what it found that isn't new. One rejected before
+// that someone has since judged otherwise is theirs now, not left out.
 func (v TaskView) LeftOut() []TaskCompany {
 	var out []TaskCompany
 	for _, c := range v.Companies {
-		if c.Held != "" && c.Stage != CompanyReview {
-			out = append(out, c)
+		if c.Held == "" || c.Stage == CompanyReview || (c.Held == heldRejected && c.Stage != CompanyRejected) {
+			continue
 		}
+		out = append(out, c)
 	}
+	slices.SortStableFunc(out, func(a, b TaskCompany) int { return a.Since.Compare(b.Since) })
 	return out
 }
 

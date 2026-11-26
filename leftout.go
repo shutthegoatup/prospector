@@ -40,6 +40,23 @@ func (s *Store) heldWhenFound(tx *gorm.DB, org int64, who Actor, c *Company, sta
 	return s.logAs(tx, org, 0, &c.ID, who, actionHeld, &why)
 }
 
+// heldWhenReached is heldWhenFound for a company an agent reaches through a fact or a
+// person rather than by adding it, judged by the task's offering as add_company is.
+func (s *Store) heldWhenReached(tx *gorm.DB, org int64, who Actor, c *Company) error {
+	if who.Task == 0 {
+		return nil
+	}
+	stage := c.Stage
+	if who.Offering != 0 {
+		stages, err := offeringStages(tx, org, who.Offering, []int64{c.ID})
+		if err != nil {
+			return err
+		}
+		stage = stages[c.ID]
+	}
+	return s.heldWhenFound(tx, org, who, c, stage)
+}
+
 // heldAs is why a company that isn't up for review isn't new: a verdict against it
 // first, then whether it is a customer or in a conversation, else it is qualified.
 func heldAs(tx *gorm.DB, org int64, c *Company, stage string) (string, error) {

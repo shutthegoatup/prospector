@@ -90,6 +90,40 @@ func TestASearchLeavesOutWhatWasAlreadyHere(t *testing.T) {
 	if !strings.Contains(queue, "Corvane Marine") {
 		t.Errorf("Corvane should wait in this search's review: %s", queue)
 	}
+	// Qualified after another look, it is someone's decision now, not something left out.
+	if err := s.SetCompanyStage(o.ID, rejected.ID, CompanyQualified, "", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if again := leftOutOf(t, ada, srv.URL, task.Id); again.Body.Rejected != 0 || len(again.Body.Items) != 2 {
+		t.Errorf("Corvane, qualified after review, came back as rejected before: %+v", again)
+	}
+}
+
+// An agent can reach a company first through a person or a fact; it is judged the same
+// as one it adds, so a customer reached that way isn't a new find either.
+func TestACompanyReachedThroughAPersonIsHeldToo(t *testing.T) {
+	s, o, srv, ada := signedIn(t)
+	scout := Actor{Name: "agent:scout", KeyID: 1}
+	belair := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Belair Kitchens", Domain: "belair.example"}))
+	if err := s.SetCompanyStage(o.ID, belair.ID, CompanyQualified, "", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	must(s.AddSubscription(o.ID, SubscriptionIn{Company: belair.ID, Name: "Support", Amount: "1200", Per: PerYear, Start: time.Now().Format(dayLayout), TermMonths: 12, Then: ThenRenews}, "Ada Lovelace"))
+	quiet := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Fennholt Campers", Domain: "fennholt.example"}))
+	if err := s.SetCompanyStage(o.ID, quiet.ID, CompanyQualified, "", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+
+	task := must(s.CreateTask(o.ID, "", "Kitchen makers.", "Ada Lovelace"))
+	must(s.AgentAddContact(o, scout, AddContactIn{Company: "Belair Kitchens", Name: "Mara Quist", SourceURL: "https://belair.example/team", Task: task.ID}))
+	must(s.AgentAddFact(o.ID, scout, AddFactIn{Company: "Fennholt Campers", FactIn: FactIn{Field: "size", Value: "12 staff", SourceURL: "https://fennholt.example/about"}, Task: task.ID}))
+	// Added afterwards, it is already this task's: nothing changes.
+	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Belair Kitchens", Task: task.ID}))
+
+	left := leftOutOf(t, ada, srv.URL, task.ID)
+	if left.Body.Customer != 1 || left.Body.Qualified != 1 || len(left.Body.Items) != 2 {
+		t.Errorf("Belair reached through a person is a customer, Fennholt through a fact qualified already: %+v", left)
+	}
 }
 
 // A rejection for another offering says nothing about this one, so a company rejected

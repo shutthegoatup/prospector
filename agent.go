@@ -237,6 +237,9 @@ func (s *Store) AgentAddFact(org int64, who Actor, in AddFactIn) (*AddFactOut, e
 		if err := forOffering(tx, org, who, c.ID); err != nil {
 			return err
 		}
+		if err := s.heldWhenReached(tx, org, who, c); err != nil {
+			return err
+		}
 		f, had, err := addFact(tx, org, c.ID, in.FactIn, who.Name)
 		if err != nil {
 			return err
@@ -333,6 +336,9 @@ func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContact
 			return err
 		}
 		if err := forOffering(tx, o.ID, who, c.ID); err != nil {
+			return err
+		}
+		if err := s.heldWhenReached(tx, o.ID, who, c); err != nil {
 			return err
 		}
 		var people []Contact
