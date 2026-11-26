@@ -310,6 +310,50 @@ func (s *Store) researchFor(org int64, filter string, page int, task int64) ([]R
 	return rows, pg, err
 }
 
+// searchFitCap is how many companies to review one search may have and still be ranked
+// by fit; past it, they come newest first as everywhere else.
+const searchFitCap = 500
+
+// rankedResearch is one search's companies to review, best fit first: fit is worked
+// out from facts, so they are ranked here rather than in SQL.
+func (s *Store) rankedResearch(org int64, set OrgSettings, task int64, page int) ([]ResearchRow, Page, bool, error) {
+	q, order, err := s.researchQuery(org, "review", task)
+	if err != nil {
+		return nil, Page{}, false, err
+	}
+	var total int64
+	if err := q.Session(&gorm.Session{}).Count(&total).Error; err != nil {
+		return nil, Page{}, false, err
+	}
+	if total > searchFitCap {
+		rows, pg, err := s.researchFor(org, "review", page, task)
+		return rows, pg, false, err
+	}
+	var companies []Company
+	if err := q.Order(order).Limit(searchFitCap).Find(&companies).Error; err != nil {
+		return nil, Page{}, false, err
+	}
+	rows, err := s.researchRows(org, companies)
+	if err != nil {
+		return nil, Page{}, false, err
+	}
+	fits := make(map[int64]Fit, len(rows))
+	for _, r := range rows {
+		fits[r.ID] = fitOf(assetsFound(set, r.Facts))
+	}
+	slices.SortStableFunc(rows, func(a, b ResearchRow) int {
+		switch {
+		case fits[a.ID].better(fits[b.ID]):
+			return -1
+		case fits[b.ID].better(fits[a.ID]):
+			return 1
+		}
+		return 0
+	})
+	pg := pageOf(page, researchPageSize, len(rows))
+	return rows[pg.offset():min(len(rows), pg.offset()+pg.Size)], pg, true, nil
+}
+
 func (s *Store) ResearchCount(org int64, filter string) int {
 	return s.researchCount(org, filter, 0)
 }
