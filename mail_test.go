@@ -68,6 +68,18 @@ func linkIn(t *testing.T, m sent) string {
 	return found[1]
 }
 
+// askReset asks for a link to choose a new password, as the forgot page does.
+func askReset(t *testing.T, srv *httptest.Server, email string) (int, string) {
+	t.Helper()
+	return call(t, http.DefaultClient, "POST", srv.URL+"/api/v1/password-resets", "application/json", map[string]string{"email": email})
+}
+
+// choose sets a password from an emailed link, as the page the link opens does.
+func choose(t *testing.T, srv *httptest.Server, link, password string) (int, string) {
+	t.Helper()
+	return call(t, http.DefaultClient, "POST", srv.URL+"/api/v1/password-resets/"+strings.TrimPrefix(link, "/reset/"), "application/json", map[string]string{"password": password})
+}
+
 var mailTestKey = strings.Repeat("ab", 32)
 
 // mailSite is signedIn with mail configured: Ada owns alpha and is signed in.
@@ -102,7 +114,7 @@ func newMailClient() *http.Client {
 
 func signIn(t *testing.T, c *http.Client, srv *httptest.Server, email, password string) bool {
 	t.Helper()
-	res, err := c.PostForm(srv.URL+"/login", url.Values{"email": {email}, "password": {password}})
+	res, err := signInWith(c, srv.URL, email, password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,11 +146,11 @@ func TestMailIsOffUntilConfigured(t *testing.T) {
 		if code, _ := call(t, http.DefaultClient, "GET", srv.URL+"/forgot", "", nil); code != http.StatusNotFound {
 			t.Errorf("%s: GET /forgot: %d", name, code)
 		}
-		if code, _ := postForm(t, http.DefaultClient, srv.URL+"/forgot", url.Values{"email": {"ada@example.com"}}); code != http.StatusNotFound {
+		if code, _ := askReset(t, srv, "ada@example.com"); code != http.StatusNotFound {
 			t.Errorf("%s: POST /forgot: %d", name, code)
 		}
-		if _, body := call(t, http.DefaultClient, "GET", srv.URL+"/login", "", nil); strings.Contains(body, "/forgot") {
-			t.Errorf("%s: the sign-in page offers a reset it can't send", name)
+		if _, body := call(t, http.DefaultClient, "GET", srv.URL+"/api/v1/sign-in", "", nil); !strings.Contains(body, `"forgot":false`) {
+			t.Errorf("%s: the sign-in page offers a reset it can't send: %s", name, body)
 		}
 		// A new member's first password is still shown, as before there was mail.
 		code, body := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json", map[string]string{"email": "grace@example.com", "name": "Grace"})
@@ -151,21 +163,21 @@ func TestMailIsOffUntilConfigured(t *testing.T) {
 
 func TestPasswordReset(t *testing.T) {
 	s, srv, ada, box := mailSite(t, nil)
-	if _, body := call(t, http.DefaultClient, "GET", srv.URL+"/login", "", nil); !strings.Contains(body, `href="/forgot"`) {
+	if _, body := call(t, http.DefaultClient, "GET", srv.URL+"/api/v1/sign-in", "", nil); !strings.Contains(body, `"forgot":true`) {
 		t.Fatal("the sign-in page doesn't offer a reset")
 	}
 
 	// A stranger learns nothing: the answer is the same, and nothing is sent.
-	_, unknown := postForm(t, http.DefaultClient, srv.URL+"/forgot", url.Values{"email": {"nobody@example.com"}})
+	_, unknown := askReset(t, srv, "nobody@example.com")
 	box.take(t, 0)
 
 	// The link points at PROSPECTOR_URL whatever host the request named.
-	req, _ := http.NewRequest("POST", srv.URL+"/forgot", strings.NewReader("email=Ada%40Example.com"))
-	req.Header.Set("content-type", "application/x-www-form-urlencoded")
+	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/password-resets", strings.NewReader(`{"email": "Ada@Example.com"}`))
+	req.Header.Set("content-type", "application/json")
 	req.Host = "evil.example"
 	res, err := http.DefaultClient.Do(req)
-	if err != nil || res.StatusCode != http.StatusOK {
-		t.Fatalf("POST /forgot: %v %v", res, err)
+	if err != nil || res.StatusCode != http.StatusAccepted {
+		t.Fatalf("asking for a link: %v %v", res, err)
 	}
 	var known strings.Builder
 	bufio.NewReader(res.Body).WriteTo(&known)
@@ -180,7 +192,7 @@ func TestPasswordReset(t *testing.T) {
 	link := linkIn(t, mail)
 
 	// Asking again straight away sends nothing more.
-	postForm(t, http.DefaultClient, srv.URL+"/forgot", url.Values{"email": {"ada@example.com"}})
+	askReset(t, srv, "ada@example.com")
 	box.take(t, 0)
 
 	// The token is stored hashed.
@@ -191,25 +203,23 @@ func TestPasswordReset(t *testing.T) {
 
 	// Opening the link, as a mail scanner does, doesn't spend it.
 	for range 2 {
-		if code, body := call(t, http.DefaultClient, "GET", srv.URL+link, "", nil); code != http.StatusOK || !strings.Contains(body, "ada@example.com") {
+		if code, _ := call(t, http.DefaultClient, "GET", srv.URL+link, "", nil); code != http.StatusOK {
 			t.Fatalf("GET %s: %d", link, code)
 		}
+		if code, body := call(t, http.DefaultClient, "GET", srv.URL+"/api/v1/password-resets/"+strings.TrimPrefix(link, "/reset/"), "", nil); code != http.StatusOK || !strings.Contains(body, "ada@example.com") {
+			t.Fatalf("whose link %s is: %d %s", link, code, body)
+		}
 	}
-	if code, body := postForm(t, http.DefaultClient, srv.URL+link, url.Values{"password": {"short"}}); code != http.StatusBadRequest || !strings.Contains(body, "10 characters") {
+	if code, body := choose(t, srv, link, "short"); code != http.StatusBadRequest || !strings.Contains(body, "10 characters") {
 		t.Fatalf("a short password: %d", code)
 	}
-	if code, _ := postForm(t, http.DefaultClient, srv.URL+link+"x", url.Values{"password": {"a brand new password"}}); code != http.StatusGone {
+	if code, _ := choose(t, srv, link+"x", "a brand new password"); code != http.StatusGone {
 		t.Fatalf("a made-up link: %d", code)
 	}
 
-	stay := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	req, _ = http.NewRequest("POST", srv.URL+link, strings.NewReader("password=a+brand+new+password"))
-	req.Header.Set("content-type", "application/x-www-form-urlencoded")
-	res, err = stay.Do(req)
-	if err != nil || res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/login?reset=1" {
-		t.Fatalf("choosing a password: %v %v", res, err)
+	if code, body := choose(t, srv, link, "a brand new password"); code != http.StatusNoContent {
+		t.Fatalf("choosing a password: %d %s", code, body)
 	}
-	res.Body.Close()
 
 	if code, _ := call(t, ada, "GET", srv.URL+"/o/alpha/api/v1/me", "", nil); code != http.StatusUnauthorized {
 		t.Error("the session from before the reset still works")
@@ -220,7 +230,7 @@ func TestPasswordReset(t *testing.T) {
 	if !signIn(t, newMailClient(), srv, "ada@example.com", "a brand new password") {
 		t.Error("the new password doesn't work")
 	}
-	if code, _ := postForm(t, http.DefaultClient, srv.URL+link, url.Values{"password": {"yet another password"}}); code != http.StatusGone {
+	if code, _ := choose(t, srv, link, "yet another password"); code != http.StatusGone {
 		t.Errorf("the link worked twice: %d", code)
 	}
 	// A browser is told what happened to the link, on a page like the rest.
@@ -263,9 +273,9 @@ func TestResetLinksEnd(t *testing.T) {
 func TestSignedOutFormsRefuseOtherSites(t *testing.T) {
 	s, srv, _, box := mailSite(t, nil)
 	token := must(s.InviteToken(must(s.UserByEmail("ada@example.com")).ID))
-	for _, path := range []string{"/forgot", "/reset/" + token} {
-		req, _ := http.NewRequest("POST", srv.URL+path, strings.NewReader("email=ada%40example.com&password=chosen+by+another+site"))
-		req.Header.Set("content-type", "application/x-www-form-urlencoded")
+	for _, path := range []string{"/api/v1/password-resets", "/api/v1/password-resets/" + token} {
+		req, _ := http.NewRequest("POST", srv.URL+path, strings.NewReader(`{"email": "ada@example.com", "password": "chosen by another site"}`))
+		req.Header.Set("content-type", "application/json")
 		req.Header.Set("Sec-Fetch-Site", "cross-site")
 		req.Header.Set("Origin", "https://evil.example")
 		res, err := http.DefaultClient.Do(req)
@@ -307,7 +317,7 @@ func TestInvitationByEmail(t *testing.T) {
 	if mail.To != "grace@example.com" || !strings.Contains(mail.Subject, "Ada Lovelace added you to Alpha") {
 		t.Fatalf("invitation: %+v", mail)
 	}
-	if code, _ := postForm(t, http.DefaultClient, srv.URL+linkIn(t, mail), url.Values{"password": {"grace's own password"}}); code != http.StatusOK {
+	if code, _ := choose(t, srv, linkIn(t, mail), "grace's own password"); code != http.StatusNoContent {
 		t.Fatalf("choosing a password from the invitation: %d", code)
 	}
 	grace := newMailClient()
@@ -419,7 +429,7 @@ func TestOrganisationMailServer(t *testing.T) {
 		t.Fatalf("sent through %+v", via)
 	}
 	// A reset is the account's, not an organisation's, so it stays with the site.
-	postForm(t, http.DefaultClient, srv.URL+"/forgot", url.Values{"email": {"ada@example.com"}})
+	askReset(t, srv, "ada@example.com")
 	if via := box.take(t, 1)[0].via; via.Host != "smtp.site.example" {
 		t.Fatalf("a reset was sent through %+v", via)
 	}
@@ -523,9 +533,9 @@ func TestAResetGivesAProviderOnlyAccountAPassword(t *testing.T) {
 	if err := s.db.Model(&User{}).Where("id = ?", dan.ID).Update("password_hash", unusableHash()).Error; err != nil {
 		t.Fatal(err)
 	}
-	postForm(t, http.DefaultClient, srv.URL+"/forgot", url.Values{"email": {"dan@example.com"}})
+	askReset(t, srv, "dan@example.com")
 	link := linkIn(t, box.take(t, 1)[0])
-	if code, _ := postForm(t, http.DefaultClient, srv.URL+link, url.Values{"password": {"dan's chosen password"}}); code != http.StatusOK {
+	if code, _ := choose(t, srv, link, "dan's chosen password"); code != http.StatusNoContent {
 		t.Fatalf("choosing a password: %d", code)
 	}
 	if u := must(s.UserByEmail("dan@example.com")); !u.HasPassword() {

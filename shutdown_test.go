@@ -29,8 +29,8 @@ func TestStoppingFinishesWhatIsInHand(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	form := "email=nobody%40larkmoor.example&password=wrong"
-	fmt.Fprintf(conn, "POST /login HTTP/1.1\r\nHost: %s\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: %d\r\n\r\n%s",
+	form := `{"email": "nobody@larkmoor.example", "password": "wrong"}`
+	fmt.Fprintf(conn, "POST /api/v1/session HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s",
 		ln.Addr(), len(form), form[:10])
 	a.sending.Add(1)
 	time.Sleep(100 * time.Millisecond)
@@ -85,7 +85,7 @@ func TestStoppingDoesntWaitForeverForAStream(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	fmt.Fprintf(conn, "POST /login HTTP/1.1\r\nHost: %s\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 100\r\n\r\nemail=", ln.Addr())
+	fmt.Fprintf(conn, "POST /api/v1/session HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\nemail=", ln.Addr())
 	time.Sleep(100 * time.Millisecond)
 	stop()
 	select {

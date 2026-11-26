@@ -54,11 +54,10 @@ func TestLoginSlowsGuessing(t *testing.T) {
 	t.Cleanup(srv.Close)
 	attempt := func(email, password string) (int, error) {
 		jar, _ := cookiejar.New(nil)
-		res, err := (&http.Client{Jar: jar}).PostForm(srv.URL+"/login", url.Values{"email": {email}, "password": {password}})
+		res, err := signInWith(&http.Client{Jar: jar}, srv.URL, email, password)
 		if err != nil {
 			return 0, err
 		}
-		res.Body.Close()
 		return res.StatusCode, nil
 	}
 	try := func(email, password string) int {
@@ -142,13 +141,13 @@ func TestLoginSlowsGuessing(t *testing.T) {
 			t.Fatalf("a %d-byte key is held in memory", len(key))
 		}
 	}
-	big, err := http.Post(srv.URL+"/login", "application/x-www-form-urlencoded", strings.NewReader("email="+strings.Repeat("x", 1<<17)))
+	big, err := http.Post(srv.URL+"/api/v1/session", "application/json", strings.NewReader(`{"email": "`+strings.Repeat("x", 1<<17)+`", "password": "x"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	big.Body.Close()
 	if big.StatusCode != http.StatusBadRequest {
-		t.Fatalf("an oversized sign-in form got %d", big.StatusCode)
+		t.Fatalf("an oversized sign-in got %d", big.StatusCode)
 	}
 }
 
@@ -159,7 +158,7 @@ func TestChangePassword(t *testing.T) {
 		t.Fatal(err)
 	}
 	change := func(current, password string) int {
-		code, _ := call(t, client, "POST", srv.URL+"/password", "application/json", map[string]string{"current": current, "new": password})
+		code, _ := call(t, client, "PUT", srv.URL+"/api/v1/password", "application/json", map[string]string{"current": current, "new": password})
 		return code
 	}
 	if code := change("wrong", "a brand new password"); code != http.StatusBadRequest {
@@ -168,7 +167,7 @@ func TestChangePassword(t *testing.T) {
 	if code := change("correct horse battery", "short"); code != http.StatusBadRequest {
 		t.Fatalf("short password: %d", code)
 	}
-	if code := change("correct horse battery", "a brand new password"); code != http.StatusOK {
+	if code := change("correct horse battery", "a brand new password"); code != http.StatusNoContent {
 		t.Fatalf("change: %d", code)
 	}
 	if code, _ := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/me", "", nil); code != http.StatusOK {
@@ -197,7 +196,7 @@ func TestChangePassword(t *testing.T) {
 	// Guessing the current password from an open session is slowed like guessing at sign-in.
 	_, _, srv, client = signedIn(t)
 	guess := func() int {
-		code, _ := call(t, client, "POST", srv.URL+"/password", "application/json", map[string]string{"current": "a guess", "new": "a brand new password"})
+		code, _ := call(t, client, "PUT", srv.URL+"/api/v1/password", "application/json", map[string]string{"current": "a guess", "new": "a brand new password"})
 		return code
 	}
 	for i := range freeAttempts {
@@ -405,22 +404,14 @@ func TestLoginRedirects(t *testing.T) {
 	if err != nil || to.Path != "/login" || to.Query().Get("next") != wanted {
 		t.Fatalf("signed out, sent to %q", res.Header.Get("Location"))
 	}
-	login := func(next string) string {
-		res, err := stay.PostForm(srv.URL+"/login", url.Values{"email": {"ada@example.com"}, "password": {"correct horse battery"}, "next": {next}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		res.Body.Close()
-		if res.StatusCode != http.StatusSeeOther {
-			t.Fatalf("login: %d", res.StatusCode)
-		}
-		return res.Header.Get("Location")
+	// The sign-in page goes on to next itself, through safeNext in web/src/lib/next.ts.
+	if res, err := stay.Get(srv.URL + to.String()); err != nil || res.StatusCode != http.StatusOK {
+		t.Fatalf("the sign-in page it was sent to: %v %v", res, err)
 	}
-	if got := login(wanted); got != wanted {
-		t.Fatalf("after signing in, sent to %q", got)
-	}
-	if got := login("/\t/evil.example"); got != "/" {
-		t.Fatalf("a tab in next sent the browser to %q", got)
+	for next, want := range map[string]string{wanted: wanted, "/\t/evil.example": "/", "//evil.example": "/"} {
+		if got := safeNext(next); got != want {
+			t.Errorf("safeNext(%q) = %q, want %q", next, got, want)
+		}
 	}
 }
 
@@ -440,7 +431,7 @@ func TestRemoveMember(t *testing.T) {
 		}
 		jar, _ := cookiejar.New(nil)
 		client := &http.Client{Jar: jar}
-		res, err := client.PostForm(srv.URL+"/login", url.Values{"email": {email}, "password": {"correct horse battery"}})
+		res, err := signInWith(client, srv.URL, email, "correct horse battery")
 		if err != nil || res.StatusCode != http.StatusOK {
 			t.Fatalf("login %s: %v", email, err)
 		}
@@ -714,7 +705,7 @@ func TestContentPolicy(t *testing.T) {
 	if err := s.db.Model(&User{}).Where("email = ?", "ada@example.com").Update("must_change_password", true).Error; err != nil {
 		t.Fatal(err)
 	}
-	check("/password", "Choose your own password")
+	check("/password", `<div id="app"></div>`)
 }
 
 func TestOrgIsCreatedWithItsOwner(t *testing.T) {
@@ -838,24 +829,24 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 	given := strings.Fields(after)[0]
 	jar, _ := cookiejar.New(nil)
 	bob := &http.Client{Jar: jar}
-	res, err := bob.PostForm(srv.URL+"/login", url.Values{"email": {"bob@example.com"}, "password": {given}})
+	res, err := signInWith(bob, srv.URL, "bob@example.com", given)
 	if err != nil {
 		t.Fatal(err)
 	}
 	landing, _ := io.ReadAll(res.Body)
-	res.Body.Close()
-	if !strings.Contains(string(landing), "Choose your own password") {
-		t.Fatal("a new member's first sign-in didn't land on the password page")
+	if !strings.Contains(string(landing), `"must_change_password":true`) {
+		t.Fatalf("a new member's first sign-in didn't say a password must be chosen: %s", landing)
 	}
-	page := func(path string) string {
-		_, body := call(t, bob, "GET", srv.URL+path, "", nil)
-		return body
+	// landsOn is where a page sends Bob, after any redirects.
+	landsOn := func(path string) string {
+		res, _ := get(t, bob, srv.URL+path)
+		return res.Request.URL.Path
 	}
 	change := func(current, password string) (int, string) {
-		return call(t, bob, "POST", srv.URL+"/password", "application/json", map[string]string{"current": current, "new": password})
+		return call(t, bob, "PUT", srv.URL+"/api/v1/password", "application/json", map[string]string{"current": current, "new": password})
 	}
 	for _, path := range []string{"/", "/o/alpha/today", "/o/alpha/settings"} {
-		if !strings.Contains(page(path), "Choose your own password") {
+		if landsOn(path) != "/password" {
 			t.Fatalf("%s is open before the first password is changed", path)
 		}
 	}
@@ -868,13 +859,13 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 	if code, _ := change(given, given); code != http.StatusBadRequest {
 		t.Fatalf("keeping the given password: %d", code)
 	}
-	if !strings.Contains(page("/o/alpha/today"), "Choose your own password") {
+	if landsOn("/o/alpha/today") != "/password" {
 		t.Fatal("a refused change opened the app")
 	}
-	if code, body := change(given, "a password of my own"); code != http.StatusOK || !strings.Contains(body, `"go":"/"`) {
+	if code, body := change(given, "a password of my own"); code != http.StatusNoContent {
 		t.Fatalf("choosing a password: %d %s", code, body)
 	}
-	if body := page("/o/alpha/settings"); !strings.Contains(body, `<div id="app"></div>`) || strings.Contains(body, "Choose your own password") {
+	if landsOn("/o/alpha/settings") != "/o/alpha/settings" || landsOn("/password") == "/password" {
 		t.Fatal("the app is still closed after choosing a password")
 	}
 	if code, body := call(t, bob, "GET", srv.URL+"/o/alpha/api/v1/me", "", nil); code != http.StatusOK || !strings.Contains(body, `"has_password":true`) {
@@ -886,7 +877,7 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 	if _, _, err := s.Login("bob@example.com", given); err == nil {
 		t.Fatal("the password the inviter saw still signs in")
 	}
-	if code, body := change("a password of my own", "another of my own"); code != http.StatusOK || !strings.Contains(body, "Password changed") {
+	if code, body := change("a password of my own", "another of my own"); code != http.StatusNoContent {
 		t.Fatalf("an ordinary change afterwards: %d %s", code, body)
 	}
 
@@ -900,10 +891,10 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 		map[string]string{"email": "bob@example.com", "role": "member"}); code != http.StatusCreated || strings.Contains(body, "shown once") {
 		t.Fatalf("adding an existing account: %d %s", code, body)
 	}
-	if body := page("/o/beta/settings"); !strings.Contains(body, `<div id="app"></div>`) || strings.Contains(body, "Choose your own password") {
+	if landsOn("/o/beta/settings") != "/o/beta/settings" {
 		t.Fatal("an existing account was asked to choose a password again")
 	}
-	if _, body := call(t, ada, "GET", srv.URL+"/password", "", nil); strings.Contains(body, "Choose your own password") || !strings.Contains(body, `<div id="app"></div>`) {
+	if res, _ := get(t, ada, srv.URL+"/password"); res.Request.URL.Path == "/password" {
 		t.Fatal("an account made by the CLI wasn't sent straight on to the app")
 	}
 }
@@ -936,9 +927,9 @@ func TestOtherSitesCantPost(t *testing.T) {
 		code, _ := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/me", "", nil)
 		return code == http.StatusOK
 	}
-	post := func(c *http.Client, path, body, ctype string, headers map[string]string) int {
+	send := func(c *http.Client, method, path, body, ctype string, headers map[string]string) int {
 		t.Helper()
-		req, _ := http.NewRequest("POST", srv.URL+path, strings.NewReader(body))
+		req, _ := http.NewRequest(method, srv.URL+path, strings.NewReader(body))
 		req.Header.Set("content-type", ctype)
 		for k, v := range headers {
 			req.Header.Set(k, v)
@@ -950,8 +941,11 @@ func TestOtherSitesCantPost(t *testing.T) {
 		res.Body.Close()
 		return res.StatusCode
 	}
-	form := "application/x-www-form-urlencoded"
-	login := "email=ada%40example.com&password=correct+horse+battery"
+	post := func(c *http.Client, path, body, ctype string, headers map[string]string) int {
+		t.Helper()
+		return send(c, "POST", path, body, ctype, headers)
+	}
+	login := `{"email": "ada@example.com", "password": "correct horse battery"}`
 	stay := func() *http.Client {
 		jar, _ := cookiejar.New(nil)
 		return &http.Client{Jar: jar, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
@@ -961,22 +955,22 @@ func TestOtherSitesCantPost(t *testing.T) {
 		headers map[string]string
 		want    int
 	}{
-		"this site, a current browser":           {map[string]string{"Sec-Fetch-Site": "same-origin", "Origin": srv.URL}, http.StatusSeeOther},
-		"typed address or bookmark":              {map[string]string{"Sec-Fetch-Site": "none"}, http.StatusSeeOther},
-		"this site, an older browser":            {map[string]string{"Origin": srv.URL}, http.StatusSeeOther},
-		"no browser headers (curl, the CLI)":     {nil, http.StatusSeeOther},
+		"this site, a current browser":           {map[string]string{"Sec-Fetch-Site": "same-origin", "Origin": srv.URL}, http.StatusOK},
+		"typed address or bookmark":              {map[string]string{"Sec-Fetch-Site": "none"}, http.StatusOK},
+		"this site, an older browser":            {map[string]string{"Origin": srv.URL}, http.StatusOK},
+		"no browser headers (curl, the CLI)":     {nil, http.StatusOK},
 		"another site, a current browser":        {map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"}, http.StatusForbidden},
 		"a sibling subdomain, a current browser": {map[string]string{"Sec-Fetch-Site": "same-site", "Origin": "http://other." + host}, http.StatusForbidden},
 		"another site, an older browser":         {map[string]string{"Origin": "https://evil.example"}, http.StatusForbidden},
 	} {
-		if got := post(stay(), "/login", login, form, c.headers); got != c.want {
+		if got := post(stay(), "/api/v1/session", login, "application/json", c.headers); got != c.want {
 			t.Errorf("sign-in from %s: %d, want %d", name, got, c.want)
 		}
 	}
 
 	// Another site can't sign this browser out, or act through it.
 	cross := map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"}
-	if got := post(client, "/logout", "", form, cross); got != http.StatusForbidden || !signedInAs() {
+	if got := send(client, "DELETE", "/api/v1/session", "", "application/json", cross); got != http.StatusForbidden || !signedInAs() {
 		t.Fatalf("sign-out from another site: %d, still signed in: %v", got, signedInAs())
 	}
 	if got := post(client, "/o/alpha/api/v1/people", `{"name":"Mallory"}`, "application/json", cross); got != http.StatusForbidden {
@@ -998,7 +992,7 @@ func TestOtherSitesCantPost(t *testing.T) {
 		t.Fatalf("an API key with browser headers: %d", got)
 	}
 	delete(cross, "Authorization")
-	if got := post(client, "/logout", "", form, map[string]string{"Sec-Fetch-Site": "same-origin"}); got != http.StatusOK || signedInAs() {
+	if got := send(client, "DELETE", "/api/v1/session", "", "application/json", map[string]string{"Sec-Fetch-Site": "same-origin"}); got != http.StatusNoContent || signedInAs() {
 		t.Fatalf("sign-out from this site: %d, still signed in: %v", got, signedInAs())
 	}
 }
@@ -1033,8 +1027,8 @@ func TestPublicURL(t *testing.T) {
 		t.Helper()
 		srv := httptest.NewServer(app.Routes())
 		t.Cleanup(srv.Close)
-		req, _ := http.NewRequest("POST", srv.URL+"/login", strings.NewReader("email=ada%40example.com&password=correct+horse+battery"))
-		req.Header.Set("content-type", "application/x-www-form-urlencoded")
+		req, _ := http.NewRequest("POST", srv.URL+"/api/v1/session", strings.NewReader(`{"email": "ada@example.com", "password": "correct horse battery"}`))
+		req.Header.Set("content-type", "application/json")
 		for k, v := range headers {
 			req.Header.Set(k, v)
 		}
@@ -1096,8 +1090,8 @@ func TestPublicURL(t *testing.T) {
 	status := func(app *App, origin string) int {
 		srv := httptest.NewServer(app.Routes())
 		defer srv.Close()
-		req, _ := http.NewRequest("POST", srv.URL+"/login", strings.NewReader("email=ada%40example.com&password=correct+horse+battery"))
-		req.Header.Set("content-type", "application/x-www-form-urlencoded")
+		req, _ := http.NewRequest("POST", srv.URL+"/api/v1/session", strings.NewReader(`{"email": "ada@example.com", "password": "correct horse battery"}`))
+		req.Header.Set("content-type", "application/json")
 		req.Header.Set("Origin", origin)
 		res, err := (&http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}).Do(req)
 		if err != nil {
@@ -1106,7 +1100,7 @@ func TestPublicURL(t *testing.T) {
 		res.Body.Close()
 		return res.StatusCode
 	}
-	if got := status(&App{s: s, base: "https://prospector.example.com"}, "https://prospector.example.com"); got != http.StatusSeeOther {
+	if got := status(&App{s: s, base: "https://prospector.example.com"}, "https://prospector.example.com"); got != http.StatusOK {
 		t.Fatalf("sign-in from the address that was set, behind a proxy that rewrites Host: %d", got)
 	}
 	if got := status(&App{s: s, base: "https://prospector.example.com"}, "https://evil.example"); got != http.StatusForbidden {
@@ -1211,17 +1205,17 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	if res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/o/alpha/today" {
 		t.Fatalf("a redirect in a browser: %d to %q", res.StatusCode, res.Header.Get("Location"))
 	}
-	wrong, _ := http.NewRequest("POST", srv.URL+"/login", strings.NewReader("email=ada%40example.com&password=wrong"))
+	wrong, _ := http.NewRequest("POST", srv.URL+"/api/v1/session", strings.NewReader(`{"email": "ada@example.com", "password": "wrong"}`))
 	wrong.Header.Set("Accept", browser["Accept"])
-	wrong.Header.Set("content-type", "application/x-www-form-urlencoded")
+	wrong.Header.Set("content-type", "application/json")
 	res, err = http.DefaultClient.Do(wrong)
 	if err != nil {
 		t.Fatal(err)
 	}
-	form, _ := io.ReadAll(res.Body)
+	said, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	if res.StatusCode != http.StatusUnauthorized || !strings.Contains(string(form), `name="password"`) || styled(string(form)) {
-		t.Fatalf("a wrong password in a browser: %d, the sign-in form again: %v", res.StatusCode, strings.Contains(string(form), `name="password"`))
+	if res.StatusCode != http.StatusUnauthorized || !strings.Contains(string(said), `"code":"wrong_login"`) || styled(string(said)) {
+		t.Fatalf("a wrong password in a browser: %d %s", res.StatusCode, said)
 	}
 	method, _ := http.NewRequest("DELETE", srv.URL+"/login", nil)
 	method.Header.Set("Accept", browser["Accept"])
@@ -1436,8 +1430,8 @@ func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
 	t.Cleanup(srv.Close)
 	try := func(email, password, device string) (int, *http.Cookie) {
 		t.Helper()
-		req, _ := http.NewRequest("POST", srv.URL+"/login", strings.NewReader(url.Values{"email": {email}, "password": {password}}.Encode()))
-		req.Header.Set("content-type", "application/x-www-form-urlencoded")
+		req, _ := http.NewRequest("POST", srv.URL+"/api/v1/session", bytes.NewReader(must(json.Marshal(map[string]string{"email": email, "password": password}))))
+		req.Header.Set("content-type", "application/json")
 		if device != "" {
 			req.AddCookie(&http.Cookie{Name: deviceCookie, Value: device})
 		}
@@ -1457,11 +1451,11 @@ func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
 
 	code, issued := try("ada@example.com", right, "")
 	// For every path, so the sign-in form and the API both count by it.
-	if code != http.StatusSeeOther || issued == nil || !issued.HttpOnly || issued.Path != "/" || strings.Contains(issued.Value, "example") {
+	if code != http.StatusOK || issued == nil || !issued.HttpOnly || issued.Path != "/" || strings.Contains(issued.Value, "example") {
 		t.Fatalf("first sign-in: %d, device cookie %+v", code, issued)
 	}
 	_, bobs := try("bob@example.com", right, "")
-	if code, again := try("ada@example.com", right, issued.Value); code != http.StatusSeeOther || again != nil {
+	if code, again := try("ada@example.com", right, issued.Value); code != http.StatusOK || again != nil {
 		t.Fatalf("a known browser signing in again: %d, reissued %v", code, again != nil)
 	}
 
@@ -1482,7 +1476,7 @@ func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
 			t.Errorf("a device cookie that is %s got past the hold: %d", name, code)
 		}
 	}
-	if code, _ := try("ada@example.com", right, issued.Value); code != http.StatusSeeOther {
+	if code, _ := try("ada@example.com", right, issued.Value); code != http.StatusOK {
 		t.Fatalf("Ada's own browser while her address is held: %d", code)
 	}
 	if code, _ := try("ada@example.com", right, ""); code != http.StatusTooManyRequests {
@@ -1521,7 +1515,7 @@ func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	change, _ := http.NewRequest("POST", srv.URL+"/password", strings.NewReader(`{"current":"correct horse battery","new":"bob's new password"}`))
+	change, _ := http.NewRequest("PUT", srv.URL+"/api/v1/password", strings.NewReader(`{"current":"correct horse battery","new":"bob's new password"}`))
 	change.Header.Set("content-type", "application/json")
 	change.AddCookie(&http.Cookie{Name: sessionCookie, Value: session})
 	changed, err := http.DefaultClient.Do(change)
@@ -1535,13 +1529,13 @@ func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
 			renewed = c
 		}
 	}
-	if changed.StatusCode != http.StatusOK || renewed == nil || renewed.Path != "/" {
+	if changed.StatusCode != http.StatusNoContent || renewed == nil || renewed.Path != "/" {
 		t.Fatalf("changing a password while the address is held: %d, device cookie %+v", changed.StatusCode, renewed)
 	}
 	if _, ok := s.knownDevice("bob@example.com", bobs.Value); ok {
 		t.Fatal("the device cookie from before the change still verifies")
 	}
-	if code, _ := try("bob@example.com", "bob's new password", renewed.Value); code != http.StatusSeeOther {
+	if code, _ := try("bob@example.com", "bob's new password", renewed.Value); code != http.StatusOK {
 		t.Fatalf("signing in with the renewed device cookie while the address is held: %d", code)
 	}
 	if code, _ := try("bob@example.com\x00"+strings.Split(renewed.Value, ".")[0], wrong, ""); code != http.StatusUnauthorized {
@@ -1563,7 +1557,7 @@ func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
 		t.Fatalf("a device cookie from before a password change still counts: %d", code)
 	}
 	now = now.Add(maxLoginWait + time.Second)
-	if code, fresh := try("ada@example.com", "a different password", issued.Value); code != http.StatusSeeOther || fresh == nil {
+	if code, fresh := try("ada@example.com", "a different password", issued.Value); code != http.StatusOK || fresh == nil {
 		t.Fatalf("signing in after a password change: %d, new device cookie: %v", code, fresh != nil)
 	}
 }

@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"regexp"
 	"slices"
@@ -166,7 +165,7 @@ func signInAs(t *testing.T, srv *httptest.Server, email, password string) *http.
 	t.Helper()
 	jar, _ := cookiejar.New(nil)
 	client := &http.Client{Jar: jar}
-	res, err := client.PostForm(srv.URL+"/login", url.Values{"email": {email}, "password": {password}})
+	res, err := signInWith(client, srv.URL, email, password)
 	if err != nil || res.StatusCode != http.StatusOK {
 		t.Fatalf("signing in as %s: %v %v", email, res, err)
 	}
