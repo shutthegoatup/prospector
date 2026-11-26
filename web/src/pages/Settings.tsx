@@ -6,6 +6,7 @@ import { ActionButton, Eyebrow, Failed, Meta, PageHead, Pill, Section, useRefres
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Cohorts } from "@/pages/SettingsCohorts";
 import { actor, plural } from "@/lib/format";
 import { useSession } from "@/session";
 
@@ -89,6 +90,7 @@ export function SettingsPage() {
         {me.data && <Password me={me.data} />}
         {settings.data && <Organisation settings={settings.data} />}
         {settings.data && <WhatYouSell orgName={name} />}
+        {settings.data && <Cohorts orgName={name} currency={settings.data.currency} />}
         {owner && settings.data && <OutgoingMail orgName={name} />}
         {owner && (
           <Section title="Agents">

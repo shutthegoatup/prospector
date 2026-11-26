@@ -171,6 +171,9 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if err := tx.Delete(&c).Error; err != nil {
 			return err
 		}
+		if err := placeContactCompany(tx, org, c.CompanyID); err != nil {
+			return err
+		}
 		for _, h := range hashes {
 			row := Erasure{OrgID: org, Hash: h, At: time.Now()}
 			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {

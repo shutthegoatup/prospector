@@ -337,7 +337,11 @@ func (s *Store) replaceContacts(org int64, rows []Contact, absent []string) (int
 			tx.Model(&Offering{}).Select("id").Where("org_id = ?", org)).Update("offering_id", 0).Error; err != nil {
 			return err
 		}
-		return linkCompanies(tx, org, nil)
+		if err := linkCompanies(tx, org, nil); err != nil {
+			return err
+		}
+		_, err := placeAll(tx, org, today())
+		return err
 	})
 	return len(rows), err
 }

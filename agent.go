@@ -46,7 +46,7 @@ type AddCompanyIn struct {
 	Name            string   `json:"name" jsonschema:"company name"`
 	Domain          string   `json:"domain,omitempty" jsonschema:"the company's own website domain, e.g. example.com; leave empty rather than give a shared site"`
 	Country         string   `json:"country,omitempty" jsonschema:"ISO country code"`
-	Segment         string   `json:"segment,omitempty"`
+	Segment         string   `json:"segment,omitempty" jsonschema:"what the company is, first, then whom it serves: CGI studio for carmakers"`
 	Fit             string   `json:"fit,omitempty" jsonschema:"suggested fit grade A, B or C"`
 	ConfiguratorURL string   `json:"configurator_url,omitempty" jsonschema:"older clients only: add a fact instead"`
 	Platform        string   `json:"platform,omitempty" jsonschema:"older clients only: add a fact instead"`
@@ -196,6 +196,9 @@ func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddComp
 			return err
 		}
 		added += older
+		if err := placeCompany(tx, org, c.ID); err != nil {
+			return err
+		}
 		if !created && added == 0 {
 			return s.matched(tx, org, who, 0, &c.ID)
 		}
@@ -741,7 +744,7 @@ func (s *Store) AgentDue(o *Org, page PageIn) (*DueOut, error) {
 
 // agentInstructions describes each task rather than naming a model: the client
 // picks the model, and the agents page shows how each key's suggestions fare.
-func agentInstructions(o *Org, k *APIKey) string {
+func agentInstructions(o *Org, k *APIKey, cohorts []Cohort) string {
 	parts := []string{"Research and outreach data for " + o.Name + ". Companies and contacts you add wait in Research until a person qualifies them. Every fact and contact needs a source URL. Search before adding, to avoid duplicates. You can draft messages; only people send them.",
 		"search, list_tasks and list_due answer a page at a time, and so do the lists inside get_company and get_task. When an answer has next_cursor, there is more: pass it back as cursor, with the same arguments, before concluding a company, person or fact isn't here. A company's older history and notes are there if you need them; you needn't read them all.",
 		"Other agents and people work the same companies. get_company returns the company's history: read it before researching, don't suggest again what a person rejected, and if last_agent shows another agent was there within the hour, take a different company unless a task's open request asks for work on that one. by_you marks what this key did, perhaps in an earlier run."}
@@ -768,6 +771,9 @@ func agentInstructions(o *Org, k *APIKey) string {
 	if k.Has("drafts:write") {
 		parts = append(parts,
 			"Drafts need a capable model. Write to the person: say plainly what you offer and why it fits them, in a few sentences. Claim nothing a source doesn't show. LinkedIn notes are 300 characters at most.")
+	}
+	if g := cohortGuidance(o, cohorts); g != "" && k.Has("research:write") {
+		parts = append(parts, g)
 	}
 	parts = append(parts, "People approve or reject what you add, and the agents page shows each key's record, so one key per agent keeps the record useful.")
 	if g := strings.TrimSpace(o.Settings.AgentGuidance); g != "" {

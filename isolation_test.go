@@ -81,6 +81,8 @@ func (in *intruder) value(t reflect.Type, name string, own bool) reflect.Value {
 			word = "someone@intruder.example"
 		case name == "Date":
 			word = "2020-01-02"
+		case name == "Colour":
+			word = CohortColours[1]
 		}
 		v.SetString(word)
 	case reflect.Pointer:
@@ -307,6 +309,17 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			return err
 		},
 		func() error {
+			// Cohort 1 takes their company by its rule, and another is the catch-all, so a
+			// preview of cohort 1 without its rule moves the company out.
+			if _, err := s.AddCohort(first.ID, CohortChange{Name: str(theirs + " cohort"), WhoTheyAre: str(theirs),
+				Rules: &[]CohortRule{{Field: "segment", Value: theirs}}}, "Owner One"); err != nil {
+				return err
+			}
+			yes := true
+			_, err := s.AddCohort(first.ID, CohortChange{Name: str(theirs + " everyone"), CatchAll: &yes}, "Owner One")
+			return err
+		},
+		func() error {
 			// One still waiting in Research, which the first is no longer.
 			_, err := s.AgentAddCompany(first.ID, scout, AddCompanyIn{Name: theirs + " waiting", Why: theirs})
 			return err
@@ -371,6 +384,8 @@ var saysNothingBack = map[string]bool{
 	"FindOne": true, "NeverContactCovers": true,
 	// A vendor saved or removed, and a count, carry nothing of the organisation's data.
 	"SaveEnricher": true, "DeleteEnricher": true, "EnricherUsed": true,
+	// A cohort saved answers with what the call gave it; placing companies answers with a count.
+	"AddCohort": true, "ChangeCohort": true, "MoveCohort": true, "RemoveCohort": true, "SetCompanyCohort": true, "CompanyByRule": true, "PlaceCompanies": true,
 }
 
 func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {

@@ -20,7 +20,7 @@ info:
     them and where; `enrich:spend` to ask the organisation's enrichment vendors, at its cost,
     for someone's email, phone or profile; `people:privacy` to export everything held on a
     person and erase them on their request; `settings:write` to change the organisation's
-    settings and its enrichment vendors; `team:write` to add and remove members and change
+    settings, its cohorts and its enrichment vendors; `team:write` to add and remove members and change
     their roles and areas; `mail:configure` to set the organisation's outgoing mail server;
     `sso:configure` to set up single sign-on and its domains; `org:export` to download
     everything the organisation holds. A signed-in member may do all of these except
@@ -68,6 +68,8 @@ tags:
     description: Marketing mail, and the one list of addresses it never goes to.
   - name: offerings
     description: The things an organisation sells besides what its settings describe, each with what to look for at a company, and where each company stands for each.
+  - name: cohorts
+    description: The kinds of company an organisation sells to. Companies fall into them by the rules an owner sets, or by hand, and the last is the catch-all for whatever no rule takes.
   - name: enrichment
     description: Data vendors the organisation pays, under its own keys, to find an email, phone or profile its research couldn't.
   - name: account
@@ -2952,6 +2954,178 @@ paths:
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/cohorts:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listCohorts
+      tags: [cohorts]
+      summary: The organisation's cohorts, in the order their rules are tried
+      description: |
+        The catch-all is last. Each comes with its rules and how many companies are in it.
+        An organisation with no cohorts has every company in none.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: In order.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Cohort" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: createCohort
+      tags: [cohorts]
+      summary: Add a cohort
+      description: |
+        It goes just before the catch-all; the first one added is the catch-all. Every
+        company is placed again by the rules. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["settings:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CohortNew" }
+      responses:
+        "201":
+          description: The cohort, added.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Cohort" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/cohorts/preview:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    post:
+      operationId: previewCohort
+      tags: [cohorts]
+      summary: Who saving a cohort would move
+      description: |
+        Saves nothing. Given a cohort as it would be (a new one for cohort 0), the companies
+        that saving it would move in and out, and those put somewhere by hand that would stay
+        where they are. It is worked out by saving and taking it back, so it is what saving does.
+      security:
+        - session: []
+        - bearer: [read]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CohortPreviewRequest" }
+      responses:
+        "200":
+          description: Who would move.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CohortPreview" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/cohorts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: updateCohort
+      tags: [cohorts]
+      summary: Change a cohort, its rules included
+      description: |
+        Send only what changes; rules, when sent, replace them all. Making a cohort the
+        catch-all moves it last. Every company is placed again. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["settings:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CohortChange" }
+      responses:
+        "200":
+          description: The cohort as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Cohort" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: deleteCohort
+      tags: [cohorts]
+      summary: Remove a cohort and its rules
+      description: |
+        Its companies, those put there by hand too, are placed again by the rules. Removing
+        the catch-all makes the last cohort left the catch-all; removing the last leaves every
+        company in none. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["settings:write"]
+      responses:
+        "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/cohorts/{id}/position:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    put:
+      operationId: moveCohort
+      tags: [cohorts]
+      summary: Move a cohort up or down the order its rules are tried in
+      description: The catch-all stays last. Every company is placed again. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["settings:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [position]
+              properties:
+                position: { type: integer, minimum: 0, description: "Where it goes, counting from 0; past the last before the catch-all is just before it." }
+      responses:
+        "204": { description: Moved. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/companies/{id}/cohort:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    put:
+      operationId: setCompanyCohort
+      tags: [cohorts]
+      summary: Put a company in a cohort by hand, or back to its rules
+      description: |
+        `{"cohort": id}` puts it there by hand, where it stays whatever its rules say;
+        `{"by_rule": true}` puts it back where its rules say. Only a person signed in: no key
+        can, whatever its scopes, since agents read a company's cohort but its rules or people set it.
+      security:
+        - session: []
+        - bearer: ["research:review"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompanyCohort" }
+      responses:
+        "204": { description: Placed. }
+        default: { $ref: "#/components/responses/Problem" }
+
   /o/{org}/api/v1/companies:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -3061,6 +3235,10 @@ paths:
       tags: [companies]
       summary: What people and agents did at a company
       parameters:
+        - name: action
+          in: query
+          description: Only this kind of thing, such as `company:cohort` for its moves between cohorts.
+          schema: { type: string }
         - $ref: "#/components/parameters/limit"
         - $ref: "#/components/parameters/cursor"
       security:
@@ -4211,9 +4389,126 @@ components:
       enum: [research, outreach, replied, meeting, proposal, won, lost, rejected]
       description: "Where a company stands, from its furthest contact: `research` until anyone there is reached, `rejected` for one turned down before then."
 
+    CohortRef:
+      type: object
+      required: [id, name, colour]
+      description: A cohort as a company names it; id 0 and an empty name before the organisation has any.
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        colour: { type: string }
+
+    CohortRule:
+      type: object
+      required: [field, value]
+      properties:
+        field:
+          type: string
+          enum: [segment, country, offering, conversation_stage, deal_value, pays_a_year, billed, deal_kind, found_by]
+          description: |
+            What the rule looks at. `segment` is matched on what the segment says the company is,
+            before " for ", " to ", " serving " or " with ", a word matching any that starts with it;
+            `offering` is what anyone there is being reached for, or what the company was found for
+            (0 is the organisation's own); `conversation_stage` is anyone's there in conversation;
+            `deal_value` is its largest open deal and `pays_a_year` its live subscriptions for a
+            year, both in the organisation's currency only; `billed` is how a live subscription is
+            priced; `deal_kind` is the kind of any deal there that wasn't lost.
+        op:
+          type: string
+          enum: [any_of, at_least, is]
+          description: "`at_least` for deal_value and pays_a_year, `is` for billed, `any_of` for the rest; left out, the field's own."
+        value:
+          type: string
+          description: "For any_of, a comma list; for at_least, an amount in the currency's hundredths; for billed, monthly or yearly."
+
+    Cohort:
+      type: object
+      required: [id, name, position, colour, who_they_are, catch_all, rules, companies, by_hand, updated_by, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        position: { type: integer, description: "Its place in the order rules are tried, from 0; the catch-all is last." }
+        colour: { type: string, description: "One of #7b8cff, #ff9f43, #35c58a, #f06595, #a77bff, #22b8cf, #e0b43c, #b08968." }
+        who_they_are: { type: string, description: "What these companies are, as research agents are told it." }
+        catch_all: { type: boolean, description: "Takes every company no rule does." }
+        rules:
+          type: array
+          items: { $ref: "#/components/schemas/CohortRule" }
+          description: Any one of them puts a company here, unless an earlier cohort's rule took it.
+        companies: { type: integer, description: How many companies are in it. }
+        by_hand: { type: integer, description: How many of them were put there by hand. }
+        updated_by: { type: string }
+        updated_at: { type: string, format: date-time }
+
+    CohortNew:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 60 }
+        colour: { type: string, description: "One of the palette; left out, one not yet used." }
+        who_they_are: { type: string, maxLength: 1000 }
+        catch_all: { type: boolean, description: "Make it the catch-all, last in the order." }
+        rules:
+          type: array
+          maxItems: 20
+          items: { $ref: "#/components/schemas/CohortRule" }
+
+    CohortChange:
+      type: object
+      properties:
+        name: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, maxLength: 60 }
+        colour: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        who_they_are: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, maxLength: 1000 }
+        catch_all: { type: boolean, nullable: true, x-go-type-skip-optional-pointer: false, description: "true makes it the catch-all, last in the order; there is always one, so another is made it instead of this one being unmade." }
+        rules:
+          type: array
+          nullable: true
+          x-go-type-skip-optional-pointer: false
+          maxItems: 20
+          items: { $ref: "#/components/schemas/CohortRule" }
+          description: Replaces every rule it has.
+
+    CohortPreviewRequest:
+      type: object
+      required: [cohort, change]
+      properties:
+        cohort: { type: integer, format: int64, description: "The cohort being changed; 0 for one being added." }
+        change: { $ref: "#/components/schemas/CohortChange" }
+
+    CohortMove:
+      type: object
+      required: [company_id, company, from, to]
+      properties:
+        company_id: { type: integer, format: int64 }
+        company: { type: string }
+        from: { $ref: "#/components/schemas/CohortRef" }
+        to: { $ref: "#/components/schemas/CohortRef" }
+
+    CohortPreview:
+      type: object
+      required: [moving_in, moving_out, kept_by_hand, other_currency_deals]
+      properties:
+        moving_in:
+          type: array
+          items: { $ref: "#/components/schemas/CohortMove" }
+        moving_out:
+          type: array
+          items: { $ref: "#/components/schemas/CohortMove" }
+        kept_by_hand:
+          type: array
+          items: { $ref: "#/components/schemas/CohortMove" }
+          description: Put somewhere by hand, so they stay, though the rules would move them into or out of it; `to` is where the rules would put them.
+        other_currency_deals: { type: integer, description: "Open deals in a currency other than the organisation's, which no deal_value rule weighs." }
+
+    CompanyCohort:
+      type: object
+      properties:
+        cohort: { type: integer, format: int64, description: The cohort to put it in by hand. }
+        by_rule: { type: boolean, description: "Put it back where its rules say." }
+
     CompanyRow:
       type: object
-      required: [id, name, country, segment, grade, people, pipeline]
+      required: [id, name, country, segment, grade, people, pipeline, cohort, cohort_why, cohort_by_hand]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
@@ -4222,10 +4517,13 @@ components:
         grade: { type: string, description: "The fit grade a person or agent gave, A, B or C; empty for none." }
         people: { type: integer, description: How many people are held there. }
         pipeline: { $ref: "#/components/schemas/Pipeline" }
+        cohort: { $ref: "#/components/schemas/CohortRef" }
+        cohort_why: { type: string, description: "The rule that put it in its cohort; empty when the catch-all took it because no rule did, or it was put there by hand." }
+        cohort_by_hand: { type: boolean, description: "Put in its cohort by hand, where it stays whatever its rules say." }
 
     CompanyOverview:
       type: object
-      required: [id, name, domain, country, segment, grade, why, stage, found_for, found_by, created_at, pipeline, touches, looking_for, facts, people, onboardings, planned_steps, subscriptions, agreements]
+      required: [id, name, domain, country, segment, grade, why, stage, found_for, found_by, created_at, pipeline, touches, looking_for, facts, people, onboardings, planned_steps, subscriptions, agreements, cohort, cohort_why, cohort_by_hand]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
@@ -4239,6 +4537,9 @@ components:
         found_by: { type: string }
         created_at: { type: string, format: date-time }
         pipeline: { $ref: "#/components/schemas/Pipeline" }
+        cohort: { $ref: "#/components/schemas/CohortRef" }
+        cohort_why: { type: string, description: "The rule that put it in its cohort; empty when the catch-all took it because no rule did, or it was put there by hand." }
+        cohort_by_hand: { type: boolean, description: "Put in its cohort by hand, where it stays whatever its rules say." }
         touches: { type: integer, description: "How many times anyone there was reached out to: added on LinkedIn, emailed, followed up or called." }
         looking_for:
           type: array

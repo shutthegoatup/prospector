@@ -330,6 +330,9 @@ func (s *Store) AddSubscription(org int64, in SubscriptionIn, actor string) (*Su
 		if err := tx.Create(&sub).Error; err != nil {
 			return err
 		}
+		if err := placeCompany(tx, org, c.ID); err != nil {
+			return err
+		}
 		return s.log(tx, org, 0, &c.ID, actor, "sub:new", &in.Start)
 	})
 	if err != nil {
@@ -444,6 +447,9 @@ func (s *Store) changeSubscription(tx *gorm.DB, org, id int64, field, value, act
 		if err := tx.Model(&sub).Updates(updates).Error; err != nil {
 			return err
 		}
+		if err := placeCompany(tx, org, sub.CompanyID); err != nil {
+			return err
+		}
 		return s.log(tx, org, 0, &sub.CompanyID, actor, "sub:"+field, nonEmpty(logged))
 	}
 }
@@ -461,6 +467,9 @@ func (s *Store) RemoveSubscription(org, id int64, actor string) error {
 		}
 		// A renewal deal for it carries on as a deal, pointing at nothing.
 		if err := tx.Model(&Deal{}).Where("org_id = ? and subscription_id = ?", org, id).Update("subscription_id", 0).Error; err != nil {
+			return err
+		}
+		if err := placeCompany(tx, org, sub.CompanyID); err != nil {
 			return err
 		}
 		return s.log(tx, org, 0, &sub.CompanyID, actor, "sub:remove", nil)
@@ -603,6 +612,9 @@ func (s *Store) StartRenewal(org, subscription, contact int64, actor string) (*D
 		d = Deal{OrgID: org, ContactID: contact, Seq: last + 1, Kind: "renewal", Stage: Stages[0].Key, SubscriptionID: sub.ID,
 			Amount: sub.Yearly(), Currency: currency, CloseDate: nonEmpty(closes)}
 		if err := tx.Create(&d).Error; err != nil {
+			return err
+		}
+		if err := placeContactCompany(tx, org, c.CompanyID); err != nil {
 			return err
 		}
 		return s.log(tx, org, contact, c.CompanyID, actor, "deal:start", str("renewal"))

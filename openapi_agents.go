@@ -14,8 +14,9 @@ import (
 // The Agents page's reads and the keys an owner makes for outside agents.
 
 // keyless are operations no key makes, whatever its scopes: a key that could make or
-// widen keys could give itself any scope.
-var keyless = map[string]bool{"CreateKey": true, "ChangeKey": true, "RevokeKey": true, "CreateOrg": true}
+// widen keys could give itself any scope, and agents read a company's cohort but only its
+// rules and people set it.
+var keyless = map[string]bool{"CreateKey": true, "ChangeKey": true, "RevokeKey": true, "CreateOrg": true, "SetCompanyCohort": true}
 
 func (s apiServer) GetConnect(ctx context.Context, _ api.GetConnectRequestObject) (api.GetConnectResponseObject, error) {
 	q := reqFrom(ctx)
@@ -175,7 +176,11 @@ func (s apiServer) ListAgentActivity(ctx context.Context, in api.ListAgentActivi
 }
 
 // refuseKeys answers an operation no key may make.
-func refuseKeys(w http.ResponseWriter) {
+func refuseKeys(w http.ResponseWriter, op string) {
+	if op == "SetCompanyCohort" {
+		writeProblem(w, http.StatusForbidden, "no key can move a company between cohorts: its rules or a person signed in do that")
+		return
+	}
 	writeProblem(w, http.StatusForbidden, "no key can make, change or revoke a key: an owner does that, signed in")
 }
 

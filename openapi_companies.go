@@ -22,11 +22,16 @@ func (s apiServer) ListCompanies(ctx context.Context, in api.ListCompaniesReques
 	if err != nil {
 		return nil, err
 	}
+	refs, err := s.cohortRefs(q.Org.ID)
+	if err != nil {
+		return nil, err
+	}
 	out := api.ListCompanies200JSONResponse{Headers: api.ListCompanies200ResponseHeaders{Link: nextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor, out.Body.Total = []api.CompanyRow{}, next, total
 	for _, r := range rows {
 		out.Body.Items = append(out.Body.Items, api.CompanyRow{Id: r.ID, Name: r.Name, Country: r.Country, Segment: r.Segment,
-			Grade: r.Fit, People: r.People, Pipeline: api.Pipeline(r.Pipeline)})
+			Grade: r.Fit, People: r.People, Pipeline: api.Pipeline(r.Pipeline),
+			Cohort: cohortRef(refs, r.CohortID), CohortWhy: r.CohortWhy, CohortByHand: r.CohortByHand})
 	}
 	return out, nil
 }
@@ -107,10 +112,15 @@ func (s apiServer) GetCompanyOverview(ctx context.Context, in api.GetCompanyOver
 	if plan, err := q.Org.Settings.Onboarding(); err == nil {
 		planned = len(plan)
 	}
+	refs, err := s.cohortRefs(org)
+	if err != nil {
+		return nil, err
+	}
 	out := api.CompanyOverview{Id: c.ID, Name: c.Name, Domain: c.Domain, Country: c.Country, Segment: c.Segment, Grade: c.Fit, Why: c.Why,
 		Stage: api.CompanyOverviewStage(c.Stage), FoundFor: c.FoundFor, FoundBy: c.FoundBy, CreatedAt: c.CreatedAt, Pipeline: api.Pipeline(pipeline(*c, people)),
 		Touches: touches, LookingFor: criteriaOut(assetsFound(q.Org.Settings, facts)), Facts: []api.ResearchFact{}, People: []api.CompanyPerson{},
-		Onboardings: onboardings, PlannedSteps: planned, Subscriptions: []api.Subscription{}, Agreements: []api.Agreement{}}
+		Onboardings: onboardings, PlannedSteps: planned, Subscriptions: []api.Subscription{}, Agreements: []api.Agreement{},
+		Cohort: cohortRef(refs, c.CohortID), CohortWhy: c.CohortWhy, CohortByHand: c.CohortByHand}
 	for _, f := range facts {
 		out.Facts = append(out.Facts, factOut(f))
 	}
@@ -155,11 +165,11 @@ func (s apiServer) ListCompanyHistory(ctx context.Context, in api.ListCompanyHis
 	if err != nil {
 		return nil, err
 	}
-	total, err := s.a.s.historyCount(org, in.Id)
+	total, err := s.a.s.historyCount(org, in.Id, in.Params.Action)
 	if err != nil {
 		return nil, err
 	}
-	items, err := s.a.s.historyAt(org, in.Id, int(at[0]), page.size())
+	items, err := s.a.s.historyAt(org, in.Id, in.Params.Action, int(at[0]), page.size())
 	if err != nil {
 		return nil, err
 	}
@@ -245,6 +255,8 @@ func historyText(h HistoryItem) string {
 		"company:rejected": "rejected the company", "company:review": "sent back to review",
 		"verdict:qualified": "qualified it for an offering", "verdict:rejected": "junked it for an offering", "verdict:review": "sent it back to review for an offering",
 		"offering:added": "added an offering", "offering:changed": "changed an offering", "offering:removed": "removed an offering",
+		"company:cohort": "moved it between cohorts", "cohort:added": "added a cohort", "cohort:changed": "changed a cohort",
+		"cohort:moved": "moved a cohort in the order", "cohort:removed": "removed a cohort",
 		"erase": "erased a person on request", "enquiry": "sent an enquiry",
 		"suggest:email": "suggested an email", "suggest:phone": "suggested a phone number", "suggest:linkedin": "suggested a LinkedIn profile",
 		"dismiss:email": "dismissed a suggested email", "dismiss:phone": "dismissed a suggested phone number", "dismiss:linkedin": "dismissed a suggested LinkedIn profile",
@@ -282,7 +294,7 @@ func historyText(h HistoryItem) string {
 	if _, note, found := strings.Cut(h.Value, " · "); found && strings.HasPrefix(h.Action, "mark:") {
 		s += ": " + note
 	}
-	if h.Value != "" && !strings.HasPrefix(h.Action, "mark:") && h.Action != "add:contact" && len(h.Value) < 80 {
+	if h.Value != "" && !strings.HasPrefix(h.Action, "mark:") && h.Action != "add:contact" && (len(h.Value) < 80 || h.Action == "company:cohort") {
 		s += ": " + h.Value
 	}
 	return s

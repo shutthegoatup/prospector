@@ -71,6 +71,9 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 				}
 			}
 		}
+		if _, err := placeAll(tx, org, today()); err != nil {
+			return err
+		}
 		return tx.Model(&Contact{}).Where("org_id = ?", org).Count(&total).Error
 	})
 	return total, err

@@ -174,11 +174,11 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 	// Settings saved while a session is open (waits, the never-contact list) apply to its next call.
 	current := func() (*Org, error) { return a.s.OrgByID(org.ID) }
 	s := mcp.NewServer(&mcp.Implementation{Name: "prospector", Title: "Prospector: " + org.Name, Version: "1"},
-		&mcp.ServerOptions{Instructions: agentInstructions(org, k)})
+		&mcp.ServerOptions{Instructions: agentInstructions(org, k, a.cohortsFor(org.ID))})
 	if k.Has("read") {
 		addTool(s, &mcp.Tool{Name: "guidance", Description: "How to research and draft for this organisation: the same text as the server instructions. Read it first if your client doesn't show those."},
 			func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, *GuidanceOut, error) {
-				return nil, &GuidanceOut{Guidance: agentInstructions(org, k)}, nil
+				return nil, &GuidanceOut{Guidance: agentInstructions(org, k, a.cohortsFor(org.ID))}, nil
 			})
 		addTool(s, &mcp.Tool{Name: "search", Description: "Find companies and contacts by name, domain, email or notes, a page at a time. Each company says which agent last changed it."},
 			func(_ context.Context, req *mcp.CallToolRequest, in SearchIn) (*mcp.CallToolResult, SearchOut, error) {

@@ -150,8 +150,15 @@ func (s *Store) checkMailDomains(email string) error {
 
 // keepCheckingMail asks about the domains of addresses already here, a few each
 // round, so people and imports get the same check agents do without waiting on DNS.
+// It is also the backstop that places companies in cohorts again as time passes, since
+// a subscription ending changes nothing that a write would notice.
 func (a *App) keepCheckingMail(ctx context.Context, every time.Duration) {
+	var placed time.Time
 	for {
+		if time.Since(placed) >= time.Hour {
+			a.s.placeEverywhere()
+			placed = time.Now()
+		}
 		a.s.checkSomeMail(ctx, 100)
 		select {
 		case <-ctx.Done():
