@@ -481,9 +481,12 @@ func (a *App) passwordSignIn(r *http.Request, email, password string) (token str
 		return "", nil, nil, 0, r.Context().Err()
 	}
 	who, known := signInBucket(email), false
-	if c, err := r.Cookie(deviceCookie); err == nil {
+	// A browser can hold two: one from when the cookie was kept to /login, which a
+	// password change since has made worthless, and the one that took its place.
+	for _, c := range r.CookiesNamed(deviceCookie) {
 		if device, ok := a.s.knownDevice(email, c.Value); ok {
 			who, known = device, true
+			break
 		}
 	}
 	if held := a.logins.begin(who); held > 0 {

@@ -135,6 +135,42 @@ func TestSigningInThroughTheAPIIsThrottled(t *testing.T) {
 	}
 }
 
+// A browser still holding the device cookie from when it was kept to /login sends that
+// one first; once a password change has made it worthless, the newer one still counts.
+func TestABrowserWithAnOldDeviceCookieStillCountsByItself(t *testing.T) {
+	s, _, srv, _ := signedIn(t)
+	ada := must(s.UserByEmail("ada@example.com"))
+	stale := newDeviceToken(ada)
+	if err := s.ChangePassword(ada, "correct horse battery", "a password of her own", ""); err != nil {
+		t.Fatal(err)
+	}
+	fresh := newDeviceToken(must(s.UserByEmail("ada@example.com")))
+	for range freeAttempts + 3 {
+		postForm(t, http.DefaultClient, srv.URL+"/login", map[string][]string{"email": {"ada@example.com"}, "password": {"a wrong guess"}})
+	}
+	try := func(devices ...string) int {
+		t.Helper()
+		form := strings.NewReader("email=ada%40example.com&password=a+password+of+her+own")
+		req, _ := http.NewRequest("POST", srv.URL+"/login", form)
+		req.Header.Set("content-type", "application/x-www-form-urlencoded")
+		for _, d := range devices {
+			req.AddCookie(&http.Cookie{Name: deviceCookie, Value: d})
+		}
+		res, err := freshBrowser().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	if code := try(stale); code != http.StatusTooManyRequests {
+		t.Fatalf("the old cookie alone, after the password changed: %d", code)
+	}
+	if code := try(stale, fresh); code != http.StatusSeeOther {
+		t.Fatalf("the old cookie sent first, then the new one: %d", code)
+	}
+}
+
 // Someone on a password their inviter saw can ask who they are and choose their own,
 // and the organisation's API says why it won't answer rather than redirecting.
 func TestAFirstPasswordIsChangedThroughTheAPI(t *testing.T) {
