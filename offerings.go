@@ -21,7 +21,6 @@ type Offering struct {
 	ID           int64     `gorm:"primaryKey" json:"id"`
 	OrgID        int64     `gorm:"uniqueIndex:idx_offering_name,priority:1;not null" json:"-"`
 	Name         string    `gorm:"uniqueIndex:idx_offering_name,priority:2;not null" json:"name"`
-	HasRoles     bool      `gorm:"not null;default:false" json:"has_roles"`
 	LookFor      string    `gorm:"not null;default:''" json:"look_for"`
 	Pitch        string    `gorm:"not null;default:''" json:"pitch"`
 	NoteTemplate string    `gorm:"not null;default:''" json:"note_template"`
@@ -101,7 +100,7 @@ func (s *Store) ChangeOffering(org int64, o Offering, actor string) (*Offering, 
 			return err
 		}
 		res := tx.Model(&Offering{}).Where("org_id = ? and id = ?", org, o.ID).
-			Select("name", "has_roles", "look_for", "pitch", "note_template", "updated_by", "updated_at").Updates(&o)
+			Select("name", "look_for", "pitch", "note_template", "updated_by", "updated_at").Updates(&o)
 		if res.Error != nil || res.RowsAffected == 0 {
 			return missing(res.Error, "no offering %d", o.ID)
 		}
@@ -179,7 +178,7 @@ func (s *Store) JudgeCompany(org, offering, company int64, stage, fit, reason, a
 		if v.Reason != "" {
 			said += ": " + v.Reason
 		}
-		return s.log(tx, org, 0, &company, actor, "company:"+stage, &said)
+		return s.log(tx, org, 0, &company, actor, "verdict:"+stage, &said)
 	})
 }
 

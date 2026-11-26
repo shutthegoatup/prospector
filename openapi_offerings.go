@@ -8,7 +8,7 @@ import (
 )
 
 func offeringOut(o Offering) api.Offering {
-	return api.Offering{Id: o.ID, Name: o.Name, HasRoles: o.HasRoles, LookFor: o.LookFor, Pitch: o.Pitch, NoteTemplate: o.NoteTemplate,
+	return api.Offering{Id: o.ID, Name: o.Name, LookFor: o.LookFor, Pitch: o.Pitch, NoteTemplate: o.NoteTemplate,
 		UpdatedBy: o.UpdatedBy, CreatedAt: o.CreatedAt, UpdatedAt: o.UpdatedAt}
 }
 
@@ -39,7 +39,7 @@ func (s apiServer) AddOffering(ctx context.Context, in api.AddOfferingRequestObj
 		return nil, errors.New("send the offering: {\"name\": …}")
 	}
 	q, b := reqFrom(ctx), in.Body
-	o, err := s.a.s.AddOffering(q.Org.ID, Offering{Name: b.Name, HasRoles: b.HasRoles, LookFor: b.LookFor, Pitch: b.Pitch, NoteTemplate: b.NoteTemplate}, q.Actor())
+	o, err := s.a.s.AddOffering(q.Org.ID, Offering{Name: b.Name, LookFor: b.LookFor, Pitch: b.Pitch, NoteTemplate: b.NoteTemplate}, q.Actor())
 	if err != nil {
 		return nil, err
 	}
@@ -59,9 +59,6 @@ func (s apiServer) ChangeOffering(ctx context.Context, in api.ChangeOfferingRequ
 	put(&o.LookFor, c.LookFor)
 	put(&o.Pitch, c.Pitch)
 	put(&o.NoteTemplate, c.NoteTemplate)
-	if c.HasRoles != nil {
-		o.HasRoles = *c.HasRoles
-	}
 	if o, err = s.a.s.ChangeOffering(q.Org.ID, *o, q.Actor()); err != nil {
 		return nil, err
 	}

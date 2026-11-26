@@ -1089,7 +1089,7 @@ export interface paths {
         head?: never;
         /**
          * Qualify a company, reject it, or put it back for review
-         * @description A rejected company is one agents are told not to suggest again.
+         * @description A company rejected for the organisation's own offering is one agents are told not to suggest again; a verdict for another offering leaves the company's own stage as it was.
          */
         patch: operations["reviewCompany"];
         trace?: never;
@@ -1332,8 +1332,6 @@ export interface components {
             /** Format: int64 */
             id: number;
             name: string;
-            /** @description Companies are judged role by role for it, such as contract openings, rather than once. */
-            has_roles: boolean;
             /** @description What makes a company a fit for it, one `name: what counts` per line. */
             look_for: string;
             /** @description The call script's pitch line. `{company}` is filled in. */
@@ -1348,14 +1346,12 @@ export interface components {
         };
         OfferingNew: {
             name: string;
-            has_roles?: boolean;
             look_for?: string;
             pitch?: string;
             note_template?: string;
         };
         OfferingChange: {
             name?: string | null;
-            has_roles?: boolean | null;
             look_for?: string | null;
             pitch?: string | null;
             note_template?: string | null;

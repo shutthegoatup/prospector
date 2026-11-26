@@ -61,6 +61,17 @@ func TestACompanyIsJudgedForEachOfferingOnItsOwn(t *testing.T) {
 	if !dueNames(t, s, o)["Priya"] {
 		t.Fatal("rejecting for one offering took its people out of outreach for another")
 	}
+	// Agents read a company's history to learn what a person rejected, so a verdict for
+	// one offering mustn't look like the company's own.
+	var own int64
+	if err := s.in(o.ID).Model(&Event{}).Where("company_id = ? and action like 'company:%'", company).Count(&own).Error; err != nil || own != 0 {
+		t.Fatalf("a verdict for an offering was logged as the company's own: %d %v", own, err)
+	}
+	detail := must(s.AgentCompany(o.ID, Actor{Name: "agent:robot"}, "Northwind Payments", PageIn{}))
+	raw, _ := json.Marshal(detail)
+	if said := string(raw); strings.Contains(said, `"company:rejected"`) || !strings.Contains(said, `"verdict:rejected"`) {
+		t.Fatalf("what an agent is told about the company: %s", said)
+	}
 
 	code, body = asKey(t, "GET", review+"/verdicts", reader, nil)
 	var stands struct{ Items []api.Verdict }
@@ -100,9 +111,9 @@ func TestACompanyIsJudgedForEachOfferingOnItsOwn(t *testing.T) {
 		t.Fatal("another organisation's verdicts were listed")
 	}
 
-	code, body = asKey(t, "PATCH", base+"/offerings/"+itoa(cto.Id), owner, map[string]any{"has_roles": true})
-	if json.Unmarshal([]byte(body), &cto); code != http.StatusOK || !cto.HasRoles || cto.Name != "Interim CTO" || cto.LookFor != "trigger: a CTO leaving" {
-		t.Fatalf("changing only whether it has roles: %d %s", code, body)
+	code, body = asKey(t, "PATCH", base+"/offerings/"+itoa(cto.Id), owner, map[string]any{"pitch": "Interim CTO for {company}."})
+	if json.Unmarshal([]byte(body), &cto); code != http.StatusOK || cto.Pitch != "Interim CTO for {company}." || cto.Name != "Interim CTO" || cto.LookFor != "trigger: a CTO leaving" {
+		t.Fatalf("changing only the pitch: %d %s", code, body)
 	}
 
 	ex := must(s.ExportOrg(o.ID, "Ada"))
