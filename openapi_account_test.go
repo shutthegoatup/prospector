@@ -52,12 +52,12 @@ func TestSigningInAndOutThroughTheAPI(t *testing.T) {
 	b := freshBrowser()
 	session := srv.URL + "/api/v1/session"
 
-	if res := asBrowser(t, b, "GET", session, nil); res.StatusCode != http.StatusUnauthorized || problemOf(t, res).Code != api.SignedOut {
+	if res := asBrowser(t, b, "GET", session, nil); res.StatusCode != http.StatusUnauthorized || problemOf(t, res).Type != api.ProblemTypeSignedOut {
 		t.Fatalf("asking who is signed in, before signing in: %s", res.Status)
 	}
 	for _, wrong := range []api.SignIn{{Email: "ada@example.com", Password: "wrong"}, {Email: "nobody@example.com", Password: "wrong"}} {
 		res := asBrowser(t, b, "POST", session, wrong)
-		if p := problemOf(t, res); res.StatusCode != http.StatusUnauthorized || p.Code != api.WrongLogin || p.Detail != errWrongLogin.Error() {
+		if p := problemOf(t, res); res.StatusCode != http.StatusUnauthorized || p.Type != api.ProblemTypeWrongLogin || p.Detail != errWrongLogin.Error() {
 			t.Fatalf("signing in as %s with the wrong password: %s %+v", wrong.Email, res.Status, p)
 		}
 	}
@@ -90,7 +90,7 @@ func TestSigningInAndOutThroughTheAPI(t *testing.T) {
 	if res := asBrowser(t, b, "DELETE", session, nil); res.StatusCode != http.StatusNoContent {
 		t.Fatalf("signing out: %s", res.Status)
 	}
-	if res := asBrowser(t, b, "GET", srv.URL+"/o/alpha/api/v1/settings", nil); res.StatusCode != http.StatusUnauthorized || problemOf(t, res).Code != api.SignedOut {
+	if res := asBrowser(t, b, "GET", srv.URL+"/o/alpha/api/v1/settings", nil); res.StatusCode != http.StatusUnauthorized || problemOf(t, res).Type != api.ProblemTypeSignedOut {
 		t.Fatalf("the organisation's API after signing out: %s", res.Status)
 	}
 	if res := asBrowser(t, b, "DELETE", session, nil); res.StatusCode != http.StatusNoContent {
@@ -126,7 +126,7 @@ func TestSigningInThroughTheAPIIsThrottled(t *testing.T) {
 	for range freeAttempts + 1 {
 		res = asBrowser(t, b, "POST", srv.URL+"/api/v1/session", api.SignIn{Email: "ada@example.com", Password: "wrong"})
 	}
-	if p := problemOf(t, res); res.StatusCode != http.StatusTooManyRequests || p.Code != api.Throttled || res.Header.Get("Retry-After") == "" {
+	if p := problemOf(t, res); res.StatusCode != http.StatusTooManyRequests || p.Type != api.ProblemTypeThrottled || res.Header.Get("Retry-After") == "" {
 		t.Fatalf("one try too many: %s %+v %q", res.Status, p, res.Header.Get("Retry-After"))
 	}
 	// Another browser, with the right password, waits too: it is no browser Ada has used.
@@ -188,7 +188,7 @@ func TestAFirstPasswordIsChangedThroughTheAPI(t *testing.T) {
 		t.Fatalf("asking who is signed in, on a first password: %s", res.Status)
 	}
 	res = asBrowser(t, b, "GET", srv.URL+"/o/alpha/api/v1/settings", nil)
-	if p := problemOf(t, res); res.StatusCode != http.StatusForbidden || p.Code != api.MustChangePassword {
+	if p := problemOf(t, res); res.StatusCode != http.StatusForbidden || p.Type != api.ProblemTypeMustChangePassword {
 		t.Fatalf("the organisation's API, on a first password: %s %+v", res.Status, p)
 	}
 
@@ -231,7 +231,7 @@ func TestResettingAPasswordThroughTheAPI(t *testing.T) {
 	}
 	for _, method := range []string{"GET", "POST"} {
 		res := asBrowser(t, freshBrowser(), method, asked+"/"+token, map[string]string{"password": "yet another password"})
-		if p := problemOf(t, res); res.StatusCode != http.StatusGone || p.Code != api.LinkUsed {
+		if p := problemOf(t, res); res.StatusCode != http.StatusGone || p.Type != api.ProblemTypeLinkUsed {
 			t.Fatalf("%s a used link: %s %+v", method, res.Status, p)
 		}
 	}
@@ -298,7 +298,7 @@ func TestFindingSingleSignOnThroughTheAPI(t *testing.T) {
 		t.Fatalf("a password session where single sign-on is required: %+v", in)
 	}
 	res = asBrowser(t, b.c, "GET", srv.URL+"/o/alpha/api/v1/settings", nil)
-	if p := problemOf(t, res); res.StatusCode != http.StatusForbidden || p.Code != api.SsoRequired {
+	if p := problemOf(t, res); res.StatusCode != http.StatusForbidden || p.Type != api.ProblemTypeSsoRequired {
 		t.Fatalf("the organisation's API before its sign-on: %s %+v", res.Status, p)
 	}
 	start := find(bob.Email)[0].StartUrl

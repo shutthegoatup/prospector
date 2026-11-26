@@ -1,11 +1,14 @@
 package main
 
 import (
+	"log"
+	"net/http"
 	"slices"
 	"sort"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/shutthegoatup/prospector/api"
 )
 
 // The page at /api is the API's contract, drawn from api/openapi.yaml as people read
@@ -18,7 +21,13 @@ type APIDoc struct {
 	Scopes         []APIScope
 	Groups         []APIGroup
 	Schemas        []APISchema
+	Problems       []APIProblem
 }
+
+// APIProblem is a problem type a client acts on, with its entry on the page.
+type APIProblem struct{ Type, Name, About string }
+
+func problemAnchor(name string) string { return "problem-" + name }
 
 type APIScope struct {
 	Name, What string
@@ -103,9 +112,6 @@ func apiDocOf(spec *openapi3.T) APIDoc {
 				for _, mt := range res.Content {
 					r.Type = typeOf(mt.Schema)
 				}
-				if code == "default" {
-					r.Code, r.About = "4xx · 5xx", "What went wrong, as RFC 9457 problem JSON."
-				}
 				o.Responses = append(o.Responses, r)
 			}
 			tag := "other"
@@ -130,7 +136,48 @@ func apiDocOf(spec *openapi3.T) APIDoc {
 	for _, name := range names {
 		doc.Schemas = append(doc.Schemas, schemaOf(name, spec.Components.Schemas[name]))
 	}
+	doc.Problems = problemsOf(spec)
 	return doc
+}
+
+const problemPrefix = "/api/problems/"
+
+func problemsOf(spec *openapi3.T) []APIProblem {
+	kinds := spec.Components.Schemas["ProblemType"].Value
+	about, _ := kinds.Extensions["x-enum-descriptions"].([]any)
+	var out []APIProblem
+	for i, e := range kinds.Enum {
+		t, _ := e.(string)
+		p := APIProblem{Type: t, Name: strings.TrimPrefix(t, problemPrefix)}
+		if i < len(about) {
+			p.About, _ = about[i].(string)
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+// apiProblem sends a problem type's link to its entry on the reference page, so the
+// type a client was given leads somewhere a person can read.
+func (a *App) apiProblem() http.HandlerFunc {
+	spec, err := api.Spec()
+	if err != nil {
+		log.Fatalf("the API spec: %v", err)
+	}
+	known := map[string]bool{}
+	for _, p := range problemsOf(spec) {
+		if p.Type != string(api.ProblemTypeUntyped) {
+			known[p.Name] = true
+		}
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		name := r.PathValue("name")
+		if !known[name] {
+			http.NotFound(w, r)
+			return
+		}
+		http.Redirect(w, r, "/api#"+problemAnchor(name), http.StatusFound)
+	}
 }
 
 func schemaOf(name string, ref *openapi3.SchemaRef) APISchema {

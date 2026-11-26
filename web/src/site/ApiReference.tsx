@@ -31,6 +31,7 @@ export type Doc = {
   scopes: { name: string; what: string; owner?: boolean }[];
   groups: { name: string; about: DocSpan[]; ops: DocOp[] }[];
   schemas: DocSchema[];
+  problems: { anchor: string; type: string; about: DocSpan[] }[];
 };
 
 const repoURL = "https://github.com/shutthegoatup/prospector";
@@ -239,6 +240,22 @@ export function ApiReference({ doc }: { doc: Doc }) {
               change.
             </p>
             <Code>{problemExample}</Code>
+            <p>
+              Each operation lists the statuses it can answer with. A problem a client can act on without reading <code>detail</code> has a <code>type</code> that
+              links here:
+            </p>
+            <dl className="divide-y divide-border">
+              {doc.problems.map((p) => (
+                <div className="scroll-mt-5 py-2" id={p.anchor} key={p.type}>
+                  <dt>
+                    <code>{p.type}</code>
+                  </dt>
+                  <dd className="mt-1 text-[15px] text-muted-foreground">
+                    <Spans of={p.about} />
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </Section>
           {doc.groups.map((g) => (
             <Section key={g.name}>

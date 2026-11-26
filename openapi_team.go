@@ -81,9 +81,7 @@ func (s apiServer) ChangeMyPassword(ctx context.Context, in api.ChangeMyPassword
 	}
 	device, wait, err := s.a.passwordChange(requestFrom(ctx), q.User, in.Body.Current, in.Body.New)
 	if wait > 0 {
-		detail := "too many attempts: try again in " + plural(wait, "second")
-		return api.ChangeMyPassword429ApplicationProblemPlusJSONResponse{Headers: api.ChangeMyPassword429ResponseHeaders{RetryAfter: wait},
-			Body: api.Problem{Type: "about:blank", Title: http.StatusText(http.StatusTooManyRequests), Status: http.StatusTooManyRequests, Detail: detail}}, nil
+		return nil, throttledFor(wait)
 	}
 	if err != nil {
 		return nil, err
