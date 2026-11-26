@@ -244,6 +244,7 @@ func (s *Store) Audience(o *Org, c Campaign) ([]Recipient, error) {
 type audienceWork struct {
 	gate      *mailGate
 	customers []int64
+	noMail    map[string]bool
 }
 
 func (s *Store) audienceWork(o *Org) (*audienceWork, error) {
@@ -255,7 +256,7 @@ func (s *Store) audienceWork(o *Org) (*audienceWork, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &audienceWork{gate: g, customers: customers}, nil
+	return &audienceWork{gate: g, customers: customers, noMail: s.noMailDomains()}, nil
 }
 
 func (s *Store) audience(o *Org, c Campaign, w *audienceWork) ([]Recipient, error) {
@@ -306,6 +307,8 @@ func (s *Store) audience(o *Org, c Campaign, w *audienceWork) ([]Recipient, erro
 					return nil, why
 				}
 				r.LeftOut = because
+			} else if w.noMail[mailDomainOf(addr)] {
+				r.LeftOut = "its domain takes no mail"
 			} else {
 				seen[addr] = r.Name
 			}

@@ -217,14 +217,14 @@ document.addEventListener("change", async (e) => {
 });
 
 // Forms post their fields as JSON: numbers as numbers, a lone checkbox as true/false,
-// checkboxes marked data-multi as a list of the checked values.
+// checkboxes marked data-multi as a list of the checked values, numbers when marked data-number.
 function formJSON(form: HTMLFormElement): Json {
   const out: Json = {};
   for (const el of Array.from(form.elements) as Field[]) {
     if (!el.name || el.disabled) continue;
     if (el instanceof HTMLInputElement && el.type === "checkbox" && el.dataset.multi) {
-      const list = (out[el.name] as string[] | undefined) || [];
-      if (el.checked) list.push(el.value);
+      const list = (out[el.name] as (string | number)[] | undefined) || [];
+      if (el.checked) list.push(el.dataset.number ? +el.value : el.value);
       out[el.name] = list;
     } else if (el instanceof HTMLInputElement && el.type === "checkbox") {
       out[el.name] = el.checked;

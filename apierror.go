@@ -31,6 +31,11 @@ type conflict string
 
 func (e conflict) Error() string { return string(e) }
 
+// refused is an error about something the caller may not do, whatever it sends.
+type refused string
+
+func (e refused) Error() string { return string(e) }
+
 // missing is what a failed look-up means: nothing there, unless the look-up itself
 // failed, which mustn't read as the thing being gone.
 func missing(err error, format string, args ...any) error {
@@ -159,7 +164,10 @@ func statusOf(err error) int {
 	var missing notFound
 	var away notSent
 	var clash conflict
+	var no refused
 	switch {
+	case errors.As(err, &no):
+		return http.StatusForbidden
 	case errors.As(err, &away):
 		return http.StatusBadGateway
 	case errors.As(err, &missing), errors.Is(err, gorm.ErrRecordNotFound):

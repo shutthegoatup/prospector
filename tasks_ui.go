@@ -23,7 +23,7 @@ func (a *App) tasksPage(w http.ResponseWriter, r *http.Request) {
 	var open, all int64
 	logged(a.s.in(q.Org.ID).Model(&Task{}).Where("closed_at is null").Count(&open))
 	logged(a.s.in(q.Org.ID).Model(&Task{}).Count(&all))
-	a.page(w, r, "tasks", TasksView(q, TasksData{Rows: rows, Page: pg, Closed: closed, Open: int(open), All: int(all), Now: now}))
+	a.page(w, r, "research", TasksView(q, TasksData{Rows: rows, Page: pg, Closed: closed, Open: int(open), All: int(all), Now: now}))
 }
 
 func (a *App) taskPage(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +66,7 @@ func (a *App) taskPage(w http.ResponseWriter, r *http.Request) {
 	ended, d.EndedPage = pageSlice(ended, panelPage(r, "runs"), taskRunsPageSize)
 	d.AgentRuns = append(going, ended...)
 	d.Runs, d.WorkPage = pageSlice(d.Runs, panelPage(r, "work"), taskRunsPageSize)
-	a.page(w, r, "tasks", TaskDetailView(q, d))
+	a.page(w, r, "research", TaskDetailView(q, d))
 }
 
 func (a *App) uiDeleteNote(w http.ResponseWriter, r *http.Request) {

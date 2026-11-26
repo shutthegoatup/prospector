@@ -46,6 +46,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -187,6 +188,7 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("open %s: %w", redact(dsn), err)
 	}
+	s.dns = net.DefaultResolver
 	switch cmd {
 	case "serve":
 		addr := "127.0.0.1:8766"

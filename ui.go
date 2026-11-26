@@ -94,7 +94,7 @@ type TodayData struct {
 func (a *App) today(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	now := time.Now()
-	cards, counts := Today(a.dueByStep(q, now), q.Voice(), now)
+	cards, counts := Today(a.dueByStep(q, now), q.Voice(), now, a.s.noMailDomains())
 	d := TodayData{Filter: r.URL.Query().Get("step"), Counts: counts, Total: len(cards),
 		Review: a.s.ResearchCount(q.Org.ID, "review"), Week: a.s.Week(q.Org.ID, now), Now: now.Format("Mon 2 Jan · 15:04")}
 	others, err := a.s.OtherDeals(q.Org.ID)
@@ -150,18 +150,93 @@ func (a *App) today(w http.ResponseWriter, r *http.Request) {
 	a.page(w, r, "today", TodayView(q, d))
 }
 
+// ResearchData is the Research page: the searches agents are on, the queue they fill,
+// and, when one search is chosen, what it has come to.
+type ResearchData struct {
+	Filter string
+	Rows   []ResearchRow
+	Page   Page
+	Counts map[string]int
+	// Searches are the open tasks, newest first, with their agents' runs.
+	Searches []SearchView
+	// Search is the one the queue is narrowed to; nil for all of it.
+	Search *SearchView
+	Notes  []NoteView
+	// Agents are Prospector's agents ready to run; LookFor what Settings says agents look for.
+	Agents  []Agent
+	LookFor []Asset
+}
+
+// SearchView is a task seen from Research: what it found and who is on it.
+type SearchView struct {
+	TaskView
+	Going []AgentRun
+	Ended []AgentRun
+}
+
+const searchesShown = 5
+
+func (a *App) searchView(org int64, t TaskView) SearchView {
+	v := SearchView{TaskView: t}
+	runs, err := a.s.AgentRuns(org, t.ID, 3)
+	if err != nil {
+		log.Print(err)
+	}
+	for _, run := range runs {
+		if run.Going() {
+			v.Going = append(v.Going, run)
+		} else {
+			v.Ended = append(v.Ended, run)
+		}
+	}
+	return v
+}
+
 func (a *App) research(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
-	f := r.URL.Query().Get("f")
-	if f == "" {
-		f = "review"
+	now := time.Now()
+	d := ResearchData{Filter: r.URL.Query().Get("f")}
+	if d.Filter == "" {
+		d.Filter = "review"
 	}
-	rows, pg, err := a.s.Research(q.Org.ID, f, pageParam(r))
-	if err != nil {
+	var task int64
+	if id, err := strconv.ParseInt(r.URL.Query().Get("task"), 10, 64); err == nil && id > 0 {
+		t, err := a.s.Task(q.Org.ID, id, now)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		task = t.ID
+		v := a.searchView(q.Org.ID, *t)
+		d.Search = &v
+		notes, _, err := a.s.TaskNotesPage(q.Org.ID, t.ID, 1)
+		if err != nil {
+			log.Print(err)
+		}
+		d.Notes = notes[:min(len(notes), 3)]
+	}
+	var err error
+	if d.Rows, d.Page, err = a.s.researchFor(q.Org.ID, d.Filter, pageParam(r), task); err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
-	a.page(w, r, "research", ResearchView(q, f, rows, pg, a.s.ResearchCounts(q.Org.ID)))
+	d.Counts = a.s.researchCountsFor(q.Org.ID, task)
+	open, _, err := a.s.Tasks(q.Org.ID, false, 1, now)
+	if err != nil {
+		log.Print(err)
+	}
+	for _, t := range open[:min(len(open), searchesShown)] {
+		d.Searches = append(d.Searches, a.searchView(q.Org.ID, t))
+	}
+	if agents, err := a.s.Agents(q.Org.ID); err == nil {
+		for _, c := range agents {
+			if c.Ready() {
+				d.Agents = append(d.Agents, c)
+			}
+		}
+	}
+	d.LookFor, _ = q.Org.Settings.Assets()
+	a.page(w, r, "research", ResearchView(q, d))
 }
 
 func (a *App) conversations(w http.ResponseWriter, r *http.Request) {

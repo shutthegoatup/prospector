@@ -662,7 +662,7 @@
       if (!el.name || el.disabled) continue;
       if (el instanceof HTMLInputElement && el.type === "checkbox" && el.dataset.multi) {
         const list = out[el.name] || [];
-        if (el.checked) list.push(el.value);
+        if (el.checked) list.push(el.dataset.number ? +el.value : el.value);
         out[el.name] = list;
       } else if (el instanceof HTMLInputElement && el.type === "checkbox") {
         out[el.name] = el.checked;
