@@ -317,7 +317,10 @@ const searchFitCap = 500
 // rankedResearch is one search's companies to review, best fit first, a page of them.
 func (s *Store) rankedResearch(org int64, set OrgSettings, task int64, page int) ([]ResearchRow, Page, bool, error) {
 	rows, ranked, err := s.rankedRows(org, set, task)
-	if err != nil || !ranked {
+	if err != nil {
+		return nil, Page{}, false, err
+	}
+	if !ranked {
 		rows, pg, err := s.researchFor(org, "review", page, task)
 		return rows, pg, false, err
 	}
