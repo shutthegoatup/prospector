@@ -10,7 +10,7 @@ import (
 
 func offeringOut(o Offering) api.Offering {
 	return api.Offering{Id: o.ID, Name: o.Name, LookFor: o.LookFor, LookingFor: lookingFor(OrgSettings{LookFor: o.LookFor}), Pitch: o.Pitch, NoteTemplate: o.NoteTemplate,
-		UpdatedBy: o.UpdatedBy, CreatedAt: o.CreatedAt, UpdatedAt: o.UpdatedAt}
+		HasRoles: o.HasRoles, UpdatedBy: o.UpdatedBy, CreatedAt: o.CreatedAt, UpdatedAt: o.UpdatedAt}
 }
 
 func verdictOut(v VerdictRow) api.Verdict {
@@ -40,7 +40,7 @@ func (s apiServer) AddOffering(ctx context.Context, in api.AddOfferingRequestObj
 		return nil, errors.New("send the offering: {\"name\": …}")
 	}
 	q, b := reqFrom(ctx), in.Body
-	o, err := s.a.s.AddOffering(q.Org.ID, Offering{Name: b.Name, LookFor: b.LookFor, Pitch: b.Pitch, NoteTemplate: b.NoteTemplate}, q.Actor())
+	o, err := s.a.s.AddOffering(q.Org.ID, Offering{Name: b.Name, LookFor: b.LookFor, Pitch: b.Pitch, NoteTemplate: b.NoteTemplate, HasRoles: b.HasRoles}, q.Actor())
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +57,9 @@ func (s apiServer) ChangeOffering(ctx context.Context, in api.ChangeOfferingRequ
 		put(&o.LookFor, c.LookFor)
 		put(&o.Pitch, c.Pitch)
 		put(&o.NoteTemplate, c.NoteTemplate)
+		if c.HasRoles != nil {
+			o.HasRoles = *c.HasRoles
+		}
 	}, q.Actor())
 	if err != nil {
 		return nil, err
@@ -109,4 +112,50 @@ func (s apiServer) ListCompanyVerdicts(ctx context.Context, in api.ListCompanyVe
 		out.Body.Items = append(out.Body.Items, verdictOut(v))
 	}
 	return out, nil
+}
+
+func roleOut(r Role) api.Role {
+	return api.Role{Id: r.ID, OfferingId: r.OfferingID, CompanyId: r.CompanyID, Title: r.Title, Url: r.URL, Details: r.Details,
+		Stage: api.RoleStage(r.Stage), Reason: r.Reason, By: r.By, FoundBy: r.FoundBy, TaskId: r.TaskID, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+}
+
+func (s apiServer) ListCompanyRoles(ctx context.Context, in api.ListCompanyRolesRequestObject) (api.ListCompanyRolesResponseObject, error) {
+	rows, err := s.a.s.Roles(reqFrom(ctx).Org.ID, in.Id, in.Params.Offering)
+	if err != nil {
+		return nil, err
+	}
+	rows, next, err := listPage(rows, in.Params.Limit, in.Params.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListCompanyRoles200JSONResponse{Headers: api.ListCompanyRoles200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out.Body.Items, out.Body.NextCursor = []api.Role{}, next
+	for _, r := range rows {
+		out.Body.Items = append(out.Body.Items, roleOut(r))
+	}
+	return out, nil
+}
+
+func (s apiServer) AddRole(ctx context.Context, in api.AddRoleRequestObject) (api.AddRoleResponseObject, error) {
+	if in.Body == nil {
+		return nil, errors.New("send the role: {\"offering\": …, \"title\": …}")
+	}
+	q, b := reqFrom(ctx), in.Body
+	r, err := s.a.s.AddRole(q.Org.ID, b.Offering, in.Id, RoleIn{Title: b.Title, SourceURL: b.SourceUrl, Details: b.Details}, q.Actor())
+	if err != nil {
+		return nil, err
+	}
+	return api.AddRole201JSONResponse(roleOut(*r)), nil
+}
+
+func (s apiServer) JudgeRole(ctx context.Context, in api.JudgeRoleRequestObject) (api.JudgeRoleResponseObject, error) {
+	if in.Body == nil {
+		return nil, errors.New("send the stage: {\"stage\": \"pursued\"}")
+	}
+	q := reqFrom(ctx)
+	r, err := s.a.s.JudgeRole(q.Org.ID, in.Id, string(in.Body.Stage), in.Body.Reason, q.Actor())
+	if err != nil {
+		return nil, err
+	}
+	return api.JudgeRole200JSONResponse(roleOut(*r)), nil
 }
