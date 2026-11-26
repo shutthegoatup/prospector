@@ -182,6 +182,44 @@ func (s *Store) JudgeCompany(org, offering, company int64, stage, fit, reason, a
 	})
 }
 
+// putUpForReview brings a company found for an offering into that offering's review,
+// unless it has already been judged for it, and says where it stands.
+func putUpForReview(tx *gorm.DB, org, offering, company int64, actor string) (string, error) {
+	v := Verdict{OrgID: org, OfferingID: offering, CompanyID: company, Stage: CompanyReview, By: actor, UpdatedAt: time.Now()}
+	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&v).Error; err != nil {
+		return "", err
+	}
+	var stage string
+	return stage, tx.Model(&Verdict{}).Select("stage").Where("org_id = ? and offering_id = ? and company_id = ?", org, offering, company).Scan(&stage).Error
+}
+
+// offeringStages is where each of these companies stands for an offering; one not yet
+// judged for it is up for review.
+func offeringStages(tx *gorm.DB, org, offering int64, companies []int64) (map[int64]string, error) {
+	out := map[int64]string{}
+	for _, id := range companies {
+		out[id] = CompanyReview
+	}
+	if len(companies) == 0 {
+		return out, nil
+	}
+	var rows []Verdict
+	if err := tx.Where("org_id = ? and offering_id = ? and company_id in ?", org, offering, companies).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, v := range rows {
+		out[v.CompanyID] = v.Stage
+	}
+	return out, nil
+}
+
+func (s *Store) standing(org, company int64) ([]OfferingStanding, error) {
+	var out []OfferingStanding
+	return out, s.db.Model(&Verdict{}).Select("offerings.name as offering, verdicts.stage, verdicts.reason").
+		Joins("join offerings on offerings.id = verdicts.offering_id and offerings.org_id = verdicts.org_id").
+		Where("verdicts.org_id = ? and verdicts.company_id = ?", org, company).Order("lower(offerings.name)").Scan(&out).Error
+}
+
 type VerdictRow struct {
 	Verdict
 	Company string

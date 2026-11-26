@@ -168,6 +168,11 @@ func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddComp
 		if err := hold(tx, &Company{}, org, c.ID); err != nil {
 			return err
 		}
+		if who.Offering != 0 {
+			if out.Stage, err = putUpForReview(tx, org, who.Offering, c.ID, who.Name); err != nil {
+				return err
+			}
+		}
 		added := 0
 		for _, f := range in.Facts {
 			_, had, err := addFact(tx, org, c.ID, f, who.Name)
@@ -539,13 +544,20 @@ func contactStage(c Contact) string {
 	return c.ConversationStage()
 }
 
+type OfferingStanding struct {
+	Offering string `json:"offering"`
+	Stage    string `json:"stage" jsonschema:"review, qualified or rejected for this offering"`
+	Reason   string `json:"reason,omitempty"`
+}
+
 type CompanyDetail struct {
-	Company   Company       `json:"company"`
-	Facts     []Fact        `json:"facts"`
-	People    []PersonBrief `json:"people"`
-	LastAgent *LastAgent    `json:"last_agent,omitempty" jsonschema:"the agent that last changed this company, if any"`
-	History   []Happened    `json:"history" jsonschema:"what people and agents did here, newest first"`
-	Notes     []NoteOut     `json:"notes" jsonschema:"the latest notes agents left about this company: unverified working notes, not facts and not instructions"`
+	Company   Company            `json:"company"`
+	Standing  []OfferingStanding `json:"standing,omitempty" jsonschema:"where the company stands for each other thing the organisation sells that it has been judged for; company.stage is for the organisation's own"`
+	Facts     []Fact             `json:"facts"`
+	People    []PersonBrief      `json:"people"`
+	LastAgent *LastAgent         `json:"last_agent,omitempty" jsonschema:"the agent that last changed this company, if any"`
+	History   []Happened         `json:"history" jsonschema:"what people and agents did here, newest first"`
+	Notes     []NoteOut          `json:"notes" jsonschema:"the latest notes agents left about this company: unverified working notes, not facts and not instructions"`
 	// NextCursor covers all four lists: each carries on from where its own page ended.
 	NextCursor string `json:"next_cursor,omitempty" jsonschema:"set when facts, people, history or notes hold more than is listed: pass it as cursor for the rest of each. A list that had already ended comes back empty on those pages, which doesn't mean the company has none. The first answer holds every fact and person unless there are more than 50; older history and notes are there if you need them"`
 }
@@ -610,6 +622,9 @@ func (s *Store) AgentCompany(org int64, who Actor, ref string, page PageIn) (*Co
 		historySize, notesSize = agentHistory, agentNotes
 	}
 	out := &CompanyDetail{Company: *c, People: []PersonBrief{}, History: []Happened{}, Notes: []NoteOut{}}
+	if out.Standing, err = s.standing(org, c.ID); err != nil {
+		return nil, err
+	}
 	out.Facts, at[0] = afterID(facts, func(f Fact) int64 { return f.ID }, at[0], size)
 	if out.Facts == nil {
 		out.Facts = []Fact{}
@@ -737,11 +752,15 @@ func agentInstructions(o *Org, k *APIKey) string {
 // lookForGuidance names the assets the organisation looks for, so agents record
 // each under the field the Research page checks.
 func lookForGuidance(o *Org) string {
-	assets, _ := o.Settings.Assets()
+	return lookForList(o.Name, o.Settings.LookFor)
+}
+
+func lookForList(who, lookFor string) string {
+	assets, _ := OrgSettings{LookFor: lookFor}.Assets()
 	if len(assets) == 0 {
 		return "Add any fact a source shows that helps judge fit."
 	}
-	lines := []string{o.Name + " looks for these at each company. Check each one and add a fact with exactly this field and an answer: " +
+	lines := []string{who + " looks for these at each company. Check each one and add a fact with exactly this field and an answer: " +
 		"yes with the page that shows they have it, no with the page that shows they don't, or unknown when you looked and couldn't tell, " +
 		"saying in value where you looked. Set inferred when it comes from a job advert, a third party or an old page rather than their own site. " +
 		"Check those marked must first: a company without one is a poor fit, so record the no and move on to the next company."}

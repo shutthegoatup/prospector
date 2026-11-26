@@ -226,6 +226,8 @@ type Actor struct {
 	ReadOnly bool
 	// Session is the MCP session calling, if any: two clients on one key are two agents.
 	Session string
+	// Offering is what Task is finding companies for; 0 is the organisation's own.
+	Offering int64
 }
 
 var Editable = map[string]bool{"phone": true, "email": true, "linkedin": true, "sources": true,

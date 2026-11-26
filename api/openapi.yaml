@@ -2259,6 +2259,7 @@ components:
       properties:
         title: { type: string, description: "A few words naming the task. Empty, it takes the brief's first line; longer than 60 characters, it is cut." }
         brief: { type: string, maxLength: 4000, description: "What is wanted: the task's first request." }
+        offering: { type: integer, format: int64, description: "What the task finds companies for: agents are given its look-for fields, and what they find waits in its review. 0 or left out is the organisation's own." }
         agents:
           type: array
           items: { type: integer, format: int64 }
@@ -2286,10 +2287,11 @@ components:
 
     Task:
       type: object
-      required: [id, title, created_by, created_at, closed_at]
+      required: [id, title, created_by, created_at, closed_at, offering_id]
       properties:
         id: { type: integer, format: int64 }
         title: { type: string }
+        offering_id: { type: integer, format: int64, description: "What the task finds companies for; 0 is the organisation's own." }
         created_by: { type: string }
         created_at: { type: string, format: date-time }
         closed_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }

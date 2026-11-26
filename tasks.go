@@ -22,6 +22,8 @@ type Task struct {
 	CreatedBy string     `json:"created_by"`
 	CreatedAt time.Time  `json:"created_at"`
 	ClosedAt  *time.Time `json:"closed_at,omitempty"`
+	// OfferingID is what the task is finding companies for; 0 is the organisation's own.
+	OfferingID int64 `gorm:"not null;default:0" json:"offering_id"`
 }
 
 // TaskRequest is something a person asked for on a task. The first is the brief.
@@ -84,6 +86,16 @@ func words(text string, max int, what string) (string, error) {
 }
 
 func (s *Store) CreateTask(org int64, title, brief, by string) (*Task, error) {
+	return s.CreateTaskFor(org, 0, title, brief, by)
+}
+
+// CreateTaskFor starts a task finding companies for an offering; 0 is the organisation's own.
+func (s *Store) CreateTaskFor(org, offering int64, title, brief, by string) (*Task, error) {
+	if offering != 0 {
+		if _, err := s.Offering(org, offering); err != nil {
+			return nil, err
+		}
+	}
 	brief, err := words(brief, maxBrief, "the brief")
 	if err != nil {
 		return nil, err
@@ -95,7 +107,7 @@ func (s *Store) CreateTask(org int64, title, brief, by string) (*Task, error) {
 	if r := []rune(title); len(r) > 60 {
 		title = strings.TrimSpace(string(r[:59])) + "…"
 	}
-	t := Task{OrgID: org, Title: title, CreatedBy: by}
+	t := Task{OrgID: org, Title: title, CreatedBy: by, OfferingID: offering}
 	return &t, s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&t).Error; err != nil {
 			return err
@@ -120,10 +132,11 @@ func (s *Store) onTask(org int64, who Actor, task int64) (Actor, error) {
 	if task == 0 {
 		return who, nil
 	}
-	if _, err := openTask(s.db, org, task); err != nil {
+	t, err := openTask(s.db, org, task)
+	if err != nil {
 		return who, err
 	}
-	who.Task = task
+	who.Task, who.Offering = task, t.OfferingID
 	return who, s.renewClaims(s.db, org, task, who, time.Now())
 }
 
@@ -650,6 +663,16 @@ func (s *Store) taskViews(tx *gorm.DB, org int64, tasks []Task, now time.Time) (
 				v.Companies = append(v.Companies, TaskCompany{ID: c.ID, Name: c.Name, Stage: c.Stage, Since: companySince[id]})
 			}
 		}
+		// A task for an offering judges its companies by that offering's verdicts.
+		if t.OfferingID != 0 {
+			stages, err := offeringStages(tx, org, t.OfferingID, slices.Collect(maps.Keys(companySince)))
+			if err != nil {
+				return nil, err
+			}
+			for j := range v.Companies {
+				v.Companies[j].Stage = stages[v.Companies[j].ID]
+			}
+		}
 		for _, id := range slices.Sorted(maps.Keys(personSince)) {
 			if p, here := people[id]; here {
 				v.People = append(v.People, TaskPerson{ID: p.ID, Name: displayName(p), Title: p.Title, Company: companyName(deref(p.Maker)),
@@ -769,8 +792,15 @@ type NoteOut struct {
 	ByYou   bool      `json:"by_you,omitempty"`
 }
 
+type TaskOffering struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Guidance string `json:"guidance" jsonschema:"what to look for and how to judge companies for this offering; it takes the place of the organisation's own look-for list for this task"`
+}
+
 type TaskOut struct {
 	TaskBrief
+	Offering   *TaskOffering `json:"offering,omitempty" jsonschema:"what this task finds companies for, when it isn't the organisation's own offering"`
 	Brief      string        `json:"brief" jsonschema:"what the person asked for, in their words"`
 	Requests   []AskedOut    `json:"requests" jsonschema:"everything asked on this task, oldest first; the first is the brief"`
 	Companies  []TaskCompany `json:"companies" jsonschema:"companies already found for this task"`
@@ -869,6 +899,15 @@ func (s *Store) agentTaskPage(org int64, who Actor, id int64, page PageIn, now t
 	}
 	out := TaskOut{TaskBrief: brief(*v, who), Brief: v.Brief, Requests: []AskedOut{}, Companies: v.Companies, People: v.People, Notes: []NoteOut{},
 		Claimed: claimed}
+	if v.OfferingID != 0 {
+		o, err := s.Offering(org, v.OfferingID)
+		if err != nil {
+			return nil, err
+		}
+		out.Offering = &TaskOffering{ID: o.ID, Name: o.Name, Guidance: "This task finds companies for " + o.Name + ". " +
+			"The stage on each company here, and in what add_company answers, is for " + o.Name + ": skip one rejected for it. " +
+			"A company rejected only for something else is still worth adding for this.\n\n" + lookForList(o.Name, o.LookFor)}
+	}
 	for _, r := range v.Requests {
 		out.Requests = append(out.Requests, asked(r, who))
 	}
