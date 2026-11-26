@@ -1456,7 +1456,8 @@ func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
 	const right, wrong = "correct horse battery", "a wrong guess"
 
 	code, issued := try("ada@example.com", right, "")
-	if code != http.StatusSeeOther || issued == nil || !issued.HttpOnly || issued.Path != "/login" || strings.Contains(issued.Value, "example") {
+	// For every path, so the sign-in form and the API both count by it.
+	if code != http.StatusSeeOther || issued == nil || !issued.HttpOnly || issued.Path != "/" || strings.Contains(issued.Value, "example") {
 		t.Fatalf("first sign-in: %d, device cookie %+v", code, issued)
 	}
 	_, bobs := try("bob@example.com", right, "")
@@ -1534,7 +1535,7 @@ func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
 			renewed = c
 		}
 	}
-	if changed.StatusCode != http.StatusOK || renewed == nil || renewed.Path != "/login" {
+	if changed.StatusCode != http.StatusOK || renewed == nil || renewed.Path != "/" {
 		t.Fatalf("changing a password while the address is held: %d, device cookie %+v", changed.StatusCode, renewed)
 	}
 	if _, ok := s.knownDevice("bob@example.com", bobs.Value); ok {

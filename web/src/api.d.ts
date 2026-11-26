@@ -4,6 +4,156 @@
  */
 
 export interface paths {
+    "/api/v1/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who is signed in
+         * @description The person this browser is signed in as and the organisations the session opens.
+         *     An organisation's own sign-on may still stand in the way of one of them: its
+         *     `sso_required` says so. Answers even while `must_change_password` holds, which is
+         *     all a new member can do until they have chosen their own.
+         */
+        get: operations["getSession"];
+        put?: never;
+        /**
+         * Sign in with a password
+         * @description Sets the session cookie and answers what `getSession` would. A wrong address or
+         *     password is `wrong_login` either way, so nobody learns which accounts exist; too
+         *     many tries is `throttled`, with `Retry-After`. An address whose organisation
+         *     requires its own sign-on is signed in all the same, and that organisation then
+         *     shows `sso_required`.
+         */
+        post: operations["signIn"];
+        /**
+         * Sign out
+         * @description Ends this browser's session and clears its cookie. Signed out already is no error.
+         */
+        delete: operations["signOut"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change your password
+         * @description Signs out every other session of yours. Works while `must_change_password` holds,
+         *     and clears it. A wrong `current` counts against you like a wrong sign-in, and too
+         *     many is `throttled`.
+         */
+        put: operations["changePassword"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sign-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The ways to sign in here
+         * @description What the sign-in page offers on this server. Says nothing about any account.
+         */
+        get: operations["getSignInWays"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sign-in/sso": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The organisations whose sign-on speaks for an address
+         * @description Worked out from the address's domain alone, so it says nothing about whether the
+         *     account exists. Also marks this browser as having asked, which the `start_url`s
+         *     need: a link from another site can't walk anyone through a provider. Go to a
+         *     `start_url` as a page, not with fetch; the provider sends the browser back to
+         *     `/login/callback`, which signs it in. 404 when this server has no address of its
+         *     own for providers to send people back to.
+         */
+        post: operations["findSingleSignOn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/password-resets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Email a link to choose a new password
+         * @description Answers the same whether or not the address has an account, and the link lasts an
+         *     hour. 404 when this server sends no mail.
+         */
+        post: operations["requestPasswordReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/password-resets/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The secret in the emailed link. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Whose password a link resets
+         * @description 410, with `code` `link_used`, once the link is used, out of date or replaced.
+         */
+        get: operations["getPasswordReset"];
+        put?: never;
+        /**
+         * Choose a new password from a link
+         * @description Uses the link up and signs the account out everywhere. Sign in afterwards with the new password.
+         */
+        post: operations["resetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/agents": {
         parameters: {
             query?: never;
@@ -3068,6 +3218,11 @@ export interface components {
             title: string;
             status: number;
             detail?: string;
+            /**
+             * @description What a client can act on without reading `detail`. Absent when there is nothing to do but show it.
+             * @enum {string}
+             */
+            code?: "wrong_login" | "throttled" | "link_used" | "signed_out" | "must_change_password" | "sso_required" | "session_limited";
         };
         /**
          * @description `openai` is any OpenAI-compatible endpoint; `anthropic` is Claude through Anthropic's own API.
@@ -3839,6 +3994,58 @@ export interface components {
             id: number;
             round: number;
         };
+        Session: {
+            user: components["schemas"]["SessionUser"];
+            /** @description Still on a password someone else saw: nothing opens until `changePassword`. */
+            must_change_password: boolean;
+            /** @description Began at one organisation's own sign-on, so it opens that organisation alone and can't start another. */
+            limited: boolean;
+            /** @description Every organisation this session opens, the one to land on first. */
+            orgs: components["schemas"]["SessionOrg"][];
+        };
+        SessionUser: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            email: string;
+            /** @description False for someone who signs in only through a provider. */
+            has_password: boolean;
+        };
+        SessionOrg: {
+            slug: string;
+            name: string;
+            /** @enum {string} */
+            role: "member" | "owner";
+            /** @description The organisation wants its own sign-on first; `findSingleSignOn` gives the way there. */
+            sso_required: boolean;
+        };
+        SignIn: {
+            email: string;
+            password: string;
+        };
+        SignInWays: {
+            /** @description Signing in with a password. Always offered. */
+            password: boolean;
+            /** @description `requestPasswordReset` works: this server sends mail. */
+            forgot: boolean;
+            /** @description `findSingleSignOn` works: organisations here may have their own sign-on. */
+            sso: boolean;
+            social: components["schemas"]["SocialWay"][];
+        };
+        SocialWay: {
+            /** @description Like `google`. */
+            key: string;
+            /** @description Like `Google`. */
+            label: string;
+            /** @description Where to go, as a page, to sign in this way. Add `?next=` for where to land. */
+            start_url: string;
+        };
+        SingleSignOnOrg: {
+            slug: string;
+            name: string;
+            /** @description Where to go, as a page, to sign in through this organisation's provider. */
+            start_url: string;
+        };
         Said: {
             /** @description What happened, for a person. */
             message: string;
@@ -4008,6 +4215,239 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    signIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignIn"];
+            };
+        };
+        responses: {
+            /** @description Signed in. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            /** @description Too many tries; `code` is `throttled`. */
+            429: {
+                headers: {
+                    /** @description Seconds until the next try counts. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    signOut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    current: string;
+                    new: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Changed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getSignInWays: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The ways. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignInWays"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    findSingleSignOn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    email: string;
+                    /** @description A path on this site to land on afterwards. */
+                    next?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The organisations, none when nobody's sign-on covers the domain. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        orgs: components["schemas"]["SingleSignOnOrg"][];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    requestPasswordReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    email: string;
+                };
+            };
+        };
+        responses: {
+            /** @description If the address has an account, a link is on its way. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getPasswordReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The secret in the emailed link. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        email: string;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    resetPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The secret in the emailed link. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     listAgents: {
         parameters: {
             query?: {
