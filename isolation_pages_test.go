@@ -17,6 +17,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
 // sourceFiles are the package's own, without tests or generated templates.
@@ -37,12 +39,25 @@ func sourceFiles(t *testing.T) (names []string) {
 // wrongField reads, from a refused body, the field that was the wrong kind of value.
 var wrongField = regexp.MustCompile(`cannot unmarshal \w+ into Go (?:struct field|value of type) \S*?\.?([a-z_]+) of type`)
 
+var pathParam = regexp.MustCompile(`\{(?:id|task|user|recipient|domain)\}`)
+
 var routeRe = regexp.MustCompile(`mux\.HandleFunc\("(GET|POST) (/o/\{org\}/[^"]*)"`)
 
-// orgRoutes reads every page and form of an organisation out of the source, so a
-// route added later is tried without anyone remembering to list it.
+// orgRoutes reads every page and form of an organisation out of the source, and every
+// read the app's pages make out of the API's spec, so a route or operation added later
+// is tried without anyone remembering to list it. The pages themselves are one shell
+// that shows nothing until it reads the API.
 func orgRoutes(t *testing.T) (gets, posts []string) {
 	t.Helper()
+	spec, err := api.Spec()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, item := range spec.Paths.Map() {
+		if item.Get != nil && strings.HasPrefix(path, "/o/{org}/") {
+			gets = append(gets, pathParam.ReplaceAllString(path, "{id}"))
+		}
+	}
 	for _, name := range sourceFiles(t) {
 		text, err := os.ReadFile(name)
 		if err != nil {
@@ -178,7 +193,9 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 		path := strings.ReplaceAll(route, "{id}", "1")
 		path = strings.TrimSuffix(path, "{$}")
 		for _, query := range []string{"", "?q=" + findable, "?f=review", "?f=details", "?closed=1", "?spam=1", "?stage=qualified",
-			"?step=linkedin", "?segment=" + theirs, "?state=waiting", "?kind=other", "?page=2"} {
+			"?step=linkedin", "?segment=" + theirs, "?state=waiting", "?kind=other", "?page=2",
+			"?filter=review", "?filter=details", "?filter=rejected", "?closed=true", "?spam=true", "?stage=research", "?task=1", "?company=1",
+			"?url=https://www.linkedin.com/in/" + findable + "&name=" + findable} {
 			if _, body := call(t, intruder, "GET", srv.URL+strings.Replace(path, "{org}", "beta", 1)+query, "", nil); strings.Contains(body, theirs) {
 				t.Errorf("GET %s%s as another organisation's owner shows the first one's rows", route, query)
 			}
@@ -193,7 +210,7 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 	}
 	// The first organisation's own owner does see its rows on those pages, so not
 	// seeing them above means something.
-	if shown < 8 {
+	if shown < 20 {
 		t.Fatalf("only %d of %d pages show the first organisation its own rows", shown, len(gets))
 	}
 	unchanged("reading the pages")
@@ -294,7 +311,7 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 		unchanged("POST " + route + " with the first organisation's own values")
 	}
 	// None of that signed the visitor out, which would have made every answer after it a refusal.
-	if code, body := call(t, intruder, "GET", srv.URL+"/o/beta/today", "", nil); code != http.StatusOK || !strings.Contains(body, "Today") {
+	if code, body := call(t, intruder, "GET", srv.URL+"/o/beta/api/v1/nav", "", nil); code != http.StatusOK || !strings.Contains(body, `"slug":"beta"`) {
 		t.Fatalf("the second organisation's owner is no longer signed in: %d", code)
 	}
 }

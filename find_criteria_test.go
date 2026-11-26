@@ -1,13 +1,42 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/api"
 )
+
+// researchQueue is what the Research page lists, read as it reads it.
+type researchQueue struct {
+	Items  []api.ResearchCompany `json:"items"`
+	Ranked bool                  `json:"ranked"`
+	body   string
+}
+
+func readResearch(t *testing.T, client *http.Client, u string) researchQueue {
+	t.Helper()
+	code, body := call(t, client, "GET", u, "", nil)
+	var q researchQueue
+	if code != http.StatusOK || json.Unmarshal([]byte(body), &q) != nil {
+		t.Fatalf("GET %s: %d %s", u, code, body)
+	}
+	q.body = body
+	return q
+}
+
+func (q researchQueue) names() []string {
+	var out []string
+	for _, c := range q.Items {
+		out = append(out, c.Name)
+	}
+	return out
+}
 
 const criteriaLookFor = "configurator (must): a product configurator on their site\npayments: takes payment online\ncrm: which CRM they run"
 
@@ -117,19 +146,22 @@ func TestASearchRanksItsCompaniesByFit(t *testing.T) {
 		}
 	}
 
-	_, ranked := call(t, client, "GET", fmt.Sprintf("%s/o/alpha/research?task=%d", srv.URL, task.ID), "", nil)
-	at := func(page, name string) int { return strings.Index(page, ">"+name+"<") }
-	if !(at(ranked, "Corran Craft") < at(ranked, "Brine Boats") && at(ranked, "Brine Boats") < at(ranked, "Anchor Works")) || at(ranked, "Corran Craft") < 0 {
-		t.Fatal("a search's companies should come best fit first, one missing a must last")
+	ranked := readResearch(t, client, fmt.Sprintf("%s/o/alpha/api/v1/research?task=%d", srv.URL, task.ID))
+	if got := strings.Join(ranked.names(), ", "); got != "Corran Craft, Brine Boats, Anchor Works" || !ranked.Ranked {
+		t.Fatalf("a search's companies should come best fit first, one missing a must last: %s (ranked %v)", got, ranked.Ranked)
 	}
-	for _, want := range []string{"Best fit first", "2 of 3 · 1 unchecked", "2 of 3 · misses a must", "not met", "· must"} {
-		if !strings.Contains(ranked, want) {
-			t.Errorf("the ranked queue is missing %q", want)
+	for _, want := range []string{`"text":"2 of 3 · 1 unchecked"`, `"text":"2 of 3 · misses a must"`} {
+		if !strings.Contains(ranked.body, want) {
+			t.Errorf("the ranked queue is missing %s", want)
 		}
 	}
-	_, all := call(t, client, "GET", srv.URL+"/o/alpha/research", "", nil)
-	if at(all, "Anchor Works") > at(all, "Corran Craft") || at(all, "Anchor Works") < 0 || strings.Contains(all, "Best fit first") {
-		t.Error("the whole queue should stay newest first")
+	anchor := ranked.Items[2].Criteria[0]
+	if anchor.Field != "configurator" || !anchor.Must || anchor.State != api.NotMet {
+		t.Errorf("the must Anchor Works misses: %+v", anchor)
+	}
+	all := readResearch(t, client, srv.URL+"/o/alpha/api/v1/research")
+	if got := strings.Join(all.names(), ", "); got != "Anchor Works, Brine Boats, Corran Craft" || all.Ranked {
+		t.Errorf("the whole queue should stay newest first: %s (ranked %v)", got, all.Ranked)
 	}
 }
 

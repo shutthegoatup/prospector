@@ -1,5 +1,5 @@
 import { type ComponentProps, type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, Meta, Pill, type Tone, useRefresh } from "@/components/app";
@@ -8,6 +8,7 @@ import { actor, plural, stamp } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Pager, StageTag, usePages } from "@/pages/Companies";
 import { OnboardingCard, today } from "@/pages/Onboarding";
+import { safeHref } from "@/lib/links";
 import { useSession } from "@/session";
 
 type Overview = components["schemas"]["CompanyOverview"];
@@ -23,10 +24,6 @@ const notesSize = 20;
 const field = "h-9 rounded-lg border border-input bg-muted px-3 text-sm";
 const select = "h-9 rounded-lg border border-input bg-muted px-2 text-sm";
 
-// safe is a link only to a web address, as the server-rendered pages allow.
-function safe(u: string) {
-  return /^https?:\/\/\S+$/.test(u.trim()) ? u.trim() : "#";
-}
 
 function save(data: unknown, name: string) {
   const a = document.createElement("a");
@@ -48,7 +45,7 @@ function formBody(form: HTMLFormElement) {
 
 export function CompanyPage() {
   const { org } = useSession();
-  const id = Number(useParams().id);
+  const { id } = useParams({ from: "/o/$org/companies/$id" });
   const overview = $api.useQuery("get", "/o/{org}/api/v1/companies/{id}/overview", { params: { path: { org, id } } });
   const historyPages = usePages(`history:${id}`);
   const notesPages = usePages(`notes:${id}`);
@@ -60,7 +57,7 @@ export function CompanyPage() {
   });
 
   const back = (
-    <Link to="/companies" className="font-mono text-xs">
+    <Link to="/o/$org/companies" params={{ org }} className="font-mono text-xs">
       ← Companies
     </Link>
   );
@@ -117,7 +114,7 @@ export function CompanyPage() {
                 <span className="font-mono text-xs text-muted-foreground">{f.field}</span>
                 <span>{f.value}</span>
                 {f.source_url ? (
-                  <a href={safe(f.source_url)} target="_blank" rel="noopener" className="font-mono text-xs">
+                  <a href={safeHref(f.source_url)} target="_blank" rel="noopener" className="font-mono text-xs">
                     source ↗
                   </a>
                 ) : (
@@ -202,7 +199,7 @@ function LookingFor({ found }: { found: Criterion[] }) {
   if (found.length === 0) {
     return (
       <div className="mt-1 text-sm text-muted-foreground">
-        {owner ? <a href={`/o/${org}/settings`}>Name what you look for</a> : "Nothing named yet"}
+        {owner ? <Link to="/o/$org/settings" params={{ org }}>Name what you look for</Link> : "Nothing named yet"}
       </div>
     );
   }
@@ -235,9 +232,9 @@ function People({ c }: { c: Overview }) {
       <div className="flex items-center justify-between">
         <Eyebrow>People</Eyebrow>
         {sales && (
-          <a href={`/o/${org}/add?company=${encodeURIComponent(c.name)}`} className="font-mono text-xs">
+          <Link to="/o/$org/add" params={{ org }} search={{ company: c.name }} className="font-mono text-xs">
             + add
-          </a>
+          </Link>
         )}
       </div>
       {c.people.length === 0 && <p className="py-2 text-sm text-muted-foreground">No one yet.</p>}
@@ -249,7 +246,7 @@ function People({ c }: { c: Overview }) {
             </span>
             <span className="flex items-center gap-2">
               {p.linkedin && (
-                <a href={safe(p.linkedin)} target="_blank" rel="noopener" className="font-mono text-xs">
+                <a href={safeHref(p.linkedin)} target="_blank" rel="noopener" className="font-mono text-xs">
                   LinkedIn ↗
                 </a>
               )}
@@ -316,7 +313,7 @@ function SuggestedDetails({ list }: { list: Pending[] }) {
               <span className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs text-mark">{actor(d.by)}</span>
                 {d.source_url && (
-                  <a href={safe(d.source_url)} target="_blank" rel="noopener" className="font-mono text-xs">
+                  <a href={safeHref(d.source_url)} target="_blank" rel="noopener" className="font-mono text-xs">
                     source ↗
                   </a>
                 )}
@@ -652,9 +649,9 @@ function SubscriptionUpdate({ s }: { s: Subscription }) {
       <Failed errors={[problem, change.error]} />
       {s.renewing ? (
         <p className="mt-2 border-t border-border pt-2">
-          <a href={`/o/${org}/conversations`} className="font-mono text-xs text-mark underline">
+          <Link to="/o/$org/conversations" params={{ org }} className="font-mono text-xs text-mark underline">
             Renewal under way in Conversations
-          </a>
+          </Link>
         </p>
       ) : s.status !== "ended" && s.people.length > 0 ? (
         <form

@@ -2938,6 +2938,57 @@ paths:
               schema: { $ref: "#/components/schemas/Me" }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/nav:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: getNav
+      tags: [settings]
+      summary: What the app's sidebar shows
+      description: |
+        Who is asking, the organisation, the others they belong to, what they work on, and
+        how much waits on each page. An API key is no one, so it gets the organisation and
+        the counts, with no user and no other organisations.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The sidebar.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Nav" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/orgs:
+    post:
+      operationId: createOrg
+      tags: [settings]
+      summary: Start an organisation
+      description: |
+        A new organisation with you as its owner. A signed-in person only: a key belongs to
+        one organisation and can't start another. A sign-in through one organisation's single
+        sign-on opens only that one, so it can't either.
+      security:
+        - session: []
+        - bearer: [read]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses:
+        "201":
+          description: The organisation, started.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrgSummary" }
+        default: { $ref: "#/components/responses/Problem" }
+
   /o/{org}/api/v1/me/password:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -4680,6 +4731,59 @@ components:
         has_password: { type: boolean, description: "False for someone who signs in only through a provider." }
         caller_name: { type: string, description: "Used in call scripts; empty uses your name." }
         signature: { type: string, description: "Added to copied emails." }
+    OrgSummary:
+      type: object
+      required: [id, slug, name, color]
+      properties:
+        id: { type: integer, format: int64 }
+        slug: { type: string, description: "Its part of every address: /o/{slug}/." }
+        name: { type: string }
+        color: { type: string, description: "A CSS colour, for its mark." }
+    NavOrg:
+      type: object
+      required: [id, slug, name, color, role]
+      properties:
+        id: { type: integer, format: int64 }
+        slug: { type: string }
+        name: { type: string }
+        color: { type: string }
+        role: { type: string, enum: [member, owner] }
+    Nav:
+      type: object
+      required: [org, orgs, areas, sales, support, owner, work, counts]
+      properties:
+        user:
+          type: object
+          description: "Who is asking; absent for an API key."
+          x-go-type-skip-optional-pointer: false
+          required: [name, email]
+          properties:
+            name: { type: string }
+            email: { type: string }
+        org: { $ref: "#/components/schemas/OrgSummary" }
+        orgs:
+          type: array
+          description: "Every organisation this sign-in opens, with your role in each; none for an API key."
+          items: { $ref: "#/components/schemas/NavOrg" }
+        role: { type: string, enum: [member, owner], description: "Yours here; absent for an API key." }
+        areas:
+          type: array
+          items: { type: string, enum: [sales, support] }
+          description: "The areas you were given; an owner may have none and still works every area."
+        sales: { type: boolean, description: "Whether you change sales work here: an owner, or given sales." }
+        support: { type: boolean, description: "Whether you change support work here: an owner, or given support." }
+        owner: { type: boolean }
+        work: { type: string, description: "What you do here in a few words, such as \"member · sales\"." }
+        counts:
+          type: object
+          description: "How much waits on each page."
+          required: [today, research, conversations, enquiries, companies]
+          properties:
+            today: { type: integer, description: "Everything due on Today." }
+            research: { type: integer, description: "Companies waiting for review." }
+            conversations: { type: integer, description: "Conversations and further deals still open." }
+            enquiries: { type: integer, description: "Enquiries nobody has answered yet." }
+            companies: { type: integer, description: "Every company." }
     MeChange:
       type: object
       properties:

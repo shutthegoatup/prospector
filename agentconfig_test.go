@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/shutthegoatup/prospector/api"
 )
 
 const agentTestKey = "sk-test-0123456789abcdef"
@@ -161,14 +163,14 @@ func TestAnOwnerSetsUpTheAgent(t *testing.T) {
 		t.Fatalf("the kept key: %v", err)
 	}
 
-	_, page := call(t, ada, "GET", srv.URL+"/o/alpha/agents", "", nil)
-	for _, want := range []string{"Prospector runs it", `value="router/auto"`, "brave-search_brave_web_search", `value="fetch_fetch" data-multi="true" checked`, "saved: leave empty to keep it"} {
-		if !strings.Contains(page, want) {
-			t.Errorf("the Agents page is missing %q", want)
-		}
+	_, page := call(t, ada, "GET", srv.URL+"/o/alpha/api/v1/agents", "", nil)
+	listed := listedAgents(t, ada, srv.URL)
+	if len(listed) != 1 || listed[0].Model != "router/auto" || !listed[0].HasKey || strings.Join(listed[0].AllowedTools, " ") != "fetch_fetch" ||
+		!slices.ContainsFunc(listed[0].Tools, func(tl api.Tool) bool { return tl.Name == "brave-search_brave_web_search" }) {
+		t.Errorf("the agent as the Agents page reads it: %+v", listed)
 	}
 	if strings.Contains(page, agentTestKey) || strings.Contains(page, c.APIKey) {
-		t.Fatal("the Agents page shows the key")
+		t.Fatal("the agents' list shows the key")
 	}
 
 	// A key isn't sent to an address it wasn't given for.
@@ -219,10 +221,13 @@ func TestAnOrganisationHasSeveralAgents(t *testing.T) {
 	if len(agents) != 4 || agents[0].Name != "ChatGPT" {
 		t.Fatalf("the agents, by name: %+v", agents)
 	}
-	_, page := call(t, ada, "GET", srv.URL+"/o/alpha/agents", "", nil)
-	for _, a := range agents {
-		if !strings.Contains(page, fmt.Sprintf(`list="agent-models-%d"`, a.ID)) || !strings.Contains(page, fmt.Sprintf(`id="agent-models-%d"`, a.ID)) {
-			t.Fatalf("each agent's form should have its own model list: %s", a.Name)
+	listed := listedAgents(t, ada, srv.URL)
+	if len(listed) != len(agents) {
+		t.Fatalf("the agents' list: %+v", listed)
+	}
+	for i, a := range agents {
+		if listed[i].Id != a.ID || listed[i].Name != a.Name || listed[i].Models == nil {
+			t.Fatalf("each agent comes with its own model list: %+v", listed[i])
 		}
 	}
 
@@ -308,11 +313,11 @@ func TestAnEndpointAtItsLimitStillSaves(t *testing.T) {
 	if c := must(s.agentNamed(must(s.OrgBySlug("alpha")).ID, "Prospector")); !c.Ready() {
 		t.Fatalf("the settings weren't kept: %+v", c)
 	}
-	if _, page := call(t, ada, "GET", srv.URL+"/o/alpha/agents", "", nil); !strings.Contains(page, "Last check: Models: the endpoint answered 429") {
-		t.Fatal("the Agents page doesn't say the last check was refused")
+	if listed := listedAgents(t, ada, srv.URL); len(listed) != 1 || !strings.Contains(listed[0].State.Todo, "Last check: Models: the endpoint answered 429") {
+		t.Fatalf("the agent doesn't say its last check was refused: %+v", listed)
 	}
 	if models, _ := fake.auths(); len(models) != 1 {
-		t.Fatalf("rendering the Agents page called the endpoint: %d calls", len(models))
+		t.Fatalf("listing the agents called the endpoint: %d calls", len(models))
 	}
 }
 
@@ -579,6 +584,17 @@ func TestRefusalsReadBothErrorShapes(t *testing.T) {
 
 // saveAgentAt saves an agent through the API as a browser's form does: a new one
 // posted, one with an id put to its own address. A save answers 200 either way.
+// listedAgents are the organisation's agents as the Agents page reads them.
+func listedAgents(t *testing.T, c *http.Client, base string) []api.Agent {
+	t.Helper()
+	code, body := call(t, c, "GET", base+"/o/alpha/api/v1/agents?limit=200", "", nil)
+	var out struct{ Items []api.Agent }
+	if code != http.StatusOK || json.Unmarshal([]byte(body), &out) != nil {
+		t.Fatalf("listing the agents: %d %s", code, body)
+	}
+	return out.Items
+}
+
 func saveAgentAt(t *testing.T, c *http.Client, base string, body map[string]any) (int, string) {
 	t.Helper()
 	method, path := "POST", base+"/o/alpha/api/v1/agents"

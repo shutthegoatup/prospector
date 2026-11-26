@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { type FormEvent, type ReactNode, useState } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
@@ -626,9 +627,9 @@ function Work() {
             {r.tasks.map((t) => (
               <span key={t.id}>
                 {" "}
-                <a href={`/o/${org}/tasks/${t.id}`} className="font-mono text-xs text-mark underline">
+                <Link to="/o/$org/tasks/$id" params={{ org, id: t.id }} className="font-mono text-xs text-mark underline">
                   {t.title}
-                </a>
+                </Link>
               </span>
             ))}
             <span className="block text-muted-foreground">{r.text}</span>

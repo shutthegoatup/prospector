@@ -1,12 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/mail"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
 // link makes an unsubscribe link for an address, as a marketing mail will.
@@ -168,12 +171,23 @@ func TestTheListIsKeptByMembersAndKeys(t *testing.T) {
 		t.Errorf("a cursor this list never gave out: %d", code)
 	}
 
-	_, page := call(t, member, "GET", srv.URL+"/o/alpha/settings", "", nil)
-	if !strings.Contains(page, "Not to be mailed") || !strings.Contains(page, "tom@larkmoor.example") || !strings.Contains(page, `data-form="api/v1/suppressions"`) {
-		t.Error("Settings doesn't show the list or the form to add to it")
+	// Settings reads the list as a member, and offers to take off only what was added.
+	code, page := call(t, member, "GET", list+"?limit=200", "", nil)
+	var rows struct{ Items []api.Suppression }
+	if code != http.StatusOK || json.Unmarshal([]byte(page), &rows) != nil {
+		t.Fatalf("the list, read as a member: %d %s", code, page)
 	}
-	if strings.Contains(page, `data-post="api/v1/suppressions/`+itoa(added.ID)+`"`) {
-		t.Error("Settings offers to take off someone who unsubscribed themselves")
+	found := false
+	for _, r := range rows.Items {
+		if r.Address == "tom@larkmoor.example" {
+			found = true
+			if r.Id != added.ID || r.Reason != "unsubscribed" || r.By != "" {
+				t.Errorf("someone who unsubscribed themselves should be shown as theirs, so they can't be taken off: %+v", r)
+			}
+		}
+	}
+	if !found {
+		t.Error("the list lacks someone who unsubscribed")
 	}
 }
 

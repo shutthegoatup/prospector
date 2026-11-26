@@ -492,8 +492,8 @@ func TestASecretKeptInClearIsSealedOnceThereIsAKey(t *testing.T) {
 		t.Fatalf("saving a connection with no key: %d %s", code, body)
 	}
 	// A connection made before there was a key can still be changed, short of its secret.
-	if _, page, _ := owner.get("/o/alpha/settings"); !strings.Contains(page, "PROSPECTOR_SECRET_KEYS") || !strings.Contains(page, `name="required"`) {
-		t.Fatal("Settings should still offer an existing connection's rules, and say a key is needed for a new secret")
+	if _, body, _ := owner.get("/o/alpha/api/v1/sso"); !strings.Contains(body, `"sealing":false`) || !strings.Contains(body, `"has_client_secret":true`) || !strings.Contains(body, `"issuer":"`+okta.srv.URL+`"`) {
+		t.Fatalf("Settings should still offer an existing connection's rules, and say a key is needed for a new secret: %s", body)
 	}
 	in = map[string]any{"issuer": okta.srv.URL, "client_id": "client", "required": true}
 	if code, body := owner.post("/o/alpha/ui/sso", in); code != http.StatusOK {
@@ -506,8 +506,10 @@ func TestASecretKeptInClearIsSealedOnceThereIsAKey(t *testing.T) {
 		t.Fatalf("turning single sign-on off needs no key: %d %s", code, body)
 	}
 	// Domains need no key, so they stay in reach with no key and no connection.
-	if _, page, _ := owner.get("/o/alpha/settings"); !strings.Contains(page, "PROSPECTOR_SECRET_KEYS") || !strings.Contains(page, "alpha.example") || !strings.Contains(page, `id="sso-domain"`) {
-		t.Fatal("with no key and no connection, Settings should say a key is needed and still list the domains")
+	_, sso, _ := owner.get("/o/alpha/api/v1/sso")
+	code, domains, _ := owner.get("/o/alpha/api/v1/sso/domains")
+	if !strings.Contains(sso, `"sealing":false`) || code != http.StatusOK || !strings.Contains(domains, `"domain":"alpha.example"`) {
+		t.Fatalf("with no key and no connection, Settings should say a key is needed and still list the domains: %s %d %s", sso, code, domains)
 	}
 	if err := s.db.Create(&SSOConnection{OrgID: alpha.ID, Issuer: okta.srv.URL, ClientID: "client", ClientSecret: "secret"}).Error; err != nil {
 		t.Fatal(err)

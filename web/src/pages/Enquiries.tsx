@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, FilterChip, Meta, PageHead, Pill, Quote, type Tone, useRefresh, Whose } from "@/components/app";
@@ -17,7 +17,7 @@ const states = [
   { key: "open", label: "To answer" },
   { key: "waiting", label: "Waiting on them" },
   { key: "closed", label: "Closed" },
-];
+] as const;
 
 const kinds = [
   { key: "sales", label: "Sales" },
@@ -26,7 +26,7 @@ const kinds = [
   { key: "support", label: "Help" },
   { key: "feature", label: "Feature request" },
   { key: "other", label: "Other" },
-];
+] as const;
 
 const select = "h-8 rounded-lg border border-input bg-muted px-2 text-sm";
 const area = "rounded-lg border border-input bg-muted px-3 py-2 text-sm leading-relaxed";
@@ -70,10 +70,8 @@ function threadMeta(m: Message) {
 
 export function EnquiriesPage() {
   const { org, support } = useSession();
-  const [params] = useSearchParams();
-  const kind = params.get("kind") ?? "";
-  const state = params.get("state") ?? "";
-  const spam = !!params.get("spam");
+  const { kind = "", state = "", spam = false } = useSearch({ from: "/o/$org/enquiries" });
+  const here = { to: "/o/$org/enquiries", params: { org } } as const;
   // Each cursor is where a page after the first starts, so Previous is one pop.
   const [cursors, setCursors] = useState<string[]>([]);
   useEffect(() => setCursors([]), [kind, state, spam]);
@@ -104,15 +102,15 @@ export function EnquiriesPage() {
           {states
             .filter((s) => s.key !== "closed" && (counts.states[s.key] ?? 0) > 0)
             .map((s) => (
-              <FilterChip key={s.key} to={`?state=${s.key}`} label={s.label} count={counts.states[s.key] ?? 0} on={state === s.key} />
+              <FilterChip key={s.key} {...here} search={{ state: s.key }} label={s.label} count={counts.states[s.key] ?? 0} on={state === s.key} />
             ))}
-          <FilterChip to="." label="All" count={counts.all} on={!kind && !state && !spam} />
+          <FilterChip {...here} label="All" count={counts.all} on={!kind && !state && !spam} />
           {kinds
             .filter((k) => (counts.kinds[k.key] ?? 0) > 0)
             .map((k) => (
-              <FilterChip key={k.key} to={`?kind=${k.key}`} label={k.label} count={counts.kinds[k.key] ?? 0} on={kind === k.key && !spam} />
+              <FilterChip key={k.key} {...here} search={{ kind: k.key }} label={k.label} count={counts.kinds[k.key] ?? 0} on={kind === k.key && !spam} />
             ))}
-          {counts.spam > 0 && <FilterChip to="?spam=1" label="Spam" count={counts.spam} on={spam} />}
+          {counts.spam > 0 && <FilterChip {...here} search={{ spam: true }} label="Spam" count={counts.spam} on={spam} />}
         </div>
       )}
       {list.error && <p className="text-sm text-[var(--stop)]">The enquiries couldn't be read. Reload to try again.</p>}
@@ -176,9 +174,9 @@ function EnquiryCard({ e, members, canReply }: { e: Enquiry; members: string[]; 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Meta>{from(e)}</Meta>
         {e.company_id !== 0 && (
-          <a href={`/o/${org}/companies/${e.company_id}`} className="font-mono text-xs text-mark underline">
+          <Link to="/o/$org/companies/$id" params={{ org, id: e.company_id }} className="font-mono text-xs text-mark underline">
             {e.company_name}
-          </a>
+          </Link>
         )}
       </div>
       {!e.spam && !support && (
@@ -226,9 +224,9 @@ function EnquiryCard({ e, members, canReply }: { e: Enquiry; members: string[]; 
         <span className="flex items-center gap-2">
           {!e.spam &&
             (e.in_conversation ? (
-              <a href={`/o/${org}/conversations`} className="font-mono text-xs text-mark underline">
+              <Link to="/o/$org/conversations" params={{ org }} className="font-mono text-xs text-mark underline">
                 In Conversations
-              </a>
+              </Link>
             ) : (
               (sales || support) && (
                 <ActionButton quiet size="xs" onClick={() => converse.mutate(converseOn)} disabled={converse.isPending}>

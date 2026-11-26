@@ -62,6 +62,10 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 // apiCaller works out who is asking: a key, or a signed-in member of the organisation.
 func (a *App) apiCaller(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if hasKey(r) && r.PathValue("org") == "" {
+			writeProblem(w, http.StatusForbidden, "a key belongs to one organisation and can't start another: sign in to do that")
+			return
+		}
 		if hasKey(r) {
 			a.agent("", next.ServeHTTP)(w, r)
 			return
@@ -90,7 +94,7 @@ func (a *App) apiScope(scopes map[string][]string) api.StrictMiddlewareFunc {
 			case q.Key == nil && slices.ContainsFunc(need, ownersOnly) && !q.Owner():
 				writeProblem(w, http.StatusForbidden, "only an owner of this organisation can change that")
 				return nil, nil
-			case q.Key == nil && !q.Member.Works(opArea[op]):
+			case q.Key == nil && q.Org != nil && !q.Member.Works(opArea[op]):
 				writeProblem(w, http.StatusForbidden, areaRefusal(opArea[op]))
 				return nil, nil
 			}

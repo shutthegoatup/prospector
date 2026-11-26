@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
@@ -141,9 +142,9 @@ function CompanyLink({ c }: { c: Card }) {
   const { org } = useSession();
   if (!c.company_id) return null;
   return (
-    <a href={`/o/${org}/companies/${c.company_id}`} className="font-mono text-xs text-muted-foreground hover:text-mark">
+    <Link to="/o/$org/companies/$id" params={{ org, id: c.company_id }} className="font-mono text-xs text-muted-foreground hover:text-mark">
       {" · " + c.company}
-    </a>
+    </Link>
   );
 }
 
@@ -179,9 +180,9 @@ function WonNext({ c, planned, day }: { c: Card; planned: number; day: string })
   if (c.stage !== "won" || !c.company_id) return null;
   if (c.onboarding) {
     return (
-      <a href={`/o/${org}/companies/${c.company_id}`} className="font-mono text-xs text-mark underline">
+      <Link to="/o/$org/companies/$id" params={{ org, id: c.company_id }} className="font-mono text-xs text-mark underline">
         {c.onboarding === "running" ? "Onboarding under way" : "Onboarded"}
-      </a>
+      </Link>
     );
   }
   if (planned === 0 || !(sales || support)) return null;

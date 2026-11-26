@@ -1,12 +1,13 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, FilterChip, Meta, PageHead, Pill, RailCard, useRefresh, Whose } from "@/components/app";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { actor, plural } from "@/lib/format";
+import { safeHref } from "@/lib/links";
 import { useSession } from "@/session";
 
 type DueCard = components["schemas"]["DueCard"];
@@ -62,18 +63,14 @@ function writeClipboard(text: string) {
   area.remove();
 }
 
-function safeHref(u: string) {
-  return /^https?:\/\//i.test(u.trim()) ? u.trim() : "#";
-}
 
-type Todo = { label: string; count: number; to?: string; href?: string };
+type LinkTo = (props: { className: string; children: ReactNode }) => ReactNode;
+type Todo = { label: string; count: number; link: LinkTo };
 
 export function TodayPage() {
   const { org, sales } = useSession();
-  const [params] = useSearchParams();
-  const filter = params.get("step") ?? "";
-  const known = steps.find((s) => s.key === filter);
-  const list = $api.useQuery("get", "/o/{org}/api/v1/today", { params: { path: { org }, query: { step: known?.key, limit: pageSize } } });
+  const { step: filter } = useSearch({ from: "/o/$org/today" });
+  const list = $api.useQuery("get", "/o/{org}/api/v1/today", { params: { path: { org }, query: { step: filter, limit: pageSize } } });
   const summary = $api.useQuery("get", "/o/{org}/api/v1/today/summary", { params: { path: { org } } });
   const client = useQueryClient();
   const [focus, setFocus] = useState(0);
@@ -105,25 +102,27 @@ export function TodayPage() {
 
   const counts = list.data?.counts ?? {};
   const total = list.data?.total ?? 0;
-  const cards = filter && !known ? [] : (list.data?.items ?? []);
-  const shown = filter && !known ? 0 : (list.data?.shown ?? 0);
+  const cards = list.data?.items ?? [];
+  const shown = list.data?.shown ?? 0;
   const later = list.data?.later_calls ?? 0;
   const s = summary.data;
 
   const todo: Todo[] = [];
-  const add = (label: string, count: number, where: { to?: string; href?: string }) => count > 0 && todo.push({ label, count, ...where });
+  const add = (label: string, count: number, link: LinkTo) => count > 0 && todo.push({ label, count, link });
+  const step = (step: Step): LinkTo => (p) => <Link to="/o/$org/today" params={{ org }} search={{ step }} {...p} />;
+  const page = (to: "/o/$org/conversations" | "/o/$org/subscriptions" | "/o/$org/onboarding" | "/o/$org/research"): LinkTo => (p) => <Link to={to} params={{ org }} {...p} />;
   if (list.data && s) {
-    add("Answer enquiries", s.enquiries, { href: `/o/${org}/enquiries?state=open` });
-    add("Set next steps", counts.next ?? 0, { to: "/today?step=next" });
-    add("Move renewals and other deals on", s.deals, { href: `/o/${org}/conversations` });
-    add("Look at subscriptions coming due", s.subscriptions, { href: `/o/${org}/subscriptions` });
-    add("Move onboarding steps on", s.onboarding_steps, { href: `/o/${org}/onboarding` });
-    add("Make calls now", (counts.call ?? 0) - later, { to: "/today?step=call" });
-    add("Send LinkedIn messages", counts.accepted ?? 0, { to: "/today?step=accepted" });
-    add("Send emails", counts.email ?? 0, { to: "/today?step=email" });
-    add("Send follow-ups", counts.followup ?? 0, { to: "/today?step=followup" });
-    add("Add on LinkedIn", counts.linkedin ?? 0, { to: "/today?step=linkedin" });
-    add("Review researched companies", s.review, { href: `/o/${org}/research` });
+    add("Answer enquiries", s.enquiries, (p) => <Link to="/o/$org/enquiries" params={{ org }} search={{ state: "open" }} {...p} />);
+    add("Set next steps", counts.next ?? 0, step("next"));
+    add("Move renewals and other deals on", s.deals, page("/o/$org/conversations"));
+    add("Look at subscriptions coming due", s.subscriptions, page("/o/$org/subscriptions"));
+    add("Move onboarding steps on", s.onboarding_steps, page("/o/$org/onboarding"));
+    add("Make calls now", (counts.call ?? 0) - later, step("call"));
+    add("Send LinkedIn messages", counts.accepted ?? 0, step("accepted"));
+    add("Send emails", counts.email ?? 0, step("email"));
+    add("Send follow-ups", counts.followup ?? 0, step("followup"));
+    add("Add on LinkedIn", counts.linkedin ?? 0, step("linkedin"));
+    add("Review researched companies", s.review, page("/o/$org/research"));
   }
 
   const marked = async (next: number) => {
@@ -144,11 +143,11 @@ export function TodayPage() {
             things due, best first: next steps, calls where it's office hours, messages, emails, follow-ups, then LinkedIn adds.
           </p>
           <nav className="flex flex-wrap gap-2" aria-label="Filter by step">
-            <FilterChip to="/today" label="All" count={total} on={filter === ""} />
+            <FilterChip to="/o/$org/today" params={{ org }} label="All" count={total} on={!filter} />
             {steps
               .filter((st) => (counts[st.key] ?? 0) > 0 || filter === st.key)
               .map((st) => (
-                <FilterChip key={st.key} to={`/today?step=${st.key}`} label={st.label} count={counts[st.key] ?? 0} on={filter === st.key} />
+                <FilterChip key={st.key} to="/o/$org/today" params={{ org }} search={{ step: st.key }} label={st.label} count={counts[st.key] ?? 0} on={filter === st.key} />
               ))}
           </nav>
           {filter === "linkedin" && sales && (
@@ -211,15 +210,7 @@ function DoNow({ t }: { t: Todo }) {
       </span>
     </>
   );
-  return t.to ? (
-    <Link to={t.to} className={className}>
-      {inner}
-    </Link>
-  ) : (
-    <a href={t.href} className={className}>
-      {inner}
-    </a>
-  );
+  return t.link({ className, children: inner });
 }
 
 function Stat({ n, label }: { n: number; label: string }) {
@@ -464,9 +455,9 @@ function TodayCard({ c, index, focused, onMarked }: { c: DueCard; index: number;
             <h2 className="mt-2 font-heading text-2xl font-bold leading-tight tracking-tight">{c.name}</h2>
             <p className="mt-0.5 truncate text-sm text-muted-foreground">
               {c.company_id ? (
-                <a className="text-foreground/90 hover:text-mark" href={`/o/${org}/companies/${c.company_id}`}>
+                <Link className="text-foreground/90 hover:text-mark" to="/o/$org/companies/$id" params={{ org, id: c.company_id }}>
                   {c.company}
-                </a>
+                </Link>
               ) : (
                 <span className="text-foreground/90">{c.company}</span>
               )}

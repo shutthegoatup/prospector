@@ -69,11 +69,12 @@ func TestExportOrg(t *testing.T) {
 	if code, _ := call(t, ada, "GET", srv.URL+"/o/alpha/ui/export-org", "", nil); code == http.StatusOK {
 		t.Fatal("following a link exported the organisation")
 	}
-	if _, page := call(t, bob, "GET", srv.URL+"/o/alpha/settings", "", nil); strings.Contains(page, "ui/export-org") {
-		t.Fatal("Settings offers the export to someone who isn't an owner")
+	// Settings offers the export to whoever the nav says is an owner.
+	if !navOwner(t, ada, srv.URL) || navOwner(t, bob, srv.URL) {
+		t.Fatal("the nav should offer the export to an owner alone")
 	}
-	if _, page := call(t, ada, "GET", srv.URL+"/o/alpha/settings", "", nil); !strings.Contains(page, `data-download="ui/export-org"`) {
-		t.Fatal("Settings gives an owner no way to export the organisation")
+	if code, _ := call(t, bob, "POST", srv.URL+"/o/alpha/api/v1/export", "application/json", struct{}{}); code != http.StatusForbidden {
+		t.Fatalf("a member who isn't an owner exported the organisation through the API: %d", code)
 	}
 
 	code, body := export(ada)

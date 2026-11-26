@@ -6,8 +6,6 @@ import (
 )
 
 func (a *App) taskRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /o/{org}/tasks", a.member(a.tasksPage))
-	mux.HandleFunc("GET /o/{org}/tasks/{id}", a.member(a.taskPage))
 	mux.HandleFunc("POST /o/{org}/ui/note/delete", a.works(areaSales, a.uiDeleteNote))
 }
 

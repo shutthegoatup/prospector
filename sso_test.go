@@ -294,8 +294,8 @@ func TestSocialSignIn(t *testing.T) {
 	if code != http.StatusSeeOther || location != "/o/alpha/research" {
 		t.Fatalf("a verified address: %d to %q", code, location)
 	}
-	if code, body, _ := b.get("/o/alpha/research"); code != http.StatusOK || !strings.Contains(body, "Ada Lovelace") {
-		t.Fatalf("the app after a social sign-in: %d", code)
+	if code, body, _ := b.get("/o/alpha/api/v1/nav"); code != http.StatusOK || !strings.Contains(body, `"name":"Ada Lovelace"`) {
+		t.Fatalf("the app after a social sign-in: %d %s", code, body)
 	}
 
 	// The link is the provider's subject: a changed or unverified address there still signs the same person in.
@@ -517,15 +517,15 @@ func TestOrganisationSingleSignOn(t *testing.T) {
 	if err := s.SetAreas(alpha.ID, bob.ID, []string{areaSales, areaSupport}); err != nil {
 		t.Fatal(err)
 	}
-	if code, body, _ := b.get("/o/alpha/today"); code != http.StatusOK || !strings.Contains(body, "Bob Stone") {
-		t.Fatalf("the organisation after its own sign-in: %d", code)
+	if code, body, _ := b.get("/o/alpha/api/v1/nav"); code != http.StatusOK || !strings.Contains(body, `"name":"Bob Stone"`) {
+		t.Fatalf("the organisation after its own sign-in: %d %s", code, body)
 	}
 	// Alpha's provider vouched for Bob at Alpha, and nowhere else he belongs.
 	if code, _, location := b.get("/o/beta/today"); code != http.StatusSeeOther || !strings.HasPrefix(location, "/login?") {
 		t.Fatalf("another organisation, on a session one organisation's provider began: %d %q", code, location)
 	}
-	if code, body, _ := b.get("/o/alpha/today"); code != http.StatusOK || strings.Contains(body, "/o/beta/") {
-		t.Fatal("the organisation switcher offers one this session can't open")
+	if code, body, _ := b.get("/o/alpha/api/v1/nav"); code != http.StatusOK || strings.Contains(body, `"slug":"beta"`) || !strings.Contains(body, `"slug":"alpha"`) {
+		t.Fatalf("the organisation switcher offers one this session can't open: %d %s", code, body)
 	}
 	if code, _ := b.post("/orgs", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
 		t.Fatalf("starting an organisation on a limited session: %d", code)
@@ -650,8 +650,8 @@ func TestPeopleJoinThroughSingleSignOn(t *testing.T) {
 	if _, _, err := s.Login("dan@alpha.example", ""); err == nil {
 		t.Fatal("an account with no password signs in with an empty one")
 	}
-	if _, body, _ := b.get("/o/alpha/settings"); strings.Contains(body, "Your password") || !strings.Contains(body, "Your sign-in") {
-		t.Fatal("Settings offers a password change to somebody who has no password")
+	if _, body, _ := b.get("/o/alpha/api/v1/me"); !strings.Contains(body, `"has_password":false`) {
+		t.Fatalf("Settings offers a password change to somebody who has no password: %s", body)
 	}
 
 	// An owner who signs in this way stays an owner.
@@ -811,9 +811,9 @@ func TestSingleSignOnSettings(t *testing.T) {
 	if sso, _ := s.SSO(alpha.ID); sso.Issuer != okta.srv.URL || sso.ClientID != "client" {
 		t.Fatalf("a refused change was saved: %+v", sso.SSOConnection)
 	}
-	_, page, _ := owner.get("/o/alpha/settings")
-	if !strings.Contains(page, srv.URL+"/login/callback") || !strings.Contains(page, "Kept. Type a new one") {
-		t.Fatal("Settings doesn't show the redirect URI to register, or that the secret is kept")
+	_, page, _ := owner.get("/o/alpha/api/v1/sso")
+	if !strings.Contains(page, `"redirect_uri":"`+srv.URL+`/login/callback"`) || !strings.Contains(page, `"has_client_secret":true`) {
+		t.Fatalf("Settings doesn't show the redirect URI to register, or that the secret is kept: %s", page)
 	}
 	var events []Event
 	s.in(alpha.ID).Where("action = ?", "sso:change").Find(&events)
@@ -856,8 +856,12 @@ func TestSingleSignOnSettings(t *testing.T) {
 			t.Errorf("a member changing single sign-on at %q: %d", path, code)
 		}
 	}
-	if _, body, _ := member.get("/o/alpha/settings"); strings.Contains(body, "Single sign-on") {
-		t.Error("a member is shown the single sign-on settings")
+	// Settings shows single sign-on only to an owner, and the API reads it only for one.
+	if _, body, _ := member.get("/o/alpha/api/v1/nav"); !strings.Contains(body, `"owner":false`) {
+		t.Errorf("a member is shown the single sign-on settings: %s", body)
+	}
+	if code, _, _ := member.get("/o/alpha/api/v1/sso"); code != http.StatusForbidden {
+		t.Errorf("a member reads the single sign-on settings: %d", code)
 	}
 
 	if code, body := owner.post("/o/alpha/ui/sso", map[string]any{"issuer": ""}); code != http.StatusOK {

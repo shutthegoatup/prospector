@@ -9,14 +9,14 @@ import (
 	"github.com/shutthegoatup/prospector/api"
 )
 
-// The React Settings page offers the owner's parts only to an owner, by the mount's word.
+// The Settings page offers the owner's parts only to an owner, by the nav's word.
 func TestTheSettingsPageKnowsWhoIsAnOwner(t *testing.T) {
 	s, o, srv, ada := signedIn(t)
 	mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
 	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")
-	for want, c := range map[string]*http.Client{`data-owner="true"`: ada, `data-owner="false"`: asGrace} {
-		if code, page := call(t, c, "GET", srv.URL+"/o/alpha/app/settings", "", nil); code != http.StatusOK || !strings.Contains(page, want) {
-			t.Errorf("the Settings page should carry %s: %d", want, code)
+	for want, c := range map[string]*http.Client{`"owner":true`: ada, `"owner":false`: asGrace} {
+		if code, body := call(t, c, "GET", srv.URL+"/o/alpha/api/v1/nav", "", nil); code != http.StatusOK || !strings.Contains(body, want) {
+			t.Errorf("the nav should say %s: %d %s", want, code, body)
 		}
 	}
 }

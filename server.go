@@ -374,20 +374,8 @@ func (a *App) Routes() http.Handler {
 		q := reqOf(r)
 		http.Redirect(w, r, q.Base()+landing(q.Member), http.StatusSeeOther)
 	}))
-	mux.HandleFunc("GET /o/{org}/today", a.member(a.today))
-	mux.HandleFunc("GET /o/{org}/research", a.member(a.research))
-	mux.HandleFunc("GET /o/{org}/app/{page...}", a.member(a.reactPage))
-	mux.HandleFunc("GET /o/{org}/conversations", a.member(a.conversations))
-	mux.HandleFunc("GET /o/{org}/companies", a.member(a.companies))
-	mux.HandleFunc("GET /o/{org}/companies/{id}", a.member(a.company))
+	a.appRoutes(mux)
 	mux.HandleFunc("GET /o/{org}/agreements/{id}/prepare", a.member(a.prepareAgreement))
-	mux.HandleFunc("GET /o/{org}/add", a.member(a.addPage))
-	mux.HandleFunc("GET /o/{org}/settings", a.member(a.settings))
-	mux.HandleFunc("GET /o/{org}/agents", a.member(a.agents))
-	mux.HandleFunc("GET /o/{org}/enquiries", a.member(a.enquiriesPage))
-	mux.HandleFunc("GET /o/{org}/subscriptions", a.member(a.subscriptionsPage))
-	mux.HandleFunc("GET /o/{org}/campaigns", a.member(a.campaignsPage))
-	mux.HandleFunc("GET /o/{org}/onboarding", a.member(a.onboardingPage))
 	a.taskRoutes(mux)
 	mux.HandleFunc("OPTIONS "+intakePattern, a.intakePreflight)
 	mux.HandleFunc("POST "+intakePattern, a.intake)
@@ -694,14 +682,9 @@ func (a *App) newOrg(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	q := reqOf(r)
-	if q.Session.Limited {
-		fail(w, errors.New("you're signed in through one organisation's single sign-on, which opens only that organisation: sign in with a password to start another"), http.StatusForbidden)
-		return
-	}
-	o, err := a.s.CreateOrgWithOwner("", in.Name, q.User)
+	o, err := newOrgFor(a.s, reqOf(r), in.Name)
 	if err != nil {
-		fail(w, err, http.StatusBadRequest)
+		fail(w, err, statusOf(err))
 		return
 	}
 	writeJSON(w, map[string]string{"go": "/o/" + o.Slug + "/settings"})

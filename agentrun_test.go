@@ -6,10 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
 const searchTool = "brave-search_brave_web_search"
@@ -322,9 +325,29 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 	if code, body := start(ada, 99); code != http.StatusNotFound || !strings.Contains(body, "no agent") {
 		t.Fatalf("starting an agent that isn't there: %d %s", code, body)
 	}
-	page := fmt.Sprintf("%s/o/alpha/tasks/%d", srv.URL, task.ID)
-	if _, body := call(t, ada, "GET", page, "", nil); strings.Contains(body, "/runs&#34;") {
-		t.Fatal("the task page offers agents nobody set up")
+	// The task page offers each ready agent with no run going on the task.
+	ready := func() (names []string) {
+		for _, a := range listedAgents(t, ada, srv.URL) {
+			if a.Ready {
+				names = append(names, a.Name)
+			}
+		}
+		return names
+	}
+	going := func() (names []string) {
+		_, body := call(t, ada, "GET", fmt.Sprintf("%s/o/alpha/api/v1/tasks/%d/runs", srv.URL, task.ID), "", nil)
+		var runs struct{ Items []api.Run }
+		json.Unmarshal([]byte(body), &runs)
+		for _, r := range runs.Items {
+			if r.Status == api.RunStatus(RunWorking) || r.Status == api.RunStatus(RunWaiting) {
+				names = append(names, r.AgentName)
+			}
+		}
+		slices.Sort(names)
+		return names
+	}
+	if len(ready()) != 0 {
+		t.Fatal("agents nobody set up are ready")
 	}
 	var agents []*Agent
 	for _, name := range []string{"Claude", "Gateway"} {
@@ -334,8 +357,8 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 		}
 		agents = append(agents, must(s.agentNamed(o.ID, name)))
 	}
-	if _, body := call(t, ada, "GET", page, "", nil); !strings.Contains(body, "Run Claude") || !strings.Contains(body, "Run Gateway") {
-		t.Fatal("the task page doesn't offer each agent")
+	if strings.Join(ready(), " ") != "Claude Gateway" || len(going()) != 0 {
+		t.Fatalf("each agent should be ready, and none going: %v %v", ready(), going())
 	}
 
 	release := make(chan struct{})
@@ -369,8 +392,8 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 	if code, body := start(ada, agents[0].ID); code != http.StatusConflict || !strings.Contains(body, "Claude is already working") {
 		t.Fatalf("the same agent twice on one task: %d %s", code, body)
 	}
-	if _, body := call(t, ada, "GET", page, "", nil); !strings.Contains(body, "Stop Claude") || !strings.Contains(body, "Stop Gateway") || strings.Contains(body, "Run Claude") {
-		t.Fatal("the task page should show both runs going, and offer neither again")
+	if strings.Join(going(), " ") != "Claude Gateway" {
+		t.Fatalf("both runs should be going, so neither is offered again: %v", going())
 	}
 	close(release)
 	var runs []AgentRun

@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
-	"strings"
 	"testing"
 	"time"
 )
@@ -41,21 +39,29 @@ func TestATasksPageHasPagesOfEachList(t *testing.T) {
 		t.Fatalf("the second page of a task's notes: %d notes, %+v, %v", len(page), pg, err)
 	}
 
-	url := fmt.Sprintf("%s/o/alpha/tasks/%d", srv.URL, task.ID)
-	code, body := call(t, client, "GET", url, "", nil)
-	if code != http.StatusOK || strings.Count(body, "Page 1 of 2") != 3 {
-		t.Fatalf("the task's page should offer a second page of its notes, its runs and its work: %d, %d pagers", code, strings.Count(body, "Page 1 of 2"))
+	// The task's page reads each list through the API, a page at a time and each on its
+	// own cursor.
+	base := fmt.Sprintf("%s/o/alpha/api/v1/tasks/%d/", srv.URL, task.ID)
+	notePages := apiPages(t, client, base+"notes?limit="+fmt.Sprint(taskNotesPageSize))
+	if len(notePages) != 2 || len(notePages[1].Items) != 5 || notePages[1].Items[4]["text"] != "Left note 0." || notePages[0].Items[0]["company"] != "Larkmoor" {
+		t.Fatalf("the task's notes should come in two pages, oldest last: %d", len(notePages))
 	}
-	// The run still going is shown whatever page of ended ones is, with what stops it.
-	if !strings.Contains(body, "Stop Still going") || strings.Contains(body, "Left note 0.") || strings.Contains(body, "Ended run 0.") {
-		t.Fatal("the first page shows what belongs on the second, or leaves out the run still going")
+	// The run still going comes first, whatever page of ended ones follows.
+	runPages := apiPages(t, client, fmt.Sprintf("%s/o/alpha/api/v1/tasks/%d/runs?limit=%d", srv.URL, task.ID, taskRunsPageSize))
+	if len(runPages) != 2 || runPages[0].Items[0]["agent_name"] != "Still going" {
+		t.Fatalf("the task's runs should come in two pages, the one going first: %d", len(runPages))
 	}
-	_, body = call(t, client, "GET", url+"?notes=2&runs=2&work=2", "", nil)
-	if !strings.Contains(body, "Left note 0.") || !strings.Contains(body, "Ended run 0.") || !strings.Contains(body, "Stop Still going") || strings.Count(body, "Page 2 of 2") != 3 {
-		t.Fatal("the second page of each doesn't show its oldest, or loses the run still going")
+	var ended []any
+	for _, pg := range runPages {
+		for _, r := range pg.Items {
+			ended = append(ended, r["agent_name"])
+		}
 	}
-	// Each pager keeps the others where they are.
-	if !strings.Contains(body, "?runs=2&amp;work=2") || !strings.Contains(body, "?notes=2&amp;work=2") || !strings.Contains(body, "?notes=2&amp;runs=2\"") {
-		t.Fatal("going back a page of one list loses the page of the others")
+	if len(ended) != taskRunsPageSize+4 || ended[len(ended)-1] != "Ended run 0." {
+		t.Fatalf("every run, once each: %v", ended)
+	}
+	workPages := apiPages(t, client, base+"work?limit="+fmt.Sprint(taskRunsPageSize))
+	if len(workPages) != 2 || len(workPages[0].Items)+len(workPages[1].Items) != taskRunsPageSize+4 || workPages[1].Items[len(workPages[1].Items)-1]["actor"] != "agent:worker0" {
+		t.Fatalf("the task's work should come in two pages, the oldest last: %d", len(workPages))
 	}
 }

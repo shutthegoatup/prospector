@@ -2058,6 +2058,53 @@ export interface paths {
         patch: operations["changeMe"];
         trace?: never;
     };
+    "/o/{org}/api/v1/nav": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What the app's sidebar shows
+         * @description Who is asking, the organisation, the others they belong to, what they work on, and
+         *     how much waits on each page. An API key is no one, so it gets the organisation and
+         *     the counts, with no user and no other organisations.
+         */
+        get: operations["getNav"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start an organisation
+         * @description A new organisation with you as its owner. A signed-in person only: a key belongs to
+         *     one organisation and can't start another. A sign-in through one organisation's single
+         *     sign-on opens only that one, so it can't either.
+         */
+        post: operations["createOrg"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/me/password": {
         parameters: {
             query?: never;
@@ -3765,6 +3812,61 @@ export interface components {
             caller_name: string;
             /** @description Added to copied emails. */
             signature: string;
+        };
+        OrgSummary: {
+            /** Format: int64 */
+            id: number;
+            /** @description Its part of every address: /o/{slug}/. */
+            slug: string;
+            name: string;
+            /** @description A CSS colour, for its mark. */
+            color: string;
+        };
+        NavOrg: {
+            /** Format: int64 */
+            id: number;
+            slug: string;
+            name: string;
+            color: string;
+            /** @enum {string} */
+            role: "member" | "owner";
+        };
+        Nav: {
+            /** @description Who is asking; absent for an API key. */
+            user?: {
+                name: string;
+                email: string;
+            };
+            org: components["schemas"]["OrgSummary"];
+            /** @description Every organisation this sign-in opens, with your role in each; none for an API key. */
+            orgs: components["schemas"]["NavOrg"][];
+            /**
+             * @description Yours here; absent for an API key.
+             * @enum {string}
+             */
+            role?: "member" | "owner";
+            /** @description The areas you were given; an owner may have none and still works every area. */
+            areas: ("sales" | "support")[];
+            /** @description Whether you change sales work here: an owner, or given sales. */
+            sales: boolean;
+            /** @description Whether you change support work here: an owner, or given support. */
+            support: boolean;
+            owner: boolean;
+            /** @description What you do here in a few words, such as "member · sales". */
+            work: string;
+            /** @description How much waits on each page. */
+            counts: {
+                /** @description Everything due on Today. */
+                today: number;
+                /** @description Companies waiting for review. */
+                research: number;
+                /** @description Conversations and further deals still open. */
+                conversations: number;
+                /** @description Enquiries nobody has answered yet. */
+                enquiries: number;
+                /** @description Every company. */
+                companies: number;
+            };
         };
         MeChange: {
             caller_name?: string | null;
@@ -7158,6 +7260,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Me"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getNav: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sidebar. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Nav"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createOrg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The organisation, started. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgSummary"];
                 };
             };
             default: components["responses"]["Problem"];

@@ -253,8 +253,9 @@ func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
 	if len(up) < 2 || html.UnescapeString(up[1]) != `{"position":1}` {
 		t.Errorf("Ada's move up: %q", up)
 	}
-	if _, company := call(t, member, "GET", srv+"/o/alpha/companies/"+itoa(*hannah.CompanyID), "", nil); !strings.Contains(company, "agreements/"+itoa(a.ID)+"/prepare") {
-		t.Error("the company's page doesn't lead to Prepare for signing")
+	// The company's page leads to Prepare for signing for an agreement with its document.
+	if shown := companyPageOverview(t, member, srv, *hannah.CompanyID).Agreements; len(shown) != 1 || shown[0].Id != a.ID || shown[0].FileHash == "" {
+		t.Errorf("the company's page should offer to prepare the agreement: %+v", shown)
 	}
 
 	grace := must(s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
