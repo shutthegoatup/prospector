@@ -101,7 +101,7 @@ func TestNoPageOffersWorkItsViewerWouldBeRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pages := []string{"today", "research", "conversations", "companies/" + itoa(*c.CompanyID), "add", "enquiries", "subscriptions", "onboarding", "campaigns", "tasks", "tasks/" + itoa(task.ID), "settings", "app/research", "app/campaigns", "app/onboarding", "app/subscriptions"}
+	pages := []string{"today", "research", "conversations", "companies/" + itoa(*c.CompanyID), "add", "enquiries", "subscriptions", "onboarding", "campaigns", "tasks", "tasks/" + itoa(task.ID), "settings", "app/research", "app/campaigns", "app/onboarding", "app/add", "app/add?popup=1&name=Hannah", "app/tasks", "app/tasks/" + itoa(task.ID), "app/enquiries", "app/subscriptions"}
 	base := srv.URL + "/o/alpha/"
 	offered := func(cl *http.Client) []control {
 		var all []control

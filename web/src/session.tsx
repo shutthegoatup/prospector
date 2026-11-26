@@ -5,9 +5,10 @@ export type Session = {
   org: string;
   sales: boolean;
   support: boolean;
+  owner: boolean;
 };
 
-export const SessionContext = createContext<Session>({ org: "", sales: false, support: false });
+export const SessionContext = createContext<Session>({ org: "", sales: false, support: false, owner: false });
 
 export function useSession() {
   return useContext(SessionContext);
