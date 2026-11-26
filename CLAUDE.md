@@ -16,6 +16,14 @@ Several sessions may be working on this machine at once. These are the commands 
 
 - After editing a `*.templ` file run `go tool templ generate` and commit the regenerated `*_templ.go`. CI fails if they differ.
 - The page script is TypeScript in `web/src/app.ts`, with types generated from the spec. After changing it, or the spec, run `npm ci && npm run build` in `web/` and commit `web/src/api.d.ts` and the built `assets/js/app.js`; CI fails if they differ. A call to the API made from code, rather than a path named in markup, goes through the typed client so a spec change breaks the build.
+- Pages are moving to React, one at a time (Research first, at `/o/{org}/app/research`). A React page:
+  - lives in `web/src/pages/`, is routed in `web/src/main.tsx`, and is listed in `reactPages` in `app_ui.go`. The server serves it inside the usual layout, so the sidebar stays server-rendered for now;
+  - reads and writes only through the typed client (`$api` in `web/src/client.ts`, openapi-react-query over the spec). Anything it needs that the API lacks goes into `api/openapi.yaml` first;
+  - builds from shadcn/ui. `web/src/components/ui/` is exactly what `npx shadcn@latest add <name>` writes (run it in `web/`): never edit those files. Prospector's look goes in wrappers in `web/src/components/app/`;
+  - takes its styles from the shared `assets/css/output.css`, so rebuild the CSS after adding classes;
+  - is built with `npm run build` in `web/`, which writes `assets/app/main.js`: commit it.
+
+  Port a page like for like, then switch its old route to it once nothing is missing.
 - The API is spec-first. Change `api/openapi.yaml`, run `go generate ./api`, and commit the regenerated `api/api.gen.go`; CI fails if they differ. A page or form does what it does through the API, never through a route of its own, and each operation names the key scope it needs.
 - `assets/css/output.css` is a committed Tailwind build. A utility class that isn't already in it renders unstyled until the CSS is rebuilt (`node build-css.mjs <node_modules with tailwindcss v4>`), so prefer classes already in use.
 - Pages are served under a Content-Security-Policy that allows only the app's own scripts: no inline `<script>`, no `on…=` attributes. `TestContentPolicy` checks every page.

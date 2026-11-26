@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-//go:embed assets/css/output.css assets/css/fonts.css assets/css/landing.css assets/css/api.css assets/js assets/fonts assets/img
+//go:embed assets/css/output.css assets/css/fonts.css assets/css/landing.css assets/css/api.css assets/js assets/app assets/fonts assets/img
 var assetFS embed.FS
 
 // assetVersion busts caches for the unhashed files (output.css, app.js) on each build.

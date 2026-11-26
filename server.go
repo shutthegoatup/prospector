@@ -374,6 +374,7 @@ func (a *App) Routes() http.Handler {
 	}))
 	mux.HandleFunc("GET /o/{org}/today", a.member(a.today))
 	mux.HandleFunc("GET /o/{org}/research", a.member(a.research))
+	mux.HandleFunc("GET /o/{org}/app/{page...}", a.member(a.reactPage))
 	mux.HandleFunc("GET /o/{org}/conversations", a.member(a.conversations))
 	mux.HandleFunc("GET /o/{org}/companies", a.member(a.companies))
 	mux.HandleFunc("GET /o/{org}/companies/{id}", a.member(a.company))
