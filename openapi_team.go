@@ -10,8 +10,6 @@ import (
 	"github.com/shutthegoatup/prospector/api"
 )
 
-type requestKey struct{}
-
 // withRequest hands an operation the request it came in, for the few that need its
 // cookies or address.
 func withRequest(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc {

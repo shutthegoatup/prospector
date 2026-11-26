@@ -44,7 +44,7 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 		w.Write(doc)
 	})
 
-	strict := api.NewStrictHandlerWithOptions(apiServer{a}, []api.StrictMiddlewareFunc{a.apiScope(scopes), func(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc { return listURL(f) }, uploads, withRequest}, api.StrictHTTPServerOptions{
+	strict := api.NewStrictHandlerWithOptions(apiServer{a}, []api.StrictMiddlewareFunc{a.apiScope(scopes), func(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc { return listURL(f) }, uploads, withRequest, a.withSite}, api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeProblem(w, http.StatusBadRequest, err.Error())
 		},
@@ -81,6 +81,9 @@ func (a *App) apiScope(scopes map[string][]string) api.StrictMiddlewareFunc {
 		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error) {
 			q, need := reqFrom(ctx), scopes[op]
 			switch {
+			case q.Key != nil && keyless[op]:
+				refuseKeys(w)
+				return nil, nil
 			case q.Key != nil && len(need) > 0 && !slices.ContainsFunc(need, q.Key.Has):
 				challenge(w, http.StatusForbidden, "insufficient_scope", need[0], "this key lacks the "+strings.Join(need, " or ")+" scope")
 				return nil, nil
@@ -111,7 +114,7 @@ func opScopes(op *openapi3.Operation) []string {
 
 func ownersOnly(scope string) bool {
 	switch scope {
-	case "agents:configure", "enquiries:delete", "settings:write", "team:write", "mail:configure", "sso:configure", "org:export":
+	case "agents:configure", "enquiries:delete", "settings:write", "people:privacy", "team:write", "mail:configure", "sso:configure", "org:export":
 		return true
 	}
 	return false
@@ -119,14 +122,26 @@ func ownersOnly(scope string) bool {
 
 func reqFrom(ctx context.Context) *Req { return ctx.Value(reqKey{}).(*Req) }
 
-func agentOut(c Agent) api.Agent {
+// agentOut is an agent with its card worked out as the Agents page shows it; all is
+// every agent of the organisation, the ones it could fall back to among them.
+func agentOut(c Agent, all []Agent) api.Agent {
+	v := agentView(c, all)
+	st := v.State()
 	tools := []api.Tool{}
 	for _, t := range c.ToolList() {
 		tools = append(tools, api.Tool{Name: t.Name, Description: t.Description})
 	}
 	return api.Agent{Id: c.ID, Name: c.Name, Kind: api.AgentKind(c.Kind), BaseUrl: c.BaseURL, Model: c.Model, ToolsUrl: c.ToolsURL, SearchUrl: c.SearchURL,
 		Models: nonNil(c.ModelList()), Tools: tools, AllowedTools: nonNil(c.AllowedTools()), Fallback: c.FallbackID, FallbackMinutes: c.FallbackMinutes,
-		ThinkingOff: c.ThinkingOff, Problem: c.Problem, CheckedAt: c.CheckedAt, HasKey: c.APIKey != "", Ready: c.Ready(), UpdatedBy: c.UpdatedBy, UpdatedAt: c.UpdatedAt}
+		ThinkingOff: c.ThinkingOff, Problem: c.Problem, CheckedAt: c.CheckedAt, HasKey: c.APIKey != "", Ready: c.Ready(), UpdatedBy: c.UpdatedBy, UpdatedAt: c.UpdatedAt,
+		State: api.AgentState{Rail: api.AgentStateRail(st.Rail), Line: st.Line, Todo: st.Todo}, Searches: c.Searches(), SearchText: v.SearchText(),
+		ToolsText: v.ToolsText(), FallbackText: v.FallbackText()}
+}
+
+// oneAgentOut is agentOut for an agent read on its own.
+func (s apiServer) oneAgentOut(org int64, c Agent) (api.Agent, error) {
+	all, err := s.a.s.Agents(org)
+	return agentOut(c, all), err
 }
 
 func runOut(r AgentRun) api.Run {
@@ -162,28 +177,30 @@ func savedMessage(c *Agent) string {
 }
 
 func (s apiServer) ListAgents(ctx context.Context, in api.ListAgentsRequestObject) (api.ListAgentsResponseObject, error) {
-	list, err := s.a.s.Agents(reqFrom(ctx).Org.ID)
+	all, err := s.a.s.Agents(reqFrom(ctx).Org.ID)
 	if err != nil {
 		return nil, err
 	}
-	list, next, err := listPage(list, in.Params.Limit, in.Params.Cursor)
+	list, next, err := listPage(all, in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
 	out := api.ListAgents200JSONResponse{Headers: api.ListAgents200ResponseHeaders{Link: nextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor = []api.Agent{}, next
 	for _, c := range list {
-		out.Body.Items = append(out.Body.Items, agentOut(c))
+		out.Body.Items = append(out.Body.Items, agentOut(c, all))
 	}
 	return out, nil
 }
 
 func (s apiServer) GetAgent(ctx context.Context, in api.GetAgentRequestObject) (api.GetAgentResponseObject, error) {
-	c, err := s.a.s.AgentByID(reqFrom(ctx).Org.ID, in.Id)
+	org := reqFrom(ctx).Org.ID
+	c, err := s.a.s.AgentByID(org, in.Id)
 	if err != nil {
 		return nil, err
 	}
-	return api.GetAgent200JSONResponse(agentOut(*c)), nil
+	out, err := s.oneAgentOut(org, *c)
+	return api.GetAgent200JSONResponse(out), err
 }
 
 func (s apiServer) CreateAgent(ctx context.Context, in api.CreateAgentRequestObject) (api.CreateAgentResponseObject, error) {
@@ -196,7 +213,8 @@ func (s apiServer) CreateAgent(ctx context.Context, in api.CreateAgentRequestObj
 	if err != nil {
 		return nil, err
 	}
-	return api.CreateAgent201JSONResponse{Agent: agentOut(*c), Message: savedMessage(c)}, nil
+	out, err := s.oneAgentOut(q.Org.ID, *c)
+	return api.CreateAgent201JSONResponse{Agent: out, Message: savedMessage(c)}, err
 }
 
 func (s apiServer) UpdateAgent(ctx context.Context, in api.UpdateAgentRequestObject) (api.UpdateAgentResponseObject, error) {
@@ -209,7 +227,8 @@ func (s apiServer) UpdateAgent(ctx context.Context, in api.UpdateAgentRequestObj
 	if err != nil {
 		return nil, err
 	}
-	return api.UpdateAgent200JSONResponse{Agent: agentOut(*c), Message: savedMessage(c)}, nil
+	out, err := s.oneAgentOut(q.Org.ID, *c)
+	return api.UpdateAgent200JSONResponse{Agent: out, Message: savedMessage(c)}, err
 }
 
 func (s apiServer) DeleteAgent(ctx context.Context, in api.DeleteAgentRequestObject) (api.DeleteAgentResponseObject, error) {

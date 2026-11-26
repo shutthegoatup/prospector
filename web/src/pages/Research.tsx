@@ -70,7 +70,7 @@ export function ResearchPage() {
           </ActionButton>
           {sales && (
             <ActionButton size="sm" asChild>
-              <a href={`/o/${org}/add`}>+ Add person</a>
+              <a href={`/o/${org}/app/add`}>+ Add person</a>
             </ActionButton>
           )}
         </div>
@@ -86,9 +86,9 @@ export function ResearchPage() {
       <div className="mb-5 flex flex-col gap-2" aria-label="Searches">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <Eyebrow>Searches</Eyebrow>
-          <a href={`/o/${org}/tasks`} className="text-[13px] text-mark underline">
+          <Link to="/tasks" className="text-[13px] text-mark underline">
             Every search, closed ones too
-          </a>
+          </Link>
         </div>
         {(tasks.data?.items ?? []).map((t) => (
           <SearchStrip key={t.id} id={t.id} title={t.title} found={t.found.companies} agents={ready} chosen={t.id === task} />
@@ -343,9 +343,9 @@ function SearchPanel({ id, onGone }: { id: number; onGone: () => void }) {
           ))}
         </div>
       )}
-      <a href={`/o/${org}/tasks/${id}`} className="text-[13px] text-mark underline">
+      <Link to={`/tasks/${id}`} className="text-[13px] text-mark underline">
         Every request, note and run
-      </a>
+      </Link>
       {sales && t && t.status !== "closed" && (
         <form
           className="flex flex-col gap-2 border-t border-dashed border-border pt-3"
@@ -443,9 +443,9 @@ function CompanyCard({ company: c, open }: { company: Company; open: boolean }) 
     <article className="panel">
       <div className="flex flex-wrap items-start gap-x-6 gap-y-3 px-5 py-4">
         <div className="min-w-[200px] flex-[2_1_220px]">
-          <a href={`/o/${org}/companies/${c.id}`} className="font-heading text-lg font-semibold text-foreground hover:text-mark">
+          <Link to={`/companies/${c.id}`} className="font-heading text-lg font-semibold text-foreground hover:text-mark">
             {c.name}
-          </a>
+          </Link>
           <p className="font-mono text-xs text-muted-foreground">{[c.country, c.segment, c.domain].filter(Boolean).join(" · ")}</p>
         </div>
         {c.criteria.length > 0 && (
@@ -520,7 +520,7 @@ function CompanyCard({ company: c, open }: { company: Company; open: boolean }) 
             {c.people.length === 0 && (
               <p className="py-2 text-sm text-muted-foreground">
                 None yet.{" "}
-                {sales && <a href={`/o/${org}/add?company=${encodeURIComponent(c.name)}`}>Add someone</a>}
+                {sales && <a href={`/o/${org}/app/add?company=${encodeURIComponent(c.name)}`}>Add someone</a>}
               </p>
             )}
             {c.people.map((p) => (

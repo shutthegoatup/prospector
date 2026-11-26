@@ -4,7 +4,22 @@ import "strconv"
 
 // ReactMount is where a React page draws itself; what it may do comes from the API, and
 // what the viewer may change from these attributes, which only decide what is offered.
+// The page script's minutely refresh would swap it for an empty mount, so it opts out.
 templ ReactMount(q *Req) {
-	<div id="app" data-org={ q.Org.Slug } data-sales={ strconv.FormatBool(canDo(ctx, areaSales)) } data-support={ strconv.FormatBool(canDo(ctx, areaSupport)) } data-owner={ strconv.FormatBool(q.Owner()) }></div>
+	<div id="app" data-org={ q.Org.Slug } data-sales={ strconv.FormatBool(canDo(ctx, areaSales)) } data-support={ strconv.FormatBool(canDo(ctx, areaSupport)) } data-no-refresh="true" data-owner={ strconv.FormatBool(q.Owner()) }></div>
 	<script type="module" src={ "/assets/app/main.js?v=" + assetVersion }></script>
+}
+
+// ReactPopup is a React page on its own, without the sidebar, for a small window opened
+// from another site, like the add form the bookmarklet opens from LinkedIn.
+templ ReactPopup(q *Req, title string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			@Head(title)
+		</head>
+		<body class="queue-backdrop min-h-svh px-5 py-5 font-sans text-[15px] antialiased" data-base={ q.Base() }>
+			@ReactMount(q)
+		</body>
+	</html>
 }
