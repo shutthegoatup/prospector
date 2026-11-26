@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"regexp"
 	"strings"
 	"testing"
@@ -111,7 +110,7 @@ func TestNoRawDatabaseErrorsGoOut(t *testing.T) {
 			tx.AddError(&pgconn.PgError{Code: "08006", Message: "connection to db.internal:5432 lost"})
 		}
 	})
-	res, err := http.PostForm(down.URL+"/login", url.Values{"email": {"ada@example.com"}, "password": {"correct horse battery"}})
+	res, err := signInWith(http.DefaultClient, down.URL, "ada@example.com", "correct horse battery")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +274,7 @@ func TestAnOutageDoesNotReadAsThePersonsMistake(t *testing.T) {
 	})
 	signIn := func() (int, string) {
 		t.Helper()
-		res, err := http.PostForm(srv.URL+"/login", url.Values{"email": {"ada@example.com"}, "password": {"correct horse battery"}})
+		res, err := signInWith(http.DefaultClient, srv.URL, "ada@example.com", "correct horse battery")
 		if err != nil {
 			t.Fatal(err)
 		}

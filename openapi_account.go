@@ -17,6 +17,8 @@ func (a *App) accountCaller(next http.Handler) http.Handler {
 			writeProblem(w, http.StatusForbidden, "a key can't sign in, sign out or change a password: a person does that in a browser")
 			return
 		}
+		// Anyone may send these, so none is let run to more than an address and a password need.
+		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 		sess, u := a.session(r)
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), reqKey{}, &Req{User: u, Session: sess})))
 	})
