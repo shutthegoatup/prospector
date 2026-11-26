@@ -21,18 +21,7 @@ func TestStoppingFinishesWhatIsInHand(t *testing.T) {
 	asked, stop := context.WithCancel(context.Background())
 	stopped := make(chan error, 1)
 	go func() { stopped <- a.serveUntil(asked, ln, 5*time.Second) }()
-	// Building the routes reads the whole API spec, so wait until the server answers
-	// rather than guess how long that takes: a request sent sooner sits unaccepted.
-	for deadline := time.Now().Add(10 * time.Second); ; {
-		if res, err := http.Get("http://" + ln.Addr().String() + "/healthz"); err == nil {
-			res.Body.Close()
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("the server never started answering")
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	answering(t, ln.Addr().String())
 
 	// A sign-in whose form is half sent, and a message on its way out.
 	conn, err := net.Dial("tcp", ln.Addr().String())
@@ -88,6 +77,7 @@ func TestStoppingDoesntWaitForeverForAStream(t *testing.T) {
 	asked, stop := context.WithCancel(context.Background())
 	stopped := make(chan error, 1)
 	go func() { stopped <- a.serveUntil(asked, ln, 200*time.Millisecond) }()
+	answering(t, ln.Addr().String())
 
 	// Like an agent's stream: a request that never finishes arriving.
 	conn, err := net.Dial("tcp", ln.Addr().String())
@@ -106,4 +96,17 @@ func TestStoppingDoesntWaitForeverForAStream(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("a connection that never finishes kept the server from stopping")
 	}
+}
+
+// answering waits until the server takes requests, since building its routes takes a
+// while and a connection it hasn't yet accepted isn't one in hand.
+func answering(t *testing.T, addr string) {
+	t.Helper()
+	for give := time.Now().Add(10 * time.Second); time.Now().Before(give); time.Sleep(10 * time.Millisecond) {
+		if res, err := http.Get("http://" + addr + "/robots.txt"); err == nil {
+			res.Body.Close()
+			return
+		}
+	}
+	t.Fatal("the server never answered")
 }

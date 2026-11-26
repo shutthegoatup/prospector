@@ -45,7 +45,7 @@ func (s apiServer) ListSegments(ctx context.Context, in api.ListSegmentsRequestO
 }
 
 func pendingOut(d PendingDetail) api.PendingDetail {
-	return api.PendingDetail{Id: d.ID, Field: d.Field, Value: d.Value, Current: d.Current, SourceUrl: d.SourceURL, By: d.By, At: d.At, EmailStatus: d.EmailStatus}
+	return api.PendingDetail{Id: d.ID, Field: d.Field, Value: d.Value, Current: d.Current, SourceUrl: d.SourceURL, By: d.By, At: d.At, EmailStatus: d.EmailStatus, Vendor: d.Vendor}
 }
 
 func factOut(f Fact) api.ResearchFact {
