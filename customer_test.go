@@ -617,3 +617,124 @@ func TestACustomersMarksKeepTheHistoryHonest(t *testing.T) {
 		t.Errorf("after erasing them: %d entries still theirs (%v), done %v", theirs, err, done())
 	}
 }
+
+func TestTakingBackAMarkRemovesOnlyThatMarksEntry(t *testing.T) {
+	s, srv, member, box := mailSite(t, nil)
+	o := must(s.OrgBySlug("alpha"))
+	o.Settings.OnboardingSteps = "them: Send your product files"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	ivo := must(s.QuickAddPerson(o, QuickAdd{Name: "Ivo Marsh", Company: "Larkmoor Yachts", Email: "ivo@larkmoor.example"}, "Ada Lovelace"))
+	if *ivo.CompanyID != *hannah.CompanyID {
+		t.Fatal("they should work at the same company")
+	}
+	// Onboardings at one company are made from the same steps, so their names repeat.
+	start := func() int64 {
+		return must(s.StartOnboarding(o.ID, OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace")).ID
+	}
+	browser := func(onboarding, contact int64) *http.Client {
+		t.Helper()
+		ageCustomerLinks(t, s)
+		if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(onboarding)+"/invites", "application/json", map[string]any{"contact": contact}); code != http.StatusNoContent {
+			t.Fatalf("inviting: %d %s", code, body)
+		}
+		c := newMailClient()
+		as(t, c, "POST", srv.URL+customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1])
+		return c
+	}
+	step := func(onboarding int64) OnboardingStep {
+		t.Helper()
+		for _, row := range must(s.Onboardings(o.ID, 0, today())) {
+			if row.ID == onboarding {
+				return row.Steps[0]
+			}
+		}
+		t.Fatal("no such onboarding")
+		return OnboardingStep{}
+	}
+	press := func(c *http.Client, onboarding int64, what string) {
+		t.Helper()
+		as(t, c, "POST", srv.URL+"/c/steps/"+itoa(step(onboarding).ID)+"/"+what)
+		if done := step(onboarding).DoneOn != nil; done != (what == "done") {
+			t.Fatalf("pressing %s left the step done %v", what, done)
+		}
+	}
+	entries := func() []Event {
+		t.Helper()
+		var out []Event
+		if err := s.db.Where("org_id = ? and action = ?", o.ID, "onboard:done").Order("id").Find(&out).Error; err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+
+	first, second := start(), start()
+	hers, his := browser(first, hannah.ID), browser(second, ivo.ID)
+	press(hers, first, "done")
+	press(his, second, "done")
+	press(hers, first, "undone")
+	if left := entries(); len(left) != 1 || left[0].ContactID != ivo.ID {
+		t.Errorf("taking back her mark left %+v, not his entry alone", left)
+	}
+	press(his, second, "undone")
+
+	// The same person on both: taking back the first removes the first's entry.
+	hersToo := browser(second, hannah.ID)
+	press(hers, first, "done")
+	press(hersToo, second, "done")
+	kept := entries()[1]
+	press(hers, first, "undone")
+	if left := entries(); len(left) != 1 || left[0].ID != kept.ID {
+		t.Errorf("taking back the first onboarding's mark left %+v, not the second's entry %d", left, kept.ID)
+	}
+	press(hersToo, second, "undone")
+
+	// Two people on one: what one marks the other can take back, and the entry goes too.
+	for range 3 {
+		press(hersToo, second, "done")
+		press(his, second, "undone")
+	}
+	if left := entries(); len(left) != 0 {
+		t.Errorf("one marking and another taking back left %d entries", len(left))
+	}
+}
+
+func TestStepsMarkedBeforeTheEntryColumnSurviveIt(t *testing.T) {
+	s, srv, member, box := mailSite(t, nil)
+	o := must(s.OrgBySlug("alpha"))
+	o.Settings.OnboardingSteps = "them: Send your product files"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	ob := must(s.StartOnboarding(o.ID, OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
+	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": hannah.ID}); code != http.StatusNoContent {
+		t.Fatalf("inviting: %d %s", code, body)
+	}
+	c := newMailClient()
+	as(t, c, "POST", srv.URL+customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1])
+	st := must(s.Onboardings(o.ID, 0, today()))[0].Steps[0]
+	as(t, c, "POST", srv.URL+"/c/steps/"+itoa(st.ID)+"/done")
+
+	// A database from before the column, with a step the customer already marked.
+	if err := s.db.Migrator().DropColumn(&OnboardingStep{}, "done_entry"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.AutoMigrate(&OnboardingStep{}); err != nil {
+		t.Fatalf("adding the column to a table with rows: %v", err)
+	}
+	if got := must(s.Onboardings(o.ID, 0, today()))[0].Steps[0]; got.DoneOn == nil || got.DoneBy != customerActor || got.DoneEntry != 0 {
+		t.Fatalf("the step after the upgrade: %+v", got)
+	}
+	// Taking it back leaves its entry, since nothing says which entry was its.
+	as(t, c, "POST", srv.URL+"/c/steps/"+itoa(st.ID)+"/undone")
+	var n int64
+	if err := s.db.Model(&Event{}).Where("org_id = ? and action = ?", o.ID, "onboard:done").Count(&n).Error; err != nil || n != 1 {
+		t.Errorf("after taking back an old mark: %d entries (%v)", n, err)
+	}
+	if got := must(s.Onboardings(o.ID, 0, today()))[0].Steps[0]; got.DoneOn != nil {
+		t.Errorf("the old mark wasn't taken back: %+v", got)
+	}
+}
