@@ -263,6 +263,17 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 				return nil, out, err
 			})
 	}
+	if k.Has("enrich:spend") {
+		addTool(s, &mcp.Tool{Name: "enrich_contact", Description: "Ask the organisation's paid data vendors for an email, phone or profile someone already here lacks. It costs the organisation money, so call it only after your own research found nothing. What is found waits for a person to accept, like a detail you suggest."},
+			func(ctx context.Context, req *mcp.CallToolRequest, in EnrichIn) (*mcp.CallToolResult, *EnrichOut, error) {
+				o, err := current()
+				if err != nil {
+					return nil, nil, err
+				}
+				results, err := a.Enrich(ctx, o, sessionOf(req), in)
+				return nil, &EnrichOut{Results: results}, err
+			})
+	}
 	if k.Has("drafts:write") {
 		addTool(s, &mcp.Tool{Name: "draft_message", Description: "Write the LinkedIn note (300 characters at most), LinkedIn message, email or follow-up for a contact. It shows as written by an agent; a person edits and sends it. Text a person has edited, or that has already gone out, is refused."},
 			func(_ context.Context, req *mcp.CallToolRequest, in DraftIn) (*mcp.CallToolResult, ok, error) {

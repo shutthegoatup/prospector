@@ -493,6 +493,7 @@ var Scopes = []struct{ Name, What string }{
 	{"customers:invite", "email a customer a link to their onboarding steps, through your mail server, and withdraw it"},
 	{"contacts:write", "add people straight to outreach and change their details and where their conversation stands"},
 	{"research:review", "qualify and reject companies, for the organisation or for one thing it sells, pick suggested people for outreach, and accept or dismiss details agents found: the review a person otherwise does"},
+	{"enrich:spend", "ask the organisation's enrichment vendors, at its cost and within each one's monthly limit, for an email, phone or profile someone lacks; what is found waits to be accepted"},
 	{"tasks:write", "start tasks, ask them for more, mark their requests done or not, and close and reopen them"},
 	{"agents:run", "start and stop Prospector's own agents on tasks"},
 	{"agents:configure", "add, change and delete Prospector's own agents, their endpoints, keys and tools"},

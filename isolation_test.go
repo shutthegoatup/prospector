@@ -359,6 +359,8 @@ var saysNothingBack = map[string]bool{
 	"AddEnquiry": true, "AgentNote": true, "CreateKey": true, "CreateTask": true, "CreateTaskFor": true, "QuickAddPerson": true,
 	// FindOne answers only when one person matches, and Find makes its query. NeverContactCovers reads the organisation it is handed.
 	"FindOne": true, "NeverContactCovers": true,
+	// A vendor saved or removed, and a count, carry nothing of the organisation's data.
+	"SaveEnricher": true, "DeleteEnricher": true, "EnricherUsed": true,
 }
 
 func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {

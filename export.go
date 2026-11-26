@@ -131,6 +131,7 @@ type OrgExport struct {
 	SignOn        *ExportSignOn        `json:"single_sign_on,omitempty"`
 	Mail          *ExportMail          `json:"mail_server,omitempty"`
 	Agents        []ExportAgent        `json:"agents"`
+	Enrichers     []ExportEnricher     `json:"enrichment_vendors"`
 	Companies     []Company            `json:"companies"`
 	Facts         []Fact               `json:"facts"`
 	Contacts      []Contact            `json:"contacts"`
@@ -192,6 +193,13 @@ type ExportSignOn struct {
 }
 
 // ExportAgent is one of the organisation's own agents, without its key.
+// ExportEnricher is a vendor without its key, which is never exported.
+type ExportEnricher struct {
+	Kind         string `json:"kind"`
+	Position     int    `json:"position"`
+	MonthlyLimit int    `json:"monthly_limit"`
+}
+
 type ExportAgent struct {
 	Name      string   `json:"name"`
 	Kind      string   `json:"kind"`
@@ -277,6 +285,14 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 				e.FallsBackTo, e.FallbackMinutes = next, a.FallbackMinutes
 			}
 			out.Agents = append(out.Agents, e)
+		}
+		var enrichers []Enricher
+		if err := tx.Where("org_id = ?", org).Order("position, id").Find(&enrichers).Error; err != nil {
+			return err
+		}
+		out.Enrichers = []ExportEnricher{}
+		for _, e := range enrichers {
+			out.Enrichers = append(out.Enrichers, ExportEnricher{Kind: e.Kind, Position: e.Position, MonthlyLimit: e.MonthlyLimit})
 		}
 		mine := func() *gorm.DB { return tx.Where("org_id = ?", org).Order("id") }
 		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Onboardings, &out.OnboardSteps, &out.Access, &out.Enquiries, &out.EnquiryThread, &out.Suppressed, &out.Campaigns, &out.Agreements, &out.Recipients, &out.Fields, &out.CampaignMail, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes, &out.Offerings, &out.Verdicts} {
