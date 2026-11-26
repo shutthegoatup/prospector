@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
@@ -49,12 +49,25 @@ function useRefresh() {
   return () => client.invalidateQueries();
 }
 
+// Failed says why a change didn't happen, in the server's words.
+function Failed({ errors }: { errors: ({ detail?: string } | null | undefined)[] }) {
+  const error = errors.find(Boolean);
+  if (!error) return null;
+  return (
+    <p className="w-full text-sm text-[var(--stop)]" role="alert">
+      {error.detail ?? "That didn't work. Reload and try again."}
+    </p>
+  );
+}
+
 export function ResearchPage() {
   const { org, sales } = useSession();
   const [params, setParams] = useSearchParams();
   const filter = (params.get("f") ?? "review") as Filter;
   const task = Number(params.get("task") ?? 0) || undefined;
   const [cursor, setCursor] = useState<string | undefined>();
+  // A cursor is a place in one list: another filter or search starts at its top.
+  useEffect(() => setCursor(undefined), [filter, task]);
 
   const research = $api.useQuery("get", "/o/{org}/api/v1/research", {
     params: { path: { org }, query: { filter, task, cursor } },
@@ -63,7 +76,8 @@ export function ResearchPage() {
   const tasks = $api.useQuery("get", "/o/{org}/api/v1/tasks", { params: { path: { org }, query: { limit: 5 } } });
   const agents = $api.useQuery("get", "/o/{org}/api/v1/agents", { params: { path: { org } } });
   const ready = (agents.data?.items ?? []).filter((a) => a.ready);
-  const chosen = tasks.data?.items.find((t) => t.id === task);
+  // The same query SearchPanel makes, so the search is read once; closed searches aren't in tasks.
+  const chosen = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}", { params: { path: { org, id: task ?? 0 }, query: { limit: 3 } } }, { enabled: !!task }).data;
 
   const link = (f: string, t?: number) => {
     const q = new URLSearchParams();
@@ -301,6 +315,7 @@ function SearchStrip({ id, title, found, agents, chosen }: { id: number; title: 
               </ActionButton>
             ))}
       </span>
+      <Failed errors={[start.error, stop.error]} />
     </div>
   );
 }
@@ -359,7 +374,7 @@ function SearchPanel({ id, onGone }: { id: number; onGone: () => void }) {
       <a href={`/o/${org}/tasks/${id}`} className="text-[13px] text-mark underline">
         Every request, note and run
       </a>
-      {sales && t && t.status !== "done" && (
+      {sales && t && t.status !== "closed" && (
         <form
           className="flex flex-col gap-2 border-t border-dashed border-border pt-3"
           onSubmit={(e) => {
@@ -385,6 +400,7 @@ function SearchPanel({ id, onGone }: { id: number; onGone: () => void }) {
               Ask
             </ActionButton>
             {ask.isSuccess && <p className="text-sm text-[var(--ok)]">Asked.</p>}
+            <Failed errors={[ask.error]} />
           </div>
         </form>
       )}
