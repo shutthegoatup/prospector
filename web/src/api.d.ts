@@ -1914,6 +1914,16 @@ export interface components {
             live_on: string;
             /** @description Who at the company has been let see their steps. */
             invites: components["schemas"]["OnboardingInvite"][];
+            /** @description People at the company with an email address here, who could be invited. */
+            invitable: components["schemas"]["Invitable"][];
+            /** @description Whether a link can be emailed at all: the organisation has a mail server and the server knows its public address. */
+            can_invite: boolean;
+        };
+        Invitable: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            email: string;
         };
         OnboardingStep: {
             /** Format: int64 */
