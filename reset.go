@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net/http"
 	"strings"
 	"time"
 
@@ -184,32 +183,6 @@ func (a *App) mailFor(org int64) (*MailServer, error) {
 	return via, nil
 }
 
-func (a *App) forgotPage(w http.ResponseWriter, r *http.Request) {
-	if !a.mailOn() {
-		http.NotFound(w, r)
-		return
-	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	ForgotPage(false).Render(r.Context(), w)
-}
-
-// forgot answers the same way, and as fast, whether or not the address has an
-// account: the lookup and the send happen after the answer.
-func (a *App) forgot(w http.ResponseWriter, r *http.Request) {
-	if !a.mailOn() {
-		http.NotFound(w, r)
-		return
-	}
-	if err := parseForm(w, r, 64<<10); err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	email := r.PostForm.Get("email")
-	a.background(func() { a.sendReset(email) })
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	ForgotPage(true).Render(r.Context(), w)
-}
-
 func (a *App) sendReset(email string) {
 	u, err := a.s.UserByEmail(email)
 	if err != nil {
@@ -229,46 +202,6 @@ func (a *App) sendReset(email string) {
 	if err != nil {
 		log.Print("password reset: ", err)
 	}
-}
-
-func (a *App) resetPage(w http.ResponseWriter, r *http.Request) {
-	u, err := a.s.PasswordTokenUser(r.PathValue("token"))
-	if err != nil {
-		fail(w, errBadLink, http.StatusGone)
-		return
-	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	ResetPage(r.PathValue("token"), u.Email, "").Render(r.Context(), w)
-}
-
-func (a *App) reset(w http.ResponseWriter, r *http.Request) {
-	if err := parseForm(w, r, 64<<10); err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	token := r.PathValue("token")
-	u, err := a.s.PasswordTokenUser(token)
-	if err != nil {
-		fail(w, errBadLink, http.StatusGone)
-		return
-	}
-	select {
-	case hashSlots <- struct{}{}:
-		defer func() { <-hashSlots }()
-	case <-r.Context().Done():
-		return
-	}
-	if err := a.s.RedeemPasswordToken(token, r.PostForm.Get("password")); errors.Is(err, errBadLink) {
-		fail(w, err, http.StatusGone)
-		return
-	} else if err != nil {
-		w.Header().Set("content-type", "text/html; charset=utf-8")
-		code, text := telling("password reset", err, http.StatusBadRequest)
-		w.WriteHeader(code)
-		ResetPage(token, u.Email, text).Render(r.Context(), w)
-		return
-	}
-	http.Redirect(w, r, "/login?reset=1", http.StatusSeeOther)
 }
 
 // invite emails a new member a link to choose their password. It reports false when

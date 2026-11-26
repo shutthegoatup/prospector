@@ -74,7 +74,7 @@ func enrichSignedIn(t *testing.T) (*Store, *Org, string, *http.Client, *fakeHunt
 	t.Cleanup(srv.Close)
 	jar, _ := cookiejar.New(nil)
 	client := &http.Client{Jar: jar}
-	res, err := client.PostForm(srv.URL+"/login", url.Values{"email": {"ada@example.com"}, "password": {"correct horse battery"}})
+	res, err := signInWith(client, srv.URL, "ada@example.com", "correct horse battery")
 	if err != nil || res.StatusCode != http.StatusOK {
 		t.Fatalf("login: %v %v", res.Status, err)
 	}

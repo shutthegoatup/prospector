@@ -68,7 +68,7 @@ func (p *problemPage) finish() {
 	h.Del("Content-Length")
 	p.ResponseWriter.WriteHeader(p.code)
 	title, message := problemText(p.code, p.text.String())
-	if err := ProblemPage(p.code, title, message).Render(p.r.Context(), p.ResponseWriter); err != nil {
+	if err := ProblemPage(p.code, title, message, "/").Render(p.r.Context(), p.ResponseWriter); err != nil {
 		log.Print(err)
 	}
 }

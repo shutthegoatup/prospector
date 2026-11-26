@@ -56,5 +56,9 @@ export const tasksSearch = z.object({ closed: flag });
 
 export const addSearch = z.object({ popup: flag, url: text, name: text, headline: text, company: text });
 
+export const signInSearch = z.object({ next: text, reset: flag });
+
+export const singleSignOnSearch = z.object({ email: text, org: text, next: text });
+
 // An id in a path is a positive whole number; anything else is no such page.
 export const pathId = z.coerce.number().int().positive();
