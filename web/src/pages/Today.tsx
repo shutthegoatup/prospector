@@ -64,14 +64,18 @@ function writeClipboard(text: string) {
   area.remove();
 }
 
-
 type LinkTo = (props: { className: string; children: ReactNode }) => ReactNode;
 type Todo = { label: string; count: number; link: LinkTo };
 
 export function TodayPage() {
   const { org, sales } = useSession();
   const { step: filter } = useSearch({ from: "/o/$org/today" });
-  const list = $api.useQuery("get", "/o/{org}/api/v1/today", { params: { path: { org }, query: { step: filter, limit: pageSize } } }, { placeholderData: keepPreviousData });
+  const list = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/today",
+    { params: { path: { org }, query: { step: filter, limit: pageSize } } },
+    { placeholderData: keepPreviousData },
+  );
   const summary = $api.useQuery("get", "/o/{org}/api/v1/today/summary", { params: { path: { org } } });
   const client = useQueryClient();
   const [focus, setFocus] = useState(0);
@@ -115,8 +119,12 @@ export function TodayPage() {
 
   const todo: Todo[] = [];
   const add = (label: string, count: number, link: LinkTo) => count > 0 && todo.push({ label, count, link });
-  const step = (step: Step): LinkTo => (p) => <Link to="/o/$org/today" params={{ org }} search={{ step }} {...p} />;
-  const page = (to: "/o/$org/conversations" | "/o/$org/subscriptions" | "/o/$org/onboarding" | "/o/$org/research"): LinkTo => (p) => <Link to={to} params={{ org }} {...p} />;
+  const step =
+    (step: Step): LinkTo =>
+    (p) => <Link to="/o/$org/today" params={{ org }} search={{ step }} {...p} />;
+  const page =
+    (to: "/o/$org/conversations" | "/o/$org/subscriptions" | "/o/$org/onboarding" | "/o/$org/research"): LinkTo =>
+    (p) => <Link to={to} params={{ org }} {...p} />;
   if (list.data && s) {
     add("Answer enquiries", s.enquiries, (p) => <Link to="/o/$org/enquiries" params={{ org }} search={{ state: "open" }} {...p} />);
     add("Set next steps", counts.next ?? 0, step("next"));
@@ -155,7 +163,15 @@ export function TodayPage() {
             {steps
               .filter((st) => (counts[st.key] ?? 0) > 0 || filter === st.key)
               .map((st) => (
-                <FilterChip key={st.key} to="/o/$org/today" params={{ org }} search={{ step: st.key }} label={st.label} count={counts[st.key] ?? 0} on={filter === st.key} />
+                <FilterChip
+                  key={st.key}
+                  to="/o/$org/today"
+                  params={{ org }}
+                  search={{ step: st.key }}
+                  label={st.label}
+                  count={counts[st.key] ?? 0}
+                  on={filter === st.key}
+                />
               ))}
           </nav>
           {filter === "linkedin" && sales && (

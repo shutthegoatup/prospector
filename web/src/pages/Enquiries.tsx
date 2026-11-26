@@ -79,9 +79,14 @@ export function EnquiriesPage() {
   useEffect(() => setCursors([]), [kind, state, spam]);
   const cursor = cursors[cursors.length - 1];
 
-  const list = $api.useQuery("get", "/o/{org}/api/v1/enquiries", {
-    params: { path: { org }, query: { kind: kind || undefined, state: state || undefined, spam: spam || undefined, cursor, limit: pageSize } },
-  }, { placeholderData: keepPreviousData });
+  const list = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/enquiries",
+    {
+      params: { path: { org }, query: { kind: kind || undefined, state: state || undefined, spam: spam || undefined, cursor, limit: pageSize } },
+    },
+    { placeholderData: keepPreviousData },
+  );
   const counts = $api.useQuery("get", "/o/{org}/api/v1/enquiry-counts", { params: { path: { org } } }).data;
   const members = $api.useQuery("get", "/o/{org}/api/v1/members", { params: { path: { org }, query: { limit: 200 } } }).data?.items ?? [];
 
@@ -94,9 +99,9 @@ export function EnquiriesPage() {
     <>
       <PageHead title="Enquiries" />
       <p className="mb-5 max-w-[70ch] text-sm text-muted-foreground">
-        What people sent through your sites' forms and your products, newest first. The words are theirs, exactly as sent. Each new one waits to
-        be answered: give it an owner, and say when you're waiting on them or it's closed. Reply from here and it is emailed to them; their answer
-        comes to your own mailbox, and you record it here.
+        What people sent through your sites' forms and your products, newest first. The words are theirs, exactly as sent. Each new one waits to be answered:
+        give it an owner, and say when you're waiting on them or it's closed. Reply from here and it is emailed to them; their answer comes to your own mailbox,
+        and you record it here.
       </p>
       <Whose area="support" work="Answering enquiries is" can={support} />
       {/* Only "All" is sure to be there, so it holds the row's place until the counts come. */}
@@ -133,7 +138,9 @@ export function EnquiriesPage() {
         </Placeholders>
       )}
       <div className="flex max-w-3xl flex-col gap-3">
-        {list.data?.items.map((e) => <EnquiryCard key={e.id} e={e} members={members.map((m) => m.name)} canReply={list.data.can_reply} />)}
+        {list.data?.items.map((e) => (
+          <EnquiryCard key={e.id} e={e} members={members.map((m) => m.name)} canReply={list.data.can_reply} />
+        ))}
       </div>
       {(cursors.length > 0 || next) && (
         <nav className="mt-3 flex max-w-3xl flex-wrap items-center justify-between gap-3" aria-label="Pages">
@@ -189,7 +196,7 @@ function EnquiryCard({ e, members, canReply }: { e?: Enquiry; members: string[];
   const set = (body: { state?: string; owner?: string; note?: string }) => change.mutate({ ...path, body });
   // The server takes a browser's POST only as JSON, even one with no body.
   const converseOn = { ...path, headers: { "content-type": "application/json" } };
-  const ownerLeft =e.owner !== "" && !members.includes(e.owner);
+  const ownerLeft = e.owner !== "" && !members.includes(e.owner);
 
   return (
     <article className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 text-sm">

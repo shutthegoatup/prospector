@@ -45,7 +45,10 @@ function money(amount: number, currency: string) {
 function worth(cards: Card[]) {
   const sums = new Map<string, number>();
   for (const c of cards) if (c.amount !== 0) sums.set(c.currency, (sums.get(c.currency) ?? 0) + c.amount);
-  return [...sums].map(([currency, sum]) => money(sum, currency)).sort().join(" + ");
+  return [...sums]
+    .map(([currency, sum]) => money(sum, currency))
+    .sort()
+    .join(" + ");
 }
 
 function kindLabel(kind: string) {
@@ -102,9 +105,8 @@ export function ConversationsPage() {
     <>
       <PageHead title="Conversations" />
       <p className="mb-5 max-w-[70ch] text-sm text-muted-foreground">
-        Everyone who replied, until it's won or lost. Each needs a next step with a date; ones without, or due today, also show on Today. Give one a
-        value and each stage shows what it is worth. A renewal or an expansion with someone already here is a deal of its own, started from their
-        card.
+        Everyone who replied, until it's won or lost. Each needs a next step with a date; ones without, or due today, also show on Today. Give one a value and
+        each stage shows what it is worth. A renewal or an expansion with someone already here is a deal of its own, started from their card.
       </p>
       <Whose area="sales" work="Deals are" can={sales} />
       <Failed errors={[error, members.error]} />
@@ -135,7 +137,9 @@ export function ConversationsPage() {
                     ))}
                   </Placeholders>
                 )}
-                {!loading && here.length === 0 && <p className="rounded-xl border border-dashed border-border p-3.5 font-mono text-xs text-muted-foreground">None</p>}
+                {!loading && here.length === 0 && (
+                  <p className="rounded-xl border border-dashed border-border p-3.5 font-mono text-xs text-muted-foreground">None</p>
+                )}
                 {here.map((c) =>
                   c.seq === 0 ? (
                     <DealCard key={"c" + c.contact_id} c={c} members={names} planned={planned} day={day} />
@@ -313,7 +317,10 @@ function DealCard({ c, members = [], planned = 0, day = "" }: Partial<CardProps>
           <b>
             <Bar w="10ch" />
           </b>
-          <span className="font-mono text-xs"> <Bar w="12ch" /></span>
+          <span className="font-mono text-xs">
+            {" "}
+            <Bar w="12ch" />
+          </span>
         </div>
         {sales && (
           <p className="font-mono text-xs">

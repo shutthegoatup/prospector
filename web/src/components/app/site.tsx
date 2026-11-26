@@ -53,10 +53,7 @@ export function SectionHead({ label, title, children, className }: { label: Reac
 // Tag is a Badge in one of the section colours, for step numbers and lists' headings.
 export function Tag({ tone = "gold", className, ...props }: ComponentProps<typeof Badge> & { tone?: Tone }) {
   return (
-    <Badge
-      className={cn("rounded-md px-2.5 py-1 font-mono text-xs font-medium uppercase tracking-[0.1em] text-ink", toneFill[tone], className)}
-      {...props}
-    />
+    <Badge className={cn("rounded-md px-2.5 py-1 font-mono text-xs font-medium uppercase tracking-[0.1em] text-ink", toneFill[tone], className)} {...props} />
   );
 }
 

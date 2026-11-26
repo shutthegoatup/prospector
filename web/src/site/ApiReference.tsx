@@ -43,7 +43,8 @@ const methodFill: Record<string, string> = {
 };
 
 // Inline code and links in running text, as the reference writes them.
-const prose = "[&_code]:rounded [&_code]:bg-ink/[0.06] [&_code]:px-[5px] [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.88em] [&_code]:font-medium [&_a]:underline [&_a]:decoration-primary [&_a]:underline-offset-[3px]";
+const prose =
+  "[&_code]:rounded [&_code]:bg-ink/[0.06] [&_code]:px-[5px] [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.88em] [&_code]:font-medium [&_a]:underline [&_a]:decoration-primary [&_a]:underline-offset-[3px]";
 
 function Spans({ of }: { of: DocSpan[] }) {
   return (
@@ -73,7 +74,10 @@ function Flag({ required, children }: { required?: boolean; children: ReactNode 
   return (
     <Badge
       variant="outline"
-      className={cn("rounded px-1.5 py-px font-mono text-[11px] uppercase tracking-[0.06em] text-muted-foreground", required && "border-chart-3 text-[#b8401f]")}
+      className={cn(
+        "rounded px-1.5 py-px font-mono text-[11px] uppercase tracking-[0.06em] text-muted-foreground",
+        required && "border-chart-3 text-[#b8401f]",
+      )}
     >
       {children}
     </Badge>
@@ -206,8 +210,8 @@ export function ApiReference({ doc }: { doc: Doc }) {
           <Section id="auth">
             <Heading>Authentication</Heading>
             <p>
-              Send an API key made on your organisation's Agents page as a bearer token. Every path starts with your organisation's slug, and a key only opens its
-              own organisation.
+              Send an API key made on your organisation's Agents page as a bearer token. Every path starts with your organisation's slug, and a key only opens
+              its own organisation.
             </p>
             <Code>Authorization: Bearer pk_…</Code>
             <p>Prospector's own pages use the same API with the signed-in session. A member can read and run; changing settings needs an owner.</p>
@@ -235,13 +239,13 @@ export function ApiReference({ doc }: { doc: Doc }) {
           <Section id="errors">
             <Heading>Errors</Heading>
             <p>
-              A failure answers with its status and an <a href="https://www.rfc-editor.org/rfc/rfc9457">RFC 9457</a> problem, whose <code>detail</code> says what to
-              change.
+              A failure answers with its status and an <a href="https://www.rfc-editor.org/rfc/rfc9457">RFC 9457</a> problem, whose <code>detail</code> says
+              what to change.
             </p>
             <Code>{problemExample}</Code>
             <p>
-              Each operation lists the statuses it can answer with. A problem a client can act on without reading <code>detail</code> has a <code>type</code> that
-              links here:
+              Each operation lists the statuses it can answer with. A problem a client can act on without reading <code>detail</code> has a <code>type</code>{" "}
+              that links here:
             </p>
             <dl className="divide-y divide-border">
               {doc.problems.map((p) => (
@@ -266,69 +270,69 @@ export function ApiReference({ doc }: { doc: Doc }) {
               )}
               {g.ops.map((o) => (
                 <article id={o.anchor} key={o.anchor} className="mt-[18px] scroll-mt-5">
-                <Panel className="border! border-border! px-4 py-[18px] shadow-[0_1px_0_rgba(28,24,16,0.04),0_10px_30px_-18px_rgba(28,24,16,0.25)]! md:px-6 md:py-[22px]">
-                  <header className="flex flex-wrap items-center gap-3">
-                    <Method op={o} big />
-                    <code className="bg-transparent! p-0! text-[15px] break-all">{o.path}</code>
-                  </header>
-                  <h3 className="mt-3.5 mb-1.5 font-heading text-xl leading-[1.3] font-semibold">{o.summary}</h3>
-                  {o.about.length > 0 && (
-                    <p className="max-w-[70ch] text-muted-foreground">
-                      <Spans of={o.about} />
-                    </p>
-                  )}
-                  <p className="mt-2.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    {o.scope && (
-                      <>
-                        Key scope <code>{o.scope}</code>
-                      </>
+                  <Panel className="border! border-border! px-4 py-[18px] shadow-[0_1px_0_rgba(28,24,16,0.04),0_10px_30px_-18px_rgba(28,24,16,0.25)]! md:px-6 md:py-[22px]">
+                    <header className="flex flex-wrap items-center gap-3">
+                      <Method op={o} big />
+                      <code className="bg-transparent! p-0! text-[15px] break-all">{o.path}</code>
+                    </header>
+                    <h3 className="mt-3.5 mb-1.5 font-heading text-xl leading-[1.3] font-semibold">{o.summary}</h3>
+                    {o.about.length > 0 && (
+                      <p className="max-w-[70ch] text-muted-foreground">
+                        <Spans of={o.about} />
+                      </p>
                     )}
-                    {o.owner_only && <Flag>owner, when signed in</Flag>}
-                  </p>
-                  <div className="mt-4 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
-                    <div>
-                      {o.params.length > 0 && (
+                    <p className="mt-2.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      {o.scope && (
                         <>
-                          <SubHead>Path</SubHead>
-                          <Fields of={o.params} />
+                          Key scope <code>{o.scope}</code>
                         </>
                       )}
-                      {o.body && (
-                        <>
-                          <SubHead>
-                            Body
-                            {o.body.of && (
-                              <span className="ml-1.5 normal-case tracking-normal">
-                                <TypeName t={o.body.of} />
-                              </span>
-                            )}
-                          </SubHead>
-                          <Fields of={o.body.fields} />
-                        </>
-                      )}
-                      <SubHead>Responses</SubHead>
-                      <dl className="divide-y divide-border">
-                        {o.responses.map((r) => (
-                          <div className="py-2" key={r.code}>
-                            <dt className="flex flex-wrap items-center gap-2">
-                              <Badge
-                                className={cn(
-                                  "rounded px-[7px] py-px font-mono text-xs font-semibold",
-                                  r.bad ? "bg-chart-3/15 text-[#b8401f]" : "bg-chart-2/20 text-[#1d7a52]",
-                                )}
-                              >
-                                {r.code}
-                              </Badge>
-                              {r.type && <TypeName t={r.type} />}
-                            </dt>
-                            <dd className="mt-1 text-[15px] text-muted-foreground">{r.about}</dd>
-                          </div>
-                        ))}
-                      </dl>
+                      {o.owner_only && <Flag>owner, when signed in</Flag>}
+                    </p>
+                    <div className="mt-4 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
+                      <div>
+                        {o.params.length > 0 && (
+                          <>
+                            <SubHead>Path</SubHead>
+                            <Fields of={o.params} />
+                          </>
+                        )}
+                        {o.body && (
+                          <>
+                            <SubHead>
+                              Body
+                              {o.body.of && (
+                                <span className="ml-1.5 normal-case tracking-normal">
+                                  <TypeName t={o.body.of} />
+                                </span>
+                              )}
+                            </SubHead>
+                            <Fields of={o.body.fields} />
+                          </>
+                        )}
+                        <SubHead>Responses</SubHead>
+                        <dl className="divide-y divide-border">
+                          {o.responses.map((r) => (
+                            <div className="py-2" key={r.code}>
+                              <dt className="flex flex-wrap items-center gap-2">
+                                <Badge
+                                  className={cn(
+                                    "rounded px-[7px] py-px font-mono text-xs font-semibold",
+                                    r.bad ? "bg-chart-3/15 text-[#b8401f]" : "bg-chart-2/20 text-[#1d7a52]",
+                                  )}
+                                >
+                                  {r.code}
+                                </Badge>
+                                {r.type && <TypeName t={r.type} />}
+                              </dt>
+                              <dd className="mt-1 text-[15px] text-muted-foreground">{r.about}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </div>
+                      <Code dark>{o.curl}</Code>
                     </div>
-                    <Code dark>{o.curl}</Code>
-                  </div>
-                </Panel>
+                  </Panel>
                 </article>
               ))}
             </Section>

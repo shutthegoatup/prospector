@@ -63,7 +63,10 @@ export function AddPage() {
 function OrgMark({ name, color }: { name?: string; color?: string }) {
   return (
     <span
-      className={cn("grid size-7 shrink-0 place-items-center rounded-md font-heading text-sm font-bold text-[#111]", name === undefined && "animate-pulse bg-accent")}
+      className={cn(
+        "grid size-7 shrink-0 place-items-center rounded-md font-heading text-sm font-bold text-[#111]",
+        name === undefined && "animate-pulse bg-accent",
+      )}
       style={color === undefined ? undefined : { background: color }}
     >
       {name !== undefined && ([...name][0]?.toUpperCase() ?? "?")}
@@ -85,7 +88,13 @@ const blank = { linkedin: "", name: "", title: "", company: "", email: "", note:
 // AddForm is drawn before the draft and settings come, its fields empty, pulsing and disabled.
 function AddForm({ draft, settings, popup }: { draft?: Draft; settings?: Settings; popup: boolean }) {
   const { org } = useSession();
-  const [values, setValues] = useState({ ...blank, linkedin: draft?.linkedin ?? "", name: draft?.name ?? "", title: draft?.title ?? "", company: draft?.company ?? "" });
+  const [values, setValues] = useState({
+    ...blank,
+    linkedin: draft?.linkedin ?? "",
+    name: draft?.name ?? "",
+    title: draft?.title ?? "",
+    company: draft?.company ?? "",
+  });
   const [added, setAdded] = useState(false);
   const [result, setResult] = useState<{ text: string; failed: boolean } | null>(null);
   const first = useRef<HTMLInputElement>(null);

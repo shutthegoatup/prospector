@@ -9,11 +9,17 @@ test("a throttled read isn't tried again; another failure is, three times", () =
 });
 
 test("an API problem says its detail", () => {
-  assert.equal(problemText({ title: "Forbidden", status: 403, detail: "this key lacks the agents:configure scope" }, "Forbidden", 403), "this key lacks the agents:configure scope");
+  assert.equal(
+    problemText({ title: "Forbidden", status: 403, detail: "this key lacks the agents:configure scope" }, "Forbidden", 403),
+    "this key lacks the agents:configure scope",
+  );
 });
 
 test("plain text from a sign-in check is shown whole", () => {
-  assert.equal(problemText("Alpha Co requires its single sign-on: reload the page to go through it\n", "Forbidden", 403), "Alpha Co requires its single sign-on: reload the page to go through it");
+  assert.equal(
+    problemText("Alpha Co requires its single sign-on: reload the page to go through it\n", "Forbidden", 403),
+    "Alpha Co requires its single sign-on: reload the page to go through it",
+  );
 });
 
 test("with nothing to say, the status stands in, even where HTTP/2 gives no status text", () => {

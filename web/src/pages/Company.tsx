@@ -25,7 +25,6 @@ const notesSize = 20;
 const field = "h-9 rounded-lg border border-input bg-muted px-3 text-sm";
 const select = "h-9 rounded-lg border border-input bg-muted px-2 text-sm";
 
-
 function save(data: unknown, name: string) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
@@ -248,7 +247,12 @@ function WhereItStands({ c }: { c: Overview }) {
         {offerings.map((o) => {
           const v = by.get(o.id);
           return (
-            <StandingRow key={o.id} name={o.name} pill={v ? (verdictPill[v.stage] ?? null) : null} said={v && (v.reason || v.by) ? `${v.reason ? `“${v.reason}” ` : ""}${actor(v.by)}, ${stamp(v.updated_at)}` : ""}>
+            <StandingRow
+              key={o.id}
+              name={o.name}
+              pill={v ? (verdictPill[v.stage] ?? null) : null}
+              said={v && (v.reason || v.by) ? `${v.reason ? `“${v.reason}” ` : ""}${actor(v.by)}, ${stamp(v.updated_at)}` : ""}
+            >
               {sales && !v && (
                 <ActionButton quiet size="xs" onClick={() => judge("review", o.id)}>
                   Review for this
@@ -302,7 +306,13 @@ function LookingFor({ found }: { found: Criterion[] }) {
   if (found.length === 0) {
     return (
       <div className="mt-1 text-sm text-muted-foreground">
-        {owner ? <Link to="/o/$org/settings" params={{ org }}>Name what you look for</Link> : "Nothing named yet"}
+        {owner ? (
+          <Link to="/o/$org/settings" params={{ org }}>
+            Name what you look for
+          </Link>
+        ) : (
+          "Nothing named yet"
+        )}
       </div>
     );
   }
@@ -360,9 +370,7 @@ function People({ c }: { c: Overview }) {
                     quiet
                     size="xs"
                     disabled={exportPerson.isPending}
-                    onClick={() =>
-                      exportPerson.mutate({ params: { path: { org, id: p.id } } }, { onSuccess: (held) => save(held, `person-${p.id}.json`) })
-                    }
+                    onClick={() => exportPerson.mutate({ params: { path: { org, id: p.id } } }, { onSuccess: (held) => save(held, `person-${p.id}.json`) })}
                   >
                     Export
                   </ActionButton>
@@ -624,7 +632,6 @@ function SubscriptionLine({ s }: { s: Subscription }) {
   );
 }
 
-
 function fileLine(a: Agreement) {
   if (!a.file_hash) return "No document yet";
   return `${a.file_name} · ${Math.floor((a.file_size + 1023) / 1024)} KB · SHA-256 ${a.file_hash.slice(0, 12)}…`;
@@ -644,13 +651,17 @@ function Agreements({ c }: { c: Overview }) {
         <div key={a.id} className="mt-1 flex flex-col gap-2 rounded-lg border border-border p-3 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <b>{a.name}</b>
-            <span className="font-mono text-xs text-muted-foreground">{a.status} · by {actor(a.created_by)}</span>
+            <span className="font-mono text-xs text-muted-foreground">
+              {a.status} · by {actor(a.created_by)}
+            </span>
           </div>
           <Meta>{fileLine(a)}</Meta>
           <div className="flex flex-wrap items-center gap-2">
             {a.file_hash && sales && a.status === "draft" ? (
               <ActionButton size="xs" asChild>
-                <Link to="/o/$org/agreements/$id/prepare" params={{ org, id: a.id }}>Prepare for signing</Link>
+                <Link to="/o/$org/agreements/$id/prepare" params={{ org, id: a.id }}>
+                  Prepare for signing
+                </Link>
               </ActionButton>
             ) : (
               a.file_hash && (
@@ -726,8 +737,8 @@ function Agreements({ c }: { c: Overview }) {
             <Failed errors={[create.error]} />
           </form>
           <Meta>
-            Prospector keeps the PDF as uploaded, with its SHA-256, and doesn't read what it says. It is not for deeds, or anything that must be
-            witnessed or notarised. You can set out who signs it and where; sending it for signature comes later.
+            Prospector keeps the PDF as uploaded, with its SHA-256, and doesn't read what it says. It is not for deeds, or anything that must be witnessed or
+            notarised. You can set out who signs it and where; sending it for signature comes later.
           </Meta>
         </Disclosure>
       )}

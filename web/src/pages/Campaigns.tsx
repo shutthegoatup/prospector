@@ -28,10 +28,18 @@ function audienceLabel(a: string) {
 
 function mailLine(m: Record<string, number>) {
   const labels: [string, string][] = [
-    ["sent", "sent"], ["queued", "waiting"], ["sending", "going now"], ["skipped", "skipped"],
-    ["failed", "refused"], ["unknown", "unknown"], ["cancelled", "cancelled"],
+    ["sent", "sent"],
+    ["queued", "waiting"],
+    ["sending", "going now"],
+    ["skipped", "skipped"],
+    ["failed", "refused"],
+    ["unknown", "unknown"],
+    ["cancelled", "cancelled"],
   ];
-  return labels.filter(([k]) => (m[k] ?? 0) > 0).map(([k, l]) => `${m[k]} ${l}`).join(" · ");
+  return labels
+    .filter(([k]) => (m[k] ?? 0) > 0)
+    .map(([k, l]) => `${m[k]} ${l}`)
+    .join(" · ");
 }
 
 function state(c: Campaign) {
@@ -64,10 +72,10 @@ export function CampaignsPage() {
     <>
       <PageHead title="Campaigns" />
       <p className="mb-5 max-w-[70ch] text-sm text-muted-foreground">
-        A marketing mail written once, for everyone in conversation or everyone at a company that is a customer now. Never for prospects who
-        haven't replied: that stays one person writing to one person. Anyone on the list not to be mailed, on the never-contact list or erased
-        is left out, and each draft shows who that leaves. It goes through your own mail server a few dozen a minute, each with your postal
-        address and a link to unsubscribe, and nobody is mailed twice.
+        A marketing mail written once, for everyone in conversation or everyone at a company that is a customer now. Never for prospects who haven't replied:
+        that stays one person writing to one person. Anyone on the list not to be mailed, on the never-contact list or erased is left out, and each draft shows
+        who that leaves. It goes through your own mail server a few dozen a minute, each with your postal address and a link to unsubscribe, and nobody is
+        mailed twice.
       </p>
       {/* Whether it can send yet comes with the list and sits above everything else, so
           nothing below the introduction is drawn until then, rather than drawn and pushed down. */}
@@ -79,9 +87,7 @@ export function CampaignsPage() {
               <Failed errors={[list.error]} />
             </div>
           )}
-          {notReady && (
-            <p className="mb-5 max-w-[70ch] rounded-lg border border-border bg-muted px-3 py-2 text-sm">Not yet ready to send: {notReady}.</p>
-          )}
+          {notReady && <p className="mb-5 max-w-[70ch] rounded-lg border border-border bg-muted px-3 py-2 text-sm">Not yet ready to send: {notReady}.</p>}
           <Whose area="sales" work="Campaigns are" can={sales} />
           {sales && (
             <form
@@ -161,11 +167,7 @@ function SentCard({ c }: { c?: Campaign }) {
               Resume
             </ActionButton>
           )}
-          <ActionButton
-            quiet
-            size="xs"
-            onClick={() => window.confirm(`Stop sending ${c.name}? What went stays sent.`) && cancel.mutate(path)}
-          >
+          <ActionButton quiet size="xs" onClick={() => window.confirm(`Stop sending ${c.name}? What went stays sent.`) && cancel.mutate(path)}>
             Cancel the rest
           </ActionButton>
         </div>
@@ -219,9 +221,9 @@ function DraftCard({ c, ready }: { c: Campaign; ready: boolean }) {
           </div>
           {c.kind === "service" && (
             <p className="rounded-lg border border-border bg-muted px-3 py-2">
-              A service notice goes to everyone at a current customer, including anyone who unsubscribed from your marketing, because it is about
-              what they already have: a price or terms change, an outage, a date that matters. Keep it to that. Anything promotional in it makes it
-              marketing, whatever it is called. It never goes to anyone on the never-contact list or erased, and carries no unsubscribe link.
+              A service notice goes to everyone at a current customer, including anyone who unsubscribed from your marketing, because it is about what they
+              already have: a price or terms change, an outage, a date that matters. Keep it to that. Anything promotional in it makes it marketing, whatever it
+              is called. It never goes to anyone on the never-contact list or erased, and carries no unsubscribe link.
             </p>
           )}
           <Input
@@ -256,8 +258,8 @@ function DraftCard({ c, ready }: { c: Campaign; ready: boolean }) {
       )}
       <details>
         <summary className="cursor-pointer font-mono text-xs text-muted-foreground">
-          Would go to <Text value={counted ? plural(going, "person", "people") : undefined} w="9ch" />;{" "}
-          <Text value={counted ? leftOut : undefined} w="2ch" /> left out
+          Would go to <Text value={counted ? plural(going, "person", "people") : undefined} w="9ch" />; <Text value={counted ? leftOut : undefined} w="2ch" />{" "}
+          left out
         </summary>
         <div className="mt-2 flex flex-col">
           {shown.map((p) => (
@@ -277,10 +279,7 @@ function DraftCard({ c, ready }: { c: Campaign; ready: boolean }) {
             Remove draft
           </ActionButton>
           {ready && going > 0 && c.subject && c.body && (
-            <ActionButton
-              size="xs"
-              onClick={() => window.confirm(`Send ${c.name} to ${plural(going, "person", "people")} now?`) && send.mutate(path)}
-            >
+            <ActionButton size="xs" onClick={() => window.confirm(`Send ${c.name} to ${plural(going, "person", "people")} now?`) && send.mutate(path)}>
               Send to {plural(going, "person", "people")}
             </ActionButton>
           )}

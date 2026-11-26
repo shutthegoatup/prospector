@@ -28,8 +28,8 @@ export function SubscriptionsPage() {
         )}
       </PageHead>
       <p className="mb-5 max-w-[70ch] text-sm text-muted-foreground">
-        What each customer is on, and until when. The one that needs someone soonest comes first: a day to cancel by, a renewal or an end.
-        Record one from a company's page. Prospector notes what was agreed and when it's due; it takes no payment and sends no invoice.
+        What each customer is on, and until when. The one that needs someone soonest comes first: a day to cancel by, a renewal or an end. Record one from a
+        company's page. Prospector notes what was agreed and when it's due; it takes no payment and sends no invoice.
       </p>
       <Whose area="support" work="Subscriptions are" can={support} />
       <Failed errors={[list.error]} />
@@ -90,9 +90,7 @@ function SubscriptionLine({ s }: { s?: Subscription }) {
             {s.company}
           </Link>
           <span className="text-muted-foreground"> · {s.name}</span>
-          <span className="block font-mono text-xs text-muted-foreground">
-            {[price, termText(s), standingText(s)].filter((p) => p.trim()).join(" · ")}
-          </span>
+          <span className="block font-mono text-xs text-muted-foreground">{[price, termText(s), standingText(s)].filter((p) => p.trim()).join(" · ")}</span>
         </span>
         <span className="flex items-center gap-2">
           {s.soon && <Pill tone="warn">within 30 days</Pill>}
@@ -103,4 +101,3 @@ function SubscriptionLine({ s }: { s?: Subscription }) {
     </div>
   );
 }
-
