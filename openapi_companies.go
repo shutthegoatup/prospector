@@ -211,13 +211,6 @@ func (s apiServer) ListCompanyNotes(ctx context.Context, in api.ListCompanyNotes
 	return out, nil
 }
 
-func (s apiServer) DeleteNote(ctx context.Context, in api.DeleteNoteRequestObject) (api.DeleteNoteResponseObject, error) {
-	if err := s.a.s.DeleteNote(reqFrom(ctx).Org.ID, in.Id); err != nil {
-		return nil, err
-	}
-	return api.DeleteNote204Response{}, nil
-}
-
 func (s apiServer) ExportPerson(ctx context.Context, in api.ExportPersonRequestObject) (api.ExportPersonResponseObject, error) {
 	q := reqFrom(ctx)
 	held, err := s.a.s.ExportPerson(q.Org.ID, in.Id, q.Actor())

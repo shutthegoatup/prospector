@@ -140,14 +140,14 @@ func TestOnlyReviewersDeleteAgentsNotes(t *testing.T) {
 	}
 	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")
 	writer, _ := must2(s.CreateKey(o.ID, "scout", []string{"research:write"}, "Ada Lovelace"))
-	reviewer, _ := must2(s.CreateKey(o.ID, "reviewer", []string{"research:review"}, "Ada Lovelace"))
+	reviewer, _ := must2(s.CreateKey(o.ID, "reviewer", []string{"tasks:write"}, "Ada Lovelace"))
 	base := srv.URL + "/o/alpha/api/v1/notes/"
 
 	n := note()
 	if code, body := call(t, asGrace, "DELETE", base+itoa(n.ID), "", nil); code != http.StatusForbidden || !strings.Contains(body, "sales") {
 		t.Fatalf("someone in support only deleting a note: %d %s", code, body)
 	}
-	if code, body := asKey(t, "DELETE", base+itoa(n.ID), writer, nil); code != http.StatusForbidden || !strings.Contains(body, "research:review") {
+	if code, body := asKey(t, "DELETE", base+itoa(n.ID), writer, nil); code != http.StatusForbidden || !strings.Contains(body, "tasks:write") {
 		t.Fatalf("a research key deleting a note: %d %s", code, body)
 	}
 	if code, body := call(t, ada, "DELETE", base+itoa(n.ID), "", nil); code != http.StatusNoContent {
@@ -157,7 +157,7 @@ func TestOnlyReviewersDeleteAgentsNotes(t *testing.T) {
 		t.Fatalf("deleting it again: %d", code)
 	}
 	if code, body := asKey(t, "DELETE", base+itoa(note().ID), reviewer, nil); code != http.StatusNoContent {
-		t.Fatalf("a reviewer's key deleting a note: %d %s", code, body)
+		t.Fatalf("a tasks:write key deleting a note: %d %s", code, body)
 	}
 }
 

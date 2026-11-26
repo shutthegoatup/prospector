@@ -715,17 +715,28 @@ const activityPageSize = 20
 
 // AgentActivity is one page of what agents did, newest first.
 func (s *Store) AgentActivity(org int64, page int) ([]AgentEvent, Page) {
+	events, total := s.agentEvents(org, 0, 0)
+	pg := pageOf(page, activityPageSize, total)
+	events, _ = s.agentEvents(org, pg.offset(), pg.Size)
+	return events, pg
+}
+
+// agentEvents is limit of what agents did from offset, newest first, and how many they
+// did in all; a limit of 0 reads none, only the count.
+func (s *Store) agentEvents(org int64, offset, limit int) ([]AgentEvent, int) {
 	agents := func() *gorm.DB { return s.in(org).Model(&Event{}).Where(`"user" like 'agent:%'`) }
 	var total int64
 	logged(agents().Count(&total))
-	pg := pageOf(page, activityPageSize, int(total))
+	if limit == 0 {
+		return nil, int(total)
+	}
 	var events []Event
-	logged(agents().Order("at desc, id desc").Limit(pg.Size).Offset(pg.offset()).Find(&events))
+	logged(agents().Order("at desc, id desc").Limit(limit).Offset(offset).Find(&events))
 	out := make([]AgentEvent, len(events))
 	for i, e := range events {
 		out[i] = AgentEvent{e.At, strings.TrimPrefix(e.User, "agent:"), e.Action, deref(e.Value)}
 	}
-	return out, pg
+	return out, int(total)
 }
 
 // QuickAdd is the "Add person" form and the LinkedIn bookmarklet: one person straight into the LinkedIn queue.

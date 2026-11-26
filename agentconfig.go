@@ -635,19 +635,24 @@ func (a *App) ownAgents(org int64) OwnAgentsView {
 	list, _ := a.s.Agents(org)
 	v := OwnAgentsView{Sealing: a.s.keys != nil}
 	for _, c := range list {
-		view := AgentView{Agent: c, HasKey: c.APIKey != ""}
-		view.APIKey = ""
-		for _, o := range list {
-			if o.ID != c.ID {
-				view.Others = append(view.Others, Agent{ID: o.ID, Name: o.Name})
-			}
-		}
-		v.Agents = append(v.Agents, view)
+		v.Agents = append(v.Agents, agentView(c, list))
 	}
 	for _, c := range list {
 		v.New.Others = append(v.New.Others, Agent{ID: c.ID, Name: c.Name})
 	}
 	return v
+}
+
+// agentView is c as its card shows it, with those of all it could fall back to.
+func agentView(c Agent, all []Agent) AgentView {
+	view := AgentView{Agent: c, HasKey: c.APIKey != ""}
+	view.APIKey = ""
+	for _, o := range all {
+		if o.ID != c.ID {
+			view.Others = append(view.Others, Agent{ID: o.ID, Name: o.Name})
+		}
+	}
+	return view
 }
 
 // Searches is whether it can look things up on the web, through SearXNG or a tool.

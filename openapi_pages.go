@@ -18,10 +18,14 @@ func pageIn(limit int, cursor string) (PageIn, error) {
 	return PageIn{Limit: limit, Cursor: cursor}, nil
 }
 
+type requestKey struct{}
+
 // listURL hands each operation the address it was asked at, so a page of a list can
-// name the next one in its Link header.
+// name the next one in its Link header, and the request, for an answer that names
+// this server's own address.
 func listURL(f func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error)) func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error) {
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error) {
+		ctx = context.WithValue(ctx, requestKey{}, r)
 		return f(context.WithValue(ctx, listURLKey{}, r.URL), w, r, in)
 	}
 }
