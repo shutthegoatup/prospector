@@ -404,6 +404,9 @@ templ SuggestedDetails(list []PendingDetail) {
 					if d.SourceURL != "" {
 						<a href={ safeHref(d.SourceURL) } target="_blank" rel="noopener" class="font-mono text-xs">source ↗</a>
 					}
+					if d.Vendor != "" {
+						<span class="font-mono text-xs">{ "found by " + vendorName(d.Vendor) }</span>
+					}
 				</span>
 			</span>
 			if canDo(ctx, areaSales) {

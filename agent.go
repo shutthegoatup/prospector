@@ -662,6 +662,10 @@ func agentInstructions(o *Org, k *APIKey) string {
 			lookForGuidance(o),
 			"Contacts need care more than speed, so use a capable model. Pick the person who owns the decision, not a general inbox. Confirm they hold the role now on a current page: an old bio, press release or speaker listing isn't enough. Set email_status to verified only when a page you cite shows that address for this person, and to guess for any address inferred from a pattern. An address whose domain takes no mail is turned away. If you can't confirm someone, don't add them; add a team_page fact so a person can look. To add an email, phone or profile for someone already here, call add_contact for them again with it: it waits for a person to accept, so don't send it twice.")
 	}
+	if k.Has("enrich:spend") {
+		parts = append(parts,
+			"enrich_contact asks the organisation's paid data vendors for an email someone already here lacks. It costs money, so use it only once your own search and reading found nothing, and only for someone worth contacting.")
+	}
 	if k.Has("outcomes:write") {
 		parts = append(parts,
 			"Record an outcome with mark only when a person tells you it happened or you can see it yourself, and say how you know in note. Each mark shows as yours.")

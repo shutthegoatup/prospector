@@ -40,7 +40,8 @@ var opArea = map[string]string{
 	"CreateCampaign": areaSales, "ChangeCampaign": areaSales, "RemoveCampaign": areaSales,
 	"SendCampaign": areaSales, "CancelCampaign": areaSales, "ResumeCampaign": areaSales,
 	"CreateAgreement": areaSales, "RenameAgreement": areaSales, "RemoveAgreement": areaSales, "PutAgreementDocument": areaSales,
-	"CreateAgent": "", "UpdateAgent": "", "DeleteAgent": "", "DeleteEnquiry": "", "ChangeSettings": "",
+	"EnrichContact": areaSales,
+	"CreateAgent": "", "UpdateAgent": "", "DeleteAgent": "", "DeleteEnquiry": "", "ChangeSettings": "", "SaveEnricher": "", "DeleteEnricher": "",
 }
 
 func (m *Membership) Works(area string) bool {
