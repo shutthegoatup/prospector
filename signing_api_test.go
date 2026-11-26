@@ -114,6 +114,29 @@ func TestAnAgreementIsSignedThroughTheAPIs(t *testing.T) {
 	}
 }
 
+// The signer's page is served to anyone with a link: none of the members' app, the
+// pdf.js policy, never a referrer (the link is in its address) and not for search engines.
+func TestTheSignersPageIsServedWithoutTheApp(t *testing.T) {
+	_, srv, _, _ := mailSite(t, nil)
+	res, err := http.Get(srv.URL + "/s/some-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK || !strings.Contains(string(body), `id="sign"`) || !strings.Contains(string(body), "/assets/app/sign.js?v=") || strings.Contains(string(body), "main.js") {
+		t.Errorf("the signer's page: %d %.300s", res.StatusCode, body)
+	}
+	for header, want := range map[string]string{"Content-Security-Policy": pdfPolicy, "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex, nofollow"} {
+		if got := res.Header.Get(header); got != want {
+			t.Errorf("%s: %q, want %q", header, got, want)
+		}
+	}
+	if code, _ := call(t, newMailClient(), "GET", srv.URL+"/s/api/v1/signing", "", nil); code == http.StatusOK {
+		t.Error("the signing API answered a browser with no session")
+	}
+}
+
 // latestMail is the latest mail to an address and the link in it.
 func latestMail(t *testing.T, box *postbox, address string) (Message, string) {
 	t.Helper()

@@ -691,6 +691,97 @@ function SubscriptionUpdate({ s }: { s: Subscription }) {
   );
 }
 
+const signerTone: Record<string, Tone> = { signed: "ok", due: "warn", declined: "stop", waiting: "", "": "" };
+
+// SignStatus is an agreement that went out: who signs and where each stands, and what
+// can be done about it now.
+function SignStatus({ a }: { a: Agreement }) {
+  const { org, sales } = useSession();
+  const refresh = useRefresh();
+  const path = { params: { path: { org, id: a.id } } };
+  const recipients = $api.useQuery("get", "/o/{org}/api/v1/agreements/{id}/recipients", { params: { path: { org, id: a.id }, query: { limit: 200 } } });
+  const overview = $api.useQuery("get", "/o/{org}/api/v1/agreements/{id}", path);
+  const voiding = $api.useMutation("post", "/o/{org}/api/v1/agreements/{id}/void", { onSuccess: refresh });
+  const resend = $api.useMutation("post", "/o/{org}/api/v1/agreements/{id}/recipients/{recipient}/resend");
+  const [resent, setResent] = useState(0);
+  const items = recipients.data?.items ?? [];
+  const until = a.expires_at ? new Date(a.expires_at).toLocaleDateString() : "";
+  return (
+    <div className="flex flex-col gap-2">
+      <Meta>
+        {a.status === "sent" && `Sent ${a.sent_at ? new Date(a.sent_at).toLocaleDateString() : ""} by ${a.sent_by} · open until ${until}`}
+        {a.status === "sealing" && "Everyone has signed: it's being sealed."}
+        {a.status === "completed" && `Signed by everyone and sealed ${a.completed_at ? new Date(a.completed_at).toLocaleDateString() : ""} · SHA-256 ${a.sealed_hash.slice(0, 12)}…`}
+        {a.status === "declined" && "Declined: it can't be signed now."}
+        {a.status === "voided" && "Withdrawn: it can't be signed now."}
+        {a.status === "expired" && `Its time ran out on ${until}.`}
+      </Meta>
+      <ol className="flex list-none flex-col overflow-hidden rounded-lg border border-border p-0">
+        {items.map((r, i) => (
+          <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2 last:border-0">
+            <span>
+              {r.role === "signer" ? (
+                <b>
+                  {i + 1} · {r.name}
+                </b>
+              ) : (
+                <span className="font-mono text-xs text-muted-foreground">gets a copy · {r.name}</span>
+              )}{" "}
+              <span className="font-mono text-xs text-muted-foreground">{r.email}</span>
+            </span>
+            <span className="flex items-center gap-2">
+              {r.role === "signer" && (
+                <Pill tone={signerTone[r.status ?? ""] ?? ""}>
+                  {r.status === "signed" && r.signed_at ? `signed ${new Date(r.signed_at).toLocaleDateString()}` : r.status === "due" ? "their turn" : r.status || "—"}
+                </Pill>
+              )}
+              {r.status === "declined" && r.decline_reason && <span className="font-mono text-xs text-muted-foreground">“{r.decline_reason}”</span>}
+              {sales && a.status === "sent" && r.status === "due" && !r.member_id && (
+                <ActionButton
+                  quiet
+                  size="xs"
+                  disabled={resent === r.id}
+                  onClick={() => resend.mutate({ params: { path: { org, id: a.id, recipient: r.id } } }, { onSuccess: () => setResent(r.id) })}
+                >
+                  {resent === r.id ? "Sent again ✓" : "Send link again"}
+                </ActionButton>
+              )}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <div className="flex flex-wrap items-center gap-2">
+        {overview.data?.my_turn && (
+          <ActionButton size="xs" asChild>
+            <Link to="/o/$org/agreements/$id/sign" params={{ org, id: a.id }}>
+              Sign now
+            </Link>
+          </ActionButton>
+        )}
+        {a.status === "completed" && (
+          <a href={`/o/${org}/api/v1/agreements/${a.id}/sealed`} className="font-mono text-xs text-mark underline">
+            Download the signed copy
+          </a>
+        )}
+        {sales && a.status === "sent" && (
+          <ActionButton
+            quiet
+            size="xs"
+            className="text-[var(--stop)]"
+            onClick={() => {
+              const reason = window.prompt(`Withdraw ${a.name}? Nobody can sign it after, and the signers already sent it are told. Why, for them (optional):`);
+              if (reason !== null) voiding.mutate({ ...path, body: { reason } });
+            }}
+          >
+            Withdraw
+          </ActionButton>
+        )}
+      </div>
+      <Failed errors={[voiding.error, resend.error]} />
+    </div>
+  );
+}
+
 function fileLine(a: Agreement) {
   if (!a.file_hash) return "No document yet";
   return `${a.file_name} · ${Math.floor((a.file_size + 1023) / 1024)} KB · SHA-256 ${a.file_hash.slice(0, 12)}…`;
@@ -713,6 +804,7 @@ function Agreements({ c }: { c: Overview }) {
             <span className="font-mono text-xs text-muted-foreground">{a.status} · by {actor(a.created_by)}</span>
           </div>
           <Meta>{fileLine(a)}</Meta>
+          {a.status !== "draft" && <SignStatus a={a} />}
           <div className="flex flex-wrap items-center gap-2">
             {a.file_hash && sales && a.status === "draft" ? (
               <ActionButton size="xs" asChild>

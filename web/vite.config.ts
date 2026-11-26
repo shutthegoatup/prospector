@@ -16,9 +16,11 @@ export default defineConfig({
     target: "es2022",
     cssCodeSplit: false,
     rollupOptions: {
-      input: fileURLToPath(new URL("./index.html", import.meta.url)),
+      // sign.html is the signer's page: someone outside the organisation, from a mailed
+      // link, with none of the members' app around it.
+      input: { main: fileURLToPath(new URL("./index.html", import.meta.url)), sign: fileURLToPath(new URL("./sign.html", import.meta.url)) },
       output: {
-        entryFileNames: "main.js",
+        entryFileNames: "[name].js",
         chunkFileNames: "chunks/[name].js",
         assetFileNames: "[name][extname]",
       },

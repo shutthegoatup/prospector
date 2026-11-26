@@ -10,6 +10,7 @@ import { EnquiriesPage } from "@/pages/Enquiries";
 import { OnboardingPage } from "@/pages/Onboarding";
 import { PreparePage } from "@/pages/Prepare";
 import { ResearchPage } from "@/pages/Research";
+import { SignPage } from "@/pages/Sign";
 import { SettingsPage } from "@/pages/Settings";
 import { SubscriptionsPage } from "@/pages/Subscriptions";
 import { TaskPage } from "@/pages/Task";
@@ -43,10 +44,11 @@ const company = createRoute({ getParentRoute: () => org, path: "companies/$id", 
 const settings = createRoute({ getParentRoute: () => org, path: "settings", component: SettingsPage });
 const agents = createRoute({ getParentRoute: () => org, path: "agents", component: AgentsPage });
 const prepare = createRoute({ getParentRoute: () => org, path: "agreements/$id/prepare", params: idParams, errorComponent: NotFound, component: PreparePage });
+const sign = createRoute({ getParentRoute: () => org, path: "agreements/$id/sign", params: idParams, errorComponent: NotFound, component: SignPage });
 const add = createRoute({ getParentRoute: () => org, path: "add", validateSearch: addSearch, component: AddPage });
 
 const routeTree = root.addChildren([
-  org.addChildren([today, research, conversations, enquiries, onboarding, subscriptions, campaigns, tasks, task, companies, company, prepare, settings, agents, add]),
+  org.addChildren([today, research, conversations, enquiries, onboarding, subscriptions, campaigns, tasks, task, companies, company, prepare, sign, settings, agents, add]),
 ]);
 
 export const router = createRouter({ routeTree, scrollRestoration: true, parseSearch, stringifySearch });

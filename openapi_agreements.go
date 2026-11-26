@@ -64,9 +64,11 @@ func (s apiServer) GetAgreement(ctx context.Context, in api.GetAgreementRequestO
 		out.Missing = []string{}
 	}
 	for _, r := range p.Parties {
-		if q.User != nil && r.UserID != nil && *r.UserID == q.User.ID && r.Status == SignerDue && p.Agreement.Status == AgreementSent {
-			out.MyTurn = true
+		if q.User == nil || r.UserID == nil || *r.UserID != q.User.ID || r.Role != RecipientSigner {
+			continue
 		}
+		out.MyRecipient = r.ID
+		out.MyTurn = r.Status == SignerDue && p.Agreement.Status == AgreementSent
 	}
 	for _, c := range p.People {
 		if !p.on(c.ID, 0) {

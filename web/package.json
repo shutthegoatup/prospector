@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "types": "openapi-typescript ../api/openapi.yaml -o src/api.d.ts",
+    "types": "openapi-typescript ../api/openapi.yaml -o src/api.d.ts && openapi-typescript ../api/signer/openapi.yaml -o src/signer-api.d.ts",
     "check": "tsc --noEmit",
     "build": "npm run types && npm run check && npm test && node build.mjs && vite build",
     "test": "node --test src/*.test.ts"
