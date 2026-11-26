@@ -532,7 +532,7 @@ func TestOrganisationSingleSignOn(t *testing.T) {
 	if code, body, _ := b.get("/o/alpha/api/v1/nav"); code != http.StatusOK || strings.Contains(body, `"slug":"beta"`) || !strings.Contains(body, `"slug":"alpha"`) {
 		t.Fatalf("the organisation switcher offers one this session can't open: %d %s", code, body)
 	}
-	if code, _ := b.post("/orgs", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
+	if code, _ := b.post("/api/v1/orgs", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
 		t.Fatalf("starting an organisation on a limited session: %d", code)
 	}
 	if code, _ := b.post("/api/v1/orgs", map[string]string{"name": "Mine"}); code != http.StatusForbidden {

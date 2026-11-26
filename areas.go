@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -56,19 +55,6 @@ func (m *Membership) Works(area string) bool {
 		return m.Role == "owner" || strings.TrimSpace(m.Areas) != ""
 	}
 	return area == "" || m.Role == "owner" || slices.Contains(strings.Fields(m.Areas), area)
-}
-
-// canDo says whether whoever a page is rendered for may change an area's work, so the
-// page offers only what they can use. The routes hold it either way.
-func canDo(ctx context.Context, area string) bool {
-	q, _ := ctx.Value(reqKey{}).(*Req)
-	return q != nil && q.Member.Works(area)
-}
-
-// pageArea is the area whose work a page in the sidebar is.
-var pageArea = map[string]string{
-	"today": areaSales, "research": areaSales, "conversations": areaSales, "campaigns": areaSales, "tasks": areaSales,
-	"enquiries": areaSupport, "onboarding": areaSupport, "subscriptions": areaSupport,
 }
 
 // landing is the page someone starts on: Today is outreach, so someone who works only

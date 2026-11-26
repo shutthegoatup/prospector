@@ -836,20 +836,7 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 		t.Fatalf("an action before the first password is changed: %d", code)
 	}
 	if code, _ := call(t, bob, "POST", srv.URL+"/api/v1/orgs", "application/json", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
-		t.Fatalf("a new organisation before the first password is changed: %d", code)
-	}
-	if code, _ := call(t, bob, "POST", srv.URL+"/api/v1/orgs", "application/json", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
 		t.Fatalf("a new organisation through the API before the first password is changed: %d", code)
-	}
-	fragment, _ := http.NewRequest("GET", srv.URL+"/o/alpha/today", nil)
-	fragment.Header.Set("X-Fragment", "1")
-	refreshed, err := bob.Do(fragment)
-	if err != nil {
-		t.Fatal(err)
-	}
-	refreshed.Body.Close()
-	if refreshed.StatusCode != http.StatusForbidden {
-		t.Fatalf("a page refresh before the first password is changed: %d", refreshed.StatusCode)
 	}
 	if code, _ := change(given, given); code != http.StatusBadRequest {
 		t.Fatalf("keeping the given password: %d", code)
@@ -1168,7 +1155,6 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 		headers      map[string]string
 	}{
 		"the page script":  {"POST", "/password", map[string]string{"content-type": "application/json", "Accept": "*/*"}},
-		"a page refresh":   {"GET", "/o/nope/today", map[string]string{"Accept": "text/html", "X-Fragment": "1"}},
 		"no Accept header": {"GET", "/o/nope/today", nil},
 	} {
 		code, ctype, body := get(client, c.method, c.path, c.headers)
