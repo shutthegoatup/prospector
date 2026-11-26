@@ -15532,6 +15532,185 @@
      "curl": "curl -X PUT https://prospector.invalid/o/your-org/api/v1/mail-server \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"host\": \"…\", \"password\": \"…\", \"port\": 1, \"sender\": \"…\"}'"
     },
     {
+     "anchor": "op-makeBounceHook",
+     "method": "POST",
+     "tone": "is-gold",
+     "path": "/o/{org}/api/v1/mail-server/bounce-hook",
+     "summary": "Make the webhook Postmark reports bounces and spam complaints to",
+     "about": [
+      {
+       "text": "Gives the address to paste into the webhook settings for the Postmark server your mail goes through, with Bounce and Spam Complaint turned on. The address signs in with your organisation's slug and a new secret, shown only now. Making another replaces it, so the old one stops working. An address that bounces for good (Postmark's HardBounce, Blocked or Suppressed) goes on the list not to be mailed as "
+      },
+      {
+       "text": "bounced",
+       "code": true
+      },
+      {
+       "text": ", and its last campaign mail is marked failed; a soft bounce changes nothing. One whose person marked a mail as spam goes on it as "
+      },
+      {
+       "text": "complained",
+       "code": true
+      },
+      {
+       "text": ". Neither gets any campaign again, service notices included. For a member, only an owner."
+      }
+     ],
+     "scope": "mail:configure",
+     "owner_only": true,
+     "params": [],
+     "responses": [
+      {
+       "code": "200",
+       "about": "The webhook, with its secret this once.",
+       "type": {
+        "name": "BounceHook",
+        "link": "#schema-BounceHook"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "415",
+       "bad": true,
+       "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/mail-server/bounce-hook \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
+     "anchor": "op-dropBounceHook",
+     "method": "DELETE",
+     "tone": "is-coral",
+     "path": "/o/{org}/api/v1/mail-server/bounce-hook",
+     "summary": "Stop taking bounces from Postmark",
+     "about": [
+      {
+       "text": "The webhook's secret stops working. What it already put on the list stays. For a member, only an owner."
+      }
+     ],
+     "scope": "mail:configure",
+     "owner_only": true,
+     "params": [],
+     "responses": [
+      {
+       "code": "204",
+       "about": "Stopped."
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X DELETE https://prospector.invalid/o/your-org/api/v1/mail-server/bounce-hook \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
      "anchor": "op-testMailServer",
      "method": "POST",
      "tone": "is-gold",
@@ -19098,6 +19277,50 @@
    ]
   },
   {
+   "anchor": "schema-BounceHook",
+   "name": "BounceHook",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "password",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The secret. It isn't kept and can't be shown again."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "url",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The webhook's address, with the username and password in it, as Postmark takes it."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "username",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The organisation's slug."
+      }
+     ],
+     "required": true
+    }
+   ]
+  },
+  {
    "anchor": "schema-Campaign",
    "name": "Campaign",
    "about": [],
@@ -22212,6 +22435,18 @@
    "about": [],
    "enum": [],
    "fields": [
+    {
+     "name": "has_bounce_hook",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [
+      {
+       "text": "Whether Postmark has a webhook here to report bounces and spam complaints to."
+      }
+     ],
+     "required": true
+    },
     {
      "name": "has_password",
      "type": {
@@ -26365,13 +26600,32 @@
      "required": true
     },
     {
+     "name": "bounced_at",
+     "type": {
+      "name": "date-time?"
+     },
+     "about": [
+      {
+       "text": "When mail to it last came back for good, whatever the reason it is here."
+      }
+     ],
+     "required": true
+    },
+    {
      "name": "by",
      "type": {
       "name": "string"
      },
      "about": [
       {
-       "text": "Who added it; empty when they unsubscribed themselves."
+       "text": "Who added it: "
+      },
+      {
+       "text": "Postmark",
+       "code": true
+      },
+      {
+       "text": " for a bounce or complaint; empty when they unsubscribed themselves."
       }
      ],
      "required": true
@@ -26406,11 +26660,46 @@
        "text": " when they asked, by a link in a mail; "
       },
       {
+       "text": "complained",
+       "code": true
+      },
+      {
+       "text": " when they marked one as spam; "
+      },
+      {
        "text": "added",
        "code": true
       },
       {
-       "text": " when a member or key put them here."
+       "text": " when a member or key put them here; "
+      },
+      {
+       "text": "bounced",
+       "code": true
+      },
+      {
+       "text": " when it is here only because mail to it came back for good. Only "
+      },
+      {
+       "text": "added",
+       "code": true
+      },
+      {
+       "text": " and "
+      },
+      {
+       "text": "bounced",
+       "code": true
+      },
+      {
+       "text": " can be taken off. A complained address, or one with "
+      },
+      {
+       "text": "bounced_at",
+       "code": true
+      },
+      {
+       "text": ", gets no service notices either."
       }
      ],
      "required": true

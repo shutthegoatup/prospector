@@ -43,7 +43,7 @@ var opArea = map[string]string{
 	"CreateAgent":   "", "UpdateAgent": "", "DeleteAgent": "", "CreateKey": "", "ChangeKey": "", "RevokeKey": "", "DeleteEnquiry": "", "ChangeSettings": "", "SaveEnricher": "", "DeleteEnricher": "",
 	"ExportPerson": "", "ErasePerson": "",
 	"AddOffering": "", "ChangeOffering": "", "RemoveOffering": "",
-	"AddMember": "", "ChangeMember": "", "RemoveMember": "", "GetMailServer": "", "SaveMailServer": "", "TestMailServer": "",
+	"AddMember": "", "ChangeMember": "", "RemoveMember": "", "GetMailServer": "", "SaveMailServer": "", "TestMailServer": "", "MakeBounceHook": "", "DropBounceHook": "",
 	"GetSSO": "", "SaveSSO": "", "ListSSODomains": "", "AddSSODomain": "", "RemoveSSODomain": "", "VerifySSODomain": "", "ExportOrg": "",
 }
 

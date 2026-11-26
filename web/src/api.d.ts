@@ -2489,6 +2489,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/mail-server/bounce-hook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make the webhook Postmark reports bounces and spam complaints to
+         * @description Gives the address to paste into the webhook settings for the Postmark server your mail goes through,
+         *     with Bounce and Spam Complaint turned on. The address signs in with your organisation's slug and a new
+         *     secret, shown only now. Making another replaces it, so the old one stops working.
+         *
+         *     An address that bounces for good (Postmark's HardBounce, Blocked or Suppressed) goes on the list not to
+         *     be mailed as `bounced`, and its last campaign mail is marked failed; a soft bounce changes nothing. One
+         *     whose person marked a mail as spam goes on it as `complained`. Neither gets any campaign again, service
+         *     notices included. For a member, only an owner.
+         */
+        post: operations["makeBounceHook"];
+        /**
+         * Stop taking bounces from Postmark
+         * @description The webhook's secret stops working. What it already put on the list stays. For a member, only an owner.
+         */
+        delete: operations["dropBounceHook"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/sso": {
         parameters: {
             query?: never;
@@ -3993,11 +4027,16 @@ export interface components {
             id: number;
             address: string;
             /**
-             * @description `unsubscribed` when they asked, by a link in a mail; `added` when a member or key put them here.
+             * @description `unsubscribed` when they asked, by a link in a mail; `complained` when they marked one as spam; `added` when a member or key put them here; `bounced` when it is here only because mail to it came back for good. Only `added` and `bounced` can be taken off. A complained address, or one with `bounced_at`, gets no service notices either.
              * @enum {string}
              */
-            reason: "unsubscribed" | "added";
-            /** @description Who added it; empty when they unsubscribed themselves. */
+            reason: "unsubscribed" | "complained" | "bounced" | "added";
+            /**
+             * Format: date-time
+             * @description When mail to it last came back for good, whatever the reason it is here.
+             */
+            bounced_at: string | null;
+            /** @description Who added it: `Postmark` for a bounce or complaint; empty when they unsubscribed themselves. */
             by: string;
             /** Format: date-time */
             created_at: string;
@@ -4337,6 +4376,8 @@ export interface components {
             sender?: string;
         };
         MailServer: {
+            /** @description Whether Postmark has a webhook here to report bounces and spam complaints to. */
+            has_bounce_hook: boolean;
             host: string;
             port: number;
             username: string;
@@ -4344,6 +4385,14 @@ export interface components {
             has_password: boolean;
             /** @description Whether this site has a server of its own that invitations fall back to. */
             site_mail: boolean;
+        };
+        BounceHook: {
+            /** @description The webhook's address, with the username and password in it, as Postmark takes it. */
+            url: string;
+            /** @description The organisation's slug. */
+            username: string;
+            /** @description The secret. It isn't kept and can't be shown again. */
+            password: string;
         };
         SSOSettings: {
             /** @description Like https://login.example.com; empty turns single sign-on off. */
@@ -9266,6 +9315,63 @@ export interface operations {
             429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
             502: components["responses"]["NotSent"];
+        };
+    };
+    makeBounceHook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The webhook, with its secret this once. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BounceHook"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    dropBounceHook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stopped. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getSSO: {
