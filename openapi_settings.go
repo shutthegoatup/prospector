@@ -16,7 +16,7 @@ func settingsOut(o *Org) api.Settings {
 	return api.Settings{Name: o.Name, Color: o.Color, EmailAfterDays: int32(set.EmailAfterDays), FollowupAfterDays: int32(set.FollowupAfterDays),
 		NoteTemplate: set.NoteTemplate, Pitch: set.Pitch, NeverContact: set.NeverContact, LookFor: set.LookFor, AgentGuidance: set.AgentGuidance,
 		EnquirySites: set.EnquirySites, OnboardingSteps: set.OnboardingSteps, Currency: set.Currency, PostalAddress: set.PostalAddress,
-		IncorporatedOnly: set.IncorporatedOnly}
+		IncorporatedOnly: set.IncorporatedOnly, LookingFor: lookingFor(o.Settings)}
 }
 
 func (s apiServer) GetSettings(ctx context.Context, _ api.GetSettingsRequestObject) (api.GetSettingsResponseObject, error) {
