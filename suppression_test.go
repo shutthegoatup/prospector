@@ -87,7 +87,7 @@ func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
 	}
 
 	// A link that was never made is answered as one that was, and records nothing.
-	if code, page := call(t, stranger, "POST", srv.URL+"/u/never-made", "application/x-www-form-urlencoded", nil); code != http.StatusOK || !strings.Contains(page, "won't get these again") {
+	if code, page := call(t, stranger, "POST", srv.URL+"/u/never-made", "application/x-www-form-urlencoded", nil); code != http.StatusOK || !served(t, page).Done {
 		t.Errorf("a made-up link: %d %.200s", code, page)
 	}
 	if listed(o.ID) != 1 {
@@ -253,12 +253,12 @@ func TestTheListHoldsAtItsEdges(t *testing.T) {
 	visitor := &http.Client{}
 	for _, aimed := range []string{"/u/..%2Flogout", "/u/..%2F..%2Fc%2Fsteps%2F1%2Fdone", "/u/short", "/u/" + strings.Repeat("a", 42) + "%2F"} {
 		_, page := call(t, visitor, "GET", srv.URL+aimed, "", nil)
-		if strings.Contains(page, "<form") || strings.Contains(page, "..") {
+		if served(t, page).Token != "" || strings.Contains(page, "..") {
 			t.Errorf("%s gave a page with a form, or kept the path: %.300s", aimed, page)
 		}
 	}
 	good := link(t, s, o.ID, "hannah@larkmoor.example")
-	if _, page := call(t, visitor, "GET", srv.URL+good, "", nil); !strings.Contains(page, `action="`+good+`"`) {
+	if _, page := call(t, visitor, "GET", srv.URL+good, "", nil); "/u/"+served(t, page).Token != good {
 		t.Errorf("a real link lost its form: %.300s", page)
 	}
 

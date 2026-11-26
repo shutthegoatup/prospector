@@ -334,7 +334,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /c/{token}", a.customerOpen)
 	mux.HandleFunc("POST /c/{token}/again", a.customerAgain)
 	mux.HandleFunc("GET /{$}", a.front)
-	mux.HandleFunc("GET /api", a.apiDocPage())
+	mux.HandleFunc("GET /api", a.apiDocPage)
 
 	mux.HandleFunc("GET /o/{org}/{$}", a.member(func(w http.ResponseWriter, r *http.Request) {
 		q := reqOf(r)
@@ -514,10 +514,7 @@ func (a *App) front(w http.ResponseWriter, r *http.Request) {
 		a.member(a.home)(w, r)
 		return
 	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	if err := LandingPage(a.frontIntake(r)).Render(r.Context(), w); err != nil {
-		log.Print(err)
-	}
+	a.frontPage(w, r)
 }
 
 // frontIntake is where the front page's form posts, and the origin a browser must be
@@ -561,8 +558,7 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login/sso?"+url.Values{"email": {q.User.Email}}.Encode(), http.StatusSeeOther)
 		return
 	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	NoOrgs(q.User).Render(r.Context(), w)
+	writeShell(w, http.StatusOK, map[string]string{"page": "start"}, "Start an organisation at /api/v1/orgs.\n")
 }
 
 const passwordChanged = "Password changed. Your other sessions are signed out."

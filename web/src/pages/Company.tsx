@@ -336,7 +336,12 @@ function CohortCard({ c }: { c: Overview }) {
               </ActionButton>
             </div>
           ) : (
-            <Meta>Moved by hand, it stays put when the rules or what they read change, until someone sets it back to by rule.</Meta>
+            <div className="flex flex-wrap items-center gap-2">
+              <ActionButton quiet size="xs" disabled={place.isPending} onClick={() => move({ cohort: c.cohort!.id })}>
+                Keep it here by hand
+              </ActionButton>
+              <Meta>Moved or kept by hand, it stays put when the rules or what they read change, until someone sets it back to by rule.</Meta>
+            </div>
           )}
         </div>
       )}

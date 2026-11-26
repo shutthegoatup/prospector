@@ -359,15 +359,14 @@ Re-importing refreshes text from the files but never clears a date or edit recor
 ```sh
 go test ./...                                            # SQLite
 PROSPECTOR_TEST_PG=postgres://… go test -p 1 ./...      # an empty, disposable Postgres database; tables are dropped
-go tool templ generate                                   # after editing *.templ
-go tool shadcn-templ add <component>                     # components for the templ pages (shadcn/ui for templ)
+PROSPECTOR_WRITE_APIDOC=1 go test -run TestTheAPIReferenceIsBuiltFromTheSpec .  # after editing the spec, for /api
 node build-css.mjs <node_modules with tailwindcss v4>   # or the standalone tailwindcss CLI
-(cd web && npm ci && npm run build)                      # the React app and the templ pages' script
+(cd web && npm ci && npm run build)                      # the React app
 ```
 
-The app inside an organisation is a React front end in `web/` (TanStack Router, its addresses `/o/<org>/today`, `/o/<org>/companies/<id>`, `/o/<org>/agreements/<id>/prepare` and so on); the server answers each of those addresses with the same page and the app reads and changes everything through the API. Only the pages outside an organisation's app are server-rendered with templ: sign-in, password reset and single sign-on, starting a first organisation, the front page, a customer's onboarding page, unsubscribing, the `/api` reference and error pages.
+The app inside an organisation is a React front end in `web/` (TanStack Router, its addresses `/o/<org>/today`, `/o/<org>/companies/<id>`, `/o/<org>/agreements/<id>/prepare` and so on); the server answers each of those addresses with the same page and the app reads and changes everything through the API. Sign-in, error pages, starting a first organisation, a customer's onboarding page and unsubscribing are React too, outside the sidebar; for the last few the server puts what the page shows in the shell. The front page and the `/api` reference are React in `web/src/site/`, rendered to HTML when the app is built so they read without script.
 
-`assets/css/output.css`, the built app and scripts and `*_templ.go` are committed, so a plain `go build` needs neither Node nor Tailwind.
+`assets/css/output.css` and the built app are committed, so a plain `go build` needs neither Node nor Tailwind.
 
 ## Releases
 

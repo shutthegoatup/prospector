@@ -288,15 +288,11 @@ func (a *App) callbackURL() string { return a.base + "/login/callback" }
 // signInProblem is a sign-in through a provider that went wrong, said on a page of the
 // server's own: its words never travel in an address, where anyone could write them.
 func (a *App) signInProblem(w http.ResponseWriter, r *http.Request, next string, code int, problem string) {
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	w.WriteHeader(code)
 	back := "/login"
 	if next != "" {
 		back += "?" + url.Values{"next": {safeNext(next)}}.Encode()
 	}
-	if err := ProblemPage(code, "Couldn't sign in", problem, back).Render(r.Context(), w); err != nil {
-		log.Print(err)
-	}
+	writeShell(w, code, problemShown{"problem", code, "Couldn't sign in", problem, back}, "Couldn't sign in: "+problem+"\n")
 }
 
 func (a *App) loginWith(w http.ResponseWriter, r *http.Request) {

@@ -454,7 +454,7 @@ func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
 		t.Fatalf("resealing what no held key opens: %d %v", moved, err)
 	}
 	// It isn't an outage, and people aren't told to try again.
-	if code, body, _ := newBrowser(t, srv.URL).through(okta, start); code != http.StatusServiceUnavailable || !strings.Contains(body, "trying again won&#39;t help") || strings.Contains(body, "key") {
+	if code, body, _ := newBrowser(t, srv.URL).through(okta, start); code != http.StatusServiceUnavailable || !strings.Contains(body, "trying again won't help") || strings.Contains(body, "key") {
 		t.Fatalf("signing in when the secret can't be opened: %d", code)
 	}
 	if clientSecret(t, s, alpha.ID) != under2 {
