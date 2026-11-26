@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
 var samplePDF = testPDF(2, "")
@@ -176,11 +179,12 @@ func TestAnAgreementIsWorkedFromItsCompanysPage(t *testing.T) {
 	if code, body, _ := upload(t, member, doc+"?name=service.pdf", "", "application/pdf", samplePDF); code != http.StatusOK {
 		t.Fatalf("uploading from the page: %d %s", code, body)
 	}
-	_, page := call(t, member, "GET", srv.URL+"/o/alpha/companies/"+itoa(company), "", nil)
-	for _, want := range []string{"Agreements", "Service agreement", "service.pdf", "SHA-256 ", `data-upload="` + itoa(a.ID) + `"`, "/document", `data-form="api/v1/agreements"`} {
-		if !strings.Contains(page, want) {
-			t.Errorf("the company's page lacks %q", want)
-		}
+	shown := companyPageOverview(t, member, srv.URL, company).Agreements
+	if len(shown) != 1 || shown[0].Id != a.ID || shown[0].Name != "Service agreement" || shown[0].FileName != "service.pdf" || len(shown[0].FileHash) != 64 {
+		t.Errorf("the company's page shows its agreements as %+v", shown)
+	}
+	if code, body := call(t, member, "GET", doc, "", nil); code != http.StatusOK || !strings.HasPrefix(body, "%PDF") {
+		t.Errorf("downloading the document from the page: %d", code)
 	}
 	// Another site can't make a member's browser replace it.
 	req, _ := http.NewRequest("PUT", doc, bytes.NewReader(samplePDF))
@@ -248,11 +252,24 @@ func TestOnlySalesWorksAgreements(t *testing.T) {
 	if !signIn(t, support, srv, "grace@example.com", "correct horse battery") {
 		t.Fatal("Grace cannot sign in")
 	}
-	_, page := call(t, support, "GET", srv.URL+"/o/alpha/companies/"+itoa(company), "", nil)
-	if !strings.Contains(page, "Service agreement") || strings.Contains(page, `data-upload=`) || strings.Contains(page, `data-form="api/v1/agreements"`) {
-		t.Error("someone in support sees an agreement's controls, or not the agreement")
+	if shown := companyPageOverview(t, support, srv.URL, company).Agreements; len(shown) != 1 || shown[0].Name != "Service agreement" {
+		t.Errorf("someone in support doesn't see the agreement: %+v", shown)
+	}
+	if code, _ := call(t, support, "POST", srv.URL+"/o/alpha/api/v1/agreements", "application/json", map[string]any{"company": company, "name": "Another"}); code != http.StatusForbidden {
+		t.Errorf("someone in support starting an agreement: %d", code)
 	}
 	if code, _, _ := upload(t, support, srv.URL+"/o/alpha/api/v1/agreements/"+itoa(a.ID)+"/document", "", "application/pdf", samplePDF); code != http.StatusForbidden {
 		t.Errorf("someone in support uploading: %d", code)
 	}
+}
+
+// companyPageOverview is what a company's page reads about it.
+func companyPageOverview(t *testing.T, c *http.Client, base string, company int64) api.CompanyOverview {
+	t.Helper()
+	code, body := call(t, c, "GET", base+"/o/alpha/api/v1/companies/"+itoa(company)+"/overview", "", nil)
+	var out api.CompanyOverview
+	if code != http.StatusOK || json.Unmarshal([]byte(body), &out) != nil {
+		t.Fatalf("the company's overview: %d %s", code, body)
+	}
+	return out
 }

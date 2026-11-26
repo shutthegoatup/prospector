@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, Meta, PageHead, Pill, type Tone, useRefresh, Whose } from "@/components/app";
@@ -73,7 +73,7 @@ export function OnboardingCard({ o, day, named = true }: { o: Onboarding; day: s
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span>
           {named && (
-            <Link to={`/companies/${o.company_id}`} className="font-bold text-foreground hover:text-mark">
+            <Link to="/o/$org/companies/$id" params={{ org, id: o.company_id }} className="font-bold text-foreground hover:text-mark">
               {o.company}
             </Link>
           )}

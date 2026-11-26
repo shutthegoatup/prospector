@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path"
 	"regexp"
 	"strings"
@@ -50,9 +51,14 @@ func TestFrontPage(t *testing.T) {
 	}
 
 	// Someone signed in never sees it: / still takes them to their queue.
-	code, body = call(t, member, "GET", srv.URL+"/", "", nil)
-	if code != http.StatusOK || strings.Contains(body, "One queue a day.") || !strings.Contains(body, `data-base="/o/alpha/"`) {
-		t.Fatalf("a signed-in member at / didn't land on their organisation: %d", code)
+	res, err := member.Get(srv.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	landed, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK || strings.Contains(string(landed), "One queue a day.") || res.Request.URL.Path != "/o/alpha/today" || !strings.Contains(string(landed), `<div id="app">`) {
+		t.Fatalf("a signed-in member at / didn't land on their organisation: %d at %s", res.StatusCode, res.Request.URL)
 	}
 }
 
@@ -214,9 +220,14 @@ func TestAppUsesTheLightPalette(t *testing.T) {
 		if strings.Contains(body, `class="dark"`) || !strings.Contains(body, `<meta name="color-scheme" content="light"`) {
 			t.Errorf("%s isn't on the light palette", page)
 		}
-		if !strings.Contains(body, `<img src="/assets/img/mark.svg`) {
-			t.Errorf("%s doesn't show the logo", page)
-		}
+	}
+	// The app draws the sidebar, logo and all.
+	layout, err := os.ReadFile("web/src/components/app/layout.tsx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(layout), `<img src="/assets/img/mark.svg"`) || strings.Contains(string(layout), `"dark"`) {
+		t.Error("the app's sidebar doesn't show the logo, or turns the dark palette on")
 	}
 }
 

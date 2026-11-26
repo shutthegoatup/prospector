@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router";
+import { Link, useParams } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, Meta, PageHead, Pill, Section, useRefresh } from "@/components/app";
@@ -76,7 +76,7 @@ function writeClipboard(text: string) {
 
 export function TaskPage() {
   const { org, sales } = useSession();
-  const id = Number(useParams().id);
+  const { id } = useParams({ from: "/o/$org/tasks/$id" });
   const refresh = useRefresh();
   const [foundAt, setFoundAt] = useState<string | undefined>();
   const task = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}", { params: { path: { org, id }, query: { limit: 200, cursor: foundAt } } });
@@ -99,9 +99,9 @@ export function TaskPage() {
             {t.companies.length === 0 && t.people.length === 0 && <p className="text-sm text-muted-foreground">Nothing yet.</p>}
             {t.companies.map((c) => (
               <div key={c.id} className="flex flex-wrap justify-between gap-2 border-b border-dashed border-border py-2.5 text-sm">
-                <a href={`/o/${org}/companies/${c.id}`} className="font-medium underline">
+                <Link to="/o/$org/companies/$id" params={{ org, id: c.id }} className="font-medium underline">
                   {c.name}
-                </a>
+                </Link>
                 <span className="font-mono text-xs text-muted-foreground">{c.stage}</span>
               </div>
             ))}
@@ -232,10 +232,10 @@ function Notes({ id }: { id: number }) {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="flex flex-wrap items-center gap-2">
               <Pill tone="agent">{noteKinds[n.kind] ?? n.kind}</Pill>
-              {n.company && (
-                <a href={`/o/${org}/companies/${n.company_id}`} className="font-mono text-xs text-mark underline">
+              {n.company && n.company_id !== undefined && (
+                <Link to="/o/$org/companies/$id" params={{ org, id: n.company_id }} className="font-mono text-xs text-mark underline">
                   {n.company}
-                </a>
+                </Link>
               )}
             </span>
             {sales && (

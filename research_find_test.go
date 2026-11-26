@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
 func TestFindStartsTheChosenAgentsOnANewSearch(t *testing.T) {
@@ -24,18 +26,11 @@ func TestFindStartsTheChosenAgentsOnANewSearch(t *testing.T) {
 	}
 	gateway := must(s.agentNamed(o.ID, "Gateway"))
 
-	_, page := call(t, ada, "GET", srv.URL+"/o/alpha/research", "", nil)
-	for _, want := range []string{`data-form="api/v1/tasks"`, `data-go="research?task={id}"`,
-		fmt.Sprintf(`name="agents" value="%d" data-multi="true" data-number="true" checked`, gateway.ID)} {
-		if !strings.Contains(page, want) {
-			t.Errorf("Research should offer to find, sending Gateway: missing %s", want)
-		}
-	}
-	if strings.Contains(page, "<span>Tasks</span>") {
-		t.Error("the sidebar still has Tasks, which Research now does")
-	}
-	if !strings.Contains(page, `href="/o/alpha/tasks" class="text-[13px] text-mark underline">Every search, closed ones too`) {
-		t.Error("Research should still lead to every search, closed ones and those past the first few")
+	// Research offers to find with the agents that are ready, the first of them chosen.
+	_, list := call(t, ada, "GET", srv.URL+"/o/alpha/api/v1/agents", "", nil)
+	var agents struct{ Items []api.Agent }
+	if json.Unmarshal([]byte(list), &agents) != nil || len(agents.Items) != 1 || agents.Items[0].Id != gateway.ID || !agents.Items[0].Ready {
+		t.Errorf("Research should be able to send Gateway: %s", list)
 	}
 
 	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/tasks", "application/json",
@@ -56,11 +51,14 @@ func TestFindStartsTheChosenAgentsOnANewSearch(t *testing.T) {
 	}
 	app.runs.wg.Wait()
 
-	_, page = call(t, ada, "GET", fmt.Sprintf("%s/o/alpha/research?task=%d", srv.URL, started.ID), "", nil)
-	for _, want := range []string{"Yacht builders with a configurator.", "From “Yacht builders with a configurator.”", "Ask for more", "<b>Gateway</b> · "} {
-		if !strings.Contains(page, want) {
-			t.Errorf("the search's own view is missing %q", want)
-		}
+	// The search's own view: its brief, what it found and Gateway's run.
+	_, one := call(t, ada, "GET", fmt.Sprintf("%s/o/alpha/api/v1/tasks/%d", srv.URL, started.ID), "", nil)
+	if !strings.Contains(one, `"brief":"Yacht builders with a configurator."`) {
+		t.Errorf("the search's own view: %s", one)
+	}
+	_, runs := call(t, ada, "GET", fmt.Sprintf("%s/o/alpha/api/v1/tasks/%d/runs", srv.URL, started.ID), "", nil)
+	if !strings.Contains(runs, `"agent_name":"Gateway"`) {
+		t.Errorf("the search's runs lack Gateway's: %s", runs)
 	}
 
 	// A key needs agents:run as well to start agents on what it makes.
@@ -98,27 +96,47 @@ func TestResearchNarrowsToWhatOneSearchFound(t *testing.T) {
 	add(map[string]any{"name": "Larkmoor Yachts", "domain": "larkmoor.example", "task": yachts.ID})
 	add(map[string]any{"name": "Brindle Kitchens", "domain": "brindle.example"})
 
-	_, all := call(t, client, "GET", srv.URL+"/o/alpha/research", "", nil)
-	_, one := call(t, client, "GET", fmt.Sprintf("%s/o/alpha/research?task=%d", srv.URL, yachts.ID), "", nil)
-	if !strings.Contains(all, "Larkmoor Yachts") || !strings.Contains(all, "Brindle Kitchens") {
-		t.Fatal("the whole queue should hold both companies")
+	names := func(query string) (int, string) {
+		t.Helper()
+		code, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/research"+query, "", nil)
+		var page struct {
+			Items  []api.ResearchCompany
+			Counts map[string]int
+		}
+		if code != http.StatusOK {
+			return code, ""
+		}
+		if err := json.Unmarshal([]byte(body), &page); err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, c := range page.Items {
+			out = append(out, c.Name)
+		}
+		return code, strings.Join(out, ", ") + fmt.Sprintf(" (%d to review)", page.Counts["review"])
 	}
-	if !strings.Contains(one, "Larkmoor Yachts") || strings.Contains(one, "Brindle Kitchens") {
-		t.Fatal("a search's queue should hold only what it found")
+	_, all := names("")
+	_, one := names(fmt.Sprintf("?task=%d", yachts.ID))
+	if !strings.Contains(all, "Larkmoor Yachts") || !strings.Contains(all, "Brindle Kitchens") || !strings.Contains(all, "(2 to review)") {
+		t.Fatalf("the whole queue should hold both companies: %s", all)
 	}
-	if !strings.Contains(one, fmt.Sprintf(`href="/o/alpha/research?f=rejected&amp;task=%d"`, yachts.ID)) {
-		t.Error("the filters should keep to the search")
+	if !strings.Contains(one, "Larkmoor Yachts") || strings.Contains(one, "Brindle Kitchens") || !strings.Contains(one, "(1 to review)") {
+		t.Fatalf("a search's queue, and its counts, should hold only what it found: %s", one)
 	}
-	if !strings.Contains(all, "Show these") || !strings.Contains(all, "1 company found") {
-		t.Error("the open search should show above the queue, with what it found")
+	if _, rejected := names(fmt.Sprintf("?filter=rejected&task=%d", yachts.ID)); rejected != " (1 to review)" {
+		t.Errorf("the filters should keep to the search: %s", rejected)
+	}
+	// The open search shows above the queue, with what it found.
+	if _, open := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/tasks?limit=5", "", nil); !strings.Contains(open, `"title":"Yachts"`) || !strings.Contains(open, `"found":{"companies":1`) {
+		t.Errorf("the open search with what it found: %s", open)
 	}
 
-	if code, _ := call(t, client, "GET", srv.URL+"/o/alpha/research?task=99999", "", nil); code != http.StatusNotFound {
+	if code, _ := names("?task=99999"); code != http.StatusNotFound {
 		t.Fatalf("an unknown search: %d", code)
 	}
 	other := mustOrg(t, s, "beta")
 	theirs := must(s.CreateTask(other.ID, "Theirs", "Not yours.", "Grace Hopper"))
-	if code, _ := call(t, client, "GET", fmt.Sprintf("%s/o/alpha/research?task=%d", srv.URL, theirs.ID), "", nil); code != http.StatusNotFound {
+	if code, _ := names(fmt.Sprintf("?task=%d", theirs.ID)); code != http.StatusNotFound {
 		t.Fatalf("another organisation's search was shown: %d", code)
 	}
 }

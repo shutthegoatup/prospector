@@ -1,9 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
+	"net/url"
 	"testing"
 	"time"
 )
@@ -31,19 +32,44 @@ func TestTheTasksPageHasPages(t *testing.T) {
 		t.Fatalf("the last page with closed tasks: %d rows, %+v, %v", len(last), pg, err)
 	}
 
-	code, body := call(t, client, "GET", srv.URL+"/o/alpha/tasks?closed=1", "", nil)
-	if code != http.StatusOK || !strings.Contains(body, "Page 1 of 2") || !strings.Contains(body, "tasks?closed=1&amp;page=2") {
-		t.Fatalf("the page doesn't offer the next one with closed tasks still shown: %d", code)
-	}
-	if strings.Contains(body, "Brief number 0<") {
-		t.Fatal("the first page shows the task that belongs on the second")
+	// The app walks the same list through the API, with closed tasks still last.
+	pages := apiPages(t, client, srv.URL+"/o/alpha/api/v1/tasks?closed=true&limit="+fmt.Sprint(taskPageSize))
+	if len(pages) != 2 || len(pages[0].Items) != taskPageSize || len(pages[1].Items) != 2 || pages[1].Items[1]["title"] != "Brief number 0" {
+		t.Fatalf("the tasks, a page at a time with closed ones: %d pages", len(pages))
 	}
 	// The counts on the chips are of every task, not of the page.
-	if !strings.Contains(body, fmt.Sprint(taskPageSize+1)) || !strings.Contains(body, fmt.Sprint(taskPageSize+2)) {
-		t.Fatal("the page doesn't count every open task and every task")
+	var counts struct{ Open, All int }
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/tasks?limit=1", "", nil); json.Unmarshal([]byte(body), &counts) != nil || counts.Open != taskPageSize+1 || counts.All != taskPageSize+2 {
+		t.Fatalf("the list doesn't count every open task and every task: %+v", counts)
 	}
-	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/tasks?closed=1&page=2", "", nil); !strings.Contains(body, "Brief number 0") {
-		t.Fatal("the second page doesn't show the closed task")
+}
+
+// apiPage is one page of an API list, as the app reads it.
+type apiPage struct {
+	Items      []map[string]any `json:"items"`
+	NextCursor string           `json:"next_cursor"`
+}
+
+// apiPages follows a list's next_cursor from its first page to its last.
+func apiPages(t *testing.T, client *http.Client, u string) []apiPage {
+	t.Helper()
+	var out []apiPage
+	next := ""
+	for {
+		at := u
+		if next != "" {
+			at += "&cursor=" + url.QueryEscape(next)
+		}
+		code, body := call(t, client, "GET", at, "", nil)
+		var pg apiPage
+		if code != http.StatusOK || json.Unmarshal([]byte(body), &pg) != nil {
+			t.Fatalf("GET %s: %d %s", at, code, body)
+		}
+		out = append(out, pg)
+		if pg.NextCursor == "" || len(out) > 50 {
+			return out
+		}
+		next = pg.NextCursor
 	}
 }
 
@@ -73,14 +99,17 @@ func TestTheEnquiriesPageHasPages(t *testing.T) {
 		t.Fatalf("a filter that matches nothing: %d rows, %+v, %v", len(none), pg, err)
 	}
 
-	code, body := call(t, client, "GET", srv.URL+"/o/alpha/enquiries?kind=demo", "", nil)
-	if code != http.StatusOK || !strings.Contains(body, "Page 1 of 2") || !strings.Contains(body, "enquiries?kind=demo&amp;page=2") {
-		t.Fatalf("the page doesn't offer the next one with its filter kept: %d", code)
+	// The app walks the same list through the API, its filter kept from page to page.
+	pages := apiPages(t, client, srv.URL+"/o/alpha/api/v1/enquiries?kind=demo&limit="+fmt.Sprint(enquiryPageSize))
+	if len(pages) != 2 || len(pages[0].Items) != enquiryPageSize || len(pages[1].Items) != 1 || pages[1].Items[0]["email"] != "sender0@larkmoor.example" {
+		t.Fatalf("the enquiries, a page at a time: %d pages", len(pages))
 	}
-	if strings.Contains(body, "sender0@larkmoor.example") {
-		t.Fatal("the first page shows an enquiry that belongs on the second")
+	for _, e := range pages[0].Items {
+		if e["email"] == "sender0@larkmoor.example" {
+			t.Fatal("the first page shows an enquiry that belongs on the second")
+		}
 	}
-	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/enquiries?kind=demo&page=2", "", nil); !strings.Contains(body, "sender0@larkmoor.example") || !strings.Contains(body, "Page 2 of 2") {
-		t.Fatal("the second page doesn't show the oldest enquiry")
+	if pages := apiPages(t, client, srv.URL+"/o/alpha/api/v1/enquiries?kind=support"); len(pages) != 1 || len(pages[0].Items) != 0 {
+		t.Fatal("a filter that matches nothing should be one empty page")
 	}
 }

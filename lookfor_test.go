@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
 func TestLookForAssets(t *testing.T) {
@@ -40,18 +42,19 @@ func TestLookForAssets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, page := call(t, client, "GET", srv.URL+"/o/alpha/research?f=review", "", nil)
-	if !strings.Contains(page, "Lists 14 open roles") || !strings.Contains(page, "1 of 2 · 1 unchecked") {
-		t.Errorf("Research doesn't show the careers page the company has, and how it fits")
+	queue := readResearch(t, client, srv.URL+"/o/alpha/api/v1/research?filter=review")
+	if len(queue.Items) != 1 || !strings.Contains(queue.body, "Lists 14 open roles") || queue.Items[0].Fit.Text != "1 of 2 · 1 unchecked" {
+		t.Errorf("Research doesn't show the careers page the company has, and how it fits: %s", queue.body)
 	}
-	if !strings.Contains(page, "No agent has checked this yet.") {
-		t.Errorf("Research doesn't show the tracking system wasn't checked")
+	if c := queue.Items[0].Criteria; len(c) != 2 || c[0].Field != "careers_page" || c[0].State != api.Met || c[1].Field != "ats" || c[1].State != api.Unchecked {
+		t.Errorf("Research doesn't show the tracking system wasn't checked: %+v", c)
 	}
-	if strings.Contains(page, "onfigurator") {
+	if strings.Contains(queue.body, "onfigurator") {
 		t.Errorf("Research still talks about configurators")
 	}
-	if _, page := call(t, client, "GET", fmt.Sprintf("%s/o/alpha/companies/%d", srv.URL, out.ID), "", nil); !strings.Contains(page, "ats unchecked") {
-		t.Errorf("the company page doesn't show what's missing")
+	_, overview := call(t, client, "GET", fmt.Sprintf("%s/o/alpha/api/v1/companies/%d/overview", srv.URL, out.ID), "", nil)
+	if !strings.Contains(overview, `"field":"ats","must":false,"state":"unchecked"`) {
+		t.Errorf("the company page doesn't show what's missing: %s", overview)
 	}
 }
 

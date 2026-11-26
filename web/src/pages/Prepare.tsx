@@ -1,5 +1,5 @@
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api, fetchClient } from "@/client";
 import { ActionButton, Eyebrow, Failed, Meta, PageHead, useRefresh, Whose } from "@/components/app";
@@ -28,7 +28,7 @@ type Signer = { id: number; name: string; colour: string };
 
 export function PreparePage() {
   const { org, sales } = useSession();
-  const id = Number(useParams().id);
+  const { id } = useParams({ from: "/o/$org/agreements/$id/prepare" });
   const refresh = useRefresh();
   const path = { params: { path: { org, id } } };
   const agreement = $api.useQuery("get", "/o/{org}/api/v1/agreements/{id}", path);
@@ -83,7 +83,7 @@ export function PreparePage() {
 
   return (
     <>
-      <Link to={`/companies/${a.company_id}`} className="font-mono text-xs text-mark">
+      <Link to="/o/$org/companies/$id" params={{ org, id: a.company_id }} className="font-mono text-xs text-mark">
         ← {a.company}
       </Link>
       <PageHead title="Prepare for signing">

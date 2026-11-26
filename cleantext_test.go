@@ -41,10 +41,10 @@ func TestTextArrivesWithoutWhatPostgresWontKeep(t *testing.T) {
 	if err != nil || c.Person == nil || *c.Person != "Hannah Pryce" || c.Maker == nil || *c.Maker != "Larkmoor Yachts" {
 		t.Fatalf("kept as %+v, %v", c, err)
 	}
-	if code, body := call(t, client, "GET", srv.URL+"/o/alpha/companies?q=Lark%00moor", "", nil); code != http.StatusOK || !strings.Contains(body, "Larkmoor Yachts") {
+	if code, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/companies?q=Lark%00moor", "", nil); code != http.StatusOK || !strings.Contains(body, "Larkmoor Yachts") {
 		t.Errorf("a search holding a NUL: %d", code)
 	}
-	if code, _ := call(t, client, "GET", srv.URL+"/o/alpha/companies?q=Lark%FFmoor", "", nil); code != http.StatusOK {
+	if code, _ := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/companies?q=Lark%FFmoor", "", nil); code != http.StatusOK {
 		t.Errorf("a search holding a byte that isn't UTF-8: %d", code)
 	}
 

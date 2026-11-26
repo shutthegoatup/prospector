@@ -152,8 +152,9 @@ func TestACampaignIsRefusedWhereItCannotBeSentProperly(t *testing.T) {
 	if now := must(s.Campaign(o.ID, c.ID)); now.Status != CampaignDraft {
 		t.Errorf("a refused send left it %s", now.Status)
 	}
-	if _, page := call(t, member, "GET", strings.Replace(list, "/api/v1/campaigns", "/campaigns", 1), "", nil); !strings.Contains(page, "Not yet ready to send") || strings.Contains(page, "/send") {
-		t.Error("the page offers to send, or doesn't say why it can't")
+	// The page offers to send only when the list says nothing stops it.
+	if _, body := call(t, member, "GET", list, "", nil); !strings.Contains(body, `"not_ready":"`) || strings.Contains(body, `"not_ready":""`) || !strings.Contains(body, "postal address") {
+		t.Errorf("the campaigns list should say why nothing can be sent: %s", body)
 	}
 
 	// A key needs the scope to send.

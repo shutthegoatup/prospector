@@ -185,11 +185,12 @@ func TestCampaignDraftsAreKeptByMembersAndKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, page := call(t, member, "GET", srv.URL+"/o/alpha/campaigns", "", nil)
-	for _, want := range []string{"Spring price list", "Would go to 1 person", `data-campaign="` + itoa(c.ID) + `"`, `data-form="api/v1/campaigns"`, "postal address"} {
-		if !strings.Contains(page, want) {
-			t.Errorf("the campaigns page lacks %q", want)
-		}
+	// What the campaigns page reads: the draft, who it would go to, and why it can't go yet.
+	if _, body := call(t, member, "GET", list, "", nil); !strings.Contains(body, `"name":"Spring price list"`) || !strings.Contains(body, `"not_ready":"`) || strings.Contains(body, `"not_ready":""`) {
+		t.Errorf("the campaigns list: %s", body)
+	}
+	if _, body := call(t, member, "GET", one+"/audience", "", nil); !strings.Contains(body, `"going":1`) {
+		t.Errorf("the draft should go to 1 person: %s", body)
 	}
 	if code, body := call(t, member, "DELETE", one, "", nil); code != http.StatusNoContent {
 		t.Errorf("removing a draft: %d %s", code, body)
@@ -209,8 +210,8 @@ func TestThePostalAddressIsKept(t *testing.T) {
 	if now := must(s.OrgBySlug("alpha")); now.Settings.PostalAddress != "Alpha Ltd\n1 Example Street\nLeith EH6 1AA" {
 		t.Errorf("the postal address saved as %q", now.Settings.PostalAddress)
 	}
-	if _, page := call(t, member, "GET", srv.URL+"/o/alpha/settings", "", nil); !strings.Contains(page, `name="postal_address"`) || !strings.Contains(page, "1 Example Street") {
-		t.Error("Settings doesn't show the postal address, so the next save would lose it")
+	if _, body := call(t, member, "GET", srv.URL+"/o/alpha/api/v1/settings", "", nil); !strings.Contains(body, `"postal_address":"Alpha Ltd\n1 Example Street\nLeith EH6 1AA"`) {
+		t.Errorf("Settings doesn't read the postal address back, so the next save would lose it: %s", body)
 	}
 	_ = o
 }

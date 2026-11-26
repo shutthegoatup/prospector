@@ -170,8 +170,8 @@ func TestChangePassword(t *testing.T) {
 	if code := change("correct horse battery", "a brand new password"); code != http.StatusOK {
 		t.Fatalf("change: %d", code)
 	}
-	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/settings", "", nil); !strings.Contains(body, "Your password") {
-		t.Fatal("the session that changed the password was signed out")
+	if code, _ := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/me", "", nil); code != http.StatusOK {
+		t.Fatalf("the session that changed the password was signed out: %d", code)
 	}
 	if _, err := s.SessionUser(elsewhere); err == nil {
 		t.Fatal("another session survived the password change")
@@ -189,8 +189,8 @@ func TestChangePassword(t *testing.T) {
 	if _, err := s.SessionUser(fresh); err == nil {
 		t.Fatal("a session survived a password reset from the CLI")
 	}
-	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/settings", "", nil); strings.Contains(body, "Your password") {
-		t.Fatal("the browser session survived a password reset from the CLI")
+	if code, _ := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/me", "", nil); code != http.StatusUnauthorized {
+		t.Fatalf("the browser session survived a password reset from the CLI: %d", code)
 	}
 
 	// Guessing the current password from an open session is slowed like guessing at sign-in.
@@ -473,11 +473,12 @@ func TestRemoveMember(t *testing.T) {
 		t.Fatalf("removing someone who isn't a member: %d", code)
 	}
 
-	if _, body := call(t, ada, "GET", srv.URL+"/o/alpha/settings", "", nil); !strings.Contains(body, "ui/member/remove") {
-		t.Fatal("an owner isn't offered Remove")
+	// Settings offers Remove to whomever the nav says is an owner.
+	if _, body := call(t, ada, "GET", srv.URL+"/o/alpha/api/v1/nav", "", nil); !strings.Contains(body, `"owner":true`) {
+		t.Fatalf("an owner isn't offered Remove: %s", body)
 	}
-	if _, body := call(t, bobClient, "GET", srv.URL+"/o/alpha/settings", "", nil); !strings.Contains(body, "Your password") || strings.Contains(body, "ui/member/remove") {
-		t.Fatal("a member is offered Remove")
+	if code, body := call(t, bobClient, "GET", srv.URL+"/o/alpha/api/v1/nav", "", nil); code != http.StatusOK || !strings.Contains(body, `"owner":false`) {
+		t.Fatalf("a member is offered Remove: %d %s", code, body)
 	}
 	if code, _ := remove(ada, bob.ID); code != http.StatusOK {
 		t.Fatalf("remove: %d", code)
@@ -485,8 +486,8 @@ func TestRemoveMember(t *testing.T) {
 	if code, _ := call(t, bobClient, "GET", srv.URL+"/o/alpha/today", "", nil); code != http.StatusNotFound {
 		t.Fatalf("a removed member still reaches the organisation: %d", code)
 	}
-	if _, body := call(t, bobClient, "GET", srv.URL+"/o/beta/settings", "", nil); !strings.Contains(body, "Your password") {
-		t.Fatal("removal from one organisation reached another")
+	if code, _ := call(t, bobClient, "GET", srv.URL+"/o/beta/api/v1/me", "", nil); code != http.StatusOK {
+		t.Fatalf("removal from one organisation reached another: %d", code)
 	}
 	if _, err := s.UserByEmail("bob@example.com"); err != nil {
 		t.Fatal("removing a member deleted their account")
@@ -572,24 +573,24 @@ func TestNeverContactLeavesTheQueue(t *testing.T) {
 		}
 	}
 
-	settings := func() string {
-		_, body := call(t, client, "GET", srv.URL+"/o/alpha/settings", "", nil)
+	covers := func() string {
+		_, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/never-contact/covers", "", nil)
 		return body
 	}
-	if strings.Contains(settings(), "out of the queue") {
-		t.Fatal("settings reports people held back by an empty list")
+	if !strings.Contains(covers(), `"total":0`) {
+		t.Fatalf("settings reports people held back by an empty list: %s", covers())
 	}
 	o.Settings.NeverContact = domain
 	do(s.SaveOrg(o))
-	if !strings.Contains(settings(), "keeps 1 person already here out of the queue: Hannah Pryce.") {
-		t.Fatal("settings doesn't name who the list holds back")
+	if body := covers(); !strings.Contains(body, `"items":["Hannah Pryce"]`) || !strings.Contains(body, `"total":1`) {
+		t.Fatalf("settings doesn't name who the list holds back: %s", body)
 	}
 	do(s.Mark(o.ID, c.ID, "replied", "2020-01-04", "test"))
-	if strings.Contains(settings(), "out of the queue") {
-		t.Fatal("settings counts someone who has replied, whom the list doesn't hide")
+	if !strings.Contains(covers(), `"total":0`) {
+		t.Fatalf("settings counts someone who has replied, whom the list doesn't hide: %s", covers())
 	}
-	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/conversations", "", nil); !strings.Contains(body, "Hannah") {
-		t.Fatal("a listed person who replied left Conversations")
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/conversations", "", nil); !strings.Contains(body, "Hannah") {
+		t.Fatalf("a listed person who replied left Conversations: %s", body)
 	}
 	var back Contact
 	do(s.in(o.ID).First(&back, c.ID).Error)
@@ -603,13 +604,13 @@ func TestNeverContactLeavesTheQueue(t *testing.T) {
 			t.Fatalf("an agent is told a listed person is due: %+v", item)
 		}
 	}
-	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(body, "Hannah") {
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/today", "", nil); strings.Contains(body, "Hannah") {
 		t.Fatal("a listed person is on Today")
 	}
 	o.Settings.NeverContact = ""
 	do(s.SaveOrg(o))
-	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); !strings.Contains(body, "Hannah") {
-		t.Fatal("unlisting didn't bring the person back to Today")
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/today", "", nil); !strings.Contains(body, "Hannah") {
+		t.Fatalf("unlisting didn't bring the person back to Today: %s", body)
 	}
 }
 
@@ -687,11 +688,10 @@ func TestContentPolicy(t *testing.T) {
 	pages := []string{"/login", "/api", "/o/alpha/today", "/o/alpha/today?step=linkedin", "/o/alpha/research", "/o/alpha/research?f=rejected", "/o/alpha/research?f=details",
 		"/o/alpha/conversations", "/o/alpha/companies", "/o/alpha/companies/" + strconv.FormatInt(company.ID, 10),
 		"/o/alpha/add", "/o/alpha/add?popup=1&name=Hannah", "/o/alpha/settings", "/o/alpha/agents", "/o/alpha/enquiries", "/o/alpha/subscriptions", "/o/alpha/onboarding", "/o/alpha/campaigns", "/c", "/u/never-made",
-		"/o/alpha/app/add?popup=1&name=Hannah", "/o/alpha/app/tasks/" + strconv.FormatInt(task.ID, 10), "/o/alpha/app/companies/" + strconv.FormatInt(company.ID, 10),
 		"/o/alpha/tasks", "/o/alpha/tasks?closed=1", "/o/alpha/tasks/" + strconv.FormatInt(task.ID, 10),
 		"/o/alpha/agreements/" + strconv.FormatInt(must(s.AddAgreement(o.ID, company.ID, "Service agreement", "test")).ID, 10) + "/prepare"}
-	for _, p := range reactPages {
-		pages = append(pages, "/o/alpha/app/"+p)
+	for _, p := range appPages {
+		pages = append(pages, "/o/alpha/"+p)
 	}
 	check := func(page, marker string) {
 		t.Helper()
@@ -793,8 +793,8 @@ func TestHistoryNamesPeopleInFull(t *testing.T) {
 	if err != nil || len(history) != 1 || history[0].Actor != "Ada Lovelace" {
 		t.Fatalf("history: %+v %v", history, err)
 	}
-	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/companies/"+strconv.FormatInt(*c.CompanyID, 10), "", nil); !strings.Contains(body, "Ada Lovelace") {
-		t.Fatal("the company page doesn't name who added the person")
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/companies/"+strconv.FormatInt(*c.CompanyID, 10)+"/history", "", nil); !strings.Contains(body, `"actor":"Ada Lovelace"`) {
+		t.Fatalf("the company page doesn't name who added the person: %s", body)
 	}
 	if got, _ := s.AgentActivity(o.ID, 1); len(got) != 0 {
 		t.Fatalf("a person's action is listed as an agent's: %+v", got)
@@ -839,6 +839,9 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 	if code, _ := call(t, bob, "POST", srv.URL+"/orgs", "application/json", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
 		t.Fatalf("a new organisation before the first password is changed: %d", code)
 	}
+	if code, _ := call(t, bob, "POST", srv.URL+"/api/v1/orgs", "application/json", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
+		t.Fatalf("a new organisation through the API before the first password is changed: %d", code)
+	}
 	fragment, _ := http.NewRequest("GET", srv.URL+"/o/alpha/today", nil)
 	fragment.Header.Set("X-Fragment", "1")
 	refreshed, err := bob.Do(fragment)
@@ -858,8 +861,11 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 	if code, body := change(given, "a password of my own"); code != http.StatusOK || !strings.Contains(body, `"go":"/"`) {
 		t.Fatalf("choosing a password: %d %s", code, body)
 	}
-	if body := page("/o/alpha/settings"); !strings.Contains(body, "Your password") || strings.Contains(body, "Choose your own password") {
+	if body := page("/o/alpha/settings"); !strings.Contains(body, `<div id="app"></div>`) || strings.Contains(body, "Choose your own password") {
 		t.Fatal("the app is still closed after choosing a password")
+	}
+	if code, body := call(t, bob, "GET", srv.URL+"/o/alpha/api/v1/me", "", nil); code != http.StatusOK || !strings.Contains(body, `"has_password":true`) {
+		t.Fatalf("the API is still closed after choosing a password: %d %s", code, body)
 	}
 	if u, err := s.UserByEmail("bob@example.com"); err != nil || u.MustChangePassword {
 		t.Fatalf("still marked for a change: %+v %v", u, err)
@@ -881,10 +887,10 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 		map[string]string{"email": "bob@example.com", "role": "member"}); code != http.StatusOK || strings.Contains(body, "shown once") {
 		t.Fatalf("adding an existing account: %d %s", code, body)
 	}
-	if !strings.Contains(page("/o/beta/settings"), "Your password") {
+	if body := page("/o/beta/settings"); !strings.Contains(body, `<div id="app"></div>`) || strings.Contains(body, "Choose your own password") {
 		t.Fatal("an existing account was asked to choose a password again")
 	}
-	if _, body := call(t, ada, "GET", srv.URL+"/password", "", nil); strings.Contains(body, "Choose your own password") || !strings.Contains(body, "Alpha") {
+	if _, body := call(t, ada, "GET", srv.URL+"/password", "", nil); strings.Contains(body, "Choose your own password") || !strings.Contains(body, `<div id="app"></div>`) {
 		t.Fatal("an account made by the CLI wasn't sent straight on to the app")
 	}
 }
@@ -914,8 +920,8 @@ func TestOtherSitesCantPost(t *testing.T) {
 	s, _, srv, client := signedIn(t)
 	host := strings.TrimPrefix(srv.URL, "http://")
 	signedInAs := func() bool {
-		_, body := call(t, client, "GET", srv.URL+"/o/alpha/settings", "", nil)
-		return strings.Contains(body, "Your password")
+		code, _ := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/me", "", nil)
+		return code == http.StatusOK
 	}
 	post := func(c *http.Client, path, body, ctype string, headers map[string]string) int {
 		t.Helper()
@@ -1050,7 +1056,7 @@ func TestPublicURL(t *testing.T) {
 	if c.Secure || h.Get("Strict-Transport-Security") != "" {
 		t.Fatal("plain HTTP with no address set was treated as HTTPS")
 	}
-	if !strings.Contains(page(srv, c, "/o/alpha/agents"), srv.URL+"/o/alpha/mcp") {
+	if !strings.Contains(page(srv, c, "/o/alpha/api/v1/connect"), srv.URL+"/o/alpha/mcp") {
 		t.Fatal("with no address set, the agents page doesn't use the request's host")
 	}
 	if _, c, _ := signIn(&App{s: s}, map[string]string{"X-Forwarded-Proto": "https"}); !c.Secure {
@@ -1062,13 +1068,10 @@ func TestPublicURL(t *testing.T) {
 	if !c.Secure || h.Get("Strict-Transport-Security") == "" {
 		t.Fatalf("with an https address set: Secure=%v, HSTS=%q", c.Secure, h.Get("Strict-Transport-Security"))
 	}
-	if body := page(srv, c, "/o/alpha/agents"); !strings.Contains(body, "https://prospector.example.com/o/alpha/mcp") || strings.Contains(body, srv.URL) {
+	if body := page(srv, c, "/o/alpha/api/v1/connect"); !strings.Contains(body, "https://prospector.example.com/o/alpha/mcp") || strings.Contains(body, srv.URL) {
 		t.Fatal("the agents page doesn't use the address that was set")
 	}
-	if body := page(srv, c, "/o/alpha/add"); !strings.Contains(body, "https://prospector.example.com/o/alpha/add?popup=1") {
-		t.Fatal("the bookmarklet doesn't use the address that was set")
-	}
-	if body := page(srv, c, "/o/alpha/api/v1/people/draft"); !strings.Contains(body, "https://prospector.example.com/o/alpha/app/add?popup=1") {
+	if body := page(srv, c, "/o/alpha/api/v1/people/draft"); !strings.Contains(body, "https://prospector.example.com/o/alpha/add?popup=1") || strings.Contains(body, srv.URL) {
 		t.Fatalf("the API's bookmarklet doesn't use the address that was set: %s", body)
 	}
 	if _, c, _ := signIn(&App{s: s, base: "http://10.0.0.5:8766"}, nil); c.Secure {
@@ -1123,14 +1126,24 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	}
 
 	for path, want := range map[string]string{
-		"/o/nope/today":            "Nothing here",
-		"/o/alpha/companies/98765": "Nothing here",
-		"/no/such/page":            "Nothing here",
-		"/o/alpha/research?f=nope": "Unknown filter",
+		"/o/nope/today":         "Nothing here",
+		"/no/such/page":         "Nothing here",
+		"/o/alpha/settings/odd": "Nothing here",
 	} {
 		code, ctype, body := get(client, "GET", path, browser)
 		if code < 400 || !strings.HasPrefix(ctype, "text/html") || !styled(body) || !strings.Contains(body, want) {
 			t.Errorf("GET %s in a browser: %d %s, styled=%v, want %q", path, code, ctype, styled(body), want)
+		}
+	}
+	// What the app reads for a page answers as the API does, even to a browser; the app
+	// shows the problem in its own page.
+	for path, want := range map[string]int{
+		"/o/alpha/api/v1/companies/98765/overview": http.StatusNotFound,
+		"/o/alpha/api/v1/research?filter=nope":     http.StatusBadRequest,
+	} {
+		code, ctype, body := get(client, "GET", path, browser)
+		if code != want || !strings.HasPrefix(ctype, "application/problem+json") || styled(body) {
+			t.Errorf("GET %s in a browser: %d %s %s, want %d as a problem", path, code, ctype, body, want)
 		}
 	}
 	code, _, body := get(client, "POST", "/login", map[string]string{"Accept": browser["Accept"], "Sec-Fetch-Site": "cross-site", "content-type": "application/x-www-form-urlencoded"})

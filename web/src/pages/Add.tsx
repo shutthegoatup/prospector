@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Eyebrow, PageHead } from "@/components/app";
@@ -18,9 +18,8 @@ const field = "h-10 rounded-lg border-input bg-muted px-3 text-sm";
 // bookmarklet opens from a LinkedIn profile, which closes itself once they are added.
 export function AddPage() {
   const { org, sales } = useSession();
-  const [params] = useSearchParams();
-  const popup = !!params.get("popup");
-  const query = { url: params.get("url") ?? "", name: params.get("name") ?? "", headline: params.get("headline") ?? "", company: params.get("company") ?? "" };
+  const { popup = false, url = "", name = "", headline = "", company = "" } = useSearch({ from: "/o/$org/add" });
+  const query = { url, name, headline, company };
   const draft = $api.useQuery("get", "/o/{org}/api/v1/people/draft", { params: { path: { org }, query } });
   const settings = $api.useQuery("get", "/o/{org}/api/v1/settings", { params: { path: { org } } });
   if (!draft.data || !settings.data) return null;

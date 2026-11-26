@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
 func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
@@ -98,13 +100,29 @@ func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
 func TestEnquiriesAreAnsweredFromTheirPage(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	help := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "support", Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Message: "Colours look pale on phones"}))
-	sidebar := regexp.MustCompile(`Enquiries</span>\s*<span[^>]*>(\d+)</span>`)
-	_, today := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil)
-	if !strings.Contains(today, "Answer enquiries") || !strings.Contains(today, "enquiries?state=open") {
-		t.Error("Today says nothing of an enquiry nobody has answered")
+	// Today's summary and the sidebar's count both say how many wait to be answered.
+	waiting := func() (today, sidebar int) {
+		t.Helper()
+		var sum api.TodaySummary
+		var nav api.Nav
+		_, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/today/summary", "", nil)
+		_, side := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/nav", "", nil)
+		if json.Unmarshal([]byte(body), &sum) != nil || json.Unmarshal([]byte(side), &nav) != nil {
+			t.Fatalf("Today's summary or the nav: %s %s", body, side)
+		}
+		return sum.Enquiries, nav.Counts.Enquiries
 	}
-	if m := sidebar.FindStringSubmatch(today); m == nil || m[1] != "1" {
-		t.Errorf("the sidebar's count of enquiries to answer: %v", m)
+	if today, sidebar := waiting(); today != 1 || sidebar != 1 {
+		t.Errorf("Today and the sidebar count %d and %d enquiries to answer, want 1", today, sidebar)
+	}
+	list := func(query string) []api.Enquiry {
+		t.Helper()
+		code, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/enquiries"+query, "", nil)
+		var out struct{ Items []api.Enquiry }
+		if code != http.StatusOK || json.Unmarshal([]byte(body), &out) != nil {
+			t.Fatalf("the enquiries%s: %d %s", query, code, body)
+		}
+		return out.Items
 	}
 	update := func(field, value string) (int, string) {
 		return call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/enquiries/"+itoa(help.ID), "application/json", map[string]any{field: value})
@@ -115,23 +133,19 @@ func TestEnquiriesAreAnsweredFromTheirPage(t *testing.T) {
 	if code, _ := update("state", "ignored"); code == http.StatusOK {
 		t.Error("an enquiry was put in a state there isn't")
 	}
-	_, page := call(t, client, "GET", srv.URL+"/o/alpha/enquiries?state=open", "", nil)
-	for _, want := range []string{"Colours look pale on phones", "To answer", `data-enquiry="` + itoa(help.ID) + `"`, "Ada Lovelace", "theirs to see if they ask"} {
-		if !strings.Contains(page, want) {
-			t.Errorf("the page of enquiries to answer doesn't show %q", want)
-		}
+	if open := list("?state=open"); len(open) != 1 || open[0].Id != help.ID || open[0].Message != "Colours look pale on phones" || open[0].State != EnquiryOpen || open[0].Owner != "Ada Lovelace" {
+		t.Errorf("the enquiries to answer: %+v", open)
 	}
 	if code, body := update("state", EnquiryClosed); code != http.StatusOK {
 		t.Fatalf("closing an enquiry: %d %s", code, body)
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/enquiries?state=open", "", nil); strings.Contains(page, "Colours look pale") {
+	if open := list("?state=open"); len(open) != 0 {
 		t.Error("a closed enquiry is still listed as one to answer")
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/enquiries", "", nil); !strings.Contains(page, "Colours look pale") || !strings.Contains(page, "Closed") {
-		t.Error("a closed enquiry isn't under All, marked closed")
+	if all := list(""); len(all) != 1 || all[0].State != EnquiryClosed {
+		t.Errorf("a closed enquiry isn't under All, marked closed: %+v", all)
 	}
-	_, today = call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil)
-	if strings.Contains(today, "Answer enquiries") || sidebar.MatchString(today) {
+	if today, sidebar := waiting(); today != 0 || sidebar != 0 {
 		t.Error("Today or the sidebar still counts an enquiry that is closed")
 	}
 }
@@ -180,8 +194,23 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 	}
 	// From someone not held yet, with no name: they are added under their address.
 	stranger := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "sales", Email: "sven@nordkap.example", Company: "Nordkap Boats", Message: "What does it cost for two sites?"}))
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/enquiries", "", nil); !strings.Contains(page, "Start a conversation") {
-		t.Fatal("the enquiry has no way onto the board")
+	inConversation := func() bool {
+		t.Helper()
+		_, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/enquiries", "", nil)
+		var list struct{ Items []api.Enquiry }
+		if err := json.Unmarshal([]byte(body), &list); err != nil {
+			t.Fatalf("the enquiries: %s", body)
+		}
+		for _, e := range list.Items {
+			if e.Id == stranger.ID {
+				return e.InConversation
+			}
+		}
+		t.Fatalf("the enquiry isn't listed: %s", body)
+		return false
+	}
+	if inConversation() {
+		t.Fatal("the enquiry has no way onto the board: it says it is in conversation already")
 	}
 	if code, body := converse(stranger.ID); code != http.StatusCreated {
 		t.Fatalf("starting a conversation: %d %s", code, body)
@@ -201,7 +230,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 	if len(linked) != 1 || linked[0].ContactID == nil || *linked[0].ContactID != added.ID || linked[0].CompanyID == nil {
 		t.Errorf("the enquiry after its sender was added: %+v", linked)
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/enquiries", "", nil); !strings.Contains(page, "In Conversations") || strings.Contains(page, "Start a conversation") {
+	if !inConversation() {
 		t.Error("the enquiry still offers to start a conversation that is under way")
 	}
 	// Pressed again, or sent from a page that had not caught up, it adds nobody.

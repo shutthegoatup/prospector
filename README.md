@@ -362,9 +362,12 @@ PROSPECTOR_TEST_PG=postgres://… go test -p 1 ./...      # an empty, disposable
 go tool templ generate                                   # after editing *.templ
 go tool shadcn-templ add <component>                     # UI components (shadcn/ui for templ)
 node build-css.mjs <node_modules with tailwindcss v4>   # or the standalone tailwindcss CLI
+(cd web && npm ci && npm run build)                      # the React app and the page scripts
 ```
 
-`assets/css/output.css`, the script bundle and `*_templ.go` are committed, so a plain `go build` needs neither Node nor Tailwind.
+The app inside an organisation is a React front end in `web/` (TanStack Router, its addresses `/o/<org>/today`, `/o/<org>/companies/<id>` and so on); the server answers each of those addresses with the same page and the app reads everything through the API. Sign-in, the front page and the customer's pages are server-rendered.
+
+`assets/css/output.css`, the built app and scripts and `*_templ.go` are committed, so a plain `go build` needs neither Node nor Tailwind.
 
 ## Releases
 

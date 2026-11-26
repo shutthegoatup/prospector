@@ -94,9 +94,9 @@ func TestFormEnquiryIsKept(t *testing.T) {
 	if got.Kind != "demo" || got.Email != "hannah@quay.example" || got.Site != formSite || got.Via != "form" || got.Spam || got.Message != enquiry.Message {
 		t.Errorf("stored as %+v", got)
 	}
-	code, page := call(t, client, "GET", srv.URL+"/o/alpha/enquiries", "", nil)
+	code, page := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/enquiries", "", nil)
 	if code != http.StatusOK || !strings.Contains(page, "Could we see it running?") || !strings.Contains(page, "Hannah Pryce") {
-		t.Errorf("the Enquiries page doesn't show it: %d", code)
+		t.Errorf("the enquiries the page lists don't hold it: %d %s", code, page)
 	}
 
 	// The listed site still can't do anything else here.
@@ -128,10 +128,10 @@ func TestEnquiryOddities(t *testing.T) {
 	if len(spam) != 1 || spam[0].Email != "bot@spam.example" {
 		t.Fatalf("spam kept apart: %+v", spam)
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/enquiries", "", nil); strings.Contains(page, "bot@spam.example") {
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/enquiries", "", nil); strings.Contains(page, "bot@spam.example") {
 		t.Error("spam shows among the enquiries")
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/enquiries?spam=1", "", nil); !strings.Contains(page, "bot@spam.example") {
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/enquiries?spam=true", "", nil); !strings.Contains(page, "bot@spam.example") {
 		t.Error("spam can't be looked at")
 	}
 
@@ -189,9 +189,9 @@ func TestEnquiryFindsWhoSentIt(t *testing.T) {
 	if e := by["stranger@elsewhere.example"]; e.ContactID != nil || e.CompanyID != nil {
 		t.Errorf("a stranger's enquiry was tied to someone: %+v", e)
 	}
-	_, page := call(t, client, "GET", fmt.Sprintf("%s/o/alpha/companies/%d", srv.URL, *known.CompanyID), "", nil)
+	_, page := call(t, client, "GET", fmt.Sprintf("%s/o/alpha/api/v1/companies/%d/history", srv.URL, *known.CompanyID), "", nil)
 	if !strings.Contains(page, "sent an enquiry · Hannah Pryce: Sales") {
-		t.Error("the company's history doesn't mention the enquiry")
+		t.Errorf("the company's history doesn't mention the enquiry: %s", page)
 	}
 	if kinds, _ := firstOf(s.Enquiries(o.ID, EnquiryFilter{Kind: "support"}, 1)); len(kinds) != 1 {
 		t.Errorf("filtering by kind found %d", len(kinds))
@@ -255,8 +255,8 @@ func TestEnquiryFromAProduct(t *testing.T) {
 	if err := s.DeleteEnquiry(other.ID, rows[0].ID); err == nil {
 		t.Error("another organisation could delete it")
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/enquiries", "", nil); !strings.Contains(page, "agent · back office") {
-		t.Error("the page doesn't say which key sent it")
+	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/enquiries", "", nil); !strings.Contains(page, `"via":"agent:back office"`) {
+		t.Errorf("the enquiries don't say which key sent it: %s", page)
 	}
 	if code, body := call(t, client, "DELETE", srv.URL+"/o/alpha/api/v1/enquiries/"+itoa(rows[0].ID), "", nil); code != http.StatusNoContent {
 		t.Fatalf("an owner deleting an enquiry: %d %s", code, body)
@@ -278,9 +278,10 @@ func TestEnquirySitesSetting(t *testing.T) {
 	if code, body := save(formSite + "\nhttp://localhost:4322"); code != http.StatusOK {
 		t.Fatalf("saving two sites: %d %s", code, body)
 	}
-	_, page := call(t, client, "GET", srv.URL+"/o/alpha/settings", "", nil)
-	if !strings.Contains(page, formSite) || !strings.Contains(page, srv.URL+"/o/alpha/intake") {
-		t.Error("Settings doesn't show the sites and where they post")
+	// The page shows where they post from its own address; the sites come from the settings.
+	_, page := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/settings", "", nil)
+	if !strings.Contains(page, formSite) || !strings.Contains(page, "http://localhost:4322") {
+		t.Errorf("the settings don't hold the sites: %s", page)
 	}
 	if res, _ := fromSite(t, "POST", srv.URL+"/o/alpha/intake", "http://localhost:4322", EnquiryIn{Email: "dev@shop.example"}); res.StatusCode != http.StatusOK {
 		t.Errorf("an enquiry from the second site: %d", res.StatusCode)

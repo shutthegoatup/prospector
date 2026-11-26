@@ -6,12 +6,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"html"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -288,7 +287,7 @@ func TestAKeyPreparesAnAgreementWithTheWriteScope(t *testing.T) {
 }
 
 // The Prepare page lists who signs and lets sales change it; someone in support only
-// reads it. Its editor is a script of its own, with pdf.js's worker served as script.
+// reads it. It is the app's shell, and pdf.js's worker is served as script.
 func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
 	s, o, base, member, a, hannah, theo := preparing(t)
 	must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
@@ -298,25 +297,39 @@ func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
 	srv := strings.TrimSuffix(base, "/o/alpha/api/v1/agreements/"+itoa(a.ID))
 	page := srv + "/o/alpha/agreements/" + itoa(a.ID) + "/prepare"
 
-	code, body := call(t, member, "GET", page, "", nil)
-	if code != http.StatusOK {
+	if code, body := call(t, member, "GET", page, "", nil); code != http.StatusOK || !strings.Contains(body, `id="app"`) {
 		t.Fatalf("the page: %d", code)
 	}
-	for _, want := range []string{"Prepare for signing", "1 · Hannah Pryce", "theo@larkmoor.example", `data-editor="` + itoa(a.ID) + `"`, `name="placing"`, `data-kind="signature"`, "/assets/js/prepare.js", "Place a signature for Hannah Pryce", "nothing here leaves Prospector"} {
-		if !strings.Contains(body, want) {
-			t.Errorf("the Prepare page lacks %q", want)
+	order := func(c *http.Client) string {
+		t.Helper()
+		code, body := call(t, c, "GET", base+"/recipients", "", nil)
+		if code != http.StatusOK {
+			t.Fatalf("who signs: %d %s", code, body)
 		}
+		var names []string
+		for _, r := range items[struct {
+			Position int
+			Name     string
+			Role     string
+		}](t, body) {
+			names = append(names, itoa(int64(r.Position))+" "+r.Name+" "+r.Role)
+		}
+		slices.Sort(names)
+		return strings.Join(names, ", ")
 	}
-	if strings.Contains(body, ">Hannah Pryce · hannah@larkmoor.example</option>") {
-		t.Error("Hannah is offered again though she is on it")
+	if got := order(member); got != "1 Hannah Pryce signer, 2 Theo Marsh copy, 3 Ada Lovelace signer" {
+		t.Errorf("who signs, in order: %s", got)
 	}
-	// Moving Ada up takes Hannah's place, not the copy's between them.
-	up := regexp.MustCompile(`data-body="([^"]*)" data-method="PATCH" data-post="api/v1/agreements/` + itoa(a.ID) + `/recipients/` + itoa(ada.ID) + `"`).FindStringSubmatch(body)
-	if len(up) < 2 || html.UnescapeString(up[1]) != `{"position":1}` {
-		t.Errorf("Ada's move up: %q", up)
+	// Ada moves to first, ahead of Hannah.
+	if code, body := call(t, member, "PATCH", base+"/recipients/"+itoa(ada.ID), "application/json", map[string]any{"position": 1}); code != http.StatusOK {
+		t.Fatalf("moving Ada up: %d %s", code, body)
 	}
-	if _, company := call(t, member, "GET", srv+"/o/alpha/companies/"+itoa(*hannah.CompanyID), "", nil); !strings.Contains(company, "agreements/"+itoa(a.ID)+"/prepare") {
-		t.Error("the company's page doesn't lead to Prepare for signing")
+	if got := order(member); got != "1 Ada Lovelace signer, 2 Hannah Pryce signer, 3 Theo Marsh copy" {
+		t.Errorf("after moving Ada up: %s", got)
+	}
+	// The company's page leads to Prepare for signing for an agreement with its document.
+	if shown := companyPageOverview(t, member, srv, *hannah.CompanyID).Agreements; len(shown) != 1 || shown[0].Id != a.ID || shown[0].FileHash == "" {
+		t.Errorf("the company's page should offer to prepare the agreement: %+v", shown)
 	}
 
 	grace := must(s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
@@ -330,9 +343,14 @@ func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
 	if !signIn(t, support, &httptest.Server{URL: srv}, "grace@example.com", "correct horse battery") {
 		t.Fatal("Grace cannot sign in")
 	}
-	_, body = call(t, support, "GET", page, "", nil)
-	if !strings.Contains(body, "Hannah Pryce") || strings.Contains(body, `name="placing"`) || strings.Contains(body, "data-post=") || strings.Contains(body, "data-kind=") {
-		t.Error("someone in support is offered the controls, or doesn't see who signs")
+	if got := order(support); !strings.Contains(got, "Hannah Pryce") {
+		t.Errorf("someone in support doesn't see who signs: %s", got)
+	}
+	if code, _ := call(t, support, "PATCH", base+"/recipients/"+itoa(ada.ID), "application/json", map[string]any{"position": 3}); code != http.StatusForbidden {
+		t.Errorf("someone in support changing who signs: %d", code)
+	}
+	if code, _ := call(t, support, "POST", base+"/recipients", "application/json", map[string]any{"role": "copy", "contact_id": theo.ID}); code != http.StatusForbidden {
+		t.Errorf("someone in support adding a signer: %d", code)
 	}
 
 	// pdf.js compiles WebAssembly to draw JPEG 2000 images, so the page and its worker
