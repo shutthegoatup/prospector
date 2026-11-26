@@ -925,6 +925,72 @@ paths:
               schema: { $ref: "#/components/schemas/Deal" }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/conversations:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listConversations
+      tags: [deals]
+      summary: The Conversations board, a card for each deal
+      description: |
+        The deals `listDeals` gives, in its order, each with what its card on the board
+        shows besides: the company's name, the notes from calls and whether the company is
+        being onboarded.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: By stage, in the board's order.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, onboarding_steps]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/DealCard" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  onboarding_steps: { type: integer, description: "How many steps an onboarding started now would have: 0 until an owner writes them in Settings, and until then a won deal offers none." }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/members:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listMembers
+      tags: [settings]
+      summary: Who is in the organisation, by name
+      description: The names that can own a deal or an enquiry, in order.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of them.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/MemberName" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
   /o/{org}/api/v1/enquiries:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -976,37 +1042,6 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EnquiryCounts" }
-        default: { $ref: "#/components/responses/Problem" }
-
-  /o/{org}/api/v1/members:
-    parameters:
-      - $ref: "#/components/parameters/org"
-    get:
-      operationId: listMembers
-      tags: [settings]
-      summary: Who is in the organisation, by name
-      description: The names that can own a deal or an enquiry, in order.
-      parameters:
-        - $ref: "#/components/parameters/limit"
-        - $ref: "#/components/parameters/cursor"
-      security:
-        - session: []
-        - bearer: [read]
-      responses:
-        "200":
-          description: A page of them.
-          headers:
-            Link: { $ref: "#/components/headers/Link" }
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [items]
-                properties:
-                  items:
-                    type: array
-                    items: { $ref: "#/components/schemas/MemberName" }
-                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/enquiries/{id}:
@@ -3504,6 +3539,22 @@ components:
         owner: { type: string }
         subscription_id: { type: integer, format: int64, description: "The subscription a renewal is for; 0 for none." }
 
+    DealCard:
+      allOf:
+        - $ref: "#/components/schemas/Deal"
+        - type: object
+          required: [company, call_notes, onboarding]
+          properties:
+            company: { type: string, description: "The name of the company the deal is with; empty when they have none here." }
+            call_notes: { type: string, description: "The notes from calls with the person." }
+            onboarding: { type: string, description: "`running` while the company is being onboarded, `live` once it is, empty when no onboarding has started." }
+
+    MemberName:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+
     DealChange:
       type: object
       properties:
@@ -3559,11 +3610,6 @@ components:
           additionalProperties: { type: integer }
           description: "Those that aren't spam, by `open`, `waiting` or `closed`. A state with none is left out."
 
-    MemberName:
-      type: object
-      required: [name]
-      properties:
-        name: { type: string }
 
     Suppression:
       type: object

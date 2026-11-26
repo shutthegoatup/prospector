@@ -5,6 +5,7 @@ import { BrowserRouter, Route, Routes } from "react-router";
 import { AgentsPage } from "@/pages/Agents";
 import { AddPage } from "@/pages/Add";
 import { CampaignsPage } from "@/pages/Campaigns";
+import { ConversationsPage } from "@/pages/Conversations";
 import { EnquiriesPage } from "@/pages/Enquiries";
 import { OnboardingPage } from "@/pages/Onboarding";
 import { ResearchPage } from "@/pages/Research";
@@ -26,6 +27,7 @@ if (mount) {
               <Route path="research" element={<ResearchPage />} />
               <Route path="campaigns" element={<CampaignsPage />} />
               <Route path="onboarding" element={<OnboardingPage />} />
+              <Route path="conversations" element={<ConversationsPage />} />
               <Route path="agents" element={<AgentsPage />} />
               <Route path="add" element={<AddPage />} />
               <Route path="tasks" element={<TasksPage />} />
