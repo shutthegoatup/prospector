@@ -95,38 +95,10 @@ func (a *App) today(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	now := time.Now()
 	cards, counts := Today(a.dueByStep(q, now), q.Voice(), now, a.s.noMailDomains())
-	d := TodayData{Filter: r.URL.Query().Get("step"), Counts: counts, Total: len(cards),
-		Review: a.s.ResearchCount(q.Org.ID, "review"), Week: a.s.Week(q.Org.ID, now), Now: now.Format("Mon 2 Jan · 15:04")}
-	others, err := a.s.OtherDeals(q.Org.ID)
-	if err != nil {
+	d := TodayData{Filter: r.URL.Query().Get("step"), Counts: counts, Total: len(cards), Now: now.Format("Mon 2 Jan · 15:04")}
+	if err := a.todayElsewhere(q.Org.ID, now, &d); err != nil {
 		fail(w, err, http.StatusInternalServerError)
 		return
-	}
-	for _, list := range others {
-		for _, o := range list {
-			if o.needsNextStep(now.Format("2006-01-02")) {
-				d.Deals++
-			}
-		}
-	}
-	subs, err := a.s.Subscriptions(q.Org.ID, 0, now.Format(dayLayout))
-	if err != nil {
-		fail(w, err, http.StatusInternalServerError)
-		return
-	}
-	d.Enquiries = a.s.EnquiryCounts(q.Org.ID)["state:"+EnquiryOpen]
-	onboard, err := a.s.Onboardings(q.Org.ID, 0, now.Format(dayLayout))
-	if err != nil {
-		fail(w, err, http.StatusInternalServerError)
-		return
-	}
-	for _, ob := range onboard {
-		d.Steps += ob.Late + ob.DueToday
-	}
-	for _, sub := range subs {
-		if sub.Soon(now.Format(dayLayout)) {
-			d.Subs++
-		}
 	}
 	for _, c := range cards {
 		if c.Step == "call" && c.State != "ok" {
@@ -148,6 +120,40 @@ func (a *App) today(w http.ResponseWriter, r *http.Request) {
 		d.Cards[i].AgentMarks = marks[d.Cards[i].ID]
 	}
 	a.page(w, r, "today", TodayView(q, d))
+}
+
+// todayElsewhere is the work Today points to on other pages, and the last seven days.
+func (a *App) todayElsewhere(org int64, now time.Time, d *TodayData) error {
+	d.Review, d.Week = a.s.ResearchCount(org, "review"), a.s.Week(org, now)
+	others, err := a.s.OtherDeals(org)
+	if err != nil {
+		return err
+	}
+	for _, list := range others {
+		for _, o := range list {
+			if o.needsNextStep(now.Format("2006-01-02")) {
+				d.Deals++
+			}
+		}
+	}
+	subs, err := a.s.Subscriptions(org, 0, now.Format(dayLayout))
+	if err != nil {
+		return err
+	}
+	d.Enquiries = a.s.EnquiryCounts(org)["state:"+EnquiryOpen]
+	onboard, err := a.s.Onboardings(org, 0, now.Format(dayLayout))
+	if err != nil {
+		return err
+	}
+	for _, ob := range onboard {
+		d.Steps += ob.Late + ob.DueToday
+	}
+	for _, sub := range subs {
+		if sub.Soon(now.Format(dayLayout)) {
+			d.Subs++
+		}
+	}
+	return nil
 }
 
 // ResearchData is the Research page: the searches agents are on, the queue they fill,

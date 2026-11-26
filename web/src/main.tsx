@@ -5,6 +5,7 @@ import { BrowserRouter, Route, Routes } from "react-router";
 import { CampaignsPage } from "@/pages/Campaigns";
 import { OnboardingPage } from "@/pages/Onboarding";
 import { ResearchPage } from "@/pages/Research";
+import { TodayPage } from "@/pages/Today";
 import { SessionContext } from "@/session";
 
 const mount = document.getElementById("app");
@@ -20,6 +21,7 @@ if (mount) {
               <Route path="research" element={<ResearchPage />} />
               <Route path="campaigns" element={<CampaignsPage />} />
               <Route path="onboarding" element={<OnboardingPage />} />
+              <Route path="today" element={<TodayPage />} />
             </Routes>
           </BrowserRouter>
         </QueryClientProvider>
