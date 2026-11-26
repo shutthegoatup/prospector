@@ -35,7 +35,7 @@ type Agreement struct {
 	// Round counts the versions sent for signing; changes asked for start the next.
 	Round int `gorm:"not null;default:1" json:"round"`
 	// InOrder is whether signers sign one after another, in their order, or all at once.
-	InOrder   bool      `gorm:"not null;default:true" json:"in_order"`
+	InOrder bool `gorm:"not null;default:true" json:"in_order"`
 	// Set when it is sent: when, by whom, until when it can be signed, and what the
 	// organisation was called then, which its certificate shows.
 	SentAt     *time.Time `json:"sent_at"`
@@ -46,12 +46,14 @@ type Agreement struct {
 	Subject    string     `gorm:"not null;default:''" json:"subject"`
 	Message    string     `gorm:"not null;default:''" json:"message"`
 	// SealedHash is the SHA-256 of the sealed PDF once everyone has signed.
-	SealedHash  string     `gorm:"not null;default:''" json:"sealed_hash"`
+	SealedHash string `gorm:"not null;default:''" json:"sealed_hash"`
+	// SealProblem is why the last try at sealing it failed, while it waits to be sealed.
+	SealProblem string     `gorm:"not null;default:''" json:"seal_problem"`
 	CompletedAt *time.Time `json:"completed_at"`
-	CreatedBy string    `gorm:"not null;default:''" json:"created_by"`
-	UpdatedBy string    `gorm:"not null;default:''" json:"updated_by"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	CreatedBy   string     `gorm:"not null;default:''" json:"created_by"`
+	UpdatedBy   string     `gorm:"not null;default:''" json:"updated_by"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // AgreementFile is the document's bytes, one row to an agreement.

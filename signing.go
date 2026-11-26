@@ -64,7 +64,7 @@ type SendIn struct {
 
 // sendable is why a draft can't go out: anything missing from it, anyone on it who
 // can't be mailed, any text the seal couldn't draw.
-func (s *Store) sendable(o *Org, a *Agreement) error {
+func (s *Store) sendable(o *Org, a *Agreement, sentBy string) error {
 	missingParts, err := s.Readiness(o.ID, *a)
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func (s *Store) sendable(o *Org, a *Agreement) error {
 	if len(missingParts) > 0 {
 		return errors.New(strings.Join(missingParts, " "))
 	}
-	for _, text := range []string{o.Name, a.Name} {
+	for _, text := range []string{o.Name, a.Name, sentBy} {
 		if err := drawable(text); err != nil {
 			return err
 		}
@@ -95,7 +95,7 @@ func (s *Store) sendable(o *Org, a *Agreement) error {
 			return err
 		}
 	}
-	return s.TrySeal(o, a.ID)
+	return s.TrySeal(o, a.ID, sentBy)
 }
 
 // SendAgreement sends a draft for signature: who it goes to is frozen, the first signer
@@ -121,7 +121,7 @@ func (s *Store) SendAgreement(o *Org, id int64, in SendIn, user *User, actor str
 	if utf8.RuneCountInString(in.Subject) > 200 || utf8.RuneCountInString(in.Message) > 2000 {
 		return nil, errors.New("a subject is 200 characters at most and a message 2,000")
 	}
-	if err := s.sendable(o, a); err != nil {
+	if err := s.sendable(o, a, actor); err != nil {
 		return nil, err
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
@@ -548,6 +548,39 @@ func eraseFromAgreements(tx *gorm.DB, org, contact int64, actor string) error {
 		}
 		if _, err := recordAgreementEvent(tx, AgreementEvent{OrgID: org, AgreementID: a.ID, Round: a.Round, Kind: EventVoided, Actor: actor,
 			Detail: "Withdrawn: someone on it was erased on their request"}); err != nil {
+			return err
+		}
+		if err := tellMailed(tx, *a, mailVoided); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// withdrawForLeaver withdraws every agreement still out that a member who is leaving has
+// yet to sign: they can no longer sign in, and it can't be completed without them.
+func withdrawForLeaver(tx *gorm.DB, org, user int64, actor string) error {
+	var pending []AgreementRecipient
+	if err := tx.Where("org_id = ? and user_id = ? and role = ? and status in ?", org, user, RecipientSigner, []string{SignerWaiting, SignerDue}).Find(&pending).Error; err != nil {
+		return err
+	}
+	for _, r := range pending {
+		a, err := lockAgreement(tx, org, r.AgreementID)
+		if _, gone := errors.AsType[notFound](err); gone {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		res := tx.Model(&Agreement{}).Where("id = ? and status = ?", a.ID, AgreementSent).Update("status", AgreementVoided)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			continue
+		}
+		if _, err := recordAgreementEvent(tx, AgreementEvent{OrgID: org, AgreementID: a.ID, Round: a.Round, Kind: EventVoided, Actor: actor,
+			Detail: "Withdrawn: " + r.SentName + ", who was to sign it, left the organisation"}); err != nil {
 			return err
 		}
 		if err := tellMailed(tx, *a, mailVoided); err != nil {

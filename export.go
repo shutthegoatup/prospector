@@ -314,7 +314,13 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 		}
 		for i, e := range out.Events {
 			if e.RecipientID != nil && erased[*e.RecipientID] {
-				out.Events[i].Detail, out.Events[i].IP, out.Events[i].UserAgent = "(someone erased)", "", ""
+				out.Events[i].Detail, out.Events[i].Actor, out.Events[i].IP, out.Events[i].UserAgent = "(someone erased)", "someone erased", "", ""
+			}
+		}
+		// What they filled in carries their name and their answers.
+		for i, f := range out.Fields {
+			if erased[f.RecipientID] {
+				out.Fields[i].Value = ""
 			}
 		}
 		var events []Event

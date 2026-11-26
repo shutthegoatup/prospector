@@ -52,6 +52,28 @@ func queueAgreementMail(tx *gorm.DB, a Agreement, r AgreementRecipient, kind str
 	return tx.Create(&AgreementMail{OrgID: a.OrgID, AgreementID: a.ID, RecipientID: r.ID, Kind: kind, Status: mailQueued, NextAt: time.Now()}).Error
 }
 
+// MailProblems are, by recipient, why the latest mail an agreement queued for them
+// hasn't gone: still being tried again, or given up on.
+func (s *Store) MailProblems(org, id int64) (map[int64]string, error) {
+	var mails []AgreementMail
+	if err := s.in(org).Where("agreement_id = ?", id).Order("id").Find(&mails).Error; err != nil {
+		return nil, err
+	}
+	out := map[int64]string{}
+	for _, m := range mails {
+		if m.Status == mailSent || m.Tries == 0 {
+			delete(out, m.RecipientID)
+			continue
+		}
+		why := "not sent yet: " + m.Error
+		if m.Status == mailFailed {
+			why = "couldn't be sent: " + m.Error
+		}
+		out[m.RecipientID] = why
+	}
+	return out, nil
+}
+
 func hashBytes(b []byte) string {
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
@@ -85,6 +107,7 @@ func (a *App) signingRound(ctx context.Context, now time.Time) {
 	for _, ag := range sealing {
 		if err := a.sealAgreement(ag); err != nil {
 			log.Printf("sealing agreement %d: %v", ag.ID, err)
+			logged(a.s.db.Model(&Agreement{}).Where("id = ? and status = ?", ag.ID, AgreementSealing).Update("seal_problem", err.Error()))
 		}
 	}
 	var queued []AgreementMail
@@ -140,7 +163,7 @@ func (a *App) sealAgreement(ag Agreement) error {
 		}
 		now := time.Now().UTC()
 		if err := tx.Model(&Agreement{}).Where("id = ? and status = ?", ag.ID, AgreementSealing).
-			Updates(map[string]any{"status": AgreementCompleted, "sealed_hash": out.Hash, "completed_at": now}).Error; err != nil {
+			Updates(map[string]any{"status": AgreementCompleted, "sealed_hash": out.Hash, "completed_at": now, "seal_problem": ""}).Error; err != nil {
 			return err
 		}
 		if _, err := recordAgreementEvent(tx, AgreementEvent{OrgID: o.ID, AgreementID: ag.ID, Round: ag.Round, At: now, Kind: EventSealed,
@@ -245,6 +268,11 @@ func (a *App) writeAndSend(ctx context.Context, m AgreementMail) error {
 	if err := a.s.db.Where("org_id = ? and id = ?", o.ID, m.RecipientID).First(&r).Error; err != nil || r.Erased {
 		return errNoMailToSend
 	}
+	// The never-contact list is checked as each mail goes, not only when it was sent:
+	// someone added to it since hears nothing more.
+	if m.Kind != mailDeclined && o.Settings.listed(r.SentEmail, "") != nil {
+		return errNoMailToSend
+	}
 	via, err := a.campaignMail(o.ID)
 	if err != nil {
 		return err
@@ -292,7 +320,7 @@ func (a *App) writeAndSend(ctx context.Context, m AgreementMail) error {
 			kind = ""
 		case mailDeclined:
 			var sender User
-			if err := tx.First(&sender, ag.SentByUser).Error; err != nil {
+			if ag.SentByUser == 0 || tx.First(&sender, ag.SentByUser).Error != nil {
 				return errNoMailToSend
 			}
 			to = sender.Email
@@ -315,7 +343,7 @@ func (a *App) writeAndSend(ctx context.Context, m AgreementMail) error {
 		msg.To = to
 		if m.Kind != mailDeclined {
 			var sender User
-			if tx.First(&sender, ag.SentByUser).Error == nil {
+			if ag.SentByUser != 0 && tx.First(&sender, ag.SentByUser).Error == nil {
 				msg.ReplyTo = sender.Email
 			}
 		}

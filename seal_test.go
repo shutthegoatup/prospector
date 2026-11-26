@@ -124,7 +124,7 @@ func TestAPDFTakenAtUploadCanBeSealed(t *testing.T) {
 	must(s.PutAgreementFile(o.ID, a.ID, "form.pdf", buildPDF("1.3", 2, "", "/Annots [<< /Type /Annot /Subtype /Caret /Rect [10 10 20 20] >>] "), "Ada Lovelace"))
 	r := must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
 	must(s.PutAgreementFields(o.ID, a.ID, []AgreementField{{RecipientID: r.ID, Page: 2, Kind: "signature", X: 0.1, Y: 0.7, W: 0.3, H: 0.06}}))
-	if err := s.TrySeal(o, a.ID); err != nil {
+	if err := s.TrySeal(o, a.ID, "Ada Lovelace"); err != nil {
 		t.Errorf("sealing a PDF the upload took: %v", err)
 	}
 }
@@ -153,7 +153,7 @@ func sealedDraft(t *testing.T) (*Store, *Org, *Agreement) {
 
 func TestADraftCanBeFilledInAndSealedBeforeItIsSent(t *testing.T) {
 	s, o, a := sealedDraft(t)
-	if err := s.TrySeal(o, a.ID); err != nil {
+	if err := s.TrySeal(o, a.ID, "Ada Lovelace"); err != nil {
 		t.Fatalf("a dry run of sealing: %v", err)
 	}
 	var made []AgreementEvent
@@ -164,7 +164,7 @@ func TestADraftCanBeFilledInAndSealedBeforeItIsSent(t *testing.T) {
 	// A name the fonts can't draw is found before anything goes out.
 	han := must(s.QuickAddPerson(o, QuickAdd{Name: "王小明", Company: "Larkmoor Yachts", Email: "wang@larkmoor.example"}, "Ada Lovelace"))
 	must(s.AddRecipient(o, a.ID, RecipientCopy, &han.ID, nil, "Ada Lovelace"))
-	if err := s.TrySeal(o, a.ID); err == nil || !strings.Contains(err.Error(), "can't show") {
+	if err := s.TrySeal(o, a.ID, "Ada Lovelace"); err == nil || !strings.Contains(err.Error(), "can't show") {
 		t.Errorf("a dry run with a name the fonts can't draw: %v", err)
 	}
 }

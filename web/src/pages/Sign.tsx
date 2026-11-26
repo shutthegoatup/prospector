@@ -5,8 +5,6 @@ import { Failed, Meta, PageHead } from "@/components/app";
 import { type Place, SignForm } from "@/components/app/signing";
 import { useSession } from "@/session";
 
-const consent = "I've read the document. I agree to sign it electronically, and that typing my name here is my signature.";
-
 // SignPage is a member signing their own place on an agreement, signed in.
 export function SignPage() {
   const { org } = useSession();
@@ -52,7 +50,7 @@ export function SignPage() {
           places={places}
           load={load}
           sentName={me?.name ?? ""}
-          consent={consent}
+          consent={a.consent}
           busy={sign.isPending || decline.isPending}
           error={(sign.error ?? decline.error)?.detail ?? ""}
           onSign={(x) => sign.mutate({ ...path, body: { typed_name: x.typed, consent: true, values: x.values } }, { onSuccess: () => setDone("You've signed") })}

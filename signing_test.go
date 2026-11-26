@@ -73,7 +73,7 @@ func (x *signingSite) round() { x.app.signingRound(context.Background(), time.No
 func (x *signingSite) proveAs(link, address string) (string, *Signing) {
 	x.t.Helper()
 	token := strings.TrimPrefix(link, testSite+"/s/")
-	session, g, err := x.s.OpenSigning(token)
+	session, g, err := x.s.OpenSigning(token, "")
 	if err != nil {
 		x.t.Fatalf("opening %s: %v", link, err)
 	}
@@ -110,7 +110,7 @@ func TestAnAgreementIsSentSignedInOrderAndSealed(t *testing.T) {
 
 	// Opening the link does nothing until the code comes back.
 	token := strings.TrimPrefix(link, testSite+"/s/")
-	session, g := must2(x.s.OpenSigning(token))
+	session, g := must2(x.s.OpenSigning(token, ""))
 	if _, err := x.s.SignerSigns(g, SignIn{Typed: "Hannah Pryce", Consent: true}, who); err == nil {
 		t.Error("signed without the emailed code")
 	}
@@ -254,19 +254,32 @@ func TestASentAgreementCanBeWithdrawnDeclinedOrRunOut(t *testing.T) {
 		must(x.s.SendAgreement(x.o, x.a.ID, SendIn{}, x.ada, "Ada Lovelace"))
 		x.round()
 		_, link := x.mailTo("hannah@larkmoor.example")
+		// She signs, then asks to be erased before Ada has.
+		_, g := x.proveAs(link, "hannah@larkmoor.example")
+		must(x.s.SignerSigns(g, SignIn{Typed: "Hannah Pryce", Consent: true, Values: map[int64]string{x.textFld: "Operations director"}}, who))
 		if err := x.s.ErasePerson(x.o.ID, x.hannah.ID, "Ada Lovelace"); err != nil {
 			t.Fatal(err)
 		}
 		if a := must(x.s.Agreement(x.o.ID, x.a.ID)); a.Status != AgreementVoided {
 			t.Errorf("after erasing a signer: %s", a.Status)
 		}
-		if _, _, err := x.s.OpenSigning(strings.TrimPrefix(link, testSite+"/s/")); err == nil {
+		if _, _, err := x.s.OpenSigning(strings.TrimPrefix(link, testSite+"/s/"), ""); err == nil {
 			t.Error("an erased signer's link still opens")
 		}
 		export := must(x.s.ExportOrg(x.o.ID, "Ada Lovelace"))
 		for _, r := range export.Recipients {
-			if strings.Contains(r.SentEmail+r.SentName, "hannah") || strings.Contains(r.SentName, "Hannah") {
+			if strings.Contains(r.SentEmail+r.SentName+r.TypedName, "annah") {
 				t.Errorf("the export names an erased person: %+v", r)
+			}
+		}
+		for _, f := range export.Fields {
+			if strings.Contains(f.Value, "annah") || f.Value == "Operations director" {
+				t.Errorf("the export keeps what an erased person filled in: %+v", f)
+			}
+		}
+		for _, e := range export.Events {
+			if strings.Contains(e.Actor+e.Detail, "annah") || e.IP == "203.0.113.24" {
+				t.Errorf("the export's events name an erased person: %+v", e)
 			}
 		}
 		if must(x.s.AgreementEvents(x.o.ID, x.a.ID)) == nil {
@@ -281,7 +294,7 @@ func TestASignersCodeCantBeGuessed(t *testing.T) {
 	must(x.s.SendAgreement(x.o, x.a.ID, SendIn{}, x.ada, "Ada Lovelace"))
 	x.round()
 	_, link := x.mailTo("hannah@larkmoor.example")
-	session, g := must2(x.s.OpenSigning(strings.TrimPrefix(link, testSite+"/s/")))
+	session, g := must2(x.s.OpenSigning(strings.TrimPrefix(link, testSite+"/s/"), ""))
 	code := must(x.s.SigningCode(g, session, "", "", nil))
 	wrong := "000000"
 	if code == wrong {
@@ -296,7 +309,7 @@ func TestASignersCodeCantBeGuessed(t *testing.T) {
 	if err := x.s.db.Model(&SignerLink{}).Where("recipient_id = ?", x.hRecip.ID).Update("failures", linkFailures).Error; err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := x.s.OpenSigning(strings.TrimPrefix(link, testSite+"/s/")); err == nil {
+	if _, _, err := x.s.OpenSigning(strings.TrimPrefix(link, testSite+"/s/"), ""); err == nil {
 		t.Error("a link with thirty wrong codes still opens")
 	}
 }

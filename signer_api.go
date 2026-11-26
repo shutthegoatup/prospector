@@ -140,7 +140,11 @@ func (s signerServer) OpenSigning(ctx context.Context, in signer.OpenSigningRequ
 	if in.Body == nil {
 		return nil, errNoSigning
 	}
-	token, g, err := s.a.s.OpenSigning(in.Body.Link)
+	current := ""
+	if c, err := signerRequest(ctx).Cookie(signerCookie); err == nil {
+		current = c.Value
+	}
+	token, g, err := s.a.s.OpenSigning(in.Body.Link, current)
 	if err != nil {
 		return nil, err
 	}

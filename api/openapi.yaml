@@ -4916,6 +4916,7 @@ components:
         subject: { type: string, description: "The subject its signers' mail went with." }
         message: { type: string, description: "What the sender wrote to its signers." }
         sealed_hash: { type: string, description: "The sealed copy's SHA-256, once completed." }
+        seal_problem: { type: string, description: "Why the last try at sealing it failed, while it waits to be sealed; empty otherwise." }
         completed_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
         file_name: { type: string, description: "Empty until a document is uploaded." }
         file_size: { type: integer, format: int64, description: In bytes. }
@@ -4931,7 +4932,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/Agreement"
         - type: object
-          required: [company, problem, people, members, missing, cant_send, my_turn, my_recipient]
+          required: [company, problem, people, members, missing, cant_send, my_turn, my_recipient, consent]
           properties:
             company: { type: string, description: "The company's name." }
             problem: { type: string, description: "Why the document can't be read to place fields on it; empty when it can." }
@@ -4942,6 +4943,7 @@ components:
             cant_send: { type: string, description: "Why this server can't send it for this organisation (its own mail server, its public address); empty when it can." }
             my_turn: { type: boolean, description: "Whether it's the signed-in member's turn to sign it." }
             my_recipient: { type: integer, format: int64, description: "The signed-in member's own place on it as a signer; 0 for none." }
+            consent: { type: string, description: "What signing agrees to, word for word, as the certificate prints it." }
             people:
               type: array
               items: { $ref: "#/components/schemas/Invitable" }
@@ -4968,6 +4970,7 @@ components:
           description: Once sent, where a signer stands; empty for a draft and for someone who gets a copy.
         signed_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
         decline_reason: { type: string }
+        mail_problem: { type: string, description: "Why the last mail to them hasn't gone, while it is being tried again or after it gave up; empty when it went." }
         created_by: { type: string }
         created_at: { type: string, format: date-time }
     AgreementFieldIn:

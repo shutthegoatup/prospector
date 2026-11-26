@@ -334,6 +334,9 @@ func (s *Store) RemoveMember(org, user int64, actor string) (*User, error) {
 		if err := tx.Delete(&m).Error; err != nil {
 			return err
 		}
+		if err := withdrawForLeaver(tx, org, user, actor); err != nil {
+			return err
+		}
 		if err := dropRecipients(tx, tx.Where("org_id = ? and user_id = ?", org, user)); err != nil {
 			return err
 		}

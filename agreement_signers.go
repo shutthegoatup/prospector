@@ -62,6 +62,9 @@ type AgreementRecipient struct {
 	// Erased is someone erased on their request after it went out: kept as the
 	// agreement's record, left out of exports.
 	Erased bool `gorm:"not null;default:false" json:"-"`
+	// Codes is how many signing codes have been mailed to them on the day CodesOn.
+	Codes   int    `gorm:"not null;default:0" json:"-"`
+	CodesOn string `gorm:"not null;default:''" json:"-"`
 }
 
 // AgreementField is a place on a page that one signer fills in. X, Y, W and H are

@@ -570,7 +570,7 @@ func (s *Store) seal(o *Org, doc []byte, stamps []Stamp, c Certificate) (*Sealed
 // TrySeal goes through sealing a draft as it is set out, with stand-in values in every
 // field and a stand-in certificate, and keeps nothing. Sending runs it first, so a
 // document that can't be filled in and sealed is found before anyone signs it.
-func (s *Store) TrySeal(o *Org, id int64) error {
+func (s *Store) TrySeal(o *Org, id int64, sentBy string) error {
 	a, doc, err := s.AgreementDocument(o.ID, id)
 	if err != nil {
 		return err
@@ -588,7 +588,7 @@ func (s *Store) TrySeal(o *Org, id int64) error {
 		return err
 	}
 	names := map[int64]string{}
-	c := Certificate{Org: o.Name, Agreement: a.Name, Ref: fmt.Sprintf("AGR-%04d", a.ID), Pages: pages, SentBy: a.CreatedBy, SentAt: time.Now(), CompletedAt: time.Now(),
+	c := Certificate{Org: o.Name, Agreement: a.Name, Ref: fmt.Sprintf("AGR-%04d", a.ID), Pages: pages, SentBy: sentBy, SentAt: time.Now(), CompletedAt: time.Now(),
 		Rounds: []CertificateRound{{N: a.Round, Hash: a.FileHash, Outcome: "signed by everyone"}}, Consent: signingConsent}
 	for _, r := range parties {
 		if err := drawable(r.Name); err != nil {

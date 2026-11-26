@@ -710,7 +710,7 @@ function SignStatus({ a }: { a: Agreement }) {
     <div className="flex flex-col gap-2">
       <Meta>
         {a.status === "sent" && `Sent ${a.sent_at ? new Date(a.sent_at).toLocaleDateString() : ""} by ${a.sent_by} · open until ${until}`}
-        {a.status === "sealing" && "Everyone has signed: it's being sealed."}
+        {a.status === "sealing" && (a.seal_problem ? `Everyone has signed, but sealing failed and is being tried again: ${a.seal_problem}` : "Everyone has signed: it's being sealed.")}
         {a.status === "completed" && `Signed by everyone and sealed ${a.completed_at ? new Date(a.completed_at).toLocaleDateString() : ""} · SHA-256 ${a.sealed_hash.slice(0, 12)}…`}
         {a.status === "declined" && "Declined: it can't be signed now."}
         {a.status === "voided" && "Withdrawn: it can't be signed now."}
@@ -736,6 +736,7 @@ function SignStatus({ a }: { a: Agreement }) {
                 </Pill>
               )}
               {r.status === "declined" && r.decline_reason && <span className="font-mono text-xs text-muted-foreground">“{r.decline_reason}”</span>}
+              {r.mail_problem && <span className="font-mono text-xs text-[var(--stop)]">Their mail {r.mail_problem}</span>}
               {sales && a.status === "sent" && r.status === "due" && !r.member_id && (
                 <ActionButton
                   quiet

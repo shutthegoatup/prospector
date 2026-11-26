@@ -17,7 +17,7 @@ import (
 func agreementOut(a Agreement) api.Agreement {
 	return api.Agreement{Id: a.ID, CompanyId: a.CompanyID, Name: a.Name, Status: api.AgreementStatus(a.Status), FileName: a.FileName,
 		FileSize: a.FileSize, FileHash: a.FileHash, PageCount: a.PageCount, Round: a.Round, InOrder: a.InOrder, CreatedBy: a.CreatedBy, UpdatedBy: a.UpdatedBy, CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt,
-		SentAt: a.SentAt, SentBy: a.SentBy, ExpiresAt: a.ExpiresAt, Subject: a.Subject, Message: a.Message, SealedHash: a.SealedHash, CompletedAt: a.CompletedAt}
+		SentAt: a.SentAt, SentBy: a.SentBy, ExpiresAt: a.ExpiresAt, Subject: a.Subject, Message: a.Message, SealedHash: a.SealedHash, CompletedAt: a.CompletedAt, SealProblem: a.SealProblem}
 }
 
 func (s apiServer) ListAgreements(ctx context.Context, in api.ListAgreementsRequestObject) (api.ListAgreementsResponseObject, error) {
@@ -58,8 +58,8 @@ func (s apiServer) GetAgreement(ctx context.Context, in api.GetAgreementRequestO
 	a := agreementOut(p.Agreement)
 	out := api.AgreementOverview{Id: a.Id, CompanyId: a.CompanyId, Name: a.Name, Status: api.AgreementOverviewStatus(a.Status), FileName: a.FileName, FileSize: a.FileSize,
 		FileHash: a.FileHash, PageCount: a.PageCount, Round: a.Round, InOrder: a.InOrder, CreatedBy: a.CreatedBy, UpdatedBy: a.UpdatedBy, CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt,
-		SentAt: a.SentAt, SentBy: a.SentBy, ExpiresAt: a.ExpiresAt, Subject: a.Subject, Message: a.Message, SealedHash: a.SealedHash, CompletedAt: a.CompletedAt,
-		Company: p.Company.Name, Problem: p.Problem, People: []api.Invitable{}, Members: []api.Invitable{}, Missing: p.Missing, CantSend: s.a.canSend(q.Org)}
+		SentAt: a.SentAt, SentBy: a.SentBy, ExpiresAt: a.ExpiresAt, Subject: a.Subject, Message: a.Message, SealedHash: a.SealedHash, CompletedAt: a.CompletedAt, SealProblem: a.SealProblem,
+		Company: p.Company.Name, Problem: p.Problem, People: []api.Invitable{}, Members: []api.Invitable{}, Missing: p.Missing, CantSend: s.a.canSend(q.Org), Consent: signingConsent}
 	if out.Missing == nil {
 		out.Missing = []string{}
 	}
@@ -129,10 +129,16 @@ func (s apiServer) ListAgreementRecipients(ctx context.Context, in api.ListAgree
 	if err != nil {
 		return nil, err
 	}
+	problems, err := s.a.s.MailProblems(reqFrom(ctx).Org.ID, in.Id)
+	if err != nil {
+		return nil, err
+	}
 	out := api.ListAgreementRecipients200JSONResponse{Headers: api.ListAgreementRecipients200ResponseHeaders{Link: nextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor = []api.AgreementRecipient{}, next
 	for _, r := range page {
-		out.Body.Items = append(out.Body.Items, recipientOut(r))
+		item := recipientOut(r)
+		item.MailProblem = problems[r.ID]
+		out.Body.Items = append(out.Body.Items, item)
 	}
 	return out, nil
 }

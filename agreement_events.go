@@ -74,6 +74,11 @@ func eventHash(e AgreementEvent) string {
 // recordAgreementEvent adds an event after the last one on its agreement, inside the
 // transaction that made it happen.
 func recordAgreementEvent(tx *gorm.DB, e AgreementEvent) (*AgreementEvent, error) {
+	// The agreement's row is the chain's lock: whoever adds next waits for this one, so
+	// two writers can't both read the same last event and fork it.
+	if err := tx.Exec("update agreements set updated_at = updated_at where org_id = ? and id = ?", e.OrgID, e.AgreementID).Error; err != nil {
+		return nil, err
+	}
 	var last AgreementEvent
 	err := tx.Where("org_id = ? and agreement_id = ?", e.OrgID, e.AgreementID).Order("id desc").Limit(1).Find(&last).Error
 	if err != nil {

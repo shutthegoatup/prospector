@@ -3944,6 +3944,8 @@ export interface components {
             message: string;
             /** @description The sealed copy's SHA-256, once completed. */
             sealed_hash: string;
+            /** @description Why the last try at sealing it failed, while it waits to be sealed; empty otherwise. */
+            seal_problem?: string;
             /** Format: date-time */
             completed_at?: string | null;
             /** @description Empty until a document is uploaded. */
@@ -3984,6 +3986,8 @@ export interface components {
              * @description The signed-in member's own place on it as a signer; 0 for none.
              */
             my_recipient: number;
+            /** @description What signing agrees to, word for word, as the certificate prints it. */
+            consent: string;
             /** @description People at the company who could still be added, by contact id. */
             people: components["schemas"]["Invitable"][];
             /** @description Members who could still be added, by user id. */
@@ -4017,6 +4021,8 @@ export interface components {
             /** Format: date-time */
             signed_at?: string | null;
             decline_reason?: string;
+            /** @description Why the last mail to them hasn't gone, while it is being tried again or after it gave up; empty when it went. */
+            mail_problem?: string;
             created_by: string;
             /** Format: date-time */
             created_at: string;
