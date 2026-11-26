@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/cookiejar"
-	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -46,7 +45,7 @@ func TestExportPerson(t *testing.T) {
 	bob := &http.Client{Jar: jar}
 	u := must(s.CreateUser("bob@example.com", "Bob", "correct horse battery"))
 	do(s.AddMember(o.ID, u.ID, "member", u.Name))
-	res, err := bob.PostForm(srv.URL+"/login", url.Values{"email": {"bob@example.com"}, "password": {"correct horse battery"}})
+	res, err := signInWith(bob, srv.URL, "bob@example.com", "correct horse battery")
 	if err != nil || res.StatusCode != http.StatusOK {
 		t.Fatalf("login: %v", err)
 	}

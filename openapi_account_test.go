@@ -129,9 +129,9 @@ func TestSigningInThroughTheAPIIsThrottled(t *testing.T) {
 	if p := problemOf(t, res); res.StatusCode != http.StatusTooManyRequests || p.Code != api.Throttled || res.Header.Get("Retry-After") == "" {
 		t.Fatalf("one try too many: %s %+v %q", res.Status, p, res.Header.Get("Retry-After"))
 	}
-	// The password form counts the same tries.
-	if code, _ := postForm(t, http.DefaultClient, srv.URL+"/login", map[string][]string{"email": {"ada@example.com"}, "password": {"correct horse battery"}}); code != http.StatusTooManyRequests {
-		t.Fatalf("the form, after the API was throttled: %d", code)
+	// Another browser, with the right password, waits too: it is no browser Ada has used.
+	if res := asBrowser(t, freshBrowser(), "POST", srv.URL+"/api/v1/session", api.SignIn{Email: "ada@example.com", Password: "correct horse battery"}); res.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("an unknown browser, while the address is held: %s", res.Status)
 	}
 }
 
@@ -146,13 +146,12 @@ func TestABrowserWithAnOldDeviceCookieStillCountsByItself(t *testing.T) {
 	}
 	fresh := newDeviceToken(must(s.UserByEmail("ada@example.com")))
 	for range freeAttempts + 3 {
-		postForm(t, http.DefaultClient, srv.URL+"/login", map[string][]string{"email": {"ada@example.com"}, "password": {"a wrong guess"}})
+		signInWith(http.DefaultClient, srv.URL, "ada@example.com", "a wrong guess")
 	}
 	try := func(devices ...string) int {
 		t.Helper()
-		form := strings.NewReader("email=ada%40example.com&password=a+password+of+her+own")
-		req, _ := http.NewRequest("POST", srv.URL+"/login", form)
-		req.Header.Set("content-type", "application/x-www-form-urlencoded")
+		req, _ := http.NewRequest("POST", srv.URL+"/api/v1/session", strings.NewReader(`{"email": "ada@example.com", "password": "a password of her own"}`))
+		req.Header.Set("content-type", "application/json")
 		for _, d := range devices {
 			req.AddCookie(&http.Cookie{Name: deviceCookie, Value: d})
 		}
@@ -166,7 +165,7 @@ func TestABrowserWithAnOldDeviceCookieStillCountsByItself(t *testing.T) {
 	if code := try(stale); code != http.StatusTooManyRequests {
 		t.Fatalf("the old cookie alone, after the password changed: %d", code)
 	}
-	if code := try(stale, fresh); code != http.StatusSeeOther {
+	if code := try(stale, fresh); code != http.StatusOK {
 		t.Fatalf("the old cookie sent first, then the new one: %d", code)
 	}
 }

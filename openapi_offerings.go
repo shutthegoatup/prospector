@@ -9,7 +9,7 @@ import (
 )
 
 func offeringOut(o Offering) api.Offering {
-	return api.Offering{Id: o.ID, Name: o.Name, LookFor: o.LookFor, Pitch: o.Pitch, NoteTemplate: o.NoteTemplate,
+	return api.Offering{Id: o.ID, Name: o.Name, LookFor: o.LookFor, LookingFor: lookingFor(OrgSettings{LookFor: o.LookFor}), Pitch: o.Pitch, NoteTemplate: o.NoteTemplate,
 		UpdatedBy: o.UpdatedBy, CreatedAt: o.CreatedAt, UpdatedAt: o.UpdatedAt}
 }
 

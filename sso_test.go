@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
+	"github.com/shutthegoatup/prospector/api"
 )
 
 // fakeIdP is a working OpenID Connect provider: discovery, keys, and a token endpoint
@@ -219,19 +220,40 @@ func (b *browser) send(method, path string, body any) (int, string) {
 
 func (b *browser) login(email, password string) {
 	b.t.Helper()
-	res, err := b.c.PostForm(b.base+"/login", url.Values{"email": {email}, "password": {password}})
-	if err != nil || res.StatusCode != http.StatusSeeOther {
+	res, err := signInWith(b.c, b.base, email, password)
+	if err != nil || res.StatusCode != http.StatusOK {
 		b.t.Fatalf("login as %s: %v %v", email, res.Status, err)
 	}
 	res.Body.Close()
+}
+
+// askedFor finds the organisations whose sign-on speaks for an address, as the single
+// sign-on page does before it offers their links; that is what lets a link be followed.
+func (b *browser) askedFor(email, next string) []api.SingleSignOnOrg {
+	b.t.Helper()
+	code, body := b.post("/api/v1/sign-in/sso", map[string]string{"email": email, "next": next})
+	var found struct{ Orgs []api.SingleSignOnOrg }
+	if err := json.Unmarshal([]byte(body), &found); code != http.StatusOK || err != nil {
+		b.t.Fatalf("finding the sign-on for %s: %d %s", email, code, body)
+	}
+	return found.Orgs
+}
+
+// askedForLink is askedFor the address in a start link.
+func (b *browser) askedForLink(start string) {
+	b.t.Helper()
+	u, err := url.Parse(start)
+	if err != nil {
+		b.t.Fatal(err)
+	}
+	b.askedFor(u.Query().Get("email"), u.Query().Get("next"))
 }
 
 // through walks a sign-in from its first link, through the provider and back.
 func (b *browser) through(p *fakeIdP, start string) (code int, body, location string) {
 	b.t.Helper()
 	if strings.HasPrefix(start, "/login/sso/start") {
-		// The link is followed from the page that offers it.
-		b.get("/login/sso")
+		b.askedForLink(start)
 	}
 	code, body, location = b.get(start)
 	if code != http.StatusSeeOther || !strings.HasPrefix(location, p.srv.URL+"/authorize") {
@@ -271,8 +293,9 @@ func TestSocialSignIn(t *testing.T) {
 	app, srv := ssoServer(t, s, nil, google)
 	app.social = []socialWay{google.way("google")}
 
-	if _, body, _ := newBrowser(t, srv.URL).get("/login?next=/o/alpha/research"); !strings.Contains(body, `href="/login/with/google?next=%2Fo%2Falpha%2Fresearch"`) {
-		t.Fatal("the sign-in page doesn't offer the provider, or drops where the person was going")
+	// The page adds where the person was going; web/src/pages/SignIn.tsx keeps it.
+	if _, body, _ := newBrowser(t, srv.URL).get("/api/v1/sign-in"); !strings.Contains(body, `"start_url":"/login/with/google"`) {
+		t.Fatalf("the sign-in page doesn't offer the provider: %s", body)
 	}
 
 	// An address the provider hasn't verified matches no account.
@@ -469,14 +492,13 @@ func TestOrganisationSingleSignOn(t *testing.T) {
 	connected(t, srv, dns, s, "alpha", "alpha.example", okta, nil)
 
 	b := newBrowser(t, srv.URL)
-	_, body, _ := b.get("/login/sso?email=Bob@Alpha.example")
-	link := regexp.MustCompile(`href="(/login/sso/start\?[^"]+)"`).FindStringSubmatch(body)
-	if link == nil || !strings.Contains(body, "Continue to Alpha") {
-		t.Fatalf("the organisation isn't offered to an address at its domain: %s", body)
+	found := b.askedFor("Bob@Alpha.example", "")
+	if len(found) != 1 || found[0].Name != "Alpha" || !strings.HasPrefix(found[0].StartUrl, "/login/sso/start?") {
+		t.Fatalf("the organisation isn't offered to an address at its domain: %+v", found)
 	}
-	start := strings.ReplaceAll(link[1], "&amp;", "&")
-	if _, body, _ := b.get("/login/sso?email=bob@elsewhere.example"); strings.Contains(body, "Continue to") {
-		t.Fatal("an organisation was offered to an address at no domain of its own")
+	start := found[0].StartUrl
+	if found := b.askedFor("bob@elsewhere.example", ""); len(found) != 0 {
+		t.Fatalf("an organisation was offered to an address at no domain of its own: %+v", found)
 	}
 	if code, _, location := b.get("/login/sso/start?org=alpha&email=bob@elsewhere.example"); code != http.StatusBadRequest || location != "" {
 		t.Fatalf("starting for an address the organisation doesn't speak for: %d %q", code, location)
@@ -486,7 +508,7 @@ func TestOrganisationSingleSignOn(t *testing.T) {
 	if code, _, location := newBrowser(t, srv.URL).get(start); code != http.StatusSeeOther || !strings.HasPrefix(location, "/login/sso?") {
 		t.Fatalf("the link to the provider, followed from somewhere else: %d %q", code, location)
 	}
-	res, err := http.Get(srv.URL + "/login/sso")
+	res, err := http.Post(srv.URL+"/api/v1/sign-in/sso", "application/json", strings.NewReader(`{"email": "bob@alpha.example"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -573,12 +595,15 @@ func TestRequiredSingleSignOn(t *testing.T) {
 	if code != http.StatusSeeOther || !strings.HasPrefix(location, "/login/sso?") {
 		t.Fatalf("a password session where single sign-on is required: %d %q", code, location)
 	}
-	_, asked, _ := b.get(location)
-	link := regexp.MustCompile(`href="(/login/sso/start\?[^"]+)"`).FindAllStringSubmatch(asked, -1)
-	if len(link) != 1 || !strings.Contains(asked, "Alpha asks its people") {
-		t.Fatalf("the page a required sign-on sends a member to: %s", asked)
+	sent, _ := url.Parse(location)
+	if code, _, _ := b.get(location); code != http.StatusOK || sent.Query().Get("org") != "alpha" || sent.Query().Get("email") != "bob@alpha.example" {
+		t.Fatalf("the page a required sign-on sends a member to: %d %q", code, location)
 	}
-	location = strings.ReplaceAll(link[0][1], "&amp;", "&")
+	found := b.askedFor(sent.Query().Get("email"), sent.Query().Get("next"))
+	if len(found) != 1 || found[0].Slug != "alpha" {
+		t.Fatalf("the sign-on offered to a member it is required of: %+v", found)
+	}
+	location = found[0].StartUrl
 	if code, body := b.post("/o/alpha/api/v1/people", QuickAdd{Name: "Hannah Pryce"}); code != http.StatusForbidden || !strings.Contains(body, "requires its single sign-on") {
 		t.Fatalf("acting on a password session: %d %s", code, body)
 	}
@@ -996,7 +1021,7 @@ func TestSocialProvidersComeFromTheEnvironment(t *testing.T) {
 	srv := httptest.NewServer((&App{s: tempStore(t)}).Routes())
 	t.Cleanup(srv.Close)
 	b := newBrowser(t, srv.URL)
-	if _, body, _ := b.get("/login"); strings.Contains(body, "/login/with/") || strings.Contains(body, "/login/sso") {
+	if _, body, _ := b.get("/api/v1/sign-in"); !strings.Contains(body, `"social":[]`) || !strings.Contains(body, `"sso":false`) {
 		t.Fatal("the sign-in page offers a way in that isn't set up")
 	}
 	for _, path := range []string{"/login/with/google", "/login/sso"} {
@@ -1038,5 +1063,20 @@ func TestSSOTokensAreJSONBooleansOrStrings(t *testing.T) {
 	}
 	if err := json.Unmarshal([]byte(`{"email_verified":"false","xms_edov":false}`), &c); err != nil || bool(*c.Verified) || bool(*c.DomainOwner) {
 		t.Fatalf("flags that are off: %+v %v", c, err)
+	}
+}
+
+// A sign-in through a provider that can't go ahead is said on a page of the server's
+// own, never in an address someone else could write, and leads back to signing in.
+func TestASignInThatCantGoAheadSaysSoOnItsOwnPage(t *testing.T) {
+	_, srv := ssoServer(t, tempStore(t), map[string][]string{})
+	b := newBrowser(t, srv.URL)
+	b.askedFor("ada@nowhere.example", "")
+	code, body, location := b.get("/login/sso/start?org=alpha&email=ada@nowhere.example&next=//evil.example")
+	if code != http.StatusBadRequest || location != "" || !strings.Contains(body, "no single sign-on for that address") {
+		t.Fatalf("starting a sign-on nobody has: %d %q %s", code, location, body)
+	}
+	if !strings.Contains(body, `href="/login?next=%2F"`) {
+		t.Fatalf("the page should lead back to signing in, and nowhere else: %s", body)
 	}
 }

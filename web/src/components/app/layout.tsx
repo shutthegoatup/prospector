@@ -59,8 +59,12 @@ export function AppLayout() {
     // A session that ended while the page was open: sign in again and come back here.
     // A body that isn't JSON reaches here as a string.
     const failed: unknown = nav.error;
-    if (typeof failed === "object" && failed !== null && "status" in failed && failed.status === 401) {
+    if (typeof failed !== "object" || failed === null) return;
+    if ("status" in failed && failed.status === 401) {
       window.location.assign("/login?next=" + encodeURIComponent(window.location.pathname + window.location.search));
+    } else if ("code" in failed && (failed.code === "must_change_password" || failed.code === "sso_required")) {
+      // Loaded as a page, this address takes the browser where it has to go first.
+      window.location.reload();
     }
   }, [nav.error]);
 
@@ -91,6 +95,7 @@ export function AppLayout() {
 
 function Sidebar({ n }: { n: Nav }) {
   const org = n.org.slug;
+  const signOut = $api.useMutation("delete", "/api/v1/session", { onSuccess: () => window.location.assign("/login") });
   const page = useLocation({ select: (l) => l.pathname.split("/")[3] ?? "" });
   const active = under[page] ?? page;
   const can = (area?: Area) => !area || (area === "sales" ? n.sales : n.support);
@@ -144,16 +149,16 @@ function Sidebar({ n }: { n: Nav }) {
           </Link>
         ))}
       </nav>
-      <form method="post" action="/logout" className="mt-auto flex items-center gap-2.5 px-2.5 text-sm text-muted-foreground">
+      <div className="mt-auto flex items-center gap-2.5 px-2.5 text-sm text-muted-foreground">
         <span className="grid size-6 place-items-center rounded-full bg-secondary text-xs text-foreground">{initial((n.user?.name ?? "") + (n.user?.email ?? ""))}</span>
         <span className="flex-1 truncate">
           {n.user?.name}
           {n.role !== "owner" && <span className="block font-mono text-[11px]">{n.work}</span>}
         </span>
-        <button type="submit" className="text-xs hover:text-foreground">
+        <button type="button" className="text-xs hover:text-foreground" disabled={signOut.isPending} onClick={() => signOut.mutate({})}>
           Sign out
         </button>
-      </form>
+      </div>
     </aside>
   );
 }

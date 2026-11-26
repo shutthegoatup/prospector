@@ -54,6 +54,7 @@ func (s apiServer) ListResearch(ctx context.Context, in api.ListResearchRequestO
 	}
 	out := api.ListResearch200JSONResponse{Headers: api.ListResearch200ResponseHeaders{Link: nextLink(ctx, next)}}
 	out.Body.Items, out.Body.Ranked, out.Body.NextCursor = []api.ResearchCompany{}, ranked, next
+	out.Body.OfferingId = offering
 	out.Body.Counts = s.a.s.researchCountsFor(q.Org.ID, offering, in.Params.Task)
 	for _, r := range rows {
 		out.Body.Items = append(out.Body.Items, researchOut(set, r))
