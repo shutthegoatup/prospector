@@ -493,12 +493,13 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, contracted]
                 properties:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/Subscription" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  contracted: { type: string, description: "What those still running come to for a year at today's prices, every page of them, a sum for each currency joined with ` + `, such as £14,000 + €5,000; empty when nothing is." }
         default: { $ref: "#/components/responses/Problem" }
     post:
       operationId: addSubscription
@@ -2807,6 +2808,13 @@ components:
           description: People at the company with an email address here, who could be invited.
         can_invite: { type: boolean, description: "Whether a link can be emailed at all: the organisation has a mail server and the server knows its public address." }
 
+    SubscriptionPerson:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+
     Invitable:
       type: object
       required: [id, name, email]
@@ -2874,7 +2882,7 @@ components:
 
     Subscription:
       type: object
-      required: [id, company_id, company, name, amount, currency, per, start, term_months, then, notice_days, notice_on, ended_on, status, term_end, cancel_by, cancel_ends, ends, renewing, created_at, updated_at]
+      required: [id, company_id, company, name, amount, currency, per, start, term_months, then, notice_days, notice_on, ended_on, status, term_end, cancel_by, cancel_ends, ends, renewing, figure, soon, people, created_at, updated_at]
       properties:
         id: { type: integer, format: int64 }
         company_id: { type: integer, format: int64 }
@@ -2895,6 +2903,12 @@ components:
         cancel_ends: { type: string, description: The last day of the term that notice by `cancel_by` would end it at. }
         ends: { type: string, description: "The last day, once that is settled." }
         renewing: { type: boolean, description: Whether a renewal deal for it is open. }
+        figure: { type: string, description: "The price for one period as written, such as £14,000; empty when there is none." }
+        soon: { type: boolean, description: "Whether a day to cancel by, a renewal or an end falls within the next 30 days. One that turns over every month counts only once it has a day it stops." }
+        people:
+          type: array
+          items: { $ref: "#/components/schemas/SubscriptionPerson" }
+          description: Those at the company already in conversation, who a renewal can be with.
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 

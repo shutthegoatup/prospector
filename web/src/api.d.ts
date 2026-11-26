@@ -2091,6 +2091,11 @@ export interface components {
             /** @description Whether a link can be emailed at all: the organisation has a mail server and the server knows its public address. */
             can_invite: boolean;
         };
+        SubscriptionPerson: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
         Invitable: {
             /** Format: int64 */
             id: number;
@@ -2201,6 +2206,12 @@ export interface components {
             ends: string;
             /** @description Whether a renewal deal for it is open. */
             renewing: boolean;
+            /** @description The price for one period as written, such as £14,000; empty when there is none. */
+            figure: string;
+            /** @description Whether a day to cancel by, a renewal or an end falls within the next 30 days. One that turns over every month counts only once it has a day it stops. */
+            soon: boolean;
+            /** @description Those at the company already in conversation, who a renewal can be with. */
+            people: components["schemas"]["SubscriptionPerson"][];
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -3034,6 +3045,8 @@ export interface operations {
                     "application/json": {
                         items: components["schemas"]["Subscription"][];
                         next_cursor?: components["schemas"]["NextCursor"];
+                        /** @description What those still running come to for a year at today's prices, every page of them, a sum for each currency joined with ` + `, such as £14,000 + €5,000; empty when nothing is. */
+                        contracted: string;
                     };
                 };
             };
