@@ -336,6 +336,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /login/callback", a.loginCallback)
 	mux.HandleFunc("GET /u/{token}", a.unsubscribePage)
 	mux.HandleFunc("POST /u/{token}", a.unsubscribe)
+	mux.HandleFunc("POST /hooks/postmark", a.postmarkHook)
 	mux.HandleFunc("GET /c", a.customerPage)
 	mux.HandleFunc("POST /c/leave", a.customerLeave)
 	mux.HandleFunc("POST /c/steps/{id}/done", a.customerStep(true))

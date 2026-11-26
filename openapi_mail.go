@@ -8,7 +8,7 @@ import (
 )
 
 func suppressionOut(s Suppression) api.Suppression {
-	return api.Suppression{Id: s.ID, Address: s.Address, Reason: api.SuppressionReason(s.Reason), By: s.By, CreatedAt: s.CreatedAt}
+	return api.Suppression{Id: s.ID, Address: s.Address, Reason: api.SuppressionReason(s.Reason), By: s.By, CreatedAt: s.CreatedAt, BouncedAt: s.BouncedAt}
 }
 
 func (s apiServer) ListSuppressions(ctx context.Context, in api.ListSuppressionsRequestObject) (api.ListSuppressionsResponseObject, error) {

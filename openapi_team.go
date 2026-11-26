@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -195,8 +196,36 @@ func mailOut(v MailView) api.MailServer {
 	return api.MailServer{Host: v.Host, Port: v.Port, Username: v.Username, Sender: v.Sender, HasPassword: v.HasPassword, SiteMail: v.SiteMail}
 }
 
+func (s apiServer) mailServerOut(org int64) api.MailServer {
+	out := mailOut(s.a.mailView(org))
+	out.HasBounceHook = s.a.s.HasBounceHook(org)
+	return out
+}
+
 func (s apiServer) GetMailServer(ctx context.Context, _ api.GetMailServerRequestObject) (api.GetMailServerResponseObject, error) {
-	return api.GetMailServer200JSONResponse(mailOut(s.a.mailView(reqFrom(ctx).Org.ID))), nil
+	return api.GetMailServer200JSONResponse(s.mailServerOut(reqFrom(ctx).Org.ID)), nil
+}
+
+func (s apiServer) MakeBounceHook(ctx context.Context, _ api.MakeBounceHookRequestObject) (api.MakeBounceHookResponseObject, error) {
+	base, err := url.Parse(s.a.base)
+	if s.a.base == "" || err != nil || base.Scheme != "https" {
+		return nil, errors.New("Postmark needs this server's public https address (PROSPECTOR_URL) to post to")
+	}
+	org := reqFrom(ctx).Org
+	secret, err := s.a.s.NewBounceHook(org.ID)
+	if err != nil {
+		return nil, err
+	}
+	hook := *base
+	hook.Path, hook.User = "/hooks/postmark", url.UserPassword(org.Slug, secret)
+	return api.MakeBounceHook200JSONResponse{Url: hook.String(), Username: org.Slug, Password: secret}, nil
+}
+
+func (s apiServer) DropBounceHook(ctx context.Context, _ api.DropBounceHookRequestObject) (api.DropBounceHookResponseObject, error) {
+	if err := s.a.s.DropBounceHook(reqFrom(ctx).Org.ID); err != nil {
+		return nil, err
+	}
+	return api.DropBounceHook204Response{}, nil
 }
 
 func (s apiServer) SaveMailServer(ctx context.Context, in api.SaveMailServerRequestObject) (api.SaveMailServerResponseObject, error) {
@@ -208,7 +237,7 @@ func (s apiServer) SaveMailServer(ctx context.Context, in api.SaveMailServerRequ
 	if _, err := s.a.saveMail(org, mailIn{Host: b.Host, Port: b.Port, Username: b.Username, Password: b.Password, Sender: b.Sender}); err != nil {
 		return nil, err
 	}
-	return api.SaveMailServer200JSONResponse(mailOut(s.a.mailView(org))), nil
+	return api.SaveMailServer200JSONResponse(s.mailServerOut(org)), nil
 }
 
 func (s apiServer) TestMailServer(ctx context.Context, _ api.TestMailServerRequestObject) (api.TestMailServerResponseObject, error) {

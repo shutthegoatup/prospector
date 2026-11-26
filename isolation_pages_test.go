@@ -140,6 +140,7 @@ var stopsShort = map[string]string{
 	"POST /o/{org}/api/v1/campaigns/1/resume":      "needs a mail server to send through",
 	"POST /o/{org}/api/v1/campaigns/1/send":        "needs a mail server to send through",
 	"POST /o/{org}/api/v1/enquiries/1/replies":     "needs a mail server to send through",
+	"POST /o/{org}/api/v1/mail-server/bounce-hook": "needs this server's public https address for Postmark to post to",
 	"POST /o/{org}/api/v1/onboardings/1/invites":   "needs a mail server to send through",
 	"POST /o/{org}/api/v1/mail-server/test":        "needs a mail server to send through",
 	"POST /o/{org}/api/v1/me/password":             "needs the current password",

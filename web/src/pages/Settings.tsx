@@ -457,8 +457,15 @@ function Sequence({ settings: set }: { settings: Settings }) {
 }
 
 function suppressionMeta(r: Suppression) {
-  if (r.reason === "unsubscribed") return "unsubscribed " + longDay(r.created_at);
-  return "added by " + actor(r.by) + " " + longDay(r.created_at);
+  const bounced = r.bounced_at ? "bounced " + longDay(r.bounced_at) : "";
+  if (r.reason === "bounced") return bounced;
+  const why =
+    r.reason === "unsubscribed"
+      ? "unsubscribed " + longDay(r.created_at)
+      : r.reason === "complained"
+        ? "marked a mail as spam " + longDay(r.created_at)
+        : "added by " + actor(r.by) + " " + longDay(r.created_at);
+  return bounced ? `${why} · ${bounced}` : why;
 }
 
 function OfferingFields({ o }: { o?: Offering }) {
