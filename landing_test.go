@@ -24,13 +24,13 @@ func TestFrontPage(t *testing.T) {
 			t.Errorf("the front page shows %q from this server's data", private)
 		}
 	}
-	if found := regexp.MustCompile(`(?i)<script|<[^>]*\son[a-z]+\s*=`).FindString(body); found != "" {
-		t.Errorf("the front page has a script or an inline handler: %s", found)
+	if found := regexp.MustCompile(`(?i)<script(?: [^>]*)?>[^<]|<[^>]*\son[a-z]+\s*=`).FindString(body); found != "" {
+		t.Errorf("the front page has an inline script or handler: %s", found)
 	}
 
 	// Everything the page loads must be in the binary and served as what it is: the
 	// release image has no system table of file types to fall back on.
-	types := map[string]string{".css": "text/css", ".svg": "image/svg+xml", ".webp": "image/webp"}
+	types := map[string]string{".css": "text/css", ".svg": "image/svg+xml", ".webp": "image/webp", ".js": "text/javascript"}
 	assets := regexp.MustCompile(`(?:src|href)="(/assets/[^"]+)"`).FindAllStringSubmatch(body, -1)
 	if len(assets) < 8 {
 		t.Fatalf("the front page loads only %d assets", len(assets))
@@ -71,7 +71,7 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 	const form = `data-intake="/o/alpha/intake"`
 
 	// Named, but the organisation hasn't listed this address: a form would only be refused.
-	if _, body := call(t, visitor, "GET", srv.URL+"/", "", nil); strings.Contains(body, "data-intake") || strings.Contains(body, "<script") {
+	if _, body := call(t, visitor, "GET", srv.URL+"/", "", nil); strings.Contains(body, "data-intake") {
 		t.Fatal("the front page has a form its organisation wouldn't take enquiries from")
 	}
 	takeEnquiriesFrom(t, s, o, "https://www.alpha.example\n"+srv.URL)
@@ -83,8 +83,8 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 	page, _ := io.ReadAll(res.Body)
 	res.Body.Close()
 	body := string(page)
-	if !strings.Contains(body, form) || !strings.Contains(body, `href="#contact"`) {
-		t.Fatal("the front page has no enquiry form")
+	if !strings.Contains(body, form+` data-origin="`+srv.URL+`"`) {
+		t.Fatal("the front page doesn't say where its enquiry form posts")
 	}
 	if !strings.Contains(res.Header.Get("Content-Security-Policy"), "connect-src 'self'") {
 		t.Errorf("the form's page may post elsewhere: %q", res.Header.Get("Content-Security-Policy"))
@@ -92,7 +92,7 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 	if found := regexp.MustCompile(`(?i)<script(?: [^>]*)?>[^<]|<[^>]*\son[a-z]+\s*=`).FindString(body); found != "" {
 		t.Errorf("the front page has an inline script or handler: %s", found)
 	}
-	script := regexp.MustCompile(`<script src="(/assets/js/landing\.js[^"]*)"`).FindStringSubmatch(body)
+	script := regexp.MustCompile(`<script src="(/assets/front/front\.js[^"]*)"`).FindStringSubmatch(body)
 	if script == nil {
 		t.Fatal("the form's script isn't loaded")
 	}
@@ -132,10 +132,7 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 	if _, body := call(t, visitor, "GET", told.URL+"/", "", nil); !strings.Contains(body, form+` data-origin="https://crm.alpha.example"`) {
 		t.Error("the form doesn't name the origin it works on")
 	}
-	script2, _ := assetFS.ReadFile("assets/js/landing.js")
-	if !strings.Contains(string(script2), "form.dataset.origin === location.origin") {
-		t.Error("the script shows the form whatever address the page was reached at")
-	}
+	// That the script shows the form only at that origin is tested in web/src/front.test.ts.
 
 	// A server that names no organisation, or one that isn't there, serves the page as before.
 	for _, slug := range []string{"", "nope"} {
@@ -143,7 +140,7 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 		t.Cleanup(plain.Close)
 		takeEnquiriesFrom(t, s, o, plain.URL)
 		code, body := call(t, visitor, "GET", plain.URL+"/", "", nil)
-		if code != http.StatusOK || !strings.Contains(body, "One queue a day.") || strings.Contains(body, "data-intake") || strings.Contains(body, "<script") {
+		if code != http.StatusOK || !strings.Contains(body, "One queue a day.") || strings.Contains(body, "data-intake") {
 			t.Errorf("a server whose front organisation is %q: %d, with a form or without the page", slug, code)
 		}
 	}
@@ -255,5 +252,26 @@ func TestTheFrontPageTellsTheTruthAboutKeys(t *testing.T) {
 	}
 	if strings.Contains(body, "organisation's settings or members") || !strings.Contains(body, "<code>settings:write</code>") {
 		t.Error("the front page still says no key can change settings")
+	}
+}
+
+// The front page prices both ways of running Prospector. Without an enquiry form it
+// offers no button that would lead to one.
+func TestFrontPagePricing(t *testing.T) {
+	_, _, srv, _ := signedIn(t)
+	_, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil)
+	for _, want := range []string{`id="pricing"`, `href="#pricing"`, "Self-hosted", "for any number of users", "Hosted", "a user a month", "Prices exclude VAT"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the front page's pricing lacks %q", want)
+		}
+	}
+	if !strings.Contains(body, `<small>£</small>0</b>`) || !strings.Contains(body, `<small>£</small>5</b>`) {
+		t.Error("the front page doesn't show self-hosting free and hosting at £5")
+	}
+	if strings.Contains(body, `href="#contact"`) || strings.Contains(body, `id="contact"`) {
+		t.Error("the front page links to an enquiry form it doesn't have")
+	}
+	if strings.Contains(body, "__ASSET_VERSION__") || !strings.Contains(body, `<div id="front" data-version="`+assetVersion+`"`) {
+		t.Error("the front page's files aren't stamped with this build's version")
 	}
 }

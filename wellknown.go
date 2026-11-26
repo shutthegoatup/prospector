@@ -11,6 +11,8 @@ import (
 	"github.com/shutthegoatup/prospector/api"
 )
 
+const repoURL = "https://github.com/shutthegoatup/prospector"
+
 // The plain-text files crawlers and agents look for at a site's root. They describe
 // the software, never an organisation's data, so they are public.
 

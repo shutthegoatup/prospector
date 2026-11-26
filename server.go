@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"log"
 	"net"
 	"net/http"
@@ -514,11 +516,27 @@ func (a *App) front(w http.ResponseWriter, r *http.Request) {
 		a.member(a.home)(w, r)
 		return
 	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	if err := LandingPage(a.frontIntake(r)).Render(r.Context(), w); err != nil {
-		log.Print(err)
+	b, err := frontHTML()
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
 	}
+	if intake, origin := a.frontIntake(r); intake != "" {
+		b = bytes.Replace(b, []byte(`<div id="front"`), []byte(`<div id="front" data-intake="`+html.EscapeString(intake)+`" data-origin="`+html.EscapeString(origin)+`"`), 1)
+	}
+	w.Header().Set("content-type", "text/html; charset=utf-8")
+	w.Write(b)
 }
+
+// frontHTML is the front page prerendered from web/src/front, with the version on the
+// files it loads so a browser can keep them until the next release.
+var frontHTML = sync.OnceValues(func() ([]byte, error) {
+	b, err := assetFS.ReadFile("assets/front/index.html")
+	if err != nil {
+		return nil, err
+	}
+	return bytes.ReplaceAll(b, []byte("__ASSET_VERSION__"), []byte(assetVersion)), nil
+})
 
 // frontIntake is where the front page's form posts, and the origin a browser must be
 // on for it. The intake route answers only the sites an organisation lists, so until

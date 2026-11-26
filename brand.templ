@@ -1,0 +1,9 @@
+package main
+
+func asset(path string) string {
+	return "/assets/" + path + "?v=" + assetVersion
+}
+
+templ Brand() {
+	<a class="lp-brand" href="/"><img src={ asset("img/mark.svg") } width="30" height="30" alt=""/><span>Prospector.</span></a>
+}
