@@ -1443,7 +1443,7 @@ func AddAgent(q *Req, d AgentsData, none bool) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, "<details class=\"rounded-xl border-2 border-ink bg-card p-3.5\"><summary class=\"cursor-pointer\"><b>Your own agent connects</b> <span class=\"block text-sm text-muted-foreground\">Claude Code or any MCP client, with a key that has only the scopes it needs. No key can mark anything sent, change settings or reach another organisation.</span></summary><div class=\"mt-3 flex flex-col gap-3\"><div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, "<details class=\"rounded-xl border-2 border-ink bg-card p-3.5\"><summary class=\"cursor-pointer\"><b>Your own agent connects</b> <span class=\"block text-sm text-muted-foreground\">Claude Code or any MCP client, with a key that has only the scopes it needs. No key can mark anything sent or reach another organisation, and only one with settings:write can change settings.</span></summary><div class=\"mt-3 flex flex-col gap-3\"><div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

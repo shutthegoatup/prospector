@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 )
 
 type Nav struct {
@@ -482,53 +481,6 @@ func (a *App) uiVoice(w http.ResponseWriter, r *http.Request) {
 		q := reqOf(r)
 		done(w, a.s.SaveVoice(q.Org.ID, q.User.ID, in.CallerName, in.Signature))
 	}
-}
-
-func (a *App) uiSettings(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Name  string `json:"name"`
-		Color string `json:"color"`
-		OrgSettings
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	if strings.TrimSpace(in.Name) == "" {
-		fail(w, errors.New("the organisation needs a name"), http.StatusBadRequest)
-		return
-	}
-	if in.EmailAfterDays < 0 || in.FollowupAfterDays < 0 || in.EmailAfterDays > 60 || in.FollowupAfterDays > 60 {
-		fail(w, errors.New("waits are between 0 and 60 days"), http.StatusBadRequest)
-		return
-	}
-	if _, err := enquiryOrigins(in.EnquirySites); err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	if _, err := in.Assets(); err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	if _, err := in.Onboarding(); err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	if utf8.RuneCountInString(in.PostalAddress) > 300 {
-		fail(w, errors.New("a postal address is 300 characters at most"), http.StatusBadRequest)
-		return
-	}
-	in.Currency = strings.ToUpper(strings.TrimSpace(in.Currency))
-	if in.Currency != "" && !currencyRe.MatchString(in.Currency) {
-		fail(w, errors.New("a currency is three letters, such as GBP, EUR or USD"), http.StatusBadRequest)
-		return
-	}
-	o := reqOf(r).Org
-	o.Name, o.Color, o.Settings = strings.TrimSpace(in.Name), in.Color, in.OrgSettings
-	err := a.s.SaveOrg(o)
-	if err == nil {
-		a.dropMCPServers()
-	}
-	done(w, err)
 }
 
 func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {

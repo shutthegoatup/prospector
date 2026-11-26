@@ -113,7 +113,6 @@ var formWords = append([]string{"new", "renewal", "month", "year", "openai", "an
 // can't tell apart.
 var stopsShort = map[string]string{
 	"/o/{org}/ui/mail/test": "needs a mail server to send through",
-	"/o/{org}/ui/settings":  "checks every setting at once, and changes only the organisation in its own address",
 }
 
 // looked matches a refusal that says the form went looking for a row and found none
@@ -161,7 +160,7 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 	theirOwner := signInAs(t, srv, "owner@alpha.example", "a long enough password")
 
 	gets, posts := orgRoutes(t)
-	if len(gets) < 10 || len(posts) < 20 {
+	if len(gets) < 10 || len(posts) < 19 {
 		t.Fatalf("found only %d pages and %d forms in the source: has the way routes are written changed?", len(gets), len(posts))
 	}
 	unchanged := func(after string) {

@@ -471,9 +471,9 @@ func (s *Store) Logout(token string) error {
 	return s.db.Where("token_hash in ?", s.keys.lookups(sessions, token)).Delete(&Session{}).Error
 }
 
-// Scopes an API key can carry. None can change settings or reach another org; only enquiries:reply, customers:invite and campaigns:send send mail, and only import skips review.
+// Scopes an API key can carry. None can change members or keys or reach another org; only enquiries:reply, customers:invite and campaigns:send send mail, and only import skips review.
 var Scopes = []struct{ Name, What string }{
-	{"read", "search companies and people, read what's due and the tasks people wrote, and read deals, subscriptions, onboardings and enquiries with what was said in answering them"},
+	{"read", "search companies and people, read what's due and the tasks people wrote, read deals, subscriptions, onboardings and enquiries with what was said in answering them, and read the organisation's settings, its never-contact list and agent guidance included"},
 	{"research:write", "add companies, facts and suggested contacts (they wait in Research), and leave notes on tasks"},
 	{"drafts:write", "write draft notes and emails, marked as written by the agent"},
 	{"outcomes:write", "record what happened (added, accepted, sent, called, replied, declined, hold), shown as the agent's"},
@@ -493,6 +493,7 @@ var Scopes = []struct{ Name, What string }{
 	{"tasks:write", "start tasks, ask them for more, mark their requests done or not, and close and reopen them"},
 	{"agents:run", "start and stop Prospector's own agents on tasks"},
 	{"agents:configure", "add, change and delete Prospector's own agents, their endpoints, keys and tools"},
+	{"settings:write", "change the organisation's settings: its name and colour, waits and wording, the guidance sent to every agent, never-contact list, what it looks for, enquiry sites, onboarding steps, currency, postal address and whether to email only incorporated companies"},
 }
 
 func validScope(s string) bool {
@@ -602,6 +603,24 @@ func (s *Store) SaveOrg(o *Org) error {
 		return fmt.Errorf("colour must look like #56c5f4")
 	}
 	return s.db.Model(o).Select("name", "color", "settings").Updates(o).Error
+}
+
+// ChangeSettings saves o and notes in its history who changed which settings, since a
+// key can now empty the never-contact list or open the enquiry route to a site.
+func (s *Store) ChangeSettings(o *Org, who Actor, changed []string) error {
+	if len(changed) == 0 {
+		return nil
+	}
+	if !colorRe.MatchString(o.Color) {
+		return fmt.Errorf("colour must look like #56c5f4")
+	}
+	what := strings.Join(changed, ", ")
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(o).Select("name", "color", "settings").Updates(o).Error; err != nil {
+			return err
+		}
+		return s.logAs(tx, o.ID, 0, nil, who, "settings:change", &what)
+	})
 }
 
 func (s *Store) SaveVoice(org, user int64, caller, signature string) error {

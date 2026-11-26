@@ -269,7 +269,7 @@ func TestEnquiryFromAProduct(t *testing.T) {
 func TestEnquirySitesSetting(t *testing.T) {
 	_, _, srv, client := signedIn(t)
 	save := func(sites string) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/settings", "application/json",
+		return call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/settings", "application/json",
 			map[string]any{"name": "Alpha", "color": "#56c5f4", "enquiry_sites": sites})
 	}
 	if code, body := save("shop.example"); code != http.StatusBadRequest || !strings.Contains(body, "isn't a site address") {
