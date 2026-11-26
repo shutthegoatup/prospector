@@ -50,16 +50,18 @@ export function ResearchPage() {
   });
   const offerings = useOfferings();
   const settings = $api.useQuery("get", "/o/{org}/api/v1/settings", { params: { path: { org } } });
-  const tasks = $api.useQuery("get", "/o/{org}/api/v1/tasks", { params: { path: { org }, query: { limit: 5 } } });
   const agents = $api.useQuery("get", "/o/{org}/api/v1/agents", { params: { path: { org } } });
   const enrichers = $api.useQuery("get", "/o/{org}/api/v1/enrichers", { params: { path: { org } } }).data?.items ?? [];
   const ready = (agents.data?.items ?? []).filter((a) => a.ready);
   // The same query SearchPanel makes, so the search is read once; closed searches aren't in tasks.
   const chosen = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}", { params: { path: { org, id: task ?? 0 }, query: { limit: 3 } } }, { enabled: !!task }).data;
-  const sellingId = task ? (chosen?.offering_id ?? 0) : (of ?? 0);
+  // Whose queue is shown is the server's to say: what is done on it goes to that offering,
+  // whether or not the list of offerings has loaded yet.
+  const sellingId = research.data?.offering_id ?? (task ? (chosen?.offering_id ?? 0) : (of ?? 0));
   const selling = offerings.find((o) => o.id === sellingId);
-  const label = (key: Filter, text: string) => (key === "rejected" && selling ? "Junked" : text);
-  const searches = (tasks.data?.items ?? []).filter((t) => t.offering_id === sellingId);
+  const label = (key: Filter, text: string) => (key === "rejected" && sellingId ? "Junked" : text);
+  const tasks = $api.useQuery("get", "/o/{org}/api/v1/tasks", { params: { path: { org }, query: { limit: 5, offering: sellingId } } });
+  const searches = tasks.data?.items ?? [];
 
 
   return (
@@ -85,7 +87,7 @@ export function ResearchPage() {
       </p>
 
       <Whose area="sales" work="Research is" can={sales} />
-      {sales && <FindBox agents={ready} selling={selling} lookingFor={selling ? selling.looking_for : (settings.data?.looking_for ?? [])} />}
+      {sales && <FindBox agents={ready} offering={research.data?.offering_id} selling={selling} lookingFor={selling ? selling.looking_for : (settings.data?.looking_for ?? [])} />}
 
       <div className="mb-5 flex flex-col gap-2" aria-label="Searches">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -146,7 +148,7 @@ export function ResearchPage() {
           )}
           {research.error && <p className="text-sm text-[var(--stop)]">The queue couldn't be read. Reload to try again.</p>}
           <div className="flex flex-col gap-3">
-            {research.data?.items.map((c, i) => <CompanyCard key={c.id} company={c} open={i === 0} enrichers={enrichers} offering={selling?.id} />)}
+            {research.data?.items.map((c, i) => <CompanyCard key={`${sellingId}-${c.id}`} company={c} open={i === 0} enrichers={enrichers} offering={research.data?.offering_id ?? 0} />)}
           </div>
           <nav className="flex justify-between gap-3">
             <span>
@@ -167,7 +169,7 @@ export function ResearchPage() {
         </div>
         {task && (
           <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
-            <SearchPanel id={task} onGone={() => navigate({ to: "/o/$org/research", params: { org } })} />
+            <SearchPanel id={task} onGone={() => navigate({ to: "/o/$org/research", params: { org }, search: { of: sellingId || undefined } })} />
           </aside>
         )}
       </div>
@@ -175,7 +177,8 @@ export function ResearchPage() {
   );
 }
 
-function FindBox({ agents, selling, lookingFor }: { agents: Agent[]; selling?: Offering; lookingFor: components["schemas"]["LookFor"][] }) {
+// offering is the queue in view, undefined until the server has said which it is.
+function FindBox({ agents, offering, selling, lookingFor }: { agents: Agent[]; offering?: number; selling?: Offering; lookingFor: components["schemas"]["LookFor"][] }) {
   const { org } = useSession();
   const navigate = useNavigate();
   const [brief, setBrief] = useState("");
@@ -190,7 +193,7 @@ function FindBox({ agents, selling, lookingFor }: { agents: Agent[]; selling?: O
       className="panel mb-5 overflow-hidden shadow-[4px_4px_0_var(--edge)]"
       onSubmit={(e) => {
         e.preventDefault();
-        create.mutate({ params: { path: { org } }, body: { title: "", brief, agents: send, offering: selling?.id } });
+        create.mutate({ params: { path: { org } }, body: { title: "", brief, agents: send, offering: offering || undefined } });
       }}
     >
       <div className="flex flex-col gap-2.5 px-5 py-4">
@@ -236,7 +239,7 @@ function FindBox({ agents, selling, lookingFor }: { agents: Agent[]; selling?: O
           </div>
           <div className="flex items-center gap-3">
             {create.error && <p className="text-sm text-[var(--stop)]">{create.error.detail ?? "That didn't work."}</p>}
-            <ActionButton type="submit" disabled={create.isPending}>
+            <ActionButton type="submit" disabled={create.isPending || offering === undefined}>
               Find
             </ActionButton>
           </div>
@@ -455,13 +458,13 @@ function SourceLink({ href, children }: { href: string; children: React.ReactNod
   );
 }
 
-// A card is reviewed for the offering in view; offering is left out for the organisation's own.
-function CompanyCard({ company: c, open, enrichers, offering }: { company: Company; open: boolean; enrichers: Enricher[]; offering?: number }) {
+// A card is reviewed, and its people picked, for the offering in view; 0 is the organisation's own.
+function CompanyCard({ company: c, open, enrichers, offering }: { company: Company; open: boolean; enrichers: Enricher[]; offering: number }) {
   const { org, sales } = useSession();
   const refresh = useRefresh();
   const [grade, setGrade] = useState(c.grade || "B");
   const patch = $api.useMutation("patch", "/o/{org}/api/v1/companies/{id}", { onSuccess: refresh });
-  const review = { mutate: (v: { params: { path: { org: string; id: number } }; body: { stage: "review" | "qualified" | "rejected"; fit?: string } }) => patch.mutate({ ...v, body: { ...v.body, offering } }) };
+  const review = { mutate: (v: { params: { path: { org: string; id: number } }; body: { stage: "review" | "qualified" | "rejected"; fit?: string } }) => patch.mutate({ ...v, body: { ...v.body, offering: offering || undefined } }) };
   const pick = $api.useMutation("post", "/o/{org}/api/v1/contacts/{id}/pick", { onSuccess: refresh });
   const decide = $api.useMutation("patch", "/o/{org}/api/v1/suggestions/{id}", { onSuccess: refresh });
 

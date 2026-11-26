@@ -68,7 +68,7 @@ export function TasksPage() {
                     {t.title}
                   </Link>
                   <span className="flex items-center gap-2">
-                    {t.offering_id !== 0 && <Pill>For {offerings.find((o) => o.id === t.offering_id)?.name ?? "a removed offering"}</Pill>}
+                    {offerings.some((o) => o.id === t.offering_id) && <Pill>For {offerings.find((o) => o.id === t.offering_id)?.name}</Pill>}
                     <TaskStatus status={t.status} />
                   </span>
                 </div>

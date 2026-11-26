@@ -1545,8 +1545,9 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items, ranked, counts]
+                required: [items, ranked, counts, offering_id]
                 properties:
+                  offering_id: { type: integer, format: int64, description: "The offering whose queue this is: the one asked for, or a task's. 0 is the organisation's own, as is a closed task's whose offering was removed." }
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/ResearchCompany" }
@@ -1574,6 +1575,10 @@ paths:
           in: query
           schema: { type: boolean, default: false }
           description: Closed tasks too, after the open ones.
+        - name: offering
+          in: query
+          schema: { type: integer, format: int64, x-go-type-skip-optional-pointer: false }
+          description: Only the tasks finding companies for this offering; 0 for the organisation's own. Left out, every task.
         - $ref: "#/components/parameters/limit"
         - $ref: "#/components/parameters/cursor"
       security:

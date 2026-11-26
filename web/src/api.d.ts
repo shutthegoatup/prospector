@@ -5965,6 +5965,11 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /**
+                         * Format: int64
+                         * @description The offering whose queue this is: the one asked for, or a task's. 0 is the organisation's own, as is a closed task's whose offering was removed.
+                         */
+                        offering_id: number;
                         items: components["schemas"]["ResearchCompany"][];
                         /** @description Whether the companies come best fit first. A search with more than 500 to review comes newest first. */
                         ranked: boolean;
@@ -5985,6 +5990,8 @@ export interface operations {
             query?: {
                 /** @description Closed tasks too, after the open ones. */
                 closed?: boolean;
+                /** @description Only the tasks finding companies for this offering; 0 for the organisation's own. Left out, every task. */
+                offering?: number;
                 /** @description How many to return. 50 if left out; 200 at most. */
                 limit?: components["parameters"]["limit"];
                 /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */

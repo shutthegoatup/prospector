@@ -35,7 +35,7 @@ func (s apiServer) ListTasks(ctx context.Context, in api.ListTasksRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	tasks, next, err := s.a.s.TaskBriefs(q.Org.ID, worker(q), in.Params.Closed, page)
+	tasks, next, err := s.a.s.taskBriefsFor(q.Org.ID, worker(q), in.Params.Closed, in.Params.Offering, page)
 	if err != nil {
 		return nil, err
 	}

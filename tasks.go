@@ -889,8 +889,13 @@ func (s *Store) AgentTasks(org int64, who Actor, page PageIn) (briefs []TaskBrie
 }
 
 // TaskBriefs is AgentTasks with the closed tasks too when asked, after the open ones as
-// the tasks page lists them. Its cursor then also says whether it ended among the closed.
-func (s *Store) TaskBriefs(org int64, who Actor, closed bool, page PageIn) (briefs []TaskBrief, next string, err error) {
+// the tasks page lists them, and only those for one offering when one is given. Its
+// cursor then also says whether it ended among the closed.
+func (s *Store) TaskBriefs(org int64, who Actor, closed bool, page PageIn) ([]TaskBrief, string, error) {
+	return s.taskBriefsFor(org, who, closed, nil, page)
+}
+
+func (s *Store) taskBriefsFor(org int64, who Actor, closed bool, offering *int64, page PageIn) (briefs []TaskBrief, next string, err error) {
 	n := 1
 	if closed {
 		n = 2
@@ -900,6 +905,9 @@ func (s *Store) TaskBriefs(org int64, who Actor, closed bool, page PageIn) (brie
 		return nil, "", err
 	}
 	q := s.in(org).Limit(page.size() + 1)
+	if offering != nil {
+		q = q.Where("offering_id = ?", *offering)
+	}
 	switch {
 	case !closed:
 		q = q.Where("closed_at is null").Order("id desc")
