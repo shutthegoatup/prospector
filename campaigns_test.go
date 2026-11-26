@@ -201,7 +201,7 @@ func TestThePostalAddressIsKept(t *testing.T) {
 	s, o, srv, member := signedIn(t)
 	save := func(postal string) {
 		t.Helper()
-		if code, body := call(t, member, "POST", srv.URL+"/o/alpha/ui/settings", "application/json", map[string]any{"name": "Alpha", "color": "#56c5f4", "postal_address": postal}); code != http.StatusOK {
+		if code, body := call(t, member, "PATCH", srv.URL+"/o/alpha/api/v1/settings", "application/json", map[string]any{"name": "Alpha", "color": "#56c5f4", "postal_address": postal}); code != http.StatusOK {
 			t.Fatalf("saving settings: %d %s", code, body)
 		}
 	}
@@ -244,7 +244,7 @@ func TestTheAudienceHoldsAtItsEdges(t *testing.T) {
 		t.Error("someone at a company whose subscription has not started is in the customers' audience")
 	}
 
-	if code, _ := call(t, member, "POST", srv.URL+"/o/alpha/ui/settings", "application/json", map[string]any{"name": "Alpha", "color": "#56c5f4", "postal_address": strings.Repeat("a", 301)}); code != http.StatusBadRequest {
+	if code, _ := call(t, member, "PATCH", srv.URL+"/o/alpha/api/v1/settings", "application/json", map[string]any{"name": "Alpha", "color": "#56c5f4", "postal_address": strings.Repeat("a", 301)}); code != http.StatusBadRequest {
 		t.Errorf("a postal address past 300 characters: %d", code)
 	}
 }

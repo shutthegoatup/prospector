@@ -519,7 +519,7 @@ func AgentsView(q *Req, d AgentsData) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = Section("Keys", "No key can mark anything sent, change settings or reach another organisation.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Section("Keys", "No key can mark anything sent or reach another organisation, and only one with settings:write can change settings.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

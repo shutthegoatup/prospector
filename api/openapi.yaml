@@ -16,9 +16,9 @@ info:
     enquiry stands and put its sender on the board, without deals; `enquiries:delete` to delete an enquiry;
     `campaigns:write` to write campaigns and keep the list of addresses marketing mail
     never goes to; `campaigns:send` to send, cancel and resume a campaign;
-    `agreements:write` to start agreements and upload their documents. A
-    signed-in member may do all of these except configuring agents and deleting enquiries,
-    which need an owner.
+    `agreements:write` to start agreements and upload their documents; `settings:write` to
+    change the organisation's settings. A signed-in member may do all of these except
+    configuring agents, deleting enquiries and changing settings, which need an owner.
 
     Every list comes a page at a time: it takes `limit` and `cursor`, and answers
     `{"items": [...], "next_cursor": "..."}`. When `next_cursor` is there, pass it back
@@ -51,6 +51,8 @@ tags:
     description: Contracts a company is to sign, each a PDF frozen by its hash.
   - name: mail
     description: Marketing mail, and the one list of addresses it never goes to.
+  - name: settings
+    description: How the organisation works, from its waits and wording to its never-contact list and the sites it takes enquiries from.
 
 paths:
   /o/{org}/api/v1/agents:
@@ -1577,6 +1579,48 @@ paths:
         "204": { description: Decided. }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/settings:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: The organisation's settings
+      description: As they are in effect, with defaults where none were saved.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The settings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Settings" }
+        default: { $ref: "#/components/responses/Problem" }
+    patch:
+      operationId: changeSettings
+      tags: [settings]
+      summary: Change the organisation's settings
+      description: |
+        Send only what changes; the rest stay as they are, and all are saved together or
+        not at all. Agents connected now are given the new guidance, wording and
+        never-contact list on their next call. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["settings:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SettingsChange" }
+      responses:
+        "200":
+          description: The settings as they now are.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Settings" }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -1625,6 +1669,43 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
 
   schemas:
+    Settings:
+      type: object
+      required: [name, color, email_after_days, followup_after_days, note_template, pitch, never_contact, look_for, agent_guidance, enquiry_sites, onboarding_steps, currency, postal_address, incorporated_only]
+      properties:
+        name: { type: string, description: "The organisation's name; never empty." }
+        color: { type: string, description: "Its colour, like `#56c5f4`." }
+        email_after_days: { type: integer, format: int32, description: "Days without a LinkedIn accept before the email is due, up to 60; 0 is the default, 2." }
+        followup_after_days: { type: integer, format: int32, description: "Days without a reply before the follow-up is due, up to 60; 0 is the default, 6." }
+        note_template: { type: string, description: "The connection note. `{first}`, `{company}` and `{org}` are filled in." }
+        pitch: { type: string, description: "The call script's pitch line. `{company}` is filled in." }
+        never_contact: { type: string, description: "Domains, email addresses and LinkedIn profiles never to contact, one per line." }
+        look_for: { type: string, description: "What makes a company a fit, one `name: what counts` per line." }
+        agent_guidance: { type: string, description: "Sent to every agent when it connects." }
+        enquiry_sites: { type: string, description: "Sites whose forms may post enquiries, one address per line, like `https://www.example.com`. Empty takes none." }
+        onboarding_steps: { type: string, description: "What a new customer goes through, one step a line." }
+        currency: { type: string, description: "The three-letter code deals are valued in." }
+        postal_address: { type: string, description: "Where the organisation can be written to; 300 characters at most." }
+        incorporated_only: { type: boolean, description: "Email only incorporated companies." }
+
+    SettingsChange:
+      type: object
+      properties:
+        name: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "The organisation's name; never empty." }
+        color: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Its colour, like `#56c5f4`." }
+        email_after_days: { type: integer, format: int32, nullable: true, x-go-type-skip-optional-pointer: false, description: "Days without a LinkedIn accept before the email is due, up to 60; 0 is the default, 2." }
+        followup_after_days: { type: integer, format: int32, nullable: true, x-go-type-skip-optional-pointer: false, description: "Days without a reply before the follow-up is due, up to 60; 0 is the default, 6." }
+        note_template: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "The connection note. `{first}`, `{company}` and `{org}` are filled in." }
+        pitch: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "The call script's pitch line. `{company}` is filled in." }
+        never_contact: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Domains, email addresses and LinkedIn profiles never to contact, one per line." }
+        look_for: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "What makes a company a fit, one `name: what counts` per line." }
+        agent_guidance: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Sent to every agent when it connects." }
+        enquiry_sites: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Sites whose forms may post enquiries, one address per line, like `https://www.example.com`. Empty takes none." }
+        onboarding_steps: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "What a new customer goes through, one step a line." }
+        currency: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "The three-letter code deals are valued in." }
+        postal_address: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Where the organisation can be written to; 300 characters at most." }
+        incorporated_only: { type: boolean, nullable: true, x-go-type-skip-optional-pointer: false, description: "Email only incorporated companies." }
+
     ContactChange:
       type: object
       properties:

@@ -382,7 +382,6 @@ func (a *App) Routes() http.Handler {
 
 	mux.HandleFunc("POST /o/{org}/ui/mark", a.works(areaSales, a.uiMark))
 	mux.HandleFunc("POST /o/{org}/ui/voice", a.member(a.uiVoice))
-	mux.HandleFunc("POST /o/{org}/ui/settings", a.owner(a.uiSettings))
 	mux.HandleFunc("POST /o/{org}/ui/member", a.owner(a.uiMember))
 	mux.HandleFunc("POST /o/{org}/ui/member/remove", a.owner(a.uiRemoveMember))
 	mux.HandleFunc("POST /o/{org}/ui/mail", a.owner(a.uiMail))

@@ -167,14 +167,11 @@ func TestOnboardingIsWorkedFromItsPages(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	person := repliedPerson(t, s, o, "Hannah Pryce")
 	company := *person.CompanyID
-	post := func(path string, body map[string]any) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/"+path, "application/json", body)
-	}
 	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/onboarding", "", nil); !strings.Contains(page, "No steps written yet") {
 		t.Error("the page with no steps written doesn't say so")
 	}
 	settings := func(steps string) (int, string) {
-		return post("settings", map[string]any{"name": "Alpha", "color": "#56c5f4", "onboarding_steps": steps})
+		return call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/settings", "application/json", map[string]any{"onboarding_steps": steps})
 	}
 	if code, body := settings("Go live, 9999 days"); code != http.StatusBadRequest || !strings.Contains(body, "730") {
 		t.Errorf("steps due in 27 years were saved: %d %s", code, body)
