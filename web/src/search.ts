@@ -1,5 +1,5 @@
 import { parseSearchWith, stringifySearchWith } from "@tanstack/react-router";
-import { z } from "zod";
+import { z } from "zod/mini";
 
 // What each page reads from its address. Only a whole number or true/false is read as
 // anything but text, and only when it prints back exactly as written, so ?q=1e5 and
@@ -16,23 +16,26 @@ function readValue(raw: string): unknown {
 export const parseSearch = parseSearchWith(readValue);
 export const stringifySearch = stringifySearchWith(JSON.stringify);
 
-const text = z
-  .union([z.string(), z.number(), z.boolean()])
-  .transform((v) => String(v))
-  .optional()
-  .catch(undefined);
+const text = z.catch(
+  z.optional(z.pipe(z.union([z.string(), z.number(), z.boolean()]), z.transform((v) => String(v)))),
+  undefined,
+);
 
 // A flag is on when the address gives it a value other than 0 or false, as ?closed=1.
-const flag = z
-  .union([z.boolean(), z.number(), z.string()])
-  .transform((v) => v !== false && v !== 0 && v !== "" && v !== "0" && v !== "false")
-  .optional()
-  .catch(undefined);
+const flag = z.catch(
+  z.optional(
+    z.pipe(
+      z.union([z.boolean(), z.number(), z.string()]),
+      z.transform((v) => v !== false && v !== 0 && v !== "" && v !== "0" && v !== "false"),
+    ),
+  ),
+  undefined,
+);
 
-const id = z.number().int().positive().optional().catch(undefined);
+const id = z.catch(z.optional(z.int().check(z.positive())), undefined);
 
 function oneOf<const T extends readonly [string, ...string[]]>(values: T) {
-  return z.enum(values).optional().catch(undefined);
+  return z.catch(z.optional(z.enum(values)), undefined);
 }
 
 export const todaySteps = ["call", "accepted", "email", "followup", "linkedin", "next"] as const;
@@ -63,4 +66,4 @@ export const signInSearch = z.object({ next: text, reset: flag });
 export const singleSignOnSearch = z.object({ email: text, org: text, next: text });
 
 // An id in a path is a positive whole number; anything else is no such page.
-export const pathId = z.coerce.number().int().positive();
+export const pathId = z.coerce.number().check(z.int(), z.positive());

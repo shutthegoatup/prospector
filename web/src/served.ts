@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/mini";
 
 // A page the server has already decided comes in the shell's data-page, for the pages
 // with no API to ask: an error, starting a first organisation, a customer's onboarding
@@ -8,24 +8,24 @@ const problem = z.object({ page: z.literal("problem"), code: z.number(), title: 
 
 const start = z.object({ page: z.literal("start") });
 
-const unsubscribe = z.object({ page: z.literal("unsubscribe"), token: z.string().optional(), done: z.boolean() });
+const unsubscribe = z.object({ page: z.literal("unsubscribe"), token: z.optional(z.string()), done: z.boolean() });
 
 export const customerStep = z.object({
   id: z.number(),
   name: z.string(),
-  due: z.string().nullable(),
-  done_on: z.string().nullable(),
+  due: z.nullable(z.string()),
+  done_on: z.nullable(z.string()),
   // Whether the customer marked it themselves, so they may take the mark back.
   mine: z.boolean(),
 });
 
 const customer = z.object({
   page: z.literal("customer"),
-  state: z.enum(["open", "again", "sent", "steps", "none"]).catch("none"),
-  token: z.string().optional(),
-  org: z.string().optional(),
-  email: z.string().optional(),
-  day: z.string().optional(),
+  state: z.catch(z.enum(["open", "again", "sent", "steps", "none"]), "none"),
+  token: z.optional(z.string()),
+  org: z.optional(z.string()),
+  email: z.optional(z.string()),
+  day: z.optional(z.string()),
   steps: z.array(customerStep),
 });
 
