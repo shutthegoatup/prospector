@@ -9,7 +9,7 @@ export type RuleField = CohortRule["field"];
 export const cohortColours = ["#7b8cff", "#ff9f43", "#35c58a", "#f06595", "#a77bff", "#22b8cf", "#e0b43c", "#b08968"];
 
 export function CohortDot({ colour, className }: { colour: string; className?: string }) {
-  return <span aria-hidden className={cn("inline-block size-3 shrink-0 rounded-sm", className)} style={{ background: colour }} />;
+  return <span aria-hidden className={cn("inline-block shrink-0 rounded-sm", className)} style={{ background: colour, width: 12, height: 12 }} />;
 }
 
 // CohortChip is the cohort a company is in. One the catch-all took because no rule
