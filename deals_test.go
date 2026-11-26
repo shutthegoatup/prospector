@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -195,10 +193,7 @@ func TestADealFollowsItsPersonThroughARestore(t *testing.T) {
 
 // A database written before deals existed has replied contacts and no deals table.
 func TestADatabaseFromBeforeDealsOpens(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)
@@ -308,10 +303,7 @@ func (dealV1) TableName() string { return "deals" }
 // A database from the first release with deals has rows without a seq, and an index
 // that allows each contact one deal.
 func TestDealsFromTheFirstReleaseBecomeTheConversationsOwn(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)

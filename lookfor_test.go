@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -87,10 +85,7 @@ func TestOlderAgentsConfiguratorBecomesFacts(t *testing.T) {
 // TestConfiguratorColumnsMove starts from a database written before assets were the
 // organisation's to name, with the configurator columns filled in.
 func TestConfiguratorColumnsMove(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	dsn := freshDatabase(t)
 	s, err := Open(dsn)
 	if err != nil {
 		t.Fatal(err)

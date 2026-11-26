@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -232,10 +230,7 @@ func TestOnboardingIsWorkedFromItsPages(t *testing.T) {
 
 // A database written before onboarding existed has companies and neither table.
 func TestADatabaseFromBeforeOnboardingOpens(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)

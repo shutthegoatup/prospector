@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -257,10 +255,7 @@ func dueSubs(t *testing.T, client *http.Client, site string) int {
 
 // A database written before subscriptions existed has companies and no such table.
 func TestADatabaseFromBeforeSubscriptionsOpens(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)
@@ -458,10 +453,7 @@ func TestARenewalDealIsStartedFromASubscription(t *testing.T) {
 
 // A database from before a deal could point at a subscription has deals without the column.
 func TestDealsFromBeforeRenewalsPointedAtSubscriptions(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)

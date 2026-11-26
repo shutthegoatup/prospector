@@ -46,7 +46,7 @@ func TestMain(m *testing.M) {
 		}
 	}
 	watchAPI = func(mux *http.ServeMux) api.ServeMux { return watched{mux, seen} }
-	code := m.Run()
+	code := withDatabases(m.Run)
 	if len(answers.wrong) > 0 {
 		wrong := make([]string, 0, len(answers.wrong))
 		for w := range answers.wrong {

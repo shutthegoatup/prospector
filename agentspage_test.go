@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -159,10 +157,7 @@ func TestAnAgentWithThinkingOffAsksItsModelNotToThink(t *testing.T) {
 
 // A database from before thinking could be turned off has agents, and they keep thinking.
 func TestAgentsFromBeforeThinkingOffStillThink(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)

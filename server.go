@@ -21,7 +21,10 @@ import (
 )
 
 // dummyHash keeps a wrong email as slow as a wrong password.
-var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("unused"), bcrypt.DefaultCost)
+// passwordCost is how hard a password hash is to compute; the tests lower it.
+var passwordCost = bcrypt.DefaultCost
+
+var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("unused"), passwordCost)
 
 const sessionCookie = "session"
 

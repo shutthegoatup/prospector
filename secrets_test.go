@@ -9,7 +9,6 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -308,7 +307,7 @@ func TestEachJobHasAKeyOfItsOwnDerivedFromTheMaster(t *testing.T) {
 }
 
 func TestTheServerSealsWhatItFindsWhenItStartsWithAKey(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "p.sqlite")
+	path := freshDatabase(t)
 	seed, err := Open(path)
 	if err != nil {
 		t.Fatal(err)

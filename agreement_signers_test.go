@@ -8,8 +8,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -385,10 +383,7 @@ func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
 // rounds, order or a page count, some with documents only their first bytes were
 // checked on. They come through as round 1, signed in order, pages counted when needed.
 func TestAgreementsFromBeforeSigningArePreparedAfterTheUpgrade(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)

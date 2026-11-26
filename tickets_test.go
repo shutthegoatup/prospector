@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -152,10 +150,7 @@ func TestEnquiriesAreAnsweredFromTheirPage(t *testing.T) {
 
 // A database from before enquiries were tracked has them without a state, owner or note.
 func TestEnquiriesFromBeforeTheyWereTrackedStayAsTheyWere(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)
