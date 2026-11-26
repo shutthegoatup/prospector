@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"sort"
 	"strings"
@@ -120,6 +121,28 @@ func TestAProblemToActOnLinksToWhatItMeans(t *testing.T) {
 	}
 }
 
+func TestEveryProblemTypeHasItsTitle(t *testing.T) {
+	spec, err := api.GetSwagger()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range spec.Components.Schemas["ProblemType"].Value.Enum {
+		kind := api.ProblemType(e.(string))
+		if _, ok := problemTitles[kind]; !ok && kind != api.ProblemTypeUntyped {
+			t.Errorf("%s has no title, so it would go out as about:blank", kind)
+		}
+	}
+}
+
+func TestFindingSingleSignOnWithoutAnAddressIsNotHere(t *testing.T) {
+	srv := httptest.NewServer((&App{s: tempStore(t)}).Routes())
+	t.Cleanup(srv.Close)
+	res := asBrowser(t, freshBrowser(), "POST", srv.URL+"/api/v1/sign-in/sso", api.FindSingleSignOnJSONRequestBody{Email: "ada@alpha.example"})
+	if p := problemOf(t, res); res.StatusCode != http.StatusNotFound || p.Status != http.StatusNotFound {
+		t.Fatalf("no PROSPECTOR_URL: %s %+v", res.Status, p)
+	}
+}
+
 func TestAnAPICallRefusedBeforeItsOperationIsStillAProblem(t *testing.T) {
 	_, _, srv, client := signedIn(t)
 	for name, c := range map[string]struct {
@@ -206,9 +229,7 @@ func (r *recorder) Write(b []byte) (int, error) {
 }
 
 func (r *recorder) Flush() {
-	if f, ok := r.ResponseWriter.(http.Flusher); ok {
-		f.Flush()
-	}
+	http.NewResponseController(r.ResponseWriter).Flush()
 }
 
 func (r *recorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }

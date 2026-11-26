@@ -366,7 +366,7 @@ func (a *App) Routes() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a.setDeadlines(w, r)
 		if !cleanRequest(r) {
-			http.NotFound(w, r)
+			refuseAs(w, r, http.StatusNotFound, "404 page not found")
 			return
 		}
 		if wantsPage(r) {

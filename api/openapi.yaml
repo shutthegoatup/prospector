@@ -218,6 +218,7 @@ paths:
                     items: { $ref: "#/components/schemas/SingleSignOnOrg" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "415": { $ref: "#/components/responses/NotJSON" }
         "500": { $ref: "#/components/responses/ServerError" }
 
