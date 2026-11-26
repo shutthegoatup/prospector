@@ -1,5 +1,6 @@
 // Prospector's own pieces, built on shadcn/ui. components/ui stays as the shadcn CLI
 // writes it, so it can be updated; the look Prospector adds lives here.
+import { useQueryClient } from "@tanstack/react-query";
 import type { ComponentProps, ReactNode } from "react";
 import { Link } from "react-router";
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +65,56 @@ export function FilterChip({ to, label, count, on }: { to: string; label: string
       {label}
       <span className="font-mono text-xs opacity-70">{count}</span>
     </Link>
+  );
+}
+
+// useRefresh reads everything the page shows again after a change, as a templ page reloads.
+export function useRefresh() {
+  const client = useQueryClient();
+  return () => client.invalidateQueries();
+}
+
+// Failed says why a change didn't happen, in the server's words.
+export function Failed({ errors }: { errors: ({ detail?: string } | null | undefined)[] }) {
+  const error = errors.find(Boolean);
+  if (!error) return null;
+  return (
+    <p className="w-full text-sm text-[var(--stop)]" role="alert">
+      {error.detail ?? "That didn't work. Reload and try again."}
+    </p>
+  );
+}
+
+// Whose tells a member who reads a page, but whose work it isn't, why and how to change that.
+export function Whose({ area, work, can }: { area: "sales" | "support"; work: string; can: boolean }) {
+  if (can) return null;
+  return (
+    <p className="mb-5 max-w-[70ch] border-t border-dashed border-border pt-2 font-mono text-xs text-mark">
+      {work} {area} work, so here you read it. An owner can add {area} to you on the Team list in Settings.
+    </p>
+  );
+}
+
+// Empty is a list with nothing in it, saying what would be there.
+export function Empty({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <div className="panel p-6 text-center">
+      <p className="font-heading font-semibold">{title}</p>
+      {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+// PageHead is a page's title, with the coral full stop, and anything beside it.
+export function PageHead({ title, children }: { title: string; children?: ReactNode }) {
+  return (
+    <header className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
+      <h1 className="font-heading text-4xl font-bold tracking-tight">
+        {title}
+        <span className="text-coral">.</span>
+      </h1>
+      {children}
+    </header>
   );
 }
 

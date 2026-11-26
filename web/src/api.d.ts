@@ -3532,6 +3532,8 @@ export interface operations {
                     "application/json": {
                         items: components["schemas"]["Campaign"][];
                         next_cursor?: components["schemas"]["NextCursor"];
+                        /** @description Why nothing can be sent yet (the organisation's own mail server, a postal address or the site's address missing); empty when a campaign can be sent. */
+                        not_ready: string;
                     };
                 };
             };

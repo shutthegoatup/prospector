@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router";
+import { CampaignsPage } from "@/pages/Campaigns";
 import { ResearchPage } from "@/pages/Research";
 import { SessionContext } from "@/session";
 
@@ -16,6 +17,7 @@ if (mount) {
           <BrowserRouter basename={`/o/${session.org}/app`}>
             <Routes>
               <Route path="research" element={<ResearchPage />} />
+              <Route path="campaigns" element={<CampaignsPage />} />
             </Routes>
           </BrowserRouter>
         </QueryClientProvider>

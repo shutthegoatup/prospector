@@ -29,6 +29,22 @@ func TestReactPagesMountInTheLayout(t *testing.T) {
 		t.Fatal("a React page was served to someone signed out")
 	}
 
+	// The sidebar sends each page React has to it.
+	_, today := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil)
+	for _, p := range reactPages {
+		if !strings.Contains(today, `href="/o/alpha/app/`+p+`"`) {
+			t.Errorf("the sidebar doesn't send %s to its React page", p)
+		}
+	}
+	if !strings.Contains(today, `href="/o/alpha/today"`) {
+		t.Error("a page still on the server lost its sidebar link")
+	}
+
+	// A campaign that can't be sent says why, for the page to show.
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/campaigns", "", nil); !strings.Contains(body, `"not_ready":"`) || strings.Contains(body, `"not_ready":""`) {
+		t.Errorf("campaigns should say why nothing can be sent yet: %s", body)
+	}
+
 	// Every page React has is routed in main.tsx too.
 	main, err := os.ReadFile("web/src/main.tsx")
 	if err != nil {
