@@ -94,20 +94,20 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 	outsider := newMailClient()
 	for range 2 {
 		res, page := as(t, outsider, "GET", link)
-		if res.StatusCode != http.StatusOK || !strings.Contains(page, "Open my steps") || strings.Contains(page, "product files") {
+		if res.StatusCode != http.StatusOK || served(t, page).State != "open" || strings.Contains(page, "product files") {
 			t.Fatalf("looking at the link: %d %.200s", res.StatusCode, page)
 		}
 		if res.Header.Get("Referrer-Policy") != "no-referrer" || !strings.Contains(res.Header.Get("X-Robots-Tag"), "noindex") || len(res.Cookies()) != 0 {
 			t.Errorf("the link's page: referrer %q, robots %q, cookies %v", res.Header.Get("Referrer-Policy"), res.Header.Get("X-Robots-Tag"), res.Cookies())
 		}
 	}
-	if _, page := as(t, outsider, "GET", srv.URL+"/c"); !strings.Contains(page, "Nothing to show here") {
+	if _, page := as(t, outsider, "GET", srv.URL+"/c"); served(t, page).State != "none" {
 		t.Error("the page opened before the link was used")
 	}
 
 	// Pressing the button opens it, in this browser, at an address with no secret in it.
 	res, page := as(t, outsider, "POST", link)
-	if res.Request.URL.Path != "/c" || !strings.Contains(page, "Send your product files") || !strings.Contains(page, "Approve the first renders") || !strings.Contains(page, "0 of 2") {
+	if res.Request.URL.Path != "/c" || !strings.Contains(page, "Send your product files") || !strings.Contains(page, "Approve the first renders") || served(t, page).progress() != "0 of 2" {
 		t.Fatalf("opening the page: ended at %s with %.300s", res.Request.URL.Path, page)
 	}
 	for _, private := range []string{"Internal credit check", "Go live", "Ada Lovelace", "/o/alpha", "Tom Ellery"} {
@@ -121,14 +121,14 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 
 	// The link is spent. Another browser gets nothing from it but the offer of a new one.
 	second := newMailClient()
-	if _, page := as(t, second, "POST", link); !strings.Contains(page, "used or has run out") || strings.Contains(page, "product files") {
+	if _, page := as(t, second, "POST", link); served(t, page).State != "again" || strings.Contains(page, "product files") {
 		t.Errorf("a second browser using the same link: %.200s", page)
 	}
-	if _, page := as(t, second, "GET", srv.URL+"/c"); !strings.Contains(page, "Nothing to show here") {
+	if _, page := as(t, second, "GET", srv.URL+"/c"); served(t, page).State != "none" {
 		t.Error("a second browser has the page without a link of its own")
 	}
 	// A member's sign-in is not a customer's, and a customer's opens nothing of the members'.
-	if _, page := as(t, member, "GET", srv.URL+"/c"); !strings.Contains(page, "Nothing to show here") {
+	if _, page := as(t, member, "GET", srv.URL+"/c"); served(t, page).State != "none" {
 		t.Error("a member's session opened a customer's page")
 	}
 	if res, page := as(t, outsider, "GET", srv.URL+"/o/alpha/onboarding"); res.Request.URL.Path != "/login" || strings.Contains(page, "Leith site") {
@@ -140,11 +140,11 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 
 	// Asking again mails only the invited address, not more often than the gap, and says
 	// the same thing whether or not anything was sent.
-	if _, page := as(t, second, "POST", link+"/again"); !strings.Contains(page, "Check your email") {
+	if _, page := as(t, second, "POST", link+"/again"); served(t, page).State != "sent" {
 		t.Errorf("asking for a new link: %.200s", page)
 	}
 	box.take(t, 0)
-	if res, page := as(t, second, "POST", srv.URL+"/c/no-such-link/again"); res.StatusCode != http.StatusOK || !strings.Contains(page, "Check your email") {
+	if res, page := as(t, second, "POST", srv.URL+"/c/no-such-link/again"); res.StatusCode != http.StatusOK || served(t, page).State != "sent" {
 		t.Errorf("asking for a new link with one that never existed: %d %.200s", res.StatusCode, page)
 	}
 	if res, _ := as(t, second, "GET", srv.URL+"/c/no-such-link"); res.StatusCode != http.StatusNotFound {
@@ -166,7 +166,7 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 	if err := s.SetOnboardingStep(o.ID, row.Steps[0].ID, "done", "yes", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if _, page := as(t, outsider, "GET", srv.URL+"/c"); !strings.Contains(page, "1 of 2") || strings.Contains(page, "Ada Lovelace") {
+	if _, page := as(t, outsider, "GET", srv.URL+"/c"); served(t, page).progress() != "1 of 2" || strings.Contains(page, "Ada Lovelace") {
 		t.Errorf("after a step was marked done: %.300s", page)
 	}
 
@@ -179,7 +179,7 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 		t.Fatalf("withdrawing access: %d %s", code, body)
 	}
 	for name, c := range map[string]*http.Client{"the first": outsider, "the second": second} {
-		if _, page := as(t, c, "GET", srv.URL+"/c"); !strings.Contains(page, "Nothing to show here") {
+		if _, page := as(t, c, "GET", srv.URL+"/c"); served(t, page).State != "none" {
 			t.Errorf("%s browser still has the page after access was withdrawn", name)
 		}
 	}
@@ -195,13 +195,13 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 		t.Fatalf("inviting again: %d %s", code, body)
 	}
 	again := srv.URL + customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1]
-	if _, page := as(t, outsider, "POST", again); !strings.Contains(page, "1 of 2") {
+	if _, page := as(t, outsider, "POST", again); served(t, page).progress() != "1 of 2" {
 		t.Fatalf("the page after being invited again: %.200s", page)
 	}
 	if err := s.RemoveOnboarding(o.ID, ob.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if _, page := as(t, outsider, "GET", srv.URL+"/c"); !strings.Contains(page, "Nothing to show here") {
+	if _, page := as(t, outsider, "GET", srv.URL+"/c"); served(t, page).State != "none" {
 		t.Error("the page outlived its onboarding")
 	}
 	var left int64
@@ -235,7 +235,7 @@ func TestErasingAPersonClosesTheirPage(t *testing.T) {
 	if err := s.ErasePerson(o.ID, hannah.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if _, page := as(t, outsider, "GET", srv.URL+"/c"); !strings.Contains(page, "Nothing to show here") || strings.Contains(page, "product files") {
+	if _, page := as(t, outsider, "GET", srv.URL+"/c"); served(t, page).State != "none" || strings.Contains(page, "product files") {
 		t.Error("an erased person's browser still has their page")
 	}
 	var left int64
@@ -262,7 +262,7 @@ func TestACustomersLinkAndBrowserRunOut(t *testing.T) {
 		t.Fatal(err)
 	}
 	outsider := newMailClient()
-	if _, page := as(t, outsider, "POST", link); !strings.Contains(page, "used or has run out") || strings.Contains(page, "product files") {
+	if _, page := as(t, outsider, "POST", link); served(t, page).State != "again" || strings.Contains(page, "product files") {
 		t.Errorf("a link past its seven days: %.200s", page)
 	}
 	if err := s.db.Model(&CustomerLink{}).Where("1 = 1").Update("expires_at", time.Now().Add(time.Hour)).Error; err != nil {
@@ -274,7 +274,7 @@ func TestACustomersLinkAndBrowserRunOut(t *testing.T) {
 	if err := s.db.Model(&CustomerSession{}).Where("1 = 1").Update("expires_at", time.Now().Add(-time.Minute)).Error; err != nil {
 		t.Fatal(err)
 	}
-	if _, page := as(t, outsider, "GET", srv.URL+"/c"); !strings.Contains(page, "Nothing to show here") {
+	if _, page := as(t, outsider, "GET", srv.URL+"/c"); served(t, page).State != "none" {
 		t.Error("a browser past its thirty days still has the page")
 	}
 	// Leaving closes it in that browser.
@@ -284,7 +284,7 @@ func TestACustomersLinkAndBrowserRunOut(t *testing.T) {
 	if _, page := as(t, outsider, "GET", srv.URL+"/c"); !strings.Contains(page, "Send your product files") {
 		t.Fatal("the page didn't come back when the browser was in date again")
 	}
-	if _, page := as(t, outsider, "POST", srv.URL+"/c/leave"); !strings.Contains(page, "Nothing to show here") {
+	if _, page := as(t, outsider, "POST", srv.URL+"/c/leave"); served(t, page).State != "none" {
 		t.Errorf("after closing the page in this browser: %.200s", page)
 	}
 	var sessions int64
@@ -475,10 +475,10 @@ func TestACustomerMarksTheirOwnSteps(t *testing.T) {
 	}
 	files, credit, renders := steps(ob.ID)[0], steps(ob.ID)[1], steps(ob.ID)[2]
 
-	if _, page := as(t, theirs, "GET", srv.URL+"/c"); strings.Count(page, "Mark done") != 2 || strings.Contains(page, "/c/steps/"+itoa(credit.ID)+"/") {
+	if _, page := as(t, theirs, "GET", srv.URL+"/c"); served(t, page).toMark() != 2 || served(t, page).step(credit.ID) != nil {
 		t.Errorf("the page offers the wrong steps to mark: %.400s", page)
 	}
-	if page := mark(theirs, files.ID, "done"); !strings.Contains(page, "1 of 2") || !strings.Contains(page, "Not done yet") {
+	if page := mark(theirs, files.ID, "done"); served(t, page).progress() != "1 of 2" || !served(t, page).undoable(files.ID) {
 		t.Errorf("after marking a step: %.300s", page)
 	}
 	got := steps(ob.ID)[0]
@@ -513,13 +513,13 @@ func TestACustomerMarksTheirOwnSteps(t *testing.T) {
 	}
 
 	// They take back their own mark, but not one a member made.
-	if page := mark(theirs, files.ID, "undone"); !strings.Contains(page, "0 of 2") {
+	if page := mark(theirs, files.ID, "undone"); served(t, page).progress() != "0 of 2" {
 		t.Errorf("after taking a mark back: %.300s", page)
 	}
 	if err := s.SetOnboardingStep(o.ID, files.ID, "done", "yes", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if page := mark(theirs, files.ID, "undone"); !strings.Contains(page, "1 of 2") || strings.Contains(page, "/c/steps/"+itoa(files.ID)+"/undone") || strings.Contains(page, "Ada Lovelace") {
+	if page := mark(theirs, files.ID, "undone"); served(t, page).progress() != "1 of 2" || served(t, page).undoable(files.ID) || strings.Contains(page, "Ada Lovelace") {
 		t.Errorf("a member's mark was taken back, or offered to be: %.300s", page)
 	}
 	if got := steps(ob.ID)[0]; got.DoneBy != "Ada Lovelace" {

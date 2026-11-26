@@ -301,7 +301,7 @@ func TestSocialSignIn(t *testing.T) {
 	// An address the provider hasn't verified matches no account.
 	google.says(map[string]any{"sub": "g-1", "email": "ada@example.com", "email_verified": false})
 	b := newBrowser(t, srv.URL)
-	if code, body, _ := b.through(google, "/login/with/google"); code != http.StatusForbidden || !strings.Contains(body, "didn&#39;t confirm") {
+	if code, body, _ := b.through(google, "/login/with/google"); code != http.StatusForbidden || !strings.Contains(body, "didn't confirm") {
 		t.Fatalf("an unverified address: %d %s", code, body)
 	}
 	if identities(t, s) != 0 {
@@ -568,7 +568,7 @@ func TestOrganisationSingleSignOn(t *testing.T) {
 	if err := s.db.Model(&User{}).Where("id = ?", bob.ID).Update("email", "bob@elsewhere.example").Error; err != nil {
 		t.Fatal(err)
 	}
-	if code, body, _ := newBrowser(t, srv.URL).through(okta, start); code != http.StatusForbidden || !strings.Contains(body, "isn&#39;t at this organisation") {
+	if code, body, _ := newBrowser(t, srv.URL).through(okta, start); code != http.StatusForbidden || !strings.Contains(body, "isn't at this organisation") {
 		t.Fatalf("a linked account now at another domain: %d %s", code, body)
 	}
 }
@@ -1076,7 +1076,7 @@ func TestASignInThatCantGoAheadSaysSoOnItsOwnPage(t *testing.T) {
 	if code != http.StatusBadRequest || location != "" || !strings.Contains(body, "no single sign-on for that address") {
 		t.Fatalf("starting a sign-on nobody has: %d %q %s", code, location, body)
 	}
-	if !strings.Contains(body, `href="/login?next=%2F"`) {
+	if served(t, body).Back != "/login?next=%2F" {
 		t.Fatalf("the page should lead back to signing in, and nowhere else: %s", body)
 	}
 }

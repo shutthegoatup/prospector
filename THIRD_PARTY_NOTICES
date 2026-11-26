@@ -1,4 +1,4 @@
-The UI components in components/, utils/ and assets/css/{shadcn-tailwind,tw-animate}.css come from
+The styles in assets/css/{shadcn-tailwind,tw-animate}.css come from
 shadcn-templ (https://github.com/axadrn/shadcn-templ), a port of shadcn/ui, under this licence:
 
 MIT License

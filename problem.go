@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"log"
 	"net/http"
 	"strings"
 	"unicode"
@@ -78,14 +77,18 @@ func (p *problemPage) finish() {
 	if p.code == 0 {
 		return
 	}
-	h := p.Header()
-	h.Set("Content-Type", "text/html; charset=utf-8")
-	h.Del("Content-Length")
-	p.ResponseWriter.WriteHeader(p.code)
+	p.Header().Del("Content-Length")
 	title, message := problemText(p.code, p.text.String())
-	if err := ProblemPage(p.code, title, message, "/").Render(p.r.Context(), p.ResponseWriter); err != nil {
-		log.Print(err)
-	}
+	writeShell(p.ResponseWriter, p.code, problemShown{"problem", p.code, title, message, "/"}, title+": "+message+"\n")
+}
+
+type problemShown struct {
+	Page    string `json:"page"`
+	Code    int    `json:"code"`
+	Title   string `json:"title"`
+	Message string `json:"message"`
+	// Back is where the page's one button goes.
+	Back string `json:"back"`
 }
 
 func problemText(code int, text string) (title, message string) {

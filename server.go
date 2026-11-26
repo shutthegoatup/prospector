@@ -562,8 +562,7 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login/sso?"+url.Values{"email": {q.User.Email}}.Encode(), http.StatusSeeOther)
 		return
 	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	NoOrgs(q.User).Render(r.Context(), w)
+	writeShell(w, http.StatusOK, map[string]string{"page": "start"}, "Start an organisation at /api/v1/orgs.\n")
 }
 
 const passwordChanged = "Password changed. Your other sessions are signed out."

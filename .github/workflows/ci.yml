@@ -33,7 +33,7 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Generated templates, API code and page script are committed
+      - name: Generated templates, API code and the built app are committed
         run: |
           go tool templ generate
           go generate ./api

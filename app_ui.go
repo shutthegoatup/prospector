@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"regexp"
+	"strings"
 	"sync"
 )
 
@@ -41,6 +44,32 @@ var shellHTML = sync.OnceValues(func() ([]byte, error) {
 	}
 	return regexp.MustCompile(`((?:src|href)="/assets/[^"?]+)"`).ReplaceAll(b, []byte(`$1?v=`+assetVersion+`"`)), nil
 })
+
+// writeShell answers with the app's shell carrying page: what the server already decided
+// a page shows, for the pages with no API to ask (an error, the start of a first
+// organisation, a customer's or an unsubscriber's). Its "page" field names which, and
+// the app draws it in place of whatever the address would route to. With no shell to
+// read, the answer is fallback as plain text.
+func writeShell(w http.ResponseWriter, code int, page any, fallback string) {
+	b, err := shellHTML()
+	var data []byte
+	if err == nil {
+		data, err = json.Marshal(page)
+	}
+	if err != nil {
+		w.Header().Set("content-type", "text/plain; charset=utf-8")
+		w.WriteHeader(code)
+		w.Write([]byte(fallback))
+		return
+	}
+	// json.Marshal already writes <, > and & as escapes, so quotes are all that could
+	// leave the attribute.
+	attr := strings.ReplaceAll(string(data), `"`, "&quot;")
+	b = bytes.Replace(b, []byte(`<div id="app"></div>`), []byte(`<div id="app" data-page="`+attr+`"></div>`), 1)
+	w.Header().Set("content-type", "text/html; charset=utf-8")
+	w.WriteHeader(code)
+	w.Write(b)
+}
 
 // shell serves the React app: everything it shows, it reads through the API.
 func (a *App) shell(w http.ResponseWriter, r *http.Request) {
