@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
-import { ActionButton, Empty, Failed, Meta, PageHead, useRefresh } from "@/components/app";
+import { ActionButton, Empty, Failed, Meta, PageHead, useRefresh, Whose } from "@/components/app";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { actor, plural } from "@/lib/format";
@@ -71,6 +71,7 @@ export function CampaignsPage() {
       {notReady && (
         <p className="mb-5 max-w-[70ch] rounded-lg border border-border bg-muted px-3 py-2 text-sm">Not yet ready to send: {notReady}.</p>
       )}
+      <Whose area="sales" work="Campaigns are" can={sales} />
       {sales && (
         <form
           className="mb-5 flex flex-wrap items-center gap-2"

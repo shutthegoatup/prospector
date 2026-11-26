@@ -85,6 +85,16 @@ export function Failed({ errors }: { errors: ({ detail?: string } | null | undef
   );
 }
 
+// Whose tells a member who reads a page, but whose work it isn't, why and how to change that.
+export function Whose({ area, work, can }: { area: "sales" | "support"; work: string; can: boolean }) {
+  if (can) return null;
+  return (
+    <p className="mb-5 max-w-[70ch] border-t border-dashed border-border pt-2 font-mono text-xs text-mark">
+      {work} {area} work, so here you read it. An owner can add {area} to you on the Team list in Settings.
+    </p>
+  );
+}
+
 // Empty is a list with nothing in it, saying what would be there.
 export function Empty({ title, hint }: { title: string; hint?: string }) {
   return (
