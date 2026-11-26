@@ -1,0 +1,108 @@
+package main
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestPeopleAreReachedForTheOfferingTheyWerePickedFor(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO", NoteTemplate: "Hi {first}, about technology leadership at {company}.",
+		Pitch: "I step in as interim CTO at companies like {company}."}, "Ada"))
+	task := must(s.CreateTaskFor(o.ID, cto.ID, "", "Find scale-ups without a CTO", "Ada"))
+	scout := Actor{Name: "agent:scout", KeyID: 2}
+
+	co := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Northwind Payments", Domain: "northwind.example"}))
+	ownPerson := must(s.AgentAddContact(o, scout, AddContactIn{Company: co.Name, Name: "Ada Vale", Title: "Head of Platform",
+		SourceURL: "https://northwind.example/team"}))
+	ctoPerson := must(s.AgentAddContact(o, scout, AddContactIn{Company: co.Name, Name: "Bram Osei", Title: "CEO",
+		SourceURL: "https://northwind.example/about", Task: task.ID}))
+	for _, id := range []int64{ownPerson.ID, ctoPerson.ID} {
+		if err := s.PickContact(o.ID, o, id, "Ada"); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var picked Contact
+	if err := s.in(o.ID).Where("id = ?", ctoPerson.ID).First(&picked).Error; err != nil {
+		t.Fatal(err)
+	}
+	if picked.OfferingID != cto.ID || !strings.HasPrefix(deref(picked.Note), "Hi Bram, about technology leadership at Northwind Payments") {
+		t.Fatalf("someone suggested for an offering should get its note: %d %q", picked.OfferingID, deref(picked.Note))
+	}
+	if v := must(s.Verdicts(o.ID, co.ID)); len(v) != 1 || v[0].Stage != CompanyQualified {
+		t.Fatalf("picking someone for an offering should qualify the company for it: %+v", v)
+	}
+	if got := companyRow(t, s, o.ID, co.ID).Stage; got != CompanyQualified {
+		t.Fatalf("picking someone for the organisation's own should still qualify the company: %s", got)
+	}
+
+	script := callScript(picked, "Bram Osei", Voice{Caller: "Ada", Org: "Alpha", Pitch: "We help {company}.", Pitches: map[int64]string{cto.ID: cto.Pitch}})
+	if !strings.Contains(scriptText(script), "I step in as interim CTO at companies like Northwind Payments") {
+		t.Fatalf("the call script should pitch the offering they're reached for: %+v", script)
+	}
+
+	// Rejected for one offering, only its people leave the queue.
+	if err := s.JudgeCompany(o.ID, cto.ID, co.ID, CompanyRejected, "", "CTO hired", "Ada"); err != nil {
+		t.Fatal(err)
+	}
+	if due := dueNames(t, s, o); due["Bram"] || !due["Ada"] {
+		t.Fatalf("rejecting for the interim CTO offering should take only its people out of the queue: %v", due)
+	}
+	if err := s.JudgeCompany(o.ID, cto.ID, co.ID, CompanyQualified, "", "", "Ada"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetCompanyStage(o.ID, co.ID, CompanyRejected, "", "Ada"); err != nil {
+		t.Fatal(err)
+	}
+	if due := dueNames(t, s, o); !due["Bram"] || due["Ada"] {
+		t.Fatalf("rejecting for the organisation's own should take only its people out of the queue: %v", due)
+	}
+
+	if _, err := s.Restore(o.ID, must(s.SnapshotText(o.ID))); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.in(o.ID).Where("id = ?", ctoPerson.ID).First(&picked).Error; err != nil || picked.OfferingID != cto.ID {
+		t.Fatalf("a snapshot and restore should keep what someone is reached for: %d %v", picked.OfferingID, err)
+	}
+
+	// With the offering gone, its people are the organisation's own again.
+	if err := s.SetTaskClosed(o.ID, task.ID, true, "Ada"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RemoveOffering(o.ID, cto.ID, "Ada"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.in(o.ID).Where("id = ?", ctoPerson.ID).First(&picked).Error; err != nil || picked.OfferingID != 0 {
+		t.Fatalf("removing an offering should hand its people to the organisation's own: %d %v", picked.OfferingID, err)
+	}
+}
+
+func scriptText(lines []Line) string {
+	var b strings.Builder
+	for _, l := range lines {
+		b.WriteString(l.Say + "\n")
+	}
+	return b.String()
+}
+
+func TestExistingPeopleAreReachedForTheOrganisationsOwnOffering(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	old := must(s.QuickAddPerson(o, QuickAdd{Name: "Cleo Marsh", Company: "Larkmoor"}, "Ada"))
+	// A database from before the column existed, with people already in it.
+	if err := s.db.Migrator().DropColumn(&Contact{}, "offering_id"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.AutoMigrate(&Contact{}); err != nil {
+		t.Fatalf("adding the column to a table with rows: %v", err)
+	}
+	var got Contact
+	if err := s.in(o.ID).Where("id = ?", old.ID).First(&got).Error; err != nil || got.OfferingID != 0 {
+		t.Fatalf("an existing person after the upgrade: %+v %v", got.OfferingID, err)
+	}
+	if !dueNames(t, s, o)["Cleo"] {
+		t.Fatal("an existing person should still be in the queue")
+	}
+}

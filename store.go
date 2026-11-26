@@ -189,6 +189,9 @@ type Contact struct {
 	NextDate    *string `json:"next_date"`
 	LostReason  string  `json:"lost_reason"`
 	DraftBy     string  `json:"draft_by"`
+	// OfferingID is what they are being reached for; 0 is the organisation's own. Their
+	// company being rejected for that offering takes them out of the queues.
+	OfferingID int64 `gorm:"not null;default:0" json:"offering_id"`
 }
 
 // ContactSuggested is a person an agent found; a human picks them before outreach.

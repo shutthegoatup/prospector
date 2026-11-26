@@ -29,26 +29,34 @@ var snapshotExtraColumns = snapshotColumns[21:]
 // laterColumns are what Prospector added to a contact after the Python tracker. A
 // snapshot carries them too: without status a restore would turn everyone an agent
 // suggested into someone a person picked.
-var laterColumns = []string{"status", "title", "email_status", "stage", "next_step", "next_date", "lost_reason", "draft_by"}
+var laterColumns = []string{"status", "title", "email_status", "stage", "next_step", "next_date", "lost_reason", "draft_by", "offering_id"}
 
 // later points at laterColumns' fields, in that order.
 func (c *Contact) later() []any {
-	return []any{&c.Status, &c.Title, &c.EmailStatus, &c.Stage, &c.NextStep, &c.NextDate, &c.LostReason, &c.DraftBy}
+	return []any{&c.Status, &c.Title, &c.EmailStatus, &c.Stage, &c.NextStep, &c.NextDate, &c.LostReason, &c.DraftBy, &c.OfferingID}
 }
 
 func laterValue(field any) *string {
-	if p, ok := field.(**string); ok {
+	switch p := field.(type) {
+	case **string:
 		return *p
+	case *int64:
+		v := strconv.FormatInt(*p, 10)
+		return &v
 	}
 	return field.(*string)
 }
 
+// setLater fills a field from a snapshot's text; a number that doesn't read is 0.
 func setLater(field any, v *string) {
-	if p, ok := field.(**string); ok {
+	switch p := field.(type) {
+	case **string:
 		*p = v
-		return
+	case *int64:
+		*p, _ = strconv.ParseInt(deref(v), 10, 64)
+	default:
+		*field.(*string) = deref(v)
 	}
-	*field.(*string) = deref(v)
 }
 
 func sqlQuote(p *string) string {

@@ -1757,7 +1757,10 @@ paths:
       operationId: pickContact
       tags: [research]
       summary: Pick a suggested person for outreach
-      description: Takes someone an agent suggested out of Research and into the LinkedIn queue.
+      description: |
+        Takes someone an agent suggested out of Research and into the LinkedIn queue. Someone
+        suggested for an offering gets its connection note, and their company is qualified for
+        that offering rather than for the organisation's own.
       security:
         - session: []
         - bearer: ["research:review"]
@@ -2048,7 +2051,10 @@ paths:
       operationId: removeOffering
       tags: [offerings]
       summary: Remove an offering, with every verdict made for it
-      description: The history keeps what was decided. For a member, only an owner.
+      description: |
+        Refused while an open task is finding companies for it. The history keeps what was
+        decided; people being reached for it are then reached for the organisation's own. For a
+        member, only an owner.
       security:
         - session: []
         - bearer: ["settings:write"]
@@ -2223,8 +2229,8 @@ components:
         id: { type: integer, format: int64 }
         name: { type: string }
         look_for: { type: string, description: "What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list." }
-        pitch: { type: string, description: "Its pitch line, kept for when people are reached for it; nothing uses it yet." }
-        note_template: { type: string, description: "Its connection note, kept for when people are picked for it; nothing uses it yet." }
+        pitch: { type: string, description: "The call script's pitch line for people reached for it; empty uses the organisation's. `{company}` is filled in." }
+        note_template: { type: string, description: "The connection note for people picked for it; empty uses the organisation's. `{first}`, `{company}` and `{org}` are filled in." }
         updated_by: { type: string }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }

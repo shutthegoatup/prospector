@@ -149,14 +149,11 @@ func nameFree(tx *gorm.DB, org, id int64, name string) error {
 }
 
 // RemoveOffering deletes an offering and every verdict made for it; the history keeps
-// what was decided.
+// what was decided. People being reached for it are then reached for the organisation's own.
 func (s *Store) RemoveOffering(org, id int64, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		o, err := heldOffering(tx, org, id)
 		if err != nil {
-			return err
-		}
-		if err := tx.Where("org_id = ? and offering_id = ?", org, id).Delete(&Verdict{}).Error; err != nil {
 			return err
 		}
 		var open int64
@@ -165,6 +162,12 @@ func (s *Store) RemoveOffering(org, id int64, actor string) error {
 		}
 		if open > 0 {
 			return conflict(fmt.Sprintf("%d open tasks are finding companies for %s: close them first", open, o.Name))
+		}
+		if err := tx.Where("org_id = ? and offering_id = ?", org, id).Delete(&Verdict{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&Contact{}).Where("org_id = ? and offering_id = ?", org, id).Update("offering_id", 0).Error; err != nil {
+			return err
 		}
 		if err := tx.Delete(o).Error; err != nil {
 			return err
@@ -229,6 +232,20 @@ func putUpForReview(tx *gorm.DB, org, offering, company int64, actor string) (st
 	}
 	var stage string
 	return stage, tx.Model(&Verdict{}).Select("stage").Where("org_id = ? and offering_id = ? and company_id = ?", org, offering, company).Scan(&stage).Error
+}
+
+// qualifyFor qualifies a company for an offering when someone there is picked for it,
+// unless a person has already said otherwise. The offering is held by the caller.
+func qualifyFor(tx *gorm.DB, org int64, o *Offering, company int64, actor string) error {
+	if _, err := putUpForReview(tx, org, o.ID, company, actor); err != nil {
+		return err
+	}
+	res := tx.Model(&Verdict{}).Where("org_id = ? and offering_id = ? and company_id = ? and stage = ?", org, o.ID, company, CompanyReview).
+		Updates(map[string]any{"stage": CompanyQualified, "decided_by": actor, "updated_at": time.Now()})
+	if res.Error != nil || res.RowsAffected == 0 {
+		return res.Error
+	}
+	return tx.Create(&Event{OrgID: org, CompanyID: &company, User: actor, Action: "verdict:" + CompanyQualified, Value: &o.Name, At: time.Now()}).Error
 }
 
 // forOffering puts a company an agent works on for a task up for review by the task's
