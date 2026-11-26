@@ -418,7 +418,7 @@ func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
 	owner := newBrowser(t, srv.URL)
 	owner.login("ada@alpha.example", "correct horse battery")
 	same := map[string]any{"issuer": okta.srv.URL, "client_id": "client"}
-	if code, body := owner.post("/o/alpha/ui/sso", same); code != http.StatusOK {
+	if code, body := owner.send("PUT", "/o/alpha/api/v1/sso", same); code != http.StatusOK {
 		t.Fatalf("saving a connection whose kept secret can't be opened: %d %s", code, body)
 	}
 	if clientSecret(t, s, alpha.ID) != under2 {
@@ -427,14 +427,14 @@ func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
 	// But nobody is newly made to depend on a sign-in that can't work.
 	for _, rule := range []string{"required", "auto_join"} {
 		in := map[string]any{"issuer": okta.srv.URL, "client_id": "client", rule: true}
-		if code, body := owner.post("/o/alpha/ui/sso", in); code != http.StatusBadRequest || !strings.Contains(body, "type the secret again") {
+		if code, body := owner.send("PUT", "/o/alpha/api/v1/sso", in); code != http.StatusBadRequest || !strings.Contains(body, "type the secret again") {
 			t.Fatalf("turning on %s when the kept secret can't be opened: %d %s", rule, code, body)
 		}
 	}
 	// A typed secret is sealed whatever it looks like, even like something sealed already.
 	lookalike := "eyJhbGciOiJub25lIn0.a.b.c.d"
 	typed := map[string]any{"issuer": okta.srv.URL, "client_id": "client", "client_secret": lookalike}
-	if code, body := owner.post("/o/alpha/ui/sso", typed); code != http.StatusOK {
+	if code, body := owner.send("PUT", "/o/alpha/api/v1/sso", typed); code != http.StatusOK {
 		t.Fatalf("typing a secret shaped like a sealed one: %d %s", code, body)
 	}
 	if stored := clientSecret(t, s, alpha.ID); stored == lookalike {
@@ -488,7 +488,7 @@ func TestASecretKeptInClearIsSealedOnceThereIsAKey(t *testing.T) {
 	owner := newBrowser(t, srv.URL)
 	owner.login("ada@alpha.example", "correct horse battery")
 	in := map[string]any{"issuer": okta.srv.URL, "client_id": "client", "client_secret": "another"}
-	if code, body := owner.post("/o/alpha/ui/sso", in); code != http.StatusBadRequest || !strings.Contains(body, "PROSPECTOR_SECRET_KEYS") {
+	if code, body := owner.send("PUT", "/o/alpha/api/v1/sso", in); code != http.StatusBadRequest || !strings.Contains(body, "PROSPECTOR_SECRET_KEYS") {
 		t.Fatalf("saving a connection with no key: %d %s", code, body)
 	}
 	// A connection made before there was a key can still be changed, short of its secret.
@@ -496,13 +496,13 @@ func TestASecretKeptInClearIsSealedOnceThereIsAKey(t *testing.T) {
 		t.Fatalf("Settings should still offer an existing connection's rules, and say a key is needed for a new secret: %s", body)
 	}
 	in = map[string]any{"issuer": okta.srv.URL, "client_id": "client", "required": true}
-	if code, body := owner.post("/o/alpha/ui/sso", in); code != http.StatusOK {
+	if code, body := owner.send("PUT", "/o/alpha/api/v1/sso", in); code != http.StatusOK {
 		t.Fatalf("changing a rule with no key: %d %s", code, body)
 	}
 	if sso, _ := s.SSO(alpha.ID); !sso.Required || sso.ClientSecret != "secret" {
 		t.Fatalf("after changing a rule with no key: %+v", sso.SSOConnection)
 	}
-	if code, body := owner.post("/o/alpha/ui/sso", map[string]any{"issuer": ""}); code != http.StatusOK {
+	if code, body := owner.send("PUT", "/o/alpha/api/v1/sso", map[string]any{"issuer": ""}); code != http.StatusOK {
 		t.Fatalf("turning single sign-on off needs no key: %d %s", code, body)
 	}
 	// Domains need no key, so they stay in reach with no key and no connection.

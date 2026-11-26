@@ -328,22 +328,6 @@ type mailIn struct {
 	Sender   string `json:"sender"`
 }
 
-func (a *App) uiMail(w http.ResponseWriter, r *http.Request) {
-	var in mailIn
-	if !decode(w, r, &in) {
-		return
-	}
-	cleared, err := a.saveMail(reqOf(r).Org.ID, in)
-	switch {
-	case err != nil:
-		fail(w, err, http.StatusBadRequest)
-	case cleared:
-		writeJSON(w, map[string]string{"message": "No mail server of this organisation's own."})
-	default:
-		done(w, nil)
-	}
-}
-
 // saveMail keeps an organisation's own mail server, or drops it for an empty host.
 func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 	in.Host = strings.TrimSpace(in.Host)
@@ -371,16 +355,6 @@ func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 		}
 	}
 	return false, a.s.SaveOrgMail(m)
-}
-
-// uiMailTest sends the owner a message through whichever server invitations would use.
-func (a *App) uiMailTest(w http.ResponseWriter, r *http.Request) {
-	msg, err := a.testMail(r.Context(), reqOf(r))
-	if err != nil {
-		fail(w, err, http.StatusBadGateway)
-		return
-	}
-	writeJSON(w, map[string]string{"message": msg})
 }
 
 func (a *App) testMail(ctx context.Context, q *Req) (string, error) {

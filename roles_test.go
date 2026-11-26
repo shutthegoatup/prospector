@@ -16,10 +16,10 @@ func TestChangingSomeonesRole(t *testing.T) {
 	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")
 	base := srv.URL + "/o/alpha/"
 	role := func(c *http.Client, user int64, to string) (int, string) {
-		return call(t, c, "POST", base+"ui/member/role", "application/json", map[string]any{"user_id": user, "role": to})
+		return call(t, c, "PATCH", base+"api/v1/members/"+itoa(user), "application/json", map[string]any{"role": to})
 	}
 	makesKey := func(c *http.Client) int {
-		code, _ := call(t, c, "POST", base+"ui/keys", "application/json", map[string]any{"name": "bot", "scopes": []string{"read"}})
+		code, _ := call(t, c, "POST", base+"api/v1/keys", "application/json", map[string]any{"name": "bot", "scopes": []string{"read"}})
 		return code
 	}
 
@@ -39,7 +39,7 @@ func TestChangingSomeonesRole(t *testing.T) {
 	if code, body := role(ada, grace.ID, "owner"); code != http.StatusOK {
 		t.Fatalf("make owner: %d %s", code, body)
 	}
-	if code := makesKey(asGrace); code != http.StatusOK {
+	if code := makesKey(asGrace); code != http.StatusCreated {
 		t.Fatalf("a new owner can't make a key: %d", code)
 	}
 	if code, body := role(ada, grace.ID, "member"); code != http.StatusOK {
@@ -55,7 +55,7 @@ func TestChangingSomeonesRole(t *testing.T) {
 		t.Fatalf("an unknown role was accepted: %d", code)
 	}
 	outsider := must(s.CreateUser("carol@example.com", "Carol Outsider", "correct horse battery"))
-	if code, _ := role(ada, outsider.ID, "owner"); code != http.StatusBadRequest {
+	if code, _ := role(ada, outsider.ID, "owner"); code != http.StatusNotFound {
 		t.Fatalf("someone outside the organisation was given a role: %d", code)
 	}
 	if _, err := s.Membership(o.ID, outsider.ID); err == nil {
@@ -77,7 +77,7 @@ func TestChangingAKeysScopes(t *testing.T) {
 		return http.DefaultTransport.RoundTrip(r)
 	})}
 	scopes := func(c *http.Client, id int64, to ...string) (int, string) {
-		return call(t, c, "POST", base+"ui/keys/scopes", "application/json", map[string]any{"id": id, "scopes": to})
+		return call(t, c, "PATCH", base+"api/v1/keys/"+itoa(id), "application/json", map[string]any{"scopes": to})
 	}
 	company := AddCompanyIn{Name: "Fjordline Saunas", Facts: []FactIn{{Field: "configurator", Value: "Kickflip", SourceURL: "https://fjordline.example"}}}
 	ctx := context.Background()

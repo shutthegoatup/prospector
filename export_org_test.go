@@ -58,7 +58,7 @@ func TestExportOrg(t *testing.T) {
 		return http.DefaultTransport.RoundTrip(r)
 	})}
 	export := func(client *http.Client) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/export-org", "application/json", struct{}{})
+		return call(t, client, "POST", srv.URL+"/o/alpha/api/v1/export", "application/json", struct{}{})
 	}
 	if code, _ := export(bob); code != http.StatusForbidden {
 		t.Fatalf("a member who isn't an owner exported the organisation: %d", code)
@@ -66,7 +66,7 @@ func TestExportOrg(t *testing.T) {
 	if code, _ := export(agent); code == http.StatusOK {
 		t.Fatal("an agent's key exported the organisation")
 	}
-	if code, _ := call(t, ada, "GET", srv.URL+"/o/alpha/ui/export-org", "", nil); code == http.StatusOK {
+	if code, _ := call(t, ada, "GET", srv.URL+"/o/alpha/api/v1/export", "", nil); code == http.StatusOK {
 		t.Fatal("following a link exported the organisation")
 	}
 	// Settings offers the export to whoever the nav says is an owner.

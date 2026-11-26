@@ -72,7 +72,7 @@ func TestEachCriterionIsMetNotMetOrNotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 	found = assetsFound(o.Settings, must(s.Facts(o.ID, out.ID)))
-	if found[2].State != assetMet || !found[2].Fact.Inferred || assetHow(found[2].Fact)[:8] != "inferred" {
+	if found[2].State != assetMet || !found[2].Fact.Inferred {
 		t.Fatalf("the newer answer should stand, marked inferred: %+v", found[2])
 	}
 	if others := otherFacts(o.Settings, must(s.Facts(o.ID, out.ID))); len(others) != 1 || others[0].Answer != answerUnknown {

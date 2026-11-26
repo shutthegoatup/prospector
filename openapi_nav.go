@@ -14,7 +14,7 @@ func orgSummary(o Org) api.OrgSummary {
 
 func (s apiServer) GetNav(ctx context.Context, _ api.GetNavRequestObject) (api.GetNavResponseObject, error) {
 	q := reqFrom(ctx)
-	n := s.a.nav(q, "")
+	n := s.a.nav(q)
 	out := api.Nav{Org: orgSummary(*q.Org), Orgs: []api.NavOrg{}, Areas: []api.NavAreas{}, Work: "API key · " + keyName(q)}
 	out.Counts.Today, out.Counts.Research, out.Counts.Conversations = n.Today, n.Research, n.Conversations
 	out.Counts.Enquiries, out.Counts.Companies = n.Enquiries, n.Companies

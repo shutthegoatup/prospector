@@ -364,12 +364,12 @@ Re-importing refreshes text from the files but never clears a date or edit recor
 go test ./...                                            # SQLite
 PROSPECTOR_TEST_PG=postgres://… go test -p 1 ./...      # an empty, disposable Postgres database; tables are dropped
 go tool templ generate                                   # after editing *.templ
-go tool shadcn-templ add <component>                     # UI components (shadcn/ui for templ)
+go tool shadcn-templ add <component>                     # components for the templ pages (shadcn/ui for templ)
 node build-css.mjs <node_modules with tailwindcss v4>   # or the standalone tailwindcss CLI
-(cd web && npm ci && npm run build)                      # the React app and the page scripts
+(cd web && npm ci && npm run build)                      # the React app and the templ pages' script
 ```
 
-The app inside an organisation is a React front end in `web/` (TanStack Router, its addresses `/o/<org>/today`, `/o/<org>/companies/<id>` and so on); the server answers each of those addresses with the same page and the app reads everything through the API. Sign-in, the front page and the customer's pages are server-rendered.
+The app inside an organisation is a React front end in `web/` (TanStack Router, its addresses `/o/<org>/today`, `/o/<org>/companies/<id>`, `/o/<org>/agreements/<id>/prepare` and so on); the server answers each of those addresses with the same page and the app reads and changes everything through the API. Only the pages outside an organisation's app are server-rendered with templ: sign-in, password reset and single sign-on, starting a first organisation, the front page, a customer's onboarding page, unsubscribing, the `/api` reference and error pages.
 
 `assets/css/output.css`, the built app and scripts and `*_templ.go` are committed, so a plain `go build` needs neither Node nor Tailwind.
 
