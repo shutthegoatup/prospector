@@ -282,6 +282,18 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 		log.Printf("campaign %d: %v", c.ID, err)
 		return
 	}
+	var customers map[int64]bool
+	if c.Kind == KindService {
+		ids, err := a.s.customerCompanies(o.ID)
+		if err != nil {
+			log.Printf("campaign %d: %v", c.ID, err)
+			return
+		}
+		customers = make(map[int64]bool, len(ids))
+		for _, id := range ids {
+			customers[id] = true
+		}
+	}
 	// One organisation's day, and one round's time, are bounded: a host carries many,
 	// and a mail server that hangs mustn't hold up the rest.
 	var today int64
@@ -310,7 +322,7 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 		if claimed.RowsAffected == 0 {
 			continue
 		}
-		if !a.sendOne(ctx, o, c, via, gate, r) {
+		if !a.sendOne(ctx, o, c, via, gate, customers, r) {
 			return
 		}
 	}
@@ -318,7 +330,7 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 
 // sendOne sends one claimed mail and settles it. It reports whether the round should go
 // on: not once the mail server can't be reached, nor once the campaign stops.
-func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, gate *mailGate, r CampaignRecipient) bool {
+func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, gate *mailGate, customers map[int64]bool, r CampaignRecipient) bool {
 	settle := func(status, reason string) bool {
 		updates := map[string]any{"status": status, "reason": reason}
 		if status == MailSent {
@@ -341,11 +353,24 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 	}
 	// Checked again as it goes: someone may have unsubscribed since it was sent.
 	var link string
+	var who Contact
+	found := false
 	if r.ContactID != nil {
-		var who Contact
-		if a.s.db.Where("org_id = ? and id = ?", o.ID, *r.ContactID).Limit(1).Find(&who).Error == nil {
-			link = deref(who.Linkedin)
+		read := a.s.db.Where("org_id = ? and id = ?", o.ID, *r.ContactID).Limit(1).Find(&who)
+		if read.Error != nil && c.Kind == KindService {
+			log.Printf("campaign %d: checking a mail: %v", c.ID, read.Error)
+			settle(MailQueued, "")
+			return false
 		}
+		if read.Error == nil && read.RowsAffected > 0 {
+			found, link = true, deref(who.Linkedin)
+		}
+	}
+	// A service notice passes the list not to be mailed only because they are a customer,
+	// so that is checked again too: a subscription may have ended since it was queued.
+	if c.Kind == KindService && (!found || who.Status == ContactSuggested || who.Declined != nil ||
+		who.CompanyID == nil || !customers[*who.CompanyID]) {
+		return settle(MailSkipped, "no longer a customer")
 	}
 	// An address made unreadable since it was queued, as erasure does, is nobody's.
 	if _, err := bareAddress(r.Address); err != nil {

@@ -517,6 +517,34 @@ func TestAServiceNoticeIsCheckedAgainAsItIsSent(t *testing.T) {
 	}
 }
 
+// A service notice skips the list not to be mailed only for customers, so a subscription
+// that ends while the notice is still going out stops the rest of it reaching them.
+func TestAServiceNoticeStopsAtSomeoneNoLongerACustomer(t *testing.T) {
+	a, s, o, _, _, box := campaignSite(t)
+	var hannah Contact
+	if err := s.db.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
+		t.Fatal(err)
+	}
+	sub := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"))
+	must(s.Suppress(o.ID, "tom@larkmoor.example", "Ada Lovelace"))
+	c := must(s.AddCampaign(o.ID, CampaignIn{Name: "Price change", Kind: KindService, Audience: AudienceCustomers, Subject: "Your price", Body: "It changes."}, "Ada Lovelace"))
+	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
+	if _, queued := mailOf(t, s, o, c)["tom@larkmoor.example"]; !queued {
+		t.Fatal("the unsubscribed customer was not queued")
+	}
+
+	if err := s.db.Model(&Subscription{}).Where("id = ?", sub.ID).Update("ended_on", "2026-02-01").Error; err != nil {
+		t.Fatal(err)
+	}
+	a.sendRound(context.Background(), time.Now())
+	if to := box.to(); len(to) != 0 {
+		t.Errorf("a service notice went to %v after their subscription ended", to)
+	}
+	if r := mailOf(t, s, o, c)["tom@larkmoor.example"]; r.Status != MailSkipped || r.Reason != "no longer a customer" {
+		t.Errorf("the unsubscribed former customer's mail: %s %q", r.Status, r.Reason)
+	}
+}
+
 func TestCampaignsFromBeforeKindsAreMarketing(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
