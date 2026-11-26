@@ -248,7 +248,7 @@ func historyText(h HistoryItem) string {
 		"erase": "erased a person on request", "enquiry": "sent an enquiry",
 		"suggest:email": "suggested an email", "suggest:phone": "suggested a phone number", "suggest:linkedin": "suggested a LinkedIn profile",
 		"dismiss:email": "dismissed a suggested email", "dismiss:phone": "dismissed a suggested phone number", "dismiss:linkedin": "dismissed a suggested LinkedIn profile",
-		"export": "exported what is held on them", "task:match": "matched to a task",
+		"export": "exported what is held on them", "task:match": "matched to a task", "task:held": "found again by a search",
 		"note:skipped": "left a note: skipped", "note:dead_end": "left a note: found nothing", "note:next": "left a note: what to do next",
 		"task:new": "wrote a task", "task:ask": "asked for more on a task", "task:pickup": "picked up a task",
 		"task:done": "finished a request", "task:reopen": "reopened a request", "task:close": "closed a task", "task:open": "reopened a task",
