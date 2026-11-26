@@ -56,3 +56,20 @@ func (s apiServer) RecordEnquiryAnswer(ctx context.Context, in api.RecordEnquiry
 	}
 	return api.RecordEnquiryAnswer201JSONResponse(messageOut(*m)), nil
 }
+
+func (s apiServer) ListMembers(ctx context.Context, in api.ListMembersRequestObject) (api.ListMembersResponseObject, error) {
+	members, err := s.a.s.Members(reqFrom(ctx).Org.ID)
+	if err != nil {
+		return nil, err
+	}
+	members, next, err := listPage(members, in.Params.Limit, in.Params.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListMembers200JSONResponse{Headers: api.ListMembers200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out.Body.Items, out.Body.NextCursor = []api.MemberName{}, next
+	for _, m := range members {
+		out.Body.Items = append(out.Body.Items, api.MemberName{Name: m.Name})
+	}
+	return out, nil
+}

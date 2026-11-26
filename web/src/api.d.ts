@@ -461,6 +461,54 @@ export interface paths {
         patch: operations["changeOwnDeal"];
         trace?: never;
     };
+    "/o/{org}/api/v1/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The Conversations board, a card for each deal
+         * @description The deals `listDeals` gives, in its order, each with what its card on the board
+         *     shows besides: the company's name, the notes from calls and whether the company is
+         *     being onboarded.
+         */
+        get: operations["listConversations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Who is in the organisation, by name
+         * @description The names that can own a deal or an enquiry, in order.
+         */
+        get: operations["listMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/enquiries": {
         parameters: {
             query?: never;
@@ -2242,6 +2290,17 @@ export interface components {
              */
             subscription_id: number;
         };
+        DealCard: components["schemas"]["Deal"] & {
+            /** @description The name of the company the deal is with; empty when they have none here. */
+            company: string;
+            /** @description The notes from calls with the person. */
+            call_notes: string;
+            /** @description `running` while the company is being onboarded, `live` once it is, empty when no onboarding has started. */
+            onboarding: string;
+        };
+        MemberName: {
+            name: string;
+        };
         DealChange: {
             kind?: string | null;
             /** @description As you would write it: `14,000`, `€5,000`; empty for none. */
@@ -3298,6 +3357,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Deal"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listConversations: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description By stage, in the board's order. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["DealCard"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                        /** @description How many steps an onboarding started now would have: 0 until an owner writes them in Settings, and until then a won deal offers none. */
+                        onboarding_steps: number;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listMembers: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of them. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MemberName"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
                 };
             };
             default: components["responses"]["Problem"];

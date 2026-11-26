@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { CampaignsPage } from "@/pages/Campaigns";
+import { ConversationsPage } from "@/pages/Conversations";
 import { OnboardingPage } from "@/pages/Onboarding";
 import { ResearchPage } from "@/pages/Research";
 import { SessionContext } from "@/session";
@@ -20,6 +21,7 @@ if (mount) {
               <Route path="research" element={<ResearchPage />} />
               <Route path="campaigns" element={<CampaignsPage />} />
               <Route path="onboarding" element={<OnboardingPage />} />
+              <Route path="conversations" element={<ConversationsPage />} />
             </Routes>
           </BrowserRouter>
         </QueryClientProvider>
