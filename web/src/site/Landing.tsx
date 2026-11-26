@@ -2,7 +2,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Brand, Eyebrow, Footer, Panel, SectionHead, Shot, SiteButton, Tag, Terminal, toneFill, Wrap, type Tone } from "@/components/app/site";
 import { Button } from "@/components/ui/button";
-import { CardDescription, CardTitle } from "@/components/ui/card";
+import { CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
 const repoURL = "https://github.com/shutthegoatup/prospector";
 
 const perUser = 5;
-export const hostedPrice = `£${perUser}`;
+const freeUsers = 5;
+export const pricing = `Free for up to ${freeUsers} users, then £${perUser} a user a month.`;
 
 const rise = "animate-in fade-in slide-in-from-bottom-3 fill-mode-both duration-600 motion-reduce:animate-none";
 
@@ -46,15 +47,15 @@ export function Landing() {
                 </span>
               </h1>
               <p className={cn("mb-8 max-w-[34em] text-[19px] text-[#3a3122]", rise, "delay-150")}>
-                Prospector is a workbench for teams selling to named accounts, from the first fact about a company to its signed agreement. Agents research and
+                Prospector is a workbench for teams selling to named accounts, from the first fact about a company to the agreement it signs. Agents research and
                 draft. People qualify, decide and send.
               </p>
               <div className={cn("flex flex-wrap gap-3", rise, "delay-200")}>
                 <SiteButton big href="#pricing">
-                  Start for {hostedPrice} a user
+                  Free for {freeUsers} users
                 </SiteButton>
-                <SiteButton look="outline" big href="#start">
-                  Self-host free
+                <SiteButton look="outline" big href="#loop">
+                  See how it works
                 </SiteButton>
               </div>
             </div>
@@ -227,7 +228,9 @@ export function Landing() {
             </div>
             <Panel className="grid self-start border-sidebar-border! bg-[#211b11]! text-background md:grid-cols-2">
               <div className="min-w-0 p-[26px]">
-                <Tag tone="green">A key can</Tag>
+                <Tag tone="green" asChild>
+                  <h3>A key can</h3>
+                </Tag>
                 <ul className="mt-[18px] grid gap-3.5 text-base leading-snug [&_code]:mt-[3px] [&_code]:block [&_code]:font-mono [&_code]:text-xs [&_code]:text-[#b9b0a0]">
                   <li>
                     Search companies and people, and read what's due and the tasks people wrote<code>read</code>
@@ -266,7 +269,9 @@ export function Landing() {
                 </ul>
               </div>
               <div className="min-w-0 border-t-2 border-sidebar-border p-[26px] md:border-t-0 md:border-l-2">
-                <Tag tone="coral">No key can</Tag>
+                <Tag tone="coral" asChild>
+                  <h3>No key can</h3>
+                </Tag>
                 <ul className="mt-[18px] grid gap-3.5 text-base leading-snug [&_code]:font-mono [&_code]:text-xs [&_code]:text-[#b9b0a0]">
                   <li>Sign an agreement</li>
                   <li>Send mail without a scope that says so, or to anyone on your never-contact list or erased on request</li>
@@ -289,7 +294,7 @@ export function Landing() {
           <SectionHead label="Built for a small team" title="The details that keep a list clean." />
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             <Feature tone="coral" title="A never-contact list that holds">
-              Domains, companies, email addresses and LinkedIn profiles. A never-contact company stays on file but out of review and outreach. It applies to agents,
+              Domains, email addresses and LinkedIn profiles. A company on a listed domain stays on file but out of review and outreach. It applies to agents,
               imports and edits alike.
             </Feature>
             <Feature tone="gold" title="Calls at a sensible hour">
@@ -318,10 +323,11 @@ export function Landing() {
       <section className="mt-[72px] border-y-2 border-ink bg-chart-3 lg:mt-[104px]" id="start">
         <Wrap className="grid items-center gap-14 py-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:py-[88px]">
           <div>
-            <Eyebrow className="text-[#4d1c0e]">Self-host</Eyebrow>
-            <h2 className="mt-3.5 mb-4 font-heading text-[clamp(32px,4.2vw,52px)] font-bold leading-[1.05] tracking-[-0.02em] text-balance">Set up in four commands.</h2>
+            <Eyebrow className="text-[#4d1c0e]">Rather run it yourself?</Eyebrow>
+            <h2 className="mt-3.5 mb-4 font-heading text-[clamp(32px,4.2vw,52px)] font-bold leading-[1.05] tracking-[-0.02em] text-balance">Self-host in four commands.</h2>
             <p className="mb-7 text-lg text-[#2c120a]">
-              Prospector is one program for Linux or macOS. Download it, name your organisation, add yourself and start working the list.
+              Prospector is one program for Linux or macOS, on SQLite or Postgres, with every feature. Download it, name your organisation, add yourself and start
+              working the list. Your server, your mail, your models.
             </p>
             <div className="flex flex-wrap gap-3">
               <SiteButton big href={`${repoURL}/releases/latest`} className="hover:shadow-[4px_4px_0_var(--primary)]!">
@@ -352,6 +358,7 @@ export function Landing() {
       <div id="enquiry" />
       <Footer blurb="Prospects and customers for small teams with a named list.">
         <a href="#pricing">Pricing</a>
+        <a href="#start">Self-host</a>
         <a href={repoURL}>GitHub</a>
         <a href={`${repoURL}/releases`}>Releases</a>
         <a href="/login">Sign in</a>
@@ -409,35 +416,45 @@ function Feature({ tone, title, children }: { tone: Tone; title: string; childre
   return (
     <Panel className="gap-2 p-[26px]">
       <span className={cn("mb-2.5 block h-2 w-[34px] rounded", toneFill[tone])} />
-      <CardTitle className="font-heading text-[19px] leading-[1.3] font-semibold">{title}</CardTitle>
+      <h3 className="font-heading text-[19px] leading-[1.3] font-semibold">{title}</h3>
       <CardDescription className="text-base leading-normal">{children}</CardDescription>
     </Panel>
   );
 }
 
-function Plan({ dark, tone, name, note, audience, price, per, items, actions, small }: {
+function Pound() {
+  return <small className="mr-0.5 align-[0.55em] text-[0.5em]">£</small>;
+}
+
+// A plan's button leads to the enquiry form, so the form's script draws it into the
+// plan's data-plan-cta slot, labelled as that says; with no form, the slot stays empty.
+function Plan({ dark, tone, name, note, audience, price, per, items, cta }: {
   dark?: boolean;
   tone: Tone;
   name: string;
   note: string;
   audience: string;
-  price: number;
+  price: ReactNode;
   per: string;
   items: string[];
-  actions: ReactNode;
-  small?: string;
+  cta: string;
 }) {
   const soft = dark ? "text-[#b9b0a0]" : "text-muted-foreground";
   return (
     <Panel tone={tone} className={cn("min-w-0 gap-[22px] p-6 sm:p-8", dark && "bg-sidebar! text-background")}>
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <CardTitle className="font-heading text-[26px] leading-[1.1] font-bold tracking-[-0.015em]">{name}</CardTitle>
+        <h3 className="font-heading text-[26px] leading-[1.1] font-bold tracking-[-0.015em]">{name}</h3>
         <Eyebrow className={soft}>{note}</Eyebrow>
       </div>
       <p className={cn("text-base leading-normal", soft)}>{audience}</p>
       <div className={cn("flex flex-wrap items-baseline gap-2.5 border-y-2 py-[18px]", dark ? "border-sidebar-border" : "border-border")}>
-        <b className={cn("font-heading text-[60px] leading-[0.9] font-bold tracking-[-0.03em] tabular-nums sm:text-[72px]", dark && "text-primary")}>
-          <small className="mr-0.5 align-[0.55em] text-[0.5em]">£</small>
+        <b
+          className={cn(
+            "font-heading leading-[0.9] font-bold tracking-[-0.03em] tabular-nums",
+            typeof price === "string" ? "text-[44px]" : "text-[60px] sm:text-[72px]",
+            dark && "text-primary",
+          )}
+        >
           {price}
         </b>
         <span className={cn("font-mono text-[13px] font-medium uppercase tracking-[0.06em]", soft)}>{per}</span>
@@ -455,8 +472,7 @@ function Plan({ dark, tone, name, note, audience, price, per, items, actions, sm
           </li>
         ))}
       </ul>
-      {actions}
-      {small && <p className={cn("mt-auto text-sm", soft)}>{small}</p>}
+      <div className="mt-auto flex flex-wrap gap-3 empty:hidden" data-plan-cta={cta} data-look={dark ? "gold" : "ink"} />
     </Panel>
   );
 }
@@ -465,53 +481,59 @@ function Pricing() {
   return (
     <section className="pt-[72px] lg:pt-[104px]" id="pricing">
       <Wrap>
-        <SectionHead label="Pricing" title="Run it yourself for nothing, or let us run it.">
-          Both are the same program with every feature. The only difference is who looks after the server.
+        <SectionHead label="Pricing" title={`Free for your first ${freeUsers} users.`}>
+          Every plan has every feature, run by us: the server, its backups and each release as it ships.
         </SectionHead>
-        <div className="grid gap-7 md:grid-cols-2">
+        <div className="grid gap-7 lg:grid-cols-3">
           <Plan
             tone="green"
-            name="Self-hosted"
-            note="Linux or macOS"
-            audience="For a team with a server and someone happy to look after it."
-            price={0}
-            per="for any number of users"
-            items={[
-              "Every feature, including agents, campaigns and agreements",
-              "One program on your own server, with SQLite or Postgres",
-              "Your own mail server, models and search",
-              "Upgrade when you choose, from the releases page",
-              "Help through GitHub issues",
-            ]}
-            actions={
-              <div className="mt-auto flex flex-wrap gap-3">
-                <SiteButton href="#start">Download Prospector</SiteButton>
-              </div>
+            name="Free"
+            note="To start"
+            audience="For a small team finding its first customers."
+            price={
+              <>
+                <Pound />0
+              </>
             }
+            per={`up to ${freeUsers} users`}
+            items={["Every feature, including agents, campaigns and agreements", "Hosting, backups, sign-in mail and every release", "Help from the docs and GitHub issues"]}
+            cta="Start free"
           />
           <Plan
             dark
             tone="gold"
-            name="Hosted"
-            note="We run it"
-            audience="For a team that would rather sell than run a server."
-            price={perUser}
+            name="Team"
+            note="As you grow"
+            audience={`For a team past ${freeUsers}. Your first ${freeUsers} users stay free.`}
+            price={
+              <>
+                <Pound />
+                {perUser}
+              </>
+            }
             per="a user a month"
-            items={[
-              "Every feature, the same as self-hosted",
-              "We run the server and its Postgres database, with backups",
-              "Each release installed as it ships",
-              "Sign-in and reset mail sent for you. Campaigns still go through your own mail server",
-              "Help by email from the people who build it",
-            ]}
-            actions={<div className="mt-auto flex flex-wrap gap-3 empty:hidden" id="hosted-cta" />}
-            small="A user is anyone who signs in to one of your organisations. API keys and agents are free. Prices exclude VAT."
+            items={["Everything in Free, for any number of users", `Pay only for users past your first ${freeUsers}`, "Help by email from the people who build it"]}
+            cta="Start with your team"
+          />
+          <Plan
+            tone="violet"
+            name="Larger teams"
+            note="Talk to us"
+            audience="For a bigger team, or terms of your own."
+            price="Let's talk"
+            per="a price that fits"
+            items={["Everything in Team", "A price for your number of users", "Terms and support to suit you"]}
+            cta="Talk to us"
           />
         </div>
+        <p className="mt-8 text-sm text-muted-foreground">
+          A user is anyone who signs in to one of your organisations. API keys and agents are free. Billed monthly; prices exclude VAT. Campaigns go through your
+          own mail server.
+        </p>
         <div role="note" className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3.5 rounded-[14px] border-2 border-dashed border-ink px-6 py-5">
           <strong className="font-heading text-[17px] font-semibold">No lock-in.</strong>
           <p className="min-w-0 flex-[1_1_24em] text-base text-muted-foreground">
-            An owner can download everything the organisation holds as one file, whenever they like, hosted or not.
+            An owner can download everything the organisation holds as one file, whenever they like. Or <a className="underline decoration-primary underline-offset-[3px]" href="#start">run Prospector yourself</a>, free.
           </p>
         </div>
       </Wrap>
@@ -547,12 +569,12 @@ async function send(to: string, body: string): Promise<Outcome> {
   return "failed";
 }
 
-const fieldLabel = "flex flex-col gap-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground";
+const fieldLabel = "flex flex-col items-stretch gap-1.5 leading-[1.4] font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground";
 const field = "h-11 rounded-lg border-2 border-ink bg-background px-3 font-sans text-base normal-case tracking-normal text-foreground";
 
 // EnquiryForm is the front page's contact section, with its link in the page's nav and
-// the hosted plan's buttons, which lead nowhere where there is no form.
-export function EnquiryForm({ intake, nav, hosted }: { intake: string; nav: Element | null; hosted: Element | null }) {
+// the plans' buttons, which lead nowhere where there is no form.
+export function EnquiryForm({ intake, nav, plans }: { intake: string; nav: Element | null; plans: HTMLElement[] }) {
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState("");
   const submit = async (e: FormEvent<HTMLFormElement>) => {
@@ -579,18 +601,14 @@ export function EnquiryForm({ intake, nav, hosted }: { intake: string; nav: Elem
   return (
     <>
       {nav && createPortal(<a href="#contact">Contact</a>, nav)}
-      {hosted &&
+      {plans.map((slot) =>
         createPortal(
-          <>
-            <SiteButton look="gold" href="#contact">
-              Start hosted
-            </SiteButton>
-            <SiteButton look="light" href="#contact">
-              Ask a question
-            </SiteButton>
-          </>,
-          hosted,
-        )}
+          <SiteButton look={slot.dataset.look === "gold" ? "gold" : "ink"} href="#contact">
+            {slot.dataset.planCta}
+          </SiteButton>,
+          slot,
+        ),
+      )}
       <section className="border-b-2 border-ink" id="contact">
         <Wrap className="grid items-start gap-14 py-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:py-[88px]">
           <div>
@@ -614,7 +632,7 @@ export function EnquiryForm({ intake, nav, hosted }: { intake: string; nav: Elem
               </Label>
               <Label className={fieldLabel}>
                 What it's about
-                <select className={field} name="kind" defaultValue="sales">
+                <select className={cn(field, "w-full")} name="kind" defaultValue="sales">
                   <option value="signup">Hosted Prospector</option>
                   <option value="sales">A question</option>
                   <option value="demo">See it running</option>
@@ -624,7 +642,7 @@ export function EnquiryForm({ intake, nav, hosted }: { intake: string; nav: Elem
               </Label>
               <Label className={cn(fieldLabel, "sm:col-span-2")}>
                 Message
-                <Textarea className={cn(field, "h-auto py-2")} name="message" rows={5} maxLength={5000} required />
+                <Textarea className={cn(field, "h-auto min-h-32 py-2")} name="message" rows={5} maxLength={5000} required />
               </Label>
               <label className="absolute -left-[9999px]" aria-hidden>
                 Leave this empty

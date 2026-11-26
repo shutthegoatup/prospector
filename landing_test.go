@@ -271,20 +271,50 @@ func TestTheFrontPageTellsTheTruthAboutKeys(t *testing.T) {
 	}
 }
 
-// The front page prices both ways of running Prospector. The hosted plan's buttons lead
-// to the enquiry form, so the built page leaves them to the form's script.
+// The front page prices the hosted plans: free for the first five users, £5 a user
+// after, and a conversation for larger teams. Self-hosting has a section of its own,
+// not a plan. Each plan's button leads to the enquiry form, so the built page leaves it
+// to the form's script.
 func TestFrontPagePricing(t *testing.T) {
 	_, _, srv, _ := signedIn(t)
 	_, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil)
-	for _, want := range []string{`id="pricing"`, `href="#pricing"`, "Self-hosted", "for any number of users", "a user a month", "Prices exclude VAT", `id="hosted-cta"></div>`} {
-		if !strings.Contains(body, want) {
+	start := strings.Index(body, `id="pricing"`)
+	if start < 0 {
+		t.Fatal("the front page has no pricing section")
+	}
+	pricing := body[start : start+strings.Index(body[start:], "</section>")]
+	for _, want := range []string{"Free for your first 5 users.", "up to 5 users", `£</small>0</b>`, `£</small>5</b>`, "a user a month", "Larger teams", "prices exclude VAT",
+		`data-plan-cta="Start free"`, `data-plan-cta="Talk to us"`} {
+		if !strings.Contains(pricing, want) {
 			t.Errorf("the front page's pricing lacks %q", want)
 		}
 	}
-	if !strings.Contains(body, `£</small>0</b>`) || !strings.Contains(body, `£</small>5</b>`) {
-		t.Error("the front page doesn't show self-hosting free and hosting at £5")
+	if strings.Contains(pricing, "Self-host") || !strings.Contains(body, `id="start"`) {
+		t.Error("self-hosting is priced as a plan, or has lost its own section")
 	}
 	if strings.Contains(body, `href="#contact"`) {
 		t.Error("the built front page links to an enquiry form it may not have")
+	}
+	// Where the form's script mounts the form and the Contact link; renamed, the form
+	// would silently not appear.
+	for _, mount := range []string{`id="enquiry"></div>`, `id="site-links"`} {
+		if !strings.Contains(body, mount) {
+			t.Errorf("the front page lost the form script's mount %s", mount)
+		}
+	}
+}
+
+// The site's sections, cards and API operations are headings, so they can be navigated
+// as such: built from components that draw divs, they would quietly stop being.
+func TestSitePagesKeepTheirHeadings(t *testing.T) {
+	_, _, srv, _ := signedIn(t)
+	visitor := &http.Client{}
+	_, front := call(t, visitor, "GET", srv.URL+"/", "", nil)
+	if n := strings.Count(front, "<h3"); n < 20 {
+		t.Errorf("the front page has %d h3 headings, want a card or step title each", n)
+	}
+	_, ref := call(t, visitor, "GET", srv.URL+"/api", "", nil)
+	if ops, n := strings.Count(ref, `id="op-`), strings.Count(ref, "<h3"); ops == 0 || n < ops {
+		t.Errorf("/api has %d h3 headings for %d operations", n, ops)
 	}
 }

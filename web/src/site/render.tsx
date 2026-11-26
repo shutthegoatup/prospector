@@ -4,7 +4,7 @@ import { ApiReference, type Doc } from "./ApiReference";
 import doc from "./apidoc.json";
 import { Landing } from "./Landing";
 
-export { hostedPrice } from "./Landing";
+export { pricing } from "./Landing";
 
 // What prerender.mjs writes into the built pages, rendered once when the app is built.
 export function landing(): string {

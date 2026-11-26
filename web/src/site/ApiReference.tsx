@@ -1,7 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 import { Brand, Eyebrow, Footer, Panel, SiteButton, Wrap } from "@/components/app/site";
 import { Badge } from "@/components/ui/badge";
-import { CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 // The shape of apidoc.json, which the server's test writes from api/openapi.yaml.
@@ -272,7 +271,7 @@ export function ApiReference({ doc }: { doc: Doc }) {
                     <Method op={o} big />
                     <code className="bg-transparent! p-0! text-[15px] break-all">{o.path}</code>
                   </header>
-                  <CardTitle className="mt-3.5 mb-1.5 font-heading text-xl leading-[1.3]">{o.summary}</CardTitle>
+                  <h3 className="mt-3.5 mb-1.5 font-heading text-xl leading-[1.3] font-semibold">{o.summary}</h3>
                   {o.about.length > 0 && (
                     <p className="max-w-[70ch] text-muted-foreground">
                       <Spans of={o.about} />
