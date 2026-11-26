@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Pager, StageTag, usePages } from "@/pages/Companies";
 import { OnboardingCard, today } from "@/pages/Onboarding";
 import { safeHref } from "@/lib/links";
+import { useOfferings } from "@/lib/offerings";
 import { useSession } from "@/session";
 
 type Overview = components["schemas"]["CompanyOverview"];
@@ -88,6 +89,7 @@ export function CompanyPage() {
       <div className="mt-3 flex flex-col gap-5 panel p-6">
         <Head c={c} />
         {c.why && <p className="text-sm text-muted-foreground">{c.why}</p>}
+        <WhereItStands c={c} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-lg bg-muted p-3">
             <Eyebrow>Looking for</Eyebrow>
@@ -182,6 +184,91 @@ function Head({ c }: { c: Overview }) {
         )}
       </div>
       <Failed errors={[review.error]} />
+    </div>
+  );
+}
+
+const verdictPill: Record<string, [string, Tone]> = {
+  review: ["To review", "warn"],
+  qualified: ["Qualified", "ok"],
+  rejected: ["Junked", "stop"],
+};
+
+// WhereItStands is the company's verdict for each offering, shown once there is more
+// than the organisation's own: ruled out for one, it can still be right for another.
+function WhereItStands({ c }: { c: Overview }) {
+  const { org, sales } = useSession();
+  const refresh = useRefresh();
+  const offerings = useOfferings();
+  const settings = $api.useQuery("get", "/o/{org}/api/v1/settings", { params: { path: { org } } });
+  const verdicts = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/companies/{id}/verdicts",
+    { params: { path: { org, id: c.id }, query: { limit: 200 } } },
+    { enabled: offerings.length > 0 },
+  );
+  const review = $api.useMutation("patch", "/o/{org}/api/v1/companies/{id}", { onSuccess: refresh });
+  if (offerings.length === 0) return null;
+  const judge = (stage: "review" | "qualified" | "rejected", offering?: number) =>
+    review.mutate({ params: { path: { org, id: c.id } }, body: { stage, offering } });
+  const by = new Map((verdicts.data?.items ?? []).map((v) => [v.offering_id, v]));
+  const ownPill: [string, Tone] = c.stage === "rejected" ? ["Rejected", "stop"] : (verdictPill[c.stage] ?? ["", ""]);
+  return (
+    <div>
+      <Eyebrow>Where it stands</Eyebrow>
+      <div className="mt-1 flex flex-col">
+        <StandingRow name={settings.data?.name ?? "Your own"} pill={c.found_for ? null : ownPill}>
+          {sales && c.found_for !== 0 && (
+            <ActionButton quiet size="xs" onClick={() => judge("review")}>
+              Review for this
+            </ActionButton>
+          )}
+          {sales && !c.found_for && c.stage === "rejected" && (
+            <ActionButton quiet size="xs" onClick={() => judge("review")}>
+              Put back
+            </ActionButton>
+          )}
+        </StandingRow>
+        {offerings.map((o) => {
+          const v = by.get(o.id);
+          return (
+            <StandingRow key={o.id} name={o.name} pill={v ? (verdictPill[v.stage] ?? null) : null} said={v && (v.reason || v.by) ? `${v.reason ? `“${v.reason}” ` : ""}${actor(v.by)}, ${stamp(v.updated_at)}` : ""}>
+              {sales && !v && (
+                <ActionButton quiet size="xs" onClick={() => judge("review", o.id)}>
+                  Review for this
+                </ActionButton>
+              )}
+              {sales && v?.stage === "review" && (
+                <ActionButton size="xs" onClick={() => judge("qualified", o.id)}>
+                  Qualify
+                </ActionButton>
+              )}
+              {sales && v && v.stage !== "rejected" && (
+                <ActionButton quiet size="xs" onClick={() => judge("rejected", o.id)}>
+                  Junk
+                </ActionButton>
+              )}
+              {sales && v?.stage === "rejected" && (
+                <ActionButton quiet size="xs" onClick={() => judge("review", o.id)}>
+                  Undo
+                </ActionButton>
+              )}
+            </StandingRow>
+          );
+        })}
+      </div>
+      <Failed errors={[verdicts.error, review.error]} />
+    </div>
+  );
+}
+
+function StandingRow({ name, pill, said, children }: { name: string; pill: [string, Tone] | null; said?: string; children?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-dashed border-border py-2 text-sm">
+      <span className="min-w-[140px] font-medium">{name}</span>
+      {pill ? <Pill tone={pill[1]}>{pill[0]}</Pill> : <span className="text-muted-foreground">Not looked at</span>}
+      {said && <span className="min-w-0 text-xs text-muted-foreground">{said}</span>}
+      <span className="ml-auto flex gap-2">{children}</span>
     </div>
   );
 }

@@ -800,15 +800,16 @@ func (s *Store) Tasks(org int64, closed bool, page int, now time.Time) ([]TaskVi
 // What agents see and do.
 
 type TaskBrief struct {
-	ID      int64      `json:"id"`
-	Title   string     `json:"title"`
-	Status  string     `json:"status" jsonschema:"waiting (nobody is on it), working (an agent changed something in the last half hour, or holds an open request) or done"`
-	Open    []AskedOut `json:"open_requests" jsonschema:"what people have asked for that nobody has finished"`
-	Found   TaskCounts `json:"found"`
-	LastBy  string     `json:"last_agent,omitempty"`
-	LastAt  *time.Time `json:"last_agent_at,omitempty"`
-	LastDid string     `json:"last_agent_action,omitempty" jsonschema:"what that agent last did: task:pickup when it only picked the task up"`
-	LastYou bool       `json:"last_agent_was_you,omitempty"`
+	ID         int64      `json:"id"`
+	Title      string     `json:"title"`
+	Status     string     `json:"status" jsonschema:"waiting (nobody is on it), working (an agent changed something in the last half hour, or holds an open request) or done"`
+	Open       []AskedOut `json:"open_requests" jsonschema:"what people have asked for that nobody has finished"`
+	Found      TaskCounts `json:"found"`
+	LastBy     string     `json:"last_agent,omitempty"`
+	LastAt     *time.Time `json:"last_agent_at,omitempty"`
+	LastDid    string     `json:"last_agent_action,omitempty" jsonschema:"what that agent last did: task:pickup when it only picked the task up"`
+	LastYou    bool       `json:"last_agent_was_you,omitempty"`
+	OfferingID int64      `json:"offering_id" jsonschema:"what the task finds companies for; 0 is the organisation's own offering"`
 }
 
 type TaskCounts struct {
@@ -871,7 +872,7 @@ func asked(r RequestView, who Actor) AskedOut {
 }
 
 func brief(v TaskView, who Actor) TaskBrief {
-	b := TaskBrief{ID: v.ID, Title: v.Title, Status: v.Status, Open: []AskedOut{}, Found: TaskCounts{len(v.Companies), len(v.People)}}
+	b := TaskBrief{ID: v.ID, Title: v.Title, Status: v.Status, Open: []AskedOut{}, Found: TaskCounts{len(v.Companies), len(v.People)}, OfferingID: v.OfferingID}
 	for _, r := range v.Open() {
 		b.Open = append(b.Open, asked(r, who))
 	}
@@ -888,8 +889,13 @@ func (s *Store) AgentTasks(org int64, who Actor, page PageIn) (briefs []TaskBrie
 }
 
 // TaskBriefs is AgentTasks with the closed tasks too when asked, after the open ones as
-// the tasks page lists them. Its cursor then also says whether it ended among the closed.
-func (s *Store) TaskBriefs(org int64, who Actor, closed bool, page PageIn) (briefs []TaskBrief, next string, err error) {
+// the tasks page lists them, and only those for one offering when one is given. Its
+// cursor then also says whether it ended among the closed.
+func (s *Store) TaskBriefs(org int64, who Actor, closed bool, page PageIn) ([]TaskBrief, string, error) {
+	return s.taskBriefsFor(org, who, closed, nil, page)
+}
+
+func (s *Store) taskBriefsFor(org int64, who Actor, closed bool, offering *int64, page PageIn) (briefs []TaskBrief, next string, err error) {
 	n := 1
 	if closed {
 		n = 2
@@ -899,6 +905,9 @@ func (s *Store) TaskBriefs(org int64, who Actor, closed bool, page PageIn) (brie
 		return nil, "", err
 	}
 	q := s.in(org).Limit(page.size() + 1)
+	if offering != nil {
+		q = q.Where("offering_id = ?", *offering)
+	}
 	switch {
 	case !closed:
 		q = q.Where("closed_at is null").Order("id desc")

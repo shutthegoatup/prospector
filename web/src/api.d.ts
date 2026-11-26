@@ -2785,6 +2785,8 @@ export interface components {
             name: string;
             /** @description What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list. */
             look_for: string;
+            /** @description `look_for`, read into its fields. */
+            looking_for: components["schemas"]["LookFor"][];
             /** @description The call script's pitch line for people reached for it; empty uses the organisation's. `{company}` is filled in. */
             pitch: string;
             /** @description The connection note for people picked for it; empty uses the organisation's. `{first}`, `{company}` and `{org}` are filled in. */
@@ -3036,6 +3038,11 @@ export interface components {
             /** Format: int64 */
             id: number;
             title: string;
+            /**
+             * Format: int64
+             * @description What the task finds companies for; 0 is the organisation's own offering.
+             */
+            offering_id: number;
             /** @description `waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request), `done` or `closed`. */
             status: string;
             open_requests: components["schemas"]["Asked"][];
@@ -3085,6 +3092,14 @@ export interface components {
         TaskOut: components["schemas"]["TaskBrief"] & {
             /** @description What the person asked for, in their words. */
             brief: string;
+            /** @description What the task finds companies for, when it isn't the organisation's own offering. */
+            offering?: {
+                /** Format: int64 */
+                id: number;
+                name: string;
+                /** @description What agents are told to look for and how to judge companies for it, in place of the organisation's own look-for list. */
+                guidance: string;
+            };
             /** @description Everything asked on this task, oldest first; the first is the brief. */
             requests: components["schemas"]["Asked"][];
             companies: components["schemas"]["TaskCompany"][];
@@ -3278,8 +3293,16 @@ export interface components {
             grade: string;
             /** @description Why it fits, in the words of whoever added it; empty for none. */
             why: string;
-            /** @enum {string} */
+            /**
+             * @description Where it stands for the organisation's own offering; `listCompanyVerdicts` has the others.
+             * @enum {string}
+             */
             stage: "review" | "qualified" | "rejected";
+            /**
+             * Format: int64
+             * @description The offering it was found for, while nothing has been done there for the organisation's own: until then it stays out of the organisation's own review. 0 otherwise.
+             */
+            found_for: number;
             found_by: string;
             /** Format: date-time */
             created_at: string;
@@ -6183,6 +6206,11 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /**
+                         * Format: int64
+                         * @description The offering whose queue this is: the one asked for, or a task's. 0 is the organisation's own, as is a closed task's whose offering was removed.
+                         */
+                        offering_id: number;
                         items: components["schemas"]["ResearchCompany"][];
                         /** @description Whether the companies come best fit first. A search with more than 500 to review comes newest first. */
                         ranked: boolean;
@@ -6203,6 +6231,8 @@ export interface operations {
             query?: {
                 /** @description Closed tasks too, after the open ones. */
                 closed?: boolean;
+                /** @description Only the tasks finding companies for this offering; 0 for the organisation's own. Left out, every task. */
+                offering?: number;
                 /** @description How many to return. 50 if left out; 200 at most. */
                 limit?: components["parameters"]["limit"];
                 /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */

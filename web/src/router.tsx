@@ -12,11 +12,24 @@ import { PreparePage } from "@/pages/Prepare";
 import { ResearchPage } from "@/pages/Research";
 import { SignPage } from "@/pages/Sign";
 import { SettingsPage } from "@/pages/Settings";
+import { ChoosePasswordPage, ForgotPage, ResetPage, SignInPage, SingleSignOnPage } from "@/pages/SignIn";
 import { SubscriptionsPage } from "@/pages/Subscriptions";
 import { TaskPage } from "@/pages/Task";
 import { TasksPage } from "@/pages/Tasks";
 import { TodayPage } from "@/pages/Today";
-import { addSearch, companiesSearch, enquiriesSearch, parseSearch, pathId, researchSearch, stringifySearch, tasksSearch, todaySearch } from "@/search";
+import {
+  addSearch,
+  companiesSearch,
+  enquiriesSearch,
+  parseSearch,
+  pathId,
+  researchSearch,
+  signInSearch,
+  singleSignOnSearch,
+  stringifySearch,
+  tasksSearch,
+  todaySearch,
+} from "@/search";
 
 // Each route is its own constant: written inline in addChildren, a route's path would be
 // typed as any string and its params and search would lose their types.
@@ -47,7 +60,19 @@ const prepare = createRoute({ getParentRoute: () => org, path: "agreements/$id/p
 const sign = createRoute({ getParentRoute: () => org, path: "agreements/$id/sign", params: idParams, errorComponent: NotFound, component: SignPage });
 const add = createRoute({ getParentRoute: () => org, path: "add", validateSearch: addSearch, component: AddPage });
 
+// Signing in, outside any organisation and its sidebar.
+const signIn = createRoute({ getParentRoute: () => root, path: "login", validateSearch: signInSearch, component: SignInPage });
+const singleSignOn = createRoute({ getParentRoute: () => root, path: "login/sso", validateSearch: singleSignOnSearch, component: SingleSignOnPage });
+const forgot = createRoute({ getParentRoute: () => root, path: "forgot", component: ForgotPage });
+const reset = createRoute({ getParentRoute: () => root, path: "reset/$token", component: ResetPage });
+const choosePassword = createRoute({ getParentRoute: () => root, path: "password", component: ChoosePasswordPage });
+
 const routeTree = root.addChildren([
+  signIn,
+  singleSignOn,
+  forgot,
+  reset,
+  choosePassword,
   org.addChildren([today, research, conversations, enquiries, onboarding, subscriptions, campaigns, tasks, task, companies, company, prepare, sign, settings, agents, add]),
 ]);
 

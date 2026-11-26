@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -321,15 +320,8 @@ func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
 	mux.Handle("GET /assets/", assetHandler())
-	mux.HandleFunc("GET /login", a.loginPage)
-	mux.HandleFunc("POST /login", a.login)
-	mux.HandleFunc("POST /logout", a.logout)
-	mux.HandleFunc("GET /forgot", a.forgotPage)
-	mux.HandleFunc("POST /forgot", a.forgot)
-	mux.HandleFunc("GET /reset/{token}", a.resetPage)
-	mux.HandleFunc("POST /reset/{token}", a.reset)
+	a.signInRoutes(mux)
 	mux.HandleFunc("GET /login/with/{way}", a.loginWith)
-	mux.HandleFunc("GET /login/sso", a.ssoPage)
 	mux.HandleFunc("GET /login/sso/start", a.ssoStart)
 	mux.HandleFunc("GET /login/callback", a.loginCallback)
 	mux.HandleFunc("GET /u/{token}", a.unsubscribePage)
@@ -343,8 +335,6 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /c/{token}/again", a.customerAgain)
 	mux.HandleFunc("GET /{$}", a.front)
 	mux.HandleFunc("GET /api", a.apiDocPage())
-	mux.HandleFunc("GET /password", a.member(a.passwordPage))
-	mux.HandleFunc("POST /password", a.member(a.changePassword))
 
 	mux.HandleFunc("GET /o/{org}/{$}", a.member(func(w http.ResponseWriter, r *http.Request) {
 		q := reqOf(r)
@@ -417,16 +407,42 @@ func (a *App) Routes() http.Handler {
 
 // signedOutForm is a plain HTML form somebody with no session posts.
 func signedOutForm(path string) bool {
-	return path == "/login" || path == "/logout" || path == "/forgot" || strings.HasPrefix(path, "/reset/") || strings.HasPrefix(path, "/c/") || strings.HasPrefix(path, "/u/")
+	return strings.HasPrefix(path, "/c/") || strings.HasPrefix(path, "/u/")
 }
 
-func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
-	v := a.loginView(r.URL.Query().Get("next"), "")
-	if r.URL.Query().Has("reset") {
-		v.Notice = "Password saved. Sign in with it."
-	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	LoginPage(v).Render(r.Context(), w)
+// signInRoutes serve the React app's sign-in pages, each only where it can work.
+func (a *App) signInRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /login", a.shell)
+	mux.HandleFunc("GET /forgot", func(w http.ResponseWriter, r *http.Request) {
+		if !a.mailOn() {
+			http.NotFound(w, r)
+			return
+		}
+		a.shell(w, r)
+	})
+	mux.HandleFunc("GET /reset/{token}", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := a.s.PasswordTokenUser(r.PathValue("token")); err != nil {
+			fail(w, errBadLink, http.StatusGone)
+			return
+		}
+		a.shell(w, r)
+	})
+	mux.HandleFunc("GET /login/sso", func(w http.ResponseWriter, r *http.Request) {
+		if a.base == "" {
+			http.NotFound(w, r)
+			return
+		}
+		a.shell(w, r)
+	})
+	// Where a new member lands until they have chosen a password; everyone else changes
+	// theirs in Settings.
+	mux.HandleFunc("GET /password", a.member(func(w http.ResponseWriter, r *http.Request) {
+		if !reqOf(r).User.MustChangePassword {
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
+		a.shell(w, r)
+	}))
 }
 
 // safeNext keeps a post-login redirect on this site. Browsers drop tabs and newlines
@@ -439,41 +455,9 @@ func safeNext(next string) string {
 	return next
 }
 
-func (a *App) login(w http.ResponseWriter, r *http.Request) {
-	if err := parseForm(w, r, 64<<10); err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	refuse := func(code int, problem string) {
-		w.Header().Set("content-type", "text/html; charset=utf-8")
-		w.WriteHeader(code)
-		LoginPage(a.loginView(r.PostForm.Get("next"), problem)).Render(r.Context(), w)
-	}
-	token, _, device, wait, err := a.passwordSignIn(r, r.PostForm.Get("email"), r.PostForm.Get("password"))
-	switch {
-	case err != nil && r.Context().Err() != nil:
-		return
-	case wait > 0:
-		w.Header().Set("Retry-After", strconv.Itoa(wait))
-		refuse(http.StatusTooManyRequests, "Too many attempts. Try again in "+plural(wait, "second")+".")
-		return
-	case errors.Is(err, errWrongLogin):
-		refuse(http.StatusUnauthorized, err.Error())
-		return
-	case err != nil:
-		refuse(telling("sign-in", err, http.StatusInternalServerError))
-		return
-	}
-	if device != nil {
-		http.SetCookie(w, device)
-	}
-	a.setSession(w, r, token)
-	http.Redirect(w, r, safeNext(r.PostForm.Get("next")), http.StatusSeeOther)
-}
-
-// passwordSignIn checks a password, for the sign-in form and the API alike. wait is the
-// seconds to hold off after too many attempts; device is set when this browser is new
-// to the account, so its own attempts are counted apart from a stranger's.
+// passwordSignIn checks a password. wait is the seconds to hold off after too many
+// attempts; device is set when this browser is new to the account, so its own attempts
+// are counted apart from a stranger's.
 func (a *App) passwordSignIn(r *http.Request, email, password string) (token string, u *User, device *http.Cookie, wait int, err error) {
 	select {
 	case hashSlots <- struct{}{}:
@@ -507,17 +491,10 @@ func (a *App) passwordSignIn(r *http.Request, email, password string) (token str
 	return token, u, device, 0, nil
 }
 
-// deviceCookie vouches for this browser to u's account. It goes to every path, so the
-// sign-in form and the API both see it.
+// deviceCookie vouches for this browser to u's account.
 func (a *App) deviceCookie(r *http.Request, u *User) *http.Cookie {
 	return &http.Cookie{Name: deviceCookie, Value: newDeviceToken(u), Path: "/", HttpOnly: true, Secure: a.secure(r),
 		SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(deviceLife)}
-}
-
-func (a *App) logout(w http.ResponseWriter, r *http.Request) {
-	a.endSession(r)
-	http.SetCookie(w, signedOutCookie())
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
 func (a *App) endSession(r *http.Request) {
@@ -587,49 +564,6 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("content-type", "text/html; charset=utf-8")
 	NoOrgs(q.User).Render(r.Context(), w)
-}
-
-// passwordPage is where a new member lands until they have chosen a password;
-// everyone else changes theirs in Settings.
-func (a *App) passwordPage(w http.ResponseWriter, r *http.Request) {
-	u := reqOf(r).User
-	if !u.MustChangePassword {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	ChoosePassword(u).Render(r.Context(), w)
-}
-
-func (a *App) changePassword(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Current string `json:"current"`
-		New     string `json:"new"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	u := reqOf(r).User
-	device, wait, err := a.passwordChange(r, u, in.Current, in.New)
-	switch {
-	case wait > 0:
-		w.Header().Set("Retry-After", strconv.Itoa(wait))
-		http.Error(w, "too many attempts: try again in "+plural(wait, "second"), http.StatusTooManyRequests)
-		return
-	case errors.Is(err, context.Canceled):
-		return
-	case err != nil:
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	if device != nil {
-		http.SetCookie(w, device)
-	}
-	if u.MustChangePassword {
-		writeJSON(w, map[string]string{"go": "/"})
-		return
-	}
-	writeJSON(w, map[string]string{"message": passwordChanged})
 }
 
 const passwordChanged = "Password changed. Your other sessions are signed out."

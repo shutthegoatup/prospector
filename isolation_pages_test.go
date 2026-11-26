@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"regexp"
 	"slices"
@@ -170,7 +169,7 @@ func signInAs(t *testing.T, srv *httptest.Server, email, password string) *http.
 	t.Helper()
 	jar, _ := cookiejar.New(nil)
 	client := &http.Client{Jar: jar}
-	res, err := client.PostForm(srv.URL+"/login", url.Values{"email": {email}, "password": {password}})
+	res, err := signInWith(client, srv.URL, email, password)
 	if err != nil || res.StatusCode != http.StatusOK {
 		t.Fatalf("signing in as %s: %v %v", email, res, err)
 	}
@@ -337,7 +336,8 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 		}
 		// What it says back of what it was sent isn't a leak; anything else of theirs is.
 		for _, sent := range named {
-			said = strings.ReplaceAll(said, sent.(string), "")
+			// A look-for list says back each line's name as the field it reads it into.
+			said = strings.ReplaceAll(strings.ReplaceAll(said, sent.(string), ""), assetKey(sent.(string)), "")
 		}
 		// A part of one, quoted back by a form that reads several from one field.
 		said = strings.ReplaceAll(strings.ReplaceAll(said, `"`+theirs+`"`, ""), `\"`+theirs+`\"`, "")

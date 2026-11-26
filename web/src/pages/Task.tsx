@@ -90,6 +90,7 @@ export function TaskPage() {
   return (
     <>
       <PageHead title={t.title}>
+        {t.offering && <Pill>For {t.offering.name}</Pill>}
         <TaskStatus status={t.status} />
       </PageHead>
       <div className="flex flex-wrap items-start gap-8">

@@ -285,22 +285,16 @@ func socialFromEnv(getenv func(string) string) ([]socialWay, error) {
 
 func (a *App) callbackURL() string { return a.base + "/login/callback" }
 
-type LoginView struct {
-	Next, Problem, Notice string
-	Ways                  []socialWay
-	SSO                   bool
-	// Forgot offers the reset link, which needs mail.
-	Forgot bool
-}
-
-func (a *App) loginView(next, problem string) LoginView {
-	return LoginView{Next: next, Problem: problem, Ways: a.social, SSO: a.base != "", Forgot: a.mailOn()}
-}
-
+// signInProblem is a sign-in through a provider that went wrong, said on a page of the
+// server's own: its words never travel in an address, where anyone could write them.
 func (a *App) signInProblem(w http.ResponseWriter, r *http.Request, next string, code int, problem string) {
 	w.Header().Set("content-type", "text/html; charset=utf-8")
 	w.WriteHeader(code)
-	if err := LoginPage(a.loginView(next, problem)).Render(r.Context(), w); err != nil {
+	back := "/login"
+	if next != "" {
+		back += "?" + url.Values{"next": {safeNext(next)}}.Encode()
+	}
+	if err := ProblemPage(code, "Couldn't sign in", problem, back).Render(r.Context(), w); err != nil {
 		log.Print(err)
 	}
 }
@@ -323,45 +317,11 @@ func (a *App) loginWith(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-type SSOView struct {
-	Next, Email, Problem string
-	// Asked is the organisation that sent a signed-in member here, when one did.
-	Asked string
-	Orgs  []Org
-}
-
 // ssoPageURL is where a member is sent when an organisation requires its sign-on. It
-// is the page and not the provider: that member may have just come from the password
-// form, and the content policy stops a form's redirects from ending at another site.
+// is the page, which offers the provider as a link, and not the provider itself: going
+// there has to be the person's own click.
 func ssoPageURL(org *Org, email, next string) string {
 	return "/login/sso?" + url.Values{"org": {org.Slug}, "email": {email}, "next": {next}}.Encode()
-}
-
-// ssoPage asks for an address and lists the organisations whose sign-in speaks for
-// it. It answers with links, never a redirect: the content policy's form-action
-// would stop a form that ended at another site.
-func (a *App) ssoPage(w http.ResponseWriter, r *http.Request) {
-	if a.base == "" {
-		http.NotFound(w, r)
-		return
-	}
-	v := SSOView{Next: r.URL.Query().Get("next"), Email: strings.ToLower(strings.TrimSpace(r.URL.Query().Get("email")))}
-	if v.Email != "" {
-		v.Orgs, _ = a.s.SSOOrgsFor(emailDomain(v.Email))
-		if len(v.Orgs) == 0 {
-			v.Problem = "No organisation here uses single sign-on for that address. Sign in with your password instead."
-		}
-		for _, o := range v.Orgs {
-			if o.Slug == r.URL.Query().Get("org") {
-				v.Asked, v.Orgs = o.Name, []Org{o}
-			}
-		}
-	}
-	http.SetCookie(w, a.askedCookie(r))
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	if err := SSOPage(v).Render(r.Context(), w); err != nil {
-		log.Print(err)
-	}
 }
 
 // askedCookie marks a browser that has seen the single sign-on page. It is Strict, so
