@@ -53,6 +53,7 @@ func robotsTxt(base string) string {
 	return "User-agent: *\n" +
 		"Allow: /\n" +
 		"Disallow: /o/\n" +
+		"Disallow: /login/\n" +
 		"Disallow: /password\n" +
 		"Disallow: /reset/\n" +
 		"\n" +

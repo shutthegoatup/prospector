@@ -51,7 +51,7 @@ func TestRobotsKeepsPublicPagesOpen(t *testing.T) {
 		t.Errorf("members' pages aren't kept from crawlers:\n%s", body)
 	}
 	// /c/ and /u/ say noindex on the page itself, which a barred crawler never reads.
-	for _, open := range []string{"/", "/api", "/llms.txt", "/c/", "/u/"} {
+	for _, open := range []string{"/", "/api", "/llms.txt", "/login", "/c/", "/u/"} {
 		for _, line := range strings.Split(body, "\n") {
 			if rule, ok := strings.CutPrefix(line, "Disallow: "); ok && rule != "" && strings.HasPrefix(open, rule) {
 				t.Errorf("%s is disallowed by %q", open, line)
