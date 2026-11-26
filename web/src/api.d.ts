@@ -1096,7 +1096,8 @@ export interface paths {
          * What a task found that isn't new
          * @description The companies the task came to that were already held when it first did, and still
          *     aren't up for review: rejected before, a customer, in an open conversation or
-         *     qualified already. How a company stood when the task first came to it is what
+         *     qualified already. With them, any whose domain the never-contact list covers now,
+         *     however they stand: they are kept, and never put up for review. How a company stood when the task first came to it is what
          *     counts; what happens to it afterwards doesn't. A rejected one can be put up for
          *     review again with `reviewCompany`, naming the task's offering.
          *
@@ -2929,10 +2930,10 @@ export interface components {
             /** Format: date-time */
             since: string;
             /**
-             * @description Set when the company was already held when the task first came to it: it isn't a new find.
+             * @description Set when the company was already held when the task first came to it, or `never_contact` while its domain is on the never-contact list: it isn't a new find. A never-contact company is kept and built on; nobody there is to be contacted.
              * @enum {string}
              */
-            held?: "rejected" | "customer" | "open_deal" | "qualified";
+            held?: "rejected" | "customer" | "open_deal" | "qualified" | "never_contact";
         };
         TaskPerson: {
             /** Format: int64 */
@@ -6143,6 +6144,8 @@ export interface operations {
                         open_deal: number;
                         /** @description Companies qualified already, with nothing under way. */
                         qualified: number;
+                        /** @description Companies whose domain the never-contact list covers: kept, never up for review. */
+                        listed: number;
                         /** @description Times a person on the never-contact list was refused. */
                         never_contact: number;
                         /** @description Times a person erased on request was refused. */

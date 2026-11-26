@@ -188,6 +188,8 @@ func (s apiServer) ListLeftOut(ctx context.Context, in api.ListLeftOutRequestObj
 			out.Body.OpenDeal++
 		case heldQualified:
 			out.Body.Qualified++
+		case heldNeverContact:
+			out.Body.Listed++
 		}
 	}
 	if out.Body.Items, err = recast[[]api.TaskCompany](page); err != nil {

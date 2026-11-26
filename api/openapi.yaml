@@ -1638,7 +1638,8 @@ paths:
       description: |
         The companies the task came to that were already held when it first did, and still
         aren't up for review: rejected before, a customer, in an open conversation or
-        qualified already. How a company stood when the task first came to it is what
+        qualified already. With them, any whose domain the never-contact list covers now,
+        however they stand: they are kept, and never put up for review. How a company stood when the task first came to it is what
         counts; what happens to it afterwards doesn't. A rejected one can be put up for
         review again with `reviewCompany`, naming the task's offering.
 
@@ -1660,7 +1661,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items, offering, rejected, customer, open_deal, qualified, never_contact, erased]
+                required: [items, offering, rejected, customer, open_deal, qualified, listed, never_contact, erased]
                 properties:
                   items:
                     type: array
@@ -1671,6 +1672,7 @@ paths:
                   customer: { type: integer, description: Companies that were customers. }
                   open_deal: { type: integer, description: Companies in an open conversation. }
                   qualified: { type: integer, description: "Companies qualified already, with nothing under way." }
+                  listed: { type: integer, description: "Companies whose domain the never-contact list covers: kept, never up for review." }
                   never_contact: { type: integer, description: Times a person on the never-contact list was refused. }
                   erased: { type: integer, description: Times a person erased on request was refused. }
         default: { $ref: "#/components/responses/Problem" }
@@ -4003,7 +4005,7 @@ components:
         name: { type: string }
         stage: { type: string, description: "`review`, `qualified` or `rejected`: a rejected company is not to be suggested again." }
         since: { type: string, format: date-time }
-        held: { type: string, enum: [rejected, customer, open_deal, qualified], description: "Set when the company was already held when the task first came to it: it isn't a new find." }
+        held: { type: string, enum: [rejected, customer, open_deal, qualified, never_contact], description: "Set when the company was already held when the task first came to it, or `never_contact` while its domain is on the never-contact list: it isn't a new find. A never-contact company is kept and built on; nobody there is to be contacted." }
 
     TaskPerson:
       type: object
