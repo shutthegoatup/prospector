@@ -553,7 +553,7 @@ func (s *Store) customerSetStep(a *CustomerAccess, step int64, done bool) error 
 		case !done:
 			updates = map[string]any{"done_on": nil, "done_by": "", "done_entry": 0}
 		}
-		marked := tx.Model(&OnboardingStep{}).Where("id = ? and org_id = ? and done_by = ?", st.ID, org, st.DoneBy).Updates(updates)
+		marked := tx.Model(&OnboardingStep{}).Where("id = ? and org_id = ? and done_by = ? and done_entry = ?", st.ID, org, st.DoneBy, st.DoneEntry).Updates(updates)
 		if marked.Error != nil || marked.RowsAffected == 0 {
 			return marked.Error
 		}
