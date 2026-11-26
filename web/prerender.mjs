@@ -28,15 +28,17 @@ const page = (headHTML, bodyClass, root) => `<!DOCTYPE html>
 </html>
 `;
 
+const site = "overflow-x-clip bg-background font-sans text-[17px] leading-[1.6] text-foreground antialiased";
+
 await writeFile(
   "../assets/app/site.html",
   page(
     head(
       "Prospector · A few hundred accounts, one queue a day",
       `A prospecting and customer workbench for small teams selling to named accounts: research, deals, agreements, subscriptions and onboarding on one company record. Agents research and draft; you decide what they may send. Free to self-host, or hosted for ${hostedPrice} a user a month.`,
-      ["landing"],
+      ["output"],
     ) + `\n    <script type="module" src="/assets/app/site.js"></script>`,
-    "lp",
+    site,
     `<div id="site">${landing()}</div>`,
   ),
 );
@@ -47,9 +49,9 @@ await writeFile(
     head(
       "Prospector API · The contract",
       "Everything Prospector does, as an HTTP API for people and robots alike: agents, runs and more, with the OpenAPI spec to build against.",
-      ["landing", "api"],
+      ["output"],
     ),
-    "lp api",
+    site,
     apiReference(),
   ),
 );

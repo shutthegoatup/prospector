@@ -276,12 +276,12 @@ func TestTheFrontPageTellsTheTruthAboutKeys(t *testing.T) {
 func TestFrontPagePricing(t *testing.T) {
 	_, _, srv, _ := signedIn(t)
 	_, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil)
-	for _, want := range []string{`id="pricing"`, `href="#pricing"`, "Self-hosted", "for any number of users", "a user a month", "Prices exclude VAT", `<div class="lp-cta" id="hosted-cta"></div>`} {
+	for _, want := range []string{`id="pricing"`, `href="#pricing"`, "Self-hosted", "for any number of users", "a user a month", "Prices exclude VAT", `id="hosted-cta"></div>`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the front page's pricing lacks %q", want)
 		}
 	}
-	if !strings.Contains(body, `<small>£</small>0</b>`) || !strings.Contains(body, `<small>£</small>5</b>`) {
+	if !strings.Contains(body, `£</small>0</b>`) || !strings.Contains(body, `£</small>5</b>`) {
 		t.Error("the front page doesn't show self-hosting free and hosting at £5")
 	}
 	if strings.Contains(body, `href="#contact"`) {
