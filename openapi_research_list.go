@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/shutthegoatup/prospector/api"
 )
@@ -16,20 +18,58 @@ func (s apiServer) ListResearch(ctx context.Context, in api.ListResearchRequestO
 	if filter == "" {
 		filter = "review"
 	}
+	offering := in.Params.Offering
 	if in.Params.Task != 0 {
-		if _, err := s.a.s.taskRow(q.Org.ID, in.Params.Task); err != nil {
+		t, err := s.a.s.taskRow(q.Org.ID, in.Params.Task)
+		if err != nil {
 			return nil, missing(err, "there's no task %d here", in.Params.Task)
 		}
+		if offering != 0 && offering != t.OfferingID {
+			return nil, fmt.Errorf("task %d finds companies for another offering", t.ID)
+		}
+		offering = t.OfferingID
+		// A closed task can outlive its offering, whose finds are then the organisation's own.
+		if offering != 0 {
+			if _, err := s.a.s.Offering(q.Org.ID, offering); errors.As(err, new(notFound)) {
+				offering = 0
+			}
+		}
 	}
-	rows, ranked, next, err := s.a.s.researchList(q.Org.ID, q.Org.Settings, filter, in.Params.Task, page)
+	set := q.Org.Settings
+	if offering != 0 {
+		o, err := s.a.s.Offering(q.Org.ID, offering)
+		if err != nil {
+			return nil, err
+		}
+		set.LookFor = o.LookFor
+	}
+	rows, ranked, next, err := s.a.s.researchList(q.Org.ID, offering, set, filter, in.Params.Task, page)
 	if err != nil {
 		return nil, err
 	}
+	if offering != 0 {
+		if err := s.a.s.withVerdicts(q.Org.ID, offering, rows); err != nil {
+			return nil, err
+		}
+	}
 	out := api.ListResearch200JSONResponse{Headers: api.ListResearch200ResponseHeaders{Link: nextLink(ctx, next)}}
 	out.Body.Items, out.Body.Ranked, out.Body.NextCursor = []api.ResearchCompany{}, ranked, next
-	out.Body.Counts = s.a.s.researchCountsFor(q.Org.ID, in.Params.Task)
+	out.Body.OfferingId = offering
+	out.Body.Counts = s.a.s.researchCountsFor(q.Org.ID, offering, in.Params.Task)
+	ids := make([]int64, len(rows))
+	for i, r := range rows {
+		ids[i] = r.ID
+	}
+	roles, err := s.a.s.rolesAt(q.Org.ID, offering, ids)
+	if err != nil {
+		return nil, err
+	}
 	for _, r := range rows {
-		out.Body.Items = append(out.Body.Items, researchOut(q.Org.Settings, r))
+		c := researchOut(set, r)
+		for _, role := range roles[r.ID] {
+			c.Roles = append(c.Roles, roleOut(role))
+		}
+		out.Body.Items = append(out.Body.Items, c)
 	}
 	return out, nil
 }

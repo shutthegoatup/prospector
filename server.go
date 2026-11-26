@@ -11,13 +11,12 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/a-h/templ"
+	"github.com/shutthegoatup/prospector/api"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -213,32 +212,39 @@ func (a *App) sessionUser(r *http.Request) *User {
 }
 
 func (a *App) setSession(w http.ResponseWriter, r *http.Request, token string) {
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: token, Path: "/", HttpOnly: true, Secure: a.secure(r),
-		SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(sessionLife)})
+	http.SetCookie(w, a.sessionCookie(r, token))
+}
+
+func (a *App) sessionCookie(r *http.Request, token string) *http.Cookie {
+	return &http.Cookie{Name: sessionCookie, Value: token, Path: "/", HttpOnly: true, Secure: a.secure(r),
+		SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(sessionLife)}
 }
 
 // member resolves the signed-in user and, for /o/{org}/ routes, their membership.
 func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		signedOut := func() {
-			if r.Method == http.MethodGet && r.Header.Get("X-Fragment") == "" {
-				http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusSeeOther)
-			} else {
-				http.Error(w, "signed out", http.StatusUnauthorized)
+		// A page is sent where it can go on; an API caller is told, with a code to act on.
+		refuse := func(status int, code api.ProblemCode, text, to string) {
+			switch {
+			case strings.Contains(r.URL.Path, "/api/v1/"):
+				writeCoded(w, status, code, text)
+			case r.Method == http.MethodGet:
+				http.Redirect(w, r, to, http.StatusSeeOther)
+			default:
+				http.Error(w, text, status)
 			}
+		}
+		signedOut := func(code api.ProblemCode) {
+			refuse(http.StatusUnauthorized, code, "signed out", "/login?next="+url.QueryEscape(r.URL.RequestURI()))
 		}
 		sess, u := a.session(r)
 		if u == nil {
-			signedOut()
+			signedOut(api.SignedOut)
 			return
 		}
 		// Someone still on a password their inviter saw can only go and choose their own.
 		if u.MustChangePassword && r.URL.Path != "/password" {
-			if r.Method == http.MethodGet && r.Header.Get("X-Fragment") == "" {
-				http.Redirect(w, r, "/password", http.StatusSeeOther)
-			} else {
-				http.Error(w, "choose your own password first", http.StatusForbidden)
-			}
+			refuse(http.StatusForbidden, api.MustChangePassword, "choose your own password first", "/password")
 			return
 		}
 		q := &Req{User: u, Session: sess}
@@ -260,31 +266,18 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 			}
 			// A session another organisation's provider began is no sign-in here.
 			if !sess.Opens(org.ID) {
-				signedOut()
+				signedOut(api.SessionLimited)
 				return
 			}
 			if a.ssoRequired(org, u, m, sess) {
-				if r.Method == http.MethodGet && r.Header.Get("X-Fragment") == "" {
-					http.Redirect(w, r, ssoPageURL(org, u.Email, r.URL.RequestURI()), http.StatusSeeOther)
-				} else {
-					http.Error(w, org.Name+" requires its single sign-on: reload the page to go through it", http.StatusForbidden)
-				}
+				refuse(http.StatusForbidden, api.SsoRequired, org.Name+" requires its single sign-on: reload the page to go through it",
+					ssoPageURL(org, u.Email, r.URL.RequestURI()))
 				return
 			}
 			q.Org, q.Member = org, m
 		}
 		next(w, r.WithContext(context.WithValue(r.Context(), reqKey{}, q)))
 	}
-}
-
-func (a *App) owner(next http.HandlerFunc) http.HandlerFunc {
-	return a.member(func(w http.ResponseWriter, r *http.Request) {
-		if !reqOf(r).Owner() {
-			http.Error(w, "only an owner of this organisation can change that", http.StatusForbidden)
-			return
-		}
-		next(w, r)
-	})
 }
 
 // agent authenticates an API key for the organisation in the URL and checks its scope.
@@ -313,23 +306,6 @@ func (a *App) agent(scope string, next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func idParam(r *http.Request, name string) int64 {
-	n, _ := strconv.ParseInt(r.PathValue(name), 10, 64)
-	return n
-}
-
-// page renders a whole page, or only its content when the page script refreshes it.
-func (a *App) page(w http.ResponseWriter, r *http.Request, active string, content templ.Component) {
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	view := content
-	if r.Header.Get("X-Fragment") == "" {
-		view = Layout(a.nav(reqOf(r), active), content)
-	}
-	if err := view.Render(r.Context(), w); err != nil {
-		log.Print(err)
-	}
-}
-
 // contentPolicy lets pages load only what this app serves, so text that slipped past
 // escaping still couldn't run and nothing is fetched from anywhere else. Styles also
 // allow inline attributes, which templ writes.
@@ -344,15 +320,8 @@ func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
 	mux.Handle("GET /assets/", assetHandler())
-	mux.HandleFunc("GET /login", a.loginPage)
-	mux.HandleFunc("POST /login", a.login)
-	mux.HandleFunc("POST /logout", a.logout)
-	mux.HandleFunc("GET /forgot", a.forgotPage)
-	mux.HandleFunc("POST /forgot", a.forgot)
-	mux.HandleFunc("GET /reset/{token}", a.resetPage)
-	mux.HandleFunc("POST /reset/{token}", a.reset)
+	a.signInRoutes(mux)
 	mux.HandleFunc("GET /login/with/{way}", a.loginWith)
-	mux.HandleFunc("GET /login/sso", a.ssoPage)
 	mux.HandleFunc("GET /login/sso/start", a.ssoStart)
 	mux.HandleFunc("GET /login/callback", a.loginCallback)
 	mux.HandleFunc("GET /u/{token}", a.unsubscribePage)
@@ -365,38 +334,15 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /c/{token}", a.customerOpen)
 	mux.HandleFunc("POST /c/{token}/again", a.customerAgain)
 	mux.HandleFunc("GET /{$}", a.front)
-	mux.HandleFunc("GET /api", a.apiDocPage())
-	mux.HandleFunc("POST /orgs", a.member(a.newOrg))
-	mux.HandleFunc("GET /password", a.member(a.passwordPage))
-	mux.HandleFunc("POST /password", a.member(a.changePassword))
+	mux.HandleFunc("GET /api", a.apiDocPage)
 
 	mux.HandleFunc("GET /o/{org}/{$}", a.member(func(w http.ResponseWriter, r *http.Request) {
 		q := reqOf(r)
 		http.Redirect(w, r, q.Base()+landing(q.Member), http.StatusSeeOther)
 	}))
 	a.appRoutes(mux)
-	a.taskRoutes(mux)
 	mux.HandleFunc("OPTIONS "+intakePattern, a.intakePreflight)
 	mux.HandleFunc("POST "+intakePattern, a.intake)
-
-	mux.HandleFunc("POST /o/{org}/ui/mark", a.works(areaSales, a.uiMark))
-	mux.HandleFunc("POST /o/{org}/ui/voice", a.member(a.uiVoice))
-	mux.HandleFunc("POST /o/{org}/ui/member", a.owner(a.uiMember))
-	mux.HandleFunc("POST /o/{org}/ui/member/remove", a.owner(a.uiRemoveMember))
-	mux.HandleFunc("POST /o/{org}/ui/mail", a.owner(a.uiMail))
-	mux.HandleFunc("POST /o/{org}/ui/mail/test", a.owner(a.uiMailTest))
-	mux.HandleFunc("POST /o/{org}/ui/sso", a.owner(a.uiSSO))
-	mux.HandleFunc("POST /o/{org}/ui/sso/domain", a.owner(a.uiSSODomain))
-	mux.HandleFunc("POST /o/{org}/ui/sso/domain/remove", a.owner(a.uiSSODomainRemove))
-	mux.HandleFunc("POST /o/{org}/ui/sso/verify", a.owner(a.uiSSOVerify))
-	mux.HandleFunc("POST /o/{org}/ui/export", a.owner(a.uiExport))
-	mux.HandleFunc("POST /o/{org}/ui/export-org", a.owner(a.uiExportOrg))
-	mux.HandleFunc("POST /o/{org}/ui/erase", a.owner(a.uiErase))
-	mux.HandleFunc("POST /o/{org}/ui/keys", a.owner(a.uiKey))
-	mux.HandleFunc("POST /o/{org}/ui/keys/revoke", a.owner(a.uiRevoke))
-	mux.HandleFunc("POST /o/{org}/ui/keys/scopes", a.owner(a.uiKeyScopes))
-	mux.HandleFunc("POST /o/{org}/ui/member/role", a.owner(a.uiMemberRole))
-	mux.HandleFunc("POST /o/{org}/ui/member/areas", a.owner(a.uiMemberAreas))
 
 	a.apiRoutes(mux)
 	a.routeAPI(mux)
@@ -460,16 +406,42 @@ func (a *App) Routes() http.Handler {
 
 // signedOutForm is a plain HTML form somebody with no session posts.
 func signedOutForm(path string) bool {
-	return path == "/login" || path == "/logout" || path == "/forgot" || strings.HasPrefix(path, "/reset/") || strings.HasPrefix(path, "/c/") || strings.HasPrefix(path, "/u/")
+	return strings.HasPrefix(path, "/c/") || strings.HasPrefix(path, "/u/")
 }
 
-func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
-	v := a.loginView(r.URL.Query().Get("next"), "")
-	if r.URL.Query().Has("reset") {
-		v.Notice = "Password saved. Sign in with it."
-	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	LoginPage(v).Render(r.Context(), w)
+// signInRoutes serve the React app's sign-in pages, each only where it can work.
+func (a *App) signInRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /login", a.shell)
+	mux.HandleFunc("GET /forgot", func(w http.ResponseWriter, r *http.Request) {
+		if !a.mailOn() {
+			http.NotFound(w, r)
+			return
+		}
+		a.shell(w, r)
+	})
+	mux.HandleFunc("GET /reset/{token}", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := a.s.PasswordTokenUser(r.PathValue("token")); err != nil {
+			fail(w, errBadLink, http.StatusGone)
+			return
+		}
+		a.shell(w, r)
+	})
+	mux.HandleFunc("GET /login/sso", func(w http.ResponseWriter, r *http.Request) {
+		if a.base == "" {
+			http.NotFound(w, r)
+			return
+		}
+		a.shell(w, r)
+	})
+	// Where a new member lands until they have chosen a password; everyone else changes
+	// theirs in Settings.
+	mux.HandleFunc("GET /password", a.member(func(w http.ResponseWriter, r *http.Request) {
+		if !reqOf(r).User.MustChangePassword {
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
+		a.shell(w, r)
+	}))
 }
 
 // safeNext keeps a post-login redirect on this site. Browsers drop tabs and newlines
@@ -482,62 +454,58 @@ func safeNext(next string) string {
 	return next
 }
 
-func (a *App) login(w http.ResponseWriter, r *http.Request) {
-	if err := parseForm(w, r, 64<<10); err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	email := r.PostForm.Get("email")
-	refuse := func(code int, problem string) {
-		w.Header().Set("content-type", "text/html; charset=utf-8")
-		w.WriteHeader(code)
-		LoginPage(a.loginView(r.PostForm.Get("next"), problem)).Render(r.Context(), w)
-	}
+// passwordSignIn checks a password. wait is the seconds to hold off after too many
+// attempts; device is set when this browser is new to the account, so its own attempts
+// are counted apart from a stranger's.
+func (a *App) passwordSignIn(r *http.Request, email, password string) (token string, u *User, device *http.Cookie, wait int, err error) {
 	select {
 	case hashSlots <- struct{}{}:
 		defer func() { <-hashSlots }()
 	case <-r.Context().Done():
-		return
+		return "", nil, nil, 0, r.Context().Err()
 	}
-	// A browser that has signed in to this account before is counted by itself.
 	who, known := signInBucket(email), false
-	if c, err := r.Cookie(deviceCookie); err == nil {
+	// A browser can hold two: one from when the cookie was kept to /login, which a
+	// password change since has made worthless, and the one that took its place.
+	for _, c := range r.CookiesNamed(deviceCookie) {
 		if device, ok := a.s.knownDevice(email, c.Value); ok {
 			who, known = device, true
+			break
 		}
 	}
-	if wait := a.logins.begin(who); wait > 0 {
-		seconds := int(wait.Seconds()) + 1
-		w.Header().Set("Retry-After", strconv.Itoa(seconds))
-		refuse(http.StatusTooManyRequests, "Too many attempts. Try again in "+plural(seconds, "second")+".")
-		return
+	if held := a.logins.begin(who); held > 0 {
+		return "", nil, nil, int(held.Seconds()) + 1, nil
 	}
-	token, u, err := a.s.Login(email, r.PostForm.Get("password"))
+	token, u, err = a.s.Login(email, password)
 	// A failure that isn't a wrong password (the database, say) doesn't count against anyone.
 	if err == nil || errors.Is(err, errWrongLogin) {
 		a.logins.record(who, err == nil)
 	}
-	if errors.Is(err, errWrongLogin) {
-		refuse(http.StatusUnauthorized, err.Error())
-		return
-	} else if err != nil {
-		refuse(telling("sign-in", err, http.StatusInternalServerError))
-		return
+	if err != nil {
+		return "", nil, nil, 0, err
 	}
 	if !known {
-		http.SetCookie(w, &http.Cookie{Name: deviceCookie, Value: newDeviceToken(u), Path: "/login", HttpOnly: true, Secure: a.secure(r),
-			SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(deviceLife)})
+		device = a.deviceCookie(r, u)
 	}
-	a.setSession(w, r, token)
-	http.Redirect(w, r, safeNext(r.PostForm.Get("next")), http.StatusSeeOther)
+	return token, u, device, 0, nil
 }
 
-func (a *App) logout(w http.ResponseWriter, r *http.Request) {
+// deviceCookie vouches for this browser to u's account.
+func (a *App) deviceCookie(r *http.Request, u *User) *http.Cookie {
+	return &http.Cookie{Name: deviceCookie, Value: newDeviceToken(u), Path: "/", HttpOnly: true, Secure: a.secure(r),
+		SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(deviceLife)}
+}
+
+func (a *App) endSession(r *http.Request) {
 	if c, err := r.Cookie(sessionCookie); err == nil {
-		a.s.Logout(c.Value)
+		if err := a.s.Logout(c.Value); err != nil {
+			log.Print("signing out: ", err)
+		}
 	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true})
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+func signedOutCookie() *http.Cookie {
+	return &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true}
 }
 
 // front is the one page a signed-out visitor sees besides the sign-in form.
@@ -546,10 +514,7 @@ func (a *App) front(w http.ResponseWriter, r *http.Request) {
 		a.member(a.home)(w, r)
 		return
 	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	if err := LandingPage(a.frontIntake(r)).Render(r.Context(), w); err != nil {
-		log.Print(err)
-	}
+	a.frontPage(w, r)
 }
 
 // frontIntake is where the front page's form posts, and the origin a browser must be
@@ -593,51 +558,7 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login/sso?"+url.Values{"email": {q.User.Email}}.Encode(), http.StatusSeeOther)
 		return
 	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	NoOrgs(q.User).Render(r.Context(), w)
-}
-
-// passwordPage is where a new member lands until they have chosen a password;
-// everyone else changes theirs in Settings.
-func (a *App) passwordPage(w http.ResponseWriter, r *http.Request) {
-	u := reqOf(r).User
-	if !u.MustChangePassword {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	ChoosePassword(u).Render(r.Context(), w)
-}
-
-func (a *App) changePassword(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Current string `json:"current"`
-		New     string `json:"new"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	u := reqOf(r).User
-	device, wait, err := a.passwordChange(r, u, in.Current, in.New)
-	switch {
-	case wait > 0:
-		w.Header().Set("Retry-After", strconv.Itoa(wait))
-		http.Error(w, "too many attempts: try again in "+plural(wait, "second"), http.StatusTooManyRequests)
-		return
-	case errors.Is(err, context.Canceled):
-		return
-	case err != nil:
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	if device != nil {
-		http.SetCookie(w, device)
-	}
-	if u.MustChangePassword {
-		writeJSON(w, map[string]string{"go": "/"})
-		return
-	}
-	writeJSON(w, map[string]string{"message": passwordChanged})
+	writeShell(w, http.StatusOK, map[string]string{"page": "start"}, "Start an organisation at /api/v1/orgs.\n")
 }
 
 const passwordChanged = "Password changed. Your other sessions are signed out."
@@ -670,23 +591,9 @@ func (a *App) passwordChange(r *http.Request, u *User, current, next string) (de
 	}
 	// The old password vouched for this browser's device cookie; the new one does now.
 	if changed, err := a.s.UserByEmail(u.Email); err == nil {
-		device = &http.Cookie{Name: deviceCookie, Value: newDeviceToken(changed), Path: "/login", HttpOnly: true, Secure: a.secure(r),
-			SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(deviceLife)}
+		device = a.deviceCookie(r, changed)
 	}
 	return device, 0, nil
-}
-
-func (a *App) newOrg(w http.ResponseWriter, r *http.Request) {
-	var in struct{ Name string }
-	if !decode(w, r, &in) {
-		return
-	}
-	o, err := newOrgFor(a.s, reqOf(r), in.Name)
-	if err != nil {
-		fail(w, err, statusOf(err))
-		return
-	}
-	writeJSON(w, map[string]string{"go": "/o/" + o.Slug + "/settings"})
 }
 
 // serve starts even with no users: every page needs a sign-in, so nobody gets in

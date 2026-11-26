@@ -12,7 +12,7 @@ import (
 //go:embed assets/css/output.css assets/css/fonts.css assets/css/landing.css assets/css/api.css assets/js assets/app assets/fonts assets/img
 var assetFS embed.FS
 
-// assetVersion busts caches for the unhashed files (output.css, app.js) on each build.
+// assetVersion busts caches for the unhashed files (output.css, the app) on each build.
 var assetVersion = func() string {
 	h := sha256.New()
 	fs.WalkDir(assetFS, "assets", func(path string, d fs.DirEntry, err error) error {
@@ -39,7 +39,7 @@ func assetHandler() http.Handler {
 		}
 		// Embedded files carry no date to revalidate against, so anything not cached
 		// for good is fetched again on every page. A font that changes gets a new name.
-		if strings.HasPrefix(r.URL.Path, "js/shadcn-templ-") || strings.HasPrefix(r.URL.Path, "fonts/") || r.URL.Query().Get("v") == assetVersion {
+		if strings.HasPrefix(r.URL.Path, "fonts/") || r.URL.Query().Get("v") == assetVersion {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		} else {
 			w.Header().Set("Cache-Control", "no-cache")

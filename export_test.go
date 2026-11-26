@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/cookiejar"
-	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -46,7 +45,7 @@ func TestExportPerson(t *testing.T) {
 	bob := &http.Client{Jar: jar}
 	u := must(s.CreateUser("bob@example.com", "Bob", "correct horse battery"))
 	do(s.AddMember(o.ID, u.ID, "member", u.Name))
-	res, err := bob.PostForm(srv.URL+"/login", url.Values{"email": {"bob@example.com"}, "password": {"correct horse battery"}})
+	res, err := signInWith(bob, srv.URL, "bob@example.com", "correct horse battery")
 	if err != nil || res.StatusCode != http.StatusOK {
 		t.Fatalf("login: %v", err)
 	}
@@ -54,7 +53,7 @@ func TestExportPerson(t *testing.T) {
 
 	companyHistory := srv.URL + "/o/alpha/api/v1/companies/" + strconv.FormatInt(*hannah.CompanyID, 10) + "/history"
 	export := func(client *http.Client, id int64) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/export", "application/json", map[string]int64{"id": id})
+		return call(t, client, "POST", srv.URL+"/o/alpha/api/v1/contacts/"+strconv.FormatInt(id, 10)+"/export", "application/json", struct{}{})
 	}
 	if code, _ := export(bob, hannah.ID); code != http.StatusForbidden {
 		t.Fatalf("a member who isn't an owner exported someone: %d", code)
@@ -69,7 +68,7 @@ func TestExportPerson(t *testing.T) {
 		t.Fatal("an agent's key exported someone")
 	}
 	// A link on another site can send an owner's browser anywhere a GET reaches.
-	if code, _ := call(t, ada, "GET", srv.URL+"/o/alpha/ui/export?id="+strconv.FormatInt(hannah.ID, 10), "", nil); code == http.StatusOK {
+	if code, _ := call(t, ada, "GET", srv.URL+"/o/alpha/api/v1/contacts/"+strconv.FormatInt(hannah.ID, 10)+"/export", "", nil); code == http.StatusOK {
 		t.Fatal("following a link exported someone")
 	}
 	for what, id := range map[string]int64{"a company's placeholder row": placeholder.ID, "someone in another organisation": theirs.ID, "nobody": 999999} {

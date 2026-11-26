@@ -35,7 +35,7 @@ func (s apiServer) ListTasks(ctx context.Context, in api.ListTasksRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	tasks, next, err := s.a.s.TaskBriefs(q.Org.ID, worker(q), in.Params.Closed, page)
+	tasks, next, err := s.a.s.taskBriefsFor(q.Org.ID, worker(q), in.Params.Closed, in.Params.Offering, page)
 	if err != nil {
 		return nil, err
 	}
@@ -157,4 +157,46 @@ func (s apiServer) DeleteNote(ctx context.Context, in api.DeleteNoteRequestObjec
 		return nil, err
 	}
 	return api.DeleteNote204Response{}, nil
+}
+
+func (s apiServer) ListLeftOut(ctx context.Context, in api.ListLeftOutRequestObject) (api.ListLeftOutResponseObject, error) {
+	q := reqFrom(ctx)
+	t, err := s.a.s.taskRow(q.Org.ID, in.Id)
+	if err != nil {
+		return nil, err
+	}
+	views, err := s.a.s.taskViews(s.a.s.db, q.Org.ID, []Task{*t}, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	v := views[0]
+	left := v.LeftOut()
+	page, next, err := listPage(left, int(in.Params.Limit), string(in.Params.Cursor))
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListLeftOut200JSONResponse{Headers: api.ListLeftOut200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out.Body.NextCursor, out.Body.Offering = next, t.OfferingID
+	out.Body.NeverContact, out.Body.Erased = v.Withheld[withheldNeverContact], v.Withheld[withheldErased]
+	for _, c := range left {
+		switch c.Held {
+		case heldRejected:
+			out.Body.Rejected++
+		case heldCustomer:
+			out.Body.Customer++
+		case heldOpenDeal:
+			out.Body.OpenDeal++
+		case heldQualified:
+			out.Body.Qualified++
+		case heldNeverContact:
+			out.Body.Listed++
+		}
+	}
+	if out.Body.Items, err = recast[[]api.TaskCompany](page); err != nil {
+		return nil, err
+	}
+	if out.Body.Items == nil {
+		out.Body.Items = []api.TaskCompany{}
+	}
+	return out, nil
 }

@@ -252,8 +252,11 @@ func forgetAddresses(tx *gorm.DB, org int64, addresses []string) error {
 // UnsubscribeView is everything the page at an unsubscribe link shows: nothing about
 // whose link it is, since mail gets forwarded.
 type UnsubscribeView struct {
-	Token string
-	Done  bool
+	Page string `json:"page"`
+	// Token is set only when it has the shape of a link we make, so the page's button
+	// can't be aimed at another route.
+	Token string `json:"token,omitempty"`
+	Done  bool   `json:"done"`
 }
 
 func (a *App) unsubscribePage(w http.ResponseWriter, r *http.Request) {
@@ -293,8 +296,6 @@ func (a *App) unsubscribe(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) unsubscribeRender(w http.ResponseWriter, r *http.Request, v UnsubscribeView) {
 	customerHeaders(w)
-	w.WriteHeader(http.StatusOK)
-	if err := UnsubscribePage(v).Render(r.Context(), w); err != nil {
-		log.Print(err)
-	}
+	v.Page = "unsubscribe"
+	writeShell(w, http.StatusOK, v, "This page needs a browser with JavaScript.\n")
 }

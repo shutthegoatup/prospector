@@ -623,26 +623,6 @@ type AgentView struct {
 	Others []Agent
 }
 
-type OwnAgentsView struct {
-	Agents []AgentView
-	// Sealing is whether the server can keep a key at all.
-	Sealing bool
-	// New is the form for adding one.
-	New AgentView
-}
-
-func (a *App) ownAgents(org int64) OwnAgentsView {
-	list, _ := a.s.Agents(org)
-	v := OwnAgentsView{Sealing: a.s.keys != nil}
-	for _, c := range list {
-		v.Agents = append(v.Agents, agentView(c, list))
-	}
-	for _, c := range list {
-		v.New.Others = append(v.New.Others, Agent{ID: c.ID, Name: c.Name})
-	}
-	return v
-}
-
 // agentView is c as its card shows it, with those of all it could fall back to.
 func agentView(c Agent, all []Agent) AgentView {
 	view := AgentView{Agent: c, HasKey: c.APIKey != ""}
@@ -716,17 +696,9 @@ func (v AgentView) SearchText() string {
 	return "none"
 }
 
-// Tally counts the agents in each state, for the line above them.
-func (v OwnAgentsView) Tally() (ok, warn, stop int) {
-	for _, a := range v.Agents {
-		switch a.State().Rail {
-		case "ok":
-			ok++
-		case "warn":
-			warn++
-		default:
-			stop++
-		}
+func agentFallbackMinutes(v AgentView) int {
+	if v.FallbackMinutes == 0 {
+		return 15
 	}
-	return ok, warn, stop
+	return v.FallbackMinutes
 }

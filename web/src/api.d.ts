@@ -4,6 +4,156 @@
  */
 
 export interface paths {
+    "/api/v1/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who is signed in
+         * @description The person this browser is signed in as and the organisations the session opens.
+         *     An organisation's own sign-on may still stand in the way of one of them: its
+         *     `sso_required` says so. Answers even while `must_change_password` holds, which is
+         *     all a new member can do until they have chosen their own.
+         */
+        get: operations["getSession"];
+        put?: never;
+        /**
+         * Sign in with a password
+         * @description Sets the session cookie and answers what `getSession` would. A wrong address or
+         *     password is `wrong_login` either way, so nobody learns which accounts exist; too
+         *     many tries is `throttled`, with `Retry-After`. An address whose organisation
+         *     requires its own sign-on is signed in all the same, and that organisation then
+         *     shows `sso_required`.
+         */
+        post: operations["signIn"];
+        /**
+         * Sign out
+         * @description Ends this browser's session and clears its cookie. Signed out already is no error.
+         */
+        delete: operations["signOut"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change your password
+         * @description Signs out every other session of yours. Works while `must_change_password` holds,
+         *     and clears it. A wrong `current` counts against you like a wrong sign-in, and too
+         *     many is `throttled`.
+         */
+        put: operations["changePassword"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sign-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The ways to sign in here
+         * @description What the sign-in page offers on this server. Says nothing about any account.
+         */
+        get: operations["getSignInWays"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sign-in/sso": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The organisations whose sign-on speaks for an address
+         * @description Worked out from the address's domain alone, so it says nothing about whether the
+         *     account exists. Also marks this browser as having asked, which the `start_url`s
+         *     need: a link from another site can't walk anyone through a provider. Go to a
+         *     `start_url` as a page, not with fetch; the provider sends the browser back to
+         *     `/login/callback`, which signs it in. 404 when this server has no address of its
+         *     own for providers to send people back to.
+         */
+        post: operations["findSingleSignOn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/password-resets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Email a link to choose a new password
+         * @description Answers the same whether or not the address has an account, and the link lasts an
+         *     hour. 404 when this server sends no mail.
+         */
+        post: operations["requestPasswordReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/password-resets/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The secret in the emailed link. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Whose password a link resets
+         * @description 410, with `code` `link_used`, once the link is used, out of date or replaced.
+         */
+        get: operations["getPasswordReset"];
+        put?: never;
+        /**
+         * Choose a new password from a link
+         * @description Uses the link up and signs the account out everywhere. Sign in afterwards with the new password.
+         */
+        post: operations["resetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/agents": {
         parameters: {
             query?: never;
@@ -883,6 +1033,12 @@ export interface paths {
          *     task's search, the companies to review come best fit first (`ranked`): none
          *     missing a must, then most met, then fewest left unknown. Otherwise newest first,
          *     or as each filter orders them.
+         *
+         *     Each offering has a queue of its own. For one other than the organisation's own,
+         *     stages are its verdicts, fit is judged against its look-for fields, and people count
+         *     towards it when they are being reached for it. A company found for another offering
+         *     stays out of the organisation's own review until anything is done there for the
+         *     organisation's own.
          */
         get: operations["listResearch"];
         put?: never;
@@ -919,6 +1075,39 @@ export interface paths {
          *     and the task is made all the same.
          */
         post: operations["createTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/tasks/{id}/left-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What a task found that isn't new
+         * @description The companies the task came to that were already held when it first did, and still
+         *     aren't up for review: rejected before, a customer, in an open conversation or
+         *     qualified already. With them, any whose domain the never-contact list covers now,
+         *     however they stand: they are kept, and never put up for review. How a company stood when the task first came to it is what
+         *     counts; what happens to it afterwards doesn't. A rejected one can be put up for
+         *     review again with `reviewCompany`, naming the task's offering.
+         *
+         *     Beside them, how many times an agent working the task was refused a person on the
+         *     never-contact list or erased on request. Who they were is kept nowhere, so a person
+         *     refused twice counts twice.
+         */
+        get: operations["listLeftOut"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1844,6 +2033,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/companies/{id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The roles found at a company
+         * @description Junked ones included, with who junked them and why, so one can be put back.
+         */
+        get: operations["listCompanyRoles"];
+        put?: never;
+        /**
+         * Add a role open at a company, for an offering that has roles
+         * @description It waits for review, and brings the company back to review for the offering. A role
+         *     already there, by its posting or else its title, is a conflict, as is the title of one
+         *     junked, and a company a person rejected for the offering.
+         */
+        post: operations["addRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/roles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Pursue or junk a role, or put it back
+         * @description The company's verdict for the role's offering follows: up for review while a role waits,
+         *     else qualified while one is pursued, and rejected once every one is junked. While it has
+         *     roles, the company itself can't be judged for the offering. Junking sends nothing to anyone.
+         */
+        patch: operations["judgeRole"];
+        trace?: never;
+    };
     "/o/{org}/api/v1/companies": {
         parameters: {
             query?: never;
@@ -2455,8 +2700,12 @@ export interface components {
             /** Format: int64 */
             id: number;
             name: string;
+            /** @description Companies are judged for it by their roles, each pursued or junked: the company's verdict follows from them. Can't be turned off while it has roles. */
+            has_roles: boolean;
             /** @description What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list. */
             look_for: string;
+            /** @description `look_for`, read into its fields. */
+            looking_for: components["schemas"]["LookFor"][];
             /** @description The call script's pitch line for people reached for it; empty uses the organisation's. `{company}` is filled in. */
             pitch: string;
             /** @description The connection note for people picked for it; empty uses the organisation's. `{first}`, `{company}` and `{org}` are filled in. */
@@ -2472,12 +2721,63 @@ export interface components {
             look_for?: string;
             pitch?: string;
             note_template?: string;
+            has_roles?: boolean;
         };
         OfferingChange: {
             name?: string | null;
             look_for?: string | null;
             pitch?: string | null;
             note_template?: string | null;
+            has_roles?: boolean | null;
+        };
+        Role: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            offering_id: number;
+            /** Format: int64 */
+            company_id: number;
+            title: string;
+            /** @description The posting, or the page that shows the role is open; empty for none. */
+            url: string;
+            /** @description Rate, length, IR35, location and the like, in one line. */
+            details: string;
+            /** @enum {string} */
+            stage: "review" | "pursued" | "junked";
+            /** @description Why it was junked, as whoever junked it said it. */
+            reason: string;
+            /** @description Who last pursued, junked or put it back; empty until someone does. */
+            by: string;
+            found_by: string;
+            /**
+             * Format: int64
+             * @description The task it was found for; 0 for none.
+             */
+            task_id: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        RoleNew: {
+            /**
+             * Format: int64
+             * @description An offering that has roles.
+             */
+            offering: number;
+            title: string;
+            /** @description The posting. */
+            source_url?: string;
+            details?: string;
+        };
+        RoleJudgement: {
+            /**
+             * @description `pursued` qualifies the company for the offering once no role waits; once every role is junked it is rejected for it; `review` puts a role back.
+             * @enum {string}
+             */
+            stage: "review" | "pursued" | "junked";
+            /** @description Why, for a junked role only. */
+            reason?: string;
         };
         Verdict: {
             /** Format: int64 */
@@ -2708,10 +3008,21 @@ export interface components {
             /** Format: int64 */
             id: number;
             title: string;
+            /**
+             * Format: int64
+             * @description What the task finds companies for; 0 is the organisation's own offering.
+             */
+            offering_id: number;
             /** @description `waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request), `done` or `closed`. */
             status: string;
             open_requests: components["schemas"]["Asked"][];
             found: components["schemas"]["TaskCounts"];
+            /** @description About how many companies the person wants found; absent when they gave no number. */
+            want?: number;
+            /** @description Of the companies found, how many wait for a person to qualify or reject them. */
+            to_review: number;
+            /** @description Of the companies found, how many were already held, such as customers or ones rejected before; they don't count towards want. */
+            left_out: number;
             last_agent?: string;
             /** Format: date-time */
             last_agent_at?: string;
@@ -2727,6 +3038,11 @@ export interface components {
             stage: string;
             /** Format: date-time */
             since: string;
+            /**
+             * @description Set when the company was already held when the task first came to it, or `never_contact` while its domain is on the never-contact list: it isn't a new find. A never-contact company is kept and built on; nobody there is to be contacted.
+             * @enum {string}
+             */
+            held?: "rejected" | "customer" | "open_deal" | "qualified" | "never_contact";
         };
         TaskPerson: {
             /** Format: int64 */
@@ -2757,6 +3073,16 @@ export interface components {
         TaskOut: components["schemas"]["TaskBrief"] & {
             /** @description What the person asked for, in their words. */
             brief: string;
+            /** @description What the task finds companies for, when it isn't the organisation's own offering. */
+            offering?: {
+                /** Format: int64 */
+                id: number;
+                name: string;
+                /** @description Agents add each role they find with add_role. */
+                has_roles: boolean;
+                /** @description What agents are told to look for and how to judge companies for it, in place of the organisation's own look-for list. */
+                guidance: string;
+            };
             /** @description Everything asked on this task, oldest first; the first is the brief. */
             requests: components["schemas"]["Asked"][];
             companies: components["schemas"]["TaskCompany"][];
@@ -2824,6 +3150,8 @@ export interface components {
              * @description What the task finds companies for: agents are given its look-for fields, and what they find waits in its review. 0 or left out is the organisation's own.
              */
             offering?: number;
+            /** @description About how many companies to find. 0 or left out gives agents no number. */
+            want?: number;
             /** @description Prospector's own agents to start on the task, each on its own request. */
             agents?: number[];
         };
@@ -2849,6 +3177,8 @@ export interface components {
             /** @description The facts besides the answers, older answers among them, oldest first. */
             facts: components["schemas"]["ResearchFact"][];
             people: components["schemas"]["ResearchPerson"][];
+            /** @description Its roles for the offering in view, when that offering has roles; oldest first. */
+            roles?: components["schemas"]["Role"][];
         };
         LookFor: {
             field: string;
@@ -2951,8 +3281,16 @@ export interface components {
             grade: string;
             /** @description Why it fits, in the words of whoever added it; empty for none. */
             why: string;
-            /** @enum {string} */
+            /**
+             * @description Where it stands for the organisation's own offering; `listCompanyVerdicts` has the others.
+             * @enum {string}
+             */
             stage: "review" | "qualified" | "rejected";
+            /**
+             * Format: int64
+             * @description The offering it was found for, while nothing has been done there for the organisation's own: until then it stays out of the organisation's own review. 0 otherwise.
+             */
+            found_for: number;
             found_by: string;
             /** Format: date-time */
             created_at: string;
@@ -3037,6 +3375,8 @@ export interface components {
              * @description What the task finds companies for; 0 is the organisation's own.
              */
             offering_id: number;
+            /** @description About how many companies the person asked for; 0 is no number. */
+            want: number;
             created_by: string;
             /** Format: date-time */
             created_at: string;
@@ -3063,6 +3403,11 @@ export interface components {
             title: string;
             status: number;
             detail?: string;
+            /**
+             * @description What a client can act on without reading `detail`. Absent when there is nothing to do but show it.
+             * @enum {string}
+             */
+            code?: "wrong_login" | "throttled" | "link_used" | "signed_out" | "must_change_password" | "sso_required" | "session_limited";
         };
         /**
          * @description `openai` is any OpenAI-compatible endpoint; `anthropic` is Claude through Anthropic's own API.
@@ -3834,6 +4179,58 @@ export interface components {
             id: number;
             round: number;
         };
+        Session: {
+            user: components["schemas"]["SessionUser"];
+            /** @description Still on a password someone else saw: nothing opens until `changePassword`. */
+            must_change_password: boolean;
+            /** @description Began at one organisation's own sign-on, so it opens that organisation alone and can't start another. */
+            limited: boolean;
+            /** @description Every organisation this session opens, the one to land on first. */
+            orgs: components["schemas"]["SessionOrg"][];
+        };
+        SessionUser: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            email: string;
+            /** @description False for someone who signs in only through a provider. */
+            has_password: boolean;
+        };
+        SessionOrg: {
+            slug: string;
+            name: string;
+            /** @enum {string} */
+            role: "member" | "owner";
+            /** @description The organisation wants its own sign-on first; `findSingleSignOn` gives the way there. */
+            sso_required: boolean;
+        };
+        SignIn: {
+            email: string;
+            password: string;
+        };
+        SignInWays: {
+            /** @description Signing in with a password. Always offered. */
+            password: boolean;
+            /** @description `requestPasswordReset` works: this server sends mail. */
+            forgot: boolean;
+            /** @description `findSingleSignOn` works: organisations here may have their own sign-on. */
+            sso: boolean;
+            social: components["schemas"]["SocialWay"][];
+        };
+        SocialWay: {
+            /** @description Like `google`. */
+            key: string;
+            /** @description Like `Google`. */
+            label: string;
+            /** @description Where to go, as a page, to sign in this way. Add `?next=` for where to land. */
+            start_url: string;
+        };
+        SingleSignOnOrg: {
+            slug: string;
+            name: string;
+            /** @description Where to go, as a page, to sign in through this organisation's provider. */
+            start_url: string;
+        };
         Said: {
             /** @description What happened, for a person. */
             message: string;
@@ -4003,6 +4400,239 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    signIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignIn"];
+            };
+        };
+        responses: {
+            /** @description Signed in. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            /** @description Too many tries; `code` is `throttled`. */
+            429: {
+                headers: {
+                    /** @description Seconds until the next try counts. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    signOut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    current: string;
+                    new: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Changed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getSignInWays: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The ways. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignInWays"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    findSingleSignOn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    email: string;
+                    /** @description A path on this site to land on afterwards. */
+                    next?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The organisations, none when nobody's sign-on covers the domain. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        orgs: components["schemas"]["SingleSignOnOrg"][];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    requestPasswordReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    email: string;
+                };
+            };
+        };
+        responses: {
+            /** @description If the address has an account, a link is on its way. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getPasswordReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The secret in the emailed link. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        email: string;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    resetPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The secret in the emailed link. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     listAgents: {
         parameters: {
             query?: {
@@ -5471,6 +6101,8 @@ export interface operations {
             query?: {
                 /** @description `review` to qualify or reject, `contact` qualified with nobody picked, `verify` with a guessed email, `details` with a new detail for someone to accept, `rejected`. */
                 filter?: "review" | "contact" | "verify" | "details" | "rejected";
+                /** @description The offering whose queue this is; 0, or none, is the organisation's own. With `task`, the task's offering, which this may only repeat. */
+                offering?: number;
                 /** @description Only what this task's search found. */
                 task?: number;
                 /** @description How many to return. 50 if left out; 200 at most. */
@@ -5495,6 +6127,11 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /**
+                         * Format: int64
+                         * @description The offering whose queue this is: the one asked for, or a task's. 0 is the organisation's own, as is a closed task's whose offering was removed.
+                         */
+                        offering_id: number;
                         items: components["schemas"]["ResearchCompany"][];
                         /** @description Whether the companies come best fit first. A search with more than 500 to review comes newest first. */
                         ranked: boolean;
@@ -5515,6 +6152,8 @@ export interface operations {
             query?: {
                 /** @description Closed tasks too, after the open ones. */
                 closed?: boolean;
+                /** @description Only the tasks finding companies for this offering; 0 for the organisation's own. Left out, every task. */
+                offering?: number;
                 /** @description How many to return. 50 if left out; 200 at most. */
                 limit?: components["parameters"]["limit"];
                 /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
@@ -5573,6 +6212,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskStarted"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listLeftOut: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of the companies left out, oldest find first, and the refusals. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["TaskCompany"][];
+                        next_cursor?: string;
+                        /**
+                         * Format: int64
+                         * @description The task's offering, to name when putting a rejected company up for review again; 0 is the organisation's own.
+                         */
+                        offering: number;
+                        /** @description Companies rejected before. */
+                        rejected: number;
+                        /** @description Companies that were customers. */
+                        customer: number;
+                        /** @description Companies in an open conversation. */
+                        open_deal: number;
+                        /** @description Companies qualified already, with nothing under way. */
+                        qualified: number;
+                        /** @description Companies whose domain the never-contact list covers: kept, never up for review. */
+                        listed: number;
+                        /** @description Times a person on the never-contact list was refused. */
+                        never_contact: number;
+                        /** @description Times a person erased on request was refused. */
+                        erased: number;
+                    };
                 };
             };
             default: components["responses"]["Problem"];
@@ -6586,7 +7278,10 @@ export interface operations {
     };
     pickContact: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Pick them for this offering, whatever they were suggested for; 0 for the organisation's own. Left out, they are picked for what they were suggested for. */
+                offering?: number;
+            };
             header?: never;
             path: {
                 /** @description The organisation's slug. */
@@ -7016,6 +7711,100 @@ export interface operations {
                         items: components["schemas"]["Verdict"][];
                         next_cursor?: components["schemas"]["NextCursor"];
                     };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCompanyRoles: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+                /** @description Only those for this offering. */
+                offering?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description By offering, oldest first. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Role"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleNew"];
+            };
+        };
+        responses: {
+            /** @description The role, added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    judgeRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleJudgement"];
+            };
+        };
+        responses: {
+            /** @description The role as it now is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"];
                 };
             };
             default: components["responses"]["Problem"];

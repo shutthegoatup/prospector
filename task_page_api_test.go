@@ -169,7 +169,7 @@ func TestDeletingANoteIsSalesWorkThroughTheAPI(t *testing.T) {
 	one := fmt.Sprintf("%s/o/alpha/api/v1/notes/%d", srv.URL, note.ID)
 	areas := func(to ...string) {
 		t.Helper()
-		if code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/member/areas", "application/json", map[string]any{"user_id": grace.ID, "areas": to}); code != http.StatusOK {
+		if code, body := call(t, ada, "PATCH", srv.URL+"/o/alpha/api/v1/members/"+itoa(grace.ID), "application/json", map[string]any{"areas": append([]string{}, to...)}); code != http.StatusOK {
 			t.Fatalf("set areas %v: %d %s", to, code, body)
 		}
 	}

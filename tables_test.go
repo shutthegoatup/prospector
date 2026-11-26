@@ -67,6 +67,7 @@ var orgExportHolds = map[string]string{
 	"agents":               "agents",
 	"offerings":            "offerings",
 	"verdicts":             "verdicts",
+	"roles":                "roles",
 	"enrichers":            "enrichment_vendors",
 	"enrich_usages":        "not exported: how many lookups each vendor was asked this month, which only its limit needs",
 	"agent_runs":           "not exported: counts, a lease and why each run ended; what a run did is in history, as the built-in agent's events",

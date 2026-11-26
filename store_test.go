@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -282,11 +281,23 @@ func signedIn(t *testing.T) (*Store, *Org, *httptest.Server, *http.Client) {
 	t.Cleanup(srv.Close)
 	jar, _ := cookiejar.New(nil)
 	client := &http.Client{Jar: jar}
-	res, err := client.PostForm(srv.URL+"/login", url.Values{"email": {"ada@example.com"}, "password": {"correct horse battery"}})
+	res, err := signInWith(client, srv.URL, "ada@example.com", "correct horse battery")
 	if err != nil || res.StatusCode != http.StatusOK {
 		t.Fatalf("login: %v %v", res.Status, err)
 	}
 	return s, o, srv, client
+}
+
+// signInWith signs c in as the sign-in page does, through the API.
+func signInWith(c *http.Client, base, email, password string) (*http.Response, error) {
+	body, _ := json.Marshal(map[string]string{"email": email, "password": password})
+	res, err := c.Post(base+"/api/v1/session", "application/json", bytes.NewReader(body))
+	if err == nil {
+		said, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		res.Body = io.NopCloser(bytes.NewReader(said))
+	}
+	return res, err
 }
 
 func call(t *testing.T, client *http.Client, method, u, ctype string, body any) (int, string) {
@@ -351,14 +362,14 @@ func TestUI(t *testing.T) {
 	if _, err := s.AgentAddContact(o, Actor{Name: "agent:x"}, AddContactIn{Company: "Larkmoor Yachts", Name: "Eve", Linkedin: "javascript:alert(1)", SourceURL: "https://x.example"}); err == nil {
 		t.Fatal("agent stored a javascript: link")
 	}
-	if code, _ := call(t, client, "POST", base+"ui/mark", "application/json", map[string]any{"id": c.ID, "step": "replied"}); code != http.StatusOK {
+	if code, _ := call(t, client, "POST", base+"api/v1/marks", "application/json", map[string]any{"contact_id": c.ID, "step": "replied"}); code != http.StatusOK {
 		t.Fatal("mark replied")
 	}
 	if _, body := call(t, client, "GET", base+"api/v1/conversations", "", nil); !strings.Contains(body, "Hannah Pryce") || !strings.Contains(body, `"next_step":""`) {
 		t.Fatalf("a reply without a next step isn't flagged: %s", body)
 	}
-	code, body = call(t, client, "POST", base+"ui/keys", "application/json", map[string]any{"name": "bot", "scopes": []string{"read"}})
-	if code != http.StatusOK || !strings.Contains(body, "pk_") {
+	code, body = call(t, client, "POST", base+"api/v1/keys", "application/json", map[string]any{"name": "bot", "scopes": []string{"read"}})
+	if code != http.StatusCreated || !strings.Contains(body, "pk_") {
 		t.Fatalf("create key: %d %s", code, body)
 	}
 }

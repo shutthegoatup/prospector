@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net/http"
 	"strings"
 	"time"
 
@@ -184,32 +183,6 @@ func (a *App) mailFor(org int64) (*MailServer, error) {
 	return via, nil
 }
 
-func (a *App) forgotPage(w http.ResponseWriter, r *http.Request) {
-	if !a.mailOn() {
-		http.NotFound(w, r)
-		return
-	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	ForgotPage(false).Render(r.Context(), w)
-}
-
-// forgot answers the same way, and as fast, whether or not the address has an
-// account: the lookup and the send happen after the answer.
-func (a *App) forgot(w http.ResponseWriter, r *http.Request) {
-	if !a.mailOn() {
-		http.NotFound(w, r)
-		return
-	}
-	if err := parseForm(w, r, 64<<10); err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	email := r.PostForm.Get("email")
-	a.background(func() { a.sendReset(email) })
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	ForgotPage(true).Render(r.Context(), w)
-}
-
 func (a *App) sendReset(email string) {
 	u, err := a.s.UserByEmail(email)
 	if err != nil {
@@ -229,46 +202,6 @@ func (a *App) sendReset(email string) {
 	if err != nil {
 		log.Print("password reset: ", err)
 	}
-}
-
-func (a *App) resetPage(w http.ResponseWriter, r *http.Request) {
-	u, err := a.s.PasswordTokenUser(r.PathValue("token"))
-	if err != nil {
-		fail(w, errBadLink, http.StatusGone)
-		return
-	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	ResetPage(r.PathValue("token"), u.Email, "").Render(r.Context(), w)
-}
-
-func (a *App) reset(w http.ResponseWriter, r *http.Request) {
-	if err := parseForm(w, r, 64<<10); err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	token := r.PathValue("token")
-	u, err := a.s.PasswordTokenUser(token)
-	if err != nil {
-		fail(w, errBadLink, http.StatusGone)
-		return
-	}
-	select {
-	case hashSlots <- struct{}{}:
-		defer func() { <-hashSlots }()
-	case <-r.Context().Done():
-		return
-	}
-	if err := a.s.RedeemPasswordToken(token, r.PostForm.Get("password")); errors.Is(err, errBadLink) {
-		fail(w, err, http.StatusGone)
-		return
-	} else if err != nil {
-		w.Header().Set("content-type", "text/html; charset=utf-8")
-		code, text := telling("password reset", err, http.StatusBadRequest)
-		w.WriteHeader(code)
-		ResetPage(token, u.Email, text).Render(r.Context(), w)
-		return
-	}
-	http.Redirect(w, r, "/login?reset=1", http.StatusSeeOther)
 }
 
 // invite emails a new member a link to choose their password. It reports false when
@@ -328,22 +261,6 @@ type mailIn struct {
 	Sender   string `json:"sender"`
 }
 
-func (a *App) uiMail(w http.ResponseWriter, r *http.Request) {
-	var in mailIn
-	if !decode(w, r, &in) {
-		return
-	}
-	cleared, err := a.saveMail(reqOf(r).Org.ID, in)
-	switch {
-	case err != nil:
-		fail(w, err, http.StatusBadRequest)
-	case cleared:
-		writeJSON(w, map[string]string{"message": "No mail server of this organisation's own."})
-	default:
-		done(w, nil)
-	}
-}
-
 // saveMail keeps an organisation's own mail server, or drops it for an empty host.
 func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 	in.Host = strings.TrimSpace(in.Host)
@@ -371,16 +288,6 @@ func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 		}
 	}
 	return false, a.s.SaveOrgMail(m)
-}
-
-// uiMailTest sends the owner a message through whichever server invitations would use.
-func (a *App) uiMailTest(w http.ResponseWriter, r *http.Request) {
-	msg, err := a.testMail(r.Context(), reqOf(r))
-	if err != nil {
-		fail(w, err, http.StatusBadGateway)
-		return
-	}
-	writeJSON(w, map[string]string{"message": msg})
 }
 
 func (a *App) testMail(ctx context.Context, q *Req) (string, error) {

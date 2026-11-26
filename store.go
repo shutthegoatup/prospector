@@ -106,20 +106,23 @@ type APIKey struct {
 }
 
 type Company struct {
-	ID           int64     `gorm:"primaryKey" json:"id"`
-	OrgID        int64     `gorm:"uniqueIndex:idx_org_company;not null" json:"-"`
-	Name         string    `gorm:"uniqueIndex:idx_org_company;not null" json:"name"`
-	Domain       string    `json:"domain"`
-	Country      string    `json:"country"`
-	Segment      string    `json:"segment"`
-	Fit          string    `json:"fit"`
-	Stage        string    `gorm:"index" json:"stage"`
-	Why          string    `json:"why"`
-	FoundBy      string    `json:"found_by"`
-	Incorporated *bool     `json:"incorporated"`
-	Hold         *string   `json:"hold"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID           int64   `gorm:"primaryKey" json:"id"`
+	OrgID        int64   `gorm:"uniqueIndex:idx_org_company;not null" json:"-"`
+	Name         string  `gorm:"uniqueIndex:idx_org_company;not null" json:"name"`
+	Domain       string  `json:"domain"`
+	Country      string  `json:"country"`
+	Segment      string  `json:"segment"`
+	Fit          string  `json:"fit"`
+	Stage        string  `gorm:"index" json:"stage"`
+	Why          string  `json:"why"`
+	FoundBy      string  `json:"found_by"`
+	Incorporated *bool   `json:"incorporated"`
+	Hold         *string `json:"hold"`
+	// FoundFor is the offering a company was first found for: until the organisation's
+	// own offering looks at it, it stays out of the organisation's own review.
+	FoundFor  int64     `gorm:"not null;default:0" json:"found_for"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 const (
@@ -262,7 +265,7 @@ type Store struct {
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
 	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &EnquiryMessage{}, &Suppression{}, &UnsubscribeLink{}, &Campaign{}, &CampaignRecipient{}, &Agreement{}, &AgreementFile{}, &AgreementRecipient{}, &AgreementField{}, &AgreementEvent{}, &SealKey{}, &Suggestion{},
-	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}, &Agent{}, &AgentRun{}, &Deal{}, &Subscription{}, &Onboarding{}, &OnboardingStep{}, &CustomerGrant{}, &CustomerLink{}, &CustomerSession{}, &MailDomain{}, &Enricher{}, &EnrichUsage{}, &Offering{}, &Verdict{}}
+	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}, &Agent{}, &AgentRun{}, &Deal{}, &Subscription{}, &Onboarding{}, &OnboardingStep{}, &CustomerGrant{}, &CustomerLink{}, &CustomerSession{}, &MailDomain{}, &Enricher{}, &EnrichUsage{}, &Offering{}, &Verdict{}, &Role{}}
 
 // Open takes a postgres:// URL or a SQLite file path.
 func Open(dsn string) (*Store, error) {

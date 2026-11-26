@@ -159,7 +159,7 @@ func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddComp
 		created := false
 		if c == nil {
 			c, created, err = ensureCompany(tx, org, Company{Name: in.Name, Domain: domain, Country: in.Country,
-				Segment: in.Segment, Fit: in.Fit, Why: in.Why, FoundBy: who.Name, Stage: CompanyReview})
+				Segment: in.Segment, Fit: in.Fit, Why: in.Why, FoundBy: who.Name, Stage: CompanyReview, FoundFor: who.Offering})
 			if err != nil {
 				return err
 			}
@@ -170,6 +170,13 @@ func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddComp
 		}
 		if who.Offering != 0 {
 			if out.Stage, err = putUpForReview(tx, org, who.Offering, c.ID, who.Name); err != nil {
+				return err
+			}
+		} else if err := foundForOwn(tx, org, c.ID); err != nil {
+			return err
+		}
+		if !created {
+			if err := s.heldWhenFound(tx, org, who, c, out.Stage); err != nil {
 				return err
 			}
 		}
@@ -230,6 +237,9 @@ func (s *Store) AgentAddFact(org int64, who Actor, in AddFactIn) (*AddFactOut, e
 			return err
 		}
 		if err := forOffering(tx, org, who, c.ID); err != nil {
+			return err
+		}
+		if err := s.heldWhenReached(tx, org, who, c); err != nil {
 			return err
 		}
 		f, had, err := addFact(tx, org, c.ID, in.FactIn, who.Name)
@@ -297,6 +307,7 @@ func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContact
 		return nil, errors.New("linkedin must be an https link")
 	}
 	if err := s.allowed(o, in.Email, in.Linkedin); err != nil {
+		s.withheld(o.ID, who, withheldNeverContact)
 		return nil, err
 	}
 	if err := s.checkMailDomains(in.Email); err != nil {
@@ -307,6 +318,9 @@ func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContact
 		return nil, err
 	}
 	if err := erased(s.db, o.ID, in.Name, c.Name, in.Email, in.Linkedin); err != nil {
+		if errors.Is(err, errErased) {
+			s.withheld(o.ID, who, withheldErased)
+		}
 		return nil, err
 	}
 	person := strings.TrimSpace(in.Name)
@@ -324,6 +338,9 @@ func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContact
 			return err
 		}
 		if err := forOffering(tx, o.ID, who, c.ID); err != nil {
+			return err
+		}
+		if err := s.heldWhenReached(tx, o.ID, who, c); err != nil {
 			return err
 		}
 		var people []Contact
@@ -556,9 +573,20 @@ type OfferingStanding struct {
 	Reason   string `json:"reason,omitempty"`
 }
 
+type RoleBrief struct {
+	ID       int64  `json:"id"`
+	Offering string `json:"offering"`
+	Title    string `json:"title"`
+	URL      string `json:"url,omitempty"`
+	Details  string `json:"details,omitempty"`
+	Stage    string `json:"stage" jsonschema:"review, pursued or junked"`
+	Reason   string `json:"reason,omitempty" jsonschema:"why a person junked it"`
+}
+
 type CompanyDetail struct {
 	Company   Company            `json:"company"`
 	Standing  []OfferingStanding `json:"standing,omitempty" jsonschema:"where the company stands for each other thing the organisation sells that it has been judged for; company.stage is for the organisation's own"`
+	Roles     []RoleBrief        `json:"roles,omitempty" jsonschema:"the roles found here for offerings that have them; don't add a junked one again"`
 	Facts     []Fact             `json:"facts"`
 	People    []PersonBrief      `json:"people"`
 	LastAgent *LastAgent         `json:"last_agent,omitempty" jsonschema:"the agent that last changed this company, if any"`
@@ -629,6 +657,9 @@ func (s *Store) AgentCompany(org int64, who Actor, ref string, page PageIn) (*Co
 	}
 	out := &CompanyDetail{Company: *c, People: []PersonBrief{}, History: []Happened{}, Notes: []NoteOut{}}
 	if out.Standing, err = s.standing(org, c.ID); err != nil {
+		return nil, err
+	}
+	if out.Roles, err = s.roleBriefs(org, c.ID); err != nil {
 		return nil, err
 	}
 	out.Facts, at[0] = afterID(facts, func(f Fact) int64 { return f.ID }, at[0], size)

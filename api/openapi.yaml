@@ -27,6 +27,10 @@ info:
     configuring agents, deleting enquiries, exporting and erasing people, changing settings,
     the team, mail or single sign-on, and exporting the organisation, which need an owner.
 
+    Signing in, signing out and passwords are account-wide, under `/api/v1/` rather than
+    an organisation's address, and only for a browser: a key is refused them. A refusal
+    a client should act on carries a `code`.
+
     Every list comes a page at a time: it takes `limit` and `cursor`, and answers
     `{"items": [...], "next_cursor": "..."}`. When `next_cursor` is there, pass it back
     as `cursor` for the next page; the `Link` header names that page too.
@@ -66,10 +70,213 @@ tags:
     description: The things an organisation sells besides what its settings describe, each with what to look for at a company, and where each company stands for each.
   - name: enrichment
     description: Data vendors the organisation pays, under its own keys, to find an email, phone or profile its research couldn't.
+  - name: account
+    description: Signing in and out, and your own password. Account-wide rather than an organisation's, and for a browser only; an API key is refused.
   - name: settings
     description: How the organisation works, from its waits and wording to its never-contact list and the sites it takes enquiries from.
 
 paths:
+  /api/v1/session:
+    get:
+      operationId: getSession
+      tags: [account]
+      summary: Who is signed in
+      description: |
+        The person this browser is signed in as and the organisations the session opens.
+        An organisation's own sign-on may still stand in the way of one of them: its
+        `sso_required` says so. Answers even while `must_change_password` holds, which is
+        all a new member can do until they have chosen their own.
+      security:
+        - session: []
+      responses:
+        "200":
+          description: The session.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Session" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: signIn
+      tags: [account]
+      summary: Sign in with a password
+      description: |
+        Sets the session cookie and answers what `getSession` would. A wrong address or
+        password is `wrong_login` either way, so nobody learns which accounts exist; too
+        many tries is `throttled`, with `Retry-After`. An address whose organisation
+        requires its own sign-on is signed in all the same, and that organisation then
+        shows `sso_required`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SignIn" }
+      responses:
+        "200":
+          description: Signed in.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Session" }
+        "429":
+          description: Too many tries; `code` is `throttled`.
+          headers:
+            Retry-After: { schema: { type: integer }, description: Seconds until the next try counts. }
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: signOut
+      tags: [account]
+      summary: Sign out
+      description: Ends this browser's session and clears its cookie. Signed out already is no error.
+      security: []
+      responses:
+        "204": { description: Signed out. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/password:
+    put:
+      operationId: changePassword
+      tags: [account]
+      summary: Change your password
+      description: |
+        Signs out every other session of yours. Works while `must_change_password` holds,
+        and clears it. A wrong `current` counts against you like a wrong sign-in, and too
+        many is `throttled`.
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current, new]
+              properties:
+                current: { type: string }
+                new: { type: string, minLength: 10 }
+      responses:
+        "204": { description: Changed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/sign-in:
+    get:
+      operationId: getSignInWays
+      tags: [account]
+      summary: The ways to sign in here
+      description: What the sign-in page offers on this server. Says nothing about any account.
+      security: []
+      responses:
+        "200":
+          description: The ways.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SignInWays" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/sign-in/sso:
+    post:
+      operationId: findSingleSignOn
+      tags: [account]
+      summary: The organisations whose sign-on speaks for an address
+      description: |
+        Worked out from the address's domain alone, so it says nothing about whether the
+        account exists. Also marks this browser as having asked, which the `start_url`s
+        need: a link from another site can't walk anyone through a provider. Go to a
+        `start_url` as a page, not with fetch; the provider sends the browser back to
+        `/login/callback`, which signs it in. 404 when this server has no address of its
+        own for providers to send people back to.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string }
+                next: { type: string, description: A path on this site to land on afterwards. }
+      responses:
+        "200":
+          description: The organisations, none when nobody's sign-on covers the domain.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [orgs]
+                properties:
+                  orgs:
+                    type: array
+                    items: { $ref: "#/components/schemas/SingleSignOnOrg" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/password-resets:
+    post:
+      operationId: requestPasswordReset
+      tags: [account]
+      summary: Email a link to choose a new password
+      description: |
+        Answers the same whether or not the address has an account, and the link lasts an
+        hour. 404 when this server sends no mail.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string }
+      responses:
+        "202": { description: "If the address has an account, a link is on its way." }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/password-resets/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema: { type: string }
+        description: The secret in the emailed link.
+    get:
+      operationId: getPasswordReset
+      tags: [account]
+      summary: Whose password a link resets
+      description: 410, with `code` `link_used`, once the link is used, out of date or replaced.
+      security: []
+      responses:
+        "200":
+          description: The account.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [email]
+                properties:
+                  email: { type: string }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: resetPassword
+      tags: [account]
+      summary: Choose a new password from a link
+      description: Uses the link up and signs the account out everywhere. Sign in afterwards with the new password.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, minLength: 10 }
+      responses:
+        "204": { description: Saved. }
+        default: { $ref: "#/components/responses/Problem" }
+
   /o/{org}/api/v1/agents:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -1305,11 +1512,21 @@ paths:
         task's search, the companies to review come best fit first (`ranked`): none
         missing a must, then most met, then fewest left unknown. Otherwise newest first,
         or as each filter orders them.
+
+        Each offering has a queue of its own. For one other than the organisation's own,
+        stages are its verdicts, fit is judged against its look-for fields, and people count
+        towards it when they are being reached for it. A company found for another offering
+        stays out of the organisation's own review until anything is done there for the
+        organisation's own.
       parameters:
         - name: filter
           in: query
           schema: { type: string, enum: [review, contact, verify, details, rejected], default: review }
           description: "`review` to qualify or reject, `contact` qualified with nobody picked, `verify` with a guessed email, `details` with a new detail for someone to accept, `rejected`."
+        - name: offering
+          in: query
+          schema: { type: integer, format: int64, default: 0 }
+          description: The offering whose queue this is; 0, or none, is the organisation's own. With `task`, the task's offering, which this may only repeat.
         - name: task
           in: query
           schema: { type: integer, format: int64 }
@@ -1328,8 +1545,9 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items, ranked, counts]
+                required: [items, ranked, counts, offering_id]
                 properties:
+                  offering_id: { type: integer, format: int64, description: "The offering whose queue this is: the one asked for, or a task's. 0 is the organisation's own, as is a closed task's whose offering was removed." }
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/ResearchCompany" }
@@ -1357,6 +1575,10 @@ paths:
           in: query
           schema: { type: boolean, default: false }
           description: Closed tasks too, after the open ones.
+        - name: offering
+          in: query
+          schema: { type: integer, format: int64, x-go-type-skip-optional-pointer: false }
+          description: Only the tasks finding companies for this offering; 0 for the organisation's own. Left out, every task.
         - $ref: "#/components/parameters/limit"
         - $ref: "#/components/parameters/cursor"
       security:
@@ -1403,6 +1625,56 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TaskStarted" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/tasks/{id}/left-out:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listLeftOut
+      tags: [tasks]
+      summary: What a task found that isn't new
+      description: |
+        The companies the task came to that were already held when it first did, and still
+        aren't up for review: rejected before, a customer, in an open conversation or
+        qualified already. With them, any whose domain the never-contact list covers now,
+        however they stand: they are kept, and never put up for review. How a company stood when the task first came to it is what
+        counts; what happens to it afterwards doesn't. A rejected one can be put up for
+        review again with `reviewCompany`, naming the task's offering.
+
+        Beside them, how many times an agent working the task was refused a person on the
+        never-contact list or erased on request. Who they were is kept nowhere, so a person
+        refused twice counts twice.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of the companies left out, oldest find first, and the refusals.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, offering, rejected, customer, open_deal, qualified, listed, never_contact, erased]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/TaskCompany" }
+                  next_cursor: { type: string }
+                  offering: { type: integer, format: int64, description: "The task's offering, to name when putting a rejected company up for review again; 0 is the organisation's own." }
+                  rejected: { type: integer, description: Companies rejected before. }
+                  customer: { type: integer, description: Companies that were customers. }
+                  open_deal: { type: integer, description: Companies in an open conversation. }
+                  qualified: { type: integer, description: "Companies qualified already, with nothing under way." }
+                  listed: { type: integer, description: "Companies whose domain the never-contact list covers: kept, never up for review." }
+                  never_contact: { type: integer, description: Times a person on the never-contact list was refused. }
+                  erased: { type: integer, description: Times a person erased on request was refused. }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/tasks/{id}:
@@ -2304,6 +2576,11 @@ paths:
         Takes someone an agent suggested out of Research and into the LinkedIn queue. Someone
         suggested for an offering gets its connection note, and their company is qualified for
         that offering rather than for the organisation's own.
+      parameters:
+        - name: offering
+          in: query
+          schema: { type: integer, format: int64, x-go-type-skip-optional-pointer: false }
+          description: Pick them for this offering, whatever they were suggested for; 0 for the organisation's own. Left out, they are picked for what they were suggested for.
       security:
         - session: []
         - bearer: ["research:review"]
@@ -2673,6 +2950,94 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Verdict" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/companies/{id}/roles:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listCompanyRoles
+      tags: [offerings]
+      summary: The roles found at a company
+      description: Junked ones included, with who junked them and why, so one can be put back.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+        - name: offering
+          in: query
+          description: Only those for this offering.
+          schema: { type: integer, format: int64 }
+          x-go-type-skip-optional-pointer: false
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: By offering, oldest first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Role" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: addRole
+      tags: [offerings]
+      summary: Add a role open at a company, for an offering that has roles
+      description: |
+        It waits for review, and brings the company back to review for the offering. A role
+        already there, by its posting or else its title, is a conflict, as is the title of one
+        junked, and a company a person rejected for the offering.
+      security:
+        - session: []
+        - bearer: ["research:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RoleNew" }
+      responses:
+        "201":
+          description: The role, added.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Role" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/roles/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: judgeRole
+      tags: [offerings]
+      summary: Pursue or junk a role, or put it back
+      description: |
+        The company's verdict for the role's offering follows: up for review while a role waits,
+        else qualified while one is pursued, and rejected once every one is junked. While it has
+        roles, the company itself can't be judged for the offering. Junking sends nothing to anyone.
+      security:
+        - session: []
+        - bearer: ["research:review"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RoleJudgement" }
+      responses:
+        "200":
+          description: The role as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Role" }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/companies:
@@ -3472,11 +3837,16 @@ components:
 
     Offering:
       type: object
-      required: [id, name, look_for, pitch, note_template, updated_by, created_at, updated_at]
+      required: [id, name, look_for, looking_for, pitch, note_template, has_roles, updated_by, created_at, updated_at]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
+        has_roles: { type: boolean, description: "Companies are judged for it by their roles, each pursued or junked: the company's verdict follows from them. Can't be turned off while it has roles." }
         look_for: { type: string, description: "What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list." }
+        looking_for:
+          type: array
+          items: { $ref: "#/components/schemas/LookFor" }
+          description: "`look_for`, read into its fields."
         pitch: { type: string, description: "The call script's pitch line for people reached for it; empty uses the organisation's. `{company}` is filled in." }
         note_template: { type: string, description: "The connection note for people picked for it; empty uses the organisation's. `{first}`, `{company}` and `{org}` are filled in." }
         updated_by: { type: string }
@@ -3491,6 +3861,7 @@ components:
         look_for: { type: string }
         pitch: { type: string }
         note_template: { type: string }
+        has_roles: { type: boolean }
 
     OfferingChange:
       type: object
@@ -3499,6 +3870,41 @@ components:
         look_for: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
         pitch: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
         note_template: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        has_roles: { type: boolean, nullable: true, x-go-type-skip-optional-pointer: false }
+
+    Role:
+      type: object
+      required: [id, offering_id, company_id, title, url, details, stage, reason, by, found_by, task_id, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        offering_id: { type: integer, format: int64 }
+        company_id: { type: integer, format: int64 }
+        title: { type: string }
+        url: { type: string, description: "The posting, or the page that shows the role is open; empty for none." }
+        details: { type: string, description: "Rate, length, IR35, location and the like, in one line." }
+        stage: { type: string, enum: [review, pursued, junked] }
+        reason: { type: string, description: "Why it was junked, as whoever junked it said it." }
+        by: { type: string, description: "Who last pursued, junked or put it back; empty until someone does." }
+        found_by: { type: string }
+        task_id: { type: integer, format: int64, description: "The task it was found for; 0 for none." }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    RoleNew:
+      type: object
+      required: [offering, title]
+      properties:
+        offering: { type: integer, format: int64, description: "An offering that has roles." }
+        title: { type: string, maxLength: 200 }
+        source_url: { type: string, description: "The posting." }
+        details: { type: string, maxLength: 300 }
+
+    RoleJudgement:
+      type: object
+      required: [stage]
+      properties:
+        stage: { type: string, enum: [review, pursued, junked], description: "`pursued` qualifies the company for the offering once no role waits; once every role is junked it is rejected for it; `review` puts a role back." }
+        reason: { type: string, description: "Why, for a junked role only." }
 
     Verdict:
       type: object
@@ -3698,15 +4104,19 @@ components:
 
     TaskBrief:
       type: object
-      required: [id, title, status, open_requests, found]
+      required: [id, title, status, open_requests, found, to_review, left_out, offering_id]
       properties:
         id: { type: integer, format: int64 }
         title: { type: string }
+        offering_id: { type: integer, format: int64, description: "What the task finds companies for; 0 is the organisation's own offering." }
         status: { type: string, description: "`waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request), `done` or `closed`." }
         open_requests:
           type: array
           items: { $ref: "#/components/schemas/Asked" }
         found: { $ref: "#/components/schemas/TaskCounts" }
+        want: { type: integer, description: "About how many companies the person wants found; absent when they gave no number." }
+        to_review: { type: integer, description: "Of the companies found, how many wait for a person to qualify or reject them." }
+        left_out: { type: integer, description: "Of the companies found, how many were already held, such as customers or ones rejected before; they don't count towards want." }
         last_agent: { type: string }
         last_agent_at: { type: string, format: date-time, x-go-type-skip-optional-pointer: false }
         last_agent_action: { type: string, description: "What that agent last did: `task:pickup` when it only picked the task up." }
@@ -3720,6 +4130,7 @@ components:
         name: { type: string }
         stage: { type: string, description: "`review`, `qualified` or `rejected`: a rejected company is not to be suggested again." }
         since: { type: string, format: date-time }
+        held: { type: string, enum: [rejected, customer, open_deal, qualified, never_contact], description: "Set when the company was already held when the task first came to it, or `never_contact` while its domain is on the never-contact list: it isn't a new find. A never-contact company is kept and built on; nobody there is to be contacted." }
 
     TaskPerson:
       type: object
@@ -3752,6 +4163,16 @@ components:
           required: [brief, requests, companies, people, notes]
           properties:
             brief: { type: string, description: "What the person asked for, in their words." }
+            offering:
+              type: object
+              x-go-type-skip-optional-pointer: false
+              description: What the task finds companies for, when it isn't the organisation's own offering.
+              required: [id, name, has_roles, guidance]
+              properties:
+                id: { type: integer, format: int64 }
+                name: { type: string }
+                has_roles: { type: boolean, description: "Agents add each role they find with add_role." }
+                guidance: { type: string, description: "What agents are told to look for and how to judge companies for it, in place of the organisation's own look-for list." }
             requests:
               type: array
               description: "Everything asked on this task, oldest first; the first is the brief."
@@ -3809,6 +4230,7 @@ components:
         title: { type: string, description: "A few words naming the task. Empty, it takes the brief's first line; longer than 60 characters, it is cut." }
         brief: { type: string, maxLength: 4000, description: "What is wanted: the task's first request." }
         offering: { type: integer, format: int64, description: "What the task finds companies for: agents are given its look-for fields, and what they find waits in its review. 0 or left out is the organisation's own." }
+        want: { type: integer, minimum: 0, maximum: 500, description: "About how many companies to find. 0 or left out gives agents no number." }
         agents:
           type: array
           items: { type: integer, format: int64 }
@@ -3840,6 +4262,10 @@ components:
         people:
           type: array
           items: { $ref: "#/components/schemas/ResearchPerson" }
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/Role" }
+          description: Its roles for the offering in view, when that offering has roles; oldest first.
 
     LookFor:
       type: object
@@ -3930,7 +4356,7 @@ components:
 
     CompanyOverview:
       type: object
-      required: [id, name, domain, country, segment, grade, why, stage, found_by, created_at, pipeline, touches, looking_for, facts, people, onboardings, planned_steps, subscriptions, agreements]
+      required: [id, name, domain, country, segment, grade, why, stage, found_for, found_by, created_at, pipeline, touches, looking_for, facts, people, onboardings, planned_steps, subscriptions, agreements]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
@@ -3939,7 +4365,8 @@ components:
         segment: { type: string }
         grade: { type: string, description: "The fit grade a person or agent gave, A, B or C; empty for none." }
         why: { type: string, description: "Why it fits, in the words of whoever added it; empty for none." }
-        stage: { type: string, enum: [review, qualified, rejected] }
+        stage: { type: string, enum: [review, qualified, rejected], description: "Where it stands for the organisation's own offering; `listCompanyVerdicts` has the others." }
+        found_for: { type: integer, format: int64, description: "The offering it was found for, while nothing has been done there for the organisation's own: until then it stays out of the organisation's own review. 0 otherwise." }
         found_by: { type: string }
         created_at: { type: string, format: date-time }
         pipeline: { $ref: "#/components/schemas/Pipeline" }
@@ -4038,11 +4465,12 @@ components:
 
     Task:
       type: object
-      required: [id, title, created_by, created_at, closed_at, offering_id]
+      required: [id, title, created_by, created_at, closed_at, offering_id, want]
       properties:
         id: { type: integer, format: int64 }
         title: { type: string }
         offering_id: { type: integer, format: int64, description: "What the task finds companies for; 0 is the organisation's own." }
+        want: { type: integer, description: "About how many companies the person asked for; 0 is no number." }
         created_by: { type: string }
         created_at: { type: string, format: date-time }
         closed_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
@@ -4070,6 +4498,10 @@ components:
         title: { type: string }
         status: { type: integer }
         detail: { type: string }
+        code:
+          type: string
+          description: What a client can act on without reading `detail`. Absent when there is nothing to do but show it.
+          enum: [wrong_login, throttled, link_used, signed_out, must_change_password, sso_required, session_limited]
 
     AgentKind:
       type: string
@@ -4769,6 +5201,69 @@ components:
           properties:
             id: { type: integer, format: int64 }
             round: { type: integer }
+
+    Session:
+      type: object
+      required: [user, must_change_password, limited, orgs]
+      properties:
+        user: { $ref: "#/components/schemas/SessionUser" }
+        must_change_password: { type: boolean, description: "Still on a password someone else saw: nothing opens until `changePassword`." }
+        limited:
+          type: boolean
+          description: Began at one organisation's own sign-on, so it opens that organisation alone and can't start another.
+        orgs:
+          type: array
+          description: Every organisation this session opens, the one to land on first.
+          items: { $ref: "#/components/schemas/SessionOrg" }
+    SessionUser:
+      type: object
+      required: [id, name, email, has_password]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        email: { type: string }
+        has_password: { type: boolean, description: "False for someone who signs in only through a provider." }
+    SessionOrg:
+      type: object
+      required: [slug, name, role, sso_required]
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        role: { type: string, enum: [member, owner] }
+        sso_required:
+          type: boolean
+          description: The organisation wants its own sign-on first; `findSingleSignOn` gives the way there.
+    SignIn:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+    SignInWays:
+      type: object
+      required: [password, forgot, sso, social]
+      properties:
+        password: { type: boolean, description: Signing in with a password. Always offered. }
+        forgot: { type: boolean, description: "`requestPasswordReset` works: this server sends mail." }
+        sso: { type: boolean, description: "`findSingleSignOn` works: organisations here may have their own sign-on." }
+        social:
+          type: array
+          items: { $ref: "#/components/schemas/SocialWay" }
+    SocialWay:
+      type: object
+      required: [key, label, start_url]
+      properties:
+        key: { type: string, description: "Like `google`." }
+        label: { type: string, description: "Like `Google`." }
+        start_url: { type: string, description: "Where to go, as a page, to sign in this way. Add `?next=` for where to land." }
+    SingleSignOnOrg:
+      type: object
+      required: [slug, name, start_url]
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        start_url: { type: string, description: "Where to go, as a page, to sign in through this organisation's provider." }
+
     Said:
       type: object
       required: [message]

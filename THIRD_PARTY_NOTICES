@@ -1,4 +1,4 @@
-The UI components in components/, utils/ and assets/css/{shadcn-tailwind,tw-animate}.css come from
+The styles in assets/css/{shadcn-tailwind,tw-animate}.css come from
 shadcn-templ (https://github.com/axadrn/shadcn-templ), a port of shadcn/ui, under this licence:
 
 MIT License
@@ -32,7 +32,7 @@ Open Font License, Version 1.1; the full text is in assets/fonts/OFL.txt and is 
 with them.
 
 
-assets/js/prepare.js bundles, and assets/js/pdf.worker.min.mjs is, pdf.js
+assets/app/chunks/pdf.js bundles, and assets/js/pdf.worker.min.mjs is, pdf.js
 (https://github.com/mozilla/pdf.js, Copyright Mozilla Foundation and contributors),
 under the Apache License, Version 2.0; the full text is in assets/js/pdf.js.LICENSE.txt
 and is served with them.

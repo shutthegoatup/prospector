@@ -285,24 +285,14 @@ func socialFromEnv(getenv func(string) string) ([]socialWay, error) {
 
 func (a *App) callbackURL() string { return a.base + "/login/callback" }
 
-type LoginView struct {
-	Next, Problem, Notice string
-	Ways                  []socialWay
-	SSO                   bool
-	// Forgot offers the reset link, which needs mail.
-	Forgot bool
-}
-
-func (a *App) loginView(next, problem string) LoginView {
-	return LoginView{Next: next, Problem: problem, Ways: a.social, SSO: a.base != "", Forgot: a.mailOn()}
-}
-
+// signInProblem is a sign-in through a provider that went wrong, said on a page of the
+// server's own: its words never travel in an address, where anyone could write them.
 func (a *App) signInProblem(w http.ResponseWriter, r *http.Request, next string, code int, problem string) {
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	w.WriteHeader(code)
-	if err := LoginPage(a.loginView(next, problem)).Render(r.Context(), w); err != nil {
-		log.Print(err)
+	back := "/login"
+	if next != "" {
+		back += "?" + url.Values{"next": {safeNext(next)}}.Encode()
 	}
+	writeShell(w, code, problemShown{"problem", code, "Couldn't sign in", problem, back}, "Couldn't sign in: "+problem+"\n")
 }
 
 func (a *App) loginWith(w http.ResponseWriter, r *http.Request) {
@@ -323,46 +313,11 @@ func (a *App) loginWith(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-type SSOView struct {
-	Next, Email, Problem string
-	// Asked is the organisation that sent a signed-in member here, when one did.
-	Asked string
-	Orgs  []Org
-}
-
 // ssoPageURL is where a member is sent when an organisation requires its sign-on. It
-// is the page and not the provider: that member may have just come from the password
-// form, and the content policy stops a form's redirects from ending at another site.
+// is the page, which offers the provider as a link, and not the provider itself: going
+// there has to be the person's own click.
 func ssoPageURL(org *Org, email, next string) string {
 	return "/login/sso?" + url.Values{"org": {org.Slug}, "email": {email}, "next": {next}}.Encode()
-}
-
-// ssoPage asks for an address and lists the organisations whose sign-in speaks for
-// it. It answers with links, never a redirect: the content policy's form-action
-// would stop a form that ended at another site.
-func (a *App) ssoPage(w http.ResponseWriter, r *http.Request) {
-	if a.base == "" {
-		http.NotFound(w, r)
-		return
-	}
-	v := SSOView{Next: r.URL.Query().Get("next"), Email: strings.ToLower(strings.TrimSpace(r.URL.Query().Get("email")))}
-	if v.Email != "" {
-		v.Orgs, _ = a.s.SSOOrgsFor(emailDomain(v.Email))
-		if len(v.Orgs) == 0 {
-			v.Problem = "No organisation here uses single sign-on for that address. Sign in with your password instead."
-		}
-		for _, o := range v.Orgs {
-			if o.Slug == r.URL.Query().Get("org") {
-				v.Asked, v.Orgs = o.Name, []Org{o}
-			}
-		}
-	}
-	http.SetCookie(w, &http.Cookie{Name: askedCookie, Value: "1", Path: "/login/sso", MaxAge: 600, HttpOnly: true,
-		Secure: a.secure(r), SameSite: http.SameSiteStrictMode})
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	if err := SSOPage(v).Render(r.Context(), w); err != nil {
-		log.Print(err)
-	}
 }
 
 // askedCookie marks a browser that has seen the single sign-on page. It is Strict, so
@@ -370,6 +325,11 @@ func (a *App) ssoPage(w http.ResponseWriter, r *http.Request) {
 // can be walked through a provider of somebody else's choosing, and into the account
 // it names, by a link alone.
 const askedCookie = "sso-asked"
+
+func (a *App) askedCookie(r *http.Request) *http.Cookie {
+	return &http.Cookie{Name: askedCookie, Value: "1", Path: "/login/sso", MaxAge: 600, HttpOnly: true,
+		Secure: a.secure(r), SameSite: http.SameSiteStrictMode}
+}
 
 func ssoStartURL(org *Org, email, next string) string {
 	return "/login/sso/start?" + url.Values{"org": {org.Slug}, "email": {email}, "next": {next}}.Encode()
@@ -587,18 +547,6 @@ type ssoIn struct {
 	AutoJoin bool   `json:"auto_join"`
 }
 
-func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
-	var in ssoIn
-	if !decode(w, r, &in) {
-		return
-	}
-	if err := a.saveSSO(r.Context(), reqOf(r), in); err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	done(w, nil)
-}
-
 func (a *App) saveSSO(ctx context.Context, q *Req, in ssoIn) error {
 	sso, err := a.s.SSO(q.Org.ID)
 	if err != nil {
@@ -658,22 +606,6 @@ func (a *App) saveSSO(ctx context.Context, q *Req, in ssoIn) error {
 	return a.s.SaveSSO(&c, q.Actor())
 }
 
-type domainIn struct {
-	Domain string `json:"domain"`
-}
-
-func (a *App) uiSSODomain(w http.ResponseWriter, r *http.Request) {
-	var in domainIn
-	if !decode(w, r, &in) {
-		return
-	}
-	if _, err := a.addSSODomain(reqOf(r).Org.ID, in.Domain); err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
-	}
-	done(w, nil)
-}
-
 func (a *App) addSSODomain(org int64, raw string) (*SSODomain, error) {
 	domain := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(raw)), "@")
 	if !domainRe.MatchString(domain) {
@@ -692,14 +624,6 @@ func (a *App) addSSODomain(org int64, raw string) (*SSODomain, error) {
 		return nil, err
 	}
 	return d, nil
-}
-
-func (a *App) uiSSODomainRemove(w http.ResponseWriter, r *http.Request) {
-	var in domainIn
-	if !decode(w, r, &in) {
-		return
-	}
-	done(w, a.removeSSODomain(reqOf(r).Org.ID, in.Domain))
 }
 
 func (a *App) removeSSODomain(org int64, domain string) error {
@@ -726,15 +650,6 @@ func (a *App) lookupTXT(ctx context.Context, name string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	return net.DefaultResolver.LookupTXT(ctx, name)
-}
-
-func (a *App) uiSSOVerify(w http.ResponseWriter, r *http.Request) {
-	var in domainIn
-	if !decode(w, r, &in) {
-		return
-	}
-	_, err := a.verifySSODomain(r.Context(), reqOf(r).Org.ID, in.Domain)
-	done(w, err)
 }
 
 func (a *App) verifySSODomain(ctx context.Context, org int64, domain string) (*SSODomain, error) {

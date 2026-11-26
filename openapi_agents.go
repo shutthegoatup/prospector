@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -176,4 +177,78 @@ func (s apiServer) ListAgentActivity(ctx context.Context, in api.ListAgentActivi
 // refuseKeys answers an operation no key may make.
 func refuseKeys(w http.ResponseWriter) {
 	writeProblem(w, http.StatusForbidden, "no key can make, change or revoke a key: an owner does that, signed in")
+}
+
+var mcpTools = []struct{ Name, Scope, What string }{
+	{"guidance", "read", "how to research and draft for this organisation"},
+	{"search", "read", "companies and people by name, domain, email or notes, and which agent was last there"},
+	{"get_company", "read", "details, facts with sources, people, and who did what"},
+	{"list_due", "read", "what's on Today, and whether its text is written"},
+	{"list_tasks", "read", "open tasks people wrote, and whether an agent is on each"},
+	{"get_task", "read", "a task's brief, requests, what is found and agents' notes; keeps an open request for a key that can add research"},
+	{"task_note", "research:write", "what was skipped or not found, for whoever comes next"},
+	{"finish_request", "research:write", "say a request on a task is done"},
+	{"add_company", "research:write", "lands in Research to review, with facts"},
+	{"add_fact", "research:write", "field, value and source URL"},
+	{"add_role", "research:write", "a role open at a company, for an offering with roles; one junked before is refused"},
+	{"add_contact", "research:write", "a suggested person, who waits until someone picks them; new details for someone already here wait to be accepted"},
+	{"enrich_contact", "enrich:spend", "ask the organisation's paid vendors for a detail someone lacks; what is found waits to be accepted"},
+	{"draft_message", "drafts:write", "note, message, email or follow-up, marked as the agent's"},
+	{"mark", "outcomes:write", "record an outcome, shown as the agent's with its note"},
+}
+
+func scoreText(sc AgentScore) string {
+	var parts []string
+	if sc.Companies > 0 {
+		parts = append(parts, fmt.Sprintf("Companies: %d suggested, %d qualified (%s), %d rejected", sc.Companies, sc.Qualified, percent(sc.Qualified, sc.Companies), sc.Rejected))
+	}
+	if sc.Contacts > 0 {
+		parts = append(parts, fmt.Sprintf("Contacts: %d suggested, %d picked (%s), %d replied", sc.Contacts, sc.Picked, percent(sc.Picked, sc.Contacts), sc.Replied))
+	}
+	return strings.Join(parts, " · ")
+}
+
+func percent(n, of int) string {
+	return fmt.Sprintf("%d%%", n*100/of)
+}
+
+func runText(r Run, now time.Time) string {
+	span := r.Start.Format("2 Jan 15:04")
+	if mins := int(r.End.Sub(r.Start).Minutes()); mins > 0 {
+		span += fmt.Sprintf(", %d min", mins)
+	}
+	if r.Going(now) {
+		span += " · last change " + ago(r.End, now)
+	}
+	if r.Changes == 0 {
+		return span + " · picked up, nothing added yet"
+	}
+	return span + " · " + joinNonEmpty(", ", plural(r.Changes, "change")+" at "+plural(r.Companies, "company"),
+		suggested(r.People), countOrNone(r.Drafts, "draft"))
+}
+
+func suggested(n int) string {
+	if n == 0 {
+		return ""
+	}
+	return plural(n, "person") + " suggested"
+}
+
+func countOrNone(n int, word string) string {
+	if n == 0 {
+		return ""
+	}
+	return plural(n, word)
+}
+func ago(t, now time.Time) string {
+	d := now.Sub(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%d min ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return plural(int(d.Hours()), "hour") + " ago"
+	}
+	return t.Format("2 Jan 2006")
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -127,6 +128,9 @@ func TestTheContractPageIsPublicAndShowsEveryOperation(t *testing.T) {
 	if code != http.StatusOK || strings.Contains(body, "<script") {
 		t.Fatalf("the contract page, signed out: %d", code)
 	}
+	if !strings.Contains(body, "/o/your-org/api/v1/") || strings.Contains(body, docBase) {
+		t.Error("the page's examples don't use this server's address")
+	}
 	spec := must(api.Spec())
 	for path, item := range spec.Paths.Map() {
 		for method, op := range item.Operations() {
@@ -160,6 +164,12 @@ func TestTheSpecIsServedAndEveryOperationNamesAScopeAKeyCanHave(t *testing.T) {
 		for method, op := range item.Operations() {
 			ops++
 			scopes := opScopes(op)
+			if slices.Contains(op.Tags, "account") {
+				if len(scopes) > 0 || op.Security == nil {
+					t.Errorf("%s %s is an account's: it should say its security, and offer a key none", method, path)
+				}
+				continue
+			}
 			if len(scopes) == 0 {
 				t.Errorf("%s %s names no scope a key can be given", method, path)
 			}
