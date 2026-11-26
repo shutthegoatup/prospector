@@ -253,10 +253,15 @@ func (a *App) enrichField(ctx context.Context, o *Org, who Actor, c Contact, p e
 		value := strings.TrimSpace(found.Value)
 		if value == "" {
 			asked = EnrichAsked{Field: field, Vendor: e.Kind, Outcome: "none"}
-			a.logEnrich(o.ID, who, c, field, e.Kind+": none found")
+			a.logEnrich(o.ID, who, c, field, e.Kind+": "+lookupNone)
 			continue
 		}
-		return a.keepFind(o, who, c, field, e.Kind, value, found.EmailStatus)
+		kept := a.keepFind(o, who, c, field, e.Kind, value, found.EmailStatus)
+		if kept.Outcome == "skipped" {
+			// Asking again would only spend another lookup on the same answer.
+			a.logEnrich(o.ID, who, c, field, e.Kind+": "+lookupNotKept)
+		}
+		return kept
 	}
 	if tried && asked.Outcome == "skipped" {
 		asked.Outcome = "none"
@@ -295,7 +300,7 @@ func (a *App) keepFind(o *Org, who Actor, c Contact, field, kind, value, status 
 		if !made {
 			asked.Outcome, asked.Detail = "has", "it was already suggested, or they have it"
 		}
-		return s.logAs(tx, o.ID, c.ID, c.CompanyID, who, "enrich:"+field, str(kind+": found"))
+		return s.logAs(tx, o.ID, c.ID, c.CompanyID, who, "enrich:"+field, str(kind+": "+lookupFound))
 	})
 	if err != nil {
 		return EnrichAsked{Field: field, Vendor: kind, Outcome: "failed", Detail: err.Error()}
@@ -313,6 +318,45 @@ func (s *Store) askedLately(org, contact int64, field, kind string) *time.Time {
 		return nil
 	}
 	return &e.At
+}
+
+const (
+	lookupFound   = "found"
+	lookupNone    = "none found"
+	lookupNotKept = "found, not kept"
+)
+
+// Lookup is a vendor's latest answer about one detail of one person.
+type Lookup struct {
+	Field, Vendor, Outcome string
+	At                     time.Time
+}
+
+// lookups are each vendor's latest lookup per detail for these people, within the
+// time a vendor isn't asked again, newest first.
+func (s *Store) lookups(org int64, people []int64) (map[int64][]Lookup, error) {
+	out := map[int64][]Lookup{}
+	if len(people) == 0 {
+		return out, nil
+	}
+	var events []Event
+	if err := s.db.Where("org_id = ? and contact_id in ? and action like 'enrich:%' and at > ?", org, people, time.Now().Add(-enrichAgain)).
+		Order("at desc, id desc").Find(&events).Error; err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	for _, e := range events {
+		kind, said, ok := strings.Cut(deref(e.Value), ": ")
+		if !ok {
+			continue
+		}
+		field := strings.TrimPrefix(e.Action, "enrich:")
+		if k := fmt.Sprint(e.ContactID, field, kind); !seen[k] {
+			seen[k] = true
+			out[e.ContactID] = append(out[e.ContactID], Lookup{Field: field, Vendor: kind, Outcome: said, At: e.At})
+		}
+	}
+	return out, nil
 }
 
 func (a *App) logEnrich(org int64, who Actor, c Contact, field, value string) {

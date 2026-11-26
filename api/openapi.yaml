@@ -3795,12 +3795,13 @@ components:
 
     ResearchPerson:
       type: object
-      required: [id, name, title, status, email_status, linkedin, source_url, pending]
+      required: [id, name, title, status, has_email, email_status, linkedin, source_url, pending, lookups]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
         title: { type: string }
         status: { type: string, description: "`suggested` until someone picks them." }
+        has_email: { type: boolean }
         email_status: { type: string, description: "`verified`, `guess`, or empty." }
         linkedin: { type: string }
         source_url: { type: string, description: The first page that shows them. }
@@ -3808,19 +3809,37 @@ components:
           type: array
           items: { $ref: "#/components/schemas/PendingDetail" }
           description: New details an agent found for them, waiting to be accepted.
+        lookups:
+          type: array
+          items: { $ref: "#/components/schemas/Lookup" }
+          description: "Each vendor's latest lookup for them within the last 30 days, newest first. A vendor isn't asked again about the same detail until its lookup is older than that."
+
+    Lookup:
+      type: object
+      required: [field, vendor, outcome, at, again_at]
+      properties:
+        field: { type: string, description: "email, phone or linkedin." }
+        vendor: { $ref: "#/components/schemas/EnricherKind" }
+        outcome:
+          type: string
+          enum: [found, none, not_kept]
+          description: "`found` became a suggestion; `none` is that the vendor found nothing; `not_kept` that what it found may not be kept, such as a never-contact address or a domain that takes no mail."
+        at: { type: string, format: date-time }
+        again_at: { type: string, format: date-time, description: "From when this vendor can be asked about it again." }
 
     PendingDetail:
       type: object
-      required: [id, field, value, current, source_url, by, at, email_status]
+      required: [id, field, value, current, email_status, source_url, vendor, by, at]
       properties:
         id: { type: integer, format: int64, description: "The suggestion: decide it at /api/v1/suggestions/{id}." }
         field: { type: string }
         value: { type: string }
         current: { type: string, description: What the person holds now; empty for nothing. }
+        email_status: { type: string, description: "For an email, `verified` when whoever found it checked it, `guess` when it was worked out from the company's pattern or the vendor couldn't confirm it; otherwise empty." }
         source_url: { type: string }
+        vendor: { type: string, description: "The enrichment vendor that found it; empty when a person or agent did." }
         by: { type: string }
         at: { type: string, format: date-time }
-        email_status: { type: string, description: "For an email, `guess` when it was worked out from the company's pattern rather than seen; otherwise empty." }
 
     Pipeline:
       type: string

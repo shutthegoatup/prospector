@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"maps"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -348,5 +351,75 @@ func TestADatabaseFromBeforeVendorsOpens(t *testing.T) {
 	var kinds []string
 	if s.db.Model(&Suggestion{}).Where("contact_id = ?", c.ID).Order("id").Pluck("vendor", &kinds); len(kinds) != 2 || kinds[1] != "hunter" {
 		t.Errorf("vendors after the upgrade: %v", kinds)
+	}
+}
+
+func TestResearchSaysWhatVendorsFoundAndWhenTheyCanBeAskedAgain(t *testing.T) {
+	s, o, api, client, f := enrichSignedIn(t)
+	s.dns = &fakeDNS{mx: map[string][]*net.MX{"larkmoor.example": {{Host: "mx.larkmoor.example."}}}}
+	hannah := atCompany(t, s, o, "Hannah Pryce", "Larkmoor Yachts", "larkmoor.example")
+	ola := person(t, s, o, "Ola Brandt", "Larkmoor Yachts", "", false)
+	tove := person(t, s, o, "Tove Lind", "Larkmoor Yachts", "", false)
+	f.found["Hannah Pryce@larkmoor.example"] = "hannah.pryce@larkmoor.example"
+	f.found["Tove Lind@larkmoor.example"] = "tove@gone.example"
+	call(t, client, "PUT", api+"/enrichers", "application/json", map[string]any{"kind": "hunter", "api_key": hunterTestKey, "monthly_limit": 10})
+	for _, id := range []int64{hannah.ID, ola.ID, tove.ID} {
+		enrich(t, client, api, id, "email")
+	}
+	// Tove's address can't be kept, and isn't paid for twice.
+	if _, out := enrich(t, client, api, tove.ID, "email"); out.Results[0].Outcome != "skipped" || f.calls() != 3 {
+		t.Errorf("asked again about an address that can't be kept: %+v after %d calls", out, f.calls())
+	}
+
+	code, body := call(t, client, "GET", api+"/research?filter=details", "", nil)
+	var list struct {
+		Items []struct {
+			People []struct {
+				Name     string `json:"name"`
+				HasEmail bool   `json:"has_email"`
+				Pending  []struct {
+					Vendor      string `json:"vendor"`
+					EmailStatus string `json:"email_status"`
+				} `json:"pending"`
+				Lookups []struct {
+					Field   string    `json:"field"`
+					Vendor  string    `json:"vendor"`
+					Outcome string    `json:"outcome"`
+					At      time.Time `json:"at"`
+					AgainAt time.Time `json:"again_at"`
+				} `json:"lookups"`
+			} `json:"people"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(body), &list); code != http.StatusOK || err != nil || len(list.Items) != 1 {
+		t.Fatalf("research: %d %v %s", code, err, body)
+	}
+	got := map[string]string{}
+	for _, p := range list.Items[0].People {
+		line := fmt.Sprint(p.HasEmail)
+		for _, d := range p.Pending {
+			line += " pending " + d.Vendor + " " + d.EmailStatus
+		}
+		for _, l := range p.Lookups {
+			line += " " + l.Field + " " + l.Vendor + " " + l.Outcome
+			if l.AgainAt.Sub(l.At) != enrichAgain {
+				t.Errorf("%s can be asked again %v after", p.Name, l.AgainAt.Sub(l.At))
+			}
+		}
+		got[p.Name] = line
+	}
+	want := map[string]string{
+		"Hannah Pryce": "false pending hunter verified email hunter found",
+		"Ola Brandt":   "false email hunter none",
+		"Tove Lind":    "false email hunter not_kept",
+	}
+	if !maps.Equal(got, want) {
+		t.Errorf("people:\n got %v\nwant %v", got, want)
+	}
+
+	// Once the 30 days are up, the lookup is no longer listed.
+	s.db.Model(&Event{}).Where("contact_id = ?", ola.ID).Update("at", time.Now().Add(-enrichAgain-time.Hour))
+	if _, body := call(t, client, "GET", api+"/research?filter=details", "", nil); strings.Contains(body, `"outcome":"none"`) {
+		t.Errorf("an old lookup is still listed: %s", body)
 	}
 }
