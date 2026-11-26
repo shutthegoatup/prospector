@@ -786,29 +786,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/o/{org}/api/v1/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The organisation's slug. */
-                org: components["parameters"]["org"];
-            };
-            cookie?: never;
-        };
-        /**
-         * Who is in the organisation, by name
-         * @description The names that can own a deal or an enquiry, in order.
-         */
-        get: operations["listMembers"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/o/{org}/api/v1/enquiries": {
         parameters: {
             query?: never;
@@ -1451,7 +1428,13 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * One agreement, with what preparing it needs
+         * @description The agreement with its company's name, why its document can't be read if it can't,
+         *     and who could still be added to it: people at its company with one email address and
+         *     not on the never-contact list, and members.
+         */
+        get: operations["getAgreement"];
         put?: never;
         post?: never;
         /** Remove a draft agreement and its document */
@@ -1577,6 +1560,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What is due, best first, as Today shows it
+         * @description Everyone due at a step, one card each, best first: next steps, calls where it is
+         *     office hours, messages, emails, follow-ups, LinkedIn adds, then calls outside office
+         *     hours. Each card carries the text drafted for it from the organisation's templates,
+         *     addressed to whoever "Send to" names, and for a call its script, in the caller's
+         *     name; the email and follow-up to copy end with the caller's signature. A key has no
+         *     name or signature of its own, so its call scripts say `[YOUR NAME]`.
+         */
+        get: operations["listToday"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/today/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What else wants doing today, and the last seven days
+         * @description The work Today points to that is done on other pages, and what the last seven days came to.
+         */
+        get: operations["getTodaySummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/marks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record what happened with someone in outreach
+         * @description The request sent, the accept, the message, email or follow-up sent, the call, a reply
+         *     or a decline, or putting them on hold. A key's mark shows as the agent's, with its
+         *     note, on Today and in the company's history; a person marking the same step again
+         *     takes it back. Someone suggested and not yet picked has had nothing happen.
+         */
+        post: operations["markOutcome"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/people": {
         parameters: {
             query?: never;
@@ -1662,7 +1722,9 @@ export interface paths {
         put?: never;
         /**
          * Pick a suggested person for outreach
-         * @description Takes someone an agent suggested out of Research and into the LinkedIn queue.
+         * @description Takes someone an agent suggested out of Research and into the LinkedIn queue. Someone
+         *     suggested for an offering gets its connection note, and their company is qualified for
+         *     that offering rather than for the organisation's own.
          */
         post: operations["pickContact"];
         delete?: never;
@@ -1869,7 +1931,9 @@ export interface paths {
         post?: never;
         /**
          * Remove an offering, with every verdict made for it
-         * @description The history keeps what was decided. For a member, only an owner.
+         * @description Refused while an open task is finding companies for it. The history keeps what was
+         *     decided; people being reached for it are then reached for the organisation's own. For a
+         *     member, only an owner.
          */
         delete: operations["removeOffering"];
         options?: never;
@@ -2099,6 +2163,366 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/never-contact/covers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Who the never-contact list keeps out of outreach
+         * @description The people already here who would otherwise be open for a next step, by name, so an entry that catches the wrong people is noticed.
+         */
+        get: operations["listNeverContactCovers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The signed-in member asking
+         * @description A signed-in member only. An API key is no one, so it is refused.
+         */
+        get: operations["getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change your voice in this organisation
+         * @description Your caller name, used in call scripts, and your signature, added to copied emails.
+         *     Send only what changes. A signed-in member only: an API key is no one, so it is refused.
+         */
+        patch: operations["changeMe"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/nav": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What the app's sidebar shows
+         * @description Who is asking, the organisation, the others they belong to, what they work on, and
+         *     how much waits on each page. An API key is no one, so it gets the organisation and
+         *     the counts, with no user and no other organisations.
+         */
+        get: operations["getNav"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start an organisation
+         * @description A new organisation with you as its owner. A signed-in person only: a key belongs to
+         *     one organisation and can't start another. A sign-in through one organisation's single
+         *     sign-on opens only that one, so it can't either.
+         */
+        post: operations["createOrg"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change your password
+         * @description For your sign-in across every organisation. Changing it signs out your other sessions.
+         *     Wrong guesses are slowed as they are at sign-in. A signed-in member only: an API key
+         *     is refused.
+         */
+        post: operations["changeMyPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /** The organisation's team */
+        get: operations["listMembers"];
+        put?: never;
+        /**
+         * Add someone to the team
+         * @description Someone new gets an account and is emailed a link to choose their password, through
+         *     the organisation's mail server or else the site's; with neither, their first password
+         *     is in the message, once. Someone already in changes to the role sent. For a member,
+         *     only an owner.
+         */
+        post: operations["addMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/members/{user}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                /** @description The member's user id. */
+                user: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Take someone out of the team
+         * @description Their account, what they added and any API keys they made stay. The last owner can't go. For a member, only an owner.
+         */
+        delete: operations["removeMember"];
+        options?: never;
+        head?: never;
+        /**
+         * Change someone's role or areas
+         * @description An organisation always keeps an owner. Areas say what a member changes: none leaves
+         *     them reading only; an owner has every area. For a member, only an owner.
+         */
+        patch: operations["changeMember"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/mail-server": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The organisation's outgoing mail server
+         * @description Its password is never shown, only whether one is kept. For a member, only an owner.
+         */
+        get: operations["getMailServer"];
+        /**
+         * Set the organisation's outgoing mail server
+         * @description SMTP over TLS, on port 587, 465, 2525 or 25. An empty host stops using one. An empty
+         *     password keeps the one saved, unless the host or username changes. For a member, only an owner.
+         */
+        put: operations["saveMailServer"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/mail-server/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Email yourself through the server invitations use
+         * @description A signed-in owner only, as it goes to them; an API key is refused.
+         */
+        post: operations["testMailServer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/sso": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Single sign-on through the organisation's own provider
+         * @description The client secret is never shown, only whether one is kept. For a member, only an owner.
+         */
+        get: operations["getSSO"];
+        /**
+         * Set the provider single sign-on goes through
+         * @description An OpenID Connect issuer, its client ID and secret. An empty issuer turns single
+         *     sign-on off. An empty secret keeps the saved one while the issuer and client ID stay
+         *     the same. Requiring it, or letting people join, needs a verified domain. The issuer
+         *     is read before anything is saved. For a member, only an owner.
+         */
+        put: operations["saveSSO"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/sso/domains": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /** The email domains single sign-on may speak for */
+        get: operations["listSSODomains"];
+        put?: never;
+        /**
+         * Claim an email domain
+         * @description It counts once verified, by a TXT record holding its token. 20 at most. For a member, only an owner.
+         */
+        post: operations["addSSODomain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/sso/domains/{domain}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                /** @description An email domain, like example.com. */
+                domain: components["parameters"]["domain"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Give up an email domain
+         * @description Not the last verified one while single sign-on is required or lets people join. For a member, only an owner.
+         */
+        delete: operations["removeSSODomain"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/sso/domains/{domain}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                /** @description An email domain, like example.com. */
+                domain: components["parameters"]["domain"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Look for a domain's TXT record
+         * @description For a member, only an owner.
+         */
+        post: operations["verifySSODomain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Everything the organisation holds, in one file
+         * @description Companies, people, facts, enquiries, history, settings and who has access. It holds
+         *     no passwords, keys or sign-on secrets. The export is recorded in the history. For a
+         *     member, only an owner.
+         */
+        post: operations["exportOrg"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2183,9 +2607,9 @@ export interface components {
             name: string;
             /** @description What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list. */
             look_for: string;
-            /** @description Its pitch line, kept for when people are reached for it; nothing uses it yet. */
+            /** @description The call script's pitch line for people reached for it; empty uses the organisation's. `{company}` is filled in. */
             pitch: string;
-            /** @description Its connection note, kept for when people are picked for it; nothing uses it yet. */
+            /** @description The connection note for people picked for it; empty uses the organisation's. `{first}`, `{company}` and `{org}` are filled in. */
             note_template: string;
             updated_by: string;
             /** Format: date-time */
@@ -2260,6 +2684,122 @@ export interface components {
             offering?: number;
             /** @description Why, kept with a verdict for an offering; refused for the organisation's own. */
             reason?: string;
+        };
+        DueCard: {
+            /**
+             * Format: int64
+             * @description The person's id.
+             */
+            id: number;
+            /** @enum {string} */
+            step: "call" | "accepted" | "email" | "followup" | "linkedin" | "next";
+            /** @description Who it goes to. */
+            name: string;
+            title: string;
+            company: string;
+            /**
+             * Format: int64
+             * @description Their company, 0 for none.
+             */
+            company_id: number;
+            fit: string;
+            /** @description Who wrote the text, `agent:<name>` for an agent; empty when it came from the templates. */
+            draft_by: string;
+            /** @description On hold. */
+            held: boolean;
+            /**
+             * @description Whether it is a good time to ring them now; empty when their time zone is unknown.
+             * @enum {string}
+             */
+            state: "ok" | "warn" | "stop" | "";
+            /**
+             * Format: int64
+             * @description The next person due at the same step, 0 for none.
+             */
+            next: number;
+            /** @description Everyone the research named there, to choose whom to send to. */
+            people: components["schemas"]["DuePerson"][];
+            /** @description What to check first, such as their local time. */
+            badges: components["schemas"]["DueBadge"][];
+            /** @description The line saying where they stand at this step: added, emailed, accepted, the subject, or for a next step the stage and date. */
+            meta: string;
+            /** @description The note, message, email or follow-up as drafted. */
+            text: string;
+            /** @description The text to copy, signed for an email or follow-up. */
+            copy: string;
+            /** @description Their LinkedIn profile, or a people search for someone without one; `#` for neither. */
+            open_url: string;
+            /** @description `Open + copy`, or `Search + copy` without a profile. */
+            open_label: string;
+            /** @description For a call, the number to ring. */
+            number: string;
+            /** @description The number as a tel link wants it. */
+            tel: string;
+            /** @description What the research said about the number. */
+            about: string;
+            /** @description For a call, what to say. */
+            script: components["schemas"]["ScriptLine"][];
+            email: string;
+            phone: string;
+            linkedin: string;
+            tz: string;
+            call_notes: string;
+            flags: string;
+            /** @description Pages to check before sending. */
+            sources: string[];
+            /** @description For a next step, where the conversation stands. */
+            stage: string;
+            next_step: string;
+            next_date: string;
+        };
+        DuePerson: {
+            name: string;
+            title: string;
+        };
+        DueBadge: {
+            text: string;
+            /** @enum {string} */
+            state: "ok" | "warn" | "stop" | "";
+        };
+        ScriptLine: {
+            cue: string;
+            say: string;
+        };
+        TodaySummary: {
+            /** @description Enquiries nobody has answered yet. */
+            enquiries: number;
+            /** @description Renewals and other further deals with no next step, or one that's due. */
+            deals: number;
+            /** @description Subscriptions with a day to cancel by, a renewal or an end coming soon. */
+            subscriptions: number;
+            /** @description Onboarding steps late or due today, ours and the customers' alike. */
+            onboarding_steps: number;
+            /** @description Researched companies waiting to be reviewed. */
+            review: number;
+            week: components["schemas"]["Week"];
+        };
+        Week: {
+            /** Format: int64 */
+            touches: number;
+            /** Format: int64 */
+            replies: number;
+            /** Format: int64 */
+            meetings: number;
+            /** Format: int64 */
+            researched: number;
+        };
+        MarkNew: {
+            /** Format: int64 */
+            contact_id: number;
+            /**
+             * @description `linkedin` is the request sent.
+             * @enum {string}
+             */
+            step: "linkedin" | "accepted" | "email" | "followup" | "call" | "replied" | "declined" | "hold";
+            /** @description YYYY-MM-DD it happened; today if left out. */
+            date?: string;
+            /** @description How you know, such as `Ada said he replied`. */
+            note?: string;
         };
         PersonNew: {
             name: string;
@@ -2485,6 +3025,7 @@ export interface components {
             title: string;
             /** @description `suggested` until someone picks them. */
             status: string;
+            has_email: boolean;
             /** @description `verified`, `guess`, or empty. */
             email_status: string;
             linkedin: string;
@@ -2492,6 +3033,25 @@ export interface components {
             source_url: string;
             /** @description New details an agent found for them, waiting to be accepted. */
             pending: components["schemas"]["PendingDetail"][];
+            /** @description Each vendor's latest lookup for them within the last 30 days, newest first. A vendor isn't asked again about the same detail until its lookup is older than that. */
+            lookups: components["schemas"]["Lookup"][];
+        };
+        Lookup: {
+            /** @description email, phone or linkedin. */
+            field: string;
+            vendor: components["schemas"]["EnricherKind"];
+            /**
+             * @description `found` became a suggestion; `none` is that the vendor found nothing; `not_kept` that what it found may not be kept, such as a never-contact address or a domain that takes no mail.
+             * @enum {string}
+             */
+            outcome: "found" | "none" | "not_kept";
+            /** Format: date-time */
+            at: string;
+            /**
+             * Format: date-time
+             * @description From when this vendor can be asked about it again.
+             */
+            again_at: string;
         };
         PendingDetail: {
             /**
@@ -2503,12 +3063,14 @@ export interface components {
             value: string;
             /** @description What the person holds now; empty for nothing. */
             current: string;
+            /** @description For an email, `verified` when whoever found it checked it, `guess` when it was worked out from the company's pattern or the vendor couldn't confirm it; otherwise empty. */
+            email_status: string;
             source_url: string;
+            /** @description The enrichment vendor that found it; empty when a person or agent did. */
+            vendor: string;
             by: string;
             /** Format: date-time */
             at: string;
-            /** @description For an email, `guess` when it was worked out from the company's pattern rather than seen; otherwise empty. */
-            email_status: string;
         };
         /**
          * @description Where a company stands, from its furthest contact: `research` until anyone there is reached, `rejected` for one turned down before then.
@@ -3161,9 +3723,6 @@ export interface components {
             /** @description `running` while the company is being onboarded, `live` once it is, empty when no onboarding has started. */
             onboarding: string;
         };
-        MemberName: {
-            name: string;
-        };
         DealChange: {
             kind?: string | null;
             /** @description As you would write it: `14,000`, `€5,000`; empty for none. */
@@ -3374,6 +3933,16 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        AgreementOverview: components["schemas"]["Agreement"] & {
+            /** @description The company's name. */
+            company: string;
+            /** @description Why the document can't be read to place fields on it; empty when it can. */
+            problem: string;
+            /** @description People at the company who could still be added, by contact id. */
+            people: components["schemas"]["Invitable"][];
+            /** @description Members who could still be added, by user id. */
+            members: components["schemas"]["Invitable"][];
+        };
         AgreementRecipient: {
             /** Format: int64 */
             id: number;
@@ -3471,6 +4040,143 @@ export interface components {
             /** @description Where to go, as a page, to sign in through this organisation's provider. */
             start_url: string;
         };
+        Said: {
+            /** @description What happened, for a person. */
+            message: string;
+        };
+        Me: {
+            /** Format: int64 */
+            user_id: number;
+            name: string;
+            email: string;
+            /** @enum {string} */
+            role: "member" | "owner";
+            /** @description False for someone who signs in only through a provider. */
+            has_password: boolean;
+            /** @description Used in call scripts; empty uses your name. */
+            caller_name: string;
+            /** @description Added to copied emails. */
+            signature: string;
+        };
+        OrgSummary: {
+            /** Format: int64 */
+            id: number;
+            /** @description Its part of every address: /o/{slug}/. */
+            slug: string;
+            name: string;
+            /** @description A CSS colour, for its mark. */
+            color: string;
+        };
+        NavOrg: {
+            /** Format: int64 */
+            id: number;
+            slug: string;
+            name: string;
+            color: string;
+            /** @enum {string} */
+            role: "member" | "owner";
+        };
+        Nav: {
+            /** @description Who is asking; absent for an API key. */
+            user?: {
+                name: string;
+                email: string;
+            };
+            org: components["schemas"]["OrgSummary"];
+            /** @description Every organisation this sign-in opens, with your role in each; none for an API key. */
+            orgs: components["schemas"]["NavOrg"][];
+            /**
+             * @description Yours here; absent for an API key.
+             * @enum {string}
+             */
+            role?: "member" | "owner";
+            /** @description The areas you were given; an owner may have none and still works every area. */
+            areas: ("sales" | "support")[];
+            /** @description Whether you change sales work here: an owner, or given sales. */
+            sales: boolean;
+            /** @description Whether you change support work here: an owner, or given support. */
+            support: boolean;
+            owner: boolean;
+            /** @description What you do here in a few words, such as "member · sales". */
+            work: string;
+            /** @description How much waits on each page. */
+            counts: {
+                /** @description Everything due on Today. */
+                today: number;
+                /** @description Companies waiting for review. */
+                research: number;
+                /** @description Conversations and further deals still open. */
+                conversations: number;
+                /** @description Enquiries nobody has answered yet. */
+                enquiries: number;
+                /** @description Every company. */
+                companies: number;
+            };
+        };
+        MeChange: {
+            caller_name?: string | null;
+            signature?: string | null;
+        };
+        Member: {
+            /** Format: int64 */
+            user_id: number;
+            name: string;
+            email: string;
+            /** @enum {string} */
+            role: "member" | "owner";
+            /** @description What a member changes; none reads only. An owner has every area. */
+            areas: ("sales" | "support")[];
+        };
+        MailServerSettings: {
+            /** @description Like smtp.example.com; empty stops using one. */
+            host?: string;
+            port?: number;
+            username?: string;
+            /** @description Sealed and never shown again; empty keeps the saved one unless the host or username changes. */
+            password?: string;
+            /** @description The From address, like `Alpha <hello@example.com>`. */
+            sender?: string;
+        };
+        MailServer: {
+            host: string;
+            port: number;
+            username: string;
+            sender: string;
+            has_password: boolean;
+            /** @description Whether this site has a server of its own that invitations fall back to. */
+            site_mail: boolean;
+        };
+        SSOSettings: {
+            /** @description Like https://login.example.com; empty turns single sign-on off. */
+            issuer?: string;
+            client_id?: string;
+            /** @description Sealed and never shown again; empty keeps the saved one. */
+            client_secret?: string;
+            /** @description Members at the verified domains must sign in this way; owners can still use a password. */
+            required?: boolean;
+            /** @description Anyone at the verified domains becomes a member, never an owner, when they first sign in. */
+            auto_join?: boolean;
+        };
+        SSO: {
+            issuer: string;
+            client_id: string;
+            has_client_secret: boolean;
+            required: boolean;
+            auto_join: boolean;
+            /** @description Where the provider sends people back; empty until the server knows its own address (PROSPECTOR_URL). */
+            redirect_uri: string;
+            /** @description Whether the server has a key to keep a client secret under. */
+            sealing: boolean;
+        };
+        SSODomain: {
+            domain: string;
+            /** @description The name of the TXT record that verifies it. */
+            record: string;
+            /** @description The value that record must hold. */
+            token: string;
+            /** Format: date-time */
+            verified_at?: string | null;
+        };
     };
     responses: {
         /** @description What went wrong (RFC 9457). */
@@ -3489,6 +4195,8 @@ export interface components {
         id: number;
         /** @description How many to return. 50 if left out; 200 at most. */
         limit: number;
+        /** @description An email domain, like example.com. */
+        domain: string;
         /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
         cursor: string;
     };
@@ -3538,8 +4246,6 @@ export interface operations {
             /** @description Signed in. */
             200: {
                 headers: {
-                    /** @description The session cookie, HttpOnly. */
-                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4808,39 +5514,6 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
-    listMembers: {
-        parameters: {
-            query?: {
-                /** @description How many to return. 50 if left out; 200 at most. */
-                limit?: components["parameters"]["limit"];
-                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
-                cursor?: components["parameters"]["cursor"];
-            };
-            header?: never;
-            path: {
-                /** @description The organisation's slug. */
-                org: components["parameters"]["org"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description A page of them. */
-            200: {
-                headers: {
-                    Link: components["headers"]["Link"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        items: components["schemas"]["MemberName"][];
-                        next_cursor?: components["schemas"]["NextCursor"];
-                    };
-                };
-            };
-            default: components["responses"]["Problem"];
-        };
-    };
     listEnquiries: {
         parameters: {
             query?: {
@@ -5825,6 +6498,31 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    getAgreement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The agreement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgreementOverview"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     removeAgreement: {
         parameters: {
             query?: never;
@@ -6132,6 +6830,105 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["AgreementField"][];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listToday: {
+        parameters: {
+            query?: {
+                /** @description Only this step: `call`, `accepted` (a LinkedIn message), `email`, `followup`, `linkedin` (an add) or `next` (a conversation's next step). */
+                step?: "call" | "accepted" | "email" | "followup" | "linkedin" | "next";
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of what is due. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["DueCard"][];
+                        /** @description How many are due at each step, whatever the filter. */
+                        counts: {
+                            [key: string]: number;
+                        };
+                        /** @description Everything due, whatever the filter. */
+                        total: number;
+                        /** @description How many the filter holds, over every page. */
+                        shown: number;
+                        /** @description Calls due where it isn't a good time to ring now. */
+                        later_calls: number;
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getTodaySummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The counts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodaySummary"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    markOutcome: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkNew"];
+            };
+        };
+        responses: {
+            /** @description Recorded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok: boolean;
                     };
                 };
             };
@@ -6880,6 +7677,583 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listNeverContactCovers: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description In the order they were added. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: string[];
+                        /** @description How many the list keeps out, on every page. */
+                        total: number;
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Who you are here. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changeMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MeChange"];
+            };
+        };
+        responses: {
+            /** @description You, as saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getNav: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sidebar. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Nav"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createOrg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The organisation, started. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgSummary"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changeMyPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    current: string;
+                    /** @description 10 characters at least. */
+                    new: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Said"];
+                };
+            };
+            /** @description Too many attempts; try again after `Retry-After` seconds. */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listMembers: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description By name. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Member"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    email: string;
+                    name?: string;
+                    /**
+                     * @description member when left out.
+                     * @enum {string}
+                     */
+                    role?: "member" | "owner";
+                };
+            };
+        };
+        responses: {
+            /** @description Added; the message says how they get in. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Said"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                /** @description The member's user id. */
+                user: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changeMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                /** @description The member's user id. */
+                user: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role?: "member" | "owner";
+                    /** @description Every area they work in; an empty list leaves them reading only. */
+                    areas?: ("sales" | "support")[] | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The member as they now are. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Member"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getMailServer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The server; an empty host when there is none. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailServer"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    saveMailServer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MailServerSettings"];
+            };
+        };
+        responses: {
+            /** @description The server as saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailServer"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    testMailServer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Said"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getSSO: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The connection; an empty issuer when it is off. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SSO"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    saveSSO: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SSOSettings"];
+            };
+        };
+        responses: {
+            /** @description The connection as saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SSO"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listSSODomains: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every domain, with the TXT record that verifies it. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["SSODomain"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addSSODomain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Like example.com. */
+                    domain: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The domain, waiting to be verified. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SSODomain"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeSSODomain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                /** @description An email domain, like example.com. */
+                domain: components["parameters"]["domain"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    verifySSODomain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                /** @description An email domain, like example.com. */
+                domain: components["parameters"]["domain"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Verified. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SSODomain"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    exportOrg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The export. */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
             };
             default: components["responses"]["Problem"];
         };

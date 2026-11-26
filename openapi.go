@@ -27,11 +27,14 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 	if err != nil {
 		log.Fatalf("the API spec: %v", err)
 	}
-	scopes := map[string][]string{}
-	for _, item := range spec.Paths.Map() {
-		for _, op := range item.Operations() {
+	scopes, account := map[string][]string{}, map[string]bool{}
+	for path, item := range spec.Paths.Map() {
+		for method, op := range item.Operations() {
 			if s := opScopes(op); len(s) > 0 {
 				scopes[op.OperationID] = s
+			}
+			if slices.Contains(op.Tags, "account") {
+				account[method+" "+path] = true
 			}
 		}
 	}
@@ -44,7 +47,7 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 		w.Write(doc)
 	})
 
-	strict := api.NewStrictHandlerWithOptions(apiServer{a}, []api.StrictMiddlewareFunc{a.apiScope(scopes), func(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc { return listURL(f) }, uploads, a.withSite}, api.StrictHTTPServerOptions{
+	strict := api.NewStrictHandlerWithOptions(apiServer{a}, []api.StrictMiddlewareFunc{a.apiScope(scopes), func(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc { return listURL(f) }, uploads, withRequest, a.withSite}, api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeProblem(w, http.StatusBadRequest, err.Error())
 		},
@@ -52,7 +55,7 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 	})
 	api.HandlerWithOptions(strict, api.StdHTTPServerOptions{
 		BaseRouter:  mux,
-		Middlewares: []api.MiddlewareFunc{a.apiCaller, noEmptyLink},
+		Middlewares: []api.MiddlewareFunc{a.apiCaller(account), noEmptyLink},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeProblem(w, http.StatusBadRequest, err.Error())
 		},
@@ -60,10 +63,15 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 }
 
 // apiCaller works out who is asking: a key, or a signed-in member of the organisation.
-func (a *App) apiCaller(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if accountPath(r.URL.Path) {
-			notYet(w)
+// The account operations, named by route, are asked by whoever is there.
+func (a *App) apiCaller(account map[string]bool) api.MiddlewareFunc {
+	return func(next http.Handler) http.Handler { return a.caller(account, next) }
+}
+
+func (a *App) caller(account map[string]bool, next http.Handler) http.Handler {
+	member := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if hasKey(r) && r.PathValue("org") == "" {
+			writeProblem(w, http.StatusForbidden, "a key belongs to one organisation and can't start another: sign in to do that")
 			return
 		}
 		if hasKey(r) {
@@ -71,10 +79,19 @@ func (a *App) apiCaller(next http.Handler) http.Handler {
 			return
 		}
 		if _, u := a.session(r); u == nil {
-			challenge(w, http.StatusUnauthorized, "", "", "sign in, or send an API key: Authorization: Bearer pk_…")
+			w.Header().Set("WWW-Authenticate", `Bearer realm="prospector"`)
+			writeCoded(w, http.StatusUnauthorized, api.SignedOut, "sign in, or send an API key: Authorization: Bearer pk_…")
 			return
 		}
 		a.member(next.ServeHTTP)(w, r)
+	})
+	anyone := a.accountCaller(next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if account[r.Pattern] {
+			anyone.ServeHTTP(w, r)
+			return
+		}
+		member.ServeHTTP(w, r)
 	})
 }
 
@@ -85,16 +102,17 @@ func (a *App) apiScope(scopes map[string][]string) api.StrictMiddlewareFunc {
 		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error) {
 			q, need := reqFrom(ctx), scopes[op]
 			switch {
-			case q.Key != nil && keyless[op]:
+			// One that names no key scope is for people signed in, never a key.
+			case q.Key != nil && (keyless[op] || len(need) == 0):
 				refuseKeys(w)
 				return nil, nil
-			case q.Key != nil && len(need) > 0 && !slices.ContainsFunc(need, q.Key.Has):
+			case q.Key != nil && !slices.ContainsFunc(need, q.Key.Has):
 				challenge(w, http.StatusForbidden, "insufficient_scope", need[0], "this key lacks the "+strings.Join(need, " or ")+" scope")
 				return nil, nil
 			case q.Key == nil && slices.ContainsFunc(need, ownersOnly) && !q.Owner():
 				writeProblem(w, http.StatusForbidden, "only an owner of this organisation can change that")
 				return nil, nil
-			case q.Key == nil && !q.Member.Works(opArea[op]):
+			case q.Key == nil && q.Org != nil && !q.Member.Works(opArea[op]):
 				writeProblem(w, http.StatusForbidden, areaRefusal(opArea[op]))
 				return nil, nil
 			}
@@ -117,7 +135,11 @@ func opScopes(op *openapi3.Operation) []string {
 }
 
 func ownersOnly(scope string) bool {
-	return scope == "agents:configure" || scope == "enquiries:delete" || scope == "settings:write" || scope == "people:privacy"
+	switch scope {
+	case "agents:configure", "enquiries:delete", "settings:write", "people:privacy", "team:write", "mail:configure", "sso:configure", "org:export":
+		return true
+	}
+	return false
 }
 
 func reqFrom(ctx context.Context) *Req { return ctx.Value(reqKey{}).(*Req) }

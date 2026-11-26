@@ -246,8 +246,8 @@ func TestALostConnectionIsTheServersFailure(t *testing.T) {
 	if code, text := telling("test", elsewhere{fmt.Errorf("that issuer couldn't be read: %w", lostMidway())}, http.StatusBadRequest); code != http.StatusBadRequest || !strings.Contains(text, "issuer") {
 		t.Errorf("a provider that couldn't be reached was told as the server's failure: %d %q", code, text)
 	}
-	if code, body := call(t, client, "GET", srv.URL+"/o/alpha/conversations", "", nil); code != http.StatusInternalServerError || strings.Contains(body, "10.0.0.9") {
-		t.Errorf("a page whose connection was lost: %d, showing the database's address or not the server's failure", code)
+	if code, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/conversations", "", nil); code != http.StatusInternalServerError || strings.Contains(body, "10.0.0.9") {
+		t.Errorf("the conversations page's read whose connection was lost: %d, showing the database's address or not the server's failure: %s", code, body)
 	}
 	down = false
 	if err := s.db.Find(&none).Error; err != nil {

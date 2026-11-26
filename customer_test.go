@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -9,9 +10,22 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
 var customerLink = regexp.MustCompile(regexp.QuoteMeta(testSite) + `(/c/[A-Za-z0-9_-]+)`)
+
+// listedOnboardings are the onboardings as the members' Onboarding page reads them.
+func listedOnboardings(t *testing.T, c *http.Client, base string) []api.Onboarding {
+	t.Helper()
+	code, body := call(t, c, "GET", base+"/o/alpha/api/v1/onboardings?limit=200", "", nil)
+	var out struct{ Items []api.Onboarding }
+	if code != http.StatusOK || json.Unmarshal([]byte(body), &out) != nil {
+		t.Fatalf("the onboardings: %d %s", code, body)
+	}
+	return out.Items
+}
 
 // as makes a request the way a browser with that cookie jar would, following redirects,
 // and returns where it ended up, the status and the page.
@@ -60,8 +74,8 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 		}
 	}
 	box.take(t, 0)
-	if _, page := call(t, member, "GET", srv.URL+"/o/alpha/onboarding", "", nil); !strings.Contains(page, `/invites"`) || !strings.Contains(page, "hannah@larkmoor.example") || strings.Contains(page, "Tom Ellery ·") {
-		t.Error("the onboarding page doesn't offer to invite the person with an address, or offers one without")
+	if on := listedOnboardings(t, member, srv.URL); len(on) != 1 || !on[0].CanInvite || len(on[0].Invitable) != 1 || on[0].Invitable[0].Email != "hannah@larkmoor.example" {
+		t.Errorf("the onboarding page should offer to invite only the person with an address: %+v", on)
 	}
 	if code, body := invite(hannah.ID); code != http.StatusNoContent {
 		t.Fatalf("inviting a customer: %d %s", code, body)
@@ -296,8 +310,9 @@ func TestNobodyIsInvitedWithoutMail(t *testing.T) {
 	if grants := must(s.CustomerInvites(o.ID)); len(grants) != 0 {
 		t.Errorf("someone was let in though no link could be sent: %+v", grants)
 	}
-	if _, page := call(t, member, "GET", srv.URL+"/o/alpha/onboarding", "", nil); strings.Contains(page, `/invites"`) || !strings.Contains(page, "PROSPECTOR_URL") {
-		t.Error("the onboarding page offers to invite, or doesn't say what is missing")
+	// The page says what is missing, rather than offering to invite, when nobody can be.
+	if on := listedOnboardings(t, member, srv.URL); len(on) != 1 || on[0].CanInvite {
+		t.Errorf("the onboarding page offers to invite with no mail: %+v", on)
 	}
 }
 
@@ -470,8 +485,16 @@ func TestACustomerMarksTheirOwnSteps(t *testing.T) {
 	if got.DoneOn == nil || got.DoneBy != customerActor {
 		t.Fatalf("the step: %+v", got)
 	}
-	if _, page := call(t, member, "GET", srv.URL+"/o/alpha/onboarding", "", nil); !strings.Contains(page, "the customer") {
-		t.Error("the members' page does not say the customer marked it")
+	var doneBy []string
+	for _, on := range listedOnboardings(t, member, srv.URL) {
+		for _, st := range on.Steps {
+			if st.Id == files.ID {
+				doneBy = append(doneBy, st.DoneBy)
+			}
+		}
+	}
+	if len(doneBy) != 1 || doneBy[0] != customerActor {
+		t.Errorf("the members' page does not say the customer marked it: %v", doneBy)
 	}
 	var entry Event
 	if err := s.db.Where("org_id = ? and action = ?", o.ID, "onboard:done").Last(&entry).Error; err != nil || entry.ContactID != hannah.ID || entry.User != customerActor || deref(entry.Value) != "Send your product files" {

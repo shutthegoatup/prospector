@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -52,11 +53,13 @@ func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
 		t.Fatalf("another organisation sees these suggestions: %+v", theirs)
 	}
 
-	page := "/o/alpha/companies/" + strconv.FormatInt(co.ID, 10)
-	for _, at := range []string{page, "/o/alpha/research?f=details"} {
-		if _, body := call(t, client, "GET", srv.URL+at, "", nil); !strings.Contains(body, "hannah.pryce@larkmoor.example") ||
-			!strings.Contains(body, "a guess") || !strings.Contains(body, "in place of +44 20 7946 0000") || !strings.Contains(body, `data-post="api/v1/suggestions/`) {
-			t.Fatalf("%s doesn't offer the suggestions", at)
+	// The company's page and Research's details to check read what waits from the API.
+	page := "/o/alpha/api/v1/companies/" + strconv.FormatInt(co.ID, 10) + "/overview"
+	for _, at := range []string{page, "/o/alpha/api/v1/research?filter=details"} {
+		if _, body := call(t, client, "GET", srv.URL+at, "", nil); !strings.Contains(body, `"value":"hannah.pryce@larkmoor.example"`) ||
+			!strings.Contains(body, `"email_status":"guess"`) || !strings.Contains(body, `"current":"+44 20 7946 0000"`) ||
+			!strings.Contains(body, fmt.Sprintf(`"field":"email","id":%d,`, pending[0].ID)) {
+			t.Fatalf("%s doesn't offer the suggestions: %s", at, body)
 		}
 	}
 	decide := func(id int64, decision string) (int, string) {
@@ -77,7 +80,7 @@ func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
 	if c := person(); deref(c.Email) != "hannah.pryce@larkmoor.example" || c.EmailStatus != "guess" || deref(c.Phone) != "+44 20 7946 0000" {
 		t.Fatalf("accepted email %q (%s), dismissed number left her with %q", deref(c.Email), c.EmailStatus, deref(c.Phone))
 	}
-	if _, body := call(t, client, "GET", srv.URL+page, "", nil); strings.Contains(body, `data-post="api/v1/suggestions/`) {
+	if _, body := call(t, client, "GET", srv.URL+page, "", nil); !strings.Contains(body, `"pending":[]`) || strings.Contains(body, `"pending":[{`) {
 		t.Fatal("settled suggestions are still offered")
 	}
 	if rows, _, _ := s.Research(o.ID, "details", 1); len(rows) != 0 {

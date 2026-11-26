@@ -25,6 +25,15 @@ var Steps = []struct{ Key, Label, Card string }{
 // Voice is who is calling and signing, from the org's settings and the member's own.
 type Voice struct {
 	Caller, Org, Pitch, Signature string
+	// Pitches are the offerings' own pitch lines, by offering, where one was written.
+	Pitches map[int64]string
+}
+
+func (v Voice) pitchFor(offering int64) string {
+	if p := v.Pitches[offering]; p != "" {
+		return p
+	}
+	return v.Pitch
 }
 
 func (v Voice) callerFirst() string {
@@ -260,7 +269,7 @@ func callScript(c Contact, name string, v Voice) []Line {
 	return append(lines,
 		Line{"When they pick up", "Hi " + first + ", it's " + v.callerFirst() + " from " + v.Org + ". Have you got a couple of minutes?"},
 		Line{"Why you're calling", why},
-		Line{"What you do", fill(v.Pitch, first, maker, v.Org)},
+		Line{"What you do", fill(v.pitchFor(c.OfferingID), first, maker, v.Org)},
 		Line{"Ask", "Who looks after that at " + maker + "? Is that you?"},
 		Line{"If they're interested", "Would 20 minutes next week be worth it?"},
 		Line{"Voicemail", "Hi " + first + ", it's " + from + ". I sent you a note on LinkedIn. I'll drop you a short email so you've got my details. Thanks, bye."},

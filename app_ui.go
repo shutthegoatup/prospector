@@ -1,47 +1,54 @@
 package main
 
 import (
-	"log"
 	"net/http"
-	"slices"
-	"strings"
+	"regexp"
+	"sync"
 )
 
-// reactPages are the pages the React app (web/src/main.tsx) has; each lights up its own
-// sidebar entry. A page moved to React is listed here and routed in main.tsx.
-var reactPages = []string{"research", "campaigns", "onboarding", "enquiries", "subscriptions", "tasks", "add", "agents", "conversations", "companies"}
+// appPages are the pages the React app (web/src/router.tsx) draws. Each is served the
+// same shell at its own address, and the app routes from there.
+var appPages = []string{"today", "research", "conversations", "enquiries", "onboarding", "subscriptions", "campaigns", "tasks", "companies", "settings", "agents", "add"}
 
-// reactUnder are React pages without a sidebar entry of their own, and the entry they light.
-var reactUnder = map[string]string{"tasks": "research"}
-
-// reactPage serves a React page inside the usual layout: the server keeps the sidebar
-// while pages move over one at a time, and the page reads everything through the API.
-func (a *App) reactPage(w http.ResponseWriter, r *http.Request) {
-	page, _, _ := strings.Cut(r.PathValue("page"), "/")
-	if !slices.Contains(reactPages, page) {
-		http.NotFound(w, r)
-		return
+func (a *App) appRoutes(mux *http.ServeMux) {
+	for _, p := range appPages {
+		mux.HandleFunc("GET /o/{org}/"+p, a.member(a.shell))
 	}
-	q := reqOf(r)
-	// The bookmarklet opens the add form in a small window of its own.
-	if page == "add" && r.URL.Query().Get("popup") != "" {
-		w.Header().Set("content-type", "text/html; charset=utf-8")
-		if err := ReactPopup(q, "Add to "+q.Org.Name).Render(r.Context(), w); err != nil {
-			log.Print(err)
+	mux.HandleFunc("GET /o/{org}/companies/{id}", a.member(a.shell))
+	mux.HandleFunc("GET /o/{org}/tasks/{id}", a.member(a.shell))
+	// An agreement's PDF is drawn with pdf.js, which needs WebAssembly for some images.
+	mux.HandleFunc("GET /o/{org}/agreements/{id}/prepare", a.member(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", pdfPolicy)
+		a.shell(w, r)
+	}))
+	// Where the React pages lived while the sidebar was still the server's; bookmarklets
+	// already dragged to a bar still open the add form there.
+	mux.HandleFunc("GET /o/{org}/app/{page...}", a.member(func(w http.ResponseWriter, r *http.Request) {
+		to := reqOf(r).Base() + r.PathValue("page")
+		if r.URL.RawQuery != "" {
+			to += "?" + r.URL.RawQuery
 		}
-		return
-	}
-	active := page
-	if under, ok := reactUnder[page]; ok {
-		active = under
-	}
-	a.page(w, r, active, ReactMount(q))
+		http.Redirect(w, r, to, http.StatusFound)
+	}))
 }
 
-// navPath is where the sidebar sends a page: its React version once it has one.
-func navPath(key string) string {
-	if slices.Contains(reactPages, key) {
-		return "app/" + key
+// shellHTML is the page Vite builds from web/index.html, with the version on each of
+// the app's own files so a browser can keep them until the next release.
+var shellHTML = sync.OnceValues(func() ([]byte, error) {
+	b, err := assetFS.ReadFile("assets/app/index.html")
+	if err != nil {
+		return nil, err
 	}
-	return key
+	return regexp.MustCompile(`((?:src|href)="/assets/[^"?]+)"`).ReplaceAll(b, []byte(`$1?v=`+assetVersion+`"`)), nil
+})
+
+// shell serves the React app: everything it shows, it reads through the API.
+func (a *App) shell(w http.ResponseWriter, r *http.Request) {
+	b, err := shellHTML()
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("content-type", "text/html; charset=utf-8")
+	w.Write(b)
 }

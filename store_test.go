@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -314,9 +313,12 @@ func TestUI(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	base := srv.URL + "/o/alpha/"
 	for _, page := range []string{"today", "research", "conversations", "companies", "add", "settings", "agents", "tasks", "today?step=linkedin"} {
-		if code, body := call(t, client, "GET", base+page, "", nil); code != http.StatusOK || !strings.Contains(body, "Alpha") {
+		if code, body := call(t, client, "GET", base+page, "", nil); code != http.StatusOK || !strings.Contains(body, `<div id="app"></div>`) {
 			t.Fatalf("GET %s: %d", page, code)
 		}
+	}
+	if code, body := call(t, client, "GET", base+"api/v1/nav", "", nil); code != http.StatusOK || !strings.Contains(body, `"name":"Alpha"`) {
+		t.Fatalf("the sidebar's organisation: %d %s", code, body)
 	}
 	if code, _ := call(t, http.DefaultClient, "GET", base+"today", "", nil); code != http.StatusOK {
 		t.Fatalf("signed-out GET should land on the login page, got %d", code)
@@ -332,20 +334,19 @@ func TestUI(t *testing.T) {
 	if code != http.StatusCreated || !strings.Contains(body, "LinkedIn queue") {
 		t.Fatalf("quick add: %d %s", code, body)
 	}
-	if _, body := call(t, client, "GET", base+"today?step=linkedin", "", nil); !strings.Contains(body, "Hannah Pryce") || !strings.Contains(body, `data-key="o"`) || !strings.Contains(body, "Open + copy") {
-		t.Fatal("quick-added person missing from the LinkedIn queue")
+	if _, body := call(t, client, "GET", base+"api/v1/today?step=linkedin", "", nil); !strings.Contains(body, "Hannah Pryce") || !strings.Contains(body, `"open_url":"https://www.linkedin.com/in/hannah-pryce"`) || !strings.Contains(body, `"open_label":"Open + copy"`) {
+		t.Fatalf("quick-added person missing from the LinkedIn queue: %s", body)
 	}
 	c, _ := s.FindOne(o.ID, "Hannah")
 	if err := s.Update(o.ID, c.ID, "linkedin", "javascript:alert(1)", "test"); err != nil {
 		t.Fatal(err)
 	}
-	if _, body := call(t, client, "GET", base+"today?step=linkedin", "", nil); !strings.Contains(body, `data-open="https://www.linkedin.com/search/results/people/?keywords=Hannah%20Pryce%20Larkmoor%20Yachts"`) || !strings.Contains(body, "Search + copy") || strings.Contains(body, "Open + copy") {
-		t.Fatal("someone without a usable profile link should open a people search")
+	_, body = call(t, client, "GET", base+"api/v1/today?step=linkedin", "", nil)
+	if !strings.Contains(body, `"open_url":"https://www.linkedin.com/search/results/people/?keywords=Hannah%20Pryce%20Larkmoor%20Yachts"`) || !strings.Contains(body, `"open_label":"Search + copy"`) || strings.Contains(body, "Open + copy") {
+		t.Fatalf("someone without a usable profile link should open a people search: %s", body)
 	}
-	for _, page := range []string{"companies/" + strconv.FormatInt(*c.CompanyID, 10), "today?step=linkedin"} {
-		if _, body := call(t, client, "GET", base+page, "", nil); strings.Contains(body, `href="javascript:`) || strings.Contains(body, `data-open="javascript:`) {
-			t.Fatalf("%s renders a javascript: link", page)
-		}
+	if strings.Contains(body, `"open_url":"javascript:`) {
+		t.Fatal("Today's card opens a javascript: link")
 	}
 	if _, err := s.AgentAddContact(o, Actor{Name: "agent:x"}, AddContactIn{Company: "Larkmoor Yachts", Name: "Eve", Linkedin: "javascript:alert(1)", SourceURL: "https://x.example"}); err == nil {
 		t.Fatal("agent stored a javascript: link")
@@ -353,8 +354,8 @@ func TestUI(t *testing.T) {
 	if code, _ := call(t, client, "POST", base+"ui/mark", "application/json", map[string]any{"id": c.ID, "step": "replied"}); code != http.StatusOK {
 		t.Fatal("mark replied")
 	}
-	if _, body := call(t, client, "GET", base+"conversations", "", nil); !strings.Contains(body, "No next step yet") {
-		t.Fatal("a reply without a next step isn't flagged")
+	if _, body := call(t, client, "GET", base+"api/v1/conversations", "", nil); !strings.Contains(body, "Hannah Pryce") || !strings.Contains(body, `"next_step":""`) {
+		t.Fatalf("a reply without a next step isn't flagged: %s", body)
 	}
 	code, body = call(t, client, "POST", base+"ui/keys", "application/json", map[string]any{"name": "bot", "scopes": []string{"read"}})
 	if code != http.StatusOK || !strings.Contains(body, "pk_") {

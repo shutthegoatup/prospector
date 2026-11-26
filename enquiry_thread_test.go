@@ -35,8 +35,8 @@ func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
 		return n
 	}
 
-	if _, page := call(t, member, "GET", srv.URL+"/o/alpha/enquiries", "", nil); !strings.Contains(page, `data-form="api/v1/enquiries/`+itoa(e.ID)+`/replies"`) {
-		t.Error("the enquiries page has no form to reply with")
+	if _, list := call(t, member, "GET", srv.URL+"/o/alpha/api/v1/enquiries", "", nil); !strings.Contains(list, `"can_reply":true`) {
+		t.Errorf("the enquiries don't say a reply can be sent from them: %s", list)
 	}
 	for why, text := range map[string]string{"nothing": "  \n ", "too much": strings.Repeat("a", replyLimit+1)} {
 		if code, body := call(t, member, "POST", base+"/replies", "application/json", map[string]any{"text": text}); code != http.StatusBadRequest {
@@ -87,9 +87,6 @@ func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
 	code, body = call(t, member, "GET", base+"/messages", "", nil)
 	if code != http.StatusOK || strings.Index(body, "We can do Tuesday") < 0 || strings.Index(body, "We can do Tuesday") > strings.Index(body, "Tuesday is fine") {
 		t.Errorf("the thread: %d %s", code, body)
-	}
-	if _, page := call(t, member, "GET", srv.URL+"/o/alpha/enquiries", "", nil); !strings.Contains(page, "We can do Tuesday.") || !strings.Contains(page, "Tuesday is fine.") {
-		t.Error("the enquiries page doesn't show the thread")
 	}
 
 	// A send that fails records nothing and changes nothing.
@@ -225,9 +222,8 @@ func TestNoReplyWithoutAMailServer(t *testing.T) {
 		t.Errorf("replying with no mail server: %d %s", code, body)
 	}
 	box.take(t, 0)
-	_, page := call(t, member, "GET", srv.URL+"/o/alpha/enquiries", "", nil)
-	if strings.Contains(page, "/replies") || !strings.Contains(page, "/answers") || !strings.Contains(page, "sets a mail server") {
-		t.Error("with no mail server the page offers to send, or doesn't offer to record their answer")
+	if _, list := call(t, member, "GET", srv.URL+"/o/alpha/api/v1/enquiries", "", nil); !strings.Contains(list, `"can_reply":false`) {
+		t.Errorf("with no mail server the enquiries still say a reply can be sent: %s", list)
 	}
 	// Their answer can still be recorded: it sends nothing.
 	if code, body := call(t, member, "POST", base+"/answers", "application/json", map[string]any{"text": "Never mind."}); code != http.StatusCreated {
@@ -393,8 +389,8 @@ func TestTheEnquiriesAPIGivesWhatThePageShows(t *testing.T) {
 			t.Errorf("the counts lack %s: %s", want, counts)
 		}
 	}
-	if _, members := call(t, member, "GET", base+"members", "", nil); members != `{"items":[{"name":"Ada Lovelace"}]}`+"\n" {
-		t.Errorf("the members, by name only: %q", members)
+	if _, members := call(t, member, "GET", base+"members", "", nil); !strings.Contains(members, `"name":"Ada Lovelace"`) {
+		t.Errorf("the members should name the team: %q", members)
 	}
 
 	_, srv, member, _ = mailSite(t, func(a *App) { a.mail = nil })

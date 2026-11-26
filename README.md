@@ -253,6 +253,10 @@ The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml),
 | `agents:run` | Start and stop Prospector's own agents on a task, and list a task's runs |
 | `agents:configure` | Add, change and delete Prospector's own agents: endpoint, key, model, tools and fallback. Owner-level: a signed-in member needs to be an owner |
 | `settings:write` | `PATCH /api/v1/settings`: change the organisation's settings, from its waits and wording to its never-contact list and enquiry sites; send only what changes. `PUT` and `DELETE /api/v1/enrichers` add, change and remove enrichment vendors and their keys. Owner-level, like `agents:configure`. `GET /api/v1/settings` reads them with `read` |
+| `team:write` | `POST /api/v1/members`, `PATCH` and `DELETE /api/v1/members/{user}`: add people, change their roles and areas, take them out. Owner-level, and as strong as an owner: it can make one, and a new account's first password comes back when there is no mail to send it by. `GET /api/v1/members` lists the team with `read` |
+| `mail:configure` | `GET` and `PUT /api/v1/mail-server`: the organisation's outgoing mail server; its password is write-only. Owner-level |
+| `sso:configure` | `/api/v1/sso` and `/api/v1/sso/domains`: the single sign-on provider, its write-only client secret, and the domains it speaks for. Owner-level |
+| `org:export` | `POST /api/v1/export`: everything the organisation holds, in one file. Owner-level |
 
 - **Every list comes a page at a time.** Each list in `/api/openapi.json` (agents, runs, the Research queue, deals, enquiries and their messages, onboardings, subscriptions), `search`, `tasks` and `due`, and the lists inside one company (`companies/<id>`: facts, people, history, notes) and one task (`tasks/<id>`: companies, people, notes), take `limit` (50 if left out, 200 at most) and `cursor`. When there is more, the answer has `next_cursor` to pass back as `cursor`, and the HTTP response names the next page in a `Link` header with `rel="next"` ([RFC 8288](https://www.rfc-editor.org/rfc/rfc8288)). A cursor is only good for the list that gave it out. The MCP tools take and return the same two fields.
 - **Errors from the JSON API** come as `application/problem+json` ([RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)), with what went wrong in `detail`. `400` is something to fix in the request, `404` a company, contact or task that isn't in this organisation, `409` something that clashes with what is already here, or a person who was erased on request, and `500` the server's own failure, which is worth retrying. A `401` or `403` about the key says which in `WWW-Authenticate`: `invalid_token` for a key to replace, `insufficient_scope` for one that can't do this.
@@ -358,9 +362,12 @@ PROSPECTOR_TEST_PG=postgres://… go test -p 1 ./...      # an empty, disposable
 go tool templ generate                                   # after editing *.templ
 go tool shadcn-templ add <component>                     # UI components (shadcn/ui for templ)
 node build-css.mjs <node_modules with tailwindcss v4>   # or the standalone tailwindcss CLI
+(cd web && npm ci && npm run build)                      # the React app and the page scripts
 ```
 
-`assets/css/output.css`, the script bundle and `*_templ.go` are committed, so a plain `go build` needs neither Node nor Tailwind.
+The app inside an organisation is a React front end in `web/` (TanStack Router, its addresses `/o/<org>/today`, `/o/<org>/companies/<id>` and so on); the server answers each of those addresses with the same page and the app reads everything through the API. Sign-in, the front page and the customer's pages are server-rendered.
+
+`assets/css/output.css`, the built app and scripts and `*_templ.go` are committed, so a plain `go build` needs neither Node nor Tailwind.
 
 ## Releases
 

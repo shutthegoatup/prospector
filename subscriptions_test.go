@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
 func TestMonthsAreAddedWithoutSpillingIntoTheNext(t *testing.T) {
@@ -206,26 +208,51 @@ func TestSubscriptionsAreRecordedAndChangedFromThePages(t *testing.T) {
 	if code, body := call(t, client, "PATCH", subs+"/"+itoa(sub.ID), "application/json", map[string]any{"notice_days": 30}); code != http.StatusOK {
 		t.Fatalf("changing a subscription: %d %s", code, body)
 	}
-	for _, path := range []string{"/o/alpha/subscriptions", "/o/alpha/companies/" + itoa(company)} {
-		_, page := call(t, client, "GET", srv.URL+path, "", nil)
-		for _, want := range []string{"Standard plan", "£14,000 a year", "12 months, then renews for the same term", `data-sub="` + itoa(sub.ID) + `"`} {
-			if !strings.Contains(page, want) {
-				t.Errorf("%s doesn't show %q", path, want)
-			}
+	// The subscriptions page reads every one; a company's page reads its own.
+	for _, query := range []string{"", "?company=" + itoa(company)} {
+		list, _ := readSubs(t, client, srv.URL, query)
+		if len(list) != 1 || list[0].Id != sub.ID || list[0].Name != "Standard plan" || list[0].Figure != "£14,000" || list[0].Per != "year" ||
+			list[0].TermMonths != 12 || list[0].Then != "renews" || list[0].NoticeDays != 30 || list[0].Company != "Larkmoor Yachts" {
+			t.Errorf("the subscriptions%s: %+v", query, list)
 		}
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil); !strings.Contains(page, "Larkmoor Yachts") || !strings.Contains(page, "a year at today") {
-		t.Error("the subscriptions page doesn't name the company or say what is contracted")
+	if _, contracted := readSubs(t, client, srv.URL, ""); contracted == "" {
+		t.Error("the subscriptions don't say what is contracted a year")
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/companies/"+itoa(company), "", nil); !strings.Contains(page, "recorded a subscription: ") || !strings.Contains(page, `data-form="api/v1/subscriptions"`) {
-		t.Error("the company's page lacks the history line or the form")
+	if _, history := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/companies/"+itoa(company)+"/history", "", nil); !strings.Contains(history, "recorded a subscription: ") {
+		t.Errorf("the company's history lacks the subscription: %s", history)
 	}
 	if code, body := call(t, client, "DELETE", subs+"/"+itoa(sub.ID), "", nil); code != http.StatusNoContent {
 		t.Fatalf("removing a subscription: %d %s", code, body)
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil); !strings.Contains(page, "No subscriptions yet") {
-		t.Error("the page after the only subscription was removed")
+	if list, _ := readSubs(t, client, srv.URL, ""); len(list) != 0 {
+		t.Errorf("after the only subscription was removed: %+v", list)
 	}
+}
+
+// readSubs is the subscriptions as the app reads them, and what they are worth a year.
+func readSubs(t *testing.T, client *http.Client, site, query string) ([]api.Subscription, string) {
+	t.Helper()
+	code, body := call(t, client, "GET", site+"/o/alpha/api/v1/subscriptions"+query, "", nil)
+	var out struct {
+		Items      []api.Subscription
+		Contracted string
+	}
+	if code != http.StatusOK || json.Unmarshal([]byte(body), &out) != nil {
+		t.Fatalf("the subscriptions: %d %s", code, body)
+	}
+	return out.Items, out.Contracted
+}
+
+// dueSubs is how many subscriptions Today points at.
+func dueSubs(t *testing.T, client *http.Client, site string) int {
+	t.Helper()
+	code, body := call(t, client, "GET", site+"/o/alpha/api/v1/today/summary", "", nil)
+	var sum api.TodaySummary
+	if code != http.StatusOK || json.Unmarshal([]byte(body), &sum) != nil {
+		t.Fatalf("Today's summary: %d %s", code, body)
+	}
+	return sum.Subscriptions
 }
 
 // A database written before subscriptions existed has companies and no such table.
@@ -260,32 +287,40 @@ func itoa(n int64) string { return strconv.FormatInt(n, 10) }
 func TestTodayPointsAtSubscriptionsComingDue(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	person := repliedPerson(t, s, o, "Hannah Pryce")
-	const prompt = "Look at subscriptions coming due"
 	now := mustDay(today())
 	on := func(days int) string { return now.AddDate(0, 0, days).Format(dayLayout) }
 	// A year-long term that began 11 months ago ends in about a month; its day to cancel by is nearer still.
 	record := func(start string, notice int) *Subscription {
 		return must(s.AddSubscription(o.ID, SubscriptionIn{Company: *person.CompanyID, Name: "Plan", Start: start, TermMonths: 12, NoticeDays: notice}, "Ada Lovelace"))
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(page, prompt) {
+	if dueSubs(t, client, srv.URL) != 0 {
 		t.Fatal("Today points at subscriptions when there are none")
 	}
 	far := record(on(-30), 30)
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(page, prompt) {
+	if dueSubs(t, client, srv.URL) != 0 {
 		t.Error("Today points at a subscription with eleven months to run")
 	}
 	near := record(now.AddDate(-1, 0, 20).Format(dayLayout), 0)
-	_, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil)
-	if !strings.Contains(page, prompt) {
+	if dueSubs(t, client, srv.URL) != 1 {
 		t.Error("Today says nothing of a subscription whose term ends in under three weeks")
 	}
-	if _, list := call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil); strings.Count(list, "within 30 days") != 1 {
-		t.Errorf("the list marks %d subscriptions as within 30 days, want the one", strings.Count(list, "within 30 days"))
+	soon := 0
+	list, _ := readSubs(t, client, srv.URL, "")
+	for _, sub := range list {
+		if sub.Soon {
+			soon++
+			if sub.Id != near.ID {
+				t.Errorf("subscription %d is marked as within 30 days, not the near one", sub.Id)
+			}
+		}
+	}
+	if soon != 1 {
+		t.Errorf("the list marks %d subscriptions as within 30 days, want the one", soon)
 	}
 	if err := s.ChangeSubscription(o.ID, near.ID, "ended_on", on(-1), "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(page, prompt) {
+	if dueSubs(t, client, srv.URL) != 0 {
 		t.Error("Today still points at a subscription that has ended")
 	}
 	for _, c := range []struct {
@@ -309,13 +344,13 @@ func TestTodayPointsAtSubscriptionsComingDue(t *testing.T) {
 	// that is routine, until it has a day it stops.
 	monthly := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *person.CompanyID, Name: "Monthly", Per: PerMonth, Start: on(-100)}, "Ada Lovelace"))
 	rolled := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *person.CompanyID, Name: "Rolled", Per: PerMonth, Start: now.AddDate(0, -8, 0).Format(dayLayout), TermMonths: 6, Then: ThenRolls}, "Ada Lovelace"))
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(page, prompt) {
+	if dueSubs(t, client, srv.URL) != 0 {
 		t.Error("Today points at plans that only turn over monthly")
 	}
 	if err := s.ChangeSubscription(o.ID, monthly.ID, "notice_on", today(), "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); !strings.Contains(page, prompt) {
+	if dueSubs(t, client, srv.URL) != 1 {
 		t.Error("Today says nothing of a monthly plan that notice was given on")
 	}
 	for _, c := range []struct {
@@ -372,9 +407,19 @@ func TestARenewalDealIsStartedFromASubscription(t *testing.T) {
 		t.Error("another organisation started a renewal")
 	}
 
-	_, page := call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil)
-	if !strings.Contains(page, `/renewals"`) || !strings.Contains(page, "Hannah Pryce") {
-		t.Error("the subscription lacks the offer of a renewal with the person in conversation")
+	offered := func() (api.Subscription, bool) {
+		t.Helper()
+		list, _ := readSubs(t, client, srv.URL, "")
+		for _, l := range list {
+			if l.Id == sub.ID {
+				return l, !l.Renewing && l.Status != "ended" && len(l.People) > 0
+			}
+		}
+		t.Fatal("the subscription isn't listed")
+		return api.Subscription{}, false
+	}
+	if l, ok := offered(); !ok || l.People[0].Id != hannah.ID || l.People[0].Name != "Hannah Pryce" {
+		t.Errorf("the subscription lacks the offer of a renewal with the person in conversation: %+v", l)
 	}
 	renew := func(contact int64) (int, string) {
 		return call(t, client, "POST", srv.URL+"/o/alpha/api/v1/subscriptions/"+itoa(sub.ID)+"/renewals", "application/json", map[string]any{"contact": contact})
@@ -392,15 +437,14 @@ func TestARenewalDealIsStartedFromASubscription(t *testing.T) {
 	if code, _ := renew(hannah.ID); code < 300 {
 		t.Error("a second renewal was started while the first is open")
 	}
-	_, page = call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil)
-	if !strings.Contains(page, "Renewal under way in Conversations") || strings.Contains(page, `/renewals"`) {
+	if l, ok := offered(); !l.Renewing || ok {
 		t.Error("the subscription still offers a renewal while one is open")
 	}
 	// Once the renewal is closed, another can be started next time round.
 	if err := s.ChangeDeal(o.ID, deals[0].ID, "stage", "won", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if _, page = call(t, client, "GET", srv.URL+"/o/alpha/subscriptions", "", nil); !strings.Contains(page, `/renewals"`) {
+	if _, ok := offered(); !ok {
 		t.Error("after the renewal was won, the subscription offers no next one")
 	}
 	// Removing the subscription leaves the deal, pointing at nothing.

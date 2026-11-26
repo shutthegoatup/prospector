@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -167,8 +168,9 @@ func TestOnboardingIsWorkedFromItsPages(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	person := repliedPerson(t, s, o, "Hannah Pryce")
 	company := *person.CompanyID
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/onboarding", "", nil); !strings.Contains(page, "No steps written yet") {
-		t.Error("the page with no steps written doesn't say so")
+	// The page says no steps are written while the settings hold none.
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/settings", "", nil); !strings.Contains(body, `"onboarding_steps":""`) {
+		t.Errorf("with no steps written the settings hold some: %s", body)
 	}
 	settings := func(steps string) (int, string) {
 		return call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/settings", "application/json", map[string]any{"onboarding_steps": steps})
@@ -179,8 +181,8 @@ func TestOnboardingIsWorkedFromItsPages(t *testing.T) {
 	if code, body := settings(fourSteps); code != http.StatusOK {
 		t.Fatalf("saving the steps: %d %s", code, body)
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/settings", "", nil); !strings.Contains(page, "them: Send your product files, 7 days") {
-		t.Error("Settings doesn't show the steps that were saved")
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/settings", "", nil); !strings.Contains(body, "them: Send your product files, 7 days") {
+		t.Errorf("the settings don't hold the steps that were saved: %s", body)
 	}
 	if code, body := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/onboardings", "application/json", map[string]any{"company": company, "name": "Leith site", "start": "2020-01-06"}); code != http.StatusCreated || !strings.Contains(body, `"who":"them"`) {
 		t.Fatalf("starting an onboarding: %d %s", code, body)
@@ -190,17 +192,21 @@ func TestOnboardingIsWorkedFromItsPages(t *testing.T) {
 	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/onboardings", "", nil); !strings.Contains(body, `"invitable":[`) || !strings.Contains(body, `"can_invite":false`) {
 		t.Errorf("the onboardings should say who could be invited and that no link can go without mail: %s", body)
 	}
-	for _, path := range []string{"/o/alpha/onboarding", "/o/alpha/companies/" + itoa(company)} {
-		_, page := call(t, client, "GET", srv.URL+path, "", nil)
-		for _, want := range []string{"Leith site", "Send your product files", "3 steps late", "late, was due 2020-01-08", `data-step="` + itoa(row.Steps[0].ID) + `"`, "api/v1/onboarding-steps/"} {
-			if !strings.Contains(page, want) {
-				t.Errorf("%s doesn't show %q", path, want)
+	// The Onboarding page and the company's page both draw it from what the API gives.
+	for _, path := range []string{"/o/alpha/api/v1/onboardings", "/o/alpha/api/v1/companies/" + itoa(company) + "/overview"} {
+		_, body := call(t, client, "GET", srv.URL+path, "", nil)
+		for _, want := range []string{`"name":"Leith site"`, `"name":"Send your product files"`, `"late":3`, `"due":"2020-01-08"`, `"id":` + itoa(row.Steps[0].ID) + `,`} {
+			if !strings.Contains(body, want) {
+				t.Errorf("%s doesn't give %s", path, want)
 			}
 		}
 	}
-	const prompt = "Move onboarding steps on"
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); !strings.Contains(page, prompt) {
-		t.Error("Today says nothing of onboarding steps that are late")
+	late := func() string {
+		_, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/today/summary", "", nil)
+		return body
+	}
+	if !strings.Contains(late(), `"onboarding_steps":3`) {
+		t.Errorf("Today says nothing of onboarding steps that are late: %s", late())
 	}
 	for _, st := range row.Steps {
 		if code, body := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/onboarding-steps/"+itoa(st.ID), "application/json", map[string]any{"done": true}); code != http.StatusOK {
@@ -210,17 +216,17 @@ func TestOnboardingIsWorkedFromItsPages(t *testing.T) {
 	if code, _ := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/onboarding-steps/"+itoa(row.Steps[0].ID), "application/json", map[string]any{"name": "Other"}); code == http.StatusOK {
 		t.Error("a step was renamed through the route")
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/onboarding", "", nil); !strings.Contains(page, "live since "+today()) || !strings.Contains(page, "Ada Lovelace") {
-		t.Error("the page doesn't say the customer is live, or who finished the steps")
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/onboardings", "", nil); !strings.Contains(body, `"live_on":"`+today()+`"`) || !strings.Contains(body, `"done_by":"Ada Lovelace"`) {
+		t.Errorf("the onboarding doesn't say the customer is live, or who finished the steps: %s", body)
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(page, prompt) {
-		t.Error("Today still points at onboarding once every step is done")
+	if !strings.Contains(late(), `"onboarding_steps":0`) {
+		t.Errorf("Today still points at onboarding once every step is done: %s", late())
 	}
 	if code, body := call(t, client, "DELETE", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(row.ID), "", nil); code != http.StatusNoContent {
 		t.Fatalf("removing an onboarding: %d %s", code, body)
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/onboarding", "", nil); !strings.Contains(page, "Nobody is being onboarded") {
-		t.Error("the page after the only onboarding was removed")
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/onboardings", "", nil); !strings.Contains(body, `"items":[]`) {
+		t.Errorf("the onboardings after the only one was removed: %s", body)
 	}
 }
 
@@ -262,31 +268,46 @@ func TestAWonDealOffersOnboarding(t *testing.T) {
 	if err := s.Update(o.ID, won.ID, "stage", "won", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	board := func() string {
-		_, page := call(t, client, "GET", srv.URL+"/o/alpha/conversations", "", nil)
-		return page
+	// The board offers to start onboarding on a won card whose company has none, once steps are written.
+	board := func() (planned int, offered, running int) {
+		t.Helper()
+		var b struct {
+			Items []struct {
+				Stage      string `json:"stage"`
+				CompanyID  int64  `json:"company_id"`
+				Onboarding string `json:"onboarding"`
+			} `json:"items"`
+			Steps int `json:"onboarding_steps"`
+		}
+		_, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/conversations", "", nil)
+		if err := json.Unmarshal([]byte(body), &b); err != nil {
+			t.Fatalf("the board: %v %s", err, body)
+		}
+		for _, c := range b.Items {
+			switch {
+			case c.Stage != "won" || c.CompanyID == 0:
+			case c.Onboarding == "running":
+				running++
+			case c.Onboarding == "":
+				offered++
+			}
+		}
+		return b.Steps, offered, running
 	}
-	// With no steps written there is nothing to start.
-	if strings.Contains(board(), "Start onboarding") {
-		t.Error("onboarding is offered though no steps are written")
+	if planned, _, _ := board(); planned != 0 {
+		t.Errorf("onboarding is offered though no steps are written: %d steps", planned)
 	}
 	o.Settings.OnboardingSteps = fourSteps
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	page := board()
-	if n := strings.Count(page, "Start onboarding"); n != 1 {
-		t.Fatalf("onboarding is offered on %d cards, want only the won one", n)
-	}
-	// The button carries what the route needs; pressing it is this post.
-	body := `{&#34;company&#34;:` + itoa(*won.CompanyID) + `,&#34;start&#34;:&#34;` + today() + `&#34;}`
-	if !strings.Contains(page, body) {
-		t.Errorf("the button lacks the company and the date: want %s", body)
+	if planned, offered, _ := board(); planned != 4 || offered != 1 {
+		t.Fatalf("onboarding is offered on %d cards with %d steps, want only the won one with 4", offered, planned)
 	}
 	if code, text := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/onboardings", "application/json", map[string]any{"company": *won.CompanyID, "start": today()}); code != http.StatusCreated {
 		t.Fatalf("starting onboarding from a won deal: %d %s", code, text)
 	}
-	if page = board(); strings.Contains(page, "Start onboarding") || !strings.Contains(page, "Onboarding under way") {
+	if _, offered, running := board(); offered != 0 || running != 1 {
 		t.Error("a won deal whose company is being onboarded still offers to start")
 	}
 	// A renewal that is won, with the same company, says the same.
@@ -294,8 +315,8 @@ func TestAWonDealOffersOnboarding(t *testing.T) {
 	if err := s.ChangeDeal(o.ID, renewal.ID, "stage", "won", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if n := strings.Count(board(), "Onboarding under way"); n != 2 {
-		t.Errorf("%d cards say onboarding has started, want the won deal and the won renewal", n)
+	if _, _, running := board(); running != 2 {
+		t.Errorf("%d cards say onboarding has started, want the won deal and the won renewal", running)
 	}
 }
 
@@ -315,9 +336,9 @@ func TestAWonDealSaysWhenItsCompanyIsOnboarded(t *testing.T) {
 	if err := s.SetOnboardingStep(o.ID, step.ID, "done", "yes", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	_, page := call(t, client, "GET", srv.URL+"/o/alpha/conversations", "", nil)
-	if !strings.Contains(page, ">Onboarded<") || strings.Contains(page, "Onboarding under way") || strings.Contains(page, "Start onboarding") {
-		t.Error("a won deal whose company is live lacks Onboarded, or still offers to start")
+	_, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/conversations", "", nil)
+	if !strings.Contains(body, `"onboarding":"live"`) || strings.Contains(body, `"onboarding":"running"`) || strings.Contains(body, `"onboarding":""`) {
+		t.Errorf("a won deal whose company is live lacks Onboarded, or still offers to start: %s", body)
 	}
 }
 

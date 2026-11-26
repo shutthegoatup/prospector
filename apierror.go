@@ -10,11 +10,13 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 
 	sqlite "github.com/glebarez/go-sqlite"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/shutthegoatup/prospector/api"
 	"gorm.io/gorm"
 )
 
@@ -188,19 +190,47 @@ type problem struct {
 	Title  string `json:"title"`
 	Status int    `json:"status"`
 	Detail string `json:"detail,omitempty"`
+	Code   string `json:"code,omitempty"`
 }
 
 func writeProblem(w http.ResponseWriter, code int, detail string) {
+	writeCoded(w, code, "", detail)
+}
+
+func writeCoded(w http.ResponseWriter, status int, code api.ProblemCode, detail string) {
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(code)
-	if err := json.NewEncoder(w).Encode(problem{Type: "about:blank", Title: http.StatusText(code), Status: code, Detail: detail}); err != nil {
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(problem{Type: "about:blank", Title: http.StatusText(status), Status: status, Detail: detail, Code: string(code)}); err != nil {
 		log.Print(err)
 	}
+}
+
+// coded is a refusal a client acts on by its code rather than by reading it.
+type coded struct {
+	status int
+	code   api.ProblemCode
+	detail string
+	// retry is the seconds to wait, for a throttled one.
+	retry int
+}
+
+func (e coded) Error() string { return e.detail }
+
+func throttledFor(seconds int) coded {
+	return coded{http.StatusTooManyRequests, api.Throttled, "too many attempts: try again in " + plural(seconds, "second"), seconds}
 }
 
 // apiFail answers an API caller with what went wrong. A failure of the server's own is
 // logged and not described: its text can carry internals.
 func apiFail(w http.ResponseWriter, r *http.Request, err error) {
+	var c coded
+	if errors.As(err, &c) {
+		if c.retry > 0 {
+			w.Header().Set("Retry-After", strconv.Itoa(c.retry))
+		}
+		writeCoded(w, c.status, c.code, c.detail)
+		return
+	}
 	code, detail := telling(r.Method+" "+r.URL.Path, err, statusOf(err))
 	writeProblem(w, code, detail)
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, FilterChip, Meta, PageHead, Pill, type Tone, Whose } from "@/components/app";
@@ -34,8 +34,7 @@ export function taskFound(companies: number, people: number) {
 
 export function TasksPage() {
   const { org, sales } = useSession();
-  const [params] = useSearchParams();
-  const closed = !!params.get("closed");
+  const { closed = false } = useSearch({ from: "/o/$org/tasks" });
   const [cursor, setCursor] = useState<string | undefined>();
   useEffect(() => setCursor(undefined), [closed]);
   const tasks = $api.useQuery("get", "/o/{org}/api/v1/tasks", { params: { path: { org }, query: { closed, limit: 30, cursor } } });
@@ -51,8 +50,8 @@ export function TasksPage() {
       <div className="flex flex-wrap items-start gap-8">
         <div className="flex min-w-0 flex-[999_1_480px] flex-col gap-3">
           <div className="flex flex-wrap gap-2">
-            <FilterChip to="." label="Open" count={tasks.data?.open ?? 0} on={!closed} />
-            <FilterChip to="?closed=1" label="With closed" count={tasks.data?.all ?? 0} on={closed} />
+            <FilterChip to="/o/$org/tasks" params={{ org }} label="Open" count={tasks.data?.open ?? 0} on={!closed} />
+            <FilterChip to="/o/$org/tasks" params={{ org }} search={{ closed: true }} label="With closed" count={tasks.data?.all ?? 0} on={closed} />
           </div>
           {tasks.error && <p className="text-sm text-[var(--stop)]">The tasks couldn't be read. Reload to try again.</p>}
           {tasks.data && tasks.data.items.length === 0 && (
@@ -63,7 +62,7 @@ export function TasksPage() {
             return (
               <article key={t.id} className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Link to={`/tasks/${t.id}`} className="font-medium underline">
+                  <Link to="/o/$org/tasks/$id" params={{ org, id: t.id }} className="font-medium underline">
                     {t.title}
                   </Link>
                   <TaskStatus status={t.status} />
@@ -89,7 +88,7 @@ function TaskCreate() {
   const navigate = useNavigate();
   const [brief, setBrief] = useState("");
   const [title, setTitle] = useState("");
-  const create = $api.useMutation("post", "/o/{org}/api/v1/tasks", { onSuccess: (t) => navigate(`/tasks/${t.id}`) });
+  const create = $api.useMutation("post", "/o/{org}/api/v1/tasks", { onSuccess: (t) => navigate({ to: "/o/$org/tasks/$id", params: { org, id: t.id } }) });
 
   return (
     <aside className="panel flex min-w-0 flex-[1_1_280px] flex-col gap-3 p-5 text-sm">

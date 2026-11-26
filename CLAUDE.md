@@ -16,14 +16,15 @@ Several sessions may be working on this machine at once. These are the commands 
 
 - After editing a `*.templ` file run `go tool templ generate` and commit the regenerated `*_templ.go`. CI fails if they differ.
 - The page script is TypeScript in `web/src/app.ts`, with types generated from the spec. After changing it, or the spec, run `npm ci && npm run build` in `web/` and commit `web/src/api.d.ts` and the built `assets/js/app.js`; CI fails if they differ. A call to the API made from code, rather than a path named in markup, goes through the typed client so a spec change breaks the build.
-- Pages are moving to React, one at a time (Research first, at `/o/{org}/app/research`). A React page:
-  - lives in `web/src/pages/`, is routed in `web/src/main.tsx`, and is listed in `reactPages` in `app_ui.go`. The server serves it inside the usual layout, so the sidebar stays server-rendered for now;
+- The app inside an organisation is a React front end in `web/`; Go serves its shell and the API. Every page at `/o/{org}/<page>` (and `/o/{org}/companies/{id}`, `/o/{org}/tasks/{id}`) gets the same `assets/app/index.html`, built by Vite from `web/index.html`, under the usual sign-in, policy and headers; the pages are listed in `appPages` in `app_ui.go`. The old `/o/{org}/app/…` addresses redirect to the real ones. The front end:
+  - routes with TanStack Router in `web/src/router.tsx`: one route constant per page (inline in `addChildren` they lose their types), path ids parsed to numbers, and every search param a zod schema in `web/src/search.ts`, with real types (numbers as numbers, enums for filters) and a bad value falling back to the default through `.catch`. Pages read them with `useSearch`/`useParams({ from: "/o/$org/…" })` and link with typed `Link`s; a page the server serves must be routed there too (a test checks);
+  - draws the sidebar itself (`web/src/components/app/layout.tsx`) from `GET /o/{org}/api/v1/nav`, which also gives the pages `useSession()`;
   - reads and writes only through the typed client (`$api` in `web/src/client.ts`, openapi-react-query over the spec). Anything it needs that the API lacks goes into `api/openapi.yaml` first;
   - builds from shadcn/ui. `web/src/components/ui/` is exactly what `npx shadcn@latest add <name>` writes (run it in `web/`): never edit those files. Prospector's look goes in wrappers in `web/src/components/app/`;
   - takes its styles from the shared `assets/css/output.css`, so rebuild the CSS after adding classes;
-  - is built with `npm run build` in `web/`, which writes `assets/app/main.js`: commit it.
+  - is built with `npm run build` in `web/`, which writes `assets/app/index.html` and `assets/app/main.js`: commit them.
 
-  Port a page like for like, then switch its old route to it once nothing is missing.
+  `assets/js/app.js` (`web/src/app.ts`) is the script of the server-rendered pages that remain (agreements prepare, sign-in and the like); it never loads on the shell. Go tests of what a page shows assert on the API, since the shell is the same at every address.
 - The API is spec-first. Change `api/openapi.yaml`, run `go generate ./api`, and commit the regenerated `api/api.gen.go`; CI fails if they differ. A page or form does what it does through the API, never through a route of its own, and each operation names the key scope it needs.
 - `assets/css/output.css` is a committed Tailwind build. A utility class that isn't already in it renders unstyled until the CSS is rebuilt (`node build-css.mjs <node_modules with tailwindcss v4>`), so prefer classes already in use.
 - Pages are served under a Content-Security-Policy that allows only the app's own scripts: no inline `<script>`, no `on…=` attributes. `TestContentPolicy` checks every page.

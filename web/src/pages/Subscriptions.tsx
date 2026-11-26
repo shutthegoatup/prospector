@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { type ComponentProps, type ReactNode, useEffect, useRef, useState } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
@@ -73,9 +74,9 @@ function SubscriptionLine({ s }: { s: Subscription }) {
     <div className="border-b border-border px-4 py-3 text-sm last:border-0">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="min-w-0">
-          <a href={`/o/${org}/companies/${s.company_id}`} className="font-bold text-foreground hover:text-mark">
+          <Link to="/o/$org/companies/$id" params={{ org, id: s.company_id }} className="font-bold text-foreground hover:text-mark">
             {s.company}
-          </a>
+          </Link>
           <span className="text-muted-foreground"> · {s.name}</span>
           <span className="block font-mono text-xs text-muted-foreground">
             {[price, termText(s), standingText(s)].filter((p) => p.trim()).join(" · ")}
@@ -223,9 +224,9 @@ function SubscriptionUpdate({ s }: { s: Subscription }) {
       <Failed errors={[problem, change.error]} />
       {s.renewing ? (
         <p className="mt-2 border-t border-border pt-2">
-          <a href={`/o/${org}/conversations`} className="font-mono text-xs text-mark underline">
+          <Link to="/o/$org/conversations" params={{ org }} className="font-mono text-xs text-mark underline">
             Renewal under way in Conversations
-          </a>
+          </Link>
         </p>
       ) : s.status !== "ended" && s.people.length > 0 ? (
         <form

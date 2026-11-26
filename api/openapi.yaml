@@ -20,9 +20,12 @@ info:
     them and where; `enrich:spend` to ask the organisation's enrichment vendors, at its cost,
     for someone's email, phone or profile; `people:privacy` to export everything held on a
     person and erase them on their request; `settings:write` to change the organisation's
-    settings and its enrichment vendors. A signed-in member may do all of these except
-    configuring agents, deleting enquiries, exporting and erasing people and changing
-    settings, which need an owner.
+    settings and its enrichment vendors; `team:write` to add and remove members and change
+    their roles and areas; `mail:configure` to set the organisation's outgoing mail server;
+    `sso:configure` to set up single sign-on and its domains; `org:export` to download
+    everything the organisation holds. A signed-in member may do all of these except
+    configuring agents, deleting enquiries, exporting and erasing people, changing settings,
+    the team, mail or single sign-on, and exporting the organisation, which need an owner.
 
     Signing in, signing out and passwords are account-wide, under `/api/v1/` rather than
     an organisation's address, and only for a browser: a key is refused them. A refusal
@@ -43,6 +46,8 @@ tags:
     description: An agent working a task.
   - name: people
     description: The people you are in touch with, and their conversations.
+  - name: today
+    description: What is due, step by step, with the text drafted for each, and recording what happened.
   - name: companies
     description: Every company, where it stands, and everything held about it.
   - name: research
@@ -109,8 +114,6 @@ paths:
       responses:
         "200":
           description: Signed in.
-          headers:
-            Set-Cookie: { schema: { type: string }, description: "The session cookie, HttpOnly." }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Session" }
@@ -1173,37 +1176,6 @@ paths:
                   onboarding_steps: { type: integer, description: "How many steps an onboarding started now would have: 0 until an owner writes them in Settings, and until then a won deal offers none." }
         default: { $ref: "#/components/responses/Problem" }
 
-  /o/{org}/api/v1/members:
-    parameters:
-      - $ref: "#/components/parameters/org"
-    get:
-      operationId: listMembers
-      tags: [settings]
-      summary: Who is in the organisation, by name
-      description: The names that can own a deal or an enquiry, in order.
-      parameters:
-        - $ref: "#/components/parameters/limit"
-        - $ref: "#/components/parameters/cursor"
-      security:
-        - session: []
-        - bearer: [read]
-      responses:
-        "200":
-          description: A page of them.
-          headers:
-            Link: { $ref: "#/components/headers/Link" }
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [items]
-                properties:
-                  items:
-                    type: array
-                    items: { $ref: "#/components/schemas/MemberName" }
-                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
-        default: { $ref: "#/components/responses/Problem" }
-
   /o/{org}/api/v1/enquiries:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -2072,6 +2044,24 @@ paths:
     parameters:
       - $ref: "#/components/parameters/org"
       - $ref: "#/components/parameters/id"
+    get:
+      operationId: getAgreement
+      tags: [agreements]
+      summary: One agreement, with what preparing it needs
+      description: |
+        The agreement with its company's name, why its document can't be read if it can't,
+        and who could still be added to it: people at its company with one email address and
+        not on the never-contact list, and members.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The agreement.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgreementOverview" }
+        default: { $ref: "#/components/responses/Problem" }
     patch:
       operationId: changeAgreement
       tags: [agreements]
@@ -2329,6 +2319,105 @@ paths:
                     items: { $ref: "#/components/schemas/AgreementField" }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/today:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listToday
+      tags: [today]
+      summary: What is due, best first, as Today shows it
+      description: |
+        Everyone due at a step, one card each, best first: next steps, calls where it is
+        office hours, messages, emails, follow-ups, LinkedIn adds, then calls outside office
+        hours. Each card carries the text drafted for it from the organisation's templates,
+        addressed to whoever "Send to" names, and for a call its script, in the caller's
+        name; the email and follow-up to copy end with the caller's signature. A key has no
+        name or signature of its own, so its call scripts say `[YOUR NAME]`.
+      parameters:
+        - name: step
+          in: query
+          schema: { type: string, enum: [call, accepted, email, followup, linkedin, next] }
+          description: "Only this step: `call`, `accepted` (a LinkedIn message), `email`, `followup`, `linkedin` (an add) or `next` (a conversation's next step)."
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of what is due.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, counts, total, shown, later_calls]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/DueCard" }
+                  counts:
+                    type: object
+                    additionalProperties: { type: integer }
+                    description: How many are due at each step, whatever the filter.
+                  total: { type: integer, description: "Everything due, whatever the filter." }
+                  shown: { type: integer, description: "How many the filter holds, over every page." }
+                  later_calls: { type: integer, description: Calls due where it isn't a good time to ring now. }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/today/summary:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: getTodaySummary
+      tags: [today]
+      summary: What else wants doing today, and the last seven days
+      description: The work Today points to that is done on other pages, and what the last seven days came to.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The counts.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TodaySummary" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/marks:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    post:
+      operationId: markOutcome
+      tags: [today]
+      summary: Record what happened with someone in outreach
+      description: |
+        The request sent, the accept, the message, email or follow-up sent, the call, a reply
+        or a decline, or putting them on hold. A key's mark shows as the agent's, with its
+        note, on Today and in the company's history; a person marking the same step again
+        takes it back. Someone suggested and not yet picked has had nothing happen.
+      security:
+        - session: []
+        - bearer: ["outcomes:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MarkNew" }
+      responses:
+        "200":
+          description: Recorded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+        default: { $ref: "#/components/responses/Problem" }
+
   /o/{org}/api/v1/people:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -2418,7 +2507,10 @@ paths:
       operationId: pickContact
       tags: [research]
       summary: Pick a suggested person for outreach
-      description: Takes someone an agent suggested out of Research and into the LinkedIn queue.
+      description: |
+        Takes someone an agent suggested out of Research and into the LinkedIn queue. Someone
+        suggested for an offering gets its connection note, and their company is qualified for
+        that offering rather than for the organisation's own.
       security:
         - session: []
         - bearer: ["research:review"]
@@ -2709,7 +2801,10 @@ paths:
       operationId: removeOffering
       tags: [offerings]
       summary: Remove an offering, with every verdict made for it
-      description: The history keeps what was decided. For a member, only an owner.
+      description: |
+        Refused while an open task is finding companies for it. The history keeps what was
+        decided; people being reached for it are then reached for the organisation's own. For a
+        member, only an owner.
       security:
         - session: []
         - bearer: ["settings:write"]
@@ -2995,6 +3090,497 @@ paths:
         "204": { description: Erased. }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/never-contact/covers:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listNeverContactCovers
+      tags: [settings]
+      summary: Who the never-contact list keeps out of outreach
+      description: The people already here who would otherwise be open for a next step, by name, so an entry that catches the wrong people is noticed.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: In the order they were added.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items: { type: string }
+                  total: { type: integer, description: "How many the list keeps out, on every page." }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/me:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: getMe
+      tags: [settings]
+      summary: The signed-in member asking
+      description: A signed-in member only. An API key is no one, so it is refused.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: Who you are here.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        default: { $ref: "#/components/responses/Problem" }
+    patch:
+      operationId: changeMe
+      tags: [settings]
+      summary: Change your voice in this organisation
+      description: |
+        Your caller name, used in call scripts, and your signature, added to copied emails.
+        Send only what changes. A signed-in member only: an API key is no one, so it is refused.
+      security:
+        - session: []
+        - bearer: [read]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MeChange" }
+      responses:
+        "200":
+          description: You, as saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/nav:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: getNav
+      tags: [settings]
+      summary: What the app's sidebar shows
+      description: |
+        Who is asking, the organisation, the others they belong to, what they work on, and
+        how much waits on each page. An API key is no one, so it gets the organisation and
+        the counts, with no user and no other organisations.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The sidebar.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Nav" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/orgs:
+    post:
+      operationId: createOrg
+      tags: [settings]
+      summary: Start an organisation
+      description: |
+        A new organisation with you as its owner. A signed-in person only: a key belongs to
+        one organisation and can't start another. A sign-in through one organisation's single
+        sign-on opens only that one, so it can't either.
+      security:
+        - session: []
+        - bearer: [read]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses:
+        "201":
+          description: The organisation, started.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrgSummary" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/me/password:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    post:
+      operationId: changeMyPassword
+      tags: [settings]
+      summary: Change your password
+      description: |
+        For your sign-in across every organisation. Changing it signs out your other sessions.
+        Wrong guesses are slowed as they are at sign-in. A signed-in member only: an API key
+        is refused.
+      security:
+        - session: []
+        - bearer: [read]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current, new]
+              properties:
+                current: { type: string, writeOnly: true }
+                new: { type: string, writeOnly: true, description: 10 characters at least. }
+      responses:
+        "200":
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Said" }
+        "429":
+          description: Too many attempts; try again after `Retry-After` seconds.
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/members:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listMembers
+      tags: [settings]
+      summary: The organisation's team
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: By name.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Member" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: addMember
+      tags: [settings]
+      summary: Add someone to the team
+      description: |
+        Someone new gets an account and is emailed a link to choose their password, through
+        the organisation's mail server or else the site's; with neither, their first password
+        is in the message, once. Someone already in changes to the role sent. For a member,
+        only an owner.
+      security:
+        - session: []
+        - bearer: ["team:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string }
+                name: { type: string }
+                role: { type: string, enum: [member, owner], description: member when left out. }
+      responses:
+        "201":
+          description: Added; the message says how they get in.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Said" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/members/{user}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - name: user
+        in: path
+        required: true
+        description: The member's user id.
+        schema: { type: integer, format: int64 }
+    patch:
+      operationId: changeMember
+      tags: [settings]
+      summary: Change someone's role or areas
+      description: |
+        An organisation always keeps an owner. Areas say what a member changes: none leaves
+        them reading only; an owner has every area. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["team:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role: { type: string, enum: [member, owner] }
+                areas:
+                  type: array
+                  nullable: true
+                  x-go-type-skip-optional-pointer: false
+                  description: Every area they work in; an empty list leaves them reading only.
+                  items: { type: string, enum: [sales, support] }
+      responses:
+        "200":
+          description: The member as they now are.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Member" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: removeMember
+      tags: [settings]
+      summary: Take someone out of the team
+      description: Their account, what they added and any API keys they made stay. The last owner can't go. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["team:write"]
+      responses:
+        "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/mail-server:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: getMailServer
+      tags: [settings]
+      summary: The organisation's outgoing mail server
+      description: Its password is never shown, only whether one is kept. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["mail:configure"]
+      responses:
+        "200":
+          description: The server; an empty host when there is none.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MailServer" }
+        default: { $ref: "#/components/responses/Problem" }
+    put:
+      operationId: saveMailServer
+      tags: [settings]
+      summary: Set the organisation's outgoing mail server
+      description: |
+        SMTP over TLS, on port 587, 465, 2525 or 25. An empty host stops using one. An empty
+        password keeps the one saved, unless the host or username changes. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["mail:configure"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MailServerSettings" }
+      responses:
+        "200":
+          description: The server as saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MailServer" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/mail-server/test:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    post:
+      operationId: testMailServer
+      tags: [settings]
+      summary: Email yourself through the server invitations use
+      description: A signed-in owner only, as it goes to them; an API key is refused.
+      security:
+        - session: []
+        - bearer: ["mail:configure"]
+      responses:
+        "200":
+          description: Sent.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Said" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/sso:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: getSSO
+      tags: [settings]
+      summary: Single sign-on through the organisation's own provider
+      description: The client secret is never shown, only whether one is kept. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["sso:configure"]
+      responses:
+        "200":
+          description: The connection; an empty issuer when it is off.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SSO" }
+        default: { $ref: "#/components/responses/Problem" }
+    put:
+      operationId: saveSSO
+      tags: [settings]
+      summary: Set the provider single sign-on goes through
+      description: |
+        An OpenID Connect issuer, its client ID and secret. An empty issuer turns single
+        sign-on off. An empty secret keeps the saved one while the issuer and client ID stay
+        the same. Requiring it, or letting people join, needs a verified domain. The issuer
+        is read before anything is saved. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["sso:configure"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SSOSettings" }
+      responses:
+        "200":
+          description: The connection as saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SSO" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/sso/domains:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listSSODomains
+      tags: [settings]
+      summary: The email domains single sign-on may speak for
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: ["sso:configure"]
+      responses:
+        "200":
+          description: Every domain, with the TXT record that verifies it.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/SSODomain" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: addSSODomain
+      tags: [settings]
+      summary: Claim an email domain
+      description: It counts once verified, by a TXT record holding its token. 20 at most. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["sso:configure"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [domain]
+              properties:
+                domain: { type: string, description: "Like example.com." }
+      responses:
+        "201":
+          description: The domain, waiting to be verified.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SSODomain" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/sso/domains/{domain}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/domain"
+    delete:
+      operationId: removeSSODomain
+      tags: [settings]
+      summary: Give up an email domain
+      description: Not the last verified one while single sign-on is required or lets people join. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["sso:configure"]
+      responses:
+        "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/sso/domains/{domain}/verify:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/domain"
+    post:
+      operationId: verifySSODomain
+      tags: [settings]
+      summary: Look for a domain's TXT record
+      description: For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["sso:configure"]
+      responses:
+        "200":
+          description: Verified.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SSODomain" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/export:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    post:
+      operationId: exportOrg
+      tags: [settings]
+      summary: Everything the organisation holds, in one file
+      description: |
+        Companies, people, facts, enquiries, history, settings and who has access. It holds
+        no passwords, keys or sign-on secrets. The export is recorded in the history. For a
+        member, only an owner.
+      security:
+        - session: []
+        - bearer: ["org:export"]
+      responses:
+        "200":
+          description: The export.
+          headers:
+            Cache-Control: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -3024,6 +3610,12 @@ components:
       in: query
       description: How many to return. 50 if left out; 200 at most.
       schema: { type: integer, minimum: 1, maximum: 200 }
+    domain:
+      name: domain
+      in: path
+      required: true
+      description: An email domain, like example.com.
+      schema: { type: string }
     cursor:
       name: cursor
       in: query
@@ -3092,8 +3684,8 @@ components:
         id: { type: integer, format: int64 }
         name: { type: string }
         look_for: { type: string, description: "What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list." }
-        pitch: { type: string, description: "Its pitch line, kept for when people are reached for it; nothing uses it yet." }
-        note_template: { type: string, description: "Its connection note, kept for when people are picked for it; nothing uses it yet." }
+        pitch: { type: string, description: "The call script's pitch line for people reached for it; empty uses the organisation's. `{company}` is filled in." }
+        note_template: { type: string, description: "The connection note for people picked for it; empty uses the organisation's. `{first}`, `{company}` and `{org}` are filled in." }
         updated_by: { type: string }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
@@ -3158,6 +3750,106 @@ components:
         fit: { type: string, description: "Why, in a few words; kept with the company, or with the verdict when an offering is named. Empty leaves it as it was." }
         offering: { type: integer, format: int64, description: "The offering this is a verdict for; 0 or left out is the organisation's own, which is the company's stage." }
         reason: { type: string, description: "Why, kept with a verdict for an offering; refused for the organisation's own." }
+
+    DueCard:
+      type: object
+      required: [id, step, name, title, company, company_id, fit, draft_by, held, state, next, people, badges, meta, text, copy, open_url, open_label,
+        number, tel, about, script, email, phone, linkedin, tz, call_notes, flags, sources, stage, next_step, next_date]
+      properties:
+        id: { type: integer, format: int64, description: The person's id. }
+        step: { type: string, enum: [call, accepted, email, followup, linkedin, next] }
+        name: { type: string, description: Who it goes to. }
+        title: { type: string }
+        company: { type: string }
+        company_id: { type: integer, format: int64, description: "Their company, 0 for none." }
+        fit: { type: string }
+        draft_by: { type: string, description: "Who wrote the text, `agent:<name>` for an agent; empty when it came from the templates." }
+        held: { type: boolean, description: On hold. }
+        state: { type: string, enum: [ok, warn, stop, ""], description: "Whether it is a good time to ring them now; empty when their time zone is unknown." }
+        next: { type: integer, format: int64, description: "The next person due at the same step, 0 for none." }
+        people:
+          type: array
+          items: { $ref: "#/components/schemas/DuePerson" }
+          description: Everyone the research named there, to choose whom to send to.
+        badges:
+          type: array
+          items: { $ref: "#/components/schemas/DueBadge" }
+          description: What to check first, such as their local time.
+        meta: { type: string, description: "The line saying where they stand at this step: added, emailed, accepted, the subject, or for a next step the stage and date." }
+        text: { type: string, description: "The note, message, email or follow-up as drafted." }
+        copy: { type: string, description: "The text to copy, signed for an email or follow-up." }
+        open_url: { type: string, description: "Their LinkedIn profile, or a people search for someone without one; `#` for neither." }
+        open_label: { type: string, description: "`Open + copy`, or `Search + copy` without a profile." }
+        number: { type: string, description: "For a call, the number to ring." }
+        tel: { type: string, description: The number as a tel link wants it. }
+        about: { type: string, description: What the research said about the number. }
+        script:
+          type: array
+          items: { $ref: "#/components/schemas/ScriptLine" }
+          description: For a call, what to say.
+        email: { type: string }
+        phone: { type: string }
+        linkedin: { type: string }
+        tz: { type: string }
+        call_notes: { type: string }
+        flags: { type: string }
+        sources:
+          type: array
+          items: { type: string }
+          description: Pages to check before sending.
+        stage: { type: string, description: "For a next step, where the conversation stands." }
+        next_step: { type: string }
+        next_date: { type: string }
+
+    DuePerson:
+      type: object
+      required: [name, title]
+      properties:
+        name: { type: string }
+        title: { type: string }
+
+    DueBadge:
+      type: object
+      required: [text, state]
+      properties:
+        text: { type: string }
+        state: { type: string, enum: [ok, warn, stop, ""] }
+
+    ScriptLine:
+      type: object
+      required: [cue, say]
+      properties:
+        cue: { type: string }
+        say: { type: string }
+
+    TodaySummary:
+      type: object
+      required: [enquiries, deals, subscriptions, onboarding_steps, review, week]
+      properties:
+        enquiries: { type: integer, description: Enquiries nobody has answered yet. }
+        deals: { type: integer, description: "Renewals and other further deals with no next step, or one that's due." }
+        subscriptions: { type: integer, description: "Subscriptions with a day to cancel by, a renewal or an end coming soon." }
+        onboarding_steps: { type: integer, description: "Onboarding steps late or due today, ours and the customers' alike." }
+        review: { type: integer, description: Researched companies waiting to be reviewed. }
+        week: { $ref: "#/components/schemas/Week" }
+
+    Week:
+      type: object
+      required: [touches, replies, meetings, researched]
+      properties:
+        touches: { type: integer, format: int64 }
+        replies: { type: integer, format: int64 }
+        meetings: { type: integer, format: int64 }
+        researched: { type: integer, format: int64 }
+
+    MarkNew:
+      type: object
+      required: [contact_id, step]
+      properties:
+        contact_id: { type: integer, format: int64 }
+        step: { type: string, enum: [linkedin, accepted, email, followup, call, replied, declined, hold], description: "`linkedin` is the request sent." }
+        date: { type: string, description: "YYYY-MM-DD it happened; today if left out." }
+        note: { type: string, description: "How you know, such as `Ada said he replied`." }
 
     PersonNew:
       type: object
@@ -3379,12 +4071,13 @@ components:
 
     ResearchPerson:
       type: object
-      required: [id, name, title, status, email_status, linkedin, source_url, pending]
+      required: [id, name, title, status, has_email, email_status, linkedin, source_url, pending, lookups]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
         title: { type: string }
         status: { type: string, description: "`suggested` until someone picks them." }
+        has_email: { type: boolean }
         email_status: { type: string, description: "`verified`, `guess`, or empty." }
         linkedin: { type: string }
         source_url: { type: string, description: The first page that shows them. }
@@ -3392,19 +4085,37 @@ components:
           type: array
           items: { $ref: "#/components/schemas/PendingDetail" }
           description: New details an agent found for them, waiting to be accepted.
+        lookups:
+          type: array
+          items: { $ref: "#/components/schemas/Lookup" }
+          description: "Each vendor's latest lookup for them within the last 30 days, newest first. A vendor isn't asked again about the same detail until its lookup is older than that."
+
+    Lookup:
+      type: object
+      required: [field, vendor, outcome, at, again_at]
+      properties:
+        field: { type: string, description: "email, phone or linkedin." }
+        vendor: { $ref: "#/components/schemas/EnricherKind" }
+        outcome:
+          type: string
+          enum: [found, none, not_kept]
+          description: "`found` became a suggestion; `none` is that the vendor found nothing; `not_kept` that what it found may not be kept, such as a never-contact address or a domain that takes no mail."
+        at: { type: string, format: date-time }
+        again_at: { type: string, format: date-time, description: "From when this vendor can be asked about it again." }
 
     PendingDetail:
       type: object
-      required: [id, field, value, current, source_url, by, at, email_status]
+      required: [id, field, value, current, email_status, source_url, vendor, by, at]
       properties:
         id: { type: integer, format: int64, description: "The suggestion: decide it at /api/v1/suggestions/{id}." }
         field: { type: string }
         value: { type: string }
         current: { type: string, description: What the person holds now; empty for nothing. }
+        email_status: { type: string, description: "For an email, `verified` when whoever found it checked it, `guess` when it was worked out from the company's pattern or the vendor couldn't confirm it; otherwise empty." }
         source_url: { type: string }
+        vendor: { type: string, description: "The enrichment vendor that found it; empty when a person or agent did." }
         by: { type: string }
         at: { type: string, format: date-time }
-        email_status: { type: string, description: "For an email, `guess` when it was worked out from the company's pattern rather than seen; otherwise empty." }
 
     Pipeline:
       type: string
@@ -4056,12 +4767,6 @@ components:
             call_notes: { type: string, description: "The notes from calls with the person." }
             onboarding: { type: string, description: "`running` while the company is being onboarded, `live` once it is, empty when no onboarding has started." }
 
-    MemberName:
-      type: object
-      required: [name]
-      properties:
-        name: { type: string }
-
     DealChange:
       type: object
       properties:
@@ -4225,6 +4930,22 @@ components:
         updated_by: { type: string }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+    AgreementOverview:
+      allOf:
+        - $ref: "#/components/schemas/Agreement"
+        - type: object
+          required: [company, problem, people, members]
+          properties:
+            company: { type: string, description: "The company's name." }
+            problem: { type: string, description: "Why the document can't be read to place fields on it; empty when it can." }
+            people:
+              type: array
+              items: { $ref: "#/components/schemas/Invitable" }
+              description: People at the company who could still be added, by contact id.
+            members:
+              type: array
+              items: { $ref: "#/components/schemas/Invitable" }
+              description: Members who could still be added, by user id.
     AgreementRecipient:
       type: object
       required: [id, agreement_id, position, role, name, email, created_by, created_at]
@@ -4320,3 +5041,135 @@ components:
         slug: { type: string }
         name: { type: string }
         start_url: { type: string, description: "Where to go, as a page, to sign in through this organisation's provider." }
+
+    Said:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string, description: "What happened, for a person." }
+    Me:
+      type: object
+      required: [user_id, name, email, role, has_password, caller_name, signature]
+      properties:
+        user_id: { type: integer, format: int64 }
+        name: { type: string }
+        email: { type: string }
+        role: { type: string, enum: [member, owner] }
+        has_password: { type: boolean, description: "False for someone who signs in only through a provider." }
+        caller_name: { type: string, description: "Used in call scripts; empty uses your name." }
+        signature: { type: string, description: "Added to copied emails." }
+    OrgSummary:
+      type: object
+      required: [id, slug, name, color]
+      properties:
+        id: { type: integer, format: int64 }
+        slug: { type: string, description: "Its part of every address: /o/{slug}/." }
+        name: { type: string }
+        color: { type: string, description: "A CSS colour, for its mark." }
+    NavOrg:
+      type: object
+      required: [id, slug, name, color, role]
+      properties:
+        id: { type: integer, format: int64 }
+        slug: { type: string }
+        name: { type: string }
+        color: { type: string }
+        role: { type: string, enum: [member, owner] }
+    Nav:
+      type: object
+      required: [org, orgs, areas, sales, support, owner, work, counts]
+      properties:
+        user:
+          type: object
+          description: "Who is asking; absent for an API key."
+          x-go-type-skip-optional-pointer: false
+          required: [name, email]
+          properties:
+            name: { type: string }
+            email: { type: string }
+        org: { $ref: "#/components/schemas/OrgSummary" }
+        orgs:
+          type: array
+          description: "Every organisation this sign-in opens, with your role in each; none for an API key."
+          items: { $ref: "#/components/schemas/NavOrg" }
+        role: { type: string, enum: [member, owner], description: "Yours here; absent for an API key." }
+        areas:
+          type: array
+          items: { type: string, enum: [sales, support] }
+          description: "The areas you were given; an owner may have none and still works every area."
+        sales: { type: boolean, description: "Whether you change sales work here: an owner, or given sales." }
+        support: { type: boolean, description: "Whether you change support work here: an owner, or given support." }
+        owner: { type: boolean }
+        work: { type: string, description: "What you do here in a few words, such as \"member · sales\"." }
+        counts:
+          type: object
+          description: "How much waits on each page."
+          required: [today, research, conversations, enquiries, companies]
+          properties:
+            today: { type: integer, description: "Everything due on Today." }
+            research: { type: integer, description: "Companies waiting for review." }
+            conversations: { type: integer, description: "Conversations and further deals still open." }
+            enquiries: { type: integer, description: "Enquiries nobody has answered yet." }
+            companies: { type: integer, description: "Every company." }
+    MeChange:
+      type: object
+      properties:
+        caller_name: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        signature: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+    Member:
+      type: object
+      required: [user_id, name, email, role, areas]
+      properties:
+        user_id: { type: integer, format: int64 }
+        name: { type: string }
+        email: { type: string }
+        role: { type: string, enum: [member, owner] }
+        areas:
+          type: array
+          items: { type: string, enum: [sales, support] }
+          description: "What a member changes; none reads only. An owner has every area."
+    MailServerSettings:
+      type: object
+      properties:
+        host: { type: string, description: "Like smtp.example.com; empty stops using one." }
+        port: { type: integer, minimum: 0, maximum: 65535 }
+        username: { type: string }
+        password: { type: string, writeOnly: true, description: "Sealed and never shown again; empty keeps the saved one unless the host or username changes." }
+        sender: { type: string, description: "The From address, like `Alpha <hello@example.com>`." }
+    MailServer:
+      type: object
+      required: [host, port, username, sender, has_password, site_mail]
+      properties:
+        host: { type: string }
+        port: { type: integer }
+        username: { type: string }
+        sender: { type: string }
+        has_password: { type: boolean }
+        site_mail: { type: boolean, description: "Whether this site has a server of its own that invitations fall back to." }
+    SSOSettings:
+      type: object
+      properties:
+        issuer: { type: string, description: "Like https://login.example.com; empty turns single sign-on off." }
+        client_id: { type: string }
+        client_secret: { type: string, writeOnly: true, description: "Sealed and never shown again; empty keeps the saved one." }
+        required: { type: boolean, description: "Members at the verified domains must sign in this way; owners can still use a password." }
+        auto_join: { type: boolean, description: "Anyone at the verified domains becomes a member, never an owner, when they first sign in." }
+    SSO:
+      type: object
+      required: [issuer, client_id, has_client_secret, required, auto_join, redirect_uri, sealing]
+      properties:
+        issuer: { type: string }
+        client_id: { type: string }
+        has_client_secret: { type: boolean }
+        required: { type: boolean }
+        auto_join: { type: boolean }
+        redirect_uri: { type: string, description: "Where the provider sends people back; empty until the server knows its own address (PROSPECTOR_URL)." }
+        sealing: { type: boolean, description: "Whether the server has a key to keep a client secret under." }
+    SSODomain:
+      type: object
+      required: [domain, record, token]
+      properties:
+        domain: { type: string }
+        record: { type: string, description: "The name of the TXT record that verifies it." }
+        token: { type: string, description: "The value that record must hold." }
+        verified_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }

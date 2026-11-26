@@ -1,8 +1,8 @@
 // Prospector's own pieces, built on shadcn/ui. components/ui stays as the shadcn CLI
 // writes it, so it can be updated; the look Prospector adds lives here.
 import { useQueryClient } from "@tanstack/react-query";
-import type { ComponentProps, ReactNode } from "react";
-import { Link } from "react-router";
+import type { ComponentProps, CSSProperties, ReactNode } from "react";
+import { createLink } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,21 +57,28 @@ export function Meta({ children, className }: { children: ReactNode; className?:
   return <p className={cn("font-mono text-xs text-muted-foreground", className)}>{children}</p>;
 }
 
-// FilterChip is one of a list's filters, with how many it holds.
-export function FilterChip({ to, label, count, on }: { to: string; label: string; count: number; on: boolean }) {
+type ChipProps = Omit<ComponentProps<"a">, "children"> & { label: string; count: number; on: boolean };
+
+function Chip({ label, count, on, className, ref, ...props }: ChipProps) {
   return (
-    <Link
-      to={to}
+    <a
+      ref={ref}
+      {...props}
       className={cn(
         "inline-flex items-center gap-2 rounded-full border-[1.5px] px-3 py-1 text-sm no-underline",
         on ? "border-2 border-ink bg-primary font-semibold text-foreground shadow-[2px_2px_0_var(--ink)]" : "border-input bg-card text-foreground",
+        className,
       )}
     >
       {label}
       <span className="font-mono text-xs opacity-70">{count}</span>
-    </Link>
+    </a>
   );
 }
+
+// FilterChip is one of a list's filters, with how many it holds: a link to the same page
+// with that filter in its address.
+export const FilterChip = createLink(Chip);
 
 // useRefresh reads everything the page shows again after a change, as a templ page reloads.
 export function useRefresh() {
@@ -120,6 +127,19 @@ export function PageHead({ title, children }: { title: string; children?: ReactN
       </h1>
       {children}
     </header>
+  );
+}
+
+// RailCard is a card with the offset shadow coloured by its state (ok, warn, stop),
+// rising in after the index-th before it; a held one is greyed until hovered.
+export function RailCard({ state, held, index, className, style, ...props }: ComponentProps<typeof Card> & { state: string; held?: boolean; index: number }) {
+  return (
+    <Card
+      data-state={state}
+      style={{ ...style, "--i": index } as CSSProperties}
+      className={cn("rail rise gap-0 py-0", held && "opacity-45 grayscale transition-opacity hover:opacity-80", className)}
+      {...props}
+    />
   );
 }
 

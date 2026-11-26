@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, FilterChip, Meta, Pill, Section, type Tone, useRefresh, Whose } from "@/components/app";
@@ -7,11 +7,14 @@ import { actor, day, stamp } from "@/lib/format";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/session";
+import { month, vendorName } from "@/lib/vendors";
 
 type Company = components["schemas"]["ResearchCompany"];
 type Criterion = components["schemas"]["Criterion"];
 type Run = components["schemas"]["Run"];
 type Agent = components["schemas"]["Agent"];
+type Person = Company["people"][number];
+type Enricher = components["schemas"]["Enricher"];
 
 const filters = [
   { key: "review", label: "To review" },
@@ -33,9 +36,8 @@ const empty: Record<Filter, [string, string]> = {
 
 export function ResearchPage() {
   const { org, sales } = useSession();
-  const [params, setParams] = useSearchParams();
-  const filter = (params.get("f") ?? "review") as Filter;
-  const task = Number(params.get("task") ?? 0) || undefined;
+  const { f: filter = "review", task } = useSearch({ from: "/o/$org/research" });
+  const navigate = useNavigate();
   const [cursor, setCursor] = useState<string | undefined>();
   // A cursor is a place in one list: another filter or search starts at its top.
   useEffect(() => setCursor(undefined), [filter, task]);
@@ -46,17 +48,11 @@ export function ResearchPage() {
   const settings = $api.useQuery("get", "/o/{org}/api/v1/settings", { params: { path: { org } } });
   const tasks = $api.useQuery("get", "/o/{org}/api/v1/tasks", { params: { path: { org }, query: { limit: 5 } } });
   const agents = $api.useQuery("get", "/o/{org}/api/v1/agents", { params: { path: { org } } });
+  const enrichers = $api.useQuery("get", "/o/{org}/api/v1/enrichers", { params: { path: { org } } }).data?.items ?? [];
   const ready = (agents.data?.items ?? []).filter((a) => a.ready);
   // The same query SearchPanel makes, so the search is read once; closed searches aren't in tasks.
   const chosen = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}", { params: { path: { org, id: task ?? 0 }, query: { limit: 3 } } }, { enabled: !!task }).data;
 
-  const link = (f: string, t?: number) => {
-    const q = new URLSearchParams();
-    if (f !== "review") q.set("f", f);
-    if (t) q.set("task", String(t));
-    const s = q.toString();
-    return s ? `?${s}` : ".";
-  };
 
   return (
     <>
@@ -66,11 +62,11 @@ export function ResearchPage() {
         </h1>
         <div className="flex flex-wrap gap-2">
           <ActionButton quiet size="sm" asChild>
-            <a href={`/o/${org}/agents`}>Connect an agent</a>
+            <Link to="/o/$org/agents" params={{ org }}>Connect an agent</Link>
           </ActionButton>
           {sales && (
             <ActionButton size="sm" asChild>
-              <a href={`/o/${org}/app/add`}>+ Add person</a>
+              <Link to="/o/$org/add" params={{ org }}>+ Add person</Link>
             </ActionButton>
           )}
         </div>
@@ -86,7 +82,7 @@ export function ResearchPage() {
       <div className="mb-5 flex flex-col gap-2" aria-label="Searches">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <Eyebrow>Searches</Eyebrow>
-          <Link to="/tasks" className="text-[13px] text-mark underline">
+          <Link to="/o/$org/tasks" params={{ org }} className="text-[13px] text-mark underline">
             Every search, closed ones too
           </Link>
         </div>
@@ -100,12 +96,12 @@ export function ResearchPage() {
         <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-3">
           <nav className="flex flex-wrap items-center gap-2" aria-label="Filter">
             {filters.map((f) => (
-              <FilterChip key={f.key} to={link(f.key, task)} label={f.label} count={research.data?.counts[f.key] ?? 0} on={f.key === filter} />
+              <FilterChip key={f.key} to="/o/$org/research" params={{ org }} search={{ f: f.key === "review" ? undefined : f.key, task }} label={f.label} count={research.data?.counts[f.key] ?? 0} on={f.key === filter} />
             ))}
             {task && (
               <span className="inline-flex items-center gap-1">
                 <Pill tone="agent">From “{chosen?.title ?? `search ${task}`}”</Pill>
-                <Link to={link(filter)} className="px-1 text-sm text-muted-foreground no-underline" aria-label="Show every search">
+                <Link to="/o/$org/research" params={{ org }} search={{ f: filter === "review" ? undefined : filter }} className="px-1 text-sm text-muted-foreground no-underline" aria-label="Show every search">
                   ×
                 </Link>
               </span>
@@ -122,7 +118,7 @@ export function ResearchPage() {
           )}
           {research.error && <p className="text-sm text-[var(--stop)]">The queue couldn't be read. Reload to try again.</p>}
           <div className="flex flex-col gap-3">
-            {research.data?.items.map((c, i) => <CompanyCard key={c.id} company={c} open={i === 0} />)}
+            {research.data?.items.map((c, i) => <CompanyCard key={c.id} company={c} open={i === 0} enrichers={enrichers} />)}
           </div>
           <nav className="flex justify-between gap-3">
             <span>
@@ -143,7 +139,7 @@ export function ResearchPage() {
         </div>
         {task && (
           <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
-            <SearchPanel id={task} onGone={() => setParams({})} />
+            <SearchPanel id={task} onGone={() => navigate({ to: "/o/$org/research", params: { org } })} />
           </aside>
         )}
       </div>
@@ -158,7 +154,7 @@ function FindBox({ agents, lookingFor }: { agents: Agent[]; lookingFor: componen
   const [picked, setPicked] = useState<number[] | null>(null);
   const send = picked ?? agents.slice(0, 1).map((a) => a.id);
   const create = $api.useMutation("post", "/o/{org}/api/v1/tasks", {
-    onSuccess: (t) => navigate(`?task=${t.id}`),
+    onSuccess: (t) => navigate({ to: "/o/$org/research", params: { org }, search: { task: t.id } }),
   });
 
   return (
@@ -188,9 +184,9 @@ function FindBox({ agents, lookingFor }: { agents: Agent[]; lookingFor: componen
             {agents.length === 0 ? (
               <span>
                 No agent of Prospector's own is ready, so this waits for one of yours.{" "}
-                <a href={`/o/${org}/agents`} className="text-mark underline">
+                <Link to="/o/$org/agents" params={{ org }} className="text-mark underline">
                   Set one up
-                </a>
+                </Link>
               </span>
             ) : (
               <>
@@ -230,9 +226,9 @@ function FindBox({ agents, lookingFor }: { agents: Agent[]; lookingFor: componen
           {lookingFor.length === 0
             ? "Agents look for what you write. Settings › What you look for adds what they check at every company. "
             : "Agents check each of these, from Settings › What you look for, and record what they find as a fact with its source. "}
-          <a href={`/o/${org}/settings`} className="text-mark underline">
+          <Link to="/o/$org/settings" params={{ org }} className="text-mark underline">
             Change them
-          </a>
+          </Link>
         </p>
       </div>
     </form>
@@ -269,7 +265,7 @@ function SearchStrip({ id, title, found, agents, chosen }: { id: number; title: 
       <span className="ml-auto flex flex-wrap gap-2">
         {!chosen && (
           <ActionButton quiet size="sm" asChild>
-            <Link to={`?task=${id}`}>Show these</Link>
+            <Link to="/o/$org/research" params={{ org }} search={{ task: id }}>Show these</Link>
           </ActionButton>
         )}
         {sales &&
@@ -343,7 +339,7 @@ function SearchPanel({ id, onGone }: { id: number; onGone: () => void }) {
           ))}
         </div>
       )}
-      <Link to={`/tasks/${id}`} className="text-[13px] text-mark underline">
+      <Link to="/o/$org/tasks/$id" params={{ org, id }} className="text-[13px] text-mark underline">
         Every request, note and run
       </Link>
       {sales && t && t.status !== "closed" && (
@@ -431,7 +427,7 @@ function SourceLink({ href, children }: { href: string; children: React.ReactNod
   );
 }
 
-function CompanyCard({ company: c, open }: { company: Company; open: boolean }) {
+function CompanyCard({ company: c, open, enrichers }: { company: Company; open: boolean; enrichers: Enricher[] }) {
   const { org, sales } = useSession();
   const refresh = useRefresh();
   const [grade, setGrade] = useState(c.grade || "B");
@@ -443,7 +439,7 @@ function CompanyCard({ company: c, open }: { company: Company; open: boolean }) 
     <article className="panel">
       <div className="flex flex-wrap items-start gap-x-6 gap-y-3 px-5 py-4">
         <div className="min-w-[200px] flex-[2_1_220px]">
-          <Link to={`/companies/${c.id}`} className="font-heading text-lg font-semibold text-foreground hover:text-mark">
+          <Link to="/o/$org/companies/$id" params={{ org, id: c.id }} className="font-heading text-lg font-semibold text-foreground hover:text-mark">
             {c.name}
           </Link>
           <p className="font-mono text-xs text-muted-foreground">{[c.country, c.segment, c.domain].filter(Boolean).join(" · ")}</p>
@@ -520,7 +516,7 @@ function CompanyCard({ company: c, open }: { company: Company; open: boolean }) 
             {c.people.length === 0 && (
               <p className="py-2 text-sm text-muted-foreground">
                 None yet.{" "}
-                {sales && <a href={`/o/${org}/app/add?company=${encodeURIComponent(c.name)}`}>Add someone</a>}
+                {sales && <Link to="/o/$org/add" params={{ org }} search={{ company: c.name }}>Add someone</Link>}
               </p>
             )}
             {c.people.map((p) => (
@@ -547,8 +543,14 @@ function CompanyCard({ company: c, open }: { company: Company; open: boolean }) 
                   <div key={d.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-card px-3 py-2">
                     <span className="font-mono text-xs text-muted-foreground">{d.field}</span>
                     <span>{d.value}</span>
+                    {d.vendor && <Pill>found by {vendorName(d.vendor)}</Pill>}
                     {d.current && <Meta>now {d.current}</Meta>}
                     {d.source_url && <SourceLink href={d.source_url}>source ↗</SourceLink>}
+                    {d.vendor && d.email_status && (
+                      <Meta className="w-full">
+                        {d.email_status === "verified" ? `${vendorName(d.vendor)} checked it: valid` : `${vendorName(d.vendor)} couldn't confirm it: a guess`}
+                      </Meta>
+                    )}
                     {sales && (
                       <span className="ml-auto flex gap-2">
                         <ActionButton size="xs" onClick={() => decide.mutate({ params: { path: { org, id: d.id } }, body: { decision: "accepted" } })}>
@@ -561,11 +563,59 @@ function CompanyCard({ company: c, open }: { company: Company; open: boolean }) 
                     )}
                   </div>
                 ))}
+                <EmailLookup person={p} enrichers={enrichers} />
               </div>
             ))}
           </div>
         </div>
       </details>
     </article>
+  );
+}
+
+const notFound: Record<components["schemas"]["Lookup"]["outcome"], string> = {
+  found: "",
+  none: "found no email",
+  not_kept: "found an email that can't be kept",
+};
+
+// EmailLookup asks the organisation's vendors for an email nobody has found, and says
+// when one that found nothing can be asked again.
+function EmailLookup({ person: p, enrichers }: { person: Person; enrichers: Enricher[] }) {
+  const { org, sales } = useSession();
+  const refresh = useRefresh();
+  const ask = $api.useMutation("post", "/o/{org}/api/v1/contacts/{id}/enrich", { onSuccess: refresh });
+  const asked = p.lookups.filter((l) => l.field === "email");
+  const misses = asked.filter((l) => l.outcome !== "found");
+  if (p.has_email || p.pending.some((d) => d.field === "email")) return null;
+  const next = enrichers.find(
+    (e) => e.fields.includes("email") && e.has_key && e.used_this_month < e.monthly_limit && !asked.some((l) => l.vendor === e.kind),
+  );
+  const answer = ask.data?.results.find((r) => r.outcome === "failed" || r.outcome === "skipped");
+  return (
+    <>
+      {misses.map((l) => (
+        <Meta key={l.vendor}>
+          {vendorName(l.vendor)} {notFound[l.outcome]} on {day(l.at)} · it can be asked again from {day(l.again_at)}
+        </Meta>
+      ))}
+      {sales && next && (
+        <div className="flex flex-wrap items-center gap-2">
+          <ActionButton
+            quiet
+            size="xs"
+            disabled={ask.isPending}
+            onClick={() => ask.mutate({ params: { path: { org, id: p.id } }, body: { fields: ["email"] } })}
+          >
+            Look up email
+          </ActionButton>
+          <Meta>
+            asks {vendorName(next.kind)} · {next.monthly_limit - next.used_this_month} of {next.monthly_limit} left in {month()}
+          </Meta>
+        </div>
+      )}
+      {answer?.detail && <Meta className="text-[var(--stop)]">{answer.detail}</Meta>}
+      <Failed errors={[ask.error]} />
+    </>
   );
 }

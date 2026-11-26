@@ -357,8 +357,7 @@ func (a *App) ssoPage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	http.SetCookie(w, &http.Cookie{Name: askedCookie, Value: "1", Path: "/login/sso", MaxAge: 600, HttpOnly: true,
-		Secure: a.secure(r), SameSite: http.SameSiteStrictMode})
+	http.SetCookie(w, a.askedCookie(r))
 	w.Header().Set("content-type", "text/html; charset=utf-8")
 	if err := SSOPage(v).Render(r.Context(), w); err != nil {
 		log.Print(err)
@@ -370,6 +369,11 @@ func (a *App) ssoPage(w http.ResponseWriter, r *http.Request) {
 // can be walked through a provider of somebody else's choosing, and into the account
 // it names, by a link alone.
 const askedCookie = "sso-asked"
+
+func (a *App) askedCookie(r *http.Request) *http.Cookie {
+	return &http.Cookie{Name: askedCookie, Value: "1", Path: "/login/sso", MaxAge: 600, HttpOnly: true,
+		Secure: a.secure(r), SameSite: http.SameSiteStrictMode}
+}
 
 func ssoStartURL(org *Org, email, next string) string {
 	return "/login/sso/start?" + url.Values{"org": {org.Slug}, "email": {email}, "next": {next}}.Encode()
@@ -579,40 +583,45 @@ func checkIssuer(raw string) error {
 	return nil
 }
 
+type ssoIn struct {
+	Issuer   string `json:"issuer"`
+	ClientID string `json:"client_id"`
+	Secret   string `json:"client_secret"`
+	Required bool   `json:"required"`
+	AutoJoin bool   `json:"auto_join"`
+}
+
 func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Issuer   string `json:"issuer"`
-		ClientID string `json:"client_id"`
-		Secret   string `json:"client_secret"`
-		Required bool   `json:"required"`
-		AutoJoin bool   `json:"auto_join"`
-	}
+	var in ssoIn
 	if !decode(w, r, &in) {
 		return
 	}
-	q := reqOf(r)
+	if err := a.saveSSO(r.Context(), reqOf(r), in); err != nil {
+		fail(w, err, http.StatusBadRequest)
+		return
+	}
+	done(w, nil)
+}
+
+func (a *App) saveSSO(ctx context.Context, q *Req, in ssoIn) error {
 	sso, err := a.s.SSO(q.Org.ID)
 	if err != nil {
-		fail(w, err, http.StatusInternalServerError)
-		return
+		return err
 	}
 	c := SSOConnection{OrgID: q.Org.ID, Issuer: strings.TrimSpace(in.Issuer), ClientID: strings.TrimSpace(in.ClientID),
 		Required: in.Required, AutoJoin: in.AutoJoin}
 	if c.Issuer == "" {
-		done(w, a.s.SaveSSO(&SSOConnection{OrgID: q.Org.ID}, q.Actor()))
-		return
+		return a.s.SaveSSO(&SSOConnection{OrgID: q.Org.ID}, q.Actor())
 	}
 	secret := strings.TrimSpace(in.Secret)
 	switch {
 	case secret != "" && a.s.keys == nil:
-		fail(w, fmt.Errorf("a client secret is kept sealed, and %w", errNoKeys), http.StatusBadRequest)
-		return
+		return fmt.Errorf("a client secret is kept sealed, and %w", errNoKeys)
 	case secret != "":
 		// Sealed here, where it is known to have been typed: one that happens to look
 		// sealed already would otherwise be stored as it came.
 		if c.ClientSecret, err = a.s.keys.seal(secret); err != nil {
-			fail(w, err, http.StatusInternalServerError)
-			return
+			return err
 		}
 	// The kept secret belongs to the provider and client it was typed for, and goes to
 	// no other. It stays as stored and unopened, so the rest can be changed on a server
@@ -621,8 +630,7 @@ func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
 		c.ClientSecret = sso.ClientSecret
 		// But nobody is made to depend on a sign-in that can't work.
 		if _, oerr := a.s.keys.open(c.ClientSecret); oerr != nil && ((c.Required && !sso.Required) || (c.AutoJoin && !sso.AutoJoin)) {
-			fail(w, errors.New("this server can't open the kept client secret, so single sign-on isn't working here: type the secret again before requiring it or letting people join"), http.StatusBadRequest)
-			return
+			return errors.New("this server can't open the kept client secret, so single sign-on isn't working here: type the secret again before requiring it or letting people join")
 		}
 	}
 	verified := false
@@ -642,72 +650,77 @@ func (a *App) uiSSO(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		// Reading the provider now catches a mistyped issuer before anyone is sent to it.
 		// Discovery sends no secret.
-		if _, derr := a.probe(r.Context(), idpSpec{Issuer: c.Issuer, ClientID: c.ClientID}); errors.Is(derr, errManyTenants) {
+		if _, derr := a.probe(ctx, idpSpec{Issuer: c.Issuer, ClientID: c.ClientID}); errors.Is(derr, errManyTenants) {
 			err = derr
 		} else if derr != nil {
 			err = elsewhere{fmt.Errorf("that issuer couldn't be read, so nothing was saved: %w", derr)}
 		}
 	}
 	if err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
+		return err
 	}
-	done(w, a.s.SaveSSO(&c, q.Actor()))
+	return a.s.SaveSSO(&c, q.Actor())
+}
+
+type domainIn struct {
+	Domain string `json:"domain"`
 }
 
 func (a *App) uiSSODomain(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Domain string `json:"domain"`
-	}
+	var in domainIn
 	if !decode(w, r, &in) {
 		return
 	}
-	q := reqOf(r)
-	domain := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(in.Domain)), "@")
-	if !domainRe.MatchString(domain) {
-		fail(w, fmt.Errorf("a domain looks like example.com, not %q", in.Domain), http.StatusBadRequest)
-		return
-	}
-	var n int64
-	logged(a.s.in(q.Org.ID).Model(&SSODomain{}).Count(&n))
-	if n >= maxSSODomains {
-		fail(w, fmt.Errorf("an organisation can have %d domains", maxSSODomains), http.StatusBadRequest)
-		return
-	}
-	if err := a.s.db.Create(&SSODomain{OrgID: q.Org.ID, Domain: domain, Token: randomToken(20)}).Error; err != nil {
-		if breaksRule(err) {
-			err = conflict(domain + " is already listed")
-		}
-		fail(w, err, http.StatusInternalServerError)
+	if _, err := a.addSSODomain(reqOf(r).Org.ID, in.Domain); err != nil {
+		fail(w, err, http.StatusBadRequest)
 		return
 	}
 	done(w, nil)
 }
 
-func (a *App) uiSSODomainRemove(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Domain string `json:"domain"`
+func (a *App) addSSODomain(org int64, raw string) (*SSODomain, error) {
+	domain := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(raw)), "@")
+	if !domainRe.MatchString(domain) {
+		return nil, fmt.Errorf("a domain looks like example.com, not %q", raw)
 	}
+	var n int64
+	logged(a.s.in(org).Model(&SSODomain{}).Count(&n))
+	if n >= maxSSODomains {
+		return nil, fmt.Errorf("an organisation can have %d domains", maxSSODomains)
+	}
+	d := &SSODomain{OrgID: org, Domain: domain, Token: randomToken(20)}
+	if err := a.s.db.Create(d).Error; err != nil {
+		if breaksRule(err) {
+			err = conflict(domain + " is already listed")
+		}
+		return nil, err
+	}
+	return d, nil
+}
+
+func (a *App) uiSSODomainRemove(w http.ResponseWriter, r *http.Request) {
+	var in domainIn
 	if !decode(w, r, &in) {
 		return
 	}
-	q := reqOf(r)
-	sso, err := a.s.SSO(q.Org.ID)
+	done(w, a.removeSSODomain(reqOf(r).Org.ID, in.Domain))
+}
+
+func (a *App) removeSSODomain(org int64, domain string) error {
+	sso, err := a.s.SSO(org)
 	if err != nil {
-		fail(w, err, http.StatusInternalServerError)
-		return
+		return err
 	}
 	others := 0
 	for _, d := range sso.Domains {
-		if d.VerifiedAt != nil && d.Domain != in.Domain {
+		if d.VerifiedAt != nil && d.Domain != domain {
 			others++
 		}
 	}
 	if others == 0 && (sso.Required || sso.AutoJoin) {
-		fail(w, errors.New("that is the last verified domain: stop requiring single sign-on and letting people join first"), http.StatusBadRequest)
-		return
+		return errors.New("that is the last verified domain: stop requiring single sign-on and letting people join first")
 	}
-	done(w, a.s.in(q.Org.ID).Where("domain = ?", in.Domain).Delete(&SSODomain{}).Error)
+	return a.s.in(org).Where("domain = ?", domain).Delete(&SSODomain{}).Error
 }
 
 func (a *App) lookupTXT(ctx context.Context, name string) ([]string, error) {
@@ -720,27 +733,34 @@ func (a *App) lookupTXT(ctx context.Context, name string) ([]string, error) {
 }
 
 func (a *App) uiSSOVerify(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Domain string `json:"domain"`
-	}
+	var in domainIn
 	if !decode(w, r, &in) {
 		return
 	}
-	q := reqOf(r)
+	_, err := a.verifySSODomain(r.Context(), reqOf(r).Org.ID, in.Domain)
+	done(w, err)
+}
+
+func (a *App) verifySSODomain(ctx context.Context, org int64, domain string) (*SSODomain, error) {
 	var d SSODomain
-	if err := a.s.in(q.Org.ID).Where("domain = ?", in.Domain).First(&d).Error; err != nil {
-		fail(w, errors.New("that domain isn't listed"), http.StatusBadRequest)
-		return
+	if err := a.s.in(org).Where("domain = ?", domain).First(&d).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		return nil, errors.New("that domain isn't listed")
 	}
-	records, _ := a.lookupTXT(r.Context(), d.Record())
+	records, _ := a.lookupTXT(ctx, d.Record())
 	for _, record := range records {
 		if strings.TrimSpace(record) == d.Token {
 			now := time.Now()
-			done(w, a.s.db.Model(&d).Update("verified_at", &now).Error)
-			return
+			if err := a.s.db.Model(&d).Update("verified_at", &now).Error; err != nil {
+				return nil, err
+			}
+			d.VerifiedAt = &now
+			return &d, nil
 		}
 	}
-	fail(w, fmt.Errorf("no TXT record at %s holds the value yet: DNS changes can take a while to show", d.Record()), http.StatusBadRequest)
+	return nil, fmt.Errorf("no TXT record at %s holds the value yet: DNS changes can take a while to show", d.Record())
 }
 
 // agentCommand sets up an organisation's agents from the shell. A key comes from the

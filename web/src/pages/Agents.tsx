@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { type FormEvent, type ReactNode, useState } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
@@ -6,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { actor, plural, stamp } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { month, vendorKinds, vendorName } from "@/lib/vendors";
 import { useSession } from "@/session";
 
 type Agent = components["schemas"]["Agent"];
@@ -13,6 +15,7 @@ type Key = components["schemas"]["APIKey"];
 type Connect = components["schemas"]["Connect"];
 type Scope = components["schemas"]["Scope"];
 type Rail = components["schemas"]["AgentState"]["rail"];
+type Enricher = components["schemas"]["Enricher"];
 
 const fieldClass = "h-10 rounded-lg border border-input bg-muted px-3 text-sm disabled:opacity-60";
 const cardClass = "rail rounded-[14px] border-2 border-ink bg-card";
@@ -41,6 +44,7 @@ export function AgentsPage() {
       <div className="flex flex-wrap items-start gap-5">
         <div className="flex min-w-0 flex-[3_1_560px] flex-col gap-5">
           {agents.data && keys.data && connect.data && <Roster agents={agents.data.items} keys={keys.data.items} connect={connect.data} />}
+          <DataVendors />
         </div>
         <div className="flex min-w-0 flex-[2_1_340px] flex-col gap-5">
           <Scores />
@@ -626,9 +630,9 @@ function Work() {
             {r.tasks.map((t) => (
               <span key={t.id}>
                 {" "}
-                <a href={`/o/${org}/tasks/${t.id}`} className="font-mono text-xs text-mark underline">
+                <Link to="/o/$org/tasks/$id" params={{ org, id: t.id }} className="font-mono text-xs text-mark underline">
                   {t.title}
-                </a>
+                </Link>
               </span>
             ))}
             <span className="block text-muted-foreground">{r.text}</span>
@@ -701,5 +705,238 @@ function Activity() {
         </nav>
       )}
     </Section>
+  );
+}
+
+// The first day of next month, UTC, when a vendor's lookups start again.
+function nextMonth(now = new Date()) {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+}
+
+function vendorState(e: Enricher): [Rail, string] {
+  if (!e.has_key) return ["stop", "no key saved: it isn't asked"];
+  if (e.monthly_limit === 0) return ["warn", "key saved · a limit of 0: it isn't asked"];
+  if (e.used_this_month >= e.monthly_limit) return ["warn", `key saved · all ${e.monthly_limit} used in ${month()}: skipped until ${nextMonth()}`];
+  return ["ok", `key saved · ${e.used_this_month} of ${plural(e.monthly_limit, "lookup")} used in ${month()} (UTC)`];
+}
+
+// DataVendors are the enrichment vendors asked, top first, for what research can't find.
+function DataVendors() {
+  const { org, owner } = useSession();
+  const refresh = useRefresh();
+  const list = $api.useQuery("get", "/o/{org}/api/v1/enrichers", { params: { path: { org } } });
+  const save = $api.useMutation("put", "/o/{org}/api/v1/enrichers");
+  const vendors = list.data?.items ?? [];
+  const [moving, setMoving] = useState(false);
+
+  // Every vendor is saved at its new place, so equal positions can't leave the order unchanged.
+  const move = async (from: number, to: number) => {
+    const order = [...vendors];
+    order.splice(to, 0, ...order.splice(from, 1));
+    setMoving(true);
+    try {
+      for (const [i, e] of order.entries()) {
+        if (e.position !== i) {
+          await save.mutateAsync({ params: { path: { org } }, body: { kind: e.kind, api_key: "", position: i, monthly_limit: e.monthly_limit } });
+        }
+      }
+    } finally {
+      setMoving(false);
+      refresh();
+    }
+  };
+
+  return (
+    <Section
+      title="Data vendors"
+      hint="When research can't find someone's email, you, and agents whose key has enrich:spend, can ask these, top first, on your own account with each. What they find waits in Research for a person to accept."
+    >
+      <div className="flex flex-col gap-4">
+        {list.data && vendors.length === 0 && <p className="text-sm text-muted-foreground">No vendors yet.</p>}
+        {vendors.map((e, i) => (
+          <VendorCard
+            key={e.id}
+            vendor={e}
+            n={i + 1}
+            up={owner && i > 0 && !moving ? () => move(i, i - 1) : undefined}
+            down={owner && i < vendors.length - 1 && !moving ? () => move(i, i + 1) : undefined}
+          />
+        ))}
+        {owner && <AddVendor vendors={vendors} />}
+      </div>
+      <Failed errors={[list.error, save.error]} />
+      {!owner && <Meta>Only an owner adds, changes or removes a vendor.</Meta>}
+      <p className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground">
+        <span>
+          <Tag quiet>POST contacts/{"{id}"}/enrich</Tag> asks
+        </span>
+        <span>
+          <Tag quiet>enrich_contact</Tag> for agents
+        </span>
+      </p>
+    </Section>
+  );
+}
+
+function VendorCard({ vendor: e, n, up, down }: { vendor: Enricher; n: number; up?: () => void; down?: () => void }) {
+  const { org, owner } = useSession();
+  const refresh = useRefresh();
+  const [rail, line] = vendorState(e);
+  const [key, setKey] = useState("");
+  const [limit, setLimit] = useState(String(e.monthly_limit));
+  const save = $api.useMutation("put", "/o/{org}/api/v1/enrichers", {
+    onSuccess: () => {
+      setKey("");
+      refresh();
+    },
+  });
+  const remove = $api.useMutation("delete", "/o/{org}/api/v1/enrichers/{id}", { onSuccess: refresh });
+  const used = e.monthly_limit > 0 ? Math.min(100, (e.used_this_month / e.monthly_limit) * 100) : 100;
+  const submit = (ev: FormEvent) => {
+    ev.preventDefault();
+    save.mutate({ params: { path: { org } }, body: { kind: e.kind, api_key: key, position: e.position, monthly_limit: Number(limit) } });
+  };
+  const button = (go: () => void) => (ev: React.MouseEvent) => {
+    ev.preventDefault();
+    go();
+  };
+
+  return (
+    <details className={cardClass} data-state={rail}>
+      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        <span className="flex flex-wrap items-start justify-between gap-3 px-4 pt-4 pb-3">
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="flex flex-wrap items-center gap-2 font-heading text-[17px] font-bold">
+              <span className="font-mono text-xs font-normal text-muted-foreground">{n}</span>
+              {vendorName(e.kind)}
+              {e.fields.map((f) => (
+                <Tag key={f} quiet>
+                  finds {f}
+                </Tag>
+              ))}
+            </span>
+            <span className={cn("font-mono text-xs", stateText[rail])}>{line}</span>
+          </span>
+          <span className="flex items-center gap-2">
+            {up && (
+              <ActionButton quiet size="xs" aria-label={`Ask ${vendorName(e.kind)} sooner`} onClick={button(up)}>
+                ↑
+              </ActionButton>
+            )}
+            {down && (
+              <ActionButton quiet size="xs" aria-label={`Ask ${vendorName(e.kind)} later`} onClick={button(down)}>
+                ↓
+              </ActionButton>
+            )}
+            <span className="rounded-lg border-[1.5px] border-ink bg-card px-2.5 py-1 text-xs font-semibold">{owner ? "Change" : "Details"}</span>
+          </span>
+        </span>
+        <span className="block px-4 pb-3">
+          <span className="block overflow-hidden rounded-full bg-secondary" style={{ height: 6 }}>
+            <span className={cn("block rounded-full", fill[rail])} style={{ width: `${used}%`, height: "100%" }} />
+          </span>
+        </span>
+      </summary>
+      <div className="flex flex-col gap-3 rounded-b-[12px] border-t-2 border-ink bg-muted px-4 py-4">
+        {owner ? (
+          <form className="flex flex-col gap-3" onSubmit={submit}>
+            <label className="flex flex-col gap-1.5">
+              <Eyebrow>API key</Eyebrow>
+              <Input
+                type="password"
+                autoComplete="off"
+                value={key}
+                onChange={(ev) => setKey(ev.target.value)}
+                placeholder={e.has_key ? "saved: leave empty to keep it" : "the key from your account with them"}
+                className={fieldClass}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <Eyebrow>Lookups a month, at most</Eyebrow>
+              <Input type="number" min={0} max={100000} required value={limit} onChange={(ev) => setLimit(ev.target.value)} className={cn(fieldClass, "w-24")} />
+              <span className="text-xs text-muted-foreground">0 stops it being asked.</span>
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <ActionButton size="sm" type="submit" disabled={save.isPending}>
+                Save
+              </ActionButton>
+              <ActionButton quiet size="sm" type="button" disabled={remove.isPending} onClick={() => remove.mutate({ params: { path: { org, id: e.id } } })}>
+                Remove {vendorName(e.kind)}
+              </ActionButton>
+              {save.isSuccess && <span className="text-sm text-[var(--ok)]">Saved.</span>}
+            </div>
+            <Failed errors={[save.error, remove.error]} />
+          </form>
+        ) : (
+          <Meta>
+            Asked at most {plural(e.monthly_limit, "time")} a month. Changed by {actor(e.updated_by)}, {stamp(e.updated_at)}.
+          </Meta>
+        )}
+        <p className="text-xs text-muted-foreground">
+          {vendorName(e.kind)} is told each person's name and their company's domain. You are bound by its terms for what it returns, and it may keep
+          what it finds in your account with it.
+        </p>
+      </div>
+    </details>
+  );
+}
+
+function AddVendor({ vendors }: { vendors: Enricher[] }) {
+  const { org } = useSession();
+  const refresh = useRefresh();
+  const free = vendorKinds.filter((k) => !vendors.some((e) => e.kind === k));
+  const [kind, setKind] = useState("");
+  const [key, setKey] = useState("");
+  const [limit, setLimit] = useState("100");
+  const add = $api.useMutation("put", "/o/{org}/api/v1/enrichers", {
+    onSuccess: () => {
+      setKind("");
+      setKey("");
+      refresh();
+    },
+  });
+  const chosen = free.find((k) => k === kind);
+  return (
+    <form
+      className="flex flex-col gap-3 rounded-[14px] border-2 border-dashed border-input p-4"
+      onSubmit={(ev) => {
+        ev.preventDefault();
+        if (!chosen) return;
+        const position = vendors.reduce((most, e) => Math.max(most, e.position + 1), 0);
+        add.mutate({ params: { path: { org } }, body: { kind: chosen, api_key: key, position, monthly_limit: Number(limit) } });
+      }}
+    >
+      <span className="font-heading text-[15px] font-semibold">Add a vendor</span>
+      {free.length === 0 ? (
+        <Meta>Every vendor Prospector can ask is added.</Meta>
+      ) : (
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1.5">
+            <Eyebrow>Vendor</Eyebrow>
+            <select required value={kind} onChange={(ev) => setKind(ev.target.value)} className={fieldClass}>
+              <option value="">Choose…</option>
+              {free.map((k) => (
+                <option key={k} value={k}>
+                  {vendorName(k)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex min-w-[200px] flex-1 flex-col gap-1.5">
+            <Eyebrow>API key</Eyebrow>
+            <Input type="password" autoComplete="off" required value={key} onChange={(ev) => setKey(ev.target.value)} className={fieldClass} />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <Eyebrow>Lookups a month</Eyebrow>
+            <Input type="number" min={0} max={100000} required value={limit} onChange={(ev) => setLimit(ev.target.value)} className={cn(fieldClass, "w-24")} />
+          </label>
+          <ActionButton size="sm" type="submit" disabled={add.isPending}>
+            Add
+          </ActionButton>
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">Keys are sealed under the server's key and never shown again. A new vendor goes to the bottom of the list.</p>
+      <Failed errors={[add.error]} />
+    </form>
   );
 }

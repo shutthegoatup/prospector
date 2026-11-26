@@ -26,5 +26,5 @@ func (s apiServer) DraftPerson(ctx context.Context, in api.DraftPersonRequestObj
 	}
 	site, _ := ctx.Value(siteKey{}).(string)
 	return api.DraftPerson200JSONResponse{Linkedin: strings.SplitN(p.Url, "?", 2)[0], Name: name, Title: role, Company: company,
-		Bookmarklet: bookmarklet(site, reqFrom(ctx), "app/add")}, nil
+		Bookmarklet: bookmarklet(site, reqFrom(ctx), "add")}, nil
 }

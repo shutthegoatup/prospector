@@ -182,6 +182,7 @@ type ResearchRow struct {
 	Facts      []Fact
 	People     []Contact
 	Pending    map[int64][]PendingDetail
+	Lookups    map[int64][]Lookup
 	Incomplete bool
 }
 
@@ -244,7 +245,7 @@ func (s *Store) researchRows(org int64, companies []Company) ([]ResearchRow, err
 	at := map[int64]int{}
 	ids := make([]int64, len(companies))
 	for i, c := range companies {
-		rows[i].Company, rows[i].Pending = c, map[int64][]PendingDetail{}
+		rows[i].Company, rows[i].Pending, rows[i].Lookups = c, map[int64][]PendingDetail{}, map[int64][]Lookup{}
 		at[c.ID], ids[i] = i, c.ID
 	}
 	var facts []Fact
@@ -259,6 +260,14 @@ func (s *Store) researchRows(org int64, companies []Company) ([]ResearchRow, err
 	if err != nil {
 		return nil, err
 	}
+	personIDs := make([]int64, len(people))
+	for i, p := range people {
+		personIDs[i] = p.ID
+	}
+	looked, err := s.lookups(org, personIDs)
+	if err != nil {
+		return nil, err
+	}
 	for _, f := range facts {
 		r := &rows[at[f.CompanyID]]
 		r.Facts = append(r.Facts, f)
@@ -268,6 +277,9 @@ func (s *Store) researchRows(org int64, companies []Company) ([]ResearchRow, err
 		r.People = append(r.People, p)
 		if waiting := pending[p.ID]; len(waiting) > 0 {
 			r.Pending[p.ID] = waiting
+		}
+		if l := looked[p.ID]; len(l) > 0 {
+			r.Lookups[p.ID] = l
 		}
 	}
 	return rows, nil
@@ -472,14 +484,29 @@ func (s *Store) PickContact(org int64, o *Org, id int64, actor string) error {
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
 			return missing(err, "no contact %d", id)
 		}
+		template := o.Settings.withDefaults().NoteTemplate
+		var offering *Offering
+		if c.OfferingID != 0 {
+			var err error
+			if offering, err = heldOffering(tx, org, c.OfferingID); err != nil {
+				return err
+			}
+			if offering.NoteTemplate != "" {
+				template = offering.NoteTemplate
+			}
+		}
 		updates := map[string]any{"status": ""}
 		if deref(c.Note) == "" {
-			updates["note"] = fill(o.Settings.withDefaults().NoteTemplate, deref(c.First), companyName(deref(c.Maker)), o.Name)
+			updates["note"] = fill(template, deref(c.First), companyName(deref(c.Maker)), o.Name)
 		}
 		if err := tx.Model(&c).Updates(updates).Error; err != nil {
 			return err
 		}
-		if c.CompanyID != nil {
+		if c.CompanyID != nil && offering != nil {
+			if err := qualifyFor(tx, org, offering, *c.CompanyID, actor); err != nil {
+				return err
+			}
+		} else if c.CompanyID != nil {
 			res := tx.Model(&Company{}).Where("org_id = ? and id = ? and stage = ?", org, *c.CompanyID, CompanyReview).Update("stage", CompanyQualified)
 			if res.Error != nil {
 				return res.Error

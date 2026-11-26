@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"log"
 	"net/http"
@@ -94,39 +95,16 @@ type TodayData struct {
 func (a *App) today(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	now := time.Now()
-	cards, counts := Today(a.dueByStep(q, now), q.Voice(), now, a.s.noMailDomains())
-	d := TodayData{Filter: r.URL.Query().Get("step"), Counts: counts, Total: len(cards),
-		Review: a.s.ResearchCount(q.Org.ID, "review"), Week: a.s.Week(q.Org.ID, now), Now: now.Format("Mon 2 Jan · 15:04")}
-	others, err := a.s.OtherDeals(q.Org.ID)
+	voice, err := a.todayVoice(q)
 	if err != nil {
 		fail(w, err, http.StatusInternalServerError)
 		return
 	}
-	for _, list := range others {
-		for _, o := range list {
-			if o.needsNextStep(now.Format("2006-01-02")) {
-				d.Deals++
-			}
-		}
-	}
-	subs, err := a.s.Subscriptions(q.Org.ID, 0, now.Format(dayLayout))
-	if err != nil {
+	cards, counts := Today(a.dueByStep(q, now), voice, now, a.s.noMailDomains())
+	d := TodayData{Filter: r.URL.Query().Get("step"), Counts: counts, Total: len(cards), Now: now.Format("Mon 2 Jan · 15:04")}
+	if err := a.todayElsewhere(q.Org.ID, now, &d); err != nil {
 		fail(w, err, http.StatusInternalServerError)
 		return
-	}
-	d.Enquiries = a.s.EnquiryCounts(q.Org.ID)["state:"+EnquiryOpen]
-	onboard, err := a.s.Onboardings(q.Org.ID, 0, now.Format(dayLayout))
-	if err != nil {
-		fail(w, err, http.StatusInternalServerError)
-		return
-	}
-	for _, ob := range onboard {
-		d.Steps += ob.Late + ob.DueToday
-	}
-	for _, sub := range subs {
-		if sub.Soon(now.Format(dayLayout)) {
-			d.Subs++
-		}
 	}
 	for _, c := range cards {
 		if c.Step == "call" && c.State != "ok" {
@@ -148,6 +126,40 @@ func (a *App) today(w http.ResponseWriter, r *http.Request) {
 		d.Cards[i].AgentMarks = marks[d.Cards[i].ID]
 	}
 	a.page(w, r, "today", TodayView(q, d))
+}
+
+// todayElsewhere is the work Today points to on other pages, and the last seven days.
+func (a *App) todayElsewhere(org int64, now time.Time, d *TodayData) error {
+	d.Review, d.Week = a.s.ResearchCount(org, "review"), a.s.Week(org, now)
+	others, err := a.s.OtherDeals(org)
+	if err != nil {
+		return err
+	}
+	for _, list := range others {
+		for _, o := range list {
+			if o.needsNextStep(now.Format("2006-01-02")) {
+				d.Deals++
+			}
+		}
+	}
+	subs, err := a.s.Subscriptions(org, 0, now.Format(dayLayout))
+	if err != nil {
+		return err
+	}
+	d.Enquiries = a.s.EnquiryCounts(org)["state:"+EnquiryOpen]
+	onboard, err := a.s.Onboardings(org, 0, now.Format(dayLayout))
+	if err != nil {
+		return err
+	}
+	for _, ob := range onboard {
+		d.Steps += ob.Late + ob.DueToday
+	}
+	for _, sub := range subs {
+		if sub.Soon(now.Format(dayLayout)) {
+			d.Subs++
+		}
+	}
+	return nil
 }
 
 // ResearchData is the Research page: the searches agents are on, the queue they fill,
@@ -566,18 +578,30 @@ func (a *App) uiVoice(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Email string `json:"email"`
-		Name  string `json:"name"`
-		Role  string `json:"role"`
-	}
+	var in memberIn
 	if !decode(w, r, &in) {
 		return
 	}
+	msg, err := a.addMember(r.Context(), reqOf(r), in)
+	if err != nil {
+		fail(w, err, http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]string{"message": msg})
+}
+
+type memberIn struct {
+	Email string `json:"email"`
+	Name  string `json:"name"`
+	Role  string `json:"role"`
+}
+
+// addMember puts someone on the team, making them an account if they have none, and
+// says how they get in.
+func (a *App) addMember(ctx context.Context, q *Req, in memberIn) (string, error) {
 	if in.Role != "owner" && in.Role != "member" {
 		in.Role = "member"
 	}
-	q := reqOf(r)
 	u, err := a.s.UserByEmail(in.Email)
 	password := ""
 	if err != nil {
@@ -588,16 +612,14 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 		err = a.s.AddMember(q.Org.ID, u.ID, in.Role, u.Name)
 	}
 	if err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
+		return "", err
 	}
 	msg := u.Email + " added to " + q.Org.Name + "."
 	// Someone who never chose a password is sent the link again, so a lost one isn't the end.
 	if password != "" || u.MustChangePassword {
-		sent, err := a.invite(r.Context(), q, u, password != "")
+		sent, err := a.invite(ctx, q, u, password != "")
 		if sent {
-			writeJSON(w, map[string]string{"message": msg + " They've been emailed a link to choose their password; it lasts 7 days."})
-			return
+			return msg + " They've been emailed a link to choose their password; it lasts 7 days.", nil
 		}
 		if errors.Is(err, errTooSoon) {
 			msg += " They were emailed a link to choose their password a moment ago, so no other was sent."
@@ -610,7 +632,7 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 	if password != "" {
 		msg += " Their first password, shown once: " + password + " (they choose their own when they first sign in)"
 	}
-	writeJSON(w, map[string]string{"message": msg})
+	return msg, nil
 }
 
 func (a *App) uiRemoveMember(w http.ResponseWriter, r *http.Request) {

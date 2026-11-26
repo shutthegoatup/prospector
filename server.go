@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/a-h/templ"
+	"github.com/shutthegoatup/prospector/api"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -213,32 +214,39 @@ func (a *App) sessionUser(r *http.Request) *User {
 }
 
 func (a *App) setSession(w http.ResponseWriter, r *http.Request, token string) {
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: token, Path: "/", HttpOnly: true, Secure: a.secure(r),
-		SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(sessionLife)})
+	http.SetCookie(w, a.sessionCookie(r, token))
+}
+
+func (a *App) sessionCookie(r *http.Request, token string) *http.Cookie {
+	return &http.Cookie{Name: sessionCookie, Value: token, Path: "/", HttpOnly: true, Secure: a.secure(r),
+		SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(sessionLife)}
 }
 
 // member resolves the signed-in user and, for /o/{org}/ routes, their membership.
 func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		signedOut := func() {
-			if r.Method == http.MethodGet && r.Header.Get("X-Fragment") == "" {
-				http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusSeeOther)
-			} else {
-				http.Error(w, "signed out", http.StatusUnauthorized)
+		// A page is sent where it can go on; an API caller is told, with a code to act on.
+		refuse := func(status int, code api.ProblemCode, text, to string) {
+			switch {
+			case strings.Contains(r.URL.Path, "/api/v1/"):
+				writeCoded(w, status, code, text)
+			case r.Method == http.MethodGet && r.Header.Get("X-Fragment") == "":
+				http.Redirect(w, r, to, http.StatusSeeOther)
+			default:
+				http.Error(w, text, status)
 			}
+		}
+		signedOut := func(code api.ProblemCode) {
+			refuse(http.StatusUnauthorized, code, "signed out", "/login?next="+url.QueryEscape(r.URL.RequestURI()))
 		}
 		sess, u := a.session(r)
 		if u == nil {
-			signedOut()
+			signedOut(api.SignedOut)
 			return
 		}
 		// Someone still on a password their inviter saw can only go and choose their own.
 		if u.MustChangePassword && r.URL.Path != "/password" {
-			if r.Method == http.MethodGet && r.Header.Get("X-Fragment") == "" {
-				http.Redirect(w, r, "/password", http.StatusSeeOther)
-			} else {
-				http.Error(w, "choose your own password first", http.StatusForbidden)
-			}
+			refuse(http.StatusForbidden, api.MustChangePassword, "choose your own password first", "/password")
 			return
 		}
 		q := &Req{User: u, Session: sess}
@@ -260,15 +268,12 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 			}
 			// A session another organisation's provider began is no sign-in here.
 			if !sess.Opens(org.ID) {
-				signedOut()
+				signedOut(api.SessionLimited)
 				return
 			}
 			if a.ssoRequired(org, u, m, sess) {
-				if r.Method == http.MethodGet && r.Header.Get("X-Fragment") == "" {
-					http.Redirect(w, r, ssoPageURL(org, u.Email, r.URL.RequestURI()), http.StatusSeeOther)
-				} else {
-					http.Error(w, org.Name+" requires its single sign-on: reload the page to go through it", http.StatusForbidden)
-				}
+				refuse(http.StatusForbidden, api.SsoRequired, org.Name+" requires its single sign-on: reload the page to go through it",
+					ssoPageURL(org, u.Email, r.URL.RequestURI()))
 				return
 			}
 			q.Org, q.Member = org, m
@@ -374,20 +379,7 @@ func (a *App) Routes() http.Handler {
 		q := reqOf(r)
 		http.Redirect(w, r, q.Base()+landing(q.Member), http.StatusSeeOther)
 	}))
-	mux.HandleFunc("GET /o/{org}/today", a.member(a.today))
-	mux.HandleFunc("GET /o/{org}/research", a.member(a.research))
-	mux.HandleFunc("GET /o/{org}/app/{page...}", a.member(a.reactPage))
-	mux.HandleFunc("GET /o/{org}/conversations", a.member(a.conversations))
-	mux.HandleFunc("GET /o/{org}/companies", a.member(a.companies))
-	mux.HandleFunc("GET /o/{org}/companies/{id}", a.member(a.company))
-	mux.HandleFunc("GET /o/{org}/agreements/{id}/prepare", a.member(a.prepareAgreement))
-	mux.HandleFunc("GET /o/{org}/add", a.member(a.addPage))
-	mux.HandleFunc("GET /o/{org}/settings", a.member(a.settings))
-	mux.HandleFunc("GET /o/{org}/agents", a.member(a.agents))
-	mux.HandleFunc("GET /o/{org}/enquiries", a.member(a.enquiriesPage))
-	mux.HandleFunc("GET /o/{org}/subscriptions", a.member(a.subscriptionsPage))
-	mux.HandleFunc("GET /o/{org}/campaigns", a.member(a.campaignsPage))
-	mux.HandleFunc("GET /o/{org}/onboarding", a.member(a.onboardingPage))
+	a.appRoutes(mux)
 	a.taskRoutes(mux)
 	mux.HandleFunc("OPTIONS "+intakePattern, a.intakePreflight)
 	mux.HandleFunc("POST "+intakePattern, a.intake)
@@ -500,57 +492,89 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
-	email := r.PostForm.Get("email")
 	refuse := func(code int, problem string) {
 		w.Header().Set("content-type", "text/html; charset=utf-8")
 		w.WriteHeader(code)
 		LoginPage(a.loginView(r.PostForm.Get("next"), problem)).Render(r.Context(), w)
 	}
+	token, _, device, wait, err := a.passwordSignIn(r, r.PostForm.Get("email"), r.PostForm.Get("password"))
+	switch {
+	case err != nil && r.Context().Err() != nil:
+		return
+	case wait > 0:
+		w.Header().Set("Retry-After", strconv.Itoa(wait))
+		refuse(http.StatusTooManyRequests, "Too many attempts. Try again in "+plural(wait, "second")+".")
+		return
+	case errors.Is(err, errWrongLogin):
+		refuse(http.StatusUnauthorized, err.Error())
+		return
+	case err != nil:
+		refuse(telling("sign-in", err, http.StatusInternalServerError))
+		return
+	}
+	if device != nil {
+		http.SetCookie(w, device)
+	}
+	a.setSession(w, r, token)
+	http.Redirect(w, r, safeNext(r.PostForm.Get("next")), http.StatusSeeOther)
+}
+
+// passwordSignIn checks a password, for the sign-in form and the API alike. wait is the
+// seconds to hold off after too many attempts; device is set when this browser is new
+// to the account, so its own attempts are counted apart from a stranger's.
+func (a *App) passwordSignIn(r *http.Request, email, password string) (token string, u *User, device *http.Cookie, wait int, err error) {
 	select {
 	case hashSlots <- struct{}{}:
 		defer func() { <-hashSlots }()
 	case <-r.Context().Done():
-		return
+		return "", nil, nil, 0, r.Context().Err()
 	}
-	// A browser that has signed in to this account before is counted by itself.
 	who, known := signInBucket(email), false
 	if c, err := r.Cookie(deviceCookie); err == nil {
 		if device, ok := a.s.knownDevice(email, c.Value); ok {
 			who, known = device, true
 		}
 	}
-	if wait := a.logins.begin(who); wait > 0 {
-		seconds := int(wait.Seconds()) + 1
-		w.Header().Set("Retry-After", strconv.Itoa(seconds))
-		refuse(http.StatusTooManyRequests, "Too many attempts. Try again in "+plural(seconds, "second")+".")
-		return
+	if held := a.logins.begin(who); held > 0 {
+		return "", nil, nil, int(held.Seconds()) + 1, nil
 	}
-	token, u, err := a.s.Login(email, r.PostForm.Get("password"))
+	token, u, err = a.s.Login(email, password)
 	// A failure that isn't a wrong password (the database, say) doesn't count against anyone.
 	if err == nil || errors.Is(err, errWrongLogin) {
 		a.logins.record(who, err == nil)
 	}
-	if errors.Is(err, errWrongLogin) {
-		refuse(http.StatusUnauthorized, err.Error())
-		return
-	} else if err != nil {
-		refuse(telling("sign-in", err, http.StatusInternalServerError))
-		return
+	if err != nil {
+		return "", nil, nil, 0, err
 	}
 	if !known {
-		http.SetCookie(w, &http.Cookie{Name: deviceCookie, Value: newDeviceToken(u), Path: "/login", HttpOnly: true, Secure: a.secure(r),
-			SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(deviceLife)})
+		device = a.deviceCookie(r, u)
 	}
-	a.setSession(w, r, token)
-	http.Redirect(w, r, safeNext(r.PostForm.Get("next")), http.StatusSeeOther)
+	return token, u, device, 0, nil
+}
+
+// deviceCookie vouches for this browser to u's account. It goes to every path, so the
+// sign-in form and the API both see it.
+func (a *App) deviceCookie(r *http.Request, u *User) *http.Cookie {
+	return &http.Cookie{Name: deviceCookie, Value: newDeviceToken(u), Path: "/", HttpOnly: true, Secure: a.secure(r),
+		SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(deviceLife)}
 }
 
 func (a *App) logout(w http.ResponseWriter, r *http.Request) {
-	if c, err := r.Cookie(sessionCookie); err == nil {
-		a.s.Logout(c.Value)
-	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true})
+	a.endSession(r)
+	http.SetCookie(w, signedOutCookie())
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+func (a *App) endSession(r *http.Request) {
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		if err := a.s.Logout(c.Value); err != nil {
+			log.Print("signing out: ", err)
+		}
+	}
+}
+
+func signedOutCookie() *http.Cookie {
+	return &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true}
 }
 
 // front is the one page a signed-out visitor sees besides the sign-in form.
@@ -630,43 +654,62 @@ func (a *App) changePassword(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	keep := ""
-	if c, err := r.Cookie(sessionCookie); err == nil {
-		keep = c.Value
-	}
-	// Guessing the current password from a borrowed session is slowed like guessing at sign-in.
 	u := reqOf(r).User
-	select {
-	case hashSlots <- struct{}{}:
-		defer func() { <-hashSlots }()
-	case <-r.Context().Done():
+	device, wait, err := a.passwordChange(r, u, in.Current, in.New)
+	switch {
+	case wait > 0:
+		w.Header().Set("Retry-After", strconv.Itoa(wait))
+		http.Error(w, "too many attempts: try again in "+plural(wait, "second"), http.StatusTooManyRequests)
 		return
-	}
-	// Counted apart from sign-in, so guesses made there by someone else don't hold this up.
-	if wait := a.logins.begin(changeBucket(u)); wait > 0 {
-		seconds := int(wait.Seconds()) + 1
-		w.Header().Set("Retry-After", strconv.Itoa(seconds))
-		http.Error(w, "too many attempts: try again in "+plural(seconds, "second"), http.StatusTooManyRequests)
+	case errors.Is(err, context.Canceled):
 		return
-	}
-	err := a.s.ChangePassword(u, in.Current, in.New, keep)
-	if err == nil || errors.Is(err, errWrongCurrent) {
-		a.logins.record(changeBucket(u), err == nil)
-	}
-	if err != nil {
+	case err != nil:
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
-	// The old password vouched for this browser's device cookie; the new one does now.
-	if changed, err := a.s.UserByEmail(u.Email); err == nil {
-		http.SetCookie(w, &http.Cookie{Name: deviceCookie, Value: newDeviceToken(changed), Path: "/login", HttpOnly: true, Secure: a.secure(r),
-			SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(deviceLife)})
+	if device != nil {
+		http.SetCookie(w, device)
 	}
 	if u.MustChangePassword {
 		writeJSON(w, map[string]string{"go": "/"})
 		return
 	}
-	writeJSON(w, map[string]string{"message": "Password changed. Your other sessions are signed out."})
+	writeJSON(w, map[string]string{"message": passwordChanged})
+}
+
+const passwordChanged = "Password changed. Your other sessions are signed out."
+
+// passwordChange changes u's password, keeping the session r came with, and gives the
+// device cookie the new password vouches for. wait is the seconds to hold off when there
+// have been too many attempts.
+func (a *App) passwordChange(r *http.Request, u *User, current, next string) (device *http.Cookie, wait int, err error) {
+	keep := ""
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		keep = c.Value
+	}
+	// Guessing the current password from a borrowed session is slowed like guessing at sign-in.
+	select {
+	case hashSlots <- struct{}{}:
+		defer func() { <-hashSlots }()
+	case <-r.Context().Done():
+		return nil, 0, r.Context().Err()
+	}
+	// Counted apart from sign-in, so guesses made there by someone else don't hold this up.
+	if held := a.logins.begin(changeBucket(u)); held > 0 {
+		return nil, int(held.Seconds()) + 1, nil
+	}
+	err = a.s.ChangePassword(u, current, next, keep)
+	if err == nil || errors.Is(err, errWrongCurrent) {
+		a.logins.record(changeBucket(u), err == nil)
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+	// The old password vouched for this browser's device cookie; the new one does now.
+	if changed, err := a.s.UserByEmail(u.Email); err == nil {
+		device = a.deviceCookie(r, changed)
+	}
+	return device, 0, nil
 }
 
 func (a *App) newOrg(w http.ResponseWriter, r *http.Request) {
@@ -674,14 +717,9 @@ func (a *App) newOrg(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	q := reqOf(r)
-	if q.Session.Limited {
-		fail(w, errors.New("you're signed in through one organisation's single sign-on, which opens only that organisation: sign in with a password to start another"), http.StatusForbidden)
-		return
-	}
-	o, err := a.s.CreateOrgWithOwner("", in.Name, q.User)
+	o, err := newOrgFor(a.s, reqOf(r), in.Name)
 	if err != nil {
-		fail(w, err, http.StatusBadRequest)
+		fail(w, err, statusOf(err))
 		return
 	}
 	writeJSON(w, map[string]string{"go": "/o/" + o.Slug + "/settings"})
