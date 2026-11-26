@@ -1,4 +1,4 @@
-# output.css, the script bundle and *_templ.go are committed, so this is a plain Go build.
+# output.css and the built app are committed, so this is a plain Go build.
 FROM golang:1.27-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
