@@ -33,6 +33,10 @@ func assetHandler() http.Handler {
 			// The release image has no system table of file types to find this in.
 			w.Header().Set("Content-Type", "font/woff2")
 		}
+		// A worker runs under the policy its own script came with, not its page's.
+		if r.URL.Path == "js/pdf.worker.min.mjs" {
+			w.Header().Set("Content-Security-Policy", pdfPolicy)
+		}
 		// Embedded files carry no date to revalidate against, so anything not cached
 		// for good is fetched again on every page. A font that changes gets a new name.
 		if strings.HasPrefix(r.URL.Path, "js/shadcn-templ-") || strings.HasPrefix(r.URL.Path, "fonts/") || r.URL.Query().Get("v") == assetVersion {

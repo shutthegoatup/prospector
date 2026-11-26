@@ -328,7 +328,7 @@ func (s *Store) replaceContacts(org int64, rows []Contact, absent []string) (int
 	return len(rows), err
 }
 
-var pointAtContacts = []any{&Event{}, &Fact{}, &Enquiry{}, &Suggestion{}, &Deal{}, &CustomerGrant{}, &CampaignRecipient{}}
+var pointAtContacts = []any{&Event{}, &Fact{}, &Enquiry{}, &Suggestion{}, &Deal{}, &CustomerGrant{}, &CampaignRecipient{}, &AgreementRecipient{}}
 
 // follow keeps history, facts and enquiries with their person across a restore. They
 // point at a contact by id, and a restore can drop a contact or give its id to someone
@@ -385,6 +385,9 @@ func forgetStrays(tx *gorm.DB, org int64) error {
 	}
 	// Nobody is left to open a page that was theirs.
 	if err := dropCustomerGrants(tx, org, tx.Where("org_id = ? and contact_id not in (?)", org, here), false); err != nil {
+		return err
+	}
+	if err := dropRecipients(tx, tx.Where("org_id = ? and contact_id is not null and contact_id not in (?)", org, here)); err != nil {
 		return err
 	}
 	// A mail sent to someone a restore dropped stays counted, belonging to nobody.
