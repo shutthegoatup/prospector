@@ -276,7 +276,7 @@ func (s *Store) sign(org, id, recipient int64, in SignIn, who Who) (*Agreement, 
 		}
 		rid := r.ID
 		for _, e := range []AgreementEvent{
-			{Kind: EventConsented, Detail: signingConsent},
+			{Kind: EventConsented, Detail: r.SentName + " agreed to sign electronically, in the wording below"},
 			{Kind: EventSigned, Detail: fmt.Sprintf("Signed by %s as %q", r.SentName, typed)},
 		} {
 			e.OrgID, e.AgreementID, e.Round, e.At, e.Actor, e.RecipientID, e.IP, e.UserAgent = org, id, a.Round, now, who.Actor, &rid, who.IP, who.Browser
