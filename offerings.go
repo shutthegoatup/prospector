@@ -224,6 +224,12 @@ func (s *Store) JudgeCompany(org, offering, company int64, stage, fit, reason, a
 		if n == 0 {
 			return noSuch("no company %d", company)
 		}
+		if byRoles, err := judgedByRoles(tx, org, o, company); err != nil || byRoles {
+			if byRoles {
+				return conflict(fmt.Sprintf("this company has roles for %s, and where it stands follows them: pursue or junk its roles", o.Name))
+			}
+			return err
+		}
 		v := Verdict{OrgID: org, OfferingID: offering, CompanyID: company, Stage: stage, Fit: fit,
 			Reason: strings.TrimSpace(reason), By: actor, UpdatedAt: time.Now()}
 		update := []string{"stage", "reason", "decided_by", "updated_at"}
@@ -259,9 +265,12 @@ func putUpForReview(tx *gorm.DB, org, offering, company int64, actor string) (st
 }
 
 // qualifyFor qualifies a company for an offering when someone there is picked for it,
-// unless a person has already said otherwise. The offering is held by the caller.
+// unless a person has already said otherwise or its roles there decide. The offering is held by the caller.
 func qualifyFor(tx *gorm.DB, org int64, o *Offering, company int64, actor string) error {
 	if _, err := putUpForReview(tx, org, o.ID, company, actor); err != nil {
+		return err
+	}
+	if byRoles, err := judgedByRoles(tx, org, o, company); err != nil || byRoles {
 		return err
 	}
 	res := tx.Model(&Verdict{}).Where("org_id = ? and offering_id = ? and company_id = ? and stage = ?", org, o.ID, company, CompanyReview).

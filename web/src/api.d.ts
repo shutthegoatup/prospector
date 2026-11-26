@@ -2052,9 +2052,9 @@ export interface paths {
         put?: never;
         /**
          * Add a role open at a company, for an offering that has roles
-         * @description It waits for review, and brings the company back to review for the offering if every
-         *     role before it was junked. A role already there, by its posting or else its title, is a
-         *     conflict.
+         * @description It waits for review, and brings the company back to review for the offering. A role
+         *     already there, by its posting or else its title, is a conflict, as is the title of one
+         *     junked, and a company a person rejected for the offering.
          */
         post: operations["addRole"];
         delete?: never;
@@ -2082,9 +2082,9 @@ export interface paths {
         head?: never;
         /**
          * Pursue or junk a role, or put it back
-         * @description The company's verdict for the role's offering follows: qualified while a role is pursued,
-         *     up for review while one waits, rejected once every one is junked. Junking sends nothing
-         *     to anyone.
+         * @description The company's verdict for the role's offering follows: up for review while a role waits,
+         *     else qualified while one is pursued, and rejected once every one is junked. While it has
+         *     roles, the company itself can't be judged for the offering. Junking sends nothing to anyone.
          */
         patch: operations["judgeRole"];
         trace?: never;
@@ -2772,7 +2772,7 @@ export interface components {
         };
         RoleJudgement: {
             /**
-             * @description `pursued` qualifies the company for the offering; once every role is junked it is rejected for it; `review` puts a role back.
+             * @description `pursued` qualifies the company for the offering once no role waits; once every role is junked it is rejected for it; `review` puts a role back.
              * @enum {string}
              */
             stage: "review" | "pursued" | "junked";

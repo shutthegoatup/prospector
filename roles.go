@@ -36,6 +36,10 @@ const (
 	RolePursued = "pursued"
 	RoleJunked  = "junked"
 
+	// everyRoleJunked is the reason on a verdict followRoles ruled out, which a new role
+	// may undo; a rejection a person made stands.
+	everyRoleJunked = "every role junked"
+
 	roleTitleMax   = 200
 	roleDetailsMax = 300
 )
@@ -80,26 +84,29 @@ func rolesOffering(tx *gorm.DB, org, id int64) (*Offering, error) {
 	return o, nil
 }
 
-// sameRole is a role at the company already, for the offering: the same posting, or the
-// same title when either has none.
+// sameRole is a role at the company already, for the offering: the same posting, the
+// same title as a junked one, or the same title when either has no posting.
 func sameRole(tx *gorm.DB, org, offering, company int64, in RoleIn) (*Role, error) {
 	var roles []Role
 	if err := tx.Where("org_id = ? and offering_id = ? and company_id = ?", org, offering, company).Order("id").Find(&roles).Error; err != nil {
 		return nil, err
 	}
-	at := normalURL(in.SourceURL)
+	at, title := normalURL(in.SourceURL), sameWords(in.Title)
 	for _, r := range roles {
 		if at != "" && normalURL(r.URL) == at {
 			return &r, nil
 		}
 	}
+	// A junked role found again on another page is still junked.
 	for _, r := range roles {
-		if strings.EqualFold(r.Title, in.Title) && (at == "" || r.URL == "") {
+		if sameWords(r.Title) == title && (r.Stage == RoleJunked || at == "" || r.URL == "") {
 			return &r, nil
 		}
 	}
 	return nil, nil
 }
+
+func sameWords(s string) string { return strings.ToLower(strings.Join(strings.Fields(s), " ")) }
 
 // junkedSaid is what an agent is told when it brings back a role that was junked.
 func junkedSaid(r Role) string {
@@ -111,7 +118,8 @@ func junkedSaid(r Role) string {
 }
 
 // addRole adds a role to a company held by the caller, for an offering it has also held.
-// A new role brings a company ruled out for the offering back to review.
+// A new role brings a company back to review for the offering, unless a person ruled it
+// out themselves rather than by junking its roles.
 func (s *Store) addRole(tx *gorm.DB, org int64, o *Offering, company int64, in RoleIn, who Actor) (*Role, bool, error) {
 	if had, err := sameRole(tx, org, o.ID, company, in); err != nil || had != nil {
 		if had != nil && had.Stage == RoleJunked {
@@ -119,30 +127,34 @@ func (s *Store) addRole(tx *gorm.DB, org int64, o *Offering, company int64, in R
 		}
 		return had, true, err
 	}
+	if _, err := putUpForReview(tx, org, o.ID, company, who.Name); err != nil {
+		return nil, false, err
+	}
+	var v Verdict
+	if err := tx.Where("org_id = ? and offering_id = ? and company_id = ?", org, o.ID, company).First(&v).Error; err != nil {
+		return nil, false, err
+	}
+	if v.Stage == CompanyRejected && v.Reason != everyRoleJunked {
+		said := fmt.Sprintf("%s rejected this company for %s", v.By, o.Name)
+		if v.Reason != "" {
+			said += ": " + v.Reason
+		}
+		return nil, false, conflict(said + ". Don't add its roles")
+	}
 	r := Role{OrgID: org, OfferingID: o.ID, CompanyID: company, Title: in.Title, URL: in.SourceURL, Details: in.Details,
 		Stage: RoleReview, FoundBy: who.Name, TaskID: who.Task}
 	if err := tx.Create(&r).Error; err != nil {
 		return nil, false, err
 	}
-	if _, err := putUpForReview(tx, org, o.ID, company, who.Name); err != nil {
+	if err := s.logAs(tx, org, 0, &company, who, "add:role", str(o.Name+": "+r.Title)); err != nil {
 		return nil, false, err
 	}
-	reopened := tx.Model(&Verdict{}).Where("org_id = ? and offering_id = ? and company_id = ? and stage = ?", org, o.ID, company, CompanyRejected).
-		Updates(map[string]any{"stage": CompanyReview, "reason": "", "decided_by": who.Name, "updated_at": time.Now()})
-	if reopened.Error != nil {
-		return nil, false, reopened.Error
-	}
-	if reopened.RowsAffected > 0 {
-		said := o.Name + ": a new role, " + r.Title
-		if err := s.logAs(tx, org, 0, &company, who, "verdict:"+CompanyReview, &said); err != nil {
-			return nil, false, err
-		}
-	}
-	return &r, false, s.logAs(tx, org, 0, &company, who, "add:role", str(o.Name+": "+r.Title))
+	return &r, false, s.followRoles(tx, org, o, company, who.Name)
 }
 
-// followRoles sets the company's verdict for the offering from its roles: qualified while
-// one is pursued, up for review while one waits, and ruled out once every one is junked.
+// followRoles sets the company's verdict for the offering from its roles: up for review
+// while one waits, so it is in a queue someone works, else qualified while one is
+// pursued, and ruled out once every one is junked.
 func (s *Store) followRoles(tx *gorm.DB, org int64, o *Offering, company int64, actor string) error {
 	var stages []string
 	if err := tx.Model(&Role{}).Where("org_id = ? and offering_id = ? and company_id = ?", org, o.ID, company).Pluck("stage", &stages).Error; err != nil {
@@ -151,13 +163,13 @@ func (s *Store) followRoles(tx *gorm.DB, org int64, o *Offering, company int64, 
 	if len(stages) == 0 {
 		return nil
 	}
-	want, reason := CompanyRejected, "every role junked"
+	want, reason := CompanyRejected, everyRoleJunked
 	for _, st := range stages {
 		switch {
-		case st == RolePursued:
-			want, reason = CompanyQualified, ""
-		case st == RoleReview && want == CompanyRejected:
+		case st == RoleReview:
 			want, reason = CompanyReview, ""
+		case st == RolePursued && want != CompanyReview:
+			want, reason = CompanyQualified, ""
 		}
 	}
 	var was string
@@ -334,18 +346,19 @@ func (s *Store) AgentAddRole(org int64, who Actor, in AddRoleIn) (*AddRoleOut, e
 		if err != nil {
 			return err
 		}
-		if err := s.heldWhenFound(tx, org, who, c, stages[c.ID]); err != nil {
-			return err
-		}
 		r, had, err := s.addRole(tx, org, o, c.ID, in.RoleIn, who)
 		if err != nil {
 			return err
 		}
 		out = AddRoleOut{ID: r.ID, Existed: had, Stage: r.Stage}
-		if had {
-			return s.matched(tx, org, who, 0, &c.ID)
+		// A new role is a find, wherever its company stood; one already here isn't.
+		if !had {
+			return nil
 		}
-		return nil
+		if err := s.heldWhenFound(tx, org, who, c, stages[c.ID]); err != nil {
+			return err
+		}
+		return s.matched(tx, org, who, 0, &c.ID)
 	})
 	return &out, err
 }
@@ -355,4 +368,15 @@ func (s *Store) roleBriefs(org, company int64) ([]RoleBrief, error) {
 	return out, s.db.Model(&Role{}).Select("roles.id, offerings.name as offering, roles.title, roles.url, roles.details, roles.stage, roles.reason").
 		Joins("join offerings on offerings.id = roles.offering_id and offerings.org_id = roles.org_id").
 		Where("roles.org_id = ? and roles.company_id = ?", org, company).Order("lower(offerings.name), roles.id").Scan(&out).Error
+}
+
+// judgedByRoles says whether a company's verdict for an offering follows its roles there,
+// so a person can't set it by hand.
+func judgedByRoles(tx *gorm.DB, org int64, o *Offering, company int64) (bool, error) {
+	if !o.HasRoles {
+		return false, nil
+	}
+	var n int64
+	err := tx.Model(&Role{}).Where("org_id = ? and offering_id = ? and company_id = ?", org, o.ID, company).Count(&n).Error
+	return n > 0, err
 }

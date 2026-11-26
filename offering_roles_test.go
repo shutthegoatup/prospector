@@ -214,3 +214,77 @@ func TestARoleAnAgentAddsMustCiteAPageItWasShown(t *testing.T) {
 		t.Fatalf("add_role's posting should be checked against the pages the run has seen: %v", got)
 	}
 }
+
+func TestANewRoleAtACompanyAlreadyPursuedWaitsForReview(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	roles := must(s.AddOffering(o.ID, Offering{Name: "Contract roles", HasRoles: true}, "Ada"))
+	scout := Actor{Name: "agent:scout"}
+	first := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find contract roles", "Ada"))
+	north := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Northwind Payments", Task: first.ID}))
+	lead := must(s.AgentAddRole(o.ID, scout, AddRoleIn{Company: "Northwind Payments", Task: first.ID, RoleIn: RoleIn{
+		Title: "Lead platform engineer", SourceURL: "https://northwind.example/jobs/1"}}))
+	must(s.JudgeRole(o.ID, lead.ID, RolePursued, "", "Ada"))
+	if v := verdictFor(t, s, o.ID, roles.ID, north.ID); v.Stage != CompanyQualified {
+		t.Fatalf("a pursued role: %+v", v)
+	}
+	if err := s.SetTaskClosed(o.ID, first.ID, true, "Ada"); err != nil {
+		t.Fatal(err)
+	}
+
+	next := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find more contract roles", "Ada"))
+	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Northwind Payments", Task: next.ID}))
+	fresh := must(s.AgentAddRole(o.ID, scout, AddRoleIn{Company: "Northwind Payments", Task: next.ID, RoleIn: RoleIn{
+		Title: "AWS landing zone engineer", SourceURL: "https://northwind.example/jobs/3"}}))
+	if v := verdictFor(t, s, o.ID, roles.ID, north.ID); v.Stage != CompanyReview {
+		t.Fatalf("a new role at a company already pursued should wait in review, or nobody is asked about it: %+v", v)
+	}
+	if n := s.ToReview(o.ID) - s.ResearchCount(o.ID, "review"); n != 1 {
+		t.Fatalf("the new role's company should be counted as waiting for review: %d", n)
+	}
+	v := must(s.Task(o.ID, next.ID, time.Now()))
+	if len(v.Companies) != 1 || len(v.LeftOut()) != 0 {
+		t.Fatalf("a new role at a company already pursued is a find, not left out: %+v left out %+v", v.Companies, v.LeftOut())
+	}
+	must(s.JudgeRole(o.ID, fresh.ID, RoleJunked, "", "Ada"))
+	if v := verdictFor(t, s, o.ID, roles.ID, north.ID); v.Stage != CompanyQualified {
+		t.Fatalf("the new role junked, the one pursued still stands: %+v", v)
+	}
+}
+
+func TestAVerdictThatFollowsRolesIsntSetByHand(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	roles := must(s.AddOffering(o.ID, Offering{Name: "Contract roles", HasRoles: true}, "Ada"))
+	scout := Actor{Name: "agent:scout"}
+	task := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find contract roles", "Ada"))
+	north := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Northwind Payments", Task: task.ID}))
+	harbour := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Harbour Analytics", Task: task.ID}))
+	junked := must(s.AgentAddRole(o.ID, scout, AddRoleIn{Company: "Northwind Payments", Task: task.ID, RoleIn: RoleIn{
+		Title: "Platform engineer (contract)", SourceURL: "https://northwind.example/jobs/2"}}))
+	must(s.JudgeRole(o.ID, junked.ID, RoleJunked, "Inside IR35", "Ada"))
+
+	var refused conflict
+	if err := s.JudgeCompany(o.ID, roles.ID, north.ID, CompanyQualified, "", "", "Ada"); !errors.As(err, &refused) {
+		t.Fatalf("qualifying by hand a company whose roles decide: %v", err)
+	}
+	// The same role on a job board is still the junked one.
+	_, err := s.AgentAddRole(o.ID, scout, AddRoleIn{Company: "Northwind Payments", Task: task.ID, RoleIn: RoleIn{
+		Title: "platform  engineer (Contract)", SourceURL: "https://jobs.example/northwind/123?utm_source=feed"}})
+	if !errors.As(err, &refused) || !strings.Contains(err.Error(), "Inside IR35") {
+		t.Fatalf("a junked role found on another page should still be refused: %v", err)
+	}
+
+	// Ruled out by a person, with no roles yet: an agent's new role doesn't undo that.
+	if err := s.JudgeCompany(o.ID, roles.ID, harbour.ID, CompanyRejected, "", "Never again", "Ada"); err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.AgentAddRole(o.ID, scout, AddRoleIn{Company: "Harbour Analytics", Task: task.ID, RoleIn: RoleIn{
+		Title: "Data platform engineer", SourceURL: "https://harbour.example/jobs/1"}})
+	if !errors.As(err, &refused) || !strings.Contains(err.Error(), "Never again") {
+		t.Fatalf("a role at a company a person rejected: %v", err)
+	}
+	if v := verdictFor(t, s, o.ID, roles.ID, harbour.ID); v.Stage != CompanyRejected || v.Reason != "Never again" {
+		t.Fatalf("a person's rejection was undone: %+v", v)
+	}
+}
