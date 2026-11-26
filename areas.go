@@ -43,6 +43,7 @@ var opArea = map[string]string{
 	"AddAgreementRecipient": areaSales, "ChangeAgreementRecipient": areaSales, "RemoveAgreementRecipient": areaSales, "PutAgreementFields": areaSales,
 	"EnrichContact": areaSales,
 	"CreateAgent":   "", "UpdateAgent": "", "DeleteAgent": "", "CreateKey": "", "ChangeKey": "", "RevokeKey": "", "DeleteEnquiry": "", "ChangeSettings": "", "SaveEnricher": "", "DeleteEnricher": "",
+	"ExportPerson": "", "ErasePerson": "",
 	"AddOffering": "", "ChangeOffering": "", "RemoveOffering": "",
 }
 

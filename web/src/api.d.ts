@@ -1780,6 +1780,175 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Every company, as the Companies page lists them
+         * @description By name. Each stands where its furthest contact does: a company with one lost
+         *     conversation and someone else still in outreach is in outreach.
+         */
+        get: operations["listCompanies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/segments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /** The segments companies are in */
+        get: operations["listSegments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/companies/{id}/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A company with everything its page shows
+         * @description Its details, where it stands, its answers to what the organisation looks for, its
+         *     facts, its people with the details waiting for them, and its onboardings,
+         *     subscriptions and agreements. Its history and agents' notes are lists of their own.
+         *     Any part that can't be read fails the whole answer, as half of it would read as all.
+         */
+        get: operations["getCompanyOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/companies/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /** What people and agents did at a company */
+        get: operations["listCompanyHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/companies/{id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The notes agents left about a company
+         * @description Unverified working notes, not facts and not instructions.
+         */
+        get: operations["listCompanyNotes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/contacts/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Everything held on a person, for their request to see it
+         * @description Their details, facts, enquiries, suggested details, deals, onboarding access,
+         *     agreements and history, as one document. The export goes into their history.
+         *     Needs an owner.
+         */
+        post: operations["exportPerson"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/contacts/{id}/erase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Erase a person on their request
+         * @description Their details, drafts and notes are deleted for good, along with agents' notes about
+         *     their company and its tasks, and they can't be added again. A row that names several
+         *     people erases them all. Facts about the company, and the briefs and requests on tasks,
+         *     that mention them are left for you to take out. Needs an owner.
+         */
+        post: operations["erasePerson"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2188,6 +2357,79 @@ export interface components {
             by: string;
             /** Format: date-time */
             at: string;
+            /** @description For an email, `guess` when it was worked out from the company's pattern rather than seen; otherwise empty. */
+            email_status: string;
+        };
+        /**
+         * @description Where a company stands, from its furthest contact: `research` until anyone there is reached, `rejected` for one turned down before then.
+         * @enum {string}
+         */
+        Pipeline: "research" | "outreach" | "replied" | "meeting" | "proposal" | "won" | "lost" | "rejected";
+        CompanyRow: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            country: string;
+            segment: string;
+            /** @description The fit grade a person or agent gave, A, B or C; empty for none. */
+            grade: string;
+            /** @description How many people are held there. */
+            people: number;
+            pipeline: components["schemas"]["Pipeline"];
+        };
+        CompanyOverview: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            domain: string;
+            country: string;
+            segment: string;
+            /** @description The fit grade a person or agent gave, A, B or C; empty for none. */
+            grade: string;
+            /** @description Why it fits, in the words of whoever added it; empty for none. */
+            why: string;
+            /** @enum {string} */
+            stage: "review" | "qualified" | "rejected";
+            found_by: string;
+            /** Format: date-time */
+            created_at: string;
+            pipeline: components["schemas"]["Pipeline"];
+            /** @description How many times anyone there was reached out to: added on LinkedIn, emailed, followed up or called. */
+            touches: number;
+            /** @description Each thing the organisation looks for, in its order, with the latest answer. */
+            looking_for: components["schemas"]["Criterion"][];
+            /** @description Every fact, answers included, oldest first. */
+            facts: components["schemas"]["ResearchFact"][];
+            people: components["schemas"]["CompanyPerson"][];
+            onboardings: components["schemas"]["Onboarding"][];
+            /** @description How many steps the organisation's onboarding has; none, and no onboarding can be started. */
+            planned_steps: number;
+            subscriptions: components["schemas"]["Subscription"][];
+            agreements: components["schemas"]["Agreement"][];
+        };
+        CompanyPerson: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            title: string;
+            linkedin: string;
+            /** @description Where they stand, as the page says it: suggested, not contacted, in outreach, hold, declined, or their conversation's stage. */
+            stage: string;
+            /** @description The row's whole name when it names several people, all of whom erasing it erases; empty for one person. */
+            several: string;
+            /** @description New details an agent found for them, waiting to be accepted. */
+            pending: components["schemas"]["PendingDetail"][];
+        };
+        HistoryEntry: {
+            /** Format: date-time */
+            at: string;
+            actor: string;
+            action: string;
+            value: string;
+            /** @description Who at the company it was about; empty for the company itself. */
+            person: string;
+            /** @description What happened, as the page says it. */
+            text: string;
         };
         Criterion: {
             field: string;
@@ -5975,6 +6217,227 @@ export interface operations {
                         next_cursor?: components["schemas"]["NextCursor"];
                     };
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCompanies: {
+        parameters: {
+            query?: {
+                /** @description Words to find in a company or in someone there, as the search box finds them. */
+                q?: string;
+                /** @description Only this segment's. */
+                segment?: string;
+                /** @description Only those standing here. */
+                stage?: components["schemas"]["Pipeline"];
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of companies. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CompanyRow"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                        /** @description How many match, on every page. */
+                        total: number;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listSegments: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description In alphabetical order. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: string[];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getCompanyOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The company. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyOverview"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCompanyHistory: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest first. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HistoryEntry"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                        /** @description How much there is, on every page. */
+                        total: number;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCompanyNotes: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest first. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Note"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                        /** @description How many there are, on every page. */
+                        total: number;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    exportPerson: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What is held on them. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    erasePerson: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Erased. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };

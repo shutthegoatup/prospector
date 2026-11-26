@@ -65,8 +65,7 @@ func researchOut(set OrgSettings, r ResearchRow) api.ResearchCompany {
 		person := api.ResearchPerson{Id: p.ID, Name: displayName(p), Title: p.Title, Status: p.Status, EmailStatus: p.EmailStatus,
 			Linkedin: deref(p.Linkedin), SourceUrl: firstLine(deref(p.Sources)), Pending: []api.PendingDetail{}}
 		for _, d := range r.Pending[p.ID] {
-			person.Pending = append(person.Pending, api.PendingDetail{Id: d.ID, Field: d.Field, Value: d.Value, Current: d.Current,
-				SourceUrl: d.SourceURL, By: d.By, At: d.At})
+			person.Pending = append(person.Pending, pendingOut(d))
 		}
 		c.People = append(c.People, person)
 	}
