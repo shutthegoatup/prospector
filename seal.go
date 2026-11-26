@@ -14,7 +14,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
 	"strings"
 	"time"
@@ -22,6 +21,7 @@ import (
 	"github.com/digitorus/pdfsign"
 	"github.com/go-pdf/fpdf"
 	"github.com/pdfcpu/pdfcpu/pkg/api"
+	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 	"golang.org/x/image/font/sfnt"
@@ -212,7 +212,11 @@ func drawStamp(p *fpdf.Fpdf, st Stamp, pw, ph float64) {
 		p.SetDrawColor(20, 24, 40)
 		p.SetLineWidth(h * 0.12)
 		p.SetLineCapStyle("round")
-		p.Polygon([]fpdf.PointType{{X: x + w*0.18, Y: y + h*0.55}, {X: x + w*0.42, Y: y + h*0.8}, {X: x + w*0.85, Y: y + h*0.2}}, "D")
+		// Two strokes, not a polygon, which would close itself into a triangle.
+		p.MoveTo(x+w*0.18, y+h*0.55)
+		p.LineTo(x+w*0.42, y+h*0.8)
+		p.LineTo(x+w*0.85, y+h*0.2)
+		p.DrawPath("D")
 		return
 	case "signature", "initials":
 		font := scriptFont
@@ -231,29 +235,51 @@ func drawStamp(p *fpdf.Fpdf, st Stamp, pw, ph float64) {
 	}
 }
 
-// stampPDF draws each stamp onto its page. The fields' places are fractions of the page
-// as a reader shows it, its crop box turned by its rotation, which is how they were placed.
-func stampPDF(doc []byte, stamps []Stamp) ([]byte, error) {
-	if len(stamps) == 0 {
-		return doc, nil
-	}
-	ctx := context.Background()
-	conf := model.NewDefaultConfiguration()
-	rc, err := api.ReadContext(ctx, bytes.NewReader(doc), conf)
+// readForSealing reads a document as uploads are read: not validated, since real PDFs
+// often break a rule of their own version that doesn't stop them being filled in.
+func readForSealing(doc []byte) (*model.Context, error) {
+	rc, err := api.ReadContext(context.Background(), bytes.NewReader(doc), model.NewDefaultConfiguration())
 	if err != nil {
 		return nil, fmt.Errorf("reading the document to fill it in: %w", err)
 	}
 	if err := rc.EnsurePageCount(); err != nil {
 		return nil, err
 	}
-	bounds, err := rc.PageBoundaries(ctx, nil)
+	return rc, nil
+}
+
+// stampPDF draws each stamp onto its page, as fillIn does, and writes the document out.
+func stampPDF(doc []byte, stamps []Stamp) ([]byte, error) {
+	rc, err := readForSealing(doc)
 	if err != nil {
 		return nil, err
+	}
+	if err := fillIn(rc, stamps); err != nil {
+		return nil, err
+	}
+	var out bytes.Buffer
+	if err := api.WriteContext(context.Background(), rc, &out); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
+}
+
+// fillIn draws each stamp onto its page of a document read for sealing. The fields'
+// places are fractions of the page as a reader shows it, its crop box turned by its
+// rotation, which is how they were placed.
+func fillIn(rc *model.Context, stamps []Stamp) error {
+	if len(stamps) == 0 {
+		return nil
+	}
+	ctx := context.Background()
+	bounds, err := rc.PageBoundaries(ctx, nil)
+	if err != nil {
+		return err
 	}
 	byPage := map[int][]Stamp{}
 	for _, st := range stamps {
 		if st.Page < 1 || st.Page > len(bounds) {
-			return nil, fmt.Errorf("a field is on page %d of a document with %d", st.Page, len(bounds))
+			return fmt.Errorf("a field is on page %d of a document with %d", st.Page, len(bounds))
 		}
 		byPage[st.Page] = append(byPage[st.Page], st)
 	}
@@ -276,21 +302,20 @@ func stampPDF(doc []byte, stamps []Stamp) ([]byte, error) {
 	}
 	var drawn bytes.Buffer
 	if err := overlay.Output(&drawn); err != nil {
-		return nil, err
+		return err
 	}
 	marks := map[int]*model.Watermark{}
 	for page, n := range order {
 		wm, err := api.PDFWatermarkForReadSeeker(ctx, bytes.NewReader(drawn.Bytes()), n, "scale:1 abs, pos:c, rot:0", true, false, types.POINTS)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		marks[page] = wm
 	}
-	var out bytes.Buffer
-	if err := api.AddWatermarksMap(ctx, bytes.NewReader(doc), &out, marks, conf); err != nil {
-		return nil, fmt.Errorf("filling the document in: %w", err)
+	if err := pdfcpu.AddWatermarksMap(ctx, rc, marks); err != nil {
+		return fmt.Errorf("filling the document in: %w", err)
 	}
-	return out.Bytes(), nil
+	return nil
 }
 
 // Certificate is what the last page of a sealed agreement says: drawn only from the
@@ -304,6 +329,9 @@ type Certificate struct {
 	Signers             []CertificateSigner
 	Events              []CertificateEvent
 	Consent             string
+	// LastEvent is the hash of the agreement's last event when it was sealed: the log can't
+	// lose events off its end without this showing it.
+	LastEvent string
 }
 
 type CertificateRound struct {
@@ -322,6 +350,26 @@ type CertificateEvent struct {
 }
 
 func stamp(t time.Time) string { return t.UTC().Format("2 Jan 2006 15:04:05 UTC") }
+
+// texts is every piece of text a seal draws: the certificate's and the stamps'.
+func (c Certificate) texts(stamps []Stamp) []string {
+	out := []string{c.Org, c.Agreement, c.Ref, c.SentBy, c.Consent, c.LastEvent}
+	for _, r := range c.Rounds {
+		out = append(out, r.Hash, r.Outcome)
+	}
+	for _, s := range c.Signers {
+		out = append(out, s.Name, s.Email, s.Via, s.Typed, s.IP, s.Browser)
+	}
+	for _, e := range c.Events {
+		out = append(out, e.Text)
+	}
+	for _, st := range stamps {
+		if st.Kind != "tick" {
+			out = append(out, st.Value)
+		}
+	}
+	return out
+}
 
 // drawCertificate draws the certificate as pages of its own, to go after the document's.
 func drawCertificate(c Certificate) ([]byte, error) {
@@ -391,6 +439,10 @@ func drawCertificate(c Certificate) ([]byte, error) {
 		p.CellFormat(150, 12, stamp(e.At), "", 0, "L", false, 0, "")
 		p.MultiCell(0, 12, e.Text, "", "L", false)
 	}
+	if c.LastEvent != "" {
+		label("Record")
+		row("Last event", "SHA-256 "+c.LastEvent)
+	}
 	if c.Consent != "" {
 		label("Wording each signer agreed to")
 		p.SetFont(textFont.name, "", 9)
@@ -404,14 +456,14 @@ func drawCertificate(c Certificate) ([]byte, error) {
 }
 
 // sealPDF signs a document with the organisation's key: a certifying PAdES signature
-// that allows only further signatures and timestamps after it, so a later timestamp can
-// still be added without breaking it.
+// that allows no changes after it, so filling in a form field left in the document breaks
+// it as plainly as any other edit.
 func sealPDF(doc []byte, key *ecdsa.PrivateKey, cert *x509.Certificate, org string) ([]byte, error) {
 	d, err := pdfsign.Open(bytes.NewReader(doc), int64(len(doc)))
 	if err != nil {
 		return nil, fmt.Errorf("opening the document to seal it: %w", err)
 	}
-	d.Sign(key, cert).Type(pdfsign.CertificationSignature).Permission(pdfsign.AllowFormFilling).Format(pdfsign.PAdES_B).
+	d.Sign(key, cert).Type(pdfsign.CertificationSignature).Permission(pdfsign.NoChanges).Format(pdfsign.PAdES_B).
 		SignerName(org).Reason("Sealed by Prospector when the last signer signed")
 	var out bytes.Buffer
 	if _, err := d.Write(&out); err != nil {
@@ -435,7 +487,31 @@ func checkSeal(doc []byte, cert *x509.Certificate) error {
 	if !r.Signatures()[0].Certificate.Equal(cert) {
 		return errors.New("the document is sealed with another key")
 	}
+	// A valid signature still leaves room for an update written after it: what it covers
+	// has to run to the document's last byte.
+	if end, ok := byteRangeEnd(doc); !ok || end != len(doc) {
+		return errors.New("the document was added to after it was sealed")
+	}
 	return nil
+}
+
+// byteRangeEnd is where the first signature's byte range ends: the second of its two
+// ranges' offset plus length.
+func byteRangeEnd(doc []byte) (int, bool) {
+	at := bytes.Index(doc, []byte("/ByteRange"))
+	if at < 0 {
+		return 0, false
+	}
+	rest := doc[at+len("/ByteRange"):]
+	open, shut := bytes.IndexByte(rest, '['), bytes.IndexByte(rest, ']')
+	if open < 0 || shut < open {
+		return 0, false
+	}
+	var r [4]int
+	if n, err := fmt.Sscan(string(rest[open+1:shut]), &r[0], &r[1], &r[2], &r[3]); err != nil || n != 4 {
+		return 0, false
+	}
+	return r[2] + r[3], true
 }
 
 // Sealed is a sealed agreement document and the hash it is kept with.
@@ -447,21 +523,38 @@ type Sealed struct {
 // seal fills an agreement's document in, adds its certificate and seals the whole with
 // the organisation's key, then checks the seal holds before handing it back.
 func (s *Store) seal(o *Org, doc []byte, stamps []Stamp, c Certificate) (*Sealed, error) {
+	// Text the fonts can't draw would seal as empty space, so it stops the seal instead.
+	for _, text := range c.texts(stamps) {
+		if err := drawable(text); err != nil {
+			return nil, err
+		}
+	}
 	key, cert, err := s.sealKey(o)
 	if err != nil {
 		return nil, err
 	}
-	filled, err := stampPDF(doc, stamps)
+	rc, err := readForSealing(doc)
 	if err != nil {
+		return nil, err
+	}
+	if err := fillIn(rc, stamps); err != nil {
 		return nil, err
 	}
 	page, err := drawCertificate(c)
 	if err != nil {
 		return nil, err
 	}
-	var whole bytes.Buffer
-	if err := api.MergeRaw(context.Background(), []io.ReadSeeker{bytes.NewReader(filled), bytes.NewReader(page)}, &whole, false, model.NewDefaultConfiguration()); err != nil {
+	certificate, err := api.ReadAndValidate(context.Background(), bytes.NewReader(page), model.NewDefaultConfiguration())
+	if err != nil {
+		return nil, fmt.Errorf("reading the certificate back: %w", err)
+	}
+	rc.EnsureVersionForWriting()
+	if err := pdfcpu.MergeXRefTables(context.Background(), "certificate", certificate, rc, false, false); err != nil {
 		return nil, fmt.Errorf("adding the certificate: %w", err)
+	}
+	var whole bytes.Buffer
+	if err := api.WriteContext(context.Background(), rc, &whole); err != nil {
+		return nil, err
 	}
 	out, err := sealPDF(whole.Bytes(), key, cert, o.Name)
 	if err != nil {

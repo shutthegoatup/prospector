@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -98,9 +99,33 @@ func TestAnOrganisationsSealingKeyIsMadeOnceAndKeptSealed(t *testing.T) {
 		t.Error("two organisations share a key")
 	}
 
+	// Moved onto a new server key, it still opens, and is the same key.
+	s.keys = mustKeys(t, "2:"+newKey+",1:"+testKey)
+	if moved, err := s.Reseal(); err != nil || moved < 1 {
+		t.Fatalf("resealing: %d moved (%v)", moved, err)
+	}
+	s.keys = mustKeys(t, "2:"+newKey)
+	if after, _ := must2(s.sealKey(o)); !after.Equal(key) {
+		t.Error("the key changed when the server's key did")
+	}
+
 	s.keys = nil
 	if _, _, err := s.sealKey(mustOrg(t, s, "gamma")); !errors.Is(err, errNoKeys) {
 		t.Errorf("making a key without a server secret to keep it under: %v", err)
+	}
+}
+
+// A PDF that bends its version's rules is taken at upload, so it has to seal too.
+func TestAPDFTakenAtUploadCanBeSealed(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	a := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Form", "Ada Lovelace"))
+	must(s.PutAgreementFile(o.ID, a.ID, "form.pdf", buildPDF("1.3", 2, "", "/Annots [<< /Type /Annot /Subtype /Caret /Rect [10 10 20 20] >>] "), "Ada Lovelace"))
+	r := must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	must(s.PutAgreementFields(o.ID, a.ID, []AgreementField{{RecipientID: r.ID, Page: 2, Kind: "signature", X: 0.1, Y: 0.7, W: 0.3, H: 0.06}}))
+	if err := s.TrySeal(o, a.ID); err != nil {
+		t.Errorf("sealing a PDF the upload took: %v", err)
 	}
 }
 
@@ -163,11 +188,31 @@ func TestASealedAgreementIsFilledInCertifiedAndShowsAnyChange(t *testing.T) {
 	if err := checkSeal(out.PDF, cert); err != nil {
 		t.Fatalf("the seal: %v", err)
 	}
+	// One byte early in the document, inside what the seal covers, changed.
 	tampered := bytes.Clone(out.PDF)
-	at := bytes.Index(tampered, []byte("/MediaBox"))
-	tampered[at+2] = 'm'
+	tampered[200] ^= 0x01
 	if err := checkSeal(tampered, cert); err == nil {
 		t.Error("a changed byte left the seal holding")
+	}
+	if err := checkSeal(append(bytes.Clone(out.PDF), []byte("\n1 0 obj (added afterwards) endobj\n%%EOF\n")...), cert); err == nil {
+		t.Error("bytes added after the seal left it holding")
+	}
+	if !bytes.Contains(out.PDF, []byte("/P 1")) {
+		t.Error("the seal allows changes after it")
+	}
+
+	// Text the fonts can't draw stops the seal rather than sealing as a blank.
+	for what, change := range map[string]func(*Certificate, []Stamp){
+		"a typed signature": func(_ *Certificate, st []Stamp) { st[0].Value = "王小明" },
+		"the agreement":     func(c *Certificate, _ []Stamp) { c.Agreement = "合同" },
+		"a signer's name":   func(c *Certificate, _ []Stamp) { c.Signers[0].Name = "سارا" },
+	} {
+		c2, st2 := c, slices.Clone(stamps)
+		c2.Signers = slices.Clone(c.Signers)
+		change(&c2, st2)
+		if _, err := s.seal(o, doc, st2, c2); err == nil || !strings.Contains(err.Error(), "can't show") {
+			t.Errorf("%s the fonts can't draw: %v", what, err)
+		}
 	}
 	_, theirs := must2(s.sealKey(mustOrg(t, s, "beta")))
 	if err := checkSeal(out.PDF, theirs); err == nil {
