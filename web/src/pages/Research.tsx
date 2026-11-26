@@ -12,6 +12,11 @@ type Company = components["schemas"]["ResearchCompany"];
 type Criterion = components["schemas"]["Criterion"];
 type Run = components["schemas"]["Run"];
 type Agent = components["schemas"]["Agent"];
+type Person = Company["people"][number];
+type Enricher = components["schemas"]["Enricher"];
+
+const vendorNames: Record<components["schemas"]["EnricherKind"], string> = { hunter: "Hunter" };
+const vendorName = (kind: string) => vendorNames[kind as Enricher["kind"]] ?? kind;
 
 const filters = [
   { key: "review", label: "To review" },
@@ -46,6 +51,7 @@ export function ResearchPage() {
   const settings = $api.useQuery("get", "/o/{org}/api/v1/settings", { params: { path: { org } } });
   const tasks = $api.useQuery("get", "/o/{org}/api/v1/tasks", { params: { path: { org }, query: { limit: 5 } } });
   const agents = $api.useQuery("get", "/o/{org}/api/v1/agents", { params: { path: { org } } });
+  const enrichers = $api.useQuery("get", "/o/{org}/api/v1/enrichers", { params: { path: { org } } }).data?.items ?? [];
   const ready = (agents.data?.items ?? []).filter((a) => a.ready);
   // The same query SearchPanel makes, so the search is read once; closed searches aren't in tasks.
   const chosen = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}", { params: { path: { org, id: task ?? 0 }, query: { limit: 3 } } }, { enabled: !!task }).data;
@@ -122,7 +128,7 @@ export function ResearchPage() {
           )}
           {research.error && <p className="text-sm text-[var(--stop)]">The queue couldn't be read. Reload to try again.</p>}
           <div className="flex flex-col gap-3">
-            {research.data?.items.map((c, i) => <CompanyCard key={c.id} company={c} open={i === 0} />)}
+            {research.data?.items.map((c, i) => <CompanyCard key={c.id} company={c} open={i === 0} enrichers={enrichers} />)}
           </div>
           <nav className="flex justify-between gap-3">
             <span>
@@ -431,7 +437,7 @@ function SourceLink({ href, children }: { href: string; children: React.ReactNod
   );
 }
 
-function CompanyCard({ company: c, open }: { company: Company; open: boolean }) {
+function CompanyCard({ company: c, open, enrichers }: { company: Company; open: boolean; enrichers: Enricher[] }) {
   const { org, sales } = useSession();
   const refresh = useRefresh();
   const [grade, setGrade] = useState(c.grade || "B");
@@ -547,8 +553,14 @@ function CompanyCard({ company: c, open }: { company: Company; open: boolean }) 
                   <div key={d.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-card px-3 py-2">
                     <span className="font-mono text-xs text-muted-foreground">{d.field}</span>
                     <span>{d.value}</span>
+                    {d.vendor && <Pill>found by {vendorName(d.vendor)}</Pill>}
                     {d.current && <Meta>now {d.current}</Meta>}
                     {d.source_url && <SourceLink href={d.source_url}>source ↗</SourceLink>}
+                    {d.vendor && d.email_status && (
+                      <Meta className="w-full">
+                        {d.email_status === "verified" ? `${vendorName(d.vendor)} checked it: valid` : `${vendorName(d.vendor)} couldn't confirm it: a guess`}
+                      </Meta>
+                    )}
                     {sales && (
                       <span className="ml-auto flex gap-2">
                         <ActionButton size="xs" onClick={() => decide.mutate({ params: { path: { org, id: d.id } }, body: { decision: "accepted" } })}>
@@ -561,11 +573,61 @@ function CompanyCard({ company: c, open }: { company: Company; open: boolean }) 
                     )}
                   </div>
                 ))}
+                <EmailLookup person={p} enrichers={enrichers} />
               </div>
             ))}
           </div>
         </div>
       </details>
     </article>
+  );
+}
+
+const notFound: Record<components["schemas"]["Lookup"]["outcome"], string> = {
+  found: "",
+  none: "found no email",
+  not_kept: "found an email that can't be kept",
+};
+
+const month = (at: Date) => at.toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
+
+// EmailLookup asks the organisation's vendors for an email nobody has found, and says
+// when one that found nothing can be asked again.
+function EmailLookup({ person: p, enrichers }: { person: Person; enrichers: Enricher[] }) {
+  const { org, sales } = useSession();
+  const refresh = useRefresh();
+  const ask = $api.useMutation("post", "/o/{org}/api/v1/contacts/{id}/enrich", { onSuccess: refresh });
+  const asked = p.lookups.filter((l) => l.field === "email");
+  const misses = asked.filter((l) => l.outcome !== "found");
+  if (p.has_email || p.pending.some((d) => d.field === "email")) return null;
+  const next = enrichers.find(
+    (e) => e.fields.includes("email") && e.has_key && e.used_this_month < e.monthly_limit && !asked.some((l) => l.vendor === e.kind),
+  );
+  const answer = ask.data?.results.find((r) => r.outcome === "failed" || r.outcome === "skipped");
+  return (
+    <>
+      {misses.map((l) => (
+        <Meta key={l.vendor}>
+          {vendorName(l.vendor)} {notFound[l.outcome]} on {day(l.at)} · it can be asked again from {day(l.again_at)}
+        </Meta>
+      ))}
+      {sales && next && (
+        <div className="flex flex-wrap items-center gap-2">
+          <ActionButton
+            quiet
+            size="xs"
+            disabled={ask.isPending}
+            onClick={() => ask.mutate({ params: { path: { org, id: p.id } }, body: { fields: ["email"] } })}
+          >
+            Look up email
+          </ActionButton>
+          <Meta>
+            asks {vendorName(next.kind)} · {next.monthly_limit - next.used_this_month} of {next.monthly_limit} left in {month(new Date())}
+          </Meta>
+        </div>
+      )}
+      {answer?.detail && <Meta className="text-[var(--stop)]">{answer.detail}</Meta>}
+      <Failed errors={[ask.error]} />
+    </>
   );
 }

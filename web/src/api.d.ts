@@ -2635,6 +2635,7 @@ export interface components {
             title: string;
             /** @description `suggested` until someone picks them. */
             status: string;
+            has_email: boolean;
             /** @description `verified`, `guess`, or empty. */
             email_status: string;
             linkedin: string;
@@ -2642,6 +2643,25 @@ export interface components {
             source_url: string;
             /** @description New details an agent found for them, waiting to be accepted. */
             pending: components["schemas"]["PendingDetail"][];
+            /** @description Each vendor's latest lookup for them within the last 30 days, newest first. A vendor isn't asked again about the same detail until its lookup is older than that. */
+            lookups: components["schemas"]["Lookup"][];
+        };
+        Lookup: {
+            /** @description email, phone or linkedin. */
+            field: string;
+            vendor: components["schemas"]["EnricherKind"];
+            /**
+             * @description `found` became a suggestion; `none` is that the vendor found nothing; `not_kept` that what it found may not be kept, such as a never-contact address or a domain that takes no mail.
+             * @enum {string}
+             */
+            outcome: "found" | "none" | "not_kept";
+            /** Format: date-time */
+            at: string;
+            /**
+             * Format: date-time
+             * @description From when this vendor can be asked about it again.
+             */
+            again_at: string;
         };
         PendingDetail: {
             /**
@@ -2653,12 +2673,14 @@ export interface components {
             value: string;
             /** @description What the person holds now; empty for nothing. */
             current: string;
+            /** @description For an email, `verified` when whoever found it checked it, `guess` when it was worked out from the company's pattern or the vendor couldn't confirm it; otherwise empty. */
+            email_status: string;
             source_url: string;
+            /** @description The enrichment vendor that found it; empty when a person or agent did. */
+            vendor: string;
             by: string;
             /** Format: date-time */
             at: string;
-            /** @description For an email, `guess` when it was worked out from the company's pattern rather than seen; otherwise empty. */
-            email_status: string;
         };
         /**
          * @description Where a company stands, from its furthest contact: `research` until anyone there is reached, `rejected` for one turned down before then.
