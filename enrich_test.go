@@ -226,11 +226,12 @@ func TestNobodyTheOrganisationMustntContactIsLookedUp(t *testing.T) {
 	}
 	found := atCompany(t, s, o, "Kai Berg", "Bergholm", "bergholm.example")
 	f.found["Kai Berg@bergholm.example"] = "kai@bergholm.example"
-	o.Settings.NeverContact = "nordkap.example\nkai@bergholm.example"
+	mailed := person(t, s, o, "Mia Holt", "Holt Marine", "mia@holt.example", false)
+	o.Settings.NeverContact = "nordkap.example\nkai@bergholm.example\nmia@holt.example"
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	for _, who := range []*Contact{listed, declined} {
+	for _, who := range []*Contact{listed, declined, mailed} {
 		if code, out := enrich(t, client, api, who.ID, "email"); code != http.StatusConflict {
 			t.Errorf("%s: %d %+v", deref(who.Person), code, out)
 		}
@@ -244,6 +245,30 @@ func TestNobodyTheOrganisationMustntContactIsLookedUp(t *testing.T) {
 	var n int64
 	if s.db.Model(&Suggestion{}).Count(&n); n != 0 {
 		t.Errorf("%d suggestions kept from finds that may not be", n)
+	}
+
+	// Research says who can't be looked up, so it offers no lookup the server would refuse.
+	s.db.Model(&Company{}).Where("org_id = ?", o.ID).Update("stage", CompanyReview)
+	code, body := call(t, client, "GET", api+"/research?filter=review", "", nil)
+	var list struct {
+		Items []struct {
+			People []struct {
+				Name       string `json:"name"`
+				Unlookable string `json:"unlookable"`
+			} `json:"people"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(body), &list); code != http.StatusOK || err != nil {
+		t.Fatalf("research: %d %v %s", code, err, body)
+	}
+	got := map[string]string{}
+	for _, c := range list.Items {
+		for _, p := range c.People {
+			got[p.Name] = p.Unlookable
+		}
+	}
+	if got["Kai Berg"] != "" || !strings.Contains(got["Said No"], "declined") || !strings.Contains(got["Mia Holt"], "never-contact") {
+		t.Errorf("who can't be looked up: %q", got)
 	}
 }
 

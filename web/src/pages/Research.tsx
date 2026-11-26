@@ -749,7 +749,7 @@ function Lookups({ person: p, enrichers }: { person: Person; enrichers: Enricher
   const { org, sales } = useSession();
   const refresh = useRefresh();
   const ask = $api.useMutation("post", "/o/{org}/api/v1/contacts/{id}/enrich", { onSuccess: refresh });
-  const wanted = details.filter((f) => !has(p, f) && !p.pending.some((d) => d.field === f));
+  const wanted = p.unlookable ? [] : details.filter((f) => !has(p, f) && !p.pending.some((d) => d.field === f));
   const misses = p.lookups.filter((l) => l.outcome !== "found" && wanted.includes(l.field as Detail));
   // The vendor each detail would go to next: the first, in order, not asked lately and with lookups left.
   const next = wanted.flatMap((field) => {
