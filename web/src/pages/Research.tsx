@@ -7,6 +7,7 @@ import { actor, day, stamp } from "@/lib/format";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/session";
+import { month, vendorName } from "@/lib/vendors";
 
 type Company = components["schemas"]["ResearchCompany"];
 type Criterion = components["schemas"]["Criterion"];
@@ -14,9 +15,6 @@ type Run = components["schemas"]["Run"];
 type Agent = components["schemas"]["Agent"];
 type Person = Company["people"][number];
 type Enricher = components["schemas"]["Enricher"];
-
-const vendorNames: Record<components["schemas"]["EnricherKind"], string> = { hunter: "Hunter" };
-const vendorName = (kind: string) => vendorNames[kind as Enricher["kind"]] ?? kind;
 
 const filters = [
   { key: "review", label: "To review" },
@@ -589,8 +587,6 @@ const notFound: Record<components["schemas"]["Lookup"]["outcome"], string> = {
   not_kept: "found an email that can't be kept",
 };
 
-const month = (at: Date) => at.toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
-
 // EmailLookup asks the organisation's vendors for an email nobody has found, and says
 // when one that found nothing can be asked again.
 function EmailLookup({ person: p, enrichers }: { person: Person; enrichers: Enricher[] }) {
@@ -622,7 +618,7 @@ function EmailLookup({ person: p, enrichers }: { person: Person; enrichers: Enri
             Look up email
           </ActionButton>
           <Meta>
-            asks {vendorName(next.kind)} · {next.monthly_limit - next.used_this_month} of {next.monthly_limit} left in {month(new Date())}
+            asks {vendorName(next.kind)} · {next.monthly_limit - next.used_this_month} of {next.monthly_limit} left in {month()}
           </Meta>
         </div>
       )}
