@@ -2777,7 +2777,7 @@ components:
 
     Onboarding:
       type: object
-      required: [id, company_id, company, name, start, created_at, steps, done, late, live_on, invites]
+      required: [id, company_id, company, name, start, created_at, steps, done, late, live_on, invites, invitable, can_invite]
       properties:
         id: { type: integer, format: int64 }
         company_id: { type: integer, format: int64 }
@@ -2795,6 +2795,19 @@ components:
           type: array
           items: { $ref: "#/components/schemas/OnboardingInvite" }
           description: Who at the company has been let see their steps.
+        invitable:
+          type: array
+          items: { $ref: "#/components/schemas/Invitable" }
+          description: People at the company with an email address here, who could be invited.
+        can_invite: { type: boolean, description: "Whether a link can be emailed at all: the organisation has a mail server and the server knows its public address." }
+
+    Invitable:
+      type: object
+      required: [id, name, email]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        email: { type: string }
 
     OnboardingStep:
       type: object

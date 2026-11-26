@@ -5,6 +5,6 @@ import "strconv"
 // ReactMount is where a React page draws itself; what it may do comes from the API, and
 // what the viewer may change from these attributes, which only decide what is offered.
 templ ReactMount(q *Req) {
-	<div id="app" data-org={ q.Org.Slug } data-sales={ strconv.FormatBool(canDo(ctx, areaSales)) }></div>
+	<div id="app" data-org={ q.Org.Slug } data-sales={ strconv.FormatBool(canDo(ctx, areaSales)) } data-support={ strconv.FormatBool(canDo(ctx, areaSupport)) } data-no-refresh="true"></div>
 	<script type="module" src={ "/assets/app/main.js?v=" + assetVersion }></script>
 }
