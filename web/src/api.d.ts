@@ -1275,6 +1275,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/people/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A person to add, read from a LinkedIn profile
+         * @description What the add form starts with when the bookmarklet opens it from someone's profile, and the bookmarklet itself. Nothing is saved; add them with `addPerson`.
+         */
+        get: operations["draftPerson"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/contacts/{id}": {
         parameters: {
             query?: never;
@@ -1756,6 +1779,15 @@ export interface components {
             note?: string;
             /** @description Already connected on LinkedIn: their email comes up next. */
             added?: boolean;
+        };
+        PersonDraft: {
+            /** @description Their profile's address. */
+            linkedin: string;
+            name: string;
+            title: string;
+            company: string;
+            /** @description A `javascript:` link to keep in the bookmarks bar: clicked on a LinkedIn profile, it opens the add form filled in from it. */
+            bookmarklet: string;
         };
         PersonAdded: {
             /** Format: int64 */
@@ -4857,6 +4889,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PersonAdded"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    draftPerson: {
+        parameters: {
+            query?: {
+                /** @description The profile's address; anything after `?` is dropped. */
+                url?: string;
+                /** @description The profile page's title, which leads with their name. */
+                name?: string;
+                /** @description Their headline, like `Head of Marketing at Larkmoor Yachts`, read for their role and company. */
+                headline?: string;
+                /** @description Their company, in place of the one the headline gives. */
+                company?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The person as far as the profile says. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDraft"];
                 };
             };
             default: components["responses"]["Problem"];
