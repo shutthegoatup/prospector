@@ -25,6 +25,10 @@ var answers struct {
 }
 
 func TestMain(m *testing.M) {
+	if err := webBuilt(assetFS); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	spec, err := api.GetSwagger()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

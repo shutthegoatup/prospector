@@ -242,9 +242,6 @@ func TestCampaignsSayWhyNothingCanBeSent(t *testing.T) {
 }
 
 func TestServeRefusesABinaryBuiltWithoutTheWebApp(t *testing.T) {
-	if err := webBuilt(assetFS); err != nil {
-		t.Fatalf("this test binary: %v", err)
-	}
 	unbuilt := fstest.MapFS{"assets/css/output.css": {}, "assets/app/index.html": {}}
 	err := webBuilt(unbuilt)
 	if err == nil || !strings.Contains(err.Error(), "npm run build") {
