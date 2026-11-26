@@ -37,9 +37,8 @@ let loaded: { hash: string; pdf: PDFDocumentProxy } | undefined;
 
 async function documentFor(id: number, hash: string): Promise<PDFDocumentProxy> {
   if (loaded?.hash === hash) return loaded.pdf;
-  const res = await fetch(`${base}api/v1/agreements/${id}/document`);
-  if (!res.ok) throw new Error("The document couldn't be fetched.");
-  const pdf = await getDocument({ data: new Uint8Array(await res.arrayBuffer()), isEvalSupported: false }).promise;
+  const bytes = answered(await api.GET("/o/{org}/api/v1/agreements/{id}/document", { params: { path: { org, id } }, parseAs: "arrayBuffer" }));
+  const pdf = await getDocument({ data: new Uint8Array(bytes), isEvalSupported: false }).promise;
   loaded = { hash, pdf };
   return pdf;
 }
@@ -58,14 +57,16 @@ class Editor {
     this.edit = "edit" in root.dataset;
   }
 
-  signer(): { id: number; colour: string; name: string } | undefined {
+  signer(): number | undefined {
     const r = document.querySelector<HTMLInputElement>("input[name=placing]:checked");
-    return r ? { id: +r.value, colour: r.dataset.colour || "#ffc233", name: r.dataset.name || "" } : undefined;
+    return r ? +r.value : undefined;
   }
 
+  // colourOf is a signer's colour and name, from the swatch beside them, which every
+  // reader of the page has; only editors get the radio that picks them.
   colourOf(recipient: number): { colour: string; name: string } {
-    const r = document.querySelector<HTMLInputElement>(`input[name=placing][value="${recipient}"]`);
-    return { colour: r?.dataset.colour || "#b3a78e", name: r?.dataset.name || "" };
+    const s = document.querySelector<HTMLElement>(`[data-signer="${recipient}"]`);
+    return { colour: s?.dataset.colour || "#b3a78e", name: s?.dataset.name || "" };
   }
 
   async start(): Promise<void> {
@@ -198,7 +199,7 @@ class Editor {
     const who = this.signer();
     if (!who) return alert("Pick who it is for first.");
     const [w, h] = sizes[kind];
-    this.fields.push({ recipient_id: who.id, page, kind, x: clamp(cx - w / 2, 0, 1 - w), y: clamp(cy - h / 2, 0, 1 - h), w, h });
+    this.fields.push({ recipient_id: who, page, kind, x: clamp(cx - w / 2, 0, 1 - w), y: clamp(cy - h / 2, 0, 1 - h), w, h });
     this.changed();
   }
 
@@ -221,9 +222,9 @@ class Editor {
     const list = document.querySelector<HTMLElement>("[data-missing]");
     if (!list) return;
     const signed = new Set(this.fields.filter((f) => f.kind === "signature").map((f) => f.recipient_id));
-    const lines = Array.from(document.querySelectorAll<HTMLInputElement>("input[name=placing]"))
-      .filter((r) => !signed.has(+r.value))
-      .map((r) => `· Place a signature for ${r.dataset.name}.`);
+    const lines = Array.from(document.querySelectorAll<HTMLElement>("[data-signer]"))
+      .filter((s) => !signed.has(+(s.dataset.signer || 0)))
+      .map((s) => `· Place a signature for ${s.dataset.name}.`);
     const line = (text: string, ok = false) => {
       const p = document.createElement("p");
       p.className = "font-mono text-xs " + (ok ? "text-[var(--ok)]" : "text-muted-foreground");

@@ -3,9 +3,15 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"html"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -225,6 +231,8 @@ func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
 	s, o, base, member, a, hannah, theo := preparing(t)
 	must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
 	must(s.AddRecipient(o, a.ID, RecipientCopy, &theo.ID, nil, "Ada Lovelace"))
+	// Ada signs after Hannah, with Theo's copy between them in the order.
+	ada := must(s.AddRecipient(o, a.ID, RecipientSigner, nil, &must(s.UserByEmail("ada@example.com")).ID, "Ada Lovelace"))
 	srv := strings.TrimSuffix(base, "/o/alpha/api/v1/agreements/"+itoa(a.ID))
 	page := srv + "/o/alpha/agreements/" + itoa(a.ID) + "/prepare"
 
@@ -239,6 +247,11 @@ func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
 	}
 	if strings.Contains(body, ">Hannah Pryce · hannah@larkmoor.example</option>") {
 		t.Error("Hannah is offered again though she is on it")
+	}
+	// Moving Ada up takes Hannah's place, not the copy's between them.
+	up := regexp.MustCompile(`data-body="([^"]*)" data-method="PATCH" data-post="api/v1/agreements/` + itoa(a.ID) + `/recipients/` + itoa(ada.ID) + `"`).FindStringSubmatch(body)
+	if len(up) < 2 || html.UnescapeString(up[1]) != `{"position":1}` {
+		t.Errorf("Ada's move up: %q", up)
 	}
 	if _, company := call(t, member, "GET", srv+"/o/alpha/companies/"+itoa(*hannah.CompanyID), "", nil); !strings.Contains(company, "agreements/"+itoa(a.ID)+"/prepare") {
 		t.Error("the company's page doesn't lead to Prepare for signing")
@@ -267,6 +280,78 @@ func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
 	res.Body.Close()
 	if res.StatusCode != http.StatusOK || !strings.Contains(res.Header.Get("Content-Type"), "javascript") {
 		t.Errorf("pdf.js's worker: %d %q", res.StatusCode, res.Header.Get("Content-Type"))
+	}
+}
+
+// A database from before agreements were prepared for signing has agreements without
+// rounds, order or a page count, some with documents only their first bytes were
+// checked on. They come through as round 1, signed in order, pages counted when needed.
+func TestAgreementsFromBeforeSigningArePreparedAfterTheUpgrade(t *testing.T) {
+	dsn := filepath.Join(t.TempDir(), "old.sqlite")
+	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
+		dsn = pg
+	}
+	old := must(Open(dsn))
+	if err := old.db.Migrator().DropTable(models...); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.db.AutoMigrate(models...); err != nil {
+		t.Fatal(err)
+	}
+	o := mustOrg(t, old, "alpha")
+	hannah := must(old.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	readable := must(old.AddAgreement(o.ID, *hannah.CompanyID, "Service agreement", "Ada Lovelace"))
+	must(old.PutAgreementFile(o.ID, readable.ID, "service.pdf", testPDF(2, ""), "Ada Lovelace"))
+	legacy := must(old.AddAgreement(o.ID, *hannah.CompanyID, "Old agreement", "Ada Lovelace"))
+	scrap := []byte("%PDF-1.7 only its first bytes were ever checked")
+	sum := sha256.Sum256(scrap)
+	if err := old.db.Create(&AgreementFile{AgreementID: legacy.ID, OrgID: o.ID, Data: scrap}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := old.db.Model(&Agreement{}).Where("id = ?", legacy.ID).Updates(map[string]any{"file_name": "old.pdf", "file_hash": hex.EncodeToString(sum[:])}).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, column := range []string{"page_count", "round", "in_order"} {
+		if err := old.db.Migrator().DropColumn(&Agreement{}, column); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	s := must(Open(dsn))
+	a := must(s.Agreement(o.ID, readable.ID))
+	if a.Round != 1 || !a.InOrder || a.PageCount != 0 {
+		t.Fatalf("an agreement after the upgrade: round %d, in order %v, %d pages", a.Round, a.InOrder, a.PageCount)
+	}
+	r := must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	if _, err := s.PutAgreementFields(o.ID, a.ID, []AgreementField{{RecipientID: r.ID, Page: 2, Kind: "signature", X: 0.1, Y: 0.8, W: 0.3, H: 0.05}}); err != nil {
+		t.Fatalf("placing a field on an agreement from before: %v", err)
+	}
+	if a := must(s.Agreement(o.ID, readable.ID)); a.PageCount != 2 {
+		t.Errorf("its pages, counted when first needed: %d", a.PageCount)
+	}
+
+	// One whose document can't be read says so, and is fixed by uploading it again.
+	l := must(s.AddRecipient(o, legacy.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	field := []AgreementField{{RecipientID: l.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.8, W: 0.3, H: 0.05}}
+	if _, err := s.PutAgreementFields(o.ID, legacy.ID, field); err == nil || !strings.Contains(err.Error(), "can't be read") {
+		t.Errorf("fields on a document that can't be read: %v", err)
+	}
+	must(s.PutAgreementFile(o.ID, legacy.ID, "old.pdf", testPDF(1, ""), "Ada Lovelace"))
+	if _, err := s.PutAgreementFields(o.ID, legacy.ID, field); err != nil {
+		t.Errorf("fields once it is uploaded again: %v", err)
+	}
+}
+
+// Real PDFs break rules of their own version that don't stop them being filled in: one
+// claiming 1.3 with an annotation 1.4 brought is taken, its pages counted.
+func TestAnAgreementTakesAPDFThatBendsItsVersionsRules(t *testing.T) {
+	s, o, base, member, a, _, _ := preparing(t)
+	bent := buildPDF("1.3", 3, "", "/Annots [<< /Type /Annot /Subtype /Caret /Rect [10 10 20 20] >>] ")
+	if code, body, _ := upload(t, member, base+"/document?name=form.pdf", "", "application/pdf", bent); code != http.StatusOK {
+		t.Fatalf("a PDF that bends its version's rules: %d %s", code, body)
+	}
+	if got := must(s.Agreement(o.ID, a.ID)); got.PageCount != 3 {
+		t.Errorf("its pages: %d", got.PageCount)
 	}
 }
 

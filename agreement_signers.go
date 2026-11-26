@@ -79,24 +79,47 @@ type Party struct {
 }
 
 // pdfPages is how many pages a document has, refusing one Prospector couldn't later fill
-// in and seal: encrypted, already signed, or one it can't read at all.
+// in and seal: encrypted, already signed, or one it can't read at all. It is read, not
+// validated: real PDFs often break a rule of their own version that doesn't matter here.
 func pdfPages(data []byte) (int, error) {
-	ctx, err := api.ReadAndValidate(context.Background(), bytes.NewReader(data), model.NewDefaultConfiguration())
+	ctx, err := api.ReadContext(context.Background(), bytes.NewReader(data), model.NewDefaultConfiguration())
 	if err != nil {
 		if errors.Is(err, pdfcpu.ErrWrongPassword) || strings.Contains(err.Error(), "password") {
 			return 0, errors.New("that PDF is password-protected: save it without a password first")
 		}
 		return 0, fmt.Errorf("that PDF can't be read to place fields on it: %v", err)
 	}
-	switch {
-	case ctx.XRefTable.Encrypt != nil || ctx.E != nil:
+	if ctx.XRefTable.Encrypt != nil || ctx.E != nil {
 		return 0, errors.New("that PDF is encrypted: save it without protection first")
-	case ctx.XRefTable.SignatureExist || bytes.Contains(data, []byte("/ByteRange")):
+	}
+	if signedPDF(ctx.XRefTable, data) {
 		return 0, errors.New("that PDF is already signed: upload the unsigned version")
-	case ctx.PageCount < 1:
+	}
+	if err := ctx.EnsurePageCount(); err != nil {
+		return 0, fmt.Errorf("that PDF can't be read to place fields on it: %v", err)
+	}
+	if ctx.PageCount < 1 {
 		return 0, errors.New("that PDF has no pages")
 	}
 	return ctx.PageCount, nil
+}
+
+// signedPDF is whether a document carries a signature: its form says so, or a signature's
+// byte range is in it, which sealing it again would break.
+func signedPDF(x *model.XRefTable, data []byte) bool {
+	if bytes.Contains(data, []byte("/ByteRange")) {
+		return true
+	}
+	root, err := x.Catalog()
+	if err != nil {
+		return false
+	}
+	form, err := x.DereferenceDict(root["AcroForm"])
+	if err != nil || form == nil {
+		return false
+	}
+	flags := form.IntEntry("SigFlags")
+	return flags != nil && *flags&1 != 0
 }
 
 // agreementPages is a draft's page count, worked out from its document for one uploaded

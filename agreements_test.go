@@ -14,9 +14,12 @@ import (
 var samplePDF = testPDF(2, "")
 
 // testPDF is a well-formed PDF of blank A4 pages, with a comment line carrying note.
-func testPDF(pages int, note string) []byte {
+func testPDF(pages int, note string) []byte { return buildPDF("1.7", pages, note, "") }
+
+// buildPDF is testPDF with the version it claims and something more on each page.
+func buildPDF(version string, pages int, note, onPage string) []byte {
 	var b bytes.Buffer
-	b.WriteString("%PDF-1.7\n")
+	b.WriteString("%PDF-" + version + "\n")
 	if note != "" {
 		b.WriteString("% " + note + "\n")
 	}
@@ -32,7 +35,7 @@ func testPDF(pages int, note string) []byte {
 	}
 	obj(fmt.Sprintf("<< /Type /Pages /Kids [%s] /Count %d >>", kids, pages))
 	for range pages {
-		obj("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] >>")
+		obj("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] " + onPage + ">>")
 	}
 	xref := b.Len()
 	fmt.Fprintf(&b, "xref\n0 %d\n0000000000 65535 f \n", len(offsets)+1)
