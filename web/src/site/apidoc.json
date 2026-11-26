@@ -180,7 +180,7 @@
   ],
   [
    {
-    "text": "Requests are rate limited per API key and per signed-in person, as a token bucket: a key may make 100 at once and then 10 a second, a person 200 at once and then 20 a second. Past that an operation answers 429 "
+    "text": "Requests are rate limited per API key and per signed-in person, as a token bucket: a key may make 1000 at once and then 100 a second, a person 2000 at once and then 200 a second. Past that an operation answers 429 "
    },
    {
     "text": "throttled",

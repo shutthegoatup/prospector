@@ -20,8 +20,8 @@ type rateLimit struct {
 }
 
 var (
-	keyRate    = rateLimit{10, 100}
-	memberRate = rateLimit{20, 200}
+	keyRate    = rateLimit{100, 1000}
+	memberRate = rateLimit{200, 2000}
 )
 
 // rateGuard holds the buckets. serve turns it on; off, the tests can make as many

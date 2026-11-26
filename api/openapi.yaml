@@ -32,8 +32,8 @@ info:
     a client should act on carries a `type` that names it (see `Problem`).
 
     Requests are rate limited per API key and per signed-in person, as a token bucket:
-    a key may make 100 at once and then 10 a second, a person 200 at once and then 20 a
-    second. Past that an operation answers 429 `throttled` with `Retry-After`, the whole
+    a key may make 1000 at once and then 100 a second, a person 2000 at once and then 200
+    a second. Past that an operation answers 429 `throttled` with `Retry-After`, the whole
     seconds until it would be let through; a refused request costs nothing.
 
     Every list comes a page at a time: it takes `limit` and `cursor`, and answers
