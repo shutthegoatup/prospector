@@ -222,6 +222,15 @@ func (s *Store) researchQuery(org, offering int64, filter string, task int64) (*
 		}
 		return q.Where("id in (?)", s.db.Model(&Verdict{}).Select("company_id").Where("org_id = ? and offering_id = ? and stage = ?", org, offering, stage))
 	}
+	// A company the never-contact list covers is kept, but nobody is asked to review it
+	// or find someone there.
+	if filter == "review" || filter == "contact" {
+		o, err := s.OrgByID(org)
+		if err != nil {
+			return nil, "", err
+		}
+		q = notListed(q, o.Settings)
+	}
 	switch filter {
 	case "review":
 		if offering == 0 {
@@ -910,6 +919,43 @@ func (set OrgSettings) listed(email, link string) error {
 }
 
 var schemeRe = regexp.MustCompile(`^[a-z]+://`)
+
+// neverDomains are the list's domain entries, the ones that cover a whole company.
+func (set OrgSettings) neverDomains() []string {
+	var out []string
+	for _, raw := range strings.FieldsFunc(strings.ToLower(set.NeverContact), func(r rune) bool { return r == ',' || r == '\n' || r == ' ' }) {
+		entry := strings.TrimRight(strings.TrimPrefix(schemeRe.ReplaceAllString(strings.TrimSpace(raw), ""), "www."), "/")
+		if entry == "" || linkedinPath(entry) != "" || strings.Contains(entry, "@") {
+			continue
+		}
+		host, _, _ := strings.Cut(entry, "/")
+		out = append(out, host)
+	}
+	return out
+}
+
+// coversCompany is whether a company's web domain, or one it is under, is on the list.
+// The company is kept and built on; only contacting it is barred.
+func (set OrgSettings) coversCompany(domain string) bool {
+	domain = bareDomain(domain)
+	if domain == "" {
+		return false
+	}
+	for _, host := range set.neverDomains() {
+		if domain == host || strings.HasSuffix(domain, "."+host) {
+			return true
+		}
+	}
+	return false
+}
+
+// notListed keeps the companies the list covers out of a query, as coversCompany does.
+func notListed(q *gorm.DB, set OrgSettings) *gorm.DB {
+	for _, host := range set.neverDomains() {
+		q = q.Where("not (lower(domain) = ? or lower(domain) like ?)", host, "%."+host)
+	}
+	return q
+}
 
 // linkedinPath is what identifies a LinkedIn page whatever the subdomain: "in/hannah-pryce".
 func linkedinPath(link string) string {

@@ -442,6 +442,7 @@ const heldLabel: Record<NonNullable<TaskCompany["held"]>, string> = {
   customer: "Existing customer",
   open_deal: "Open conversation",
   qualified: "Qualified already",
+  never_contact: "Never contact, kept on file",
 };
 
 // LeftOutPanel is what a search came to that was already held, and the people it was
@@ -453,7 +454,7 @@ function LeftOutPanel({ id }: { id: number }) {
   const again = $api.useMutation("patch", "/o/{org}/api/v1/companies/{id}", { onSuccess: refresh });
   const d = left.data;
   if (!d) return null;
-  const held = d.rejected + d.customer + d.open_deal + d.qualified;
+  const held = d.rejected + d.customer + d.open_deal + d.qualified + d.listed;
   const refused = d.never_contact + d.erased;
   if (held + refused === 0) return null;
   const counts: [string, number][] = [
@@ -461,11 +462,12 @@ function LeftOutPanel({ id }: { id: number }) {
     [heldLabel.customer, d.customer],
     [heldLabel.qualified, d.qualified],
     [heldLabel.rejected, d.rejected],
+    [heldLabel.never_contact, d.listed],
   ];
   return (
     <Section className="gap-2.5 p-5" aria-label="Left out">
       <Eyebrow>Left out · {held + refused}</Eyebrow>
-      <p className="text-[13px] text-muted-foreground">Already here when this search came to them, so not new.</p>
+      <p className="text-[13px] text-muted-foreground">Already here when this search came to them, or on a domain the never-contact list covers: kept, never up for review.</p>
       {counts
         .filter(([, n]) => n > 0)
         .map(([label, n]) => (

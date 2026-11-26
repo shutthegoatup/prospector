@@ -572,7 +572,9 @@ type TaskView struct {
 func (v TaskView) LeftOut() []TaskCompany {
 	var out []TaskCompany
 	for _, c := range v.Companies {
-		if c.Held == "" || c.Stage == CompanyReview || (c.Held == heldRejected && c.Stage != CompanyRejected) {
+		switch {
+		case c.Held == heldNeverContact:
+		case c.Held == "" || c.Stage == CompanyReview, c.Held == heldRejected && c.Stage != CompanyRejected:
 			continue
 		}
 		out = append(out, c)
@@ -598,7 +600,7 @@ type TaskCompany struct {
 	Stage string    `json:"stage" jsonschema:"review, qualified or rejected: don't suggest a rejected company again"`
 	Since time.Time `json:"since"`
 	// Held is how the company already stood when the task first came to it.
-	Held string `json:"held,omitempty" jsonschema:"set when the company was already held when this task first came to it: rejected, customer, open_deal or qualified. It isn't a new find"`
+	Held string `json:"held,omitempty" jsonschema:"set when the company was already held when this task first came to it (rejected, customer, open_deal or qualified), or never_contact when its domain is on the never-contact list: keep adding what you find, but suggest nobody there. It isn't a new find"`
 }
 
 type TaskPerson struct {
@@ -711,6 +713,10 @@ func (s *Store) taskViews(tx *gorm.DB, org int64, tasks []Task, now time.Time) (
 	}
 
 	out := make([]TaskView, len(tasks))
+	o, err := s.OrgByID(org)
+	if err != nil {
+		return nil, err
+	}
 	for i, t := range tasks {
 		v := &out[i]
 		v.Task = t
@@ -745,6 +751,9 @@ func (s *Store) taskViews(tx *gorm.DB, org int64, tasks []Task, now time.Time) (
 		for _, id := range slices.Sorted(maps.Keys(companySince)) {
 			if c, here := companies[id]; here {
 				v.Companies = append(v.Companies, TaskCompany{ID: c.ID, Name: c.Name, Stage: c.Stage, Since: companySince[id], Held: heldAs[id]})
+				if o.Settings.coversCompany(c.Domain) {
+					v.Companies[len(v.Companies)-1].Held = heldNeverContact
+				}
 			}
 		}
 		// A task for an offering judges its companies by that offering's verdicts.
@@ -915,7 +924,7 @@ func asked(r RequestView, who Actor) AskedOut {
 func brief(v TaskView, who Actor) TaskBrief {
 	b := TaskBrief{ID: v.ID, Title: v.Title, Status: v.Status, Open: []AskedOut{}, Found: TaskCounts{len(v.Companies), len(v.People)}, Want: v.Want, OfferingID: v.OfferingID}
 	for _, c := range v.Companies {
-		if c.Stage == CompanyReview {
+		if c.Stage == CompanyReview && c.Held != heldNeverContact {
 			b.Review++
 		}
 	}
