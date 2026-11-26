@@ -330,6 +330,10 @@ func (a *App) page(w http.ResponseWriter, r *http.Request, active string, conten
 const contentPolicy = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
 	"font-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
 
+// pdfPolicy is the policy where pdf.js draws a document: it decodes JPEG 2000 images
+// with WebAssembly, which compiling needs allowed. Evaluating script still isn't.
+var pdfPolicy = strings.Replace(contentPolicy, "script-src 'self';", "script-src 'self' 'wasm-unsafe-eval';", 1)
+
 func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })

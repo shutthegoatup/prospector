@@ -273,13 +273,31 @@ func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
 		t.Error("someone in support is offered the controls, or doesn't see who signs")
 	}
 
-	res, err := http.Get(srv + "/assets/js/pdf.worker.min.mjs")
-	if err != nil {
-		t.Fatal(err)
+	// pdf.js compiles WebAssembly to draw JPEG 2000 images, so the page and its worker
+	// allow that, and only that: evaluating script stays refused, and other pages are
+	// as strict as ever.
+	policy := func(c *http.Client, u string) string {
+		t.Helper()
+		res, err := c.Get(u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("GET %s: %d", u, res.StatusCode)
+		}
+		if strings.HasSuffix(u, ".mjs") && !strings.Contains(res.Header.Get("Content-Type"), "javascript") {
+			t.Errorf("pdf.js's worker is served as %q", res.Header.Get("Content-Type"))
+		}
+		return res.Header.Get("Content-Security-Policy")
 	}
-	res.Body.Close()
-	if res.StatusCode != http.StatusOK || !strings.Contains(res.Header.Get("Content-Type"), "javascript") {
-		t.Errorf("pdf.js's worker: %d %q", res.StatusCode, res.Header.Get("Content-Type"))
+	for _, u := range []string{page, srv + "/assets/js/pdf.worker.min.mjs"} {
+		if got := policy(member, u); got != strings.Replace(contentPolicy, "script-src 'self';", "script-src 'self' 'wasm-unsafe-eval';", 1) {
+			t.Errorf("%s has the policy %q", u, got)
+		}
+	}
+	if got := policy(member, srv+"/o/alpha/companies/"+itoa(*hannah.CompanyID)); got != contentPolicy {
+		t.Errorf("the company's page has the policy %q", got)
 	}
 }
 

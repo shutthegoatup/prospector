@@ -57,6 +57,7 @@ func (a *App) prepareAgreement(w http.ResponseWriter, r *http.Request) {
 			p.People = append(p.People, person)
 		}
 	}
+	w.Header().Set("Content-Security-Policy", pdfPolicy)
 	a.page(w, r, "companies", PrepareView(q, p))
 }
 
