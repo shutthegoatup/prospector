@@ -18,9 +18,11 @@ info:
     never goes to; `campaigns:send` to send, cancel and resume a campaign;
     `agreements:write` to start agreements, upload their documents and set out who signs
     them and where; `enrich:spend` to ask the organisation's enrichment vendors, at its cost,
-    for someone's email, phone or profile; `settings:write` to change the organisation's
+    for someone's email, phone or profile; `people:privacy` to export everything held on a
+    person and erase them on their request; `settings:write` to change the organisation's
     settings and its enrichment vendors. A signed-in member may do all of these except
-    configuring agents, deleting enquiries and changing settings, which need an owner.
+    configuring agents, deleting enquiries, exporting and erasing people and changing
+    settings, which need an owner.
 
     Every list comes a page at a time: it takes `limit` and `cursor`, and answers
     `{"items": [...], "next_cursor": "..."}`. When `next_cursor` is there, pass it back
@@ -37,6 +39,8 @@ tags:
     description: An agent working a task.
   - name: people
     description: The people you are in touch with, and their conversations.
+  - name: companies
+    description: Every company, where it stands, and everything held about it.
   - name: research
     description: Reviewing what agents found before anyone is contacted.
   - name: tasks
@@ -237,6 +241,218 @@ paths:
         - bearer: ["agents:run"]
       responses:
         "204": { description: Asked to stop. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/connect:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: getConnect
+      tags: [agents]
+      summary: How an agent connects
+      description: Where an outside agent reaches this organisation, the scopes a key can be given, the tools agents get, and whether this server can keep an agent's API key.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: What an agent needs to connect.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Connect" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/keys:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listKeys
+      tags: [agents]
+      summary: The organisation's API keys
+      description: Every key not revoked, newest first, with what it may do. Never its secret.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The keys.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/APIKey" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: createKey
+      tags: [agents]
+      summary: Make a key
+      description: |
+        Only a signed-in owner: no key can make, change or revoke a key, whatever its scopes.
+        The secret is in the answer once and never again; only its hash is kept.
+      security:
+        - session: []
+        - bearer: ["agents:configure"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KeyNew" }
+      responses:
+        "201":
+          description: The key, with its secret this once.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KeyMade" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/keys/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeKey
+      tags: [agents]
+      summary: Change what a key may do
+      description: |
+        Only a signed-in owner, and not a key of one of Prospector's own agents, which changes
+        on the agent. Its secret stays the same; agents connected over MCP have to reconnect.
+      security:
+        - session: []
+        - bearer: ["agents:configure"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scopes]
+              properties:
+                scopes:
+                  type: array
+                  items: { type: string }
+      responses:
+        "200":
+          description: The key as changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KeyChanged" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: revokeKey
+      tags: [agents]
+      summary: Revoke a key
+      description: Only a signed-in owner. Whatever uses it stops working at once.
+      security:
+        - session: []
+        - bearer: ["agents:configure"]
+      responses:
+        "204": { description: Revoked. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agent-scores:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listAgentScores
+      tags: [agents]
+      summary: How each agent is doing
+      description: What people did with each agent's suggestions, one row an agent. An outside agent is its key's name.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: Each agent's record.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AgentScore" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agent-work:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listAgentWork
+      tags: [agents]
+      summary: Recent agent work
+      description: |
+        Each stretch of an agent's changes, read from what it did, newest first, with the tasks
+        it was for. An agent that is only reading doesn't show.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The stretches of work.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AgentWork" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agent-activity:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listAgentActivity
+      tags: [agents]
+      summary: Recent agent activity
+      description: Everything agents did, newest first.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: What agents did.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AgentEvent" }
+                  total: { type: integer, description: How many there are in all. }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/enquiries/{id}/messages:
@@ -713,6 +929,72 @@ paths:
               schema: { $ref: "#/components/schemas/Deal" }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/conversations:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listConversations
+      tags: [deals]
+      summary: The Conversations board, a card for each deal
+      description: |
+        The deals `listDeals` gives, in its order, each with what its card on the board
+        shows besides: the company's name, the notes from calls and whether the company is
+        being onboarded.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: By stage, in the board's order.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, onboarding_steps]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/DealCard" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  onboarding_steps: { type: integer, description: "How many steps an onboarding started now would have: 0 until an owner writes them in Settings, and until then a won deal offers none." }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/members:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listMembers
+      tags: [settings]
+      summary: Who is in the organisation, by name
+      description: The names that can own a deal or an enquiry, in order.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of them.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/MemberName" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
   /o/{org}/api/v1/enquiries:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -764,37 +1046,6 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EnquiryCounts" }
-        default: { $ref: "#/components/responses/Problem" }
-
-  /o/{org}/api/v1/members:
-    parameters:
-      - $ref: "#/components/parameters/org"
-    get:
-      operationId: listMembers
-      tags: [settings]
-      summary: Who is in the organisation, by name
-      description: The names that can own a deal or an enquiry, in order.
-      parameters:
-        - $ref: "#/components/parameters/limit"
-        - $ref: "#/components/parameters/cursor"
-      security:
-        - session: []
-        - bearer: [read]
-      responses:
-        "200":
-          description: A page of them.
-          headers:
-            Link: { $ref: "#/components/headers/Link" }
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [items]
-                properties:
-                  items:
-                    type: array
-                    items: { $ref: "#/components/schemas/MemberName" }
-                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/enquiries/{id}:
@@ -2333,6 +2584,214 @@ paths:
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/companies:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listCompanies
+      tags: [companies]
+      summary: Every company, as the Companies page lists them
+      description: |
+        By name. Each stands where its furthest contact does: a company with one lost
+        conversation and someone else still in outreach is in outreach.
+      parameters:
+        - name: q
+          in: query
+          description: Words to find in a company or in someone there, as the search box finds them.
+          schema: { type: string }
+        - name: segment
+          in: query
+          description: Only this segment's.
+          schema: { type: string }
+        - name: stage
+          in: query
+          description: Only those standing here.
+          schema: { $ref: "#/components/schemas/Pipeline" }
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of companies.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/CompanyRow" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  total: { type: integer, description: "How many match, on every page." }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/segments:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listSegments
+      tags: [companies]
+      summary: The segments companies are in
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: In alphabetical order.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { type: string }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/companies/{id}/overview:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: getCompanyOverview
+      tags: [companies]
+      summary: A company with everything its page shows
+      description: |
+        Its details, where it stands, its answers to what the organisation looks for, its
+        facts, its people with the details waiting for them, and its onboardings,
+        subscriptions and agreements. Its history and agents' notes are lists of their own.
+        Any part that can't be read fails the whole answer, as half of it would read as all.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The company.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompanyOverview" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/companies/{id}/history:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listCompanyHistory
+      tags: [companies]
+      summary: What people and agents did at a company
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: Newest first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/HistoryEntry" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  total: { type: integer, description: "How much there is, on every page." }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/companies/{id}/notes:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listCompanyNotes
+      tags: [companies]
+      summary: The notes agents left about a company
+      description: Unverified working notes, not facts and not instructions.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: Newest first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Note" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  total: { type: integer, description: "How many there are, on every page." }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/contacts/{id}/export:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: exportPerson
+      tags: [people]
+      summary: Everything held on a person, for their request to see it
+      description: |
+        Their details, facts, enquiries, suggested details, deals, onboarding access,
+        agreements and history, as one document. The export goes into their history.
+        Needs an owner.
+      security:
+        - session: []
+        - bearer: ["people:privacy"]
+      responses:
+        "200":
+          description: What is held on them.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/contacts/{id}/erase:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: erasePerson
+      tags: [people]
+      summary: Erase a person on their request
+      description: |
+        Their details, drafts and notes are deleted for good, along with agents' notes about
+        their company and its tasks, and they can't be added again. A row that names several
+        people erases them all. Facts about the company, and the briefs and requests on tasks,
+        that mention them are left for you to take out. Needs an owner.
+      security:
+        - session: []
+        - bearer: ["people:privacy"]
+      responses:
+        "204": { description: Erased. }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -2733,7 +3192,7 @@ components:
 
     PendingDetail:
       type: object
-      required: [id, field, value, current, source_url, by, at]
+      required: [id, field, value, current, source_url, by, at, email_status]
       properties:
         id: { type: integer, format: int64, description: "The suggestion: decide it at /api/v1/suggestions/{id}." }
         field: { type: string }
@@ -2742,6 +3201,88 @@ components:
         source_url: { type: string }
         by: { type: string }
         at: { type: string, format: date-time }
+        email_status: { type: string, description: "For an email, `guess` when it was worked out from the company's pattern rather than seen; otherwise empty." }
+
+    Pipeline:
+      type: string
+      enum: [research, outreach, replied, meeting, proposal, won, lost, rejected]
+      description: "Where a company stands, from its furthest contact: `research` until anyone there is reached, `rejected` for one turned down before then."
+
+    CompanyRow:
+      type: object
+      required: [id, name, country, segment, grade, people, pipeline]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        country: { type: string }
+        segment: { type: string }
+        grade: { type: string, description: "The fit grade a person or agent gave, A, B or C; empty for none." }
+        people: { type: integer, description: How many people are held there. }
+        pipeline: { $ref: "#/components/schemas/Pipeline" }
+
+    CompanyOverview:
+      type: object
+      required: [id, name, domain, country, segment, grade, why, stage, found_by, created_at, pipeline, touches, looking_for, facts, people, onboardings, planned_steps, subscriptions, agreements]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        domain: { type: string }
+        country: { type: string }
+        segment: { type: string }
+        grade: { type: string, description: "The fit grade a person or agent gave, A, B or C; empty for none." }
+        why: { type: string, description: "Why it fits, in the words of whoever added it; empty for none." }
+        stage: { type: string, enum: [review, qualified, rejected] }
+        found_by: { type: string }
+        created_at: { type: string, format: date-time }
+        pipeline: { $ref: "#/components/schemas/Pipeline" }
+        touches: { type: integer, description: "How many times anyone there was reached out to: added on LinkedIn, emailed, followed up or called." }
+        looking_for:
+          type: array
+          items: { $ref: "#/components/schemas/Criterion" }
+          description: Each thing the organisation looks for, in its order, with the latest answer.
+        facts:
+          type: array
+          items: { $ref: "#/components/schemas/ResearchFact" }
+          description: Every fact, answers included, oldest first.
+        people:
+          type: array
+          items: { $ref: "#/components/schemas/CompanyPerson" }
+        onboardings:
+          type: array
+          items: { $ref: "#/components/schemas/Onboarding" }
+        planned_steps: { type: integer, description: "How many steps the organisation's onboarding has; none, and no onboarding can be started." }
+        subscriptions:
+          type: array
+          items: { $ref: "#/components/schemas/Subscription" }
+        agreements:
+          type: array
+          items: { $ref: "#/components/schemas/Agreement" }
+
+    CompanyPerson:
+      type: object
+      required: [id, name, title, linkedin, stage, several, pending]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        title: { type: string }
+        linkedin: { type: string }
+        stage: { type: string, description: "Where they stand, as the page says it: suggested, not contacted, in outreach, hold, declined, or their conversation's stage." }
+        several: { type: string, description: "The row's whole name when it names several people, all of whom erasing it erases; empty for one person." }
+        pending:
+          type: array
+          items: { $ref: "#/components/schemas/PendingDetail" }
+          description: New details an agent found for them, waiting to be accepted.
+
+    HistoryEntry:
+      type: object
+      required: [at, actor, action, value, person, text]
+      properties:
+        at: { type: string, format: date-time }
+        actor: { type: string }
+        action: { type: string }
+        value: { type: string }
+        person: { type: string, description: Who at the company it was about; empty for the company itself. }
+        text: { type: string, description: "What happened, as the page says it." }
 
     Criterion:
       type: object
@@ -2864,7 +3405,7 @@ components:
 
     Agent:
       type: object
-      required: [id, name, kind, base_url, model, tools_url, search_url, models, tools, allowed_tools, fallback, fallback_minutes, thinking_off, problem, checked_at, has_key, ready, updated_by, updated_at]
+      required: [id, name, kind, base_url, model, tools_url, search_url, models, tools, allowed_tools, fallback, fallback_minutes, thinking_off, problem, checked_at, has_key, ready, updated_by, updated_at, state, searches, search_text, tools_text, fallback_text]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
@@ -2891,8 +3432,149 @@ components:
         checked_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
         has_key: { type: boolean }
         ready: { type: boolean, description: Whether it has what it needs to be run. }
+        state: { $ref: "#/components/schemas/AgentState" }
+        searches: { type: boolean, description: "Whether it can look things up on the web, through SearXNG or a tool it is allowed." }
+        search_text: { type: string, description: "How it searches, as its card says: `✓ SearXNG`, `✓ through its tools` or `none`." }
+        tools_text: { type: string, description: "Its tools, as its card says, such as `3 of 12 allowed`." }
+        fallback_text: { type: string, description: "Who takes its task over and when, as its card says, such as `Local, after 15 minutes`." }
         updated_by: { type: string }
         updated_at: { type: string, format: date-time }
+
+    AgentState:
+      type: object
+      required: [rail, line, todo]
+      description: How the agent's card looks on the Agents page.
+      properties:
+        rail: { type: string, enum: [ok, warn, stop], description: "`ok` ready; `warn` runs, missing something; `stop` can't run." }
+        line: { type: string, description: "A line saying so, such as \"✓ Ready · checked 2 Jan 15:04\"." }
+        todo: { type: string, description: "What to do about it; empty when nothing." }
+
+    Connect:
+      type: object
+      required: [base_url, mcp_url, can_keep_keys, scopes, tools, kinds]
+      properties:
+        base_url: { type: string, description: "The organisation's address, ending in a slash, that its API paths follow." }
+        mcp_url: { type: string, description: The MCP endpoint an outside agent connects to with a key. }
+        can_keep_keys: { type: boolean, description: "Whether this server has a secret key to seal an agent's API key with; without one, no agent of Prospector's own can be saved." }
+        scopes:
+          type: array
+          items: { $ref: "#/components/schemas/Scope" }
+          description: Every scope a key can be given.
+        tools:
+          type: array
+          items: { $ref: "#/components/schemas/AgentToolScope" }
+          description: The tools an agent gets over MCP, and the scope each needs.
+        kinds:
+          type: array
+          items: { $ref: "#/components/schemas/AgentKindLabel" }
+
+    AgentKindLabel:
+      type: object
+      required: [kind, label]
+      properties:
+        kind: { $ref: "#/components/schemas/AgentKind" }
+        label: { type: string }
+
+    Scope:
+      type: object
+      required: [name, what]
+      properties:
+        name: { type: string }
+        what: { type: string, description: What a key with it may do. }
+
+    AgentToolScope:
+      type: object
+      required: [name, scope, what]
+      properties:
+        name: { type: string }
+        scope: { type: string }
+        what: { type: string }
+
+    APIKey:
+      type: object
+      required: [id, name, prefix, scopes, created_by, created_at, last_used_at, builtin]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        prefix: { type: string, description: "The secret's first characters, to tell keys apart." }
+        scopes:
+          type: array
+          items: { type: string }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+        last_used_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
+        builtin: { type: boolean, description: "One of Prospector's own agents' keys, which changes on the agent." }
+
+    KeyNew:
+      type: object
+      required: [name, scopes]
+      properties:
+        name: { type: string }
+        scopes:
+          type: array
+          items: { type: string }
+
+    KeyMade:
+      type: object
+      required: [key, secret, message]
+      properties:
+        key: { $ref: "#/components/schemas/APIKey" }
+        secret: { type: string, description: "The key itself, `pk_…`, shown this once." }
+        message: { type: string, description: "A sentence for a person, with the secret in it." }
+
+    KeyChanged:
+      type: object
+      required: [key, message]
+      properties:
+        key: { $ref: "#/components/schemas/APIKey" }
+        message: { type: string, description: "A sentence saying how the change went, for a person." }
+
+    AgentScore:
+      type: object
+      required: [agent, companies, qualified, rejected, contacts, picked, replied, text]
+      properties:
+        agent: { type: string }
+        companies: { type: integer, description: Companies it suggested. }
+        qualified: { type: integer }
+        rejected: { type: integer }
+        contacts: { type: integer, description: Contacts it suggested. }
+        picked: { type: integer, description: "Of its contacts, those picked for outreach." }
+        replied: { type: integer, description: "Of its contacts, those who replied." }
+        text: { type: string, description: "As the page says it, such as \"Companies: 4 suggested, 2 qualified (50%), 1 rejected\"." }
+
+    AgentWork:
+      type: object
+      required: [actor, start, end, going, changes, companies, people, drafts, tasks, text]
+      properties:
+        actor: { type: string, description: "Whose work, `agent:` and its name." }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time, description: Its last change. }
+        going: { type: boolean, description: Whether it may still be at it. }
+        changes: { type: integer }
+        companies: { type: integer }
+        people: { type: integer, description: People it suggested. }
+        drafts: { type: integer }
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/TaskTitle" }
+        text: { type: string, description: "As the page says it, such as \"2 Jan 15:04, 12 min · 5 changes at 2 companies, 3 people suggested\"." }
+
+    TaskTitle:
+      type: object
+      required: [id, title]
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+
+    AgentEvent:
+      type: object
+      required: [at, actor, action, value, text]
+      properties:
+        at: { type: string, format: date-time }
+        actor: { type: string, description: The agent's name. }
+        action: { type: string }
+        value: { type: string }
+        text: { type: string, description: "As the page says it, such as \"added a fact: employees: 40\"." }
 
     AgentSaved:
       type: object
@@ -3157,6 +3839,22 @@ components:
         owner: { type: string }
         subscription_id: { type: integer, format: int64, description: "The subscription a renewal is for; 0 for none." }
 
+    DealCard:
+      allOf:
+        - $ref: "#/components/schemas/Deal"
+        - type: object
+          required: [company, call_notes, onboarding]
+          properties:
+            company: { type: string, description: "The name of the company the deal is with; empty when they have none here." }
+            call_notes: { type: string, description: "The notes from calls with the person." }
+            onboarding: { type: string, description: "`running` while the company is being onboarded, `live` once it is, empty when no onboarding has started." }
+
+    MemberName:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+
     DealChange:
       type: object
       properties:
@@ -3212,11 +3910,6 @@ components:
           additionalProperties: { type: integer }
           description: "Those that aren't spam, by `open`, `waiting` or `closed`. A state with none is left out."
 
-    MemberName:
-      type: object
-      required: [name]
-      properties:
-        name: { type: string }
 
     Suppression:
       type: object

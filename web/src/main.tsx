@@ -2,8 +2,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router";
+import { AgentsPage } from "@/pages/Agents";
 import { AddPage } from "@/pages/Add";
 import { CampaignsPage } from "@/pages/Campaigns";
+import { CompaniesPage } from "@/pages/Companies";
+import { CompanyPage } from "@/pages/Company";
+import { ConversationsPage } from "@/pages/Conversations";
 import { EnquiriesPage } from "@/pages/Enquiries";
 import { OnboardingPage } from "@/pages/Onboarding";
 import { ResearchPage } from "@/pages/Research";
@@ -25,6 +29,10 @@ if (mount) {
               <Route path="research" element={<ResearchPage />} />
               <Route path="campaigns" element={<CampaignsPage />} />
               <Route path="onboarding" element={<OnboardingPage />} />
+              <Route path="companies" element={<CompaniesPage />} />
+              <Route path="companies/:id" element={<CompanyPage />} />
+              <Route path="conversations" element={<ConversationsPage />} />
+              <Route path="agents" element={<AgentsPage />} />
               <Route path="add" element={<AddPage />} />
               <Route path="tasks" element={<TasksPage />} />
               <Route path="tasks/:id" element={<TaskPage />} />

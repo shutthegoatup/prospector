@@ -9,7 +9,7 @@ import (
 
 // reactPages are the pages the React app (web/src/main.tsx) has; each lights up its own
 // sidebar entry. A page moved to React is listed here and routed in main.tsx.
-var reactPages = []string{"research", "campaigns", "onboarding", "enquiries", "subscriptions", "tasks", "add"}
+var reactPages = []string{"research", "campaigns", "onboarding", "enquiries", "subscriptions", "tasks", "add", "agents", "conversations", "companies"}
 
 // reactUnder are React pages without a sidebar entry of their own, and the entry they light.
 var reactUnder = map[string]string{"tasks": "research"}
