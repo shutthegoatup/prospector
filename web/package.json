@@ -14,7 +14,18 @@
     "typescript": "5.9.3"
   },
   "dependencies": {
+    "@tanstack/react-query": "5.108.4",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "cn": "^0.5.2",
+    "lucide-react": "1.81.0",
     "openapi-fetch": "0.17.0",
-    "pdfjs-dist": "4.10.38"
+    "openapi-react-query": "0.5.4",
+    "pdfjs-dist": "4.10.38",
+    "radix-ui": "1.8.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-router": "7.18.7",
+    "tailwind-merge": "3.7.1"
   }
 }
