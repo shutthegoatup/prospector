@@ -899,11 +899,11 @@ func (s *Store) agentTaskPage(org int64, who Actor, id int64, page PageIn, now t
 	}
 	out := TaskOut{TaskBrief: brief(*v, who), Brief: v.Brief, Requests: []AskedOut{}, Companies: v.Companies, People: v.People, Notes: []NoteOut{},
 		Claimed: claimed}
-	if v.OfferingID != 0 {
-		o, err := s.Offering(org, v.OfferingID)
-		if err != nil {
-			return nil, err
-		}
+	// A closed task can outlive its offering; an open one can't, as removing it is refused.
+	var gone notFound
+	if o, err := s.offeringOf(org, v.OfferingID); err != nil && !errors.As(err, &gone) {
+		return nil, err
+	} else if o != nil {
 		out.Offering = &TaskOffering{ID: o.ID, Name: o.Name, Guidance: "This task finds companies for " + o.Name + ". " +
 			"The stage on each company here, and in what add_company answers, is for " + o.Name + ": skip one rejected for it. " +
 			"A company rejected only for something else is still worth adding for this.\n\n" + lookForList(o.Name, o.LookFor)}

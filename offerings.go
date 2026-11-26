@@ -69,6 +69,14 @@ func (s *Store) Offering(org, id int64) (*Offering, error) {
 	return &o, nil
 }
 
+// offeringOf is the offering with this id, or nil for the organisation's own.
+func (s *Store) offeringOf(org, id int64) (*Offering, error) {
+	if id == 0 {
+		return nil, nil
+	}
+	return s.Offering(org, id)
+}
+
 func (s *Store) AddOffering(org int64, o Offering, actor string) (*Offering, error) {
 	if err := o.check(); err != nil {
 		return nil, err
@@ -81,32 +89,52 @@ func (s *Store) AddOffering(org int64, o Offering, actor string) (*Offering, err
 		if err := nameFree(tx, org, 0, o.Name); err != nil {
 			return err
 		}
-		return tx.Create(&o).Error
+		if err := tx.Create(&o).Error; err != nil {
+			return err
+		}
+		return s.log(tx, org, 0, nil, actor, "offering:added", &o.Name)
 	})
 	return &o, err
 }
 
-// ChangeOffering saves o over the offering with its id.
-func (s *Store) ChangeOffering(org int64, o Offering, actor string) (*Offering, error) {
-	if err := o.check(); err != nil {
+// heldOffering reads an offering with its row held, so it can't be removed or changed
+// under the caller before the transaction ends.
+func heldOffering(tx *gorm.DB, org, id int64) (*Offering, error) {
+	if err := hold(tx, &Offering{}, org, id); err != nil {
 		return nil, err
 	}
-	o.OrgID, o.UpdatedBy = org, actor
+	var o Offering
+	if err := tx.Where("org_id = ? and id = ?", org, id).First(&o).Error; err != nil {
+		return nil, missing(err, "no offering %d", id)
+	}
+	return &o, nil
+}
+
+// ChangeOffering applies change to the offering as it is now, and saves it.
+func (s *Store) ChangeOffering(org, id int64, change func(*Offering), actor string) (*Offering, error) {
+	var o *Offering
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := holdOrg(tx, org); err != nil {
+			return err
+		}
+		var err error
+		if o, err = heldOffering(tx, org, id); err != nil {
+			return err
+		}
+		change(o)
+		if err := o.check(); err != nil {
 			return err
 		}
 		if err := nameFree(tx, org, o.ID, o.Name); err != nil {
 			return err
 		}
-		res := tx.Model(&Offering{}).Where("org_id = ? and id = ?", org, o.ID).
-			Select("name", "look_for", "pitch", "note_template", "updated_by", "updated_at").Updates(&o)
-		if res.Error != nil || res.RowsAffected == 0 {
-			return missing(res.Error, "no offering %d", o.ID)
+		o.UpdatedBy = actor
+		if err := tx.Model(o).Select("name", "look_for", "pitch", "note_template", "updated_by", "updated_at").Updates(o).Error; err != nil {
+			return err
 		}
-		return tx.Where("org_id = ? and id = ?", org, o.ID).First(&o).Error
+		return s.log(tx, org, 0, nil, actor, "offering:changed", &o.Name)
 	})
-	return &o, err
+	return o, err
 }
 
 func nameFree(tx *gorm.DB, org, id int64, name string) error {
@@ -124,14 +152,21 @@ func nameFree(tx *gorm.DB, org, id int64, name string) error {
 // what was decided.
 func (s *Store) RemoveOffering(org, id int64, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		var o Offering
-		if err := tx.Where("org_id = ? and id = ?", org, id).First(&o).Error; err != nil {
-			return missing(err, "no offering %d", id)
+		o, err := heldOffering(tx, org, id)
+		if err != nil {
+			return err
 		}
 		if err := tx.Where("org_id = ? and offering_id = ?", org, id).Delete(&Verdict{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Delete(&o).Error; err != nil {
+		var open int64
+		if err := tx.Model(&Task{}).Where("org_id = ? and offering_id = ? and closed_at is null", org, id).Count(&open).Error; err != nil {
+			return err
+		}
+		if open > 0 {
+			return conflict(fmt.Sprintf("%d open tasks are finding companies for %s: close them first", open, o.Name))
+		}
+		if err := tx.Delete(o).Error; err != nil {
 			return err
 		}
 		return s.log(tx, org, 0, nil, actor, "offering:removed", &o.Name)
@@ -151,9 +186,9 @@ func (s *Store) JudgeCompany(org, offering, company int64, stage, fit, reason, a
 		return fmt.Errorf("unknown stage %q", stage)
 	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		var o Offering
-		if err := tx.Where("org_id = ? and id = ?", org, offering).First(&o).Error; err != nil {
-			return missing(err, "no offering %d", offering)
+		o, err := heldOffering(tx, org, offering)
+		if err != nil {
+			return err
 		}
 		var n int64
 		if err := tx.Model(&Company{}).Where("org_id = ? and id = ?", org, company).Count(&n).Error; err != nil {
@@ -185,6 +220,9 @@ func (s *Store) JudgeCompany(org, offering, company int64, stage, fit, reason, a
 // putUpForReview brings a company found for an offering into that offering's review,
 // unless it has already been judged for it, and says where it stands.
 func putUpForReview(tx *gorm.DB, org, offering, company int64, actor string) (string, error) {
+	if _, err := heldOffering(tx, org, offering); err != nil {
+		return "", err
+	}
 	v := Verdict{OrgID: org, OfferingID: offering, CompanyID: company, Stage: CompanyReview, By: actor, UpdatedAt: time.Now()}
 	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&v).Error; err != nil {
 		return "", err
@@ -228,6 +266,7 @@ type VerdictRow struct {
 func (s *Store) verdictRows(org int64) *gorm.DB {
 	return s.db.Model(&Verdict{}).Select("verdicts.*, companies.name as company").
 		Joins("join companies on companies.id = verdicts.company_id and companies.org_id = verdicts.org_id").
+		Joins("join offerings on offerings.id = verdicts.offering_id and offerings.org_id = verdicts.org_id").
 		Where("verdicts.org_id = ?", org)
 }
 

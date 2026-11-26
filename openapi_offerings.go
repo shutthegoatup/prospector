@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/shutthegoatup/prospector/api"
 )
@@ -51,15 +52,13 @@ func (s apiServer) ChangeOffering(ctx context.Context, in api.ChangeOfferingRequ
 		return nil, errors.New("send what changes, such as {\"name\": …}")
 	}
 	q, c := reqFrom(ctx), in.Body
-	o, err := s.a.s.Offering(q.Org.ID, in.Id)
+	o, err := s.a.s.ChangeOffering(q.Org.ID, in.Id, func(o *Offering) {
+		put(&o.Name, c.Name)
+		put(&o.LookFor, c.LookFor)
+		put(&o.Pitch, c.Pitch)
+		put(&o.NoteTemplate, c.NoteTemplate)
+	}, q.Actor())
 	if err != nil {
-		return nil, err
-	}
-	put(&o.Name, c.Name)
-	put(&o.LookFor, c.LookFor)
-	put(&o.Pitch, c.Pitch)
-	put(&o.NoteTemplate, c.NoteTemplate)
-	if o, err = s.a.s.ChangeOffering(q.Org.ID, *o, q.Actor()); err != nil {
 		return nil, err
 	}
 	return api.ChangeOffering200JSONResponse(offeringOut(*o)), nil
@@ -74,6 +73,11 @@ func (s apiServer) RemoveOffering(ctx context.Context, in api.RemoveOfferingRequ
 }
 
 func (s apiServer) ListVerdicts(ctx context.Context, in api.ListVerdictsRequestObject) (api.ListVerdictsResponseObject, error) {
+	switch stage := string(in.Params.Stage); stage {
+	case "", CompanyReview, CompanyQualified, CompanyRejected:
+	default:
+		return nil, fmt.Errorf("stage is review, qualified or rejected, not %q", stage)
+	}
 	rows, err := s.a.s.Judged(reqFrom(ctx).Org.ID, in.Id, string(in.Params.Stage))
 	if err != nil {
 		return nil, err

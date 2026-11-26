@@ -75,6 +75,24 @@ func TestATaskFindsCompaniesForItsOffering(t *testing.T) {
 	if v := must(s.AgentTask(o.ID, scout, own.ID, PageIn{})); v.Offering != nil {
 		t.Fatalf("a task for the organisation's own offering names none: %+v", v.Offering)
 	}
+
+	if code, body := asKey(t, "GET", srv.URL+"/o/alpha/api/v1/offerings/"+itoa(cto.ID)+"/verdicts?stage=junk", secret, nil); code != http.StatusBadRequest {
+		t.Fatalf("listing verdicts at a stage there is no such thing as: %d %s", code, body)
+	}
+
+	// Agents still on it would be left finding for the wrong thing.
+	if err := s.RemoveOffering(o.ID, cto.ID, "Ada"); err == nil || !strings.Contains(err.Error(), "close them first") {
+		t.Fatalf("removing an offering an open task is finding for: %v", err)
+	}
+	if err := s.SetTaskClosed(o.ID, task.Id, true, "Ada"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RemoveOffering(o.ID, cto.ID, "Ada"); err != nil {
+		t.Fatalf("removing it once its tasks are closed: %v", err)
+	}
+	if v, err := s.AgentTask(o.ID, scout, task.Id, PageIn{}); err != nil || v.Offering != nil {
+		t.Fatalf("a closed task whose offering was removed should still read: %+v %v", v, err)
+	}
 }
 
 func TestExistingTasksAreForTheOrganisationsOwnOffering(t *testing.T) {

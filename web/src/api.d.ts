@@ -1244,8 +1244,9 @@ export interface paths {
         };
         /**
          * What the organisation sells besides what its settings describe
-         * @description The organisation's own offering, whose wording is in Settings and whose verdict on a
-         *     company is the company's stage, isn't listed; it is offering 0 wherever one is named.
+         * @description The organisation's own offering, whose look-for list is in Settings and whose verdict on
+         *     a company is the company's stage, isn't listed. Reviewing a company or starting a task
+         *     names it as offering 0.
          */
         get: operations["listOfferings"];
         put?: never;
@@ -1417,11 +1418,11 @@ export interface components {
             /** Format: int64 */
             id: number;
             name: string;
-            /** @description What makes a company a fit for it, one `name: what counts` per line. */
+            /** @description What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list. */
             look_for: string;
-            /** @description The call script's pitch line. `{company}` is filled in. */
+            /** @description Its pitch line, kept for when people are reached for it; nothing uses it yet. */
             pitch: string;
-            /** @description The connection note. `{first}`, `{company}` and `{org}` are filled in. */
+            /** @description Its connection note, kept for when people are picked for it; nothing uses it yet. */
             note_template: string;
             updated_by: string;
             /** Format: date-time */
@@ -1487,7 +1488,7 @@ export interface components {
         CompanyReview: {
             /** @enum {string} */
             stage: "review" | "qualified" | "rejected";
-            /** @description Why, in a few words; kept with the company. Empty leaves it as it was. */
+            /** @description Why, in a few words; kept with the company, or with the verdict when an offering is named. Empty leaves it as it was. */
             fit?: string;
             /**
              * Format: int64
@@ -1631,6 +1632,11 @@ export interface components {
             title: string;
             /** @description What is wanted: the task's first request. */
             brief: string;
+            /**
+             * Format: int64
+             * @description What the task finds companies for: agents are given its look-for fields, and what they find waits in its review. 0 or left out is the organisation's own.
+             */
+            offering?: number;
             /** @description Prospector's own agents to start on the task, each on its own request. */
             agents?: number[];
         };
@@ -1646,6 +1652,11 @@ export interface components {
             /** Format: int64 */
             id: number;
             title: string;
+            /**
+             * Format: int64
+             * @description What the task finds companies for; 0 is the organisation's own.
+             */
+            offering_id: number;
             created_by: string;
             /** Format: date-time */
             created_at: string;
