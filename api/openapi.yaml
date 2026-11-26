@@ -53,6 +53,8 @@ tags:
     description: Contracts a company is to sign, each a PDF frozen by its hash.
   - name: mail
     description: Marketing mail, and the one list of addresses it never goes to.
+  - name: offerings
+    description: The things an organisation sells besides what its settings describe, each with what to look for at a company, and where each company stands for each.
   - name: enrichment
     description: Data vendors the organisation pays, under its own keys, to find an email, phone or profile its research couldn't.
   - name: settings
@@ -1772,7 +1774,7 @@ paths:
       operationId: reviewCompany
       tags: [research]
       summary: Qualify a company, reject it, or put it back for review
-      description: A rejected company is one agents are told not to suggest again.
+      description: A company rejected for the organisation's own offering is one agents are told not to suggest again; a verdict for another offering leaves the company's own stage as it was.
       security:
         - session: []
         - bearer: ["research:review"]
@@ -1964,6 +1966,167 @@ paths:
               schema: { $ref: "#/components/schemas/Settings" }
         default: { $ref: "#/components/responses/Problem" }
 
+
+  /o/{org}/api/v1/offerings:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listOfferings
+      tags: [offerings]
+      summary: What the organisation sells besides what its settings describe
+      description: |
+        The organisation's own offering, whose look-for list is in Settings and whose verdict on
+        a company is the company's stage, isn't listed. Reviewing a company or starting a task
+        names it as offering 0.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: By name.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Offering" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: addOffering
+      tags: [offerings]
+      summary: Add something the organisation sells
+      description: For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["settings:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OfferingNew" }
+      responses:
+        "201":
+          description: The offering, added.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Offering" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/offerings/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeOffering
+      tags: [offerings]
+      summary: Change an offering's name or wording
+      description: Send only what changes. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["settings:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OfferingChange" }
+      responses:
+        "200":
+          description: The offering as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Offering" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: removeOffering
+      tags: [offerings]
+      summary: Remove an offering, with every verdict made for it
+      description: The history keeps what was decided. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["settings:write"]
+      responses:
+        "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/offerings/{id}/verdicts:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listVerdicts
+      tags: [offerings]
+      summary: Where companies stand for an offering
+      description: |
+        Rejected ones included, with who decided, when and why, so one ruled out by mistake
+        can be found and put back for review.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+        - name: stage
+          in: query
+          description: Only those at this stage.
+          schema: { type: string, enum: [review, qualified, rejected] }
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The latest decided first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Verdict" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/companies/{id}/verdicts:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listCompanyVerdicts
+      tags: [offerings]
+      summary: Where one company stands for each offering it has been judged for
+      description: Its stage for the organisation's own offering is the company's stage, not listed here.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: By offering.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Verdict" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -2054,6 +2217,49 @@ components:
         postal_address: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Where the organisation can be written to; 300 characters at most." }
         incorporated_only: { type: boolean, nullable: true, x-go-type-skip-optional-pointer: false, description: "Email only incorporated companies." }
 
+    Offering:
+      type: object
+      required: [id, name, look_for, pitch, note_template, updated_by, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        look_for: { type: string, description: "What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list." }
+        pitch: { type: string, description: "Its pitch line, kept for when people are reached for it; nothing uses it yet." }
+        note_template: { type: string, description: "Its connection note, kept for when people are picked for it; nothing uses it yet." }
+        updated_by: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    OfferingNew:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 60 }
+        look_for: { type: string }
+        pitch: { type: string }
+        note_template: { type: string }
+
+    OfferingChange:
+      type: object
+      properties:
+        name: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, maxLength: 60 }
+        look_for: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        pitch: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        note_template: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+
+    Verdict:
+      type: object
+      required: [offering_id, company_id, company, stage, fit, reason, by, updated_at]
+      properties:
+        offering_id: { type: integer, format: int64 }
+        company_id: { type: integer, format: int64 }
+        company: { type: string, description: "The company's name." }
+        stage: { type: string, enum: [review, qualified, rejected] }
+        fit: { type: string }
+        reason: { type: string, description: "Why, as whoever decided said it." }
+        by: { type: string, description: "Who decided." }
+        updated_at: { type: string, format: date-time }
+
     ContactChange:
       type: object
       properties:
@@ -2081,7 +2287,9 @@ components:
       required: [stage]
       properties:
         stage: { type: string, enum: [review, qualified, rejected] }
-        fit: { type: string, description: "Why, in a few words; kept with the company. Empty leaves it as it was." }
+        fit: { type: string, description: "Why, in a few words; kept with the company, or with the verdict when an offering is named. Empty leaves it as it was." }
+        offering: { type: integer, format: int64, description: "The offering this is a verdict for; 0 or left out is the organisation's own, which is the company's stage." }
+        reason: { type: string, description: "Why, kept with a verdict for an offering; refused for the organisation's own." }
 
     PersonNew:
       type: object
@@ -2222,6 +2430,7 @@ components:
       properties:
         title: { type: string, description: "A few words naming the task. Empty, it takes the brief's first line; longer than 60 characters, it is cut." }
         brief: { type: string, maxLength: 4000, description: "What is wanted: the task's first request." }
+        offering: { type: integer, format: int64, description: "What the task finds companies for: agents are given its look-for fields, and what they find waits in its review. 0 or left out is the organisation's own." }
         agents:
           type: array
           items: { type: integer, format: int64 }
@@ -2349,10 +2558,11 @@ components:
 
     Task:
       type: object
-      required: [id, title, created_by, created_at, closed_at]
+      required: [id, title, created_by, created_at, closed_at, offering_id]
       properties:
         id: { type: integer, format: int64 }
         title: { type: string }
+        offering_id: { type: integer, format: int64, description: "What the task finds companies for; 0 is the organisation's own." }
         created_by: { type: string }
         created_at: { type: string, format: date-time }
         closed_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
