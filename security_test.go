@@ -753,7 +753,7 @@ func TestOrgIsCreatedWithItsOwner(t *testing.T) {
 	}
 }
 
-// Someone in no organisation is offered a form that starts one through the API, and
+// Someone in no organisation is offered the page that starts one through the API, and
 // lands on its settings.
 func TestTheFirstOrganisationIsStartedThroughTheAPI(t *testing.T) {
 	s, _, srv, _ := signedIn(t)
@@ -761,17 +761,15 @@ func TestTheFirstOrganisationIsStartedThroughTheAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	grace := signInAs(t, srv, "grace@example.com", "correct horse battery")
-	_, page := call(t, grace, "GET", srv.URL+"/", "", nil)
-	form := regexp.MustCompile(`<form data-form="([^"]+)" data-go="([^"]+)"`).FindStringSubmatch(page)
-	if form == nil || form[1] != "/api/v1/orgs" || form[2] != "/o/{slug}/settings" {
-		t.Fatalf("the first-organisation form: %v in %s", form, page)
+	if _, page := call(t, grace, "GET", srv.URL+"/", "", nil); served(t, page).Page != "start" {
+		t.Fatalf("the first-organisation page: %s", page)
 	}
-	code, body := call(t, grace, "POST", srv.URL+form[1], "application/json", map[string]string{"name": "Grace Works"})
+	code, body := call(t, grace, "POST", srv.URL+"/api/v1/orgs", "application/json", map[string]string{"name": "Grace Works"})
 	var made struct{ Slug string }
 	if code != http.StatusCreated || json.Unmarshal([]byte(body), &made) != nil || made.Slug == "" {
 		t.Fatalf("starting it: %d %s", code, body)
 	}
-	if code, _ := call(t, grace, "GET", srv.URL+strings.Replace(form[2], "{slug}", made.Slug, 1), "", nil); code != http.StatusOK {
+	if code, _ := call(t, grace, "GET", srv.URL+"/o/"+made.Slug+"/settings", "", nil); code != http.StatusOK {
 		t.Fatalf("its settings: %d", code)
 	}
 	if code, _ := call(t, grace, "POST", srv.URL+"/orgs", "application/json", map[string]string{"name": "Again"}); code != http.StatusNotFound {
@@ -1129,7 +1127,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	}
 	browser := map[string]string{"Accept": "text/html,application/xhtml+xml,*/*;q=0.8"}
 	styled := func(body string) bool {
-		return strings.Contains(body, "Back to Prospector") && strings.Contains(body, "/assets/css/output.css")
+		return dataPage.MatchString(body) && strings.Contains(body, "/assets/css/output.css")
 	}
 
 	for path, want := range map[string]string{

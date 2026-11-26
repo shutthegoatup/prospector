@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/a-h/templ"
 	"net/url"
 	"regexp"
 	"sort"
@@ -408,9 +407,9 @@ func prefixed(prefix, s string) string {
 
 // safeHref lets only web links through, so a stored javascript: link (from an agent
 // or a teammate) can never run when clicked.
-func safeHref(u string) templ.SafeURL {
+func safeHref(u string) string {
 	if httpURL.MatchString(strings.TrimSpace(u)) {
-		return templ.SafeURL(strings.TrimSpace(u))
+		return strings.TrimSpace(u)
 	}
 	return "#"
 }
@@ -419,7 +418,7 @@ func safeHref(u string) templ.SafeURL {
 // someone added without one.
 func profileHref(c Contact) string {
 	if u := safeHref(deref(c.Linkedin)); u != "#" {
-		return string(u)
+		return u
 	}
 	name := strings.SplitN(deref(c.Person), ",", 2)[0]
 	words := strings.Join(strings.Fields(name+" "+deref(c.Maker)), " ")
@@ -434,4 +433,29 @@ func openLabel(c Contact) string {
 		return "Search + copy"
 	}
 	return "Open + copy"
+}
+
+func plural(n int, word string) string {
+	if n == 1 {
+		return "1 " + word
+	}
+	switch {
+	case word == "person":
+		word = "people"
+	case strings.HasSuffix(word, "y") && !strings.ContainsAny(word[len(word)-2:len(word)-1], "aeiou"):
+		word = word[:len(word)-1] + "ies"
+	default:
+		word += "s"
+	}
+	return fmt.Sprintf("%d %s", n, word)
+}
+
+func actorLabel(actor string) string {
+	if actor == customerActor {
+		return "the customer"
+	}
+	if a, ok := strings.CutPrefix(actor, "agent:"); ok {
+		return "agent · " + a
+	}
+	return actor
 }
