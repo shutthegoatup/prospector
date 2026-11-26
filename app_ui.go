@@ -6,8 +6,8 @@ import (
 	"sync"
 )
 
-// appPages are the pages the React app (web/src/main.tsx) draws. Each is served the
-// same shell, at its own address and below it, and the app routes from there.
+// appPages are the pages the React app (web/src/router.tsx) draws. Each is served the
+// same shell at its own address, and the app routes from there.
 var appPages = []string{"today", "research", "conversations", "enquiries", "onboarding", "subscriptions", "campaigns", "tasks", "companies", "settings", "agents", "add"}
 
 func (a *App) appRoutes(mux *http.ServeMux) {

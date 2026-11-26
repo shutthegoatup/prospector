@@ -530,6 +530,9 @@ func TestOrganisationSingleSignOn(t *testing.T) {
 	if code, _ := b.post("/orgs", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
 		t.Fatalf("starting an organisation on a limited session: %d", code)
 	}
+	if code, _ := b.post("/api/v1/orgs", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
+		t.Fatalf("starting an organisation through the API on a limited session: %d", code)
+	}
 	if code, _ := b.post("/o/beta/api/v1/people", QuickAdd{Name: "Hannah Pryce"}); code != http.StatusUnauthorized {
 		t.Fatalf("acting in another organisation on a limited session: %d", code)
 	}
