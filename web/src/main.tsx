@@ -10,6 +10,7 @@ import { CompanyPage } from "@/pages/Company";
 import { ConversationsPage } from "@/pages/Conversations";
 import { EnquiriesPage } from "@/pages/Enquiries";
 import { OnboardingPage } from "@/pages/Onboarding";
+import { PreparePage } from "@/pages/Prepare";
 import { ResearchPage } from "@/pages/Research";
 import { TodayPage } from "@/pages/Today";
 import { TaskPage } from "@/pages/Task";
@@ -39,6 +40,7 @@ if (mount) {
               <Route path="today" element={<TodayPage />} />
               <Route path="companies" element={<CompaniesPage />} />
               <Route path="companies/:id" element={<CompanyPage />} />
+              <Route path="agreements/:id/prepare" element={<PreparePage />} />
               <Route path="conversations" element={<ConversationsPage />} />
               <Route path="agents" element={<AgentsPage />} />
               <Route path="add" element={<AddPage />} />

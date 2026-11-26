@@ -373,6 +373,70 @@ func TestAnAgreementTakesAPDFThatBendsItsVersionsRules(t *testing.T) {
 	}
 }
 
+// The React Prepare page reads one agreement with what preparing it needs: its company,
+// any problem with its document, and who could still be added. It is served with the
+// policy pdf.js needs; other React pages keep the strict one.
+func TestTheReactPreparePageReadsItsAgreementThroughTheAPI(t *testing.T) {
+	s, o, base, member, a, hannah, theo := preparing(t)
+	must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	srv := strings.TrimSuffix(base, "/o/alpha/api/v1/agreements/"+itoa(a.ID))
+
+	code, body := call(t, member, "GET", base, "", nil)
+	if code != http.StatusOK {
+		t.Fatalf("reading the agreement: %d %s", code, body)
+	}
+	var got struct {
+		Company, Problem string
+		PageCount        int `json:"page_count"`
+		People, Members  []struct {
+			ID    int64
+			Name  string
+			Email string
+		}
+	}
+	if err := json.Unmarshal([]byte(body), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Company != "Larkmoor Yachts" || got.Problem != "" || got.PageCount != 2 {
+		t.Errorf("the agreement: %+v", got)
+	}
+	if len(got.People) != 1 || got.People[0].ID != theo.ID || got.People[0].Email != "theo@larkmoor.example" {
+		t.Errorf("people who could still be added, Hannah being on it: %+v", got.People)
+	}
+	if len(got.Members) != 1 || got.Members[0].Email != "ada@example.com" {
+		t.Errorf("members who could be added: %+v", got.Members)
+	}
+	reader, _, err := s.CreateKey(o.ID, "reader", []string{"read"}, "Ada Lovelace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, _ := asKey(t, "GET", base, reader, nil); code != http.StatusOK {
+		t.Errorf("a read key reading the agreement: %d", code)
+	}
+	if code, _ := asKey(t, "GET", srv+"/o/alpha/api/v1/agreements/99999", reader, nil); code != http.StatusNotFound {
+		t.Errorf("an agreement that isn't there: %d", code)
+	}
+
+	policy := func(u string) string {
+		t.Helper()
+		res, err := member.Get(u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("GET %s: %d", u, res.StatusCode)
+		}
+		return res.Header.Get("Content-Security-Policy")
+	}
+	if got := policy(srv + "/o/alpha/app/agreements/" + itoa(a.ID) + "/prepare"); got != pdfPolicy {
+		t.Errorf("the React Prepare page has the policy %q", got)
+	}
+	if got := policy(srv + "/o/alpha/app/companies"); got != contentPolicy {
+		t.Errorf("another React page has the policy %q", got)
+	}
+}
+
 // A PDF Prospector couldn't later fill in and seal is refused when it is uploaded.
 func TestAnAgreementRefusesAPDFItCouldntSeal(t *testing.T) {
 	_, _, base, member, _, _, _ := preparing(t)

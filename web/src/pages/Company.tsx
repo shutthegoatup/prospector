@@ -719,13 +719,13 @@ function Agreements({ c }: { c: Overview }) {
           <div className="flex flex-wrap items-center gap-2">
             {a.file_hash && sales ? (
               <ActionButton size="xs" asChild>
-                <a href={`/o/${org}/agreements/${a.id}/prepare`}>Prepare for signing</a>
+                <Link to={`/agreements/${a.id}/prepare`}>Prepare for signing</Link>
               </ActionButton>
             ) : (
               a.file_hash && (
-                <a href={`/o/${org}/agreements/${a.id}/prepare`} className="font-mono text-xs text-mark underline">
+                <Link to={`/agreements/${a.id}/prepare`} className="font-mono text-xs text-mark underline">
                   Who signs it
-                </a>
+                </Link>
               )
             )}
             {a.file_hash && (

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"net/mail"
@@ -25,40 +26,52 @@ var signerColours = []string{"#ff7452", "#ffc233", "#35c58a", "#8f7bff", "#56c5f
 
 func signerColour(i int) string { return signerColours[i%len(signerColours)] }
 
-func (a *App) prepareAgreement(w http.ResponseWriter, r *http.Request) {
-	q := reqOf(r)
-	ag, err := a.s.Agreement(q.Org.ID, idParam(r, "id"))
+// Preparing is everything a draft's Prepare page shows. People are only those at the
+// company who could be sent it; whoever is on it already is left in, for the page to tell.
+func (s *Store) Preparing(o *Org, id int64) (*PreparePage, error) {
+	ag, err := s.Agreement(o.ID, id)
 	if err != nil {
-		http.NotFound(w, r)
-		return
+		return nil, err
 	}
-	c, err := a.s.CompanyByID(q.Org.ID, ag.CompanyID)
+	c, err := s.CompanyByID(o.ID, ag.CompanyID)
 	if err != nil {
-		http.NotFound(w, r)
-		return
+		return nil, missing(err, "no company %d", ag.CompanyID)
 	}
 	p := PreparePage{Agreement: *ag, Company: *c}
-	if _, err := a.s.agreementPages(q.Org.ID, &p.Agreement); err != nil {
+	if _, err := s.agreementPages(o.ID, &p.Agreement); err != nil {
 		p.Problem = err.Error()
 	}
 	var failed [4]error
-	p.Parties, failed[0] = a.s.AgreementRecipients(q.Org.ID, ag.ID)
+	p.Parties, failed[0] = s.AgreementRecipients(o.ID, ag.ID)
 	var people []Contact
-	people, failed[1] = a.s.People(q.Org.ID, c.ID)
-	p.Members, failed[2] = a.s.Members(q.Org.ID)
-	p.Missing, failed[3] = a.s.Readiness(q.Org.ID, p.Agreement)
+	people, failed[1] = s.People(o.ID, c.ID)
+	p.Members, failed[2] = s.Members(o.ID)
+	p.Missing, failed[3] = s.Readiness(o.ID, p.Agreement)
 	if err := errors.Join(failed[:]...); err != nil {
-		log.Printf("agreement %d: %v", ag.ID, err)
-		http.Error(w, "the agreement couldn't be read", http.StatusInternalServerError)
-		return
+		return nil, fmt.Errorf("agreement %d: %w", ag.ID, err)
 	}
 	for _, person := range people {
-		if signable(q.Org, c.ID, person) == nil {
+		if signable(o, c.ID, person) == nil {
 			p.People = append(p.People, person)
 		}
 	}
+	return &p, nil
+}
+
+func (a *App) prepareAgreement(w http.ResponseWriter, r *http.Request) {
+	q := reqOf(r)
+	p, err := a.s.Preparing(q.Org, idParam(r, "id"))
+	if _, gone := errors.AsType[notFound](err); gone {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		log.Print(err)
+		http.Error(w, "the agreement couldn't be read", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Security-Policy", pdfPolicy)
-	a.page(w, r, "companies", PrepareView(q, p))
+	a.page(w, r, "companies", PrepareView(q, *p))
 }
 
 // on is whether a contact or member is on the agreement already, so they aren't offered twice.

@@ -67,7 +67,7 @@ func TestReactPagesMountInTheLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, p := range reactPages {
-		if !strings.Contains(string(main), `path="`+p+`"`) {
+		if !strings.Contains(string(main), `path="`+p+`"`) && !strings.Contains(string(main), `path="`+p+`/`) {
 			t.Errorf("%s is served as a React page but main.tsx doesn't route it", p)
 		}
 	}
