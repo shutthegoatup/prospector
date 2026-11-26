@@ -1448,6 +1448,8 @@ export interface components {
             fallback?: number;
             /** @description How long it waits before falling back, 1 to 10080; 0 is 15. */
             fallback_minutes?: number;
+            /** @description For `openai`, asks the model not to think before it answers (`chat_template_kwargs.enable_thinking` false, which llama.cpp and vLLM honour), for a local thinking model too slow to think at every step. Ignored for `anthropic`. */
+            thinking_off?: boolean;
         };
         Agent: {
             /** Format: int64 */
@@ -1466,6 +1468,7 @@ export interface components {
             /** Format: int64 */
             fallback: number;
             fallback_minutes: number;
+            thinking_off: boolean;
             /** @description What the last check found wrong, if anything. */
             problem: string;
             /** Format: date-time */

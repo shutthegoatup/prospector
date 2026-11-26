@@ -770,11 +770,18 @@ func agentCommand(s *Store, rest []string) error {
 		// The name says which: an agent already called that is changed, else one is made.
 		if name, err := agentName(in.Name); err == nil {
 			if c, err := s.agentNamed(o.ID, name); err == nil {
-				in.ID, in.Fallback, in.FallbackMinutes, in.SearchURL = c.ID, c.FallbackID, c.FallbackMinutes, c.SearchURL
+				in.ID, in.Fallback, in.FallbackMinutes, in.SearchURL, in.ThinkingOff = c.ID, c.FallbackID, c.FallbackMinutes, c.SearchURL, c.ThinkingOff
 			}
 		}
 		if search, ok := os.LookupEnv("PROSPECTOR_AGENT_SEARCH_URL"); ok {
 			in.SearchURL = search
+		}
+		switch thinking, ok := os.LookupEnv("PROSPECTOR_AGENT_THINKING"); {
+		case !ok:
+		case thinking == "off" || thinking == "on":
+			in.ThinkingOff = thinking == "off"
+		default:
+			return fmt.Errorf("PROSPECTOR_AGENT_THINKING is off or on, not %q", thinking)
 		}
 		c, err := (&App{s: s}).saveAgent(context.Background(), o.ID, in, "cli")
 		if err != nil {

@@ -167,7 +167,9 @@ templ SettingsView(q *Req, d SettingsData) {
 					<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
 				</form>
 			}
-			@OwnAgents(d.Agents)
+			@Section("Agents", "") {
+				<p class="text-sm">Prospector's own agents, and keys for yours, are set up on <a href={ templ.SafeURL(q.Base() + "agents") } class="text-mark underline">Agents</a>.</p>
+			}
 		}
 		@Section("Sequence", "Every contact goes through these steps; the waits come from above.") {
 			<ol class="flex max-w-lg flex-col gap-1 text-sm">
@@ -309,154 +311,6 @@ func passwordHint(m MailView) string {
 		return "saved: leave empty to keep it"
 	}
 	return ""
-}
-
-templ OwnAgents(v OwnAgentsView) {
-	@Section("Prospector's agents", "Models Prospector calls itself to work tasks, each through its own OpenAI-compatible endpoint, with tools from an MCP server: Claude, ChatGPT and open models side by side. Several can work one task at once, each on its own request. What they find waits in Research like any agent's.") {
-		if !v.Sealing {
-			<p class="text-sm text-[var(--stop)]" role="alert">This server has no secret key, so it can't keep an API key: whoever runs it needs to set PROSPECTOR_SECRET_KEYS first.</p>
-		}
-		for _, agent := range v.Agents {
-			@AgentForm(agent)
-		}
-		<details class="rounded-lg border border-dashed border-border p-3" open?={ len(v.Agents) == 0 }>
-			<summary class="cursor-pointer text-sm font-medium">Add an agent</summary>
-			@AgentForm(v.New)
-		</details>
-	}
-}
-
-// agentPath and agentMethod are where an agent's form goes in the API.
-func agentPath(v AgentView) string {
-	if v.ID == 0 {
-		return "api/v1/agents"
-	}
-	return "api/v1/agents/" + strconv.FormatInt(v.ID, 10)
-}
-
-func agentMethod(v AgentView) string {
-	if v.ID == 0 {
-		return "POST"
-	}
-	return "PUT"
-}
-
-func agentFallbackMinutes(v AgentView) int {
-	if v.FallbackMinutes == 0 {
-		return 15
-	}
-	return v.FallbackMinutes
-}
-
-func agentModelsID(v AgentView) string {
-	if v.ID == 0 {
-		return "agent-models-new"
-	}
-	return "agent-models-" + strconv.FormatInt(v.ID, 10)
-}
-
-templ AgentForm(v AgentView) {
-	<form data-form={ agentPath(v) } data-method={ agentMethod(v) } data-refresh="true" class="flex flex-col gap-3 border-b border-dashed border-border py-3 last:border-0">
-		@Row("Name") {
-			<input name="name" value={ v.Name } placeholder="Claude, ChatGPT, the gateway…" autocomplete="off" class={ fieldClass }/>
-			@Meta("What it is called on the task page and in the record.")
-		}
-		@Row("Kind") {
-			<select name="kind" class={ fieldClass }>
-				for _, k := range AgentKinds {
-					<option value={ k.Key } selected?={ k.Key == v.Kind || (v.Kind == "" && k.Key == kindOpenAI) }>{ k.Label }</option>
-				}
-			</select>
-			@Meta("Anthropic reaches Claude through Anthropic's own API with its official SDK; OpenAI-compatible is ChatGPT, OpenRouter, a gateway of your own or any open model behind one.")
-		}
-		@Row("Endpoint") {
-			<input name="base_url" value={ v.BaseURL } placeholder="https://openrouter.ai/api/v1" autocomplete="off" class={ fieldClass }/>
-			@Meta("For OpenAI-compatible, the address its /models and /chat/completions are under, such as https://api.openai.com/v1. For Anthropic, leave it empty for Anthropic's own.")
-		}
-		@Row("API key") {
-			<input name="api_key" type="password" autocomplete="new-password" placeholder={ agentKeyHint(v) } class={ fieldClass }/>
-			@Meta("Never shown again. Changing the endpoint needs it entered again.")
-		}
-		@Row("Model") {
-			<input name="model" value={ v.Model } list={ agentModelsID(v) } autocomplete="off" placeholder="one the endpoint lists" class={ fieldClass }/>
-			<datalist id={ agentModelsID(v) }>
-				for _, m := range v.ModelList() {
-					<option value={ m }></option>
-				}
-			</datalist>
-			@Meta(agentModelHint(v))
-		}
-		@Row("Search") {
-			<input name="search_url" value={ v.SearchURL } placeholder="https://searx.example.com" autocomplete="off" class={ fieldClass }/>
-			@Meta("A SearXNG instance you run: free, open-source search, with json among its search.formats. The agent searches through it, and reads pages itself, with no paid search service.")
-		}
-		@Row("Tools") {
-			<input name="tools_url" value={ v.ToolsURL } placeholder="https://mcp.example.com/mcp" autocomplete="off" class={ fieldClass }/>
-			@Meta("An MCP server, such as a gateway's federated /mcp. It's sent the endpoint's key only when it's on the same address.")
-		}
-		if len(v.Others) > 0 {
-			@Row("Fallback") {
-				<div class="flex flex-wrap items-center gap-2">
-					<select name="fallback" data-number="true" class={ fieldClass }>
-						<option value="0">None: wait however long it takes</option>
-						for _, o := range v.Others {
-							<option value={ strconv.FormatInt(o.ID, 10) } selected?={ o.ID == v.FallbackID }>{ o.Name }</option>
-						}
-					</select>
-					<span class="text-sm text-muted-foreground">after</span>
-					<input type="number" name="fallback_minutes" min="1" value={ strconv.Itoa(agentFallbackMinutes(v)) } class={ fieldClass }/>
-					<span class="text-sm text-muted-foreground">minutes</span>
-				</div>
-				@Meta("When its endpoint stays limited or away this long, the agent hands its task to the one chosen here, which carries on from the task's notes.")
-			}
-		}
-		if tools := v.ToolList(); len(tools) > 0 {
-			@Row("Allowed tools") {
-				<div class="flex flex-col gap-1.5 pt-1.5">
-					for _, t := range tools {
-						<label class="flex items-start gap-2.5 text-sm">
-							<input type="checkbox" name="tools" value={ t.Name } data-multi="true" checked?={ v.Allows(t.Name) } class="mt-0.5 size-4 accent-[var(--primary)]"/>
-							<span><span class="font-mono text-xs">{ t.Name }</span> <span class="text-muted-foreground">{ t.Description }</span></span>
-						</label>
-					}
-				</div>
-				@Meta("The agent uses only the tools ticked here. LinkedIn's terms forbid automated access, logged-in browsers included: prefer search and fetch tools to browser and captcha ones.")
-			}
-		}
-		if v.Problem != "" {
-			<p class="text-sm text-[var(--stop)]" role="alert">{ "Last check: " + v.Problem }</p>
-		}
-		<div class="flex flex-wrap items-center gap-3">
-			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-				if v.ID == 0 {
-					Add and check
-				} else {
-					Save and check
-				}
-			}
-			if v.ID != 0 {
-				@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": agentPath(v), "data-method": "DELETE",
-					"data-confirm": "Delete " + v.Name + "? Its runs stop and its key is revoked; what it found stays."}}) {
-					Delete
-				}
-			}
-			<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
-		</div>
-	</form>
-}
-
-func agentKeyHint(v AgentView) string {
-	if v.HasKey {
-		return "saved: leave empty to keep it"
-	}
-	return ""
-}
-
-func agentModelHint(v AgentView) string {
-	if n := len(v.ModelList()); n > 0 {
-		return "The endpoint lists " + plural(n, "model") + "; a router model that picks one per request works too."
-	}
-	return "Saving fetches the endpoint's list to choose from."
 }
 
 func ownerHint(q *Req) string {

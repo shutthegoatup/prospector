@@ -178,7 +178,7 @@ func (a *App) startRun(org, task, agent int64, by string, replacing int64) (*Age
 		return nil, err
 	}
 	if !cfg.Ready() {
-		return nil, fmt.Errorf("%s isn't set up: an owner gives it an endpoint and a model in Settings", cfg.Name)
+		return nil, fmt.Errorf("%s isn't set up: an owner gives it an endpoint and a model on the Agents page", cfg.Name)
 	}
 	if _, err := openTask(a.s.db, org, task); err != nil {
 		return nil, err
@@ -357,11 +357,11 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 	}
 	cfg, err := a.s.AgentByID(run.OrgID, run.AgentID)
 	if err != nil || !cfg.Ready() {
-		return RunFailed, "the agent is no longer set up in Settings"
+		return RunFailed, "the agent is no longer set up: see the Agents page"
 	}
 	key, err := a.s.keys.open(cfg.APIKey)
 	if err != nil {
-		return RunFailed, "the endpoint's key can't be read: an owner enters it again in Settings"
+		return RunFailed, "the endpoint's key can't be read: an owner enters it again on the Agents page"
 	}
 	bk, err := a.s.agentKey(cfg)
 	if err != nil {
@@ -954,8 +954,13 @@ type chatReply struct {
 // complete asks the endpoint for the model's next turn. A failure on the way, or a
 // server error, is tried again a few times before the run gives up.
 func (a *App) complete(ctx context.Context, cfg *Agent, key string, run *AgentRun, messages []chatMessage, tools []toolDef) (*chatReply, error) {
-	body, err := json.Marshal(map[string]any{"model": cfg.Model, "messages": messages, "tools": tools, "tool_choice": "auto",
-		"max_tokens": 8192, "prompt_cache_key": fmt.Sprintf("prospector-run-%d", run.ID)})
+	req := map[string]any{"model": cfg.Model, "messages": messages, "tools": tools, "tool_choice": "auto",
+		"max_tokens": 8192, "prompt_cache_key": fmt.Sprintf("prospector-run-%d", run.ID)}
+	if cfg.ThinkingOff {
+		// llama.cpp and vLLM pass this to the chat template, which is where Qwen's switch is.
+		req["chat_template_kwargs"] = map[string]any{"enable_thinking": false}
+	}
+	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}

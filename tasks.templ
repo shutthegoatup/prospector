@@ -278,7 +278,7 @@ templ TaskDetailView(q *Req, d TaskPage) {
 		</div>
 		<aside class="flex min-w-0 flex-[1_1_280px] flex-col gap-5">
 			if len(d.Agents) > 0 || len(d.AgentRuns) > 0 {
-				@Section("Prospector's agents", "Work the task here, each with the model and tools set in Settings, each on its own request. What they find waits in Research.") {
+				@Section("Prospector's agents", "Work the task here, each with the model and tools set on the Agents page, each on its own request. What they find waits in Research.") {
 					for _, run := range d.AgentRuns {
 						if run.Going() {
 							<div class="flex flex-col gap-1.5 border-b border-dashed border-border py-2 text-sm">
