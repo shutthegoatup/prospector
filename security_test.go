@@ -1153,9 +1153,9 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 			t.Errorf("GET %s in a browser: %d %s %s, want %d as a problem", path, code, ctype, body, want)
 		}
 	}
-	code, _, body := get(client, "POST", "/login", map[string]string{"Accept": browser["Accept"], "Sec-Fetch-Site": "cross-site", "content-type": "application/x-www-form-urlencoded"})
+	code, _, body := get(client, "POST", "/api/v1/session", map[string]string{"Accept": browser["Accept"], "Sec-Fetch-Site": "cross-site", "content-type": "application/json"})
 	if code != http.StatusForbidden || !styled(body) || !strings.Contains(body, "This request came from another site.") {
-		t.Fatalf("a refused form post in a browser: %d, styled=%v", code, styled(body))
+		t.Fatalf("a sign-in from another site, in a browser: %d, styled=%v", code, styled(body))
 	}
 	if h := func() http.Header {
 		req, _ := http.NewRequest("GET", srv.URL+"/no/such/page", nil)

@@ -4,15 +4,12 @@ import { $api } from "@/client";
 import { Field, Notice, Problem, SignedOutPage, SignedOutTitle } from "@/components/app/signed-out";
 import { ActionButton } from "@/components/app";
 import { safeNext } from "@/lib/next";
+import { failure, offered as offeredFrom, withNext } from "@/lib/sign-in";
 
 // After signing in the browser goes on as a page, not a route: the server decides where
 // a session may go, from choosing a first password to an organisation's own sign-on.
 function goOn(next: string | undefined) {
   window.location.assign(safeNext(next));
-}
-
-function withNext(path: string, next: string | undefined) {
-  return next ? `${path}?${new URLSearchParams({ next })}` : path;
 }
 
 function value(f: FormData, name: string) {
@@ -37,7 +34,7 @@ export function SignInPage() {
         <img src="/assets/img/mark.svg" width="30" height="30" alt="" />
         Prospector.
       </h1>
-      <Problem>{signIn.error?.detail}</Problem>
+      <Problem>{failure(signIn.error)}</Problem>
       {reset && !signIn.error && <Notice>Password saved. Sign in with it.</Notice>}
       <form onSubmit={submit} className="flex flex-col gap-4">
         <Field label="Email" name="email" type="email" required autoComplete="username" />
@@ -87,7 +84,7 @@ export function ForgotPage() {
         ) : (
           <p className="text-sm text-muted-foreground">We'll email you a link to choose a new one.</p>
         )}
-        <Problem>{ask.error?.detail}</Problem>
+        <Problem>{failure(ask.error)}</Problem>
         <Field label="Email" name="email" type="email" required autoComplete="username" />
         <ActionButton type="submit" size="lg" disabled={ask.isPending}>
           Email me a link
@@ -102,7 +99,8 @@ export function ForgotPage() {
 
 export function ResetPage() {
   const { token } = useParams({ from: "/reset/$token" });
-  const link = $api.useQuery("get", "/api/v1/password-resets/{token}", { params: { path: { token } } });
+  // A dead link answers 410, which asking again won't change.
+  const link = $api.useQuery("get", "/api/v1/password-resets/{token}", { params: { path: { token } } }, { retry: false });
   const save = $api.useMutation("post", "/api/v1/password-resets/{token}", { onSuccess: () => window.location.assign("/login?reset=1") });
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -113,7 +111,7 @@ export function ResetPage() {
       <form onSubmit={submit} className="flex flex-col gap-4">
         <SignedOutTitle>Choose a password</SignedOutTitle>
         {link.data && <p className="text-sm text-muted-foreground">For {link.data.email}. 10 characters or more.</p>}
-        <Problem>{link.error?.detail ?? save.error?.detail}</Problem>
+        <Problem>{failure(link.error ?? save.error)}</Problem>
         <Field label="New password" name="password" type="password" required minLength={10} autoComplete="new-password" />
         <ActionButton type="submit" size="lg" disabled={save.isPending || save.isSuccess || !link.data}>
           Save password
@@ -140,15 +138,15 @@ export function SingleSignOnPage() {
     find.mutate({ body: { email: value(new FormData(e.currentTarget), "email"), next } });
   };
   const found = find.data?.orgs;
-  const theOne = found?.find((o) => o.slug === org);
-  const offered = theOne ? [theOne] : (found ?? []);
+  const offered = offeredFrom(found, org);
+  const theOne = offered.length === 1 && offered[0]?.slug === org ? offered[0] : undefined;
   return (
     <SignedOutPage title="Single sign-on">
       <SignedOutTitle>
         Single sign-on<span className="text-coral">.</span>
       </SignedOutTitle>
       <Problem>
-        {find.error?.detail ?? (found && found.length === 0 && "No organisation here uses single sign-on for that address. Sign in with your password instead.")}
+        {failure(find.error) ?? (found && found.length === 0 && "No organisation here uses single sign-on for that address. Sign in with your password instead.")}
       </Problem>
       {theOne && <p className="text-sm text-muted-foreground">{theOne.name} asks its people to sign in through its own provider.</p>}
       {offered.map((o) => (
@@ -190,7 +188,7 @@ export function ChoosePasswordPage() {
         <ActionButton type="submit" size="lg" disabled={change.isPending || change.isSuccess}>
           Continue
         </ActionButton>
-        <Problem>{change.error?.detail}</Problem>
+        <Problem>{failure(change.error)}</Problem>
       </form>
       <div className="flex items-center gap-2.5 px-2.5 text-sm text-muted-foreground">
         <span className="flex-1 truncate">{session.data?.user.email}</span>
