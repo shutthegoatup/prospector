@@ -26,7 +26,8 @@
   "include": [
     "src",
     "vite.config.ts",
-    "vite.site.config.ts"
+    "vite.site.config.ts",
+    "vite.form.config.ts"
   ],
   "exclude": [
     "src/**/*.test.ts"

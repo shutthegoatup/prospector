@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 
 const repoURL = "https://github.com/shutthegoatup/prospector";
 
@@ -19,17 +20,9 @@ function Shot({ file, width, height, alt, tone }: { file: string; width: number;
   );
 }
 
-// Intake is where the enquiry form posts, and the origin a browser must be on for the
-// server to take it.
-export type Intake = { intake: string; origin: string };
-
-// Landing is the front page. It is drawn when the site is built, with no form: the form
-// shows once the page runs, and only on the origin the intake route answers.
-export function Landing({ intake }: { intake?: Intake }) {
-  const [form, setForm] = useState<string>();
-  useEffect(() => {
-    if (intake && intake.origin === window.location.origin) setForm(intake.intake);
-  }, [intake]);
+// Landing is the front page, drawn when the site is built. It has no enquiry form:
+// main.tsx mounts one in its place where the server has somewhere for it to send.
+export function Landing() {
   return (
     <>
       <header className="lp-hero">
@@ -42,7 +35,6 @@ export function Landing({ intake }: { intake?: Intake }) {
               <a href="#customers">Customers</a>
               <a href="#agents">Agents</a>
               <a href="#start">Get started</a>
-              {form && <a href="#contact">Contact</a>}
             </div>
             <a className="lp-btn is-small" href="/login">
               Sign in
@@ -381,7 +373,7 @@ export function Landing({ intake }: { intake?: Intake }) {
           </div>
         </div>
       </section>
-      {form && <EnquiryForm intake={form} />}
+      <div id="enquiry" />
       <footer className="lp-foot">
         <div className="lp-wrap">
           <Brand />
@@ -425,7 +417,8 @@ async function send(to: string, body: string): Promise<Outcome> {
   return "failed";
 }
 
-function EnquiryForm({ intake }: { intake: string }) {
+// EnquiryForm is the front page's contact section, with its link in the page's nav.
+export function EnquiryForm({ intake, nav }: { intake: string; nav: Element | null }) {
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState("");
   const submit = async (e: FormEvent<HTMLFormElement>) => {
@@ -450,52 +443,55 @@ function EnquiryForm({ intake }: { intake: string }) {
     setStatus(said[outcome]);
   };
   return (
-    <section className="lp-contact" id="contact">
-      <div className="lp-wrap lp-contact-grid">
-        <div>
-          <p className="lp-label">Contact</p>
-          <h2>Ask us anything.</h2>
-          <p className="lp-lede">A question, a demo, or help getting it running. Someone will write back to the address you give.</p>
-        </div>
-        <form className="lp-form" onSubmit={submit}>
-          <label>
-            Your name
-            <input name="name" autoComplete="name" maxLength={200} />
-          </label>
-          <label>
-            Email
-            <input name="email" type="email" autoComplete="email" maxLength={200} required />
-          </label>
-          <label>
-            Company
-            <input name="company" autoComplete="organization" maxLength={200} />
-          </label>
-          <label>
-            What it's about
-            <select name="kind">
-              <option value="sales">A question</option>
-              <option value="demo">See it running</option>
-              <option value="support">Help running it</option>
-              <option value="feature">Something it should do</option>
-            </select>
-          </label>
-          <label className="is-wide">
-            Message<textarea name="message" rows={5} maxLength={5000} required></textarea>
-          </label>
-          <label className="lp-trap" aria-hidden>
-            Leave this empty
-            <input name="ref_note" tabIndex={-1} autoComplete="off" />
-          </label>
-          <div className="lp-form-foot is-wide">
-            <button className="lp-btn is-primary" type="submit" disabled={sending}>
-              Send
-            </button>
-            <p className="lp-form-status" role="status">
-              {status}
-            </p>
+    <>
+      {nav && createPortal(<a href="#contact">Contact</a>, nav)}
+      <section className="lp-contact" id="contact">
+        <div className="lp-wrap lp-contact-grid">
+          <div>
+            <p className="lp-label">Contact</p>
+            <h2>Ask us anything.</h2>
+            <p className="lp-lede">A question, a demo, or help getting it running. Someone will write back to the address you give.</p>
           </div>
-        </form>
-      </div>
-    </section>
+          <form className="lp-form" onSubmit={submit}>
+            <label>
+              Your name
+              <input name="name" autoComplete="name" maxLength={200} />
+            </label>
+            <label>
+              Email
+              <input name="email" type="email" autoComplete="email" maxLength={200} required />
+            </label>
+            <label>
+              Company
+              <input name="company" autoComplete="organization" maxLength={200} />
+            </label>
+            <label>
+              What it's about
+              <select name="kind">
+                <option value="sales">A question</option>
+                <option value="demo">See it running</option>
+                <option value="support">Help running it</option>
+                <option value="feature">Something it should do</option>
+              </select>
+            </label>
+            <label className="is-wide">
+              Message<textarea name="message" rows={5} maxLength={5000} required></textarea>
+            </label>
+            <label className="lp-trap" aria-hidden>
+              Leave this empty
+              <input name="ref_note" tabIndex={-1} autoComplete="off" />
+            </label>
+            <div className="lp-form-foot is-wide">
+              <button className="lp-btn is-primary" type="submit" disabled={sending}>
+                Send
+              </button>
+              <p className="lp-form-status" role="status">
+                {status}
+              </p>
+            </div>
+          </form>
+        </div>
+      </section>
+    </>
   );
 }

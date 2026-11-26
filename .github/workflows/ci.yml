@@ -33,7 +33,7 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Generated templates, API code and the built app are committed
+      - name: Generated API code and the built app are committed
         run: |
           go generate ./api
           npm ci --prefix web --no-audit --no-fund

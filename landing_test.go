@@ -145,8 +145,8 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 	if _, body := call(t, visitor, "GET", told.URL+"/", "", nil); func() bool { i, o := formOf(body); return i != "/o/alpha/intake" || o != "https://crm.alpha.example" }() {
 		t.Error("the form doesn't name the origin it works on")
 	}
-	script2, _ := os.ReadFile("web/src/site/Landing.tsx")
-	if !strings.Contains(string(script2), "intake.origin === window.location.origin") {
+	script2, _ := os.ReadFile("web/src/site/main.tsx")
+	if !strings.Contains(string(script2), "got.origin === window.location.origin") {
 		t.Error("the script shows the form whatever address the page was reached at")
 	}
 

@@ -1,22 +1,25 @@
 import { StrictMode } from "react";
-import { hydrateRoot } from "react-dom/client";
-import { Landing, type Intake } from "./Landing";
+import { createRoot } from "react-dom/client";
+import { EnquiryForm } from "./Landing";
 
-// The front page is built as HTML; this script only brings its enquiry form, so the
-// server loads it only where it has somewhere for the form to send.
-const mount = document.getElementById("site");
-if (mount) {
-  let intake: Intake | undefined;
+// The front page is built as HTML; this script only brings its enquiry form, and the
+// server loads it only where it has somewhere for the form to send. The form shows only
+// on the origin the intake route answers: reached by another name, it would be refused.
+const site = document.getElementById("site");
+const mount = document.getElementById("enquiry");
+if (site && mount) {
+  let intake = "";
   try {
-    const got = JSON.parse(mount.dataset.page ?? "null");
-    if (got && typeof got.intake === "string" && typeof got.origin === "string") intake = { intake: got.intake, origin: got.origin };
+    const got = JSON.parse(site.dataset.page ?? "null");
+    if (got && typeof got.intake === "string" && got.origin === window.location.origin) intake = got.intake;
   } catch {
-    intake = undefined;
+    intake = "";
   }
-  hydrateRoot(
-    mount,
-    <StrictMode>
-      <Landing intake={intake} />
-    </StrictMode>,
-  );
+  if (intake) {
+    createRoot(mount).render(
+      <StrictMode>
+        <EnquiryForm intake={intake} nav={document.querySelector(".lp-links")} />
+      </StrictMode>,
+    );
+  }
 }
