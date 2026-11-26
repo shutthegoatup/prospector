@@ -73,8 +73,7 @@ func (s apiServer) PickContact(ctx context.Context, in api.PickContactRequestObj
 
 func (s apiServer) ReviewCompany(ctx context.Context, in api.ReviewCompanyRequestObject) (api.ReviewCompanyResponseObject, error) {
 	q := reqFrom(ctx)
-	b := in.Body
-	if err := s.a.s.JudgeCompany(q.Org.ID, b.Offering, in.Id, string(b.Stage), b.Fit, b.Reason, q.Actor()); err != nil {
+	if err := s.a.s.SetCompanyStage(q.Org.ID, in.Id, string(in.Body.Stage), in.Body.Fit, q.Actor()); err != nil {
 		return nil, err
 	}
 	return api.ReviewCompany204Response{}, nil

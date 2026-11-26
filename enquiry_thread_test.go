@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/mail"
@@ -315,4 +316,89 @@ func TestRepliesKeepToTheirLimits(t *testing.T) {
 		t.Errorf("a reply to someone erased: %d %s", code, body)
 	}
 	box.take(t, 0)
+}
+
+// The API gives what the enquiries page shows beside each one: the company it matched,
+// whether its sender is in Conversations, its thread, the chip counts, the members who
+// can own it, and whether a reply can be emailed.
+func TestTheEnquiriesAPIGivesWhatThePageShows(t *testing.T) {
+	s, srv, member, _ := mailSite(t, nil)
+	o := must(s.OrgBySlug("alpha"))
+	known := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Quay Marine", Email: "hannah@quay.example"}, "Ada Lovelace"))
+	e := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "sales", Name: "Hannah Pryce", Email: "hannah@quay.example", Message: "What does it cost?"}))
+	must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "support", Email: "omar@reef.example", Message: "It stalls."}))
+	must(s.AddEnquiry(o.ID, "form", EnquiryIn{Email: "bot@spam.example", Trap: "filled"}))
+	base := srv.URL + "/o/alpha/api/v1/"
+	if code, body := call(t, member, "POST", base+"enquiries/"+itoa(e.ID)+"/answers", "application/json", map[string]any{"text": "Tuesday suits."}); code != http.StatusCreated {
+		t.Fatalf("recording their answer: %d %s", code, body)
+	}
+
+	type listed struct {
+		Items []struct {
+			ID             int64  `json:"id"`
+			CompanyName    string `json:"company_name"`
+			InConversation bool   `json:"in_conversation"`
+			Thread         []struct {
+				Text string `json:"text"`
+			} `json:"thread"`
+		} `json:"items"`
+		CanReply bool `json:"can_reply"`
+	}
+	read := func(cl *http.Client, base string) listed {
+		t.Helper()
+		code, body := call(t, cl, "GET", base+"enquiries", "", nil)
+		var out listed
+		if err := json.Unmarshal([]byte(body), &out); code != http.StatusOK || err != nil {
+			t.Fatalf("listing enquiries: %d %v %s", code, err, body)
+		}
+		return out
+	}
+	byID := func(l listed, id int64) (found struct {
+		name   string
+		talks  bool
+		thread []string
+	}) {
+		for _, it := range l.Items {
+			if it.ID == id {
+				found.name, found.talks = it.CompanyName, it.InConversation
+				for _, m := range it.Thread {
+					found.thread = append(found.thread, m.Text)
+				}
+			}
+		}
+		return found
+	}
+
+	got := read(member, base)
+	if hers := byID(got, e.ID); hers.name != "Quay Marine" || hers.talks || len(hers.thread) != 1 || hers.thread[0] != "Tuesday suits." {
+		t.Errorf("before a conversation, her enquiry reads %+v", hers)
+	}
+	if !got.CanReply {
+		t.Error("with a mail server, the list should say a reply can be emailed")
+	}
+	if _, err := s.ConverseEnquiry(o, e.ID, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if hers := byID(read(member, base), e.ID); !hers.talks {
+		t.Errorf("once she is on the board, her enquiry should say so: %+v (contact %d)", hers, known.ID)
+	}
+	if code, body := call(t, member, "PATCH", base+"enquiries/"+itoa(e.ID), "application/json", map[string]any{"owner": "Ada Lovelace"}); code != http.StatusOK ||
+		!strings.Contains(body, `"company_name":"Quay Marine"`) || !strings.Contains(body, `"in_conversation":true`) || !strings.Contains(body, "Tuesday suits.") {
+		t.Errorf("a change answers with the enquiry as the list gives it: %d %s", code, body)
+	}
+
+	_, counts := call(t, member, "GET", base+"enquiry-counts", "", nil)
+	for _, want := range []string{`"all":2`, `"spam":1`, `"sales":1`, `"support":1`, `"open":2`} {
+		if !strings.Contains(counts, want) {
+			t.Errorf("the counts lack %s: %s", want, counts)
+		}
+	}
+	if _, members := call(t, member, "GET", base+"members", "", nil); !strings.Contains(members, `"name":"Ada Lovelace"`) {
+		t.Errorf("the members should name the team: %q", members)
+	}
+
+	_, srv, member, _ = mailSite(t, func(a *App) { a.mail = nil })
+	if read(member, srv.URL+"/o/alpha/api/v1/").CanReply {
+		t.Error("with no mail server, the list should say no reply can be emailed")
+	}
 }

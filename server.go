@@ -37,8 +37,6 @@ type App struct {
 	base string
 	// frontOrg is the organisation the front page's form sends enquiries to; empty is no form.
 	frontOrg string
-	// securityContact is security.txt's Contact; empty serves no security.txt.
-	securityContact string
 	// mail is the app's own server, for password resets and invitations; nil is none.
 	mail *MailServer
 	// send and later stand in for SMTP and for a goroutine in tests.
@@ -413,7 +411,6 @@ func (a *App) Routes() http.Handler {
 
 	a.apiRoutes(mux)
 	a.routeAPI(mux)
-	a.wellKnownRoutes(mux)
 
 	sameOrigin := http.NewCrossOriginProtection()
 	// Enquiry forms live on other sites. The route checks the origin against the
@@ -630,43 +627,63 @@ func (a *App) changePassword(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	keep := ""
-	if c, err := r.Cookie(sessionCookie); err == nil {
-		keep = c.Value
-	}
-	// Guessing the current password from a borrowed session is slowed like guessing at sign-in.
 	u := reqOf(r).User
-	select {
-	case hashSlots <- struct{}{}:
-		defer func() { <-hashSlots }()
-	case <-r.Context().Done():
+	device, wait, err := a.passwordChange(r, u, in.Current, in.New)
+	switch {
+	case wait > 0:
+		w.Header().Set("Retry-After", strconv.Itoa(wait))
+		http.Error(w, "too many attempts: try again in "+plural(wait, "second"), http.StatusTooManyRequests)
 		return
-	}
-	// Counted apart from sign-in, so guesses made there by someone else don't hold this up.
-	if wait := a.logins.begin(changeBucket(u)); wait > 0 {
-		seconds := int(wait.Seconds()) + 1
-		w.Header().Set("Retry-After", strconv.Itoa(seconds))
-		http.Error(w, "too many attempts: try again in "+plural(seconds, "second"), http.StatusTooManyRequests)
+	case errors.Is(err, context.Canceled):
 		return
-	}
-	err := a.s.ChangePassword(u, in.Current, in.New, keep)
-	if err == nil || errors.Is(err, errWrongCurrent) {
-		a.logins.record(changeBucket(u), err == nil)
-	}
-	if err != nil {
+	case err != nil:
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
-	// The old password vouched for this browser's device cookie; the new one does now.
-	if changed, err := a.s.UserByEmail(u.Email); err == nil {
-		http.SetCookie(w, &http.Cookie{Name: deviceCookie, Value: newDeviceToken(changed), Path: "/login", HttpOnly: true, Secure: a.secure(r),
-			SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(deviceLife)})
+	if device != nil {
+		http.SetCookie(w, device)
 	}
 	if u.MustChangePassword {
 		writeJSON(w, map[string]string{"go": "/"})
 		return
 	}
-	writeJSON(w, map[string]string{"message": "Password changed. Your other sessions are signed out."})
+	writeJSON(w, map[string]string{"message": passwordChanged})
+}
+
+const passwordChanged = "Password changed. Your other sessions are signed out."
+
+// passwordChange changes u's password, keeping the session r came with, and gives the
+// device cookie the new password vouches for. wait is the seconds to hold off when there
+// have been too many attempts.
+func (a *App) passwordChange(r *http.Request, u *User, current, next string) (device *http.Cookie, wait int, err error) {
+	keep := ""
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		keep = c.Value
+	}
+	// Guessing the current password from a borrowed session is slowed like guessing at sign-in.
+	select {
+	case hashSlots <- struct{}{}:
+		defer func() { <-hashSlots }()
+	case <-r.Context().Done():
+		return nil, 0, r.Context().Err()
+	}
+	// Counted apart from sign-in, so guesses made there by someone else don't hold this up.
+	if held := a.logins.begin(changeBucket(u)); held > 0 {
+		return nil, int(held.Seconds()) + 1, nil
+	}
+	err = a.s.ChangePassword(u, current, next, keep)
+	if err == nil || errors.Is(err, errWrongCurrent) {
+		a.logins.record(changeBucket(u), err == nil)
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+	// The old password vouched for this browser's device cookie; the new one does now.
+	if changed, err := a.s.UserByEmail(u.Email); err == nil {
+		device = &http.Cookie{Name: deviceCookie, Value: newDeviceToken(changed), Path: "/login", HttpOnly: true, Secure: a.secure(r),
+			SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(deviceLife)}
+	}
+	return device, 0, nil
 }
 
 func (a *App) newOrg(w http.ResponseWriter, r *http.Request) {

@@ -120,7 +120,6 @@ prospector serve                                          # http://127.0.0.1:876
 | `SMTP_USERNAME`, `SMTP_PASSWORD` | What that server asks for, if anything |
 | `PROSPECTOR_SECRET_KEYS` | The server's secret keys, newest first: `2:<64 hex>,1:<64 hex>`. Needed for an organisation's single sign-on and for a mail server of its own (see [Secret keys](#secret-keys)) |
 | `PROSPECTOR_GOOGLE_CLIENT_ID`, `PROSPECTOR_GOOGLE_CLIENT_SECRET` | Offer "Continue with Google" on the sign-in page. The same pair exists for `MICROSOFT` and `LINKEDIN`. Each needs `PROSPECTOR_URL` (see [Signing in](#signing-in)) |
-| `PROSPECTOR_SECURITY_CONTACT` | Where to report a security problem with this server, as a `mailto:`, `https://` or `tel:` address. It is served as the `Contact` of `/.well-known/security.txt`, which isn't served without it |
 | `TZ` | The time zone "today" is counted in |
 | `PROSPECTOR_ORG` | Default organisation for CLI commands (`--org=` overrides it) |
 | `PROSPECTOR_KEY` | API key for `push` and `pull` |
@@ -226,7 +225,7 @@ The first key in the list seals and signs; every key in the list opens and verif
 
 Each organisation has an MCP endpoint at `/o/<slug>/mcp` (streamable HTTP) and a JSON API at `/o/<slug>/api/v1/…`. Create keys on the Agents & API page or with `prospector key add <org> <name> <scope>…`.
 
-The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml), served at `/api/openapi.json` and drawn as a readable contract at `/api`. Both are public, like the front page, since they hold no data. `/llms.txt` lists the same operations for a language model, with links into `/api`; `/robots.txt` and `/sitemap.xml` let crawlers read the public pages and keep them out of an organisation's, and `/.well-known/security.txt` says where to report a security problem once `PROSPECTOR_SECURITY_CONTACT` is set. Prospector's own pages use the same API with the signed-in session, so whatever the app can do a key can be given. The spec is moving over a part at a time; agents and their runs are first.
+The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml), served at `/api/openapi.json` and drawn as a readable contract at `/api`. Both are public, like the front page, since they hold no data. Prospector's own pages use the same API with the signed-in session, so whatever the app can do a key can be given. The spec is moving over a part at a time; agents and their runs are first.
 
 | Scope | Allows |
 |---|---|
@@ -253,6 +252,10 @@ The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml),
 | `agents:run` | Start and stop Prospector's own agents on a task, and list a task's runs |
 | `agents:configure` | Add, change and delete Prospector's own agents: endpoint, key, model, tools and fallback. Owner-level: a signed-in member needs to be an owner |
 | `settings:write` | `PATCH /api/v1/settings`: change the organisation's settings, from its waits and wording to its never-contact list and enquiry sites; send only what changes. `PUT` and `DELETE /api/v1/enrichers` add, change and remove enrichment vendors and their keys. Owner-level, like `agents:configure`. `GET /api/v1/settings` reads them with `read` |
+| `team:write` | `POST /api/v1/members`, `PATCH` and `DELETE /api/v1/members/{user}`: add people, change their roles and areas, take them out. Owner-level, and as strong as an owner: it can make one, and a new account's first password comes back when there is no mail to send it by. `GET /api/v1/members` lists the team with `read` |
+| `mail:configure` | `GET` and `PUT /api/v1/mail-server`: the organisation's outgoing mail server; its password is write-only. Owner-level |
+| `sso:configure` | `/api/v1/sso` and `/api/v1/sso/domains`: the single sign-on provider, its write-only client secret, and the domains it speaks for. Owner-level |
+| `org:export` | `POST /api/v1/export`: everything the organisation holds, in one file. Owner-level |
 
 - **Every list comes a page at a time.** Each list in `/api/openapi.json` (agents, runs, the Research queue, deals, enquiries and their messages, onboardings, subscriptions), `search`, `tasks` and `due`, and the lists inside one company (`companies/<id>`: facts, people, history, notes) and one task (`tasks/<id>`: companies, people, notes), take `limit` (50 if left out, 200 at most) and `cursor`. When there is more, the answer has `next_cursor` to pass back as `cursor`, and the HTTP response names the next page in a `Link` header with `rel="next"` ([RFC 8288](https://www.rfc-editor.org/rfc/rfc8288)). A cursor is only good for the list that gave it out. The MCP tools take and return the same two fields.
 - **Errors from the JSON API** come as `application/problem+json` ([RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)), with what went wrong in `detail`. `400` is something to fix in the request, `404` a company, contact or task that isn't in this organisation, `409` something that clashes with what is already here, or a person who was erased on request, and `500` the server's own failure, which is worth retrying. A `401` or `403` about the key says which in `WWW-Authenticate`: `invalid_token` for a key to replace, `insufficient_scope` for one that can't do this.

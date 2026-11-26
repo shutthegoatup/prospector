@@ -7,7 +7,7 @@ import (
 )
 
 func taskOut(t Task) api.Task {
-	return api.Task{Id: t.ID, Title: t.Title, CreatedBy: t.CreatedBy, CreatedAt: t.CreatedAt, ClosedAt: t.ClosedAt, OfferingId: t.OfferingID}
+	return api.Task{Id: t.ID, Title: t.Title, CreatedBy: t.CreatedBy, CreatedAt: t.CreatedAt, ClosedAt: t.ClosedAt}
 }
 
 func requestOut(r TaskRequest) api.TaskRequest {
@@ -19,12 +19,12 @@ func (s apiServer) CreateTask(ctx context.Context, in api.CreateTaskRequestObjec
 	if len(in.Body.Agents) > 0 && q.Key != nil && !q.Key.Has("agents:run") {
 		return nil, refused("starting agents on the task needs the agents:run scope as well")
 	}
-	t, err := s.a.s.CreateTaskFor(q.Org.ID, in.Body.Offering, in.Body.Title, in.Body.Brief, q.Actor())
+	t, err := s.a.s.CreateTask(q.Org.ID, in.Body.Title, in.Body.Brief, q.Actor())
 	if err != nil {
 		return nil, err
 	}
 	out := taskOut(*t)
-	started := api.TaskStarted{Id: out.Id, Title: out.Title, CreatedBy: out.CreatedBy, CreatedAt: out.CreatedAt, ClosedAt: out.ClosedAt, OfferingId: out.OfferingId,
+	started := api.TaskStarted{Id: out.Id, Title: out.Title, CreatedBy: out.CreatedBy, CreatedAt: out.CreatedAt, ClosedAt: out.ClosedAt,
 		Runs: []api.Run{}, NotStarted: []string{}}
 	for _, agent := range in.Body.Agents {
 		run, err := s.a.StartRun(q.Org.ID, t.ID, agent, q.Actor())

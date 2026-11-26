@@ -22,8 +22,6 @@ type Task struct {
 	CreatedBy string     `json:"created_by"`
 	CreatedAt time.Time  `json:"created_at"`
 	ClosedAt  *time.Time `json:"closed_at,omitempty"`
-	// OfferingID is what the task is finding companies for; 0 is the organisation's own.
-	OfferingID int64 `gorm:"not null;default:0" json:"offering_id"`
 }
 
 // TaskRequest is something a person asked for on a task. The first is the brief.
@@ -86,11 +84,6 @@ func words(text string, max int, what string) (string, error) {
 }
 
 func (s *Store) CreateTask(org int64, title, brief, by string) (*Task, error) {
-	return s.CreateTaskFor(org, 0, title, brief, by)
-}
-
-// CreateTaskFor starts a task finding companies for an offering; 0 is the organisation's own.
-func (s *Store) CreateTaskFor(org, offering int64, title, brief, by string) (*Task, error) {
 	brief, err := words(brief, maxBrief, "the brief")
 	if err != nil {
 		return nil, err
@@ -102,13 +95,8 @@ func (s *Store) CreateTaskFor(org, offering int64, title, brief, by string) (*Ta
 	if r := []rune(title); len(r) > 60 {
 		title = strings.TrimSpace(string(r[:59])) + "…"
 	}
-	t := Task{OrgID: org, Title: title, CreatedBy: by, OfferingID: offering}
+	t := Task{OrgID: org, Title: title, CreatedBy: by}
 	return &t, s.db.Transaction(func(tx *gorm.DB) error {
-		if offering != 0 {
-			if _, err := heldOffering(tx, org, offering); err != nil {
-				return err
-			}
-		}
 		if err := tx.Create(&t).Error; err != nil {
 			return err
 		}
@@ -132,19 +120,10 @@ func (s *Store) onTask(org int64, who Actor, task int64) (Actor, error) {
 	if task == 0 {
 		return who, nil
 	}
-	t, err := openTask(s.db, org, task)
-	if err != nil {
+	if _, err := openTask(s.db, org, task); err != nil {
 		return who, err
 	}
-	// Only a release from before offerings could have removed one an open task is for.
-	if _, err := s.offeringOf(org, t.OfferingID); err != nil {
-		var gone notFound
-		if errors.As(err, &gone) {
-			return who, conflict(fmt.Sprintf("the offering task %d was finding companies for has been removed: stop, and leave a note saying so", task))
-		}
-		return who, err
-	}
-	who.Task, who.Offering = task, t.OfferingID
+	who.Task = task
 	return who, s.renewClaims(s.db, org, task, who, time.Now())
 }
 
@@ -253,15 +232,6 @@ func (s *Store) SetTaskClosed(org, task int64, closed bool, by string) error {
 		if closed == (t.ClosedAt != nil) {
 			return nil
 		}
-		if !closed && t.OfferingID != 0 {
-			if _, err := heldOffering(tx, org, t.OfferingID); err != nil {
-				var gone notFound
-				if errors.As(err, &gone) {
-					return conflict("the offering this task was finding companies for has been removed: start a new task instead")
-				}
-				return err
-			}
-		}
 		var at *time.Time
 		action := "task:open"
 		if closed {
@@ -302,6 +272,35 @@ func (s *Store) TaskNotesPage(org, task int64, page int) ([]NoteView, Page, erro
 	if err := theirs().Order("id desc").Limit(pg.Size).Offset(pg.offset()).Find(&notes).Error; err != nil {
 		return nil, Page{}, err
 	}
+	out, err := s.noteViews(org, notes)
+	return out, pg, err
+}
+
+// TaskNotes is TaskNotesPage a cursor at a time, for the API.
+func (s *Store) TaskNotes(org, task int64, page PageIn) ([]NoteView, string, error) {
+	at, err := page.at(1)
+	if err != nil {
+		return nil, "", err
+	}
+	q := s.in(org).Where("task_id = ?", task).Order("id desc").Limit(page.size() + 1)
+	if at[0] > 0 {
+		q = q.Where("id < ?", at[0])
+	}
+	var notes []TaskNote
+	if err := q.Find(&notes).Error; err != nil {
+		return nil, "", err
+	}
+	var next string
+	if len(notes) > page.size() {
+		notes = notes[:page.size()]
+		next = cursorOf(notes[len(notes)-1].ID)
+	}
+	out, err := s.noteViews(org, notes)
+	return out, next, err
+}
+
+// noteViews names the company each note is about.
+func (s *Store) noteViews(org int64, notes []TaskNote) ([]NoteView, error) {
 	names := map[int64]string{}
 	for _, n := range notes {
 		if n.CompanyID != 0 {
@@ -311,7 +310,7 @@ func (s *Store) TaskNotesPage(org, task int64, page int) ([]NoteView, Page, erro
 	if len(names) > 0 {
 		var companies []Company
 		if err := s.in(org).Where("id in ?", slices.Collect(maps.Keys(names))).Find(&companies).Error; err != nil {
-			return nil, Page{}, err
+			return nil, err
 		}
 		for _, c := range companies {
 			names[c.ID] = c.Name
@@ -321,7 +320,7 @@ func (s *Store) TaskNotesPage(org, task int64, page int) ([]NoteView, Page, erro
 	for i, n := range notes {
 		out[i] = NoteView{TaskNote: n, Company: names[n.CompanyID]}
 	}
-	return out, pg, nil
+	return out, nil
 }
 
 // CompanyNotesPage is one page of the notes agents left about a company, newest first.
@@ -680,16 +679,6 @@ func (s *Store) taskViews(tx *gorm.DB, org int64, tasks []Task, now time.Time) (
 				v.Companies = append(v.Companies, TaskCompany{ID: c.ID, Name: c.Name, Stage: c.Stage, Since: companySince[id]})
 			}
 		}
-		// A task for an offering judges its companies by that offering's verdicts.
-		if t.OfferingID != 0 {
-			stages, err := offeringStages(tx, org, t.OfferingID, slices.Collect(maps.Keys(companySince)))
-			if err != nil {
-				return nil, err
-			}
-			for j := range v.Companies {
-				v.Companies[j].Stage = stages[v.Companies[j].ID]
-			}
-		}
 		for _, id := range slices.Sorted(maps.Keys(personSince)) {
 			if p, here := people[id]; here {
 				v.People = append(v.People, TaskPerson{ID: p.ID, Name: displayName(p), Title: p.Title, Company: companyName(deref(p.Maker)),
@@ -778,6 +767,7 @@ type TaskBrief struct {
 	Found   TaskCounts `json:"found"`
 	LastBy  string     `json:"last_agent,omitempty"`
 	LastAt  *time.Time `json:"last_agent_at,omitempty"`
+	LastDid string     `json:"last_agent_action,omitempty" jsonschema:"what that agent last did: task:pickup when it only picked the task up"`
 	LastYou bool       `json:"last_agent_was_you,omitempty"`
 }
 
@@ -806,18 +796,12 @@ type NoteOut struct {
 	Actor   string    `json:"actor"`
 	At      time.Time `json:"at"`
 	Company string    `json:"company,omitempty"`
+	About   int64     `json:"company_id,omitempty" jsonschema:"the id of the company it is about, if any"`
 	ByYou   bool      `json:"by_you,omitempty"`
-}
-
-type TaskOffering struct {
-	ID       int64  `json:"id"`
-	Name     string `json:"name"`
-	Guidance string `json:"guidance" jsonschema:"what to look for and how to judge companies for this offering; it takes the place of the organisation's own look-for list for this task"`
 }
 
 type TaskOut struct {
 	TaskBrief
-	Offering   *TaskOffering `json:"offering,omitempty" jsonschema:"what this task finds companies for, when it isn't the organisation's own offering"`
 	Brief      string        `json:"brief" jsonschema:"what the person asked for, in their words"`
 	Requests   []AskedOut    `json:"requests" jsonschema:"everything asked on this task, oldest first; the first is the brief"`
 	Companies  []TaskCompany `json:"companies" jsonschema:"companies already found for this task"`
@@ -845,7 +829,7 @@ func brief(v TaskView, who Actor) TaskBrief {
 		b.Open = append(b.Open, asked(r, who))
 	}
 	if v.Last != nil {
-		b.LastBy, b.LastAt, b.LastYou = v.Last.User, &v.Last.At, who.did(*v.Last)
+		b.LastBy, b.LastAt, b.LastDid, b.LastYou = v.Last.User, &v.Last.At, v.Last.Action, who.did(*v.Last)
 	}
 	return b
 }
@@ -853,13 +837,34 @@ func brief(v TaskView, who Actor) TaskBrief {
 // AgentTasks lists a page of the open tasks, newest first. The cursor is the last
 // task listed, so one opened meanwhile doesn't shift the pages after it.
 func (s *Store) AgentTasks(org int64, who Actor, page PageIn) (briefs []TaskBrief, next string, err error) {
-	at, err := page.at(1)
+	return s.TaskBriefs(org, who, false, page)
+}
+
+// TaskBriefs is AgentTasks with the closed tasks too when asked, after the open ones as
+// the tasks page lists them. Its cursor then also says whether it ended among the closed.
+func (s *Store) TaskBriefs(org int64, who Actor, closed bool, page PageIn) (briefs []TaskBrief, next string, err error) {
+	n := 1
+	if closed {
+		n = 2
+	}
+	at, err := page.at(n)
 	if err != nil {
 		return nil, "", err
 	}
-	q := s.in(org).Where("closed_at is null").Order("id desc").Limit(page.size() + 1)
-	if at[0] > 0 {
-		q = q.Where("id < ?", at[0])
+	q := s.in(org).Limit(page.size() + 1)
+	switch {
+	case !closed:
+		q = q.Where("closed_at is null").Order("id desc")
+		if at[0] > 0 {
+			q = q.Where("id < ?", at[0])
+		}
+	case at[0] == 1:
+		q = q.Where("closed_at is not null and id < ?", at[1]).Order("id desc")
+	default:
+		q = q.Order("closed_at is not null, id desc")
+		if at[1] > 0 {
+			q = q.Where("(closed_at is not null or id < ?)", at[1])
+		}
 	}
 	var tasks []Task
 	if err := q.Find(&tasks).Error; err != nil {
@@ -867,7 +872,15 @@ func (s *Store) AgentTasks(org int64, who Actor, page PageIn) (briefs []TaskBrie
 	}
 	if len(tasks) > page.size() {
 		tasks = tasks[:page.size()]
-		next = cursorOf(tasks[len(tasks)-1].ID)
+		last := tasks[len(tasks)-1]
+		switch {
+		case !closed:
+			next = cursorOf(last.ID)
+		case last.ClosedAt != nil:
+			next = cursorOf(1, last.ID)
+		default:
+			next = cursorOf(0, last.ID)
+		}
 	}
 	views, err := s.taskViews(s.db, org, tasks, time.Now())
 	if err != nil {
@@ -916,15 +929,6 @@ func (s *Store) agentTaskPage(org int64, who Actor, id int64, page PageIn, now t
 	}
 	out := TaskOut{TaskBrief: brief(*v, who), Brief: v.Brief, Requests: []AskedOut{}, Companies: v.Companies, People: v.People, Notes: []NoteOut{},
 		Claimed: claimed}
-	// A closed task can outlive its offering; an open one can't, as removing it is refused.
-	var gone notFound
-	if o, err := s.offeringOf(org, v.OfferingID); err != nil && !errors.As(err, &gone) {
-		return nil, err
-	} else if o != nil {
-		out.Offering = &TaskOffering{ID: o.ID, Name: o.Name, Guidance: "This task finds companies for " + o.Name + ". " +
-			"The stage on each company here, and in what add_company answers, is for " + o.Name + ": skip one rejected for it. " +
-			"A company rejected only for something else is still worth adding for this.\n\n" + lookForList(o.Name, o.LookFor)}
-	}
 	for _, r := range v.Requests {
 		out.Requests = append(out.Requests, asked(r, who))
 	}
@@ -956,7 +960,7 @@ func (s *Store) agentTaskPage(org int64, who Actor, id int64, page PageIn, now t
 	}
 	for _, n := range notes {
 		out.Notes = append(out.Notes, NoteOut{ID: n.ID, Kind: n.Kind, Text: n.Text, Actor: n.Actor, At: n.CreatedAt, Company: about[n.CompanyID],
-			ByYou: who.did(Event{User: n.Actor, KeyID: n.KeyID})})
+			About: n.CompanyID, ByYou: who.did(Event{User: n.Actor, KeyID: n.KeyID})})
 	}
 	// The counts in the brief are of everything found; only the lists are a page.
 	out.Companies, at[0] = afterID(out.Companies, func(c TaskCompany) int64 { return c.ID }, at[0], page.size())

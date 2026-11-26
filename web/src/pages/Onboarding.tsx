@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, Meta, PageHead, Pill, type Tone, useRefresh, Whose } from "@/components/app";
@@ -9,7 +10,7 @@ import { useSession } from "@/session";
 type Onboarding = components["schemas"]["Onboarding"];
 type Step = components["schemas"]["OnboardingStep"];
 
-function today() {
+export function today() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -56,7 +57,8 @@ export function OnboardingPage() {
   );
 }
 
-function OnboardingCard({ o, day }: { o: Onboarding; day: string }) {
+// OnboardingCard is one onboarding; on its company's own page it goes unnamed.
+export function OnboardingCard({ o, day, named = true }: { o: Onboarding; day: string; named?: boolean }) {
   const { org, support } = useSession();
   const refresh = useRefresh();
   const [text, tone] = standing(o, day);
@@ -70,10 +72,17 @@ function OnboardingCard({ o, day }: { o: Onboarding; day: string }) {
     <article className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span>
-          <a href={`/o/${org}/companies/${o.company_id}`} className="font-bold text-foreground hover:text-mark">
-            {o.company}
-          </a>
-          {o.name && <span className="text-muted-foreground"> · {o.name}</span>}
+          {named && (
+            <Link to={`/companies/${o.company_id}`} className="font-bold text-foreground hover:text-mark">
+              {o.company}
+            </Link>
+          )}
+          {o.name && (
+            <span className="text-muted-foreground">
+              {named ? " · " : ""}
+              {o.name}
+            </span>
+          )}
           <span className="block font-mono text-xs text-muted-foreground">
             {o.done} of {o.steps.length} · started {o.start}
           </span>
