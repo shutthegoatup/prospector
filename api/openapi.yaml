@@ -31,6 +31,11 @@ info:
     an organisation's address, and only for a browser: a key is refused them. A refusal
     a client should act on carries a `type` that names it (see `Problem`).
 
+    Requests are rate limited per API key and per signed-in person, as a token bucket:
+    a key may make 1000 at once and then 100 a second, a person 2000 at once and then 200
+    a second. Past that an operation answers 429 `throttled` with `Retry-After`, the whole
+    seconds until it would be let through; a refused request costs nothing.
+
     Every list comes a page at a time: it takes `limit` and `cursor`, and answers
     `{"items": [...], "next_cursor": "..."}`. When `next_cursor` is there, pass it back
     as `cursor` for the next page; the `Link` header names that page too.
@@ -332,6 +337,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: createAgent
@@ -360,6 +366,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agents/{id}:
@@ -383,6 +390,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     put:
       operationId: updateAgent
@@ -410,6 +418,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: deleteAgent
@@ -426,6 +435,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks/{task}/runs:
@@ -465,6 +475,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: startRun
@@ -494,6 +505,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/runs/{id}/stop:
@@ -516,6 +528,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/connect:
@@ -539,6 +552,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/keys:
@@ -574,6 +588,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: createKey
@@ -602,6 +617,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/keys/{id}:
@@ -640,6 +656,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: revokeKey
@@ -656,6 +673,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agent-scores:
@@ -691,6 +709,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agent-work:
@@ -728,6 +747,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agent-activity:
@@ -764,6 +784,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enquiries/{id}/messages:
@@ -800,6 +821,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enquiries/{id}/replies:
@@ -837,6 +859,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
         "502": { $ref: "#/components/responses/NotSent" }
 
@@ -869,6 +892,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/onboardings:
@@ -907,6 +931,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: startOnboarding
@@ -933,6 +958,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/onboardings/{id}:
@@ -954,6 +980,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/onboarding-steps/{id}:
@@ -984,6 +1011,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/onboardings/{id}/invites:
@@ -1019,6 +1047,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
         "502": { $ref: "#/components/responses/NotSent" }
 
@@ -1041,6 +1070,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/subscriptions:
@@ -1080,6 +1110,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: addSubscription
@@ -1105,6 +1136,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/subscriptions/{id}:
@@ -1135,6 +1167,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: removeSubscription
@@ -1151,6 +1184,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/subscriptions/{id}/renewals:
@@ -1191,6 +1225,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/deals:
@@ -1229,6 +1264,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: startDeal
@@ -1259,6 +1295,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/deals/{id}:
@@ -1289,6 +1326,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: removeDeal
@@ -1305,6 +1343,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/contacts/{id}/deal:
@@ -1338,6 +1377,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/conversations:
@@ -1377,6 +1417,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enquiries:
@@ -1415,6 +1456,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enquiry-counts:
@@ -1438,6 +1480,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enquiries/{id}:
@@ -1474,6 +1517,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: deleteEnquiry
@@ -1490,6 +1534,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enquiries/{id}/conversation:
@@ -1521,6 +1566,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/suppressions:
@@ -1559,6 +1605,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: addSuppression
@@ -1589,6 +1636,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/suppressions/{id}:
@@ -1610,6 +1658,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/campaigns:
@@ -1645,6 +1694,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: createCampaign
@@ -1674,6 +1724,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/campaigns/{id}:
@@ -1704,6 +1755,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: removeCampaign
@@ -1720,6 +1772,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/campaigns/{id}/audience:
@@ -1763,6 +1816,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/research:
@@ -1827,6 +1881,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks:
@@ -1875,6 +1930,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: createTask
@@ -1905,6 +1961,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks/{id}/left-out:
@@ -1959,6 +2016,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks/{id}:
@@ -1992,6 +2050,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     patch:
       operationId: changeTask
@@ -2017,6 +2076,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks/{id}/prompt:
@@ -2045,6 +2105,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks/{id}/notes:
@@ -2081,6 +2142,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks/{id}/work:
@@ -2119,6 +2181,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/tasks/{id}/requests:
@@ -2154,6 +2217,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/task-requests/{id}:
@@ -2188,6 +2252,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/campaigns/{id}/send:
@@ -2223,6 +2288,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/campaigns/{id}/cancel:
@@ -2249,6 +2315,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/campaigns/{id}/resume:
@@ -2274,6 +2341,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/campaigns/{id}/mail:
@@ -2309,6 +2377,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/notes:
@@ -2341,6 +2410,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/notes/{id}:
@@ -2361,6 +2431,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/requests/finish:
@@ -2399,6 +2470,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agreements:
@@ -2437,6 +2509,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: createAgreement
@@ -2468,6 +2541,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agreements/{id}:
@@ -2495,6 +2569,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     patch:
       operationId: changeAgreement
@@ -2523,6 +2598,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: removeAgreement
@@ -2538,6 +2614,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agreements/{id}/document:
@@ -2580,6 +2657,7 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "413": { $ref: "#/components/responses/TooLarge" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     get:
       operationId: getAgreementDocument
@@ -2601,6 +2679,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agreements/{id}/recipients:
@@ -2637,6 +2716,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: addAgreementRecipient
@@ -2672,6 +2752,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agreements/{id}/recipients/{recipient}:
@@ -2710,6 +2791,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: removeAgreementRecipient
@@ -2725,6 +2807,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/agreements/{id}/fields:
@@ -2760,6 +2843,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     put:
       operationId: putAgreementFields
@@ -2801,6 +2885,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/today:
@@ -2853,6 +2938,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/today/summary:
@@ -2876,6 +2962,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/marks:
@@ -2914,6 +3001,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/people:
@@ -2944,6 +3032,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/people/draft:
@@ -2984,6 +3073,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/contacts/{id}:
@@ -3010,6 +3100,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/contacts/{id}/pick:
@@ -3040,6 +3131,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/companies/{id}:
@@ -3066,6 +3158,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/suggestions/{id}:
@@ -3096,6 +3189,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enrichers:
@@ -3130,6 +3224,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     put:
       operationId: saveEnricher
@@ -3158,6 +3253,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/enrichers/{id}:
@@ -3178,6 +3274,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/contacts/{id}/enrich:
@@ -3228,6 +3325,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/settings:
@@ -3251,6 +3349,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     patch:
       operationId: changeSettings
@@ -3279,6 +3378,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
 
@@ -3318,6 +3418,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: addOffering
@@ -3344,6 +3445,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/offerings/{id}:
@@ -3374,6 +3476,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: removeOffering
@@ -3393,6 +3496,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/offerings/{id}/verdicts:
@@ -3435,6 +3539,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/companies/{id}/verdicts:
@@ -3471,6 +3576,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/companies/{id}/roles:
@@ -3512,6 +3618,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: addRole
@@ -3541,6 +3648,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/roles/{id}:
@@ -3574,6 +3682,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/companies:
@@ -3624,6 +3733,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/segments:
@@ -3658,6 +3768,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/companies/{id}/overview:
@@ -3686,6 +3797,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/companies/{id}/history:
@@ -3722,6 +3834,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/companies/{id}/notes:
@@ -3759,6 +3872,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/contacts/{id}/export:
@@ -3788,6 +3902,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/contacts/{id}/erase:
@@ -3814,6 +3929,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/never-contact/covers:
@@ -3850,6 +3966,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/me:
@@ -3873,6 +3990,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     patch:
       operationId: changeMe
@@ -3900,6 +4018,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/nav:
@@ -3926,6 +4045,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /api/v1/orgs:
@@ -3960,6 +4080,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/me/password:
@@ -4033,6 +4154,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: addMember
@@ -4069,6 +4191,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/members/{user}:
@@ -4114,6 +4237,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     delete:
       operationId: removeMember
@@ -4130,6 +4254,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/mail-server:
@@ -4153,6 +4278,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     put:
       operationId: saveMailServer
@@ -4180,6 +4306,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/mail-server/test:
@@ -4205,6 +4332,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
         "502": { $ref: "#/components/responses/NotSent" }
 
@@ -4229,6 +4357,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     put:
       operationId: saveSSO
@@ -4258,6 +4387,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/sso/domains:
@@ -4292,6 +4422,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
     post:
       operationId: addSSODomain
@@ -4322,6 +4453,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/sso/domains/{domain}:
@@ -4343,6 +4475,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/sso/domains/{domain}/verify:
@@ -4369,6 +4502,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
   /o/{org}/api/v1/export:
@@ -4399,6 +4533,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
 components:
@@ -4500,7 +4635,7 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
     Throttled:
-      description: "`throttled`: too many tries."
+      description: "`throttled`: too many tries, or too many requests."
       headers:
         Retry-After: { schema: { type: integer }, description: Seconds until the next try counts. }
       content:
@@ -5248,7 +5383,7 @@ components:
         - "401: no session or key. Sign in."
         - "401: this session began through another organisation's single sign-on. Sign in again."
         - "401: that email and password don't match an account."
-        - "429: too many tries. Wait `Retry-After` seconds."
+        - "429: too many tries, or too many requests. Wait `Retry-After` seconds."
         - "410: a reset link that is used, out of date or replaced. Ask for another."
         - "403: still on a password someone else saw. Choose your own (`changePassword`) before anything else."
         - "403: this organisation requires its single sign-on. Load one of its pages to go through it."

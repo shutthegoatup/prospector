@@ -34,6 +34,7 @@ type App struct {
 	mcp       map[int64]builtMCP
 	logins    loginGuard
 	enquiries enquiryGuard
+	rates     rateGuard
 	// base is the address people reach the app at, when the operator has said: then
 	// links and the cookie's Secure mark don't depend on what a proxy forwards.
 	base string
@@ -279,6 +280,9 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 			}
 			q.Org, q.Member = org, m
 		}
+		if forAPI(r) && !a.limited(w, r, userBucket(u), memberRate) {
+			return
+		}
 		next(w, r.WithContext(context.WithValue(r.Context(), reqKey{}, q)))
 	}
 }
@@ -303,6 +307,9 @@ func (a *App) agent(scope string, next http.HandlerFunc) http.HandlerFunc {
 		}
 		if scope != "" && !k.Has(scope) {
 			challenge(w, http.StatusForbidden, "insufficient_scope", scope, "this key lacks the "+scope+" scope")
+			return
+		}
+		if !a.limited(w, r, keyBucket(k), keyRate) {
 			return
 		}
 		next(w, r.WithContext(context.WithValue(r.Context(), reqKey{}, &Req{Org: org, Key: k})))
