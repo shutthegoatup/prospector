@@ -178,7 +178,7 @@ func (a *App) startRun(org, task, agent int64, by string, replacing int64) (*Age
 		return nil, err
 	}
 	if !cfg.Ready() {
-		return nil, fmt.Errorf("%s isn't set up: an owner gives it an endpoint and a model in Settings", cfg.Name)
+		return nil, fmt.Errorf("%s isn't set up: an owner gives it an endpoint and a model on the Agents page", cfg.Name)
 	}
 	if _, err := openTask(a.s.db, org, task); err != nil {
 		return nil, err
@@ -357,11 +357,11 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 	}
 	cfg, err := a.s.AgentByID(run.OrgID, run.AgentID)
 	if err != nil || !cfg.Ready() {
-		return RunFailed, "the agent is no longer set up in Settings"
+		return RunFailed, "the agent is no longer set up: see the Agents page"
 	}
 	key, err := a.s.keys.open(cfg.APIKey)
 	if err != nil {
-		return RunFailed, "the endpoint's key can't be read: an owner enters it again in Settings"
+		return RunFailed, "the endpoint's key can't be read: an owner enters it again on the Agents page"
 	}
 	bk, err := a.s.agentKey(cfg)
 	if err != nil {

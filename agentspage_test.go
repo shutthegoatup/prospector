@@ -45,6 +45,9 @@ func TestTheAgentsPageSaysWhichAgentsAreReady(t *testing.T) {
 		"tools": []string{"brave-search_brave_web_search"}, "fallback": local.ID})); code != http.StatusOK {
 		t.Fatalf("adding Gateway: %d %s", code, body)
 	}
+	if code, body := saveAgentAt(t, ada, srv.URL, settings("Unpicked", map[string]any{"model": ""})); code != http.StatusOK {
+		t.Fatalf("adding Unpicked: %d %s", code, body)
+	}
 	fake.limited = true
 	if code, body := saveAgentAt(t, ada, srv.URL, settings("Spent", nil)); code != http.StatusOK {
 		t.Fatalf("adding Spent: %d %s", code, body)
@@ -55,6 +58,7 @@ func TestTheAgentsPageSaysWhichAgentsAreReady(t *testing.T) {
 
 	_, page := call(t, ada, "GET", srv.URL+"/o/alpha/agents", "", nil)
 	gateway, localCard, spent := agentCard(t, s, page, "Gateway"), agentCard(t, s, page, "Local"), agentCard(t, s, page, "Spent")
+	unpicked := agentCard(t, s, page, "Unpicked")
 	for _, c := range []struct{ html, state, want string }{
 		{gateway, "ok", "✓ Ready"},
 		{gateway, "ok", "Local, after 15 minutes"},
@@ -62,7 +66,10 @@ func TestTheAgentsPageSaysWhichAgentsAreReady(t *testing.T) {
 		{localCard, "warn", "Runs, but can&#39;t search the web"},
 		{localCard, "warn", "thinking off"},
 		{localCard, "warn", "nobody: it waits"},
-		{spent, "stop", "Last check: Models: the endpoint answered 429"},
+		// A check refused for its limit leaves an agent that still runs.
+		{spent, "warn", "Last check: Models: the endpoint answered 429"},
+		{unpicked, "stop", "✕ Can&#39;t run"},
+		{unpicked, "stop", "Pick one of the models the endpoint lists."},
 	} {
 		if !strings.Contains(c.html, `data-state="`+c.state+`"`) || !strings.Contains(c.html, c.want) {
 			t.Errorf("a card should be %s and say %q:\n%s", c.state, c.want, c.html)
@@ -71,7 +78,7 @@ func TestTheAgentsPageSaysWhichAgentsAreReady(t *testing.T) {
 	if !strings.Contains(localCard, `name="thinking_off" checked`) {
 		t.Error("Local's form should have thinking off ticked")
 	}
-	for _, want := range []string{"1 ready", "1 missing something", "1 can&#39;t run", "research-bot", "Connects with a key", "Your own agent connects"} {
+	for _, want := range []string{"1 ready", "2 missing something", "1 can&#39;t run", "research-bot", "Connects with a key", "Your own agent connects"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the Agents page is missing %q", want)
 		}

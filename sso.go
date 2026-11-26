@@ -776,8 +776,12 @@ func agentCommand(s *Store, rest []string) error {
 		if search, ok := os.LookupEnv("PROSPECTOR_AGENT_SEARCH_URL"); ok {
 			in.SearchURL = search
 		}
-		if thinking, ok := os.LookupEnv("PROSPECTOR_AGENT_THINKING"); ok {
+		switch thinking, ok := os.LookupEnv("PROSPECTOR_AGENT_THINKING"); {
+		case !ok:
+		case thinking == "off" || thinking == "on":
 			in.ThinkingOff = thinking == "off"
+		default:
+			return fmt.Errorf("PROSPECTOR_AGENT_THINKING is off or on, not %q", thinking)
 		}
 		c, err := (&App{s: s}).saveAgent(context.Background(), o.ID, in, "cli")
 		if err != nil {

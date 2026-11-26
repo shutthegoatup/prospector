@@ -672,7 +672,7 @@ func (v AgentView) State() AgentState {
 	case v.Model == "":
 		return AgentState{"stop", "✕ Can't run" + checked, "Pick one of the models the endpoint lists."}
 	case v.Problem != "":
-		return AgentState{"stop", "✕ Its last check failed" + checked, "Last check: " + v.Problem}
+		return AgentState{"warn", "● Its last check found a problem" + checked, "Last check: " + v.Problem}
 	case !v.Searches():
 		return AgentState{"warn", "● Runs, but can't search the web" + checked,
 			"Add a search address or allow a search tool; until then it only reads pages it's given."}

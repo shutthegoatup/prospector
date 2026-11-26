@@ -598,7 +598,7 @@ func Roster(q *Req, d AgentsData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</div><p class=\"flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground\"><span><i class=\"mr-1.5 inline-block h-2.5 w-3.5 rounded-sm border border-ink bg-[var(--ok-fill)] align-[-1px]\"></i>ready</span> <span><i class=\"mr-1.5 inline-block h-2.5 w-3.5 rounded-sm border border-ink bg-[var(--warn-fill)] align-[-1px]\"></i>runs, missing something</span> <span><i class=\"mr-1.5 inline-block h-2.5 w-3.5 rounded-sm border border-ink bg-[var(--stop-fill)] align-[-1px]\"></i>can't run: no key or model, or its last check failed</span></p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</div><p class=\"flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground\"><span><i class=\"mr-1.5 inline-block h-2.5 w-3.5 rounded-sm border border-ink bg-[var(--ok-fill)] align-[-1px]\"></i>ready</span> <span><i class=\"mr-1.5 inline-block h-2.5 w-3.5 rounded-sm border border-ink bg-[var(--warn-fill)] align-[-1px]\"></i>runs, missing something</span> <span><i class=\"mr-1.5 inline-block h-2.5 w-3.5 rounded-sm border border-ink bg-[var(--stop-fill)] align-[-1px]\"></i>can't run: no key, endpoint or model</span></p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

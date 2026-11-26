@@ -928,7 +928,7 @@ func TaskDetailView(q *Req, d TaskPage) templ.Component {
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = Section("Prospector's agents", "Work the task here, each with the model and tools set in Settings, each on its own request. What they find waits in Research.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var23), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = Section("Prospector's agents", "Work the task here, each with the model and tools set on the Agents page, each on its own request. What they find waits in Research.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var23), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
