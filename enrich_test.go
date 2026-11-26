@@ -63,14 +63,21 @@ func (f *fakeHunter) calls() int {
 // enrichSignedIn is signedIn with the vendors reached at a fake.
 func enrichSignedIn(t *testing.T) (*Store, *Org, string, *http.Client, *fakeHunter) {
 	t.Helper()
+	f := newFakeHunter(t)
+	s, o, api, client := vendorsAt(t, f.srv)
+	return s, o, api, client, f
+}
+
+// vendorsAt is signedIn with every vendor reached at one fake.
+func vendorsAt(t *testing.T, fake *httptest.Server) (*Store, *Org, string, *http.Client) {
+	t.Helper()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	u := must(s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery"))
 	if err := s.AddMember(o.ID, u.ID, "owner", u.Name); err != nil {
 		t.Fatal(err)
 	}
-	f := newFakeHunter(t)
-	srv := httptest.NewServer((&App{s: s, vendorClient: f.srv.Client(), vendorBase: f.srv.URL}).Routes())
+	srv := httptest.NewServer((&App{s: s, vendorClient: fake.Client(), vendorBase: fake.URL}).Routes())
 	t.Cleanup(srv.Close)
 	jar, _ := cookiejar.New(nil)
 	client := &http.Client{Jar: jar}
@@ -78,7 +85,7 @@ func enrichSignedIn(t *testing.T) (*Store, *Org, string, *http.Client, *fakeHunt
 	if err != nil || res.StatusCode != http.StatusOK {
 		t.Fatalf("login: %v %v", res.Status, err)
 	}
-	return s, o, srv.URL + "/o/alpha/api/v1", client, f
+	return s, o, srv.URL + "/o/alpha/api/v1", client
 }
 
 type enrichAnswer struct {

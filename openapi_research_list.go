@@ -66,7 +66,7 @@ func researchOut(set OrgSettings, r ResearchRow) api.ResearchCompany {
 			Answer: factAnswerOut(f.Answer), Inferred: f.Inferred, By: f.Actor, At: f.CreatedAt})
 	}
 	for _, p := range r.People {
-		person := api.ResearchPerson{Id: p.ID, Name: displayName(p), Title: p.Title, Status: p.Status, HasEmail: deref(p.Email) != "",
+		person := api.ResearchPerson{Id: p.ID, Name: displayName(p), Title: p.Title, Status: p.Status, HasEmail: deref(p.Email) != "", HasPhone: deref(p.Phone) != "",
 			EmailStatus: p.EmailStatus, Linkedin: deref(p.Linkedin), SourceUrl: firstLine(deref(p.Sources)),
 			Pending: []api.PendingDetail{}, Lookups: []api.Lookup{}}
 		for _, d := range r.Pending[p.ID] {
