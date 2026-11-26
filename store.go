@@ -129,13 +129,19 @@ const (
 )
 
 type Fact struct {
-	ID        int64     `gorm:"primaryKey" json:"id"`
-	OrgID     int64     `gorm:"index;not null" json:"-"`
-	CompanyID int64     `gorm:"index" json:"company_id"`
-	ContactID *int64    `json:"contact_id,omitempty"`
-	Field     string    `json:"field"`
-	Value     string    `json:"value"`
-	SourceURL string    `json:"source_url"`
+	ID        int64  `gorm:"primaryKey" json:"id"`
+	OrgID     int64  `gorm:"index;not null" json:"-"`
+	CompanyID int64  `gorm:"index" json:"company_id"`
+	ContactID *int64 `json:"contact_id,omitempty"`
+	Field     string `json:"field"`
+	Value     string `json:"value"`
+	SourceURL string `json:"source_url"`
+	// Answer is, for something the organisation looks for, whether the company has it:
+	// empty for yes, "no", or "unknown" when the agent looked and couldn't tell.
+	Answer string `gorm:"not null;default:''" json:"answer,omitempty"`
+	// Inferred is read from a job advert, a third party or an old page, not seen on
+	// the company's own site.
+	Inferred  bool      `gorm:"not null;default:false" json:"inferred,omitempty"`
 	Actor     string    `json:"actor"`
 	CreatedAt time.Time `json:"created_at"`
 }

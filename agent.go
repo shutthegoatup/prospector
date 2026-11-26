@@ -18,8 +18,28 @@ import (
 
 type FactIn struct {
 	Field     string `json:"field" jsonschema:"what the fact is about, e.g. team_page or press, or one of the things the guidance says this organisation looks for"`
-	Value     string `json:"value" jsonschema:"the fact itself, one sentence"`
-	SourceURL string `json:"source_url" jsonschema:"the page that shows it (required)"`
+	Value     string `json:"value" jsonschema:"the fact itself, one sentence; for answer unknown, where you looked"`
+	SourceURL string `json:"source_url" jsonschema:"the page that shows it; required unless answer is unknown"`
+	Answer    string `json:"answer,omitempty" jsonschema:"for one of the things this organisation looks for: yes (the default) when the source shows they have it, no when it shows they don't, unknown when you looked and couldn't tell"`
+	Inferred  bool   `json:"inferred,omitempty" jsonschema:"true when read from a job advert, a third party or an old page rather than seen on their own site"`
+}
+
+const (
+	answerYes     = ""
+	answerNo      = "no"
+	answerUnknown = "unknown"
+)
+
+func factAnswer(raw string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "yes":
+		return answerYes, nil
+	case answerNo:
+		return answerNo, nil
+	case answerUnknown:
+		return answerUnknown, nil
+	}
+	return "", fmt.Errorf("answer is yes, no or unknown, not %q", raw)
 }
 
 type AddCompanyIn struct {
@@ -47,6 +67,14 @@ func checkFact(f FactIn) error {
 	if strings.TrimSpace(f.Field) == "" || strings.TrimSpace(f.Value) == "" {
 		return errors.New("a fact needs a field and a value")
 	}
+	answer, err := factAnswer(f.Answer)
+	if err != nil {
+		return err
+	}
+	// Not being able to tell has no page to show it; the value says where the agent looked.
+	if answer == answerUnknown && strings.TrimSpace(f.SourceURL) == "" {
+		return nil
+	}
 	if !httpURL.MatchString(strings.TrimSpace(f.SourceURL)) {
 		return fmt.Errorf("fact %q needs a source_url starting with http", f.Field)
 	}
@@ -56,15 +84,19 @@ func checkFact(f FactIn) error {
 // addFact stores a fact unless the company already has the same one from the same
 // page, so an agent that runs again, or a second agent, doesn't double the list.
 func addFact(tx *gorm.DB, org, company int64, in FactIn, actor string) (*Fact, bool, error) {
+	answer, err := factAnswer(in.Answer)
+	if err != nil {
+		return nil, false, err
+	}
 	f := Fact{OrgID: org, CompanyID: company, Field: strings.TrimSpace(in.Field), Value: strings.TrimSpace(in.Value),
-		SourceURL: strings.TrimSpace(in.SourceURL), Actor: actor}
+		SourceURL: strings.TrimSpace(in.SourceURL), Answer: answer, Inferred: in.Inferred, Actor: actor}
 	var from []Fact
 	if err := tx.Where("org_id = ? and company_id = ? and source_url = ?", org, company, f.SourceURL).Order("id").Find(&from).Error; err != nil {
 		return nil, false, err
 	}
 	// Compared here because SQLite's lower() only folds ASCII.
 	for i, had := range from {
-		if strings.EqualFold(had.Field, f.Field) && strings.EqualFold(strings.TrimSpace(had.Value), f.Value) {
+		if strings.EqualFold(had.Field, f.Field) && strings.EqualFold(strings.TrimSpace(had.Value), f.Value) && had.Answer == f.Answer {
 			return &from[i], true, nil
 		}
 	}
@@ -684,9 +716,16 @@ func lookForGuidance(o *Org) string {
 	if len(assets) == 0 {
 		return "Add any fact a source shows that helps judge fit."
 	}
-	lines := []string{o.Name + " looks for these at each company. When a source shows one, add a fact with exactly this field. Add nothing for one you didn't find:"}
+	lines := []string{o.Name + " looks for these at each company. Check each one and add a fact with exactly this field and an answer: " +
+		"yes with the page that shows they have it, no with the page that shows they don't, or unknown when you looked and couldn't tell, " +
+		"saying in value where you looked. Set inferred when it comes from a job advert, a third party or an old page rather than their own site. " +
+		"Check those marked must first: a company without one is a poor fit, so record the no and move on to the next company."}
 	for _, a := range assets {
-		lines = append(lines, "- "+a.Field+prefixed(": ", a.Hint))
+		need := ""
+		if a.Must {
+			need = " (must)"
+		}
+		lines = append(lines, "- "+a.Field+need+prefixed(": ", a.Hint))
 	}
 	return strings.Join(lines, "\n")
 }

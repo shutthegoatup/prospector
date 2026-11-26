@@ -109,6 +109,9 @@ templ ResearchView(q *Req, d ResearchData) {
 					</span>
 				}
 			</nav>
+			if d.Ranked && len(d.Rows) > 0 {
+				@Meta("Best fit first: no must missed, then most met, then fewest left unknown.")
+			}
 			if len(d.Rows) == 0 {
 				{{ t, x := researchEmpty(d.Filter) }}
 				@Empty(t, x)
@@ -165,6 +168,9 @@ templ FindBox(q *Req, d ResearchData) {
 				<div class="flex min-w-0 flex-[1_1_280px] items-baseline gap-2">
 					<span class="w-[104px] shrink-0 font-mono text-xs">{ a.Field }</span>
 					<span class="min-w-0 text-sm">{ a.Hint }</span>
+					if a.Must {
+						<span class="font-mono text-[11px] text-mark">must</span>
+					}
 				</div>
 			}
 			<p class="w-full text-[13px] text-muted-foreground">
@@ -264,8 +270,8 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 			</div>
 			if found := assetsFound(q.Org.Settings, r.Facts); len(found) > 0 {
 				<div class="flex flex-[1_1_180px] flex-col gap-1">
-					@Label("Looking for")
-					@AssetPills(found)
+					@Label("Fit")
+					<span class="font-mono text-[13px] font-medium">{ fitOf(found).Text() }</span>
 				</div>
 			}
 			<div class="flex flex-[1_1_150px] flex-col gap-1">
@@ -289,10 +295,13 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 				</div>
 			}
 		</div>
+		for _, a := range assetsFound(q.Org.Settings, r.Facts) {
+			@CriterionRow(a)
+		}
 		<details class="group border-t border-border/70 bg-muted" open?={ i == 0 }>
 			<summary class="flex cursor-pointer list-none items-center gap-2 px-5 py-2.5 font-mono text-xs text-muted-foreground hover:text-foreground">
 				<span class="transition-transform group-open:rotate-90">›</span>
-				{ plural(len(r.Facts), "fact") + " · " + plural(len(r.People), "person") }
+				{ plural(len(otherFacts(q.Org.Settings, r.Facts)), "other fact") + " · " + plural(len(r.People), "person") }
 			</summary>
 			<div class="flex flex-wrap gap-6 px-5 pb-5">
 				<div class="min-w-0 flex-[2_1_380px]">
@@ -300,7 +309,7 @@ templ ResearchItem(q *Req, r ResearchRow, i int) {
 					if r.Why != "" {
 						<div class="grid grid-cols-[130px_1fr] gap-3 border-b border-dashed border-border py-2 text-sm"><span class="font-mono text-xs text-muted-foreground">why it fits</span><span>{ r.Why }</span></div>
 					}
-					for _, f := range r.Facts {
+					for _, f := range otherFacts(q.Org.Settings, r.Facts) {
 						@FactRow(f)
 					}
 				</div>
@@ -360,12 +369,73 @@ templ FitPicker(c Company) {
 templ AssetPills(found []AssetFound) {
 	<div class="flex flex-wrap gap-1.5">
 		for _, a := range found {
-			if a.Has {
-				@Pill(strings.ReplaceAll(a.Field, "_", " "), "ok")
-			} else {
-				@Pill("no "+strings.ReplaceAll(a.Field, "_", " ")+" found", "")
-			}
+			{{ text, state := assetPill(a) }}
+			@Pill(text, state)
 		}
+	</div>
+}
+
+func assetPill(a AssetFound) (string, string) {
+	name := strings.ReplaceAll(a.Field, "_", " ")
+	switch a.State {
+	case assetMet:
+		return name, "ok"
+	case assetNotMet:
+		return "no " + name, "stop"
+	case assetNotFound:
+		return name + " not found", ""
+	}
+	return name + " unchecked", ""
+}
+
+func assetState(a AssetFound) (string, string) {
+	switch a.State {
+	case assetMet:
+		return "met", "ok"
+	case assetNotMet:
+		return "not met", "stop"
+	case assetNotFound:
+		return "not found", ""
+	}
+	return "unchecked", ""
+}
+
+// assetHow says how an answer is known: seen on their site, or inferred, and when.
+func assetHow(f *Fact) string {
+	how := "seen on their site"
+	switch {
+	case f.Answer == answerUnknown:
+		how = "looked"
+	case f.Inferred:
+		how = "inferred"
+	}
+	return how + " · " + actorLabel(f.Actor) + " · " + f.CreatedAt.Format("2 Jan")
+}
+
+// CriterionRow is what a company's facts say of one thing the organisation looks for.
+templ CriterionRow(a AssetFound) {
+	{{ text, state := assetState(a) }}
+	<div class="grid grid-cols-1 items-baseline gap-1 border-t border-dashed border-border px-5 py-2 sm:grid-cols-[168px_96px_1fr] sm:gap-3">
+		<span class="font-mono text-xs text-muted-foreground">
+			{ a.Field }
+			if a.Must {
+				<span class="text-mark">· must</span>
+			}
+		</span>
+		<span>@Pill(text, state)</span>
+		<span class="min-w-0 text-sm">
+			if a.Fact == nil {
+				<span class="text-muted-foreground">No agent has checked this yet.</span>
+			} else {
+				{ a.Fact.Value }
+				<span class="block font-mono text-[11px] text-muted-foreground">
+					{ assetHow(a.Fact) }
+					if a.Fact.SourceURL != "" {
+						· <a href={ templ.SafeURL(a.Fact.SourceURL) } target="_blank" rel="noopener noreferrer" class="text-mark underline">source ↗</a>
+					}
+				</span>
+			}
+		</span>
 	</div>
 }
 

@@ -1162,7 +1162,7 @@ func SettingsView(q *Req, d SettingsData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Meta("One per line, a name and what counts. Agents record each as a fact under that name, and Research shows which a company has.").Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = Meta("One per line, a name and what counts; put (must) after the name of anything a company is no fit without. Agents answer each yes, no or unknown with a source, and Research ranks a search's companies by them.").Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
