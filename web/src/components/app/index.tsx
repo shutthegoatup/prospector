@@ -48,6 +48,11 @@ export function Eyebrow({ children }: { children: ReactNode }) {
   return <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">{children}</span>;
 }
 
+// Quote is someone else's words, exactly as they sent them.
+export function Quote({ children }: { children: ReactNode }) {
+  return <div className="whitespace-pre-wrap rounded-lg border-l-2 border-primary bg-muted px-4 py-3 text-[15px] leading-relaxed">{children}</div>;
+}
+
 export function Meta({ children, className }: { children: ReactNode; className?: string }) {
   return <p className={cn("font-mono text-xs text-muted-foreground", className)}>{children}</p>;
 }

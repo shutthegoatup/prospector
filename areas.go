@@ -43,6 +43,7 @@ var opArea = map[string]string{
 	"AddAgreementRecipient": areaSales, "ChangeAgreementRecipient": areaSales, "RemoveAgreementRecipient": areaSales, "PutAgreementFields": areaSales,
 	"EnrichContact": areaSales,
 	"CreateAgent":   "", "UpdateAgent": "", "DeleteAgent": "", "DeleteEnquiry": "", "ChangeSettings": "", "SaveEnricher": "", "DeleteEnricher": "",
+	"AddOffering": "", "ChangeOffering": "", "RemoveOffering": "",
 }
 
 func (m *Membership) Works(area string) bool {
