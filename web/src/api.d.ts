@@ -1033,6 +1033,12 @@ export interface paths {
          *     task's search, the companies to review come best fit first (`ranked`): none
          *     missing a must, then most met, then fewest left unknown. Otherwise newest first,
          *     or as each filter orders them.
+         *
+         *     Each offering has a queue of its own. For one other than the organisation's own,
+         *     stages are its verdicts, fit is judged against its look-for fields, and people count
+         *     towards it when they are being reached for it. A company found for another offering
+         *     stays out of the organisation's own review until anything is done there for the
+         *     organisation's own.
          */
         get: operations["listResearch"];
         put?: never;
@@ -5910,6 +5916,8 @@ export interface operations {
             query?: {
                 /** @description `review` to qualify or reject, `contact` qualified with nobody picked, `verify` with a guessed email, `details` with a new detail for someone to accept, `rejected`. */
                 filter?: "review" | "contact" | "verify" | "details" | "rejected";
+                /** @description The offering whose queue this is; 0, or none, is the organisation's own. With `task`, the task's offering, which this may only repeat. */
+                offering?: number;
                 /** @description Only what this task's search found. */
                 task?: number;
                 /** @description How many to return. 50 if left out; 200 at most. */
@@ -7025,7 +7033,10 @@ export interface operations {
     };
     pickContact: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Pick them for this offering, whatever they were suggested for; 0 for the organisation's own. Left out, they are picked for what they were suggested for. */
+                offering?: number;
+            };
             header?: never;
             path: {
                 /** @description The organisation's slug. */
