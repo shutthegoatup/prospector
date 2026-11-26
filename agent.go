@@ -159,7 +159,7 @@ func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddComp
 		created := false
 		if c == nil {
 			c, created, err = ensureCompany(tx, org, Company{Name: in.Name, Domain: domain, Country: in.Country,
-				Segment: in.Segment, Fit: in.Fit, Why: in.Why, FoundBy: who.Name, Stage: CompanyReview})
+				Segment: in.Segment, Fit: in.Fit, Why: in.Why, FoundBy: who.Name, Stage: CompanyReview, FoundFor: who.Offering})
 			if err != nil {
 				return err
 			}
@@ -172,6 +172,8 @@ func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddComp
 			if out.Stage, err = putUpForReview(tx, org, who.Offering, c.ID, who.Name); err != nil {
 				return err
 			}
+		} else if err := foundForOwn(tx, org, c.ID); err != nil {
+			return err
 		}
 		if !created {
 			if err := s.heldWhenFound(tx, org, who, c, out.Stage); err != nil {
