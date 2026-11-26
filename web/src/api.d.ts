@@ -1512,7 +1512,9 @@ export interface paths {
         put?: never;
         /**
          * Pick a suggested person for outreach
-         * @description Takes someone an agent suggested out of Research and into the LinkedIn queue.
+         * @description Takes someone an agent suggested out of Research and into the LinkedIn queue. Someone
+         *     suggested for an offering gets its connection note, and their company is qualified for
+         *     that offering rather than for the organisation's own.
          */
         post: operations["pickContact"];
         delete?: never;
@@ -1719,7 +1721,9 @@ export interface paths {
         post?: never;
         /**
          * Remove an offering, with every verdict made for it
-         * @description The history keeps what was decided. For a member, only an owner.
+         * @description Refused while an open task is finding companies for it. The history keeps what was
+         *     decided; people being reached for it are then reached for the organisation's own. For a
+         *     member, only an owner.
          */
         delete: operations["removeOffering"];
         options?: never;
@@ -2033,9 +2037,9 @@ export interface components {
             name: string;
             /** @description What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list. */
             look_for: string;
-            /** @description Its pitch line, kept for when people are reached for it; nothing uses it yet. */
+            /** @description The call script's pitch line for people reached for it; empty uses the organisation's. `{company}` is filled in. */
             pitch: string;
-            /** @description Its connection note, kept for when people are picked for it; nothing uses it yet. */
+            /** @description The connection note for people picked for it; empty uses the organisation's. `{first}`, `{company}` and `{org}` are filled in. */
             note_template: string;
             updated_by: string;
             /** Format: date-time */
