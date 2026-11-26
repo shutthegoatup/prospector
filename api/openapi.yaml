@@ -42,6 +42,8 @@ tags:
     description: An agent working a task.
   - name: people
     description: The people you are in touch with, and their conversations.
+  - name: today
+    description: What is due, step by step, with the text drafted for each, and recording what happened.
   - name: companies
     description: Every company, where it stands, and everything held about it.
   - name: research
@@ -2110,6 +2112,105 @@ paths:
                     items: { $ref: "#/components/schemas/AgreementField" }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/today:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listToday
+      tags: [today]
+      summary: What is due, best first, as Today shows it
+      description: |
+        Everyone due at a step, one card each, best first: next steps, calls where it is
+        office hours, messages, emails, follow-ups, LinkedIn adds, then calls outside office
+        hours. Each card carries the text drafted for it from the organisation's templates,
+        addressed to whoever "Send to" names, and for a call its script, in the caller's
+        name; the email and follow-up to copy end with the caller's signature. A key has no
+        name or signature of its own, so its call scripts say `[YOUR NAME]`.
+      parameters:
+        - name: step
+          in: query
+          schema: { type: string, enum: [call, accepted, email, followup, linkedin, next] }
+          description: "Only this step: `call`, `accepted` (a LinkedIn message), `email`, `followup`, `linkedin` (an add) or `next` (a conversation's next step)."
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of what is due.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, counts, total, shown, later_calls]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/DueCard" }
+                  counts:
+                    type: object
+                    additionalProperties: { type: integer }
+                    description: How many are due at each step, whatever the filter.
+                  total: { type: integer, description: "Everything due, whatever the filter." }
+                  shown: { type: integer, description: "How many the filter holds, over every page." }
+                  later_calls: { type: integer, description: Calls due where it isn't a good time to ring now. }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/today/summary:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: getTodaySummary
+      tags: [today]
+      summary: What else wants doing today, and the last seven days
+      description: The work Today points to that is done on other pages, and what the last seven days came to.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The counts.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TodaySummary" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/marks:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    post:
+      operationId: markOutcome
+      tags: [today]
+      summary: Record what happened with someone in outreach
+      description: |
+        The request sent, the accept, the message, email or follow-up sent, the call, a reply
+        or a decline, or putting them on hold. A key's mark shows as the agent's, with its
+        note, on Today and in the company's history; a person marking the same step again
+        takes it back. Someone suggested and not yet picked has had nothing happen.
+      security:
+        - session: []
+        - bearer: ["outcomes:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MarkNew" }
+      responses:
+        "200":
+          description: Recorded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+        default: { $ref: "#/components/responses/Problem" }
+
   /o/{org}/api/v1/people:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -3391,6 +3492,106 @@ components:
         fit: { type: string, description: "Why, in a few words; kept with the company, or with the verdict when an offering is named. Empty leaves it as it was." }
         offering: { type: integer, format: int64, description: "The offering this is a verdict for; 0 or left out is the organisation's own, which is the company's stage." }
         reason: { type: string, description: "Why, kept with a verdict for an offering; refused for the organisation's own." }
+
+    DueCard:
+      type: object
+      required: [id, step, name, title, company, company_id, fit, draft_by, held, state, next, people, badges, meta, text, copy, open_url, open_label,
+        number, tel, about, script, email, phone, linkedin, tz, call_notes, flags, sources, stage, next_step, next_date]
+      properties:
+        id: { type: integer, format: int64, description: The person's id. }
+        step: { type: string, enum: [call, accepted, email, followup, linkedin, next] }
+        name: { type: string, description: Who it goes to. }
+        title: { type: string }
+        company: { type: string }
+        company_id: { type: integer, format: int64, description: "Their company, 0 for none." }
+        fit: { type: string }
+        draft_by: { type: string, description: "Who wrote the text, `agent:<name>` for an agent; empty when it came from the templates." }
+        held: { type: boolean, description: On hold. }
+        state: { type: string, enum: [ok, warn, stop, ""], description: "Whether it is a good time to ring them now; empty when their time zone is unknown." }
+        next: { type: integer, format: int64, description: "The next person due at the same step, 0 for none." }
+        people:
+          type: array
+          items: { $ref: "#/components/schemas/DuePerson" }
+          description: Everyone the research named there, to choose whom to send to.
+        badges:
+          type: array
+          items: { $ref: "#/components/schemas/DueBadge" }
+          description: What to check first, such as their local time.
+        meta: { type: string, description: "The line saying where they stand at this step: added, emailed, accepted, the subject, or for a next step the stage and date." }
+        text: { type: string, description: "The note, message, email or follow-up as drafted." }
+        copy: { type: string, description: "The text to copy, signed for an email or follow-up." }
+        open_url: { type: string, description: "Their LinkedIn profile, or a people search for someone without one; `#` for neither." }
+        open_label: { type: string, description: "`Open + copy`, or `Search + copy` without a profile." }
+        number: { type: string, description: "For a call, the number to ring." }
+        tel: { type: string, description: The number as a tel link wants it. }
+        about: { type: string, description: What the research said about the number. }
+        script:
+          type: array
+          items: { $ref: "#/components/schemas/ScriptLine" }
+          description: For a call, what to say.
+        email: { type: string }
+        phone: { type: string }
+        linkedin: { type: string }
+        tz: { type: string }
+        call_notes: { type: string }
+        flags: { type: string }
+        sources:
+          type: array
+          items: { type: string }
+          description: Pages to check before sending.
+        stage: { type: string, description: "For a next step, where the conversation stands." }
+        next_step: { type: string }
+        next_date: { type: string }
+
+    DuePerson:
+      type: object
+      required: [name, title]
+      properties:
+        name: { type: string }
+        title: { type: string }
+
+    DueBadge:
+      type: object
+      required: [text, state]
+      properties:
+        text: { type: string }
+        state: { type: string, enum: [ok, warn, stop, ""] }
+
+    ScriptLine:
+      type: object
+      required: [cue, say]
+      properties:
+        cue: { type: string }
+        say: { type: string }
+
+    TodaySummary:
+      type: object
+      required: [enquiries, deals, subscriptions, onboarding_steps, review, week]
+      properties:
+        enquiries: { type: integer, description: Enquiries nobody has answered yet. }
+        deals: { type: integer, description: "Renewals and other further deals with no next step, or one that's due." }
+        subscriptions: { type: integer, description: "Subscriptions with a day to cancel by, a renewal or an end coming soon." }
+        onboarding_steps: { type: integer, description: "Onboarding steps late or due today, ours and the customers' alike." }
+        review: { type: integer, description: Researched companies waiting to be reviewed. }
+        week: { $ref: "#/components/schemas/Week" }
+
+    Week:
+      type: object
+      required: [touches, replies, meetings, researched]
+      properties:
+        touches: { type: integer, format: int64 }
+        replies: { type: integer, format: int64 }
+        meetings: { type: integer, format: int64 }
+        researched: { type: integer, format: int64 }
+
+    MarkNew:
+      type: object
+      required: [contact_id, step]
+      properties:
+        contact_id: { type: integer, format: int64 }
+        step: { type: string, enum: [linkedin, accepted, email, followup, call, replied, declined, hold], description: "`linkedin` is the request sent." }
+        date: { type: string, description: "YYYY-MM-DD it happened; today if left out." }
+        note: { type: string, description: "How you know, such as `Ada said he replied`." }
 
     PersonNew:
       type: object

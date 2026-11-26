@@ -1410,6 +1410,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What is due, best first, as Today shows it
+         * @description Everyone due at a step, one card each, best first: next steps, calls where it is
+         *     office hours, messages, emails, follow-ups, LinkedIn adds, then calls outside office
+         *     hours. Each card carries the text drafted for it from the organisation's templates,
+         *     addressed to whoever "Send to" names, and for a call its script, in the caller's
+         *     name; the email and follow-up to copy end with the caller's signature. A key has no
+         *     name or signature of its own, so its call scripts say `[YOUR NAME]`.
+         */
+        get: operations["listToday"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/today/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What else wants doing today, and the last seven days
+         * @description The work Today points to that is done on other pages, and what the last seven days came to.
+         */
+        get: operations["getTodaySummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/marks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record what happened with someone in outreach
+         * @description The request sent, the accept, the message, email or follow-up sent, the call, a reply
+         *     or a decline, or putting them on hold. A key's mark shows as the agent's, with its
+         *     note, on Today and in the company's history; a person marking the same step again
+         *     takes it back. Someone suggested and not yet picked has had nothing happen.
+         */
+        post: operations["markOutcome"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/people": {
         parameters: {
             query?: never;
@@ -2410,6 +2487,122 @@ export interface components {
             offering?: number;
             /** @description Why, kept with a verdict for an offering; refused for the organisation's own. */
             reason?: string;
+        };
+        DueCard: {
+            /**
+             * Format: int64
+             * @description The person's id.
+             */
+            id: number;
+            /** @enum {string} */
+            step: "call" | "accepted" | "email" | "followup" | "linkedin" | "next";
+            /** @description Who it goes to. */
+            name: string;
+            title: string;
+            company: string;
+            /**
+             * Format: int64
+             * @description Their company, 0 for none.
+             */
+            company_id: number;
+            fit: string;
+            /** @description Who wrote the text, `agent:<name>` for an agent; empty when it came from the templates. */
+            draft_by: string;
+            /** @description On hold. */
+            held: boolean;
+            /**
+             * @description Whether it is a good time to ring them now; empty when their time zone is unknown.
+             * @enum {string}
+             */
+            state: "ok" | "warn" | "stop" | "";
+            /**
+             * Format: int64
+             * @description The next person due at the same step, 0 for none.
+             */
+            next: number;
+            /** @description Everyone the research named there, to choose whom to send to. */
+            people: components["schemas"]["DuePerson"][];
+            /** @description What to check first, such as their local time. */
+            badges: components["schemas"]["DueBadge"][];
+            /** @description The line saying where they stand at this step: added, emailed, accepted, the subject, or for a next step the stage and date. */
+            meta: string;
+            /** @description The note, message, email or follow-up as drafted. */
+            text: string;
+            /** @description The text to copy, signed for an email or follow-up. */
+            copy: string;
+            /** @description Their LinkedIn profile, or a people search for someone without one; `#` for neither. */
+            open_url: string;
+            /** @description `Open + copy`, or `Search + copy` without a profile. */
+            open_label: string;
+            /** @description For a call, the number to ring. */
+            number: string;
+            /** @description The number as a tel link wants it. */
+            tel: string;
+            /** @description What the research said about the number. */
+            about: string;
+            /** @description For a call, what to say. */
+            script: components["schemas"]["ScriptLine"][];
+            email: string;
+            phone: string;
+            linkedin: string;
+            tz: string;
+            call_notes: string;
+            flags: string;
+            /** @description Pages to check before sending. */
+            sources: string[];
+            /** @description For a next step, where the conversation stands. */
+            stage: string;
+            next_step: string;
+            next_date: string;
+        };
+        DuePerson: {
+            name: string;
+            title: string;
+        };
+        DueBadge: {
+            text: string;
+            /** @enum {string} */
+            state: "ok" | "warn" | "stop" | "";
+        };
+        ScriptLine: {
+            cue: string;
+            say: string;
+        };
+        TodaySummary: {
+            /** @description Enquiries nobody has answered yet. */
+            enquiries: number;
+            /** @description Renewals and other further deals with no next step, or one that's due. */
+            deals: number;
+            /** @description Subscriptions with a day to cancel by, a renewal or an end coming soon. */
+            subscriptions: number;
+            /** @description Onboarding steps late or due today, ours and the customers' alike. */
+            onboarding_steps: number;
+            /** @description Researched companies waiting to be reviewed. */
+            review: number;
+            week: components["schemas"]["Week"];
+        };
+        Week: {
+            /** Format: int64 */
+            touches: number;
+            /** Format: int64 */
+            replies: number;
+            /** Format: int64 */
+            meetings: number;
+            /** Format: int64 */
+            researched: number;
+        };
+        MarkNew: {
+            /** Format: int64 */
+            contact_id: number;
+            /**
+             * @description `linkedin` is the request sent.
+             * @enum {string}
+             */
+            step: "linkedin" | "accepted" | "email" | "followup" | "call" | "replied" | "declined" | "hold";
+            /** @description YYYY-MM-DD it happened; today if left out. */
+            date?: string;
+            /** @description How you know, such as `Ada said he replied`. */
+            note?: string;
         };
         PersonNew: {
             name: string;
@@ -6095,6 +6288,105 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["AgreementField"][];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listToday: {
+        parameters: {
+            query?: {
+                /** @description Only this step: `call`, `accepted` (a LinkedIn message), `email`, `followup`, `linkedin` (an add) or `next` (a conversation's next step). */
+                step?: "call" | "accepted" | "email" | "followup" | "linkedin" | "next";
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of what is due. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["DueCard"][];
+                        /** @description How many are due at each step, whatever the filter. */
+                        counts: {
+                            [key: string]: number;
+                        };
+                        /** @description Everything due, whatever the filter. */
+                        total: number;
+                        /** @description How many the filter holds, over every page. */
+                        shown: number;
+                        /** @description Calls due where it isn't a good time to ring now. */
+                        later_calls: number;
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getTodaySummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The counts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodaySummary"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    markOutcome: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkNew"];
+            };
+        };
+        responses: {
+            /** @description Recorded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok: boolean;
                     };
                 };
             };

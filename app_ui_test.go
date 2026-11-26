@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -44,8 +45,10 @@ func TestReactPagesMountInTheLayout(t *testing.T) {
 			t.Errorf("the sidebar doesn't send %s to its React page", p)
 		}
 	}
-	if !strings.Contains(today, `href="/o/alpha/today"`) {
-		t.Error("a page still on the server lost its sidebar link")
+	for _, p := range []string{"conversations", "companies", "settings"} {
+		if !slices.Contains(reactPages, p) && !strings.Contains(today, `href="/o/alpha/`+p+`"`) {
+			t.Errorf("%s, still on the server, lost its sidebar link", p)
+		}
 	}
 	// A task's page lights Research, as the server's tasks pages do.
 	_, task := call(t, client, "GET", srv.URL+"/o/alpha/app/tasks/7", "", nil)
