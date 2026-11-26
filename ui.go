@@ -155,6 +155,8 @@ func (a *App) today(w http.ResponseWriter, r *http.Request) {
 type ResearchData struct {
 	Filter string
 	Rows   []ResearchRow
+	// Ranked is the queue in order of fit rather than newest first.
+	Ranked bool
 	Page   Page
 	Counts map[string]int
 	// Searches are the open tasks, newest first, with their agents' runs.
@@ -216,7 +218,12 @@ func (a *App) research(w http.ResponseWriter, r *http.Request) {
 		d.Notes = notes[:min(len(notes), 3)]
 	}
 	var err error
-	if d.Rows, d.Page, err = a.s.researchFor(q.Org.ID, d.Filter, pageParam(r), task); err != nil {
+	if task != 0 && d.Filter == "review" {
+		d.Rows, d.Page, d.Ranked, err = a.s.rankedResearch(q.Org.ID, q.Org.Settings, task, pageParam(r))
+	} else {
+		d.Rows, d.Page, err = a.s.researchFor(q.Org.ID, d.Filter, pageParam(r), task)
+	}
+	if err != nil {
 		fail(w, err, http.StatusBadRequest)
 		return
 	}
