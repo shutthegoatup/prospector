@@ -742,7 +742,7 @@ func agentInstructions(o *Org, k *APIKey) string {
 	}
 	if k.Has("enrich:spend") {
 		parts = append(parts,
-			"enrich_contact asks the organisation's paid data vendors for an email someone already here lacks. It costs money, so use it only once your own search and reading found nothing, and only for someone worth contacting.")
+			"enrich_contact asks the organisation's paid data vendors for an email, mobile or LinkedIn profile someone already here lacks. It costs money, a mobile most of all, so use it only once your own search and reading found nothing, and only for someone worth contacting.")
 	}
 	if k.Has("outcomes:write") {
 		parts = append(parts,

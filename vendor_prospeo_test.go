@@ -85,7 +85,7 @@ func TestProspeoFindsAMobileAnEmailAndAProfile(t *testing.T) {
 	s, o, api, client := vendorsAt(t, f.srv)
 	nell := atCompany(t, s, o, "Nell Achterberg", "Wrenfield Kitchens", "wrenfield.example")
 	f.people["Nell Achterberg@wrenfield.example"] = map[string]any{
-		"email": "nell@wrenfield.example", "email_status": "VERIFIED", "mobile": "+447911123456", "linkedin": "https://www.linkedin.com/in/nell-achterberg-example",
+		"email": "nell@wrenfield.example", "email_status": "VERIFIED", "mobile": "+61491570156", "linkedin": "https://www.linkedin.com/in/nell-achterberg-example",
 	}
 	call(t, client, "PUT", api+"/enrichers", "application/json", map[string]any{"kind": "prospeo", "api_key": prospeoTestKey, "monthly_limit": 10})
 
@@ -106,7 +106,7 @@ func TestProspeoFindsAMobileAnEmailAndAProfile(t *testing.T) {
 	}
 	want := map[string]string{
 		"email":    "nell@wrenfield.example verified prospeo",
-		"phone":    "+447911123456  prospeo",
+		"phone":    "+61491570156  prospeo",
 		"linkedin": "https://www.linkedin.com/in/nell-achterberg-example  prospeo",
 	}
 	for k, v := range want {

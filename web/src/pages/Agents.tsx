@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { actor, plural, stamp } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { detailNames, month, vendorCosts, vendorKinds, vendorName } from "@/lib/vendors";
+import { detailNames, month, vendorCosts, vendorKinds, vendorName, vendorTold } from "@/lib/vendors";
 import { useSession } from "@/session";
 
 type Agent = components["schemas"]["Agent"];
@@ -873,7 +873,7 @@ function VendorCard({ vendor: e, n, up, down }: { vendor: Enricher; n: number; u
           </Meta>
         )}
         <p className="text-xs text-muted-foreground">
-          {vendorName(e.kind)} is told each person's name, their company's domain and any LinkedIn profile you hold. {vendorCosts[e.kind]} You are bound by its terms for what it returns, and it may keep
+          {vendorTold[e.kind]} {vendorCosts[e.kind]} You are bound by its terms for what it returns, and it may keep
           what it finds in your account with it.
         </p>
       </div>
