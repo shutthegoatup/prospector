@@ -119,7 +119,7 @@ func answerOf(takes bool) mailAnswer {
 // noMailDomains are the domains known not to take mail, for pages that mustn't wait on DNS.
 func (s *Store) noMailDomains() map[string]bool {
 	var domains []string
-	logged(s.db.Model(&MailDomain{}).Where("takes_mail = ?", false).Pluck("domain", &domains))
+	logged(s.db.Model(&MailDomain{}).Where("takes_mail = ? and checked_at > ?", false, time.Now().Add(-mailRefusedFor)).Pluck("domain", &domains))
 	out := make(map[string]bool, len(domains))
 	for _, d := range domains {
 		out[d] = true
@@ -169,17 +169,31 @@ func (s *Store) checkSomeMail(ctx context.Context, most int) {
 	if err := logged(s.db.Model(&Contact{}).Where("email is not null and email <> ''").Distinct().Pluck("email", &emails)); err != nil {
 		return
 	}
+	var kept []MailDomain
+	if err := logged(s.db.Find(&kept)); err != nil {
+		return
+	}
+	// Fresh answers are passed over without counting, so a round reaches past them.
 	asked := map[string]bool{}
+	for _, k := range kept {
+		fresh := mailTakenFor
+		if !k.TakesMail {
+			fresh = mailRefusedFor
+		}
+		asked[k.Domain] = time.Since(k.CheckedAt) < fresh
+	}
+	lookups := 0
 	for _, email := range emails {
 		for _, e := range emailRe.FindAllString(strings.ToLower(email), -1) {
 			domain := mailDomainOf(e)
 			if domain == "" || asked[domain] {
 				continue
 			}
-			if len(asked) >= most || ctx.Err() != nil {
+			if lookups >= most || ctx.Err() != nil {
 				return
 			}
 			asked[domain] = true
+			lookups++
 			s.takesMail(ctx, domain)
 		}
 	}

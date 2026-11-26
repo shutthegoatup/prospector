@@ -124,7 +124,7 @@ func TestAddressesAlreadyHereAreCheckedAFewAtATime(t *testing.T) {
 	if s.db.Model(&MailDomain{}).Count(&n); n != 2 {
 		t.Errorf("%d domains kept after a round of two", n)
 	}
-	s.checkSomeMail(context.Background(), 100)
+	s.checkSomeMail(context.Background(), 2)
 	if s.db.Model(&MailDomain{}).Count(&n); n != 3 {
 		t.Errorf("%d domains kept, want each of the three once", n)
 	}
@@ -154,6 +154,11 @@ func TestTheDaysCardWarnsOfADetailThatCantBeRight(t *testing.T) {
 	if !strings.Contains(got, "info@larkmoor.example is a shared inbox: ask for Hannah's own") || strings.Contains(got, "Phone number") || strings.Contains(got, "takes no mail") {
 		t.Errorf("a shared inbox and a good number: %q", got)
 	}
+	for _, good := range []string{"+44 (0)20 7946 0958", "+44 20 7946 0958 ext. 214", "+1 212 555 0123 / +1 212 555 0199"} {
+		if got := texts(Contact{Key: "hannah", Phone: str(good)}, nil); strings.Contains(got, "Phone number") {
+			t.Errorf("%s: %q", good, got)
+		}
+	}
 	if got := texts(Contact{Key: "org:larkmoor", Email: str("info@larkmoor.example"), Phone: str("020 7946 0958")}, nil); strings.Contains(got, "shared inbox") || strings.Contains(got, "Phone number") {
 		t.Errorf("a company's own inbox, or a number without a country code: %q", got)
 	}
@@ -168,6 +173,19 @@ func TestACampaignLeavesOutAnAddressWhoseDomainTakesNoMail(t *testing.T) {
 	got := leftOut(must(s.Audience(o, *c)))
 	if got["Hannah Pryce"] != "" || got["Sven Dahl"] != "its domain takes no mail" {
 		t.Errorf("left out: %+v", got)
+	}
+	// An answer gone stale no longer counts against them, and asking again replaces it.
+	s.db.Model(&MailDomain{}).Where("domain = ?", "nordkap.example").Update("checked_at", time.Now().Add(-mailRefusedFor-time.Hour))
+	if got := leftOut(must(s.Audience(o, *c))); got["Sven Dahl"] != "" {
+		t.Errorf("a stale answer left them out: %q", got["Sven Dahl"])
+	}
+	s.dns = &fakeDNS{mx: map[string][]*net.MX{"nordkap.example": {{Host: "mx.nordkap.example."}}}}
+	if s.takesMail(context.Background(), "nordkap.example") != mailTaken {
+		t.Error("asking again didn't find the mail server")
+	}
+	var kept MailDomain
+	if s.db.Where("domain = ?", "nordkap.example").First(&kept); !kept.TakesMail {
+		t.Errorf("the stored answer wasn't replaced: %+v", kept)
 	}
 }
 
