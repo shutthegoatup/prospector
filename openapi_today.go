@@ -17,6 +17,21 @@ func voiceOf(q *Req) Voice {
 	return q.Voice()
 }
 
+// todayVoice is voiceOf with each of the organisation's offerings' pitches, which a
+// call card uses for a company found for one of them.
+func (a *App) todayVoice(q *Req) (Voice, error) {
+	voice := voiceOf(q)
+	offerings, err := a.s.Offerings(q.Org.ID)
+	if err != nil {
+		return voice, err
+	}
+	voice.Pitches = map[int64]string{}
+	for _, o := range offerings {
+		voice.Pitches[o.ID] = o.Pitch
+	}
+	return voice, nil
+}
+
 func cardMeta(c Card) string {
 	switch c.Step {
 	case "call":
@@ -56,7 +71,11 @@ func dueCardOut(c Card) api.DueCard {
 func (s apiServer) ListToday(ctx context.Context, in api.ListTodayRequestObject) (api.ListTodayResponseObject, error) {
 	q := reqFrom(ctx)
 	now := time.Now()
-	cards, counts := Today(s.a.dueByStep(q, now), voiceOf(q), now, s.a.s.noMailDomains())
+	voice, err := s.a.todayVoice(q)
+	if err != nil {
+		return nil, err
+	}
+	cards, counts := Today(s.a.dueByStep(q, now), voice, now, s.a.s.noMailDomains())
 	filter := string(in.Params.Step)
 	if filter != "" && !in.Params.Step.Valid() {
 		return nil, errors.New("step is call, accepted, email, followup, linkedin or next")

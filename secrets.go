@@ -243,6 +243,7 @@ var sealedColumns = []sealedColumn{
 	{"sso_connections", "client_secret", "single sign-on secret", "org_id"},
 	{"org_mails", "password", "mail password", "org_id"},
 	{"agents", "api_key", "agent endpoint key", "id"},
+	{"seal_keys", "key", "agreement sealing key", "org_id"},
 }
 
 type storedSecret struct {

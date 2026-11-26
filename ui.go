@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"log"
 	"net/http"
@@ -94,7 +95,12 @@ type TodayData struct {
 func (a *App) today(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	now := time.Now()
-	cards, counts := Today(a.dueByStep(q, now), q.Voice(), now, a.s.noMailDomains())
+	voice, err := a.todayVoice(q)
+	if err != nil {
+		fail(w, err, http.StatusInternalServerError)
+		return
+	}
+	cards, counts := Today(a.dueByStep(q, now), voice, now, a.s.noMailDomains())
 	d := TodayData{Filter: r.URL.Query().Get("step"), Counts: counts, Total: len(cards), Now: now.Format("Mon 2 Jan · 15:04")}
 	if err := a.todayElsewhere(q.Org.ID, now, &d); err != nil {
 		fail(w, err, http.StatusInternalServerError)
@@ -439,13 +445,13 @@ func (a *App) addPage(w http.ResponseWriter, r *http.Request) {
 		AddPopup(q, in).Render(r.Context(), w)
 		return
 	}
-	a.page(w, r, "add", AddView(q, in, bookmarklet(a.baseURL(r), q)))
+	a.page(w, r, "add", AddView(q, in, bookmarklet(a.baseURL(r), q, "add")))
 }
 
 // bookmarklet sends the LinkedIn profile you're looking at to the add form. It reads only
 // the page's title and headline, on your click.
-func bookmarklet(site string, q *Req) string {
-	base := site + q.Base() + "add?popup=1"
+func bookmarklet(site string, q *Req, page string) string {
+	base := site + q.Base() + page + "?popup=1"
 	return `javascript:(()=>{const h=(document.querySelector('.text-body-medium')||{}).innerText||'';` +
 		`window.open('` + base + `&url='+encodeURIComponent(location.href)+'&name='+encodeURIComponent(document.title)+'&headline='+encodeURIComponent(h),'prospect','width=520,height=760')})()`
 }
@@ -572,18 +578,30 @@ func (a *App) uiVoice(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Email string `json:"email"`
-		Name  string `json:"name"`
-		Role  string `json:"role"`
-	}
+	var in memberIn
 	if !decode(w, r, &in) {
 		return
 	}
+	msg, err := a.addMember(r.Context(), reqOf(r), in)
+	if err != nil {
+		fail(w, err, http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]string{"message": msg})
+}
+
+type memberIn struct {
+	Email string `json:"email"`
+	Name  string `json:"name"`
+	Role  string `json:"role"`
+}
+
+// addMember puts someone on the team, making them an account if they have none, and
+// says how they get in.
+func (a *App) addMember(ctx context.Context, q *Req, in memberIn) (string, error) {
 	if in.Role != "owner" && in.Role != "member" {
 		in.Role = "member"
 	}
-	q := reqOf(r)
 	u, err := a.s.UserByEmail(in.Email)
 	password := ""
 	if err != nil {
@@ -594,16 +612,14 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 		err = a.s.AddMember(q.Org.ID, u.ID, in.Role, u.Name)
 	}
 	if err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
+		return "", err
 	}
 	msg := u.Email + " added to " + q.Org.Name + "."
 	// Someone who never chose a password is sent the link again, so a lost one isn't the end.
 	if password != "" || u.MustChangePassword {
-		sent, err := a.invite(r.Context(), q, u, password != "")
+		sent, err := a.invite(ctx, q, u, password != "")
 		if sent {
-			writeJSON(w, map[string]string{"message": msg + " They've been emailed a link to choose their password; it lasts 7 days."})
-			return
+			return msg + " They've been emailed a link to choose their password; it lasts 7 days.", nil
 		}
 		if errors.Is(err, errTooSoon) {
 			msg += " They were emailed a link to choose their password a moment ago, so no other was sent."
@@ -616,7 +632,7 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 	if password != "" {
 		msg += " Their first password, shown once: " + password + " (they choose their own when they first sign in)"
 	}
-	writeJSON(w, map[string]string{"message": msg})
+	return msg, nil
 }
 
 func (a *App) uiRemoveMember(w http.ResponseWriter, r *http.Request) {
