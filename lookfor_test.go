@@ -11,7 +11,7 @@ import (
 
 func TestLookForAssets(t *testing.T) {
 	got, err := OrgSettings{LookFor: "Careers page: a jobs page on their site\n\nats\ncareers-page: again"}.Assets()
-	if err != nil || len(got) != 2 || got[0] != (Asset{"careers_page", "a jobs page on their site"}) || got[1] != (Asset{"ats", ""}) {
+	if err != nil || len(got) != 2 || got[0] != (Asset{Field: "careers_page", Hint: "a jobs page on their site"}) || got[1] != (Asset{Field: "ats"}) {
 		t.Fatalf("assets: %+v %v", got, err)
 	}
 	if _, err := (OrgSettings{LookFor: ": no name"}).Assets(); err == nil {
@@ -41,16 +41,16 @@ func TestLookForAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, page := call(t, client, "GET", srv.URL+"/o/alpha/research?f=review", "", nil)
-	if !strings.Contains(page, "careers page") {
-		t.Errorf("Research doesn't show the careers page the company has")
+	if !strings.Contains(page, "Lists 14 open roles") || !strings.Contains(page, "1 of 2 · 1 unchecked") {
+		t.Errorf("Research doesn't show the careers page the company has, and how it fits")
 	}
-	if !strings.Contains(page, "no ats found") {
-		t.Errorf("Research doesn't show the tracking system wasn't found")
+	if !strings.Contains(page, "No agent has checked this yet.") {
+		t.Errorf("Research doesn't show the tracking system wasn't checked")
 	}
 	if strings.Contains(page, "onfigurator") {
 		t.Errorf("Research still talks about configurators")
 	}
-	if _, page := call(t, client, "GET", fmt.Sprintf("%s/o/alpha/companies/%d", srv.URL, out.ID), "", nil); !strings.Contains(page, "no ats found") {
+	if _, page := call(t, client, "GET", fmt.Sprintf("%s/o/alpha/companies/%d", srv.URL, out.ID), "", nil); !strings.Contains(page, "ats unchecked") {
 		t.Errorf("the company page doesn't show what's missing")
 	}
 }

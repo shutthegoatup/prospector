@@ -12,19 +12,20 @@ import (
 // PersonExport is everything held about one contact row, for answering a request
 // from that person to see it.
 type PersonExport struct {
-	ExportedAt    time.Time           `json:"exported_at"`
-	Note          string              `json:"note,omitempty"`
-	Company       string              `json:"company,omitempty"`
-	Person        Contact             `json:"person"`
-	Facts         []Fact              `json:"facts"`
-	Enquiries     []Enquiry           `json:"enquiries"`
-	EnquiryThread []EnquiryMessage    `json:"enquiry_messages"`
-	Suppressed    []Suppression       `json:"not_to_be_mailed"`
-	CampaignMail  []CampaignRecipient `json:"campaign_mail"`
-	Suggested     []Suggestion        `json:"suggested_details"`
-	Deals         []Deal              `json:"deals"`
-	Access        []CustomerGrant     `json:"onboarding_access"`
-	History       []ExportEvent       `json:"history"`
+	ExportedAt    time.Time            `json:"exported_at"`
+	Note          string               `json:"note,omitempty"`
+	Company       string               `json:"company,omitempty"`
+	Person        Contact              `json:"person"`
+	Facts         []Fact               `json:"facts"`
+	Enquiries     []Enquiry            `json:"enquiries"`
+	EnquiryThread []EnquiryMessage     `json:"enquiry_messages"`
+	Suppressed    []Suppression        `json:"not_to_be_mailed"`
+	CampaignMail  []CampaignRecipient  `json:"campaign_mail"`
+	Suggested     []Suggestion         `json:"suggested_details"`
+	Deals         []Deal               `json:"deals"`
+	Access        []CustomerGrant      `json:"onboarding_access"`
+	Agreements    []AgreementRecipient `json:"agreements_to_sign"`
+	History       []ExportEvent        `json:"history"`
 }
 
 type ExportEvent struct {
@@ -35,7 +36,7 @@ type ExportEvent struct {
 }
 
 func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error) {
-	out := &PersonExport{ExportedAt: time.Now().UTC(), Facts: []Fact{}, Enquiries: []Enquiry{}, Suggested: []Suggestion{}, Deals: []Deal{}, Access: []CustomerGrant{}, History: []ExportEvent{}}
+	out := &PersonExport{ExportedAt: time.Now().UTC(), Facts: []Fact{}, Enquiries: []Enquiry{}, Suggested: []Suggestion{}, Deals: []Deal{}, Access: []CustomerGrant{}, Agreements: []AgreementRecipient{}, History: []ExportEvent{}}
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		c := &out.Person
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(c).Error; err != nil {
@@ -101,6 +102,9 @@ func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error)
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("id").Find(&out.Access).Error; err != nil {
 			return err
 		}
+		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("id").Find(&out.Agreements).Error; err != nil {
+			return err
+		}
 		var events []Event
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Order("at, id").Find(&events).Error; err != nil {
 			return err
@@ -120,35 +124,37 @@ func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error)
 // holds no secret: not a password or key hash, nor the sign-on client secret, sealed
 // or otherwise. What identifies erased people is left out too; only how many there are.
 type OrgExport struct {
-	ExportedAt    time.Time           `json:"exported_at"`
-	Organisation  ExportedOrg         `json:"organisation"`
-	Members       []ExportMember      `json:"members"`
-	Keys          []ExportKey         `json:"api_keys"`
-	SignOn        *ExportSignOn       `json:"single_sign_on,omitempty"`
-	Mail          *ExportMail         `json:"mail_server,omitempty"`
-	Agents        []ExportAgent       `json:"agents"`
-	Companies     []Company           `json:"companies"`
-	Facts         []Fact              `json:"facts"`
-	Contacts      []Contact           `json:"contacts"`
-	Deals         []Deal              `json:"deals"`
-	Subs          []Subscription      `json:"subscriptions"`
-	Onboardings   []Onboarding        `json:"onboardings"`
-	OnboardSteps  []OnboardingStep    `json:"onboarding_steps"`
-	Access        []CustomerGrant     `json:"onboarding_access"`
-	Enquiries     []Enquiry           `json:"enquiries"`
-	EnquiryThread []EnquiryMessage    `json:"enquiry_messages"`
-	Suppressed    []Suppression       `json:"not_to_be_mailed"`
-	Campaigns     []Campaign          `json:"campaigns"`
-	CampaignMail  []CampaignRecipient `json:"campaign_mail"`
-	Agreements    []Agreement         `json:"agreements"`
-	Suggested     []Suggestion        `json:"suggested_details"`
-	Tasks         []Task              `json:"tasks"`
-	TaskRequests  []TaskRequest       `json:"task_requests"`
-	TaskNotes     []TaskNote          `json:"task_notes"`
-	Offerings     []Offering          `json:"offerings"`
-	Verdicts      []Verdict           `json:"verdicts"`
-	History       []ExportRecord      `json:"history"`
-	Erased        int64               `json:"people_erased"`
+	ExportedAt    time.Time            `json:"exported_at"`
+	Organisation  ExportedOrg          `json:"organisation"`
+	Members       []ExportMember       `json:"members"`
+	Keys          []ExportKey          `json:"api_keys"`
+	SignOn        *ExportSignOn        `json:"single_sign_on,omitempty"`
+	Mail          *ExportMail          `json:"mail_server,omitempty"`
+	Agents        []ExportAgent        `json:"agents"`
+	Companies     []Company            `json:"companies"`
+	Facts         []Fact               `json:"facts"`
+	Contacts      []Contact            `json:"contacts"`
+	Deals         []Deal               `json:"deals"`
+	Subs          []Subscription       `json:"subscriptions"`
+	Onboardings   []Onboarding         `json:"onboardings"`
+	OnboardSteps  []OnboardingStep     `json:"onboarding_steps"`
+	Access        []CustomerGrant      `json:"onboarding_access"`
+	Enquiries     []Enquiry            `json:"enquiries"`
+	EnquiryThread []EnquiryMessage     `json:"enquiry_messages"`
+	Suppressed    []Suppression        `json:"not_to_be_mailed"`
+	Campaigns     []Campaign           `json:"campaigns"`
+	CampaignMail  []CampaignRecipient  `json:"campaign_mail"`
+	Agreements    []Agreement          `json:"agreements"`
+	Recipients    []AgreementRecipient `json:"agreement_recipients"`
+	Fields        []AgreementField     `json:"agreement_fields"`
+	Suggested     []Suggestion         `json:"suggested_details"`
+	Tasks         []Task               `json:"tasks"`
+	TaskRequests  []TaskRequest        `json:"task_requests"`
+	TaskNotes     []TaskNote           `json:"task_notes"`
+	Offerings     []Offering           `json:"offerings"`
+	Verdicts      []Verdict            `json:"verdicts"`
+	History       []ExportRecord       `json:"history"`
+	Erased        int64                `json:"people_erased"`
 }
 
 type ExportedOrg struct {
@@ -273,7 +279,7 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			out.Agents = append(out.Agents, e)
 		}
 		mine := func() *gorm.DB { return tx.Where("org_id = ?", org).Order("id") }
-		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Onboardings, &out.OnboardSteps, &out.Access, &out.Enquiries, &out.EnquiryThread, &out.Suppressed, &out.Campaigns, &out.Agreements, &out.CampaignMail, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes, &out.Offerings, &out.Verdicts} {
+		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Onboardings, &out.OnboardSteps, &out.Access, &out.Enquiries, &out.EnquiryThread, &out.Suppressed, &out.Campaigns, &out.Agreements, &out.Recipients, &out.Fields, &out.CampaignMail, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes, &out.Offerings, &out.Verdicts} {
 			if err := mine().Find(rows).Error; err != nil {
 				return err
 			}

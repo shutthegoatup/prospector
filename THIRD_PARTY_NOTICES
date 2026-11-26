@@ -30,3 +30,9 @@ and IBM Plex Mono (Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"), 
 latin and latin-ext subsets published by Google Fonts. They are licensed under the SIL
 Open Font License, Version 1.1; the full text is in assets/fonts/OFL.txt and is served
 with them.
+
+
+assets/js/prepare.js bundles, and assets/js/pdf.worker.min.mjs is, pdf.js
+(https://github.com/mozilla/pdf.js, Copyright Mozilla Foundation and contributors),
+under the Apache License, Version 2.0; the full text is in assets/js/pdf.js.LICENSE.txt
+and is served with them.

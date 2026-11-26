@@ -965,8 +965,8 @@ export interface paths {
         delete: operations["removeAgreement"];
         options?: never;
         head?: never;
-        /** Rename a draft agreement */
-        patch: operations["renameAgreement"];
+        /** Rename a draft agreement, or say whether its signers sign in order */
+        patch: operations["changeAgreement"];
         trace?: never;
     };
     "/o/{org}/api/v1/agreements/{id}/document": {
@@ -989,9 +989,94 @@ export interface paths {
          * Upload a draft's document
          * @description The agreement as a PDF, 10 MB at most, replacing any uploaded before. Its SHA-256 is
          *     kept with it, and checked whenever it is read back. Prospector doesn't read what it
-         *     says, and it is not for deeds or anything that must be witnessed or notarised.
+         *     says, and it is not for deeds or anything that must be witnessed or notarised. A PDF
+         *     that is password-protected, encrypted or already signed is refused, as Prospector
+         *     couldn't fill it in and seal it. Fields on pages a replacement doesn't have go.
          */
         put: operations["putAgreementDocument"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/agreements/{id}/recipients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Who an agreement goes to
+         * @description Its signers in their order, then those who get a copy once it is signed.
+         */
+        get: operations["listAgreementRecipients"];
+        put?: never;
+        /**
+         * Add a signer, or someone who gets a copy, to a draft
+         * @description One contact or one member. A contact must be a person at the agreement's company,
+         *     picked, with a single email address, and not on the never-contact list. They go last
+         *     in the order. Nothing is sent: that comes in a later release.
+         */
+        post: operations["addAgreementRecipient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/agreements/{id}/recipients/{recipient}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+                recipient: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Take a recipient off a draft, with their fields */
+        delete: operations["removeAgreementRecipient"];
+        options?: never;
+        head?: never;
+        /**
+         * Move a recipient in the order, or change what they get
+         * @description Making a signer someone who gets a copy removes the fields placed for them.
+         */
+        patch: operations["changeAgreementRecipient"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/agreements/{id}/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /** Where each signer fills in a draft */
+        get: operations["listAgreementFields"];
+        /**
+         * Set every field on a draft at once
+         * @description Replaces all of them. Each belongs to one of the agreement's signers and lies wholly
+         *     on one of its pages, given as fractions of the page as shown, from its top left.
+         *     200 at most.
+         */
+        put: operations["putAgreementFields"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2060,7 +2145,7 @@ export interface components {
             company_id: number;
             name: string;
             /**
-             * @description Every agreement is a draft until signing arrives.
+             * @description Every agreement is a draft until sending arrives.
              * @enum {string}
              */
             status: "draft";
@@ -2073,12 +2158,63 @@ export interface components {
             file_size: number;
             /** @description The document's SHA-256, in hex; empty until one is uploaded. */
             file_hash: string;
+            /** @description The document's pages; 0 until one is uploaded, or for one uploaded before pages were counted. */
+            page_count: number;
+            /** @description Which version this is, from 1; asking for changes starts the next. */
+            round: number;
+            /** @description Whether signers sign one after another, in their order. */
+            in_order: boolean;
             created_by: string;
             updated_by: string;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
             updated_at: string;
+        };
+        AgreementRecipient: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            agreement_id: number;
+            /** @description Their place in the order, from 1. */
+            position: number;
+            /** @enum {string} */
+            role: "signer" | "copy";
+            /** Format: int64 */
+            contact_id?: number | null;
+            /**
+             * Format: int64
+             * @description A member's user id.
+             */
+            member_id?: number | null;
+            /** @description As they are named now; sending will freeze it. */
+            name: string;
+            /** @description Where it will go; sending will freeze it. */
+            email: string;
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        AgreementFieldIn: {
+            /**
+             * Format: int64
+             * @description One of the agreement's signers.
+             */
+            recipient_id: number;
+            page: number;
+            /** @enum {string} */
+            kind: "signature" | "initials" | "name" | "date" | "text" | "tick";
+            /** @description From the page's left edge, as a fraction of its width. */
+            x: number;
+            /** @description From the page's top edge, as a fraction of its height. */
+            y: number;
+            w: number;
+            h: number;
+        };
+        AgreementField: components["schemas"]["AgreementFieldIn"] & {
+            /** Format: int64 */
+            id: number;
+            round: number;
         };
     };
     responses: {
@@ -3716,7 +3852,7 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
-    renameAgreement: {
+    changeAgreement: {
         parameters: {
             query?: never;
             header?: never;
@@ -3730,7 +3866,9 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    name: string;
+                    name?: string;
+                    /** @description Signers sign one after another, in their order; false lets them all sign at once. */
+                    in_order?: boolean;
                 };
             };
         };
@@ -3800,6 +3938,205 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Agreement"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listAgreementRecipients: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signers first. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AgreementRecipient"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addAgreementRecipient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role: "signer" | "copy";
+                    /** Format: int64 */
+                    contact?: number;
+                    /**
+                     * Format: int64
+                     * @description The member's user id.
+                     */
+                    member?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgreementRecipient"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeAgreementRecipient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+                recipient: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changeAgreementRecipient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+                recipient: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role?: "signer" | "copy";
+                    /** @description Where in the order, from 1. */
+                    position?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description The recipient as they now are. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgreementRecipient"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listAgreementFields: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description By page, then from the top. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AgreementField"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    putAgreementFields: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    items: components["schemas"]["AgreementFieldIn"][];
+                };
+            };
+        };
+        responses: {
+            /** @description The fields as kept. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AgreementField"][];
+                    };
                 };
             };
             default: components["responses"]["Problem"];
