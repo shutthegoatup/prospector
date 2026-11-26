@@ -458,6 +458,8 @@ function Sequence({ settings: set }: { settings: Settings }) {
 
 function suppressionMeta(r: Suppression) {
   if (r.reason === "unsubscribed") return "unsubscribed " + longDay(r.created_at);
+  if (r.reason === "bounced") return "bounced " + longDay(r.created_at);
+  if (r.reason === "complained") return "marked a mail as spam " + longDay(r.created_at);
   return "added by " + actor(r.by) + " " + longDay(r.created_at);
 }
 

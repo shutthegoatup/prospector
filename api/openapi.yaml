@@ -4336,6 +4336,55 @@ paths:
         "500": { $ref: "#/components/responses/ServerError" }
         "502": { $ref: "#/components/responses/NotSent" }
 
+  /o/{org}/api/v1/mail-server/bounce-hook:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    post:
+      operationId: makeBounceHook
+      tags: [settings]
+      summary: Make the webhook Postmark reports bounces and spam complaints to
+      description: |
+        Gives the address to paste into the webhook settings for the Postmark server your mail goes through,
+        with Bounce and Spam Complaint turned on. The address signs in with your organisation's slug and a new
+        secret, shown only now. Making another replaces it, so the old one stops working.
+
+        An address that bounces for good (Postmark's HardBounce, Blocked or Suppressed) goes on the list not to
+        be mailed as `bounced`, and its last campaign mail is marked failed; a soft bounce changes nothing. One
+        whose person marked a mail as spam goes on it as `complained`. Neither gets any campaign again, service
+        notices included. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["mail:configure"]
+      responses:
+        "200":
+          description: The webhook, with its secret this once.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BounceHook" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    delete:
+      operationId: dropBounceHook
+      tags: [settings]
+      summary: Stop taking bounces from Postmark
+      description: The webhook's secret stops working. What it already put on the list stays. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["mail:configure"]
+      responses:
+        "204": { description: Stopped. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
   /o/{org}/api/v1/sso:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -5936,8 +5985,8 @@ components:
       properties:
         id: { type: integer, format: int64 }
         address: { type: string }
-        reason: { type: string, enum: [unsubscribed, added], description: "`unsubscribed` when they asked, by a link in a mail; `added` when a member or key put them here." }
-        by: { type: string, description: Who added it; empty when they unsubscribed themselves. }
+        reason: { type: string, enum: [unsubscribed, complained, bounced, added], description: "`unsubscribed` when they asked, by a link in a mail; `complained` when they marked one as spam; `bounced` when mail to it came back for good; `added` when a member or key put them here. Only `added` and `bounced` can be taken off, and a bounced or complained address gets no service notices either." }
+        by: { type: string, description: "Who added it: `Postmark` for a bounce or complaint; empty when they unsubscribed themselves." }
         created_at: { type: string, format: date-time }
 
     CampaignAudience:
@@ -6245,14 +6294,22 @@ components:
         sender: { type: string, description: "The From address, like `Alpha <hello@example.com>`." }
     MailServer:
       type: object
-      required: [host, port, username, sender, has_password, site_mail]
+      required: [host, port, username, sender, has_password, site_mail, has_bounce_hook]
       properties:
+        has_bounce_hook: { type: boolean, description: "Whether Postmark has a webhook here to report bounces and spam complaints to." }
         host: { type: string }
         port: { type: integer }
         username: { type: string }
         sender: { type: string }
         has_password: { type: boolean }
         site_mail: { type: boolean, description: "Whether this site has a server of its own that invitations fall back to." }
+    BounceHook:
+      type: object
+      required: [url, username, password]
+      properties:
+        url: { type: string, description: "The webhook's address, with the username and password in it, as Postmark takes it." }
+        username: { type: string, description: The organisation's slug. }
+        password: { type: string, description: The secret. It isn't kept and can't be shown again. }
     SSOSettings:
       type: object
       properties:
