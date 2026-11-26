@@ -94,13 +94,38 @@ func addFact(tx *gorm.DB, org, company int64, in FactIn, actor string) (*Fact, b
 	if err := tx.Where("org_id = ? and company_id = ? and source_url = ?", org, company, f.SourceURL).Order("id").Find(&from).Error; err != nil {
 		return nil, false, err
 	}
-	// Compared here because SQLite's lower() only folds ASCII.
-	for i, had := range from {
+	// Compared here because SQLite's lower() only folds ASCII; newest first, so the same
+	// fact said twice is matched to its latest saying.
+	for i := len(from) - 1; i >= 0; i-- {
+		had := from[i]
 		if strings.EqualFold(had.Field, f.Field) && strings.EqualFold(strings.TrimSpace(had.Value), f.Value) && had.Answer == f.Answer {
-			return &from[i], true, nil
+			// The same answer again only counts as had if nothing since says otherwise:
+			// the latest fact for a field is its answer.
+			latest, err := latestFact(tx, org, company, f.Field)
+			if err != nil {
+				return nil, false, err
+			}
+			if latest == nil || latest.ID == had.ID {
+				return &from[i], true, nil
+			}
+			break
 		}
 	}
 	return &f, false, tx.Create(&f).Error
+}
+
+// latestFact is the company's newest fact for a field, however its name is written.
+func latestFact(tx *gorm.DB, org, company int64, field string) (*Fact, error) {
+	var facts []Fact
+	if err := tx.Select("id", "field").Where("org_id = ? and company_id = ?", org, company).Order("id desc").Find(&facts).Error; err != nil {
+		return nil, err
+	}
+	for i := range facts {
+		if assetKey(facts[i].Field) == assetKey(field) {
+			return &facts[i], nil
+		}
+	}
+	return nil, nil
 }
 
 func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddCompanyOut, error) {

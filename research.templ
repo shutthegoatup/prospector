@@ -431,7 +431,7 @@ templ CriterionRow(a AssetFound) {
 				<span class="block font-mono text-[11px] text-muted-foreground">
 					{ assetHow(a.Fact) }
 					if a.Fact.SourceURL != "" {
-						· <a href={ templ.SafeURL(a.Fact.SourceURL) } target="_blank" rel="noopener noreferrer" class="text-mark underline">source ↗</a>
+						· <a href={ safeHref(a.Fact.SourceURL) } target="_blank" rel="noopener noreferrer" class="text-mark underline">source ↗</a>
 					}
 				</span>
 			}

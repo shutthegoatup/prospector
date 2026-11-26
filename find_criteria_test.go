@@ -50,6 +50,28 @@ func TestEachCriterionIsMetNotMetOrNotFound(t *testing.T) {
 		t.Fatalf("the answer it replaced should still be kept among the other facts: %+v", others)
 	}
 
+	// Said again after a different answer, an earlier answer stands once more.
+	payments := func(f FactIn) string {
+		t.Helper()
+		if _, err := s.AgentAddFact(o.ID, bot, AddFactIn{Company: "Tidewater Skiffs", FactIn: f}); err != nil {
+			t.Fatal(err)
+		}
+		return assetsFound(o.Settings, must(s.Facts(o.ID, out.ID)))[1].State
+	}
+	paid := FactIn{Field: "payments", Value: "Card deposit at checkout", SourceURL: "https://tidewater.example/checkout"}
+	if payments(paid) != assetMet {
+		t.Fatal("a yes after a no should stand")
+	}
+	if payments(FactIn{Field: "Payments", Value: "Order through a dealer; no online payment", SourceURL: "https://tidewater.example/buy", Answer: "no"}) != assetNotMet {
+		t.Fatal("the no, said again after a yes, should stand again")
+	}
+	if payments(paid) != assetMet {
+		t.Fatal("the yes, said again word for word after a no, should stand again")
+	}
+	if payments(paid) != assetMet || len(must(s.Facts(o.ID, out.ID))) != 7 {
+		t.Fatalf("the latest answer repeated should add nothing: %d facts", len(must(s.Facts(o.ID, out.ID))))
+	}
+
 	for _, bad := range []FactIn{
 		{Field: "payments", Value: "No online payment", Answer: "no"},
 		{Field: "payments", Value: "Maybe", SourceURL: "https://tidewater.example", Answer: "perhaps"},

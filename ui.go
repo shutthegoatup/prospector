@@ -219,8 +219,7 @@ func (a *App) research(w http.ResponseWriter, r *http.Request) {
 	}
 	var err error
 	if task != 0 && d.Filter == "review" {
-		d.Ranked = true
-		d.Rows, d.Page, err = a.s.rankedResearch(q.Org.ID, q.Org.Settings, task, pageParam(r))
+		d.Rows, d.Page, d.Ranked, err = a.s.rankedResearch(q.Org.ID, q.Org.Settings, task, pageParam(r))
 	} else {
 		d.Rows, d.Page, err = a.s.researchFor(q.Org.ID, d.Filter, pageParam(r), task)
 	}
