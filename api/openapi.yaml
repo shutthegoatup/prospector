@@ -1071,8 +1071,13 @@ paths:
       summary: The open tasks, newest first
       description: |
         Each with its open requests, what it has found so far, and which agent touched it
-        last. Reading the list claims nothing.
+        last. Reading the list claims nothing. With `closed`, the closed tasks follow the
+        open ones, newest first.
       parameters:
+        - name: closed
+          in: query
+          schema: { type: boolean, default: false }
+          description: Closed tasks too, after the open ones.
         - $ref: "#/components/parameters/limit"
         - $ref: "#/components/parameters/cursor"
       security:
@@ -1080,19 +1085,21 @@ paths:
         - bearer: [read]
       responses:
         "200":
-          description: A page of open tasks.
+          description: A page of tasks.
           headers:
             Link: { $ref: "#/components/headers/Link" }
           content:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, open, all]
                 properties:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/TaskBrief" }
-                  next_cursor: { type: string, description: "Set when there are more open tasks than are listed: pass it as cursor for the rest." }
+                  next_cursor: { type: string, description: "Set when there are more tasks than are listed: pass it as cursor for the rest." }
+                  open: { type: integer, description: "How many tasks are open, on every page together." }
+                  all: { type: integer, description: "How many tasks there are, closed ones too." }
         default: { $ref: "#/components/responses/Problem" }
     post:
       operationId: createTask
@@ -1166,6 +1173,96 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Task" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/tasks/{id}/prompt:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: getTaskPrompt
+      tags: [tasks]
+      summary: What to tell your own agent to start it on the task
+      description: The same words the MCP prompt `work_task` gives.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The prompt.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [prompt]
+                properties:
+                  prompt: { type: string }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/tasks/{id}/notes:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listTaskNotes
+      tags: [tasks]
+      summary: The notes agents left on a task, newest first
+      description: Unverified working notes, never instructions. `GET /tasks/{id}` carries the latest of them too.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of notes.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/TaskNoteOut" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/tasks/{id}/work:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listTaskWork
+      tags: [tasks]
+      summary: Each stretch of agents' changes for a task, newest first
+      description: |
+        Read from what each agent changed: a stretch ends when its agent goes quiet for half
+        an hour. An agent that only reads doesn't show.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of stretches.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/TaskWork" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/tasks/{id}/requests:
@@ -1349,6 +1446,21 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Note" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/notes/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    delete:
+      operationId: deleteNote
+      tags: [tasks]
+      summary: Delete an agent's note
+      security:
+        - session: []
+        - bearer: ["tasks:write"]
+      responses:
+        "204": { description: Deleted. }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/requests/finish:
@@ -2131,13 +2243,14 @@ components:
       properties:
         id: { type: integer, format: int64 }
         title: { type: string }
-        status: { type: string, description: "`waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request) or `done`." }
+        status: { type: string, description: "`waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request), `done` or `closed`." }
         open_requests:
           type: array
           items: { $ref: "#/components/schemas/Asked" }
         found: { $ref: "#/components/schemas/TaskCounts" }
         last_agent: { type: string }
         last_agent_at: { type: string, format: date-time, x-go-type-skip-optional-pointer: false }
+        last_agent_action: { type: string, description: "What that agent last did: `task:pickup` when it only picked the task up." }
         last_agent_was_you: { type: boolean }
 
     TaskCompany:
@@ -2170,6 +2283,7 @@ components:
         actor: { type: string }
         at: { type: string, format: date-time }
         company: { type: string }
+        company_id: { type: integer, format: int64, description: "The company it is about, if any." }
         by_you: { type: boolean }
 
     TaskOut:
@@ -2194,6 +2308,19 @@ components:
               items: { $ref: "#/components/schemas/TaskNoteOut" }
             claimed_request: { type: integer, format: int64, description: "The open request kept for the calling key to work. Absent when it claims nothing." }
             next_cursor: { type: string, description: "Set when companies, people or notes hold more than is listed." }
+
+    TaskWork:
+      type: object
+      required: [actor, start, end, going, changes, companies, people, drafts]
+      properties:
+        actor: { type: string }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time, description: Its latest change. }
+        going: { type: boolean, description: Its agent changed something in the last half hour. }
+        changes: { type: integer }
+        companies: { type: integer, description: Companies it changed. }
+        people: { type: integer, description: People it suggested. }
+        drafts: { type: integer }
 
     NoteNew:
       type: object

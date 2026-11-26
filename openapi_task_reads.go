@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/shutthegoatup/prospector/api"
 )
@@ -34,11 +35,19 @@ func (s apiServer) ListTasks(ctx context.Context, in api.ListTasksRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	tasks, next, err := s.a.s.AgentTasks(q.Org.ID, worker(q), page)
+	tasks, next, err := s.a.s.TaskBriefs(q.Org.ID, worker(q), in.Params.Closed, page)
 	if err != nil {
 		return nil, err
 	}
+	var open, all int64
+	if err := s.a.s.in(q.Org.ID).Model(&Task{}).Where("closed_at is null").Count(&open).Error; err != nil {
+		return nil, err
+	}
+	if err := s.a.s.in(q.Org.ID).Model(&Task{}).Count(&all).Error; err != nil {
+		return nil, err
+	}
 	out := api.ListTasks200JSONResponse{Headers: api.ListTasks200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out.Body.Open, out.Body.All = int(open), int(all)
 	if out.Body.Items, err = recast[[]api.TaskBrief](tasks); err != nil {
 		return nil, err
 	}
@@ -89,4 +98,63 @@ func (s apiServer) FinishRequest(ctx context.Context, in api.FinishRequestReques
 		return nil, err
 	}
 	return api.FinishRequest200JSONResponse{Ok: true}, nil
+}
+
+func (s apiServer) GetTaskPrompt(ctx context.Context, in api.GetTaskPromptRequestObject) (api.GetTaskPromptResponseObject, error) {
+	q := reqFrom(ctx)
+	t, err := s.a.s.taskRow(q.Org.ID, in.Id)
+	if err != nil {
+		return nil, err
+	}
+	return api.GetTaskPrompt200JSONResponse{Prompt: taskPrompt(q.Org, *t)}, nil
+}
+
+func (s apiServer) ListTaskNotes(ctx context.Context, in api.ListTaskNotesRequestObject) (api.ListTaskNotesResponseObject, error) {
+	q := reqFrom(ctx)
+	if _, err := s.a.s.taskRow(q.Org.ID, in.Id); err != nil {
+		return nil, err
+	}
+	page, err := pageIn(in.Params.Limit, in.Params.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	notes, next, err := s.a.s.TaskNotes(q.Org.ID, in.Id, page)
+	if err != nil {
+		return nil, err
+	}
+	who := worker(q)
+	out := api.ListTaskNotes200JSONResponse{Headers: api.ListTaskNotes200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out.Body.Items, out.Body.NextCursor = []api.TaskNoteOut{}, next
+	for _, n := range notes {
+		out.Body.Items = append(out.Body.Items, api.TaskNoteOut{Id: n.ID, Kind: n.Kind, Text: n.Text, Actor: n.Actor, At: n.CreatedAt,
+			Company: n.Company, CompanyId: n.CompanyID, ByYou: who.did(Event{User: n.Actor, KeyID: n.KeyID})})
+	}
+	return out, nil
+}
+
+func (s apiServer) ListTaskWork(ctx context.Context, in api.ListTaskWorkRequestObject) (api.ListTaskWorkResponseObject, error) {
+	q := reqFrom(ctx)
+	now := time.Now()
+	t, err := s.a.s.Task(q.Org.ID, in.Id, now)
+	if err != nil {
+		return nil, err
+	}
+	runs, next, err := listPage(t.Runs, in.Params.Limit, in.Params.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListTaskWork200JSONResponse{Headers: api.ListTaskWork200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out.Body.Items, out.Body.NextCursor = []api.TaskWork{}, next
+	for _, r := range runs {
+		out.Body.Items = append(out.Body.Items, api.TaskWork{Actor: r.Actor, Start: r.Start, End: r.End, Going: r.Going(now),
+			Changes: r.Changes, Companies: r.Companies, People: r.People, Drafts: r.Drafts})
+	}
+	return out, nil
+}
+
+func (s apiServer) DeleteNote(ctx context.Context, in api.DeleteNoteRequestObject) (api.DeleteNoteResponseObject, error) {
+	if err := s.a.s.DeleteNote(reqFrom(ctx).Org.ID, in.Id); err != nil {
+		return nil, err
+	}
+	return api.DeleteNote204Response{}, nil
 }

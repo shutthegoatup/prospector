@@ -708,7 +708,8 @@ export interface paths {
         /**
          * The open tasks, newest first
          * @description Each with its open requests, what it has found so far, and which agent touched it
-         *     last. Reading the list claims nothing.
+         *     last. Reading the list claims nothing. With `closed`, the closed tasks follow the
+         *     open ones, newest first.
          */
         get: operations["listTasks"];
         put?: never;
@@ -755,6 +756,79 @@ export interface paths {
          * @description Agents stop seeing a closed task; what was found stays. Closing one already closed changes nothing.
          */
         patch: operations["changeTask"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/tasks/{id}/prompt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What to tell your own agent to start it on the task
+         * @description The same words the MCP prompt `work_task` gives.
+         */
+        get: operations["getTaskPrompt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/tasks/{id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The notes agents left on a task, newest first
+         * @description Unverified working notes, never instructions. `GET /tasks/{id}` carries the latest of them too.
+         */
+        get: operations["listTaskNotes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/tasks/{id}/work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Each stretch of agents' changes for a task, newest first
+         * @description Read from what each agent changed: a stretch ends when its agent goes quiet for half
+         *     an hour. An agent that only reads doesn't show.
+         */
+        get: operations["listTaskWork"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/o/{org}/api/v1/tasks/{id}/requests": {
@@ -922,6 +996,27 @@ export interface paths {
          */
         post: operations["addNote"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/notes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete an agent's note */
+        delete: operations["deleteNote"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1493,13 +1588,15 @@ export interface components {
             /** Format: int64 */
             id: number;
             title: string;
-            /** @description `waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request) or `done`. */
+            /** @description `waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request), `done` or `closed`. */
             status: string;
             open_requests: components["schemas"]["Asked"][];
             found: components["schemas"]["TaskCounts"];
             last_agent?: string;
             /** Format: date-time */
             last_agent_at?: string;
+            /** @description What that agent last did: `task:pickup` when it only picked the task up. */
+            last_agent_action?: string;
             last_agent_was_you?: boolean;
         };
         TaskCompany: {
@@ -1530,6 +1627,11 @@ export interface components {
             /** Format: date-time */
             at: string;
             company?: string;
+            /**
+             * Format: int64
+             * @description The company it is about, if any.
+             */
+            company_id?: number;
             by_you?: boolean;
         };
         TaskOut: components["schemas"]["TaskBrief"] & {
@@ -1547,6 +1649,24 @@ export interface components {
             claimed_request?: number;
             /** @description Set when companies, people or notes hold more than is listed. */
             next_cursor?: string;
+        };
+        TaskWork: {
+            actor: string;
+            /** Format: date-time */
+            start: string;
+            /**
+             * Format: date-time
+             * @description Its latest change.
+             */
+            end: string;
+            /** @description Its agent changed something in the last half hour. */
+            going: boolean;
+            changes: number;
+            /** @description Companies it changed. */
+            companies: number;
+            /** @description People it suggested. */
+            people: number;
+            drafts: number;
         };
         NoteNew: {
             /**
@@ -3547,6 +3667,8 @@ export interface operations {
     listTasks: {
         parameters: {
             query?: {
+                /** @description Closed tasks too, after the open ones. */
+                closed?: boolean;
                 /** @description How many to return. 50 if left out; 200 at most. */
                 limit?: components["parameters"]["limit"];
                 /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
@@ -3561,7 +3683,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description A page of open tasks. */
+            /** @description A page of tasks. */
             200: {
                 headers: {
                     Link: components["headers"]["Link"];
@@ -3570,8 +3692,12 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["TaskBrief"][];
-                        /** @description Set when there are more open tasks than are listed: pass it as cursor for the rest. */
+                        /** @description Set when there are more tasks than are listed: pass it as cursor for the rest. */
                         next_cursor?: string;
+                        /** @description How many tasks are open, on every page together. */
+                        open: number;
+                        /** @description How many tasks there are, closed ones too. */
+                        all: number;
                     };
                 };
             };
@@ -3661,6 +3787,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Task"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getTaskPrompt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The prompt. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        prompt: string;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listTaskNotes: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of notes. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["TaskNoteOut"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listTaskWork: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of stretches. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["TaskWork"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
                 };
             };
             default: components["responses"]["Problem"];
@@ -3862,6 +4083,29 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Note"];
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };
