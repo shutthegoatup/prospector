@@ -18,9 +18,11 @@ info:
     never goes to; `campaigns:send` to send, cancel and resume a campaign;
     `agreements:write` to start agreements, upload their documents and set out who signs
     them and where; `enrich:spend` to ask the organisation's enrichment vendors, at its cost,
-    for someone's email, phone or profile; `settings:write` to change the organisation's
+    for someone's email, phone or profile; `people:privacy` to export everything held on a
+    person and erase them on their request; `settings:write` to change the organisation's
     settings and its enrichment vendors. A signed-in member may do all of these except
-    configuring agents, deleting enquiries and changing settings, which need an owner.
+    configuring agents, deleting enquiries, exporting and erasing people and changing
+    settings, which need an owner.
 
     Every list comes a page at a time: it takes `limit` and `cursor`, and answers
     `{"items": [...], "next_cursor": "..."}`. When `next_cursor` is there, pass it back
@@ -37,6 +39,8 @@ tags:
     description: An agent working a task.
   - name: people
     description: The people you are in touch with, and their conversations.
+  - name: companies
+    description: Every company, where it stands, and everything held about it.
   - name: research
     description: Reviewing what agents found before anyone is contacted.
   - name: tasks
@@ -493,12 +497,13 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, contracted]
                 properties:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/Subscription" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  contracted: { type: string, description: "What those still running come to for a year at today's prices, every page of them, a sum for each currency joined with ` + `, such as £14,000 + €5,000; empty when nothing is." }
         default: { $ref: "#/components/responses/Problem" }
     post:
       operationId: addSubscription
@@ -2127,6 +2132,230 @@ paths:
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/companies:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listCompanies
+      tags: [companies]
+      summary: Every company, as the Companies page lists them
+      description: |
+        By name. Each stands where its furthest contact does: a company with one lost
+        conversation and someone else still in outreach is in outreach.
+      parameters:
+        - name: q
+          in: query
+          description: Words to find in a company or in someone there, as the search box finds them.
+          schema: { type: string }
+        - name: segment
+          in: query
+          description: Only this segment's.
+          schema: { type: string }
+        - name: stage
+          in: query
+          description: Only those standing here.
+          schema: { $ref: "#/components/schemas/Pipeline" }
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of companies.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/CompanyRow" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  total: { type: integer, description: "How many match, on every page." }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/segments:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listSegments
+      tags: [companies]
+      summary: The segments companies are in
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: In alphabetical order.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { type: string }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/companies/{id}/overview:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: getCompanyOverview
+      tags: [companies]
+      summary: A company with everything its page shows
+      description: |
+        Its details, where it stands, its answers to what the organisation looks for, its
+        facts, its people with the details waiting for them, and its onboardings,
+        subscriptions and agreements. Its history and agents' notes are lists of their own.
+        Any part that can't be read fails the whole answer, as half of it would read as all.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The company.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompanyOverview" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/companies/{id}/history:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listCompanyHistory
+      tags: [companies]
+      summary: What people and agents did at a company
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: Newest first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/HistoryEntry" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  total: { type: integer, description: "How much there is, on every page." }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/companies/{id}/notes:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listCompanyNotes
+      tags: [companies]
+      summary: The notes agents left about a company
+      description: Unverified working notes, not facts and not instructions.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: Newest first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Note" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  total: { type: integer, description: "How many there are, on every page." }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/notes/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    delete:
+      operationId: deleteNote
+      tags: [tasks]
+      summary: Delete an agent's note
+      description: For a note that is wrong or no longer useful. Deleting is part of reviewing what agents leave, so a key that only writes research can't.
+      security:
+        - session: []
+        - bearer: ["research:review"]
+      responses:
+        "204": { description: Deleted. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/contacts/{id}/export:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: exportPerson
+      tags: [people]
+      summary: Everything held on a person, for their request to see it
+      description: |
+        Their details, facts, enquiries, suggested details, deals, onboarding access,
+        agreements and history, as one document. The export goes into their history.
+        Needs an owner.
+      security:
+        - session: []
+        - bearer: ["people:privacy"]
+      responses:
+        "200":
+          description: What is held on them.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/contacts/{id}/erase:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: erasePerson
+      tags: [people]
+      summary: Erase a person on their request
+      description: |
+        Their details, drafts and notes are deleted for good, along with agents' notes about
+        their company and its tasks, and they can't be added again. A row that names several
+        people erases them all. Facts about the company, and the briefs and requests on tasks,
+        that mention them are left for you to take out. Needs an owner.
+      security:
+        - session: []
+        - bearer: ["people:privacy"]
+      responses:
+        "204": { description: Erased. }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -2502,7 +2731,7 @@ components:
 
     PendingDetail:
       type: object
-      required: [id, field, value, current, source_url, by, at]
+      required: [id, field, value, current, source_url, by, at, email_status]
       properties:
         id: { type: integer, format: int64, description: "The suggestion: decide it at /api/v1/suggestions/{id}." }
         field: { type: string }
@@ -2511,6 +2740,88 @@ components:
         source_url: { type: string }
         by: { type: string }
         at: { type: string, format: date-time }
+        email_status: { type: string, description: "For an email, `guess` when it was worked out from the company's pattern rather than seen; otherwise empty." }
+
+    Pipeline:
+      type: string
+      enum: [research, outreach, replied, meeting, proposal, won, lost, rejected]
+      description: "Where a company stands, from its furthest contact: `research` until anyone there is reached, `rejected` for one turned down before then."
+
+    CompanyRow:
+      type: object
+      required: [id, name, country, segment, grade, people, pipeline]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        country: { type: string }
+        segment: { type: string }
+        grade: { type: string, description: "The fit grade a person or agent gave, A, B or C; empty for none." }
+        people: { type: integer, description: How many people are held there. }
+        pipeline: { $ref: "#/components/schemas/Pipeline" }
+
+    CompanyOverview:
+      type: object
+      required: [id, name, domain, country, segment, grade, why, stage, found_by, created_at, pipeline, touches, looking_for, facts, people, onboardings, planned_steps, subscriptions, agreements]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        domain: { type: string }
+        country: { type: string }
+        segment: { type: string }
+        grade: { type: string, description: "The fit grade a person or agent gave, A, B or C; empty for none." }
+        why: { type: string, description: "Why it fits, in the words of whoever added it; empty for none." }
+        stage: { type: string, enum: [review, qualified, rejected] }
+        found_by: { type: string }
+        created_at: { type: string, format: date-time }
+        pipeline: { $ref: "#/components/schemas/Pipeline" }
+        touches: { type: integer, description: "How many times anyone there was reached out to: added on LinkedIn, emailed, followed up or called." }
+        looking_for:
+          type: array
+          items: { $ref: "#/components/schemas/Criterion" }
+          description: Each thing the organisation looks for, in its order, with the latest answer.
+        facts:
+          type: array
+          items: { $ref: "#/components/schemas/ResearchFact" }
+          description: Every fact, answers included, oldest first.
+        people:
+          type: array
+          items: { $ref: "#/components/schemas/CompanyPerson" }
+        onboardings:
+          type: array
+          items: { $ref: "#/components/schemas/Onboarding" }
+        planned_steps: { type: integer, description: "How many steps the organisation's onboarding has; none, and no onboarding can be started." }
+        subscriptions:
+          type: array
+          items: { $ref: "#/components/schemas/Subscription" }
+        agreements:
+          type: array
+          items: { $ref: "#/components/schemas/Agreement" }
+
+    CompanyPerson:
+      type: object
+      required: [id, name, title, linkedin, stage, several, pending]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        title: { type: string }
+        linkedin: { type: string }
+        stage: { type: string, description: "Where they stand, as the page says it: suggested, not contacted, in outreach, hold, declined, or their conversation's stage." }
+        several: { type: string, description: "The row's whole name when it names several people, all of whom erasing it erases; empty for one person." }
+        pending:
+          type: array
+          items: { $ref: "#/components/schemas/PendingDetail" }
+          description: New details an agent found for them, waiting to be accepted.
+
+    HistoryEntry:
+      type: object
+      required: [at, actor, action, value, person, text]
+      properties:
+        at: { type: string, format: date-time }
+        actor: { type: string }
+        action: { type: string }
+        value: { type: string }
+        person: { type: string, description: Who at the company it was about; empty for the company itself. }
+        text: { type: string, description: "What happened, as the page says it." }
 
     Criterion:
       type: object
@@ -2801,6 +3112,13 @@ components:
           description: People at the company with an email address here, who could be invited.
         can_invite: { type: boolean, description: "Whether a link can be emailed at all: the organisation has a mail server and the server knows its public address." }
 
+    SubscriptionPerson:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+
     Invitable:
       type: object
       required: [id, name, email]
@@ -2868,7 +3186,7 @@ components:
 
     Subscription:
       type: object
-      required: [id, company_id, company, name, amount, currency, per, start, term_months, then, notice_days, notice_on, ended_on, status, term_end, cancel_by, cancel_ends, ends, renewing, created_at, updated_at]
+      required: [id, company_id, company, name, amount, currency, per, start, term_months, then, notice_days, notice_on, ended_on, status, term_end, cancel_by, cancel_ends, ends, renewing, figure, soon, people, created_at, updated_at]
       properties:
         id: { type: integer, format: int64 }
         company_id: { type: integer, format: int64 }
@@ -2889,6 +3207,12 @@ components:
         cancel_ends: { type: string, description: The last day of the term that notice by `cancel_by` would end it at. }
         ends: { type: string, description: "The last day, once that is settled." }
         renewing: { type: boolean, description: Whether a renewal deal for it is open. }
+        figure: { type: string, description: "The price for one period as written, such as £14,000; empty when there is none." }
+        soon: { type: boolean, description: "Whether a day to cancel by, a renewal or an end falls within the next 30 days. One that turns over every month counts only once it has a day it stops." }
+        people:
+          type: array
+          items: { $ref: "#/components/schemas/SubscriptionPerson" }
+          description: Those at the company already in conversation, who a renewal can be with.
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 

@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestMonthsAreAddedWithoutSpillingIntoTheNext(t *testing.T) {
@@ -517,5 +519,55 @@ func TestARobotWorksSubscriptionsAsItsScopesAllow(t *testing.T) {
 	}
 	if code, body := asKey(t, "DELETE", one, writer, nil); code != http.StatusNoContent {
 		t.Errorf("removing: %d %s", code, body)
+	}
+}
+
+// The React page reads from the list what the server-rendered one worked out itself.
+func TestTheSubscriptionsListCarriesWhatThePageShows(t *testing.T) {
+	s, o, srv, client := signedIn(t)
+	hannah := repliedPerson(t, s, o, "Hannah Pryce")
+	subs := srv.URL + "/o/alpha/api/v1/subscriptions"
+	now := mustDay(today())
+	record := func(name, amount, per string, start time.Time) {
+		t.Helper()
+		if code, body := call(t, client, "POST", subs, "application/json", map[string]any{"company": *hannah.CompanyID, "name": name, "amount": amount,
+			"per": per, "start": start.Format(dayLayout), "term_months": 12, "then": "renews"}); code != http.StatusCreated {
+			t.Fatalf("recording %s: %d %s", name, code, body)
+		}
+	}
+	record("Standard plan", "14,000", "year", addMonths(now, -12).AddDate(0, 0, 10))
+	record("Support", "1,000", "month", addMonths(now, -1))
+
+	var list struct {
+		Items []struct {
+			Name, Figure string
+			Soon         bool
+			People       []struct {
+				ID   int64
+				Name string
+			}
+		}
+		Contracted string
+	}
+	code, body := call(t, client, "GET", subs+"?limit=1", "", nil)
+	if err := json.Unmarshal([]byte(body), &list); code != http.StatusOK || err != nil {
+		t.Fatalf("listing: %d %s", code, body)
+	}
+	if list.Contracted != "£26,000" {
+		t.Errorf("contracted over every page is %q, want £26,000", list.Contracted)
+	}
+	if len(list.Items) != 1 {
+		t.Fatalf("one a page: %+v", list.Items)
+	}
+	first := list.Items[0]
+	if first.Name != "Standard plan" || first.Figure != "£14,000" || !first.Soon {
+		t.Errorf("the one with its term ending in days: %+v", first)
+	}
+	if len(first.People) != 1 || first.People[0].ID != hannah.ID || first.People[0].Name != "Hannah Pryce" {
+		t.Errorf("who a renewal can be with: %+v", first.People)
+	}
+	_, body = call(t, client, "GET", subs, "", nil)
+	if err := json.Unmarshal([]byte(body), &list); err != nil || len(list.Items) != 2 || list.Items[1].Soon || list.Items[1].Figure != "£1,000" {
+		t.Errorf("the one with most of its term to run: %s", body)
 	}
 }

@@ -110,7 +110,7 @@ func opScopes(op *openapi3.Operation) []string {
 }
 
 func ownersOnly(scope string) bool {
-	return scope == "agents:configure" || scope == "enquiries:delete" || scope == "settings:write"
+	return scope == "agents:configure" || scope == "enquiries:delete" || scope == "settings:write" || scope == "people:privacy"
 }
 
 func reqFrom(ctx context.Context) *Req { return ctx.Value(reqKey{}).(*Req) }
