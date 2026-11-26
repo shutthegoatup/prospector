@@ -1045,12 +1045,16 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items, ranked]
+                required: [items, ranked, counts]
                 properties:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/ResearchCompany" }
                   ranked: { type: boolean, description: "Whether the companies come best fit first. A search with more than 500 to review comes newest first." }
+                  counts:
+                    type: object
+                    additionalProperties: { type: integer }
+                    description: How many each filter holds, narrowed to the task when one is given. What the organisation looks for is in the settings, as looking_for.
                   next_cursor: { type: string, description: "Set when there is more: pass it as cursor for the rest." }
         default: { $ref: "#/components/responses/Problem" }
 
@@ -1894,7 +1898,7 @@ components:
   schemas:
     Settings:
       type: object
-      required: [name, color, email_after_days, followup_after_days, note_template, pitch, never_contact, look_for, agent_guidance, enquiry_sites, onboarding_steps, currency, postal_address, incorporated_only]
+      required: [name, color, email_after_days, followup_after_days, note_template, pitch, never_contact, look_for, looking_for, agent_guidance, enquiry_sites, onboarding_steps, currency, postal_address, incorporated_only]
       properties:
         name: { type: string, description: "The organisation's name; never empty." }
         color: { type: string, description: "Its colour, like `#56c5f4`." }
@@ -1904,6 +1908,11 @@ components:
         pitch: { type: string, description: "The call script's pitch line. `{company}` is filled in." }
         never_contact: { type: string, description: "Domains, email addresses and LinkedIn profiles never to contact, one per line." }
         look_for: { type: string, description: "What makes a company a fit, one `name: what counts` per line." }
+        looking_for:
+          type: array
+          items: { $ref: "#/components/schemas/LookFor" }
+          readOnly: true
+          description: "`look_for` read: each thing in order, with its hint and whether it is a must (`(must)` after its name)."
         agent_guidance: { type: string, description: "Sent to every agent when it connects." }
         enquiry_sites: { type: string, description: "Sites whose forms may post enquiries, one address per line, like `https://www.example.com`. Empty takes none." }
         onboarding_steps: { type: string, description: "What a new customer goes through, one step a line." }
@@ -2104,7 +2113,7 @@ components:
 
     ResearchCompany:
       type: object
-      required: [id, name, domain, country, segment, stage, grade, found_by, created_at, criteria, fit, other_facts, people]
+      required: [id, name, domain, country, segment, stage, grade, why, found_by, created_at, criteria, fit, facts, people]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
@@ -2120,8 +2129,63 @@ components:
           items: { $ref: "#/components/schemas/Criterion" }
           description: Each thing the organisation looks for, in its order, with the latest answer.
         fit: { $ref: "#/components/schemas/Fit" }
-        other_facts: { type: integer, description: "Facts besides the answers, older answers among them: get_company has them." }
-        people: { type: integer, description: People suggested or held at the company. }
+        why: { type: string, description: "Why it fits, in the words of whoever added it; empty for none." }
+        facts:
+          type: array
+          items: { $ref: "#/components/schemas/ResearchFact" }
+          description: The facts besides the answers, older answers among them, oldest first.
+        people:
+          type: array
+          items: { $ref: "#/components/schemas/ResearchPerson" }
+
+    LookFor:
+      type: object
+      required: [field, hint, must]
+      properties:
+        field: { type: string }
+        hint: { type: string }
+        must: { type: boolean }
+
+    ResearchFact:
+      type: object
+      required: [id, field, value, source_url, answer, inferred, by, at]
+      properties:
+        id: { type: integer, format: int64 }
+        field: { type: string }
+        value: { type: string }
+        source_url: { type: string }
+        answer: { type: string, enum: [yes, "no", unknown] }
+        inferred: { type: boolean }
+        by: { type: string }
+        at: { type: string, format: date-time }
+
+    ResearchPerson:
+      type: object
+      required: [id, name, title, status, email_status, linkedin, source_url, pending]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        title: { type: string }
+        status: { type: string, description: "`suggested` until someone picks them." }
+        email_status: { type: string, description: "`verified`, `guess`, or empty." }
+        linkedin: { type: string }
+        source_url: { type: string, description: The first page that shows them. }
+        pending:
+          type: array
+          items: { $ref: "#/components/schemas/PendingDetail" }
+          description: New details an agent found for them, waiting to be accepted.
+
+    PendingDetail:
+      type: object
+      required: [id, field, value, current, source_url, by, at]
+      properties:
+        id: { type: integer, format: int64, description: "The suggestion: decide it at /api/v1/suggestions/{id}." }
+        field: { type: string }
+        value: { type: string }
+        current: { type: string, description: What the person holds now; empty for nothing. }
+        source_url: { type: string }
+        by: { type: string }
+        at: { type: string, format: date-time }
 
     Criterion:
       type: object

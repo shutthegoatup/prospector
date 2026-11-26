@@ -1286,6 +1286,8 @@ export interface components {
             never_contact: string;
             /** @description What makes a company a fit, one `name: what counts` per line. */
             look_for: string;
+            /** @description `look_for` read: each thing in order, with its hint and whether it is a must (`(must)` after its name). */
+            readonly looking_for: components["schemas"]["LookFor"][];
             /** @description Sent to every agent when it connects. */
             agent_guidance: string;
             /** @description Sites whose forms may post enquiries, one address per line, like `https://www.example.com`. Empty takes none. */
@@ -1521,10 +1523,59 @@ export interface components {
             /** @description Each thing the organisation looks for, in its order, with the latest answer. */
             criteria: components["schemas"]["Criterion"][];
             fit: components["schemas"]["Fit"];
-            /** @description Facts besides the answers, older answers among them: get_company has them. */
-            other_facts: number;
-            /** @description People suggested or held at the company. */
-            people: number;
+            /** @description Why it fits, in the words of whoever added it; empty for none. */
+            why: string;
+            /** @description The facts besides the answers, older answers among them, oldest first. */
+            facts: components["schemas"]["ResearchFact"][];
+            people: components["schemas"]["ResearchPerson"][];
+        };
+        LookFor: {
+            field: string;
+            hint: string;
+            must: boolean;
+        };
+        ResearchFact: {
+            /** Format: int64 */
+            id: number;
+            field: string;
+            value: string;
+            source_url: string;
+            /** @enum {string} */
+            answer: "yes" | "no" | "unknown";
+            inferred: boolean;
+            by: string;
+            /** Format: date-time */
+            at: string;
+        };
+        ResearchPerson: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            title: string;
+            /** @description `suggested` until someone picks them. */
+            status: string;
+            /** @description `verified`, `guess`, or empty. */
+            email_status: string;
+            linkedin: string;
+            /** @description The first page that shows them. */
+            source_url: string;
+            /** @description New details an agent found for them, waiting to be accepted. */
+            pending: components["schemas"]["PendingDetail"][];
+        };
+        PendingDetail: {
+            /**
+             * Format: int64
+             * @description The suggestion: decide it at /api/v1/suggestions/{id}.
+             */
+            id: number;
+            field: string;
+            value: string;
+            /** @description What the person holds now; empty for nothing. */
+            current: string;
+            source_url: string;
+            by: string;
+            /** Format: date-time */
+            at: string;
         };
         Criterion: {
             field: string;
@@ -3354,6 +3405,10 @@ export interface operations {
                         items: components["schemas"]["ResearchCompany"][];
                         /** @description Whether the companies come best fit first. A search with more than 500 to review comes newest first. */
                         ranked: boolean;
+                        /** @description How many each filter holds, narrowed to the task when one is given. What the organisation looks for is in the settings, as looking_for. */
+                        counts: {
+                            [key: string]: number;
+                        };
                         /** @description Set when there is more: pass it as cursor for the rest. */
                         next_cursor?: string;
                     };

@@ -21,9 +21,22 @@ type researchPage struct {
 			Text        string `json:"text"`
 			MustsMissed int    `json:"musts_missed"`
 		} `json:"fit"`
+		Facts []struct {
+			Field  string `json:"field"`
+			Answer string `json:"answer"`
+		} `json:"facts"`
+		People []struct {
+			Name    string `json:"name"`
+			Status  string `json:"status"`
+			Pending []struct {
+				Field string `json:"field"`
+				Value string `json:"value"`
+			} `json:"pending"`
+		} `json:"people"`
 	} `json:"items"`
-	Ranked     bool   `json:"ranked"`
-	NextCursor string `json:"next_cursor"`
+	Counts     map[string]int `json:"counts"`
+	Ranked     bool           `json:"ranked"`
+	NextCursor string         `json:"next_cursor"`
 }
 
 func TestTheResearchQueueIsInTheAPI(t *testing.T) {
@@ -80,6 +93,30 @@ func TestTheResearchQueueIsInTheAPI(t *testing.T) {
 	}
 	if ranked.Items[2].Fit.MustsMissed != 1 {
 		t.Fatalf("Anchor misses its must: %+v", ranked.Items[2])
+	}
+	if ranked.Counts["review"] != 3 || ranked.Counts["rejected"] != 0 {
+		t.Fatalf("the filters' counts: %+v", ranked.Counts)
+	}
+	if _, body := asKey(t, "GET", srv.URL+"/o/alpha/api/v1/settings", key, nil); !strings.Contains(body, `"looking_for":[{"field":"configurator","hint":"a product configurator on their site","must":true}`) {
+		t.Fatalf("the settings should read what the organisation looks for: %s", body)
+	}
+
+	// What else the page shows of a company: its other facts and its people, with what waits.
+	if _, err := s.AgentAddFact(o.ID, bot, AddFactIn{Company: "Corran Craft", FactIn: FactIn{Field: "team_page",
+		Value: "Lists the sales team", SourceURL: "https://corran.example/team"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AgentAddContact(o, bot, AddContactIn{Company: "Corran Craft", Name: "Mairi Corran", Title: "Head of sales",
+		SourceURL: "https://corran.example/team"}); err != nil {
+		t.Fatal(err)
+	}
+	_, ranked, _ = list(fmt.Sprintf("?task=%d", task.ID))
+	corran = ranked.Items[0]
+	if len(corran.Facts) != 1 || corran.Facts[0].Field != "team_page" || corran.Facts[0].Answer != "yes" {
+		t.Fatalf("the other facts: %+v", corran.Facts)
+	}
+	if len(corran.People) != 1 || corran.People[0].Name != "Mairi Corran" || corran.People[0].Status != ContactSuggested {
+		t.Fatalf("the people: %+v", corran.People)
 	}
 
 	// A page at a time, as every list is.
