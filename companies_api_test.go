@@ -205,3 +205,15 @@ func TestOnlyAnOwnerExportsOrErasesAPersonThroughTheAPI(t *testing.T) {
 		t.Fatalf("erasing someone already erased: %d", code)
 	}
 }
+
+func TestReadingCompaniesNeedsTheReadScope(t *testing.T) {
+	s, o, srv, _ := signedIn(t)
+	co := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout", KeyID: 1}, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	writer, _ := must2(s.CreateKey(o.ID, "scout", []string{"research:write"}, "Ada Lovelace"))
+	base := srv.URL + "/o/alpha/api/v1/"
+	for _, path := range []string{"companies", "segments", "companies/" + itoa(co.ID) + "/overview", "companies/" + itoa(co.ID) + "/history", "companies/" + itoa(co.ID) + "/notes"} {
+		if code, body := asKey(t, "GET", base+path, writer, nil); code != http.StatusForbidden || !strings.Contains(body, "read") {
+			t.Errorf("a key without read reading %s: %d %s", path, code, body)
+		}
+	}
+}

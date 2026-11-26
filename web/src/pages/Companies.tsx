@@ -43,7 +43,8 @@ export function usePages(of: string) {
 
 export function Pager({ n, total, size, next, onNext, onPrevious }: { n: number; total: number; size: number; next?: string; onNext: (cursor: string) => void; onPrevious: () => void }) {
   const pages = Math.max(1, Math.ceil(total / size));
-  if (pages <= 1) return null;
+  // Past the first page, Previous stays: a page emptied by a change shouldn't strand anyone.
+  if (pages <= 1 && n <= 1) return null;
   return (
     <nav className="mt-3 flex flex-wrap items-center justify-between gap-3" aria-label="Pages">
       <span>
@@ -108,7 +109,8 @@ export function CompaniesPage() {
         <label className="sr-only" htmlFor="segment">
           Segment
         </label>
-        <select id="segment" name="segment" defaultValue={segment} className="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
+        {/* Keyed on the segments arriving, so the one in the address is picked once it is an option. */}
+        <select key={segments.data ? "segments" : "loading"} id="segment" name="segment" defaultValue={segment} className="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
           <option value="">All segments</option>
           {(segments.data?.items ?? []).map((s) => (
             <option key={s} value={s}>
