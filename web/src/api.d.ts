@@ -631,6 +631,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/enquiry-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * How many enquiries there are of each kind and state
+         * @description Spam is counted on its own and left out of the rest.
+         */
+        get: operations["countEnquiries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Who is in the organisation, by name
+         * @description The names that can own a deal or an enquiry, in order.
+         */
+        get: operations["listMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/enquiries/{id}": {
         parameters: {
             query?: never;
@@ -858,7 +904,8 @@ export interface paths {
         /**
          * The open tasks, newest first
          * @description Each with its open requests, what it has found so far, and which agent touched it
-         *     last. Reading the list claims nothing.
+         *     last. Reading the list claims nothing. With `closed`, the closed tasks follow the
+         *     open ones, newest first.
          */
         get: operations["listTasks"];
         put?: never;
@@ -905,6 +952,79 @@ export interface paths {
          * @description Agents stop seeing a closed task; what was found stays. Closing one already closed changes nothing.
          */
         patch: operations["changeTask"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/tasks/{id}/prompt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What to tell your own agent to start it on the task
+         * @description The same words the MCP prompt `work_task` gives.
+         */
+        get: operations["getTaskPrompt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/tasks/{id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The notes agents left on a task, newest first
+         * @description Unverified working notes, never instructions. `GET /tasks/{id}` carries the latest of them too.
+         */
+        get: operations["listTaskNotes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/tasks/{id}/work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Each stretch of agents' changes for a task, newest first
+         * @description Read from what each agent changed: a stretch ends when its agent goes quiet for half
+         *     an hour. An agent that only reads doesn't show.
+         */
+        get: operations["listTaskWork"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/o/{org}/api/v1/tasks/{id}/requests": {
@@ -1072,6 +1192,27 @@ export interface paths {
          */
         post: operations["addNote"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/notes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete an agent's note */
+        delete: operations["deleteNote"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1284,6 +1425,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/people/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A person to add, read from a LinkedIn profile
+         * @description What the add form starts with when the bookmarklet opens it from someone's profile, and the bookmarklet itself. Nothing is saved; add them with `addPerson`.
+         */
+        get: operations["draftPerson"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/contacts/{id}": {
         parameters: {
             query?: never;
@@ -1351,7 +1515,7 @@ export interface paths {
         head?: never;
         /**
          * Qualify a company, reject it, or put it back for review
-         * @description A rejected company is one agents are told not to suggest again.
+         * @description A company rejected for the organisation's own offering is one agents are told not to suggest again; a verdict for another offering leaves the company's own stage as it was.
          */
         patch: operations["reviewCompany"];
         trace?: never;
@@ -1485,6 +1649,112 @@ export interface paths {
         patch: operations["changeSettings"];
         trace?: never;
     };
+    "/o/{org}/api/v1/offerings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What the organisation sells besides what its settings describe
+         * @description The organisation's own offering, whose look-for list is in Settings and whose verdict on
+         *     a company is the company's stage, isn't listed. Reviewing a company or starting a task
+         *     names it as offering 0.
+         */
+        get: operations["listOfferings"];
+        put?: never;
+        /**
+         * Add something the organisation sells
+         * @description For a member, only an owner.
+         */
+        post: operations["addOffering"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/offerings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove an offering, with every verdict made for it
+         * @description The history keeps what was decided. For a member, only an owner.
+         */
+        delete: operations["removeOffering"];
+        options?: never;
+        head?: never;
+        /**
+         * Change an offering's name or wording
+         * @description Send only what changes. For a member, only an owner.
+         */
+        patch: operations["changeOffering"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/offerings/{id}/verdicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Where companies stand for an offering
+         * @description Rejected ones included, with who decided, when and why, so one ruled out by mistake
+         *     can be found and put back for review.
+         */
+        get: operations["listVerdicts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/companies/{id}/verdicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Where one company stands for each offering it has been judged for
+         * @description Its stage for the organisation's own offering is the company's stage, not listed here.
+         */
+        get: operations["listCompanyVerdicts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1563,6 +1833,51 @@ export interface components {
             /** @description Email only incorporated companies. */
             incorporated_only?: boolean | null;
         };
+        Offering: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /** @description What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list. */
+            look_for: string;
+            /** @description Its pitch line, kept for when people are reached for it; nothing uses it yet. */
+            pitch: string;
+            /** @description Its connection note, kept for when people are picked for it; nothing uses it yet. */
+            note_template: string;
+            updated_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        OfferingNew: {
+            name: string;
+            look_for?: string;
+            pitch?: string;
+            note_template?: string;
+        };
+        OfferingChange: {
+            name?: string | null;
+            look_for?: string | null;
+            pitch?: string | null;
+            note_template?: string | null;
+        };
+        Verdict: {
+            /** Format: int64 */
+            offering_id: number;
+            /** Format: int64 */
+            company_id: number;
+            /** @description The company's name. */
+            company: string;
+            /** @enum {string} */
+            stage: "review" | "qualified" | "rejected";
+            fit: string;
+            /** @description Why, as whoever decided said it. */
+            reason: string;
+            /** @description Who decided. */
+            by: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
         ContactChange: {
             /** @description Their name. */
             person?: string | null;
@@ -1592,8 +1907,15 @@ export interface components {
         CompanyReview: {
             /** @enum {string} */
             stage: "review" | "qualified" | "rejected";
-            /** @description Why, in a few words; kept with the company. Empty leaves it as it was. */
+            /** @description Why, in a few words; kept with the company, or with the verdict when an offering is named. Empty leaves it as it was. */
             fit?: string;
+            /**
+             * Format: int64
+             * @description The offering this is a verdict for; 0 or left out is the organisation's own, which is the company's stage.
+             */
+            offering?: number;
+            /** @description Why, kept with a verdict for an offering; refused for the organisation's own. */
+            reason?: string;
         };
         PersonNew: {
             name: string;
@@ -1607,6 +1929,15 @@ export interface components {
             note?: string;
             /** @description Already connected on LinkedIn: their email comes up next. */
             added?: boolean;
+        };
+        PersonDraft: {
+            /** @description Their profile's address. */
+            linkedin: string;
+            name: string;
+            title: string;
+            company: string;
+            /** @description A `javascript:` link to keep in the bookmarks bar: clicked on a LinkedIn profile, it opens the add form filled in from it. */
+            bookmarklet: string;
         };
         PersonAdded: {
             /** Format: int64 */
@@ -1643,13 +1974,15 @@ export interface components {
             /** Format: int64 */
             id: number;
             title: string;
-            /** @description `waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request) or `done`. */
+            /** @description `waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request), `done` or `closed`. */
             status: string;
             open_requests: components["schemas"]["Asked"][];
             found: components["schemas"]["TaskCounts"];
             last_agent?: string;
             /** Format: date-time */
             last_agent_at?: string;
+            /** @description What that agent last did: `task:pickup` when it only picked the task up. */
+            last_agent_action?: string;
             last_agent_was_you?: boolean;
         };
         TaskCompany: {
@@ -1680,6 +2013,11 @@ export interface components {
             /** Format: date-time */
             at: string;
             company?: string;
+            /**
+             * Format: int64
+             * @description The company it is about, if any.
+             */
+            company_id?: number;
             by_you?: boolean;
         };
         TaskOut: components["schemas"]["TaskBrief"] & {
@@ -1697,6 +2035,24 @@ export interface components {
             claimed_request?: number;
             /** @description Set when companies, people or notes hold more than is listed. */
             next_cursor?: string;
+        };
+        TaskWork: {
+            actor: string;
+            /** Format: date-time */
+            start: string;
+            /**
+             * Format: date-time
+             * @description Its latest change.
+             */
+            end: string;
+            /** @description Its agent changed something in the last half hour. */
+            going: boolean;
+            changes: number;
+            /** @description Companies it changed. */
+            companies: number;
+            /** @description People it suggested. */
+            people: number;
+            drafts: number;
         };
         NoteNew: {
             /**
@@ -1729,6 +2085,11 @@ export interface components {
             title: string;
             /** @description What is wanted: the task's first request. */
             brief: string;
+            /**
+             * Format: int64
+             * @description What the task finds companies for: agents are given its look-for fields, and what they find waits in its review. 0 or left out is the organisation's own.
+             */
+            offering?: number;
             /** @description Prospector's own agents to start on the task, each on its own request. */
             agents?: number[];
         };
@@ -1841,6 +2202,11 @@ export interface components {
             /** Format: int64 */
             id: number;
             title: string;
+            /**
+             * Format: int64
+             * @description What the task finds companies for; 0 is the organisation's own.
+             */
+            offering_id: number;
             created_by: string;
             /** Format: date-time */
             created_at: string;
@@ -2199,6 +2565,11 @@ export interface components {
             /** @description Whether a link can be emailed at all: the organisation has a mail server and the server knows its public address. */
             can_invite: boolean;
         };
+        SubscriptionPerson: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
         Invitable: {
             /** Format: int64 */
             id: number;
@@ -2309,6 +2680,12 @@ export interface components {
             ends: string;
             /** @description Whether a renewal deal for it is open. */
             renewing: boolean;
+            /** @description The price for one period as written, such as £14,000; empty when there is none. */
+            figure: string;
+            /** @description Whether a day to cancel by, a renewal or an end falls within the next 30 days. One that turns over every month counts only once it has a day it stops. */
+            soon: boolean;
+            /** @description Those at the company already in conversation, who a renewal can be with. */
+            people: components["schemas"]["SubscriptionPerson"][];
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -2400,6 +2777,28 @@ export interface components {
             state: string;
             owner: string;
             note: string;
+            /** @description The name of the company it was matched to; empty for none. */
+            company_name: string;
+            /** @description Whether whoever sent it is on the Conversations board already. */
+            in_conversation: boolean;
+            /** @description What has been said in answering it, oldest first, as its messages list gives it. */
+            thread: components["schemas"]["EnquiryMessage"][];
+        };
+        EnquiryCounts: {
+            /** @description Every enquiry that isn't spam. */
+            all: number;
+            spam: number;
+            /** @description Those that aren't spam, by kind: `sales`, `demo`, `signup`, `support`, `feature` or `other`. A kind with none is left out. */
+            kinds: {
+                [key: string]: number;
+            };
+            /** @description Those that aren't spam, by `open`, `waiting` or `closed`. A state with none is left out. */
+            states: {
+                [key: string]: number;
+            };
+        };
+        MemberName: {
+            name: string;
         };
         Suppression: {
             /** Format: int64 */
@@ -3382,6 +3781,8 @@ export interface operations {
                     "application/json": {
                         items: components["schemas"]["Subscription"][];
                         next_cursor?: components["schemas"]["NextCursor"];
+                        /** @description What those still running come to for a year at today's prices, every page of them, a sum for each currency joined with ` + `, such as £14,000 + €5,000; empty when nothing is. */
+                        contracted: string;
                     };
                 };
             };
@@ -3687,6 +4088,65 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["Enquiry"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                        /** @description Whether a reply can be emailed from here: the organisation has a mail server. Their answers can be recorded either way. */
+                        can_reply: boolean;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    countEnquiries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The counts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnquiryCounts"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listMembers: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of them. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MemberName"][];
                         next_cursor?: components["schemas"]["NextCursor"];
                     };
                 };
@@ -4067,6 +4527,8 @@ export interface operations {
     listTasks: {
         parameters: {
             query?: {
+                /** @description Closed tasks too, after the open ones. */
+                closed?: boolean;
                 /** @description How many to return. 50 if left out; 200 at most. */
                 limit?: components["parameters"]["limit"];
                 /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
@@ -4081,7 +4543,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description A page of open tasks. */
+            /** @description A page of tasks. */
             200: {
                 headers: {
                     Link: components["headers"]["Link"];
@@ -4090,8 +4552,12 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["TaskBrief"][];
-                        /** @description Set when there are more open tasks than are listed: pass it as cursor for the rest. */
+                        /** @description Set when there are more tasks than are listed: pass it as cursor for the rest. */
                         next_cursor?: string;
+                        /** @description How many tasks are open, on every page together. */
+                        open: number;
+                        /** @description How many tasks there are, closed ones too. */
+                        all: number;
                     };
                 };
             };
@@ -4181,6 +4647,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Task"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getTaskPrompt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The prompt. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        prompt: string;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listTaskNotes: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of notes. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["TaskNoteOut"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listTaskWork: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of stretches. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["TaskWork"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
                 };
             };
             default: components["responses"]["Problem"];
@@ -4382,6 +4943,29 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Note"];
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };
@@ -4830,6 +5414,39 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    draftPerson: {
+        parameters: {
+            query?: {
+                /** @description The profile's address; anything after `?` is dropped. */
+                url?: string;
+                /** @description The profile page's title, which leads with their name. */
+                name?: string;
+                /** @description Their headline, like `Head of Marketing at Larkmoor Yachts`, read for their role and company. */
+                headline?: string;
+                /** @description Their company, in place of the one the headline gives. */
+                company?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The person as far as the profile says. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDraft"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     changeContact: {
         parameters: {
             query?: never;
@@ -5106,6 +5723,189 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Settings"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listOfferings: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description By name. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Offering"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addOffering: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferingNew"];
+            };
+        };
+        responses: {
+            /** @description The offering, added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Offering"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeOffering: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changeOffering: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferingChange"];
+            };
+        };
+        responses: {
+            /** @description The offering as it now is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Offering"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listVerdicts: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+                /** @description Only those at this stage. */
+                stage?: "review" | "qualified" | "rejected";
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The latest decided first. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Verdict"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCompanyVerdicts: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description By offering. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Verdict"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
                 };
             };
             default: components["responses"]["Problem"];

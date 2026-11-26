@@ -37,6 +37,8 @@ type App struct {
 	base string
 	// frontOrg is the organisation the front page's form sends enquiries to; empty is no form.
 	frontOrg string
+	// securityContact is security.txt's Contact; empty serves no security.txt.
+	securityContact string
 	// mail is the app's own server, for password resets and invitations; nil is none.
 	mail *MailServer
 	// send and later stand in for SMTP and for a goroutine in tests.
@@ -411,6 +413,7 @@ func (a *App) Routes() http.Handler {
 
 	a.apiRoutes(mux)
 	a.routeAPI(mux)
+	a.wellKnownRoutes(mux)
 
 	sameOrigin := http.NewCrossOriginProtection()
 	// Enquiry forms live on other sites. The route checks the origin against the
