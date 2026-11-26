@@ -203,10 +203,6 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		contact, err := securityContactFrom(os.Getenv("PROSPECTOR_SECURITY_CONTACT"))
-		if err != nil {
-			return err
-		}
 		via, err := mailFromEnv(os.Getenv)
 		if err != nil {
 			return err
@@ -226,7 +222,7 @@ func run(args []string) error {
 		if os.Getenv("PROSPECTOR_FRONT_ORG") != "" {
 			fmt.Fprintf(os.Stderr, "PROSPECTOR_FRONT_ORG is no longer read: the front page's form sends to the %q organisation\n", frontOrgSlug)
 		}
-		return serve(&App{s: s, base: base, frontOrg: frontOrgSlug, securityContact: contact, social: social, mail: via}, arg(rest, 0, addr))
+		return serve(&App{s: s, base: base, frontOrg: frontOrgSlug, social: social, mail: via}, arg(rest, 0, addr))
 	case "sso":
 		return ssoCommand(s, rest)
 	case "agent":

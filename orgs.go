@@ -476,7 +476,7 @@ func (s *Store) Logout(token string) error {
 
 // Scopes an API key can carry. None can change members or keys or reach another org; only enquiries:reply, customers:invite and campaigns:send send mail, and only import skips review.
 var Scopes = []struct{ Name, What string }{
-	{"read", "search companies and people, read what's due and the tasks people wrote, read deals, subscriptions, onboardings and enquiries with what was said in answering them, and read the organisation's settings, its never-contact list and agent guidance included, and what it sells with where each company stands for each"},
+	{"read", "search companies and people, read what's due and the tasks people wrote, read deals, subscriptions, onboardings and enquiries with what was said in answering them, and read the organisation's settings, its never-contact list and agent guidance included"},
 	{"research:write", "add companies, facts and suggested contacts (they wait in Research), and leave notes on tasks"},
 	{"drafts:write", "write draft notes and emails, marked as written by the agent"},
 	{"outcomes:write", "record what happened (added, accepted, sent, called, replied, declined, hold), shown as the agent's"},
@@ -492,12 +492,16 @@ var Scopes = []struct{ Name, What string }{
 	{"agreements:write", "start agreements for companies, upload their documents, and set out who signs them and where; nothing is sent"},
 	{"customers:invite", "email a customer a link to their onboarding steps, through your mail server, and withdraw it"},
 	{"contacts:write", "add people straight to outreach and change their details and where their conversation stands"},
-	{"research:review", "qualify and reject companies, for the organisation or for one thing it sells, pick suggested people for outreach, and accept or dismiss details agents found: the review a person otherwise does"},
+	{"research:review", "qualify and reject companies, pick suggested people for outreach, and accept or dismiss details agents found: the review a person otherwise does"},
 	{"enrich:spend", "ask the organisation's enrichment vendors, at its cost and within each one's monthly limit, for an email, phone or profile someone lacks; what is found waits to be accepted"},
 	{"tasks:write", "start tasks, ask them for more, mark their requests done or not, and close and reopen them"},
 	{"agents:run", "start and stop Prospector's own agents on tasks"},
 	{"agents:configure", "add, change and delete Prospector's own agents, their endpoints, keys and tools"},
-	{"settings:write", "change the organisation's settings: its name and colour, waits and wording, the guidance sent to every agent, never-contact list, what it looks for, enquiry sites, onboarding steps, currency, postal address and whether to email only incorporated companies, and add, change and remove the things it sells"},
+	{"settings:write", "change the organisation's settings: its name and colour, waits and wording, the guidance sent to every agent, never-contact list, what it looks for, enquiry sites, onboarding steps, currency, postal address and whether to email only incorporated companies"},
+	{"team:write", "add people to the team, change their roles and areas, and take them out"},
+	{"mail:configure", "set the organisation's outgoing mail server, its username and password"},
+	{"sso:configure", "set up single sign-on: the provider, its client secret, the email domains it speaks for and whether it is required"},
+	{"org:export", "download everything the organisation holds in one file"},
 }
 
 func validScope(s string) bool {

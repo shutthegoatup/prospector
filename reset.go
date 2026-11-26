@@ -320,69 +320,81 @@ func (a *App) mailView(org int64) MailView {
 	return v
 }
 
+type mailIn struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Sender   string `json:"sender"`
+}
+
 func (a *App) uiMail(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Host     string `json:"host"`
-		Port     int    `json:"port"`
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Sender   string `json:"sender"`
-	}
+	var in mailIn
 	if !decode(w, r, &in) {
 		return
 	}
-	org := reqOf(r).Org.ID
+	cleared, err := a.saveMail(reqOf(r).Org.ID, in)
+	switch {
+	case err != nil:
+		fail(w, err, http.StatusBadRequest)
+	case cleared:
+		writeJSON(w, map[string]string{"message": "No mail server of this organisation's own."})
+	default:
+		done(w, nil)
+	}
+}
+
+// saveMail keeps an organisation's own mail server, or drops it for an empty host.
+func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 	in.Host = strings.TrimSpace(in.Host)
 	if in.Host == "" {
-		if err := a.s.DeleteOrgMail(org); err != nil {
-			fail(w, err, http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, map[string]string{"message": "No mail server of this organisation's own."})
-		return
+		return true, a.s.DeleteOrgMail(org)
 	}
 	m := &OrgMail{OrgID: org, Host: in.Host, Port: in.Port, Username: strings.TrimSpace(in.Username), Sender: strings.TrimSpace(in.Sender)}
-	err := (MailServer{Host: m.Host, Port: m.Port, From: m.Sender}).check()
+	err = (MailServer{Host: m.Host, Port: m.Port, From: m.Sender}).check()
 	// Only the operator may name this machine, where any port and no TLS are allowed.
 	if err == nil && loopback(m.Host) {
 		err = errors.New("an organisation's mail server can't be this machine")
 	}
 	if err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
+		return false, err
 	}
 	// An empty password field means the one already saved, which is never sent back.
 	if old, err := a.s.OrgMail(org); err == nil && in.Password == "" && old.Host == m.Host && old.Username == m.Username {
 		m.Password = old.Password
 	} else if in.Password != "" {
 		if a.s.keys == nil {
-			fail(w, errors.New("this server has no secret key, so it can't keep a mail password safely: ask whoever runs it"), http.StatusBadRequest)
-			return
+			return false, errors.New("this server has no secret key, so it can't keep a mail password safely: ask whoever runs it")
 		}
-		kept, err := a.s.keys.seal(in.Password)
-		if err != nil {
-			fail(w, err, http.StatusInternalServerError)
-			return
+		if m.Password, err = a.s.keys.seal(in.Password); err != nil {
+			return false, err
 		}
-		m.Password = kept
 	}
-	done(w, a.s.SaveOrgMail(m))
+	return false, a.s.SaveOrgMail(m)
 }
 
 // uiMailTest sends the owner a message through whichever server invitations would use.
 func (a *App) uiMailTest(w http.ResponseWriter, r *http.Request) {
-	q := reqOf(r)
-	via, err := a.mailFor(q.Org.ID)
-	if err == nil && via == nil {
-		err = errors.New("there is no mail server to test: save one first")
-	}
-	if err == nil {
-		err = a.deliver(r.Context(), *via, Message{To: q.User.Email, Subject: "Prospector can send mail for " + q.Org.Name,
-			Body: "This is the test " + q.Actor() + " asked for in Settings.\n\nIt was sent through " + via.Host + " as " + via.From + ".\n"})
-	}
+	msg, err := a.testMail(r.Context(), reqOf(r))
 	if err != nil {
 		fail(w, err, http.StatusBadGateway)
 		return
 	}
-	writeJSON(w, map[string]string{"message": fmt.Sprintf("Sent to %s through %s.", q.User.Email, via.Host)})
+	writeJSON(w, map[string]string{"message": msg})
+}
+
+func (a *App) testMail(ctx context.Context, q *Req) (string, error) {
+	via, err := a.mailFor(q.Org.ID)
+	if err == nil && via == nil {
+		err = errors.New("there is no mail server to test: save one first")
+	}
+	if err != nil {
+		return "", err
+	}
+	err = a.deliver(ctx, *via, Message{To: q.User.Email, Subject: "Prospector can send mail for " + q.Org.Name,
+		Body: "This is the test " + q.Actor() + " asked for in Settings.\n\nIt was sent through " + via.Host + " as " + via.From + ".\n"})
+	if err != nil {
+		return "", notSent{err}
+	}
+	return fmt.Sprintf("Sent to %s through %s.", q.User.Email, via.Host), nil
 }

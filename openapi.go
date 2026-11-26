@@ -44,7 +44,7 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 		w.Write(doc)
 	})
 
-	strict := api.NewStrictHandlerWithOptions(apiServer{a}, []api.StrictMiddlewareFunc{a.apiScope(scopes), func(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc { return listURL(f) }, uploads}, api.StrictHTTPServerOptions{
+	strict := api.NewStrictHandlerWithOptions(apiServer{a}, []api.StrictMiddlewareFunc{a.apiScope(scopes), func(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc { return listURL(f) }, uploads, withRequest}, api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeProblem(w, http.StatusBadRequest, err.Error())
 		},
@@ -110,7 +110,11 @@ func opScopes(op *openapi3.Operation) []string {
 }
 
 func ownersOnly(scope string) bool {
-	return scope == "agents:configure" || scope == "enquiries:delete" || scope == "settings:write"
+	switch scope {
+	case "agents:configure", "enquiries:delete", "settings:write", "team:write", "mail:configure", "sso:configure", "org:export":
+		return true
+	}
+	return false
 }
 
 func reqFrom(ctx context.Context) *Req { return ctx.Value(reqKey{}).(*Req) }
