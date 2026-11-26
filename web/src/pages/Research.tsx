@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
-import { ActionButton, Eyebrow, Failed, FilterChip, Meta, Pill, Section, type Tone, useRefresh, Whose } from "@/components/app";
+import { ActionButton, Eyebrow, Failed, FilterChip, Meta, Meter, Pill, Section, type Tone, useRefresh, Whose } from "@/components/app";
 import { actor, day, stamp } from "@/lib/format";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/session";
 import { month, vendorName } from "@/lib/vendors";
@@ -13,6 +14,7 @@ type Company = components["schemas"]["ResearchCompany"];
 type Criterion = components["schemas"]["Criterion"];
 type Run = components["schemas"]["Run"];
 type Agent = components["schemas"]["Agent"];
+type TaskBrief = components["schemas"]["TaskBrief"];
 type Person = Company["people"][number];
 type Enricher = components["schemas"]["Enricher"];
 
@@ -87,7 +89,7 @@ export function ResearchPage() {
           </Link>
         </div>
         {(tasks.data?.items ?? []).map((t) => (
-          <SearchStrip key={t.id} id={t.id} title={t.title} found={t.found.companies} agents={ready} chosen={t.id === task} />
+          <SearchStrip key={t.id} task={t} agents={ready} chosen={t.id === task} />
         ))}
         {tasks.data && tasks.data.items.length === 0 && <p className="text-sm text-muted-foreground">No search open.</p>}
       </div>
@@ -150,11 +152,18 @@ export function ResearchPage() {
 function FindBox({ agents, lookingFor }: { agents: Agent[]; lookingFor: components["schemas"]["LookFor"][] }) {
   const { org } = useSession();
   const navigate = useNavigate();
+  const refresh = useRefresh();
   const [brief, setBrief] = useState("");
   const [picked, setPicked] = useState<number[] | null>(null);
+  const [want, setWant] = useState("");
   const send = picked ?? agents.slice(0, 1).map((a) => a.id);
   const create = $api.useMutation("post", "/o/{org}/api/v1/tasks", {
-    onSuccess: (t) => navigate({ to: "/o/$org/research", params: { org }, search: { task: t.id } }),
+    onSuccess: (t) => {
+      setBrief("");
+      setWant("");
+      refresh();
+      navigate({ to: "/o/$org/research", params: { org }, search: { task: t.id } });
+    },
   });
 
   return (
@@ -162,7 +171,7 @@ function FindBox({ agents, lookingFor }: { agents: Agent[]; lookingFor: componen
       className="panel mb-5 overflow-hidden shadow-[4px_4px_0_var(--edge)]"
       onSubmit={(e) => {
         e.preventDefault();
-        create.mutate({ params: { path: { org } }, body: { title: "", brief, agents: send } });
+        create.mutate({ params: { path: { org } }, body: { title: "", brief, agents: send, want: want === "" ? undefined : Number(want) } });
       }}
     >
       <div className="flex flex-col gap-2.5 px-5 py-4">
@@ -181,6 +190,19 @@ function FindBox({ agents, lookingFor }: { agents: Agent[]; lookingFor: componen
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <label className="contents">
+              <span>Find about</span>
+              <Input
+                type="number"
+                min={1}
+                max={500}
+                value={want}
+                onChange={(e) => setWant(e.target.value)}
+                aria-label="About how many companies"
+                className="h-8 w-16 bg-muted px-2"
+              />
+              <span>companies</span>
+            </label>
             {agents.length === 0 ? (
               <span>
                 No agent of Prospector's own is ready, so this waits for one of yours.{" "}
@@ -190,7 +212,7 @@ function FindBox({ agents, lookingFor }: { agents: Agent[]; lookingFor: componen
               </span>
             ) : (
               <>
-                <span>Send</span>
+                <span>with</span>
                 {agents.map((a) => (
                   <label
                     key={a.id}
@@ -241,8 +263,10 @@ function runState(r: Run) {
   return r.status;
 }
 
-function SearchStrip({ id, title, found, agents, chosen }: { id: number; title: string; found: number; agents: Agent[]; chosen: boolean }) {
+function SearchStrip({ task, agents, chosen }: { task: TaskBrief; agents: Agent[]; chosen: boolean }) {
   const { org, sales } = useSession();
+  const { id, title, want } = task;
+  const found = task.found.companies;
   const refresh = useRefresh();
   const runs = $api.useQuery("get", "/o/{org}/api/v1/tasks/{task}/runs", { params: { path: { org, task: id }, query: { limit: 3 } } });
   const going = (runs.data?.items ?? []).filter((r) => r.status === "running" || r.status === "waiting");
@@ -259,8 +283,10 @@ function SearchStrip({ id, title, found, agents, chosen }: { id: number; title: 
           {r.agent_name} · {runState(r)}
         </Pill>
       ))}
+      {want ? <Meter value={found} of={want} /> : null}
       <span className="font-mono text-xs text-muted-foreground">
-        {found} {found === 1 ? "company" : "companies"} found
+        {want ? `${found} of about ${want} found` : `${found} ${found === 1 ? "company" : "companies"} found`}
+        {task.to_review > 0 && ` · ${task.to_review} to review`}
       </span>
       <span className="ml-auto flex flex-wrap gap-2">
         {!chosen && (

@@ -24,6 +24,8 @@ type Task struct {
 	ClosedAt  *time.Time `json:"closed_at,omitempty"`
 	// OfferingID is what the task is finding companies for; 0 is the organisation's own.
 	OfferingID int64 `gorm:"not null;default:0" json:"offering_id"`
+	// Want is about how many companies the person asked for; 0 is no number.
+	Want int `gorm:"not null;default:0" json:"want"`
 }
 
 // TaskRequest is something a person asked for on a task. The first is the brief.
@@ -56,6 +58,7 @@ const (
 	maxBrief   = 4000
 	maxRequest = 2000
 	maxNote    = 500
+	maxWant    = 500
 	// runGap is how long an agent can go quiet before its next change counts as a new
 	// run, and before a task it was on reads as waiting again.
 	runGap = 30 * time.Minute
@@ -91,6 +94,14 @@ func (s *Store) CreateTask(org int64, title, brief, by string) (*Task, error) {
 
 // CreateTaskFor starts a task finding companies for an offering; 0 is the organisation's own.
 func (s *Store) CreateTaskFor(org, offering int64, title, brief, by string) (*Task, error) {
+	return s.CreateTaskWanting(org, offering, 0, title, brief, by)
+}
+
+// CreateTaskWanting is CreateTaskFor asking for about want companies.
+func (s *Store) CreateTaskWanting(org, offering int64, want int, title, brief, by string) (*Task, error) {
+	if want < 0 || want > maxWant {
+		return nil, fmt.Errorf("ask for between 1 and %d companies, or leave the number out", maxWant)
+	}
 	brief, err := words(brief, maxBrief, "the brief")
 	if err != nil {
 		return nil, err
@@ -102,7 +113,7 @@ func (s *Store) CreateTaskFor(org, offering int64, title, brief, by string) (*Ta
 	if r := []rune(title); len(r) > 60 {
 		title = strings.TrimSpace(string(r[:59])) + "…"
 	}
-	t := Task{OrgID: org, Title: title, CreatedBy: by, OfferingID: offering}
+	t := Task{OrgID: org, Title: title, CreatedBy: by, OfferingID: offering, Want: want}
 	return &t, s.db.Transaction(func(tx *gorm.DB) error {
 		if offering != 0 {
 			if _, err := heldOffering(tx, org, offering); err != nil {
@@ -805,6 +816,8 @@ type TaskBrief struct {
 	Status  string     `json:"status" jsonschema:"waiting (nobody is on it), working (an agent changed something in the last half hour, or holds an open request) or done"`
 	Open    []AskedOut `json:"open_requests" jsonschema:"what people have asked for that nobody has finished"`
 	Found   TaskCounts `json:"found"`
+	Want    int        `json:"want,omitempty" jsonschema:"about how many companies the person wants found; absent when they gave no number. Once found.companies reaches it, finish the request unless it asks for more"`
+	Review  int        `json:"to_review" jsonschema:"of the companies found, how many wait for a person to qualify or reject them"`
 	LastBy  string     `json:"last_agent,omitempty"`
 	LastAt  *time.Time `json:"last_agent_at,omitempty"`
 	LastDid string     `json:"last_agent_action,omitempty" jsonschema:"what that agent last did: task:pickup when it only picked the task up"`
@@ -871,7 +884,12 @@ func asked(r RequestView, who Actor) AskedOut {
 }
 
 func brief(v TaskView, who Actor) TaskBrief {
-	b := TaskBrief{ID: v.ID, Title: v.Title, Status: v.Status, Open: []AskedOut{}, Found: TaskCounts{len(v.Companies), len(v.People)}}
+	b := TaskBrief{ID: v.ID, Title: v.Title, Status: v.Status, Open: []AskedOut{}, Found: TaskCounts{len(v.Companies), len(v.People)}, Want: v.Want}
+	for _, c := range v.Companies {
+		if c.Stage == CompanyReview {
+			b.Review++
+		}
+	}
 	for _, r := range v.Open() {
 		b.Open = append(b.Open, asked(r, who))
 	}

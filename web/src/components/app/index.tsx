@@ -6,6 +6,7 @@ import { createLink } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
 export type Tone = "ok" | "warn" | "stop" | "agent" | "";
@@ -19,6 +20,17 @@ const tones: Record<Tone, string> = {
 };
 
 // Pill is a status: a dot and a few words, coloured by what it says.
+// Meter is how far something has got towards a number: an agent's search towards what was asked.
+export function Meter({ value, of }: { value: number; of: number }) {
+  return (
+    <Progress
+      value={Math.min(100, (100 * value) / Math.max(of, 1))}
+      aria-hidden
+      className="h-2 min-w-[120px] flex-[1_1_160px] rounded bg-[#ece2cd] [&>[data-slot=progress-indicator]]:bg-[#5b45d6]"
+    />
+  );
+}
+
 export function Pill({ tone = "", children }: { tone?: Tone; children: ReactNode }) {
   return (
     <Badge variant="secondary" className={cn("gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium", tones[tone])}>

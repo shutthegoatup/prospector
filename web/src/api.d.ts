@@ -2712,6 +2712,10 @@ export interface components {
             status: string;
             open_requests: components["schemas"]["Asked"][];
             found: components["schemas"]["TaskCounts"];
+            /** @description About how many companies the person wants found; absent when they gave no number. */
+            want?: number;
+            /** @description Of the companies found, how many wait for a person to qualify or reject them. */
+            to_review: number;
             last_agent?: string;
             /** Format: date-time */
             last_agent_at?: string;
@@ -2824,6 +2828,8 @@ export interface components {
              * @description What the task finds companies for: agents are given its look-for fields, and what they find waits in its review. 0 or left out is the organisation's own.
              */
             offering?: number;
+            /** @description About how many companies to find. 0 or left out gives agents no number. */
+            want?: number;
             /** @description Prospector's own agents to start on the task, each on its own request. */
             agents?: number[];
         };
@@ -3036,6 +3042,8 @@ export interface components {
              * @description What the task finds companies for; 0 is the organisation's own.
              */
             offering_id: number;
+            /** @description About how many companies the person asked for; 0 is no number. */
+            want: number;
             created_by: string;
             /** Format: date-time */
             created_at: string;
