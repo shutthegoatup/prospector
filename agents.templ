@@ -42,7 +42,7 @@ templ AgentsView(q *Req, d AgentsData) {
 					@Code("GET  " + d.Base + "api/v1/search?q=…\nGET  " + d.Base + "api/v1/companies/{id or name}\nGET  " + d.Base + "api/v1/due\nGET  " + d.Base + "api/v1/tasks\nGET  " + d.Base + "api/v1/tasks/{id}\nPOST " + d.Base + "api/v1/companies   {name, domain, facts: [{field, value, source_url}], task}\nPOST " + d.Base + "api/v1/facts       {company, field, value, source_url}\nPOST " + d.Base + "api/v1/contacts    {company, name, title, email, source_url}\nPOST " + d.Base + "api/v1/drafts      {contact_id, kind, text}\nPOST " + d.Base + "api/v1/notes       {task, company, kind, text}\nPOST " + d.Base + "api/v1/requests/finish {request}")
 				</div>
 			}
-			@Section("Keys", "No key can mark anything sent, change settings or reach another organisation.") {
+			@Section("Keys", "No key can mark anything sent or reach another organisation, and only one with settings:write can change settings.") {
 				if len(d.Keys) == 0 {
 					<p class="text-sm text-muted-foreground">No keys yet.</p>
 				}

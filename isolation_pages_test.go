@@ -160,7 +160,7 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 	theirOwner := signInAs(t, srv, "owner@alpha.example", "a long enough password")
 
 	gets, posts := orgRoutes(t)
-	if len(gets) < 10 || len(posts) < 15 {
+	if len(gets) < 10 || len(posts) < 19 {
 		t.Fatalf("found only %d pages and %d forms in the source: has the way routes are written changed?", len(gets), len(posts))
 	}
 	unchanged := func(after string) {

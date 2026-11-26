@@ -224,7 +224,7 @@ The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml),
 | Scope | Allows |
 |---|---|
 | `read` | `search`, `get_company`, `list_due`, `list_tasks`, `get_task` |
-| `read` (API) | also `GET /api/v1/deals`, `/subscriptions`, `/onboardings`, `/enquiries` and `/enquiries/{id}/messages`: deal values, terms, invited contacts, and what people sent in with our notes on it |
+| `read` (API) | also `GET /api/v1/deals`, `/subscriptions`, `/onboardings`, `/enquiries` and `/enquiries/{id}/messages`: deal values, terms, invited contacts, and what people sent in with our notes on it; and `GET /api/v1/settings`, the never-contact list and agent guidance included |
 | `research:write` | `add_company`, `add_fact`, `add_contact`; these wait in Research for a person. `task_note` and `finish_request` on tasks |
 | `drafts:write` | `draft_message`, shown as written by the agent |
 | `import` | `push` and `pull`: a full sync, for a person's own files rather than an agent |

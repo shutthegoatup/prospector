@@ -37,6 +37,23 @@ func TestSettingsChangeThroughTheAPIOnlyWhatIsSent(t *testing.T) {
 	if !saved.Settings.takesEnquiriesFrom("https://www.alpha.example") || saved.Settings.NeverContact != "rival.example" {
 		t.Fatalf("what was left out should stay as it was: %+v", saved.Settings)
 	}
+	if activity, _ := s.AgentActivity(o.ID, 1); len(activity) != 1 || activity[0].Actor != "robot" || activity[0].Action != "settings:change" || activity[0].Value != "enquiry_sites" {
+		t.Fatalf("the key's change should be in the history, naming what it changed: %+v", activity)
+	}
+
+	beta := mustOrg(t, s, "beta")
+	theirs, _, _ := s.CreateKey(beta.ID, "theirs", []string{"settings:write"}, "Grace Hopper")
+	mustUser(t, s, beta, "owner@beta.example", "Barbara Liskov", "owner")
+	betaOwner := signInAs(t, srv, "owner@beta.example", "correct horse battery")
+	if code, _ := asKey(t, "PATCH", url, theirs, map[string]any{"pitch": "theirs"}); code == http.StatusOK {
+		t.Fatal("another organisation's key changed alpha's settings")
+	}
+	if code, _ := call(t, betaOwner, "PATCH", url, "application/json", map[string]any{"pitch": "theirs"}); code == http.StatusOK {
+		t.Fatal("another organisation's owner changed alpha's settings")
+	}
+	if must(s.OrgBySlug("alpha")).Settings.Pitch != "We help {company}." {
+		t.Fatal("alpha's pitch was changed from another organisation")
+	}
 
 	if code, body := asKey(t, "PATCH", url, writer, map[string]any{"enquiry_sites": "alpha.example", "pitch": "changed"}); code != http.StatusBadRequest || !strings.Contains(body, "isn't a site address") {
 		t.Fatalf("a site without a scheme was saved: %d %s", code, body)

@@ -29,49 +29,55 @@ func (s apiServer) ChangeSettings(ctx context.Context, in api.ChangeSettingsRequ
 	if in.Body == nil {
 		return nil, errors.New("send what changes, such as {\"enquiry_sites\": \"https://www.example.com\"}")
 	}
+	q := reqFrom(ctx)
 	// Read afresh, so what this leaves out is what is saved now rather than what the
 	// request's copy held when it arrived.
-	o, err := s.a.s.OrgBySlug(reqFrom(ctx).Org.Slug)
+	o, err := s.a.s.OrgBySlug(q.Org.Slug)
 	if err != nil {
 		return nil, err
 	}
 	c, set := in.Body, &o.Settings
-	put(&o.Name, c.Name)
-	put(&o.Color, c.Color)
-	putInt(&set.EmailAfterDays, c.EmailAfterDays)
-	putInt(&set.FollowupAfterDays, c.FollowupAfterDays)
-	put(&set.NoteTemplate, c.NoteTemplate)
-	put(&set.Pitch, c.Pitch)
-	put(&set.NeverContact, c.NeverContact)
-	put(&set.LookFor, c.LookFor)
-	put(&set.AgentGuidance, c.AgentGuidance)
-	put(&set.EnquirySites, c.EnquirySites)
-	put(&set.OnboardingSteps, c.OnboardingSteps)
-	put(&set.Currency, c.Currency)
-	put(&set.PostalAddress, c.PostalAddress)
-	if c.IncorporatedOnly != nil {
-		set.IncorporatedOnly = *c.IncorporatedOnly
+	var changed []string
+	put := func(name string, to *string, v *string) {
+		if v != nil && *v != *to {
+			*to, changed = *v, append(changed, name)
+		}
+	}
+	putInt := func(name string, to *int, v *int32) {
+		if v != nil && int(*v) != *to {
+			*to, changed = int(*v), append(changed, name)
+		}
+	}
+	put("name", &o.Name, c.Name)
+	put("color", &o.Color, c.Color)
+	putInt("email_after_days", &set.EmailAfterDays, c.EmailAfterDays)
+	putInt("followup_after_days", &set.FollowupAfterDays, c.FollowupAfterDays)
+	put("note_template", &set.NoteTemplate, c.NoteTemplate)
+	put("pitch", &set.Pitch, c.Pitch)
+	put("never_contact", &set.NeverContact, c.NeverContact)
+	put("look_for", &set.LookFor, c.LookFor)
+	put("agent_guidance", &set.AgentGuidance, c.AgentGuidance)
+	put("enquiry_sites", &set.EnquirySites, c.EnquirySites)
+	put("onboarding_steps", &set.OnboardingSteps, c.OnboardingSteps)
+	put("currency", &set.Currency, c.Currency)
+	put("postal_address", &set.PostalAddress, c.PostalAddress)
+	if c.IncorporatedOnly != nil && *c.IncorporatedOnly != set.IncorporatedOnly {
+		set.IncorporatedOnly, changed = *c.IncorporatedOnly, append(changed, "incorporated_only")
 	}
 	if err := checkOrg(o); err != nil {
 		return nil, err
 	}
-	if err := s.a.s.SaveOrg(o); err != nil {
+	who := Actor{Name: q.Actor()}
+	if q.Key != nil {
+		who.KeyID = q.Key.ID
+	}
+	if err := s.a.s.ChangeSettings(o, who, changed); err != nil {
 		return nil, err
 	}
-	s.a.dropMCPServers()
+	if len(changed) > 0 {
+		s.a.dropMCPServers()
+	}
 	return api.ChangeSettings200JSONResponse(settingsOut(o)), nil
-}
-
-func put(to *string, v *string) {
-	if v != nil {
-		*to = *v
-	}
-}
-
-func putInt(to *int, v *int32) {
-	if v != nil {
-		*to = int(*v)
-	}
 }
 
 // checkOrg refuses settings that can't be worked with, and tidies the name and currency.
