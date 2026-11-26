@@ -175,7 +175,7 @@ func TestFrontOrgIsMadeOnce(t *testing.T) {
 	}
 	srv := httptest.NewServer((&App{s: s, frontOrg: frontOrgSlug, base: address}).Routes())
 	t.Cleanup(srv.Close)
-	if _, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil); !strings.Contains(body, `data-intake="/o/prospector/intake" data-origin="`+address+`"`) {
+	if _, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil); !strings.Contains(body, `&quot;intake&quot;:&quot;/o/prospector/intake&quot;,&quot;origin&quot;:&quot;`+address+`&quot;`) {
 		t.Error("a server told its address starts without the front page's form")
 	}
 
