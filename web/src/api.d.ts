@@ -3206,6 +3206,7 @@ export interface components {
             /** @description `suggested` until someone picks them. */
             status: string;
             has_email: boolean;
+            has_phone: boolean;
             /** @description `verified`, `guess`, or empty. */
             email_status: string;
             linkedin: string;
@@ -3613,10 +3614,10 @@ export interface components {
             description: string;
         };
         /**
-         * @description The vendors Prospector can ask. `hunter` is Hunter.io, which finds work emails.
+         * @description The vendors Prospector can ask. `hunter` is Hunter.io, which finds work emails; `prospeo` is Prospeo, which finds work emails, mobiles and LinkedIn profiles.
          * @enum {string}
          */
-        EnricherKind: "hunter";
+        EnricherKind: "hunter" | "prospeo";
         EnricherSettings: {
             kind: components["schemas"]["EnricherKind"];
             /** @description The vendor's key for your account; empty keeps the saved one. */
