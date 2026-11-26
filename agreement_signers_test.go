@@ -6,12 +6,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"html"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -226,7 +225,7 @@ func TestAKeyPreparesAnAgreementWithTheWriteScope(t *testing.T) {
 }
 
 // The Prepare page lists who signs and lets sales change it; someone in support only
-// reads it. Its editor is a script of its own, with pdf.js's worker served as script.
+// reads it. It is the app's shell, and pdf.js's worker is served as script.
 func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
 	s, o, base, member, a, hannah, theo := preparing(t)
 	must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
@@ -236,22 +235,35 @@ func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
 	srv := strings.TrimSuffix(base, "/o/alpha/api/v1/agreements/"+itoa(a.ID))
 	page := srv + "/o/alpha/agreements/" + itoa(a.ID) + "/prepare"
 
-	code, body := call(t, member, "GET", page, "", nil)
-	if code != http.StatusOK {
+	if code, body := call(t, member, "GET", page, "", nil); code != http.StatusOK || !strings.Contains(body, `id="app"`) {
 		t.Fatalf("the page: %d", code)
 	}
-	for _, want := range []string{"Prepare for signing", "1 · Hannah Pryce", "theo@larkmoor.example", `data-editor="` + itoa(a.ID) + `"`, `name="placing"`, `data-kind="signature"`, "/assets/js/prepare.js", "Place a signature for Hannah Pryce", "nothing here leaves Prospector"} {
-		if !strings.Contains(body, want) {
-			t.Errorf("the Prepare page lacks %q", want)
+	order := func(c *http.Client) string {
+		t.Helper()
+		code, body := call(t, c, "GET", base+"/recipients", "", nil)
+		if code != http.StatusOK {
+			t.Fatalf("who signs: %d %s", code, body)
 		}
+		var names []string
+		for _, r := range items[struct {
+			Position int
+			Name     string
+			Role     string
+		}](t, body) {
+			names = append(names, itoa(int64(r.Position))+" "+r.Name+" "+r.Role)
+		}
+		slices.Sort(names)
+		return strings.Join(names, ", ")
 	}
-	if strings.Contains(body, ">Hannah Pryce · hannah@larkmoor.example</option>") {
-		t.Error("Hannah is offered again though she is on it")
+	if got := order(member); got != "1 Hannah Pryce signer, 2 Theo Marsh copy, 3 Ada Lovelace signer" {
+		t.Errorf("who signs, in order: %s", got)
 	}
-	// Moving Ada up takes Hannah's place, not the copy's between them.
-	up := regexp.MustCompile(`data-body="([^"]*)" data-method="PATCH" data-post="api/v1/agreements/` + itoa(a.ID) + `/recipients/` + itoa(ada.ID) + `"`).FindStringSubmatch(body)
-	if len(up) < 2 || html.UnescapeString(up[1]) != `{"position":1}` {
-		t.Errorf("Ada's move up: %q", up)
+	// Ada moves to first, ahead of Hannah.
+	if code, body := call(t, member, "PATCH", base+"/recipients/"+itoa(ada.ID), "application/json", map[string]any{"position": 1}); code != http.StatusOK {
+		t.Fatalf("moving Ada up: %d %s", code, body)
+	}
+	if got := order(member); got != "1 Ada Lovelace signer, 2 Hannah Pryce signer, 3 Theo Marsh copy" {
+		t.Errorf("after moving Ada up: %s", got)
 	}
 	// The company's page leads to Prepare for signing for an agreement with its document.
 	if shown := companyPageOverview(t, member, srv, *hannah.CompanyID).Agreements; len(shown) != 1 || shown[0].Id != a.ID || shown[0].FileHash == "" {
@@ -269,9 +281,14 @@ func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
 	if !signIn(t, support, &httptest.Server{URL: srv}, "grace@example.com", "correct horse battery") {
 		t.Fatal("Grace cannot sign in")
 	}
-	_, body = call(t, support, "GET", page, "", nil)
-	if !strings.Contains(body, "Hannah Pryce") || strings.Contains(body, `name="placing"`) || strings.Contains(body, "data-post=") || strings.Contains(body, "data-kind=") {
-		t.Error("someone in support is offered the controls, or doesn't see who signs")
+	if got := order(support); !strings.Contains(got, "Hannah Pryce") {
+		t.Errorf("someone in support doesn't see who signs: %s", got)
+	}
+	if code, _ := call(t, support, "PATCH", base+"/recipients/"+itoa(ada.ID), "application/json", map[string]any{"position": 3}); code != http.StatusForbidden {
+		t.Errorf("someone in support changing who signs: %d", code)
+	}
+	if code, _ := call(t, support, "POST", base+"/recipients", "application/json", map[string]any{"role": "copy", "contact_id": theo.ID}); code != http.StatusForbidden {
+		t.Errorf("someone in support adding a signer: %d", code)
 	}
 
 	// pdf.js compiles WebAssembly to draw JPEG 2000 images, so the page and its worker
@@ -371,6 +388,70 @@ func TestAnAgreementTakesAPDFThatBendsItsVersionsRules(t *testing.T) {
 	}
 	if got := must(s.Agreement(o.ID, a.ID)); got.PageCount != 3 {
 		t.Errorf("its pages: %d", got.PageCount)
+	}
+}
+
+// The React Prepare page reads one agreement with what preparing it needs: its company,
+// any problem with its document, and who could still be added. It is served with the
+// policy pdf.js needs; other React pages keep the strict one.
+func TestTheReactPreparePageReadsItsAgreementThroughTheAPI(t *testing.T) {
+	s, o, base, member, a, hannah, theo := preparing(t)
+	must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	srv := strings.TrimSuffix(base, "/o/alpha/api/v1/agreements/"+itoa(a.ID))
+
+	code, body := call(t, member, "GET", base, "", nil)
+	if code != http.StatusOK {
+		t.Fatalf("reading the agreement: %d %s", code, body)
+	}
+	var got struct {
+		Company, Problem string
+		PageCount        int `json:"page_count"`
+		People, Members  []struct {
+			ID    int64
+			Name  string
+			Email string
+		}
+	}
+	if err := json.Unmarshal([]byte(body), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Company != "Larkmoor Yachts" || got.Problem != "" || got.PageCount != 2 {
+		t.Errorf("the agreement: %+v", got)
+	}
+	if len(got.People) != 1 || got.People[0].ID != theo.ID || got.People[0].Email != "theo@larkmoor.example" {
+		t.Errorf("people who could still be added, Hannah being on it: %+v", got.People)
+	}
+	if len(got.Members) != 1 || got.Members[0].Email != "ada@example.com" {
+		t.Errorf("members who could be added: %+v", got.Members)
+	}
+	reader, _, err := s.CreateKey(o.ID, "reader", []string{"read"}, "Ada Lovelace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, _ := asKey(t, "GET", base, reader, nil); code != http.StatusOK {
+		t.Errorf("a read key reading the agreement: %d", code)
+	}
+	if code, _ := asKey(t, "GET", srv+"/o/alpha/api/v1/agreements/99999", reader, nil); code != http.StatusNotFound {
+		t.Errorf("an agreement that isn't there: %d", code)
+	}
+
+	policy := func(u string) string {
+		t.Helper()
+		res, err := member.Get(u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("GET %s: %d", u, res.StatusCode)
+		}
+		return res.Header.Get("Content-Security-Policy")
+	}
+	if got := policy(srv + "/o/alpha/app/agreements/" + itoa(a.ID) + "/prepare"); got != pdfPolicy {
+		t.Errorf("the React Prepare page has the policy %q", got)
+	}
+	if got := policy(srv + "/o/alpha/app/companies"); got != contentPolicy {
+		t.Errorf("another React page has the policy %q", got)
 	}
 }
 

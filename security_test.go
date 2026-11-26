@@ -838,6 +838,9 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 	if code, _ := call(t, bob, "POST", srv.URL+"/api/v1/orgs", "application/json", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
 		t.Fatalf("a new organisation before the first password is changed: %d", code)
 	}
+	if code, _ := call(t, bob, "POST", srv.URL+"/api/v1/orgs", "application/json", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
+		t.Fatalf("a new organisation through the API before the first password is changed: %d", code)
+	}
 	fragment, _ := http.NewRequest("GET", srv.URL+"/o/alpha/today", nil)
 	fragment.Header.Set("X-Fragment", "1")
 	refreshed, err := bob.Do(fragment)

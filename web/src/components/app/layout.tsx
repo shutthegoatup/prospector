@@ -57,7 +57,9 @@ export function AppLayout() {
   }, [n, popup]);
   useEffect(() => {
     // A session that ended while the page was open: sign in again and come back here.
-    if (nav.error && "status" in nav.error && nav.error.status === 401) {
+    // A body that isn't JSON reaches here as a string.
+    const failed: unknown = nav.error;
+    if (typeof failed === "object" && failed !== null && "status" in failed && failed.status === 401) {
       window.location.assign("/login?next=" + encodeURIComponent(window.location.pathname + window.location.search));
     }
   }, [nav.error]);
