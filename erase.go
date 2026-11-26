@@ -102,6 +102,9 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if err := dropCustomerGrants(tx, org, tx.Where("org_id = ? and contact_id = ?", org, id), false); err != nil {
 			return err
 		}
+		if err := dropRecipients(tx, tx.Where("org_id = ? and contact_id = ?", org, id)); err != nil {
+			return err
+		}
 		// An address or profile suggested for them identifies them too, unless someone
 		// dismissed it as not theirs.
 		var suggested []Suggestion

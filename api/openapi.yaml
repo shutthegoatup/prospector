@@ -16,7 +16,8 @@ info:
     enquiry stands and put its sender on the board, without deals; `enquiries:delete` to delete an enquiry;
     `campaigns:write` to write campaigns and keep the list of addresses marketing mail
     never goes to; `campaigns:send` to send, cancel and resume a campaign;
-    `agreements:write` to start agreements and upload their documents; `settings:write` to
+    `agreements:write` to start agreements, upload their documents and set out who signs
+    them and where; `settings:write` to
     change the organisation's settings. A signed-in member may do all of these except
     configuring agents, deleting enquiries and changing settings, which need an owner.
 
@@ -1389,9 +1390,9 @@ paths:
       - $ref: "#/components/parameters/org"
       - $ref: "#/components/parameters/id"
     patch:
-      operationId: renameAgreement
+      operationId: changeAgreement
       tags: [agreements]
-      summary: Rename a draft agreement
+      summary: Rename a draft agreement, or say whether its signers sign in order
       security:
         - session: []
         - bearer: ["agreements:write"]
@@ -1401,9 +1402,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name]
               properties:
-                name: { type: string, maxLength: 120 }
+                name: { type: string, maxLength: 120, x-go-type-skip-optional-pointer: false }
+                in_order: { type: boolean, x-go-type-skip-optional-pointer: false, description: "Signers sign one after another, in their order; false lets them all sign at once." }
       responses:
         "200":
           description: The draft as it now is.
@@ -1433,7 +1434,9 @@ paths:
       description: |
         The agreement as a PDF, 10 MB at most, replacing any uploaded before. Its SHA-256 is
         kept with it, and checked whenever it is read back. Prospector doesn't read what it
-        says, and it is not for deeds or anything that must be witnessed or notarised.
+        says, and it is not for deeds or anything that must be witnessed or notarised. A PDF
+        that is password-protected, encrypted or already signed is refused, as Prospector
+        couldn't fill it in and seal it. Fields on pages a replacement doesn't have go.
       parameters:
         - name: name
           in: query
@@ -1470,6 +1473,177 @@ paths:
           content:
             application/pdf:
               schema: { type: string, format: binary }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agreements/{id}/recipients:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listAgreementRecipients
+      tags: [agreements]
+      summary: Who an agreement goes to
+      description: Its signers in their order, then those who get a copy once it is signed.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: Signers first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AgreementRecipient" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: addAgreementRecipient
+      tags: [agreements]
+      summary: Add a signer, or someone who gets a copy, to a draft
+      description: |
+        One contact or one member. A contact must be a person at the agreement's company,
+        picked, with a single email address, and not on the never-contact list. They go last
+        in the order. Nothing is sent: that comes in a later release.
+      security:
+        - session: []
+        - bearer: ["agreements:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [signer, copy] }
+                contact: { type: integer, format: int64, x-go-type-skip-optional-pointer: false }
+                member: { type: integer, format: int64, x-go-type-skip-optional-pointer: false, description: "The member's user id." }
+      responses:
+        "201":
+          description: Added.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgreementRecipient" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agreements/{id}/recipients/{recipient}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+      - name: recipient
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    patch:
+      operationId: changeAgreementRecipient
+      tags: [agreements]
+      summary: Move a recipient in the order, or change what they get
+      description: Making a signer someone who gets a copy removes the fields placed for them.
+      security:
+        - session: []
+        - bearer: ["agreements:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role: { type: string, enum: [signer, copy], x-go-type-skip-optional-pointer: false }
+                position: { type: integer, minimum: 1, x-go-type-skip-optional-pointer: false, description: "Where in the order, from 1." }
+      responses:
+        "200":
+          description: The recipient as they now are.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgreementRecipient" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: removeAgreementRecipient
+      tags: [agreements]
+      summary: Take a recipient off a draft, with their fields
+      security:
+        - session: []
+        - bearer: ["agreements:write"]
+      responses:
+        "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agreements/{id}/fields:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listAgreementFields
+      tags: [agreements]
+      summary: Where each signer fills in a draft
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: By page, then from the top.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AgreementField" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+    put:
+      operationId: putAgreementFields
+      tags: [agreements]
+      summary: Set every field on a draft at once
+      description: |
+        Replaces all of them. Each belongs to one of the agreement's signers and lies wholly
+        on one of its pages, given as fractions of the page as shown, from its top left.
+        200 at most.
+      security:
+        - session: []
+        - bearer: ["agreements:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  maxItems: 200
+                  items: { $ref: "#/components/schemas/AgreementFieldIn" }
+      responses:
+        "200":
+          description: The fields as kept.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AgreementField" }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/people:
@@ -2306,16 +2480,52 @@ components:
         or erased. Anything promotional in it makes it marketing, whatever it is called.
     Agreement:
       type: object
-      required: [id, company_id, name, status, file_name, file_size, file_hash, created_by, updated_by, created_at, updated_at]
+      required: [id, company_id, name, status, file_name, file_size, file_hash, page_count, round, in_order, created_by, updated_by, created_at, updated_at]
       properties:
         id: { type: integer, format: int64 }
         company_id: { type: integer, format: int64 }
         name: { type: string }
-        status: { type: string, enum: [draft], description: "Every agreement is a draft until signing arrives." }
+        status: { type: string, enum: [draft], description: "Every agreement is a draft until sending arrives." }
         file_name: { type: string, description: "Empty until a document is uploaded." }
         file_size: { type: integer, format: int64, description: In bytes. }
         file_hash: { type: string, description: "The document's SHA-256, in hex; empty until one is uploaded." }
+        page_count: { type: integer, description: "The document's pages; 0 until one is uploaded, or for one uploaded before pages were counted." }
+        round: { type: integer, description: "Which version this is, from 1; asking for changes starts the next." }
+        in_order: { type: boolean, description: "Whether signers sign one after another, in their order." }
         created_by: { type: string }
         updated_by: { type: string }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+    AgreementRecipient:
+      type: object
+      required: [id, agreement_id, position, role, name, email, created_by, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        agreement_id: { type: integer, format: int64 }
+        position: { type: integer, description: "Their place in the order, from 1." }
+        role: { type: string, enum: [signer, copy] }
+        contact_id: { type: integer, format: int64, nullable: true, x-go-type-skip-optional-pointer: false }
+        member_id: { type: integer, format: int64, nullable: true, x-go-type-skip-optional-pointer: false, description: "A member's user id." }
+        name: { type: string, description: "As they are named now; sending will freeze it." }
+        email: { type: string, description: "Where it will go; sending will freeze it." }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+    AgreementFieldIn:
+      type: object
+      required: [recipient_id, page, kind, x, y, w, h]
+      properties:
+        recipient_id: { type: integer, format: int64, description: "One of the agreement's signers." }
+        page: { type: integer, minimum: 1 }
+        kind: { type: string, enum: [signature, initials, name, date, text, tick] }
+        x: { type: number, minimum: 0, maximum: 1, description: "From the page's left edge, as a fraction of its width." }
+        y: { type: number, minimum: 0, maximum: 1, description: "From the page's top edge, as a fraction of its height." }
+        w: { type: number, minimum: 0.01, maximum: 1 }
+        h: { type: number, minimum: 0.01, maximum: 1 }
+    AgreementField:
+      allOf:
+        - $ref: "#/components/schemas/AgreementFieldIn"
+        - type: object
+          required: [id, round]
+          properties:
+            id: { type: integer, format: int64 }
+            round: { type: integer }

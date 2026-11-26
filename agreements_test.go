@@ -4,13 +4,44 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 )
 
-var samplePDF = []byte("%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n")
+var samplePDF = testPDF(2, "")
+
+// testPDF is a well-formed PDF of blank A4 pages, with a comment line carrying note.
+func testPDF(pages int, note string) []byte {
+	var b bytes.Buffer
+	b.WriteString("%PDF-1.7\n")
+	if note != "" {
+		b.WriteString("% " + note + "\n")
+	}
+	var offsets []int
+	obj := func(body string) {
+		offsets = append(offsets, b.Len())
+		fmt.Fprintf(&b, "%d 0 obj\n%s\nendobj\n", len(offsets), body)
+	}
+	obj("<< /Type /Catalog /Pages 2 0 R >>")
+	kids := ""
+	for i := range pages {
+		kids += fmt.Sprintf("%d 0 R ", 3+i)
+	}
+	obj(fmt.Sprintf("<< /Type /Pages /Kids [%s] /Count %d >>", kids, pages))
+	for range pages {
+		obj("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] >>")
+	}
+	xref := b.Len()
+	fmt.Fprintf(&b, "xref\n0 %d\n0000000000 65535 f \n", len(offsets)+1)
+	for _, o := range offsets {
+		fmt.Fprintf(&b, "%010d 00000 n \n", o)
+	}
+	fmt.Fprintf(&b, "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", len(offsets)+1, xref)
+	return b.Bytes()
+}
 
 // upload sends raw bytes as the agreement's document, as a key or a member's browser does.
 func upload(t *testing.T, c *http.Client, url, key, contentType string, body []byte) (int, string, http.Header) {
@@ -101,7 +132,7 @@ func TestAnAgreementKeepsItsDocumentAsUploaded(t *testing.T) {
 	}
 
 	// A document changed behind Prospector's back is not handed out.
-	if err := s.db.Model(&AgreementFile{}).Where("agreement_id = ?", a.ID).Update("data", []byte("%PDF-1.7 tampered")).Error; err != nil {
+	if err := s.db.Model(&AgreementFile{}).Where("agreement_id = ?", a.ID).Update("data", testPDF(2, "tampered")).Error; err != nil {
 		t.Fatal(err)
 	}
 	if code, body := asKey(t, "GET", doc, reader, nil); code != http.StatusInternalServerError || strings.Contains(body, "tampered") {
@@ -170,7 +201,7 @@ func TestADocumentIsKeptByteForByte(t *testing.T) {
 	company := *must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace")).CompanyID
 	a := must(s.AddAgreement(o.ID, company, "API agreement", "Ada Lovelace"))
 	doc := srv.URL + "/o/alpha/api/v1/agreements/" + itoa(a.ID) + "/document"
-	quoting := []byte("%PDF-1.7\n(the API sends \\u0000 for a NUL) Tj\n%%EOF\n")
+	quoting := testPDF(1, "(the API sends \\u0000 for a NUL) Tj")
 	if code, body, _ := upload(t, member, doc, "", "application/pdf", quoting); code != http.StatusOK {
 		t.Fatalf("uploading: %d %s", code, body)
 	}

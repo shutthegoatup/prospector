@@ -272,7 +272,16 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			if err != nil {
 				return err
 			}
-			_, err = s.PutAgreementFile(first.ID, a.ID, theirs+".pdf", []byte("%PDF-1.7 "+theirs), "Owner One")
+			if _, err = s.PutAgreementFile(first.ID, a.ID, theirs+".pdf", testPDF(1, theirs), "Owner One"); err != nil {
+				return err
+			}
+			// The picked contact, so who signs carries the mark.
+			contact := int64(1)
+			r, err := s.AddRecipient(first, a.ID, RecipientSigner, &contact, nil, "Owner One")
+			if err != nil {
+				return err
+			}
+			_, err = s.PutAgreementFields(first.ID, a.ID, []AgreementField{{RecipientID: r.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.1, W: 0.3, H: 0.05}})
 			return err
 		},
 		func() error {
@@ -341,6 +350,8 @@ var saysNothingBack = map[string]bool{
 	"StartDeal": true, "ChangeDeal": true, "RemoveDeal": true,
 	"AddSubscription": true, "ChangeSubscription": true, "ChangeSubscriptionFields": true, "RemoveSubscription": true, "StartRenewal": true, "SetEnquiry": true, "ConverseEnquiry": true, "SetEnquiryFields": true, "ChangeDealFields": true, "SetDealFields": true, "HearEnquiry": true,
 	"StartOnboarding": true, "SetOnboardingStep": true, "RemoveOnboarding": true, "InviteCustomer": true, "RevokeCustomer": true, "Suppress": true, "Unsuppress": true, "AddCampaign": true, "Audience": true, "RemoveCampaign": true, "ResumeCampaign": true, "AddAgreement": true, "PutAgreementFile": true, "RemoveAgreement": true,
+	// Recipients and fields come back as ids, places and kinds; who they are is AgreementRecipients'.
+	"AddRecipient": true, "ChangeRecipient": true, "RemoveRecipient": true, "PutAgreementFields": true, "AgreementFields": true, "Readiness": true,
 	"ErasePerson": true, "Import": true, "ImportLegacy": true, "Restore": true,
 	"ResearchCount": true, "ResearchCounts": true, "EnquiryCounts": true, "Week": true, "AgentMarks": true, "Touches": true,
 	"AddEnquiry": true, "AgentNote": true, "CreateKey": true, "CreateTask": true, "QuickAddPerson": true,

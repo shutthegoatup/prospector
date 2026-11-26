@@ -282,6 +282,7 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// A page with work in hand of its own, like the field editor, is left alone.
 setInterval(() => {
-  if (!typing() && !document.querySelector("details[open] form")) refresh();
+  if (!typing() && !document.querySelector("details[open] form, [data-no-refresh]")) refresh();
 }, 60000);

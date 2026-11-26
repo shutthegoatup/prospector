@@ -715,6 +715,6 @@
     }
   });
   setInterval(() => {
-    if (!typing() && !document.querySelector("details[open] form")) refresh();
+    if (!typing() && !document.querySelector("details[open] form, [data-no-refresh]")) refresh();
   }, 6e4);
 })();
