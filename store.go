@@ -189,6 +189,9 @@ type Contact struct {
 	NextDate    *string `json:"next_date"`
 	LostReason  string  `json:"lost_reason"`
 	DraftBy     string  `json:"draft_by"`
+	// OfferingID is what they are being reached for; 0 is the organisation's own. Their
+	// company being rejected for that offering takes them out of the queues.
+	OfferingID int64 `gorm:"not null;default:0" json:"offering_id"`
 }
 
 // ContactSuggested is a person an agent found; a human picks them before outreach.
@@ -258,7 +261,7 @@ type Store struct {
 }
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
-	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &EnquiryMessage{}, &Suppression{}, &UnsubscribeLink{}, &Campaign{}, &CampaignRecipient{}, &Agreement{}, &AgreementFile{}, &AgreementRecipient{}, &AgreementField{}, &Suggestion{},
+	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &EnquiryMessage{}, &Suppression{}, &UnsubscribeLink{}, &Campaign{}, &CampaignRecipient{}, &Agreement{}, &AgreementFile{}, &AgreementRecipient{}, &AgreementField{}, &AgreementEvent{}, &SealKey{}, &Suggestion{},
 	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}, &Agent{}, &AgentRun{}, &Deal{}, &Subscription{}, &Onboarding{}, &OnboardingStep{}, &CustomerGrant{}, &CustomerLink{}, &CustomerSession{}, &MailDomain{}, &Enricher{}, &EnrichUsage{}, &Offering{}, &Verdict{}}
 
 // Open takes a postgres:// URL or a SQLite file path.

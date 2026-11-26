@@ -95,7 +95,17 @@ type TodayData struct {
 func (a *App) today(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	now := time.Now()
-	cards, counts := Today(a.dueByStep(q, now), q.Voice(), now, a.s.noMailDomains())
+	voice := q.Voice()
+	offerings, err := a.s.Offerings(q.Org.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	voice.Pitches = map[int64]string{}
+	for _, o := range offerings {
+		voice.Pitches[o.ID] = o.Pitch
+	}
+	cards, counts := Today(a.dueByStep(q, now), voice, now, a.s.noMailDomains())
 	d := TodayData{Filter: r.URL.Query().Get("step"), Counts: counts, Total: len(cards),
 		Review: a.s.ResearchCount(q.Org.ID, "review"), Week: a.s.Week(q.Org.ID, now), Now: now.Format("Mon 2 Jan · 15:04")}
 	others, err := a.s.OtherDeals(q.Org.ID)
