@@ -8,7 +8,7 @@ import (
 )
 
 func campaignOut(c Campaign) api.Campaign {
-	return api.Campaign{Id: c.ID, Name: c.Name, Audience: api.CampaignAudience(c.Audience), Subject: c.Subject, Body: c.Body,
+	return api.Campaign{Id: c.ID, Name: c.Name, Kind: api.CampaignKind(c.Kind), Audience: api.CampaignAudience(c.Audience), Subject: c.Subject, Body: c.Body,
 		Status: api.CampaignStatus(c.Status), CreatedBy: c.CreatedBy, UpdatedBy: c.UpdatedBy, CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt,
 		QueuedBy: c.QueuedBy, QueuedAt: c.QueuedAt, SentAt: c.SentAt, Paused: c.Paused, Mail: map[string]int{}}
 }
@@ -128,7 +128,7 @@ func (s apiServer) CreateCampaign(ctx context.Context, in api.CreateCampaignRequ
 		return nil, errors.New("send the campaign: {\"name\": …}")
 	}
 	q, b := reqFrom(ctx), in.Body
-	c, err := s.a.s.AddCampaign(q.Org.ID, CampaignIn{Name: b.Name, Audience: b.Audience, Subject: b.Subject, Body: b.Body}, q.Actor())
+	c, err := s.a.s.AddCampaign(q.Org.ID, CampaignIn{Name: b.Name, Kind: b.Kind, Audience: b.Audience, Subject: b.Subject, Body: b.Body}, q.Actor())
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (s apiServer) ChangeCampaign(ctx context.Context, in api.ChangeCampaignRequ
 		for _, set := range []struct {
 			field string
 			value *string
-		}{{"name", b.Name}, {"audience", b.Audience}, {"subject", b.Subject}, {"body", b.Body}} {
+		}{{"name", b.Name}, {"kind", b.Kind}, {"audience", b.Audience}, {"subject", b.Subject}, {"body", b.Body}} {
 			if set.value != nil {
 				changes = append(changes, Change{set.field, *set.value})
 			}

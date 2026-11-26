@@ -148,7 +148,7 @@ const subscriptionFields = ["name", "amount", "per", "start", "term_months", "th
 const dealFields = ["kind", "amount", "close_date", "owner", "stage", "next_step", "next_date", "lost_reason"] as const satisfies readonly (keyof Schemas["DealChange"])[];
 const enquiryFields = ["state", "owner", "note"] as const satisfies readonly (keyof EnquiryChange)[];
 const contactFields = ["person", "title", "email", "linkedin", "phone", "tz", "sources", "call_notes", "send_to", "message", "note", "subject", "body", "followup", "stage", "next_step", "next_date", "lost_reason"] as const satisfies readonly (keyof Schemas["ContactChange"])[];
-const campaignFields = ["name", "audience", "subject", "body"] as const satisfies readonly (keyof Schemas["CampaignChange"])[];
+const campaignFields = ["name", "kind", "audience", "subject", "body"] as const satisfies readonly (keyof Schemas["CampaignChange"])[];
 
 function oneOf<T extends string>(list: readonly T[], f: string, what: string): T {
   if (!(list as readonly string[]).includes(f)) throw new Error(`${what} has no ${f}.`);

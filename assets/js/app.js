@@ -596,7 +596,7 @@
   var dealFields = ["kind", "amount", "close_date", "owner", "stage", "next_step", "next_date", "lost_reason"];
   var enquiryFields = ["state", "owner", "note"];
   var contactFields = ["person", "title", "email", "linkedin", "phone", "tz", "sources", "call_notes", "send_to", "message", "note", "subject", "body", "followup", "stage", "next_step", "next_date", "lost_reason"];
-  var campaignFields = ["name", "audience", "subject", "body"];
+  var campaignFields = ["name", "kind", "audience", "subject", "body"];
   function oneOf(list, f, what) {
     if (!list.includes(f)) throw new Error(`${what} has no ${f}.`);
     return f;

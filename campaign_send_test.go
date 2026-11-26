@@ -419,3 +419,145 @@ func TestCampaignSendingHoldsAtItsEdges(t *testing.T) {
 	}
 	box.answer = nil
 }
+
+func TestAServiceNoticeReachesCustomersWhoUnsubscribedButNobodyElse(t *testing.T) {
+	a, s, o, list, member, box := campaignSite(t)
+	// Everyone made by campaignSite is at Larkmoor Yachts; make it a current customer.
+	var hannah Contact
+	if err := s.db.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddSubscription(o.ID, SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	person(t, s, o, "Never Mail", "Larkmoor Yachts", "never@larkmoor.example", false)
+	o.Settings.NeverContact = "never@larkmoor.example"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	person(t, s, o, "Not A Customer", "Quayside Ltd", "cold@quayside.example", true)
+	must(s.Suppress(o.ID, "tom@larkmoor.example", "Ada Lovelace"))
+
+	// A service notice is for customers only.
+	if code, body := call(t, member, "POST", list, "application/json", map[string]any{"name": "Prices", "kind": "service", "audience": "conversations"}); code != http.StatusBadRequest || !strings.Contains(body, "customers only") {
+		t.Errorf("a service notice to people in conversation: %d %s", code, body)
+	}
+	code, body := call(t, member, "POST", list, "application/json", map[string]any{"name": "Price change", "kind": "service", "subject": "Your price from March", "body": "Your price changes on 1 March."})
+	if code != http.StatusCreated || !strings.Contains(body, `"kind":"service"`) || !strings.Contains(body, `"audience":"customers"`) {
+		t.Fatalf("starting a service notice: %d %s", code, body)
+	}
+	c := must(s.Campaigns(o.ID))[0]
+	if code, _ := call(t, member, "PATCH", list+"/"+itoa(c.ID), "application/json", map[string]any{"audience": "conversations"}); code != http.StatusBadRequest {
+		t.Errorf("moving a service notice to people in conversation: %d", code)
+	}
+
+	got := leftOut(must(s.Audience(o, c)))
+	if got["Tom Ellery"] != "" || got["Never Mail"] != "on the never-contact list" {
+		t.Errorf("its audience: unsubscribed %q, never-contact %q", got["Tom Ellery"], got["Never Mail"])
+	}
+	if _, there := got["Not A Customer"]; there {
+		t.Error("someone at no current customer is in a service notice's audience")
+	}
+
+	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
+	a.sendRound(context.Background(), time.Now())
+	sent := map[string]Message{}
+	for _, m := range box.sent {
+		sent[m.To] = m
+	}
+	if _, ok := sent["tom@larkmoor.example"]; !ok {
+		t.Error("a customer who unsubscribed from marketing did not get the service notice")
+	}
+	for _, nobody := range []string{"never@larkmoor.example", "cold@quayside.example"} {
+		if _, ok := sent[nobody]; ok {
+			t.Errorf("a service notice went to %s", nobody)
+		}
+	}
+	m := sent["hannah@larkmoor.example"]
+	if m.Unsubscribe != "" || strings.Contains(m.Body, "/u/") || !strings.Contains(m.Body, "as a customer of") || !strings.Contains(m.Body, "1 Example Street") {
+		t.Errorf("a service notice's mail:\n%s\nunsubscribe %q", m.Body, m.Unsubscribe)
+	}
+
+	// A marketing campaign to the same people still leaves out who unsubscribed.
+	box.mu.Lock()
+	box.sent = nil
+	box.mu.Unlock()
+	marketing := must(s.AddCampaign(o.ID, CampaignIn{Name: "Offer", Audience: AudienceCustomers, Subject: "An offer", Body: "Buy more."}, "Ada Lovelace"))
+	must(s.SendCampaign(o, marketing.ID, "Ada Lovelace"))
+	a.sendRound(context.Background(), time.Now())
+	for _, to := range box.to() {
+		if to == "tom@larkmoor.example" {
+			t.Error("a marketing campaign went to someone who unsubscribed")
+		}
+	}
+}
+
+// What the review of service notices found: a kind and audience that do not go together
+// are refused when the campaign is sent, not only when it is written, and a new column
+// reads right on rows that were there before it.
+func TestAServiceNoticeIsCheckedAgainAsItIsSent(t *testing.T) {
+	_, s, o, _, _, _ := campaignSite(t)
+	c := draft(t, s, o)
+	// As a rollback to a release without kinds, or an edit racing the send, could leave it.
+	if err := s.db.Model(&Campaign{}).Where("id = ?", c.ID).Update("kind", KindService).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SendCampaign(o, c.ID, "Ada Lovelace"); err == nil || !strings.Contains(err.Error(), "customers only") {
+		t.Errorf("a service notice to people in conversation was sent: %v", err)
+	}
+	if now := must(s.Campaign(o.ID, c.ID)); now.Status != CampaignDraft || len(mailOf(t, s, o, c)) != 0 {
+		t.Errorf("the refused send left it %s with %d mails", now.Status, len(mailOf(t, s, o, c)))
+	}
+
+	// Changing a draft to a service notice takes it to customers.
+	m := draft(t, s, o)
+	changed := must(s.ChangeCampaign(o.ID, m.ID, []Change{{"kind", KindService}}, "Ada Lovelace"))
+	if changed.Kind != KindService || changed.Audience != AudienceCustomers {
+		t.Errorf("after making it a service notice: %s to %s", changed.Kind, changed.Audience)
+	}
+}
+
+// A service notice skips the list not to be mailed only for customers, so a subscription
+// that ends while the notice is still going out stops the rest of it reaching them.
+func TestAServiceNoticeStopsAtSomeoneNoLongerACustomer(t *testing.T) {
+	a, s, o, _, _, box := campaignSite(t)
+	var hannah Contact
+	if err := s.db.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
+		t.Fatal(err)
+	}
+	sub := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"))
+	must(s.Suppress(o.ID, "tom@larkmoor.example", "Ada Lovelace"))
+	c := must(s.AddCampaign(o.ID, CampaignIn{Name: "Price change", Kind: KindService, Audience: AudienceCustomers, Subject: "Your price", Body: "It changes."}, "Ada Lovelace"))
+	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
+	if _, queued := mailOf(t, s, o, c)["tom@larkmoor.example"]; !queued {
+		t.Fatal("the unsubscribed customer was not queued")
+	}
+
+	if err := s.db.Model(&Subscription{}).Where("id = ?", sub.ID).Update("ended_on", "2026-02-01").Error; err != nil {
+		t.Fatal(err)
+	}
+	a.sendRound(context.Background(), time.Now())
+	if to := box.to(); len(to) != 0 {
+		t.Errorf("a service notice went to %v after their subscription ended", to)
+	}
+	if r := mailOf(t, s, o, c)["tom@larkmoor.example"]; r.Status != MailSkipped || r.Reason != "no longer a customer" {
+		t.Errorf("the unsubscribed former customer's mail: %s %q", r.Status, r.Reason)
+	}
+}
+
+func TestCampaignsFromBeforeKindsAreMarketing(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	if err := s.db.Create(&Campaign{OrgID: o.ID, Name: "Old", Audience: AudienceConversations, Status: CampaignDraft}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.Migrator().DropColumn(&Campaign{}, "kind"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.AutoMigrate(&Campaign{}); err != nil {
+		t.Fatal(err)
+	}
+	if c := must(s.Campaigns(o.ID))[0]; c.Kind != KindMarketing {
+		t.Errorf("a campaign from before kinds reads as %q", c.Kind)
+	}
+}

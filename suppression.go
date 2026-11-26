@@ -180,11 +180,18 @@ func (s *Store) gate(tx *gorm.DB, o *Org) (*mailGate, error) {
 }
 
 func (g *mailGate) why(address, link string) error {
+	return g.whyFor(KindMarketing, address, link)
+}
+
+// whyFor is why for a campaign of a kind. A service notice reaches someone who
+// unsubscribed from marketing, since it is about what they have; never anyone on the
+// never-contact list or erased.
+func (g *mailGate) whyFor(kind, address, link string) error {
 	addr, err := bareAddress(address)
 	if err != nil {
 		return err
 	}
-	if g.suppressed[addr] {
+	if g.suppressed[addr] && kind != KindService {
 		return errSuppressed
 	}
 	if err := g.o.Settings.listed(addr, link); err != nil {
