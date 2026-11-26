@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
-import { ActionButton, Eyebrow, Failed, FilterChip, Meta, Pill, Section, type Tone, useRefresh, Whose } from "@/components/app";
+import { ActionButton, Eyebrow, Failed, FilterChip, Meta, Meter, Pill, Section, type Tone, useRefresh, Whose } from "@/components/app";
 import { actor, day, stamp } from "@/lib/format";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/session";
 import { month, vendorName } from "@/lib/vendors";
@@ -15,6 +16,8 @@ type Company = components["schemas"]["ResearchCompany"];
 type Criterion = components["schemas"]["Criterion"];
 type Run = components["schemas"]["Run"];
 type Agent = components["schemas"]["Agent"];
+type TaskBrief = components["schemas"]["TaskBrief"];
+type TaskCompany = components["schemas"]["TaskCompany"];
 type Person = Company["people"][number];
 type Enricher = components["schemas"]["Enricher"];
 
@@ -97,7 +100,7 @@ export function ResearchPage() {
           </Link>
         </div>
         {searches.map((t) => (
-          <SearchStrip key={t.id} id={t.id} title={t.title} found={t.found.companies} agents={ready} chosen={t.id === task} />
+          <SearchStrip key={t.id} task={t} agents={ready} chosen={t.id === task} />
         ))}
         {tasks.data && searches.length === 0 && <p className="text-sm text-muted-foreground">No search open.</p>}
       </div>
@@ -170,6 +173,7 @@ export function ResearchPage() {
         {task && (
           <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
             <SearchPanel id={task} onGone={() => navigate({ to: "/o/$org/research", params: { org }, search: { of: sellingId || undefined } })} />
+            <LeftOutPanel id={task} />
           </aside>
         )}
       </div>
@@ -181,11 +185,18 @@ export function ResearchPage() {
 function FindBox({ agents, offering, selling, lookingFor }: { agents: Agent[]; offering?: number; selling?: Offering; lookingFor: components["schemas"]["LookFor"][] }) {
   const { org } = useSession();
   const navigate = useNavigate();
+  const refresh = useRefresh();
   const [brief, setBrief] = useState("");
   const [picked, setPicked] = useState<number[] | null>(null);
+  const [want, setWant] = useState("");
   const send = picked ?? agents.slice(0, 1).map((a) => a.id);
   const create = $api.useMutation("post", "/o/{org}/api/v1/tasks", {
-    onSuccess: (t) => navigate({ to: "/o/$org/research", params: { org }, search: { task: t.id } }),
+    onSuccess: (t) => {
+      setBrief("");
+      setWant("");
+      refresh();
+      navigate({ to: "/o/$org/research", params: { org }, search: { task: t.id } });
+    },
   });
 
   return (
@@ -193,7 +204,7 @@ function FindBox({ agents, offering, selling, lookingFor }: { agents: Agent[]; o
       className="panel mb-5 overflow-hidden shadow-[4px_4px_0_var(--edge)]"
       onSubmit={(e) => {
         e.preventDefault();
-        create.mutate({ params: { path: { org } }, body: { title: "", brief, agents: send, offering: offering || undefined } });
+        create.mutate({ params: { path: { org } }, body: { title: "", brief, agents: send, offering: offering || undefined, want: want === "" ? undefined : Number(want) } });
       }}
     >
       <div className="flex flex-col gap-2.5 px-5 py-4">
@@ -212,6 +223,19 @@ function FindBox({ agents, offering, selling, lookingFor }: { agents: Agent[]; o
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <label className="contents">
+              <span>Find about</span>
+              <Input
+                type="number"
+                min={1}
+                max={500}
+                value={want}
+                onChange={(e) => setWant(e.target.value)}
+                aria-label="About how many companies"
+                className="h-8 w-16 bg-muted px-2"
+              />
+              <span>companies</span>
+            </label>
             {agents.length === 0 ? (
               <span>
                 No agent of Prospector's own is ready, so this waits for one of yours.{" "}
@@ -221,7 +245,7 @@ function FindBox({ agents, offering, selling, lookingFor }: { agents: Agent[]; o
               </span>
             ) : (
               <>
-                <span>Send</span>
+                <span>with</span>
                 {agents.map((a) => (
                   <label
                     key={a.id}
@@ -272,8 +296,11 @@ function runState(r: Run) {
   return r.status;
 }
 
-function SearchStrip({ id, title, found, agents, chosen }: { id: number; title: string; found: number; agents: Agent[]; chosen: boolean }) {
+function SearchStrip({ task, agents, chosen }: { task: TaskBrief; agents: Agent[]; chosen: boolean }) {
   const { org, sales } = useSession();
+  const { id, title, want } = task;
+  // Companies already held when the search came to them aren't new, so they don't count towards the number.
+  const found = task.found.companies - task.left_out;
   const refresh = useRefresh();
   const runs = $api.useQuery("get", "/o/{org}/api/v1/tasks/{task}/runs", { params: { path: { org, task: id }, query: { limit: 3 } } });
   const going = (runs.data?.items ?? []).filter((r) => r.status === "running" || r.status === "waiting");
@@ -290,8 +317,11 @@ function SearchStrip({ id, title, found, agents, chosen }: { id: number; title: 
           {r.agent_name} · {runState(r)}
         </Pill>
       ))}
+      {want ? <Meter value={found} of={want} /> : null}
       <span className="font-mono text-xs text-muted-foreground">
-        {found} {found === 1 ? "company" : "companies"} found
+        {want ? `${found} of about ${want} found` : `${found} new ${found === 1 ? "company" : "companies"} found`}
+        {task.to_review > 0 && ` · ${task.to_review} to review`}
+        {task.left_out > 0 && ` · ${task.left_out} left out`}
       </span>
       <span className="ml-auto flex flex-wrap gap-2">
         {!chosen && (
@@ -403,6 +433,93 @@ function SearchPanel({ id, onGone }: { id: number; onGone: () => void }) {
           </div>
         </form>
       )}
+    </Section>
+  );
+}
+
+const heldLabel: Record<NonNullable<TaskCompany["held"]>, string> = {
+  rejected: "Rejected before",
+  customer: "Existing customer",
+  open_deal: "Open conversation",
+  qualified: "Qualified already",
+};
+
+// LeftOutPanel is what a search came to that was already held, and the people it was
+// refused: matched on web domain, name, email address and profile against what's here.
+function LeftOutPanel({ id }: { id: number }) {
+  const { org, sales } = useSession();
+  const refresh = useRefresh();
+  const left = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}/left-out", { params: { path: { org, id }, query: { limit: 200 } } });
+  const again = $api.useMutation("patch", "/o/{org}/api/v1/companies/{id}", { onSuccess: refresh });
+  const d = left.data;
+  if (!d) return null;
+  const held = d.rejected + d.customer + d.open_deal + d.qualified;
+  const refused = d.never_contact + d.erased;
+  if (held + refused === 0) return null;
+  const counts: [string, number][] = [
+    [heldLabel.open_deal, d.open_deal],
+    [heldLabel.customer, d.customer],
+    [heldLabel.qualified, d.qualified],
+    [heldLabel.rejected, d.rejected],
+  ];
+  return (
+    <Section className="gap-2.5 p-5" aria-label="Left out">
+      <Eyebrow>Left out · {held + refused}</Eyebrow>
+      <p className="text-[13px] text-muted-foreground">Already here when this search came to them, so not new.</p>
+      {counts
+        .filter(([, n]) => n > 0)
+        .map(([label, n]) => (
+          <div key={label} className="flex justify-between gap-3 text-sm">
+            <span>{label}</span>
+            <span className="font-mono text-xs text-muted-foreground">{n}</span>
+          </div>
+        ))}
+      {d.items.map((c) => (
+        <div key={c.id} className="flex flex-wrap items-baseline justify-between gap-2 border-t border-dashed border-border pt-2 text-sm">
+          <Link to="/o/$org/companies/$id" params={{ org, id: c.id }} className="text-mark underline">
+            {c.name}
+          </Link>
+          <span className="flex items-baseline gap-2">
+            <Meta>{c.held ? heldLabel[c.held] : ""}</Meta>
+            {sales && c.held === "rejected" && c.stage === "rejected" && (
+              <ActionButton
+                quiet
+                size="sm"
+                disabled={again.isPending}
+                onClick={() => again.mutate({ params: { path: { org, id: c.id } }, body: { stage: "review", offering: d.offering } })}
+              >
+                Review again
+              </ActionButton>
+            )}
+          </span>
+        </div>
+      ))}
+      {d.next_cursor && (
+        <Link to="/o/$org/tasks/$id" params={{ org, id }} className="text-[13px] text-mark underline">
+          {held - d.items.length} more on the search's own page
+        </Link>
+      )}
+      {refused > 0 && (
+        <div className="flex flex-col gap-1 border-t border-dashed border-border pt-2 text-sm">
+          {d.never_contact > 0 && (
+            <div className="flex justify-between gap-3">
+              <span>Never contact</span>
+              <span className="font-mono text-xs text-muted-foreground">refused {d.never_contact}×</span>
+            </div>
+          )}
+          {d.erased > 0 && (
+            <div className="flex justify-between gap-3">
+              <span>Erased on request</span>
+              <span className="font-mono text-xs text-muted-foreground">refused {d.erased}×</span>
+            </div>
+          )}
+          <p className="text-[13px] text-muted-foreground">
+            People an agent tried to add and was refused. They can't be included, and who they were isn't kept, so one person
+            tried twice counts twice.
+          </p>
+        </div>
+      )}
+      <Failed errors={[again.error]} />
     </Section>
   );
 }
