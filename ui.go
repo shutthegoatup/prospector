@@ -379,7 +379,6 @@ type SettingsData struct {
 	Me      Membership
 	Covered []string
 	Mail    MailView
-	Agents  OwnAgentsView
 	SSO     *SSO
 	// Callback is where a provider sends people back; empty until PROSPECTOR_URL is set.
 	Callback string
@@ -396,7 +395,7 @@ func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 	q := reqOf(r)
 	members, _ := a.s.Members(q.Org.ID)
 	d := SettingsData{Members: members, Me: *q.Member, Covered: a.s.NeverContactCovers(q.Org), Intake: a.baseURL(r) + q.Base() + "intake",
-		Mail: a.mailView(q.Org.ID), Agents: a.ownAgents(q.Org.ID)}
+		Mail: a.mailView(q.Org.ID)}
 	d.Sealing = a.s.keys != nil
 	var next string
 	var err error
@@ -416,6 +415,7 @@ func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 
 type AgentsData struct {
 	Base     string
+	Own      OwnAgentsView
 	Keys     []APIKey
 	Activity []AgentEvent
 	// ActivityPage is where the list of activity is.
@@ -450,7 +450,7 @@ func (a *App) agents(w http.ResponseWriter, r *http.Request) {
 	}
 	runs, tasks, older := a.s.Runs(q.Org.ID, before, runsShown)
 	activity, activityPage := a.s.AgentActivity(q.Org.ID, panelPage(r, "activity"))
-	a.page(w, r, "agents", AgentsView(q, AgentsData{Base: a.baseURL(r) + q.Base(), Keys: keys, Activity: activity, ActivityPage: activityPage,
+	a.page(w, r, "agents", AgentsView(q, AgentsData{Base: a.baseURL(r) + q.Base(), Own: a.ownAgents(q.Org.ID), Keys: keys, Activity: activity, ActivityPage: activityPage,
 		Scores: a.s.AgentScores(q.Org.ID), Runs: runs, Tasks: tasks, Now: time.Now(), RunsPaged: !before.IsZero(), OlderRuns: olderRuns(q, older, r)}))
 }
 

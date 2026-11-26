@@ -954,8 +954,13 @@ type chatReply struct {
 // complete asks the endpoint for the model's next turn. A failure on the way, or a
 // server error, is tried again a few times before the run gives up.
 func (a *App) complete(ctx context.Context, cfg *Agent, key string, run *AgentRun, messages []chatMessage, tools []toolDef) (*chatReply, error) {
-	body, err := json.Marshal(map[string]any{"model": cfg.Model, "messages": messages, "tools": tools, "tool_choice": "auto",
-		"max_tokens": 8192, "prompt_cache_key": fmt.Sprintf("prospector-run-%d", run.ID)})
+	req := map[string]any{"model": cfg.Model, "messages": messages, "tools": tools, "tool_choice": "auto",
+		"max_tokens": 8192, "prompt_cache_key": fmt.Sprintf("prospector-run-%d", run.ID)}
+	if cfg.ThinkingOff {
+		// llama.cpp and vLLM pass this to the chat template, which is where Qwen's switch is.
+		req["chat_template_kwargs"] = map[string]any{"enable_thinking": false}
+	}
+	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}

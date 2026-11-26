@@ -1870,10 +1870,13 @@ components:
         fallback_minutes:
           type: integer
           description: How long it waits before falling back, 1 to 10080; 0 is 15.
+        thinking_off:
+          type: boolean
+          description: For `openai`, asks the model not to think before it answers (`chat_template_kwargs.enable_thinking` false, which llama.cpp and vLLM honour), for a local thinking model too slow to think at every step. Ignored for `anthropic`.
 
     Agent:
       type: object
-      required: [id, name, kind, base_url, model, tools_url, search_url, models, tools, allowed_tools, fallback, fallback_minutes, problem, checked_at, has_key, ready, updated_by, updated_at]
+      required: [id, name, kind, base_url, model, tools_url, search_url, models, tools, allowed_tools, fallback, fallback_minutes, thinking_off, problem, checked_at, has_key, ready, updated_by, updated_at]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
@@ -1895,6 +1898,7 @@ components:
           items: { type: string }
         fallback: { type: integer, format: int64 }
         fallback_minutes: { type: integer }
+        thinking_off: { type: boolean }
         problem: { type: string, description: "What the last check found wrong, if anything." }
         checked_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
         has_key: { type: boolean }

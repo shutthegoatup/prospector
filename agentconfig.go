@@ -45,12 +45,15 @@ type Agent struct {
 	Allowed string `gorm:"not null;default:'[]'"`
 	// FallbackID is the agent that takes the task over once this one's endpoint has kept
 	// it waiting FallbackMinutes; 0 is none, so it waits however long.
-	FallbackID      int64  `gorm:"not null;default:0"`
-	FallbackMinutes int    `gorm:"not null;default:15"`
-	Problem         string `gorm:"not null;default:''"`
-	CheckedAt       *time.Time
-	UpdatedBy       string `gorm:"not null;default:''"`
-	UpdatedAt       time.Time
+	FallbackID      int64 `gorm:"not null;default:0"`
+	FallbackMinutes int   `gorm:"not null;default:15"`
+	// ThinkingOff asks an OpenAI-compatible endpoint's model not to think first: a local
+	// thinking model is too slow to think before every tool call.
+	ThinkingOff bool   `gorm:"not null;default:false"`
+	Problem     string `gorm:"not null;default:''"`
+	CheckedAt   *time.Time
+	UpdatedBy   string `gorm:"not null;default:''"`
+	UpdatedAt   time.Time
 }
 
 type AgentTool struct {
@@ -372,6 +375,7 @@ type AgentSettingsIn struct {
 	// how long it waits first, 0 for the default.
 	Fallback        int64 `json:"fallback"`
 	FallbackMinutes int   `json:"fallback_minutes"`
+	ThinkingOff     bool  `json:"thinking_off"`
 }
 
 // toolsKey is the key the tools URL may be sent: the endpoint's, on the same origin only.
@@ -496,6 +500,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 		return nil, errors.New("wait between a minute and a week before falling back")
 	}
 	c.FallbackID, c.FallbackMinutes = fallback, in.FallbackMinutes
+	c.ThinkingOff = in.ThinkingOff && kind == kindOpenAI
 	c.Kind, c.BaseURL, c.APIKey, c.ToolsURL, c.SearchURL, c.UpdatedBy = kind, base, sealedKey, tools, search, by
 	c.Model = strings.TrimSpace(in.Model)
 	if len(c.Model) > 200 {
@@ -574,7 +579,7 @@ func (s *Store) writeAgent(c *Agent) error {
 		return s.db.Create(c).Error
 	}
 	res := s.db.Model(&Agent{}).Where("id = ? and org_id = ?", c.ID, c.OrgID).
-		Select("name", "kind", "base_url", "fallback_id", "fallback_minutes", "api_key", "model", "tools_url", "search_url", "models", "tools", "allowed", "problem", "checked_at", "updated_by", "updated_at").
+		Select("name", "kind", "base_url", "fallback_id", "fallback_minutes", "thinking_off", "api_key", "model", "tools_url", "search_url", "models", "tools", "allowed", "problem", "checked_at", "updated_by", "updated_at").
 		Updates(c)
 	if res.Error == nil && res.RowsAffected == 0 {
 		return fmt.Errorf("%s was deleted meanwhile", c.Name)
@@ -610,7 +615,7 @@ func (a *App) deleteAgent(org, id int64) error {
 	})
 }
 
-// AgentView is what Settings shows of an agent: never the key.
+// AgentView is what the Agents page shows of an agent: never the key.
 type AgentView struct {
 	Agent
 	HasKey bool
@@ -643,4 +648,80 @@ func (a *App) ownAgents(org int64) OwnAgentsView {
 		v.New.Others = append(v.New.Others, Agent{ID: c.ID, Name: c.Name})
 	}
 	return v
+}
+
+// Searches is whether it can look things up on the web, through SearXNG or a tool.
+func (c Agent) Searches() bool {
+	return c.SearchURL != "" || slices.ContainsFunc(c.AllowedTools(), func(t string) bool { return strings.Contains(t, "search") })
+}
+
+// AgentState is how an agent's card looks: ok, warn or stop, a line saying so, and
+// what to do about it.
+type AgentState struct{ Rail, Line, Todo string }
+
+func (v AgentView) State() AgentState {
+	checked := ""
+	if v.CheckedAt != nil {
+		checked = " · checked " + v.CheckedAt.Format("2 Jan 15:04")
+	}
+	switch {
+	case !v.HasKey:
+		return AgentState{"stop", "✕ Can't run", "It needs an API key."}
+	case v.Kind == kindOpenAI && v.BaseURL == "":
+		return AgentState{"stop", "✕ Can't run", "It needs the endpoint's address."}
+	case v.Model == "":
+		return AgentState{"stop", "✕ Can't run" + checked, "Pick one of the models the endpoint lists."}
+	case v.Problem != "":
+		return AgentState{"stop", "✕ Its last check failed" + checked, "Last check: " + v.Problem}
+	case !v.Searches():
+		return AgentState{"warn", "● Runs, but can't search the web" + checked,
+			"Add a search address or allow a search tool; until then it only reads pages it's given."}
+	}
+	return AgentState{"ok", "✓ Ready" + checked, ""}
+}
+
+// FallbackText says who takes its task over, and when.
+func (v AgentView) FallbackText() string {
+	for _, o := range v.Others {
+		if o.ID == v.FallbackID {
+			return o.Name + ", after " + plural(agentFallbackMinutes(v), "minute")
+		}
+	}
+	return "nobody: it waits"
+}
+
+func (v AgentView) ToolsText() string {
+	switch offered := len(v.ToolList()); {
+	case v.ToolsURL == "":
+		return "built-in only"
+	case offered == 0:
+		return "none listed"
+	default:
+		return fmt.Sprintf("%d of %d allowed", len(v.AllowedTools()), offered)
+	}
+}
+
+func (v AgentView) SearchText() string {
+	switch {
+	case v.SearchURL != "":
+		return "✓ SearXNG"
+	case v.Searches():
+		return "✓ through its tools"
+	}
+	return "none"
+}
+
+// Tally counts the agents in each state, for the line above them.
+func (v OwnAgentsView) Tally() (ok, warn, stop int) {
+	for _, a := range v.Agents {
+		switch a.State().Rail {
+		case "ok":
+			ok++
+		case "warn":
+			warn++
+		default:
+			stop++
+		}
+	}
+	return ok, warn, stop
 }

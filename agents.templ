@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/shutthegoatup/prospector/components/button"
+	"strconv"
 	"strings"
 )
 
@@ -28,99 +29,13 @@ templ Code(s string) {
 
 templ AgentsView(q *Req, d AgentsData) {
 	@PageHead("Agents & API")
-	<p class="mb-5 max-w-[72ch] text-sm text-muted-foreground">Let your own agents research, add and draft for <b class="text-foreground">{ q.Org.Name }</b>. A key works for this organisation only. What agents add waits in Research for a person; agents can draft, but only people send.</p>
+	<p class="mb-5 max-w-[72ch] text-sm text-muted-foreground">Agents research, add and draft for <b class="text-foreground">{ q.Org.Name }</b>. Some Prospector runs itself; others are your own and connect with a key, which works for this organisation only. What any of them adds waits in Research for a person; agents can draft, but only people send.</p>
 	<div class="flex flex-wrap items-start gap-5">
-		<div class="flex min-w-0 flex-[3_1_520px] flex-col gap-5">
-			@Section("Connect", "MCP for Claude and other agents, and the same operations as a JSON API.") {
-				<div>@Label("MCP endpoint")@Code(d.Base + "mcp")</div>
-				<div>
-					@Label("Claude Code")
-					@Code("claude mcp add --transport http prospector " + d.Base + "mcp \\\n  --header \"Authorization: Bearer $PROSPECTOR_KEY\"")
-				</div>
-				<div>
-					@Label("REST")
-					@Code("GET  " + d.Base + "api/v1/search?q=…\nGET  " + d.Base + "api/v1/companies/{id or name}\nGET  " + d.Base + "api/v1/due\nGET  " + d.Base + "api/v1/tasks\nGET  " + d.Base + "api/v1/tasks/{id}\nPOST " + d.Base + "api/v1/companies   {name, domain, facts: [{field, value, source_url}], task}\nPOST " + d.Base + "api/v1/facts       {company, field, value, source_url}\nPOST " + d.Base + "api/v1/contacts    {company, name, title, email, source_url}\nPOST " + d.Base + "api/v1/drafts      {contact_id, kind, text}\nPOST " + d.Base + "api/v1/notes       {task, company, kind, text}\nPOST " + d.Base + "api/v1/requests/finish {request}")
-				</div>
-			}
-			@Section("Keys", "No key can mark anything sent, change settings or reach another organisation.") {
-				if len(d.Keys) == 0 {
-					<p class="text-sm text-muted-foreground">No keys yet.</p>
-				}
-				for _, k := range d.Keys {
-					<div class="flex flex-wrap items-center justify-between gap-3 border-b border-dashed border-border py-2 text-sm">
-						<span>
-							<b>{ k.Name }</b>
-							<span class="block font-mono text-xs text-muted-foreground">{ k.Prefix + "… · made by " + k.CreatedBy + " · " + lastUsed(k) }</span>
-						</span>
-						<span class="flex flex-wrap items-center gap-1.5">
-							for _, s := range strings.Fields(k.Scopes) {
-								<span class="rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">{ s }</span>
-							}
-							if q.Owner() {
-								@button.Button(button.Props{Size: button.SizeXs, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/keys/revoke", "data-body": jsonBody("id", k.ID), "data-confirm": "Revoke " + k.Name + "? Agents using it stop working."}}) {
-									Revoke
-								}
-							}
-						</span>
-						if q.Owner() && k.Prefix != builtinPrefix {
-							<details class="w-full text-sm">
-								<summary class="cursor-pointer text-muted-foreground">Change scopes</summary>
-								<form data-form="ui/keys/scopes" data-refresh="true" class="mt-2 flex flex-col gap-1.5 rounded-lg bg-muted p-4">
-									<input type="hidden" name="id" value={ fmt.Sprint(k.ID) } data-number="true"/>
-									for _, s := range Scopes {
-										<label class="flex items-start gap-2.5 text-sm">
-											<input type="checkbox" name="scopes" value={ s.Name } data-multi="true" checked?={ k.Has(s.Name) } class="mt-1 size-4 accent-[var(--primary)]"/>
-											<span><span class="font-mono text-xs text-mark">{ s.Name }</span> <span class="text-muted-foreground">{ s.What }</span></span>
-										</label>
-									}
-									<div>
-										@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-											Save scopes
-										}
-									</div>
-									<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
-								</form>
-							</details>
-						}
-					</div>
-				}
-				if q.Owner() {
-					<form data-form="ui/keys" data-reset="true" class="flex flex-col gap-3 rounded-lg bg-muted p-4">
-						<label class="flex flex-col gap-1.5">
-							@Label("New key name")
-							<input name="name" required placeholder="research-bot" class={ fieldClass }/>
-						</label>
-						<fieldset class="flex flex-col gap-1.5">
-							<legend class="mb-1">@Label("Scopes")</legend>
-							for _, s := range Scopes {
-								<label class="flex items-start gap-2.5 text-sm">
-									<input type="checkbox" name="scopes" value={ s.Name } data-multi="true" checked?={ s.Name == "read" || s.Name == "research:write" } class="mt-1 size-4 accent-[var(--primary)]"/>
-									<span><span class="font-mono text-xs text-mark">{ s.Name }</span> <span class="text-muted-foreground">{ s.What }</span></span>
-								</label>
-							}
-						</fieldset>
-						<div>
-							@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-								Create key
-							}
-						</div>
-						<p data-result class="select-all break-all font-mono text-sm text-[var(--ok)]" role="status"></p>
-					</form>
-				}
-			}
+		<div class="flex min-w-0 flex-[3_1_560px] flex-col gap-5">
+			@Roster(q, d)
 		</div>
 		<div class="flex min-w-0 flex-[2_1_340px] flex-col gap-5">
-			@Section("Tools agents get", "Writes need a source URL, and go through this organisation's never-contact list.") {
-				<div>
-					for _, t := range mcpTools {
-						<div class="grid grid-cols-[120px_1fr] gap-3 border-b border-dashed border-border py-2 text-sm last:border-0">
-							<code class="font-mono text-[13px] text-mark">{ t.Name }</code>
-							<span>{ t.What } <span class="font-mono text-[11px] text-muted-foreground">{ t.Scope }</span></span>
-						</div>
-					}
-				</div>
-			}
-			@Section("How each agent is doing", "What people did with each key's suggestions. Use one key per agent to compare them.") {
+			@Section("How each agent is doing", "What people did with each agent's suggestions. Use one key per outside agent to compare them.") {
 				if len(d.Scores) == 0 {
 					<p class="text-sm text-muted-foreground">Nothing suggested yet.</p>
 				}
@@ -163,6 +78,16 @@ templ AgentsView(q *Req, d AgentsData) {
 					</nav>
 				}
 			}
+			@Section("Tools agents get", "Writes need a source URL, and go through this organisation's never-contact list.") {
+				<div>
+					for _, t := range mcpTools {
+						<div class="grid grid-cols-[120px_1fr] gap-3 border-b border-dashed border-border py-2 text-sm last:border-0">
+							<code class="font-mono text-[13px] text-mark">{ t.Name }</code>
+							<span>{ t.What } <span class="font-mono text-[11px] text-muted-foreground">{ t.Scope }</span></span>
+						</div>
+					}
+				</div>
+			}
 			@Section("Recent agent activity", "") {
 				if len(d.Activity) == 0 {
 					<p class="text-sm text-muted-foreground">None yet.</p>
@@ -178,6 +103,408 @@ templ AgentsView(q *Req, d AgentsData) {
 			}
 		</div>
 	</div>
+}
+
+// outsideKeys are the keys people made for their own agents; each of Prospector's
+// agents has a built-in key of its own, shown on its card instead.
+func outsideKeys(keys []APIKey) []APIKey {
+	var out []APIKey
+	for _, k := range keys {
+		if k.Prefix != builtinPrefix {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+func stateText(rail string) string {
+	switch rail {
+	case "ok":
+		return "text-[var(--ok)]"
+	case "warn":
+		return "text-[var(--warn)]"
+	}
+	return "text-[var(--stop)]"
+}
+
+// Roster is every agent in one list, each card's offset colour its state.
+templ Roster(q *Req, d AgentsData) {
+	{{ keys := outsideKeys(d.Keys) }}
+	{{ ok, warn, stop := d.Own.Tally() }}
+	@Section("Who works here", "Every agent in one list: those Prospector runs and those that connect with a key. The colour behind each card is its state.") {
+		if !d.Own.Sealing && q.Owner() {
+			<p class="text-sm text-[var(--stop)]" role="alert">This server has no secret key, so it can't keep an API key: whoever runs it needs to set PROSPECTOR_SECRET_KEYS first.</p>
+		}
+		if len(d.Own.Agents) > 0 {
+			<div class="flex flex-wrap gap-2 font-mono text-xs" aria-label="Prospector's agents">
+				@TallyChip("ok", ok, "ready")
+				@TallyChip("warn", warn, "missing something")
+				@TallyChip("stop", stop, "can't run")
+			</div>
+		}
+		<div class="flex flex-col gap-4">
+			if len(d.Own.Agents) == 0 && len(keys) == 0 {
+				<p class="text-sm text-muted-foreground">No agents yet.</p>
+			}
+			for _, agent := range d.Own.Agents {
+				@OwnAgentCard(q, agent)
+			}
+			for _, k := range keys {
+				@KeyCard(q, k)
+			}
+			@AddAgent(q, d, len(d.Own.Agents) == 0 && len(keys) == 0)
+		</div>
+		<p class="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground">
+			<span><i class="mr-1.5 inline-block h-2.5 w-3.5 rounded-sm border border-ink bg-[var(--ok-fill)] align-[-1px]"></i>ready</span>
+			<span><i class="mr-1.5 inline-block h-2.5 w-3.5 rounded-sm border border-ink bg-[var(--warn-fill)] align-[-1px]"></i>runs, missing something</span>
+			<span><i class="mr-1.5 inline-block h-2.5 w-3.5 rounded-sm border border-ink bg-[var(--stop-fill)] align-[-1px]"></i>can't run: no key or model, or its last check failed</span>
+		</p>
+	}
+}
+
+templ TallyChip(rail string, n int, text string) {
+	if n > 0 {
+		<span class="rounded-full border-[1.5px] border-ink bg-card px-2.5 py-0.5">
+			<i class={ "mr-1.5 inline-block size-2 rounded-full", templ.KV("bg-[var(--ok-fill)]", rail == "ok"), templ.KV("bg-[var(--warn-fill)]", rail == "warn"), templ.KV("bg-[var(--stop-fill)]", rail == "stop") }></i>{ strconv.Itoa(n) + " " + text }
+		</span>
+	}
+}
+
+templ AgentFact(label, value string, rail string) {
+	<span class="flex min-w-0 flex-col gap-0.5 border-b border-dashed border-border px-4 py-2.5 sm:border-r sm:border-b-0 sm:last:border-r-0">
+		@Label(label)
+		<span class={ "font-mono text-[13px] break-words", templ.KV("text-[var(--warn)]", rail == "warn"), templ.KV("text-[var(--stop)]", rail == "stop"), templ.KV("text-muted-foreground", rail == "none") }>{ value }</span>
+	</span>
+}
+
+func (v AgentView) modelText() (string, string) {
+	if v.Model == "" {
+		return "none picked", "stop"
+	}
+	return v.Model, ""
+}
+
+func searchRail(v AgentView) string {
+	if v.Searches() {
+		return ""
+	}
+	return "warn"
+}
+
+func fallbackRail(v AgentView) string {
+	if v.FallbackID == 0 {
+		return "none"
+	}
+	return ""
+}
+
+const cardClass = "rail rounded-[14px] border-2 border-ink bg-card"
+
+templ OwnAgentCard(q *Req, v AgentView) {
+	{{ st := v.State() }}
+	{{ model, modelRail := v.modelText() }}
+	<details class={ cardClass } data-state={ st.Rail } id={ "agent-" + strconv.FormatInt(v.ID, 10) }>
+		<summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+			<span class="flex flex-wrap items-start justify-between gap-3 px-4 pt-4 pb-3">
+				<span class="flex min-w-0 flex-col gap-0.5">
+					<span class="flex flex-wrap items-center gap-2 font-heading text-[17px] font-bold">
+						{ v.Name }
+						<span class="rounded-md bg-secondary px-1.5 py-0.5 font-mono text-[11px] font-normal text-[var(--agent)]">Prospector runs it</span>
+						if v.ThinkingOff {
+							<span class="rounded-md bg-secondary px-1.5 py-0.5 font-mono text-[11px] font-normal text-muted-foreground">thinking off</span>
+						}
+					</span>
+					<span class={ "font-mono text-xs", stateText(st.Rail) }>{ st.Line }</span>
+				</span>
+				<span class="rounded-lg border-[1.5px] border-ink bg-card px-2.5 py-1 text-xs font-semibold">
+					if q.Owner() {
+						Setup
+					} else {
+						Details
+					}
+				</span>
+			</span>
+			<span class="grid grid-cols-1 border-t border-dashed border-border sm:grid-cols-4">
+				@AgentFact("Model", model, modelRail)
+				@AgentFact("Search", v.SearchText(), searchRail(v))
+				@AgentFact("Tools", v.ToolsText(), "")
+				@AgentFact("Falls back to", v.FallbackText(), fallbackRail(v))
+			</span>
+			if st.Todo != "" {
+				<span class={ "mx-4 mb-3 block rounded-lg border border-dashed border-current px-3 py-2 font-mono text-xs", stateText(st.Rail) }>{ st.Todo }</span>
+			}
+		</summary>
+		<div class="rounded-b-[12px] border-t-2 border-ink bg-muted px-4 py-4">
+			if q.Owner() {
+				@AgentForm(v)
+			} else {
+				@Meta(agentReadOnly(v))
+			}
+		</div>
+	</details>
+}
+
+func agentReadOnly(v AgentView) string {
+	where := v.BaseURL
+	if where == "" {
+		where = "Anthropic's own API"
+	}
+	return "Reaches " + where + ". Only an owner changes its setup."
+}
+
+templ KeyCard(q *Req, k APIKey) {
+	<details class={ cardClass } data-state={ keyRail(k) }>
+		<summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+			<span class="flex flex-wrap items-start justify-between gap-3 px-4 pt-4 pb-3">
+				<span class="flex min-w-0 flex-col gap-0.5">
+					<span class="flex flex-wrap items-center gap-2 font-heading text-[17px] font-bold">
+						{ k.Name }
+						<span class="rounded-md bg-secondary px-1.5 py-0.5 font-mono text-[11px] font-normal text-muted-foreground">Connects with a key</span>
+					</span>
+					<span class={ "font-mono text-xs", templ.KV("text-[var(--ok)]", k.LastUsedAt != nil), templ.KV("text-muted-foreground", k.LastUsedAt == nil) }>{ keyLine(k) }</span>
+				</span>
+				if q.Owner() {
+					<span class="rounded-lg border-[1.5px] border-ink bg-card px-2.5 py-1 text-xs font-semibold">Change scopes</span>
+				}
+			</span>
+			<span class="flex flex-wrap items-center gap-1.5 border-t border-dashed border-border px-4 py-2.5">
+				@Label("Can")
+				for _, s := range strings.Fields(k.Scopes) {
+					<span class="rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">{ s }</span>
+				}
+			</span>
+		</summary>
+		if q.Owner() {
+			<div class="flex flex-col gap-3 rounded-b-[12px] border-t-2 border-ink bg-muted px-4 py-4">
+				<form data-form="ui/keys/scopes" data-refresh="true" class="flex flex-col gap-1.5">
+					<input type="hidden" name="id" value={ fmt.Sprint(k.ID) } data-number="true"/>
+					for _, s := range Scopes {
+						<label class="flex items-start gap-2.5 text-sm">
+							<input type="checkbox" name="scopes" value={ s.Name } data-multi="true" checked?={ k.Has(s.Name) } class="mt-1 size-4 accent-[var(--primary)]"/>
+							<span><span class="font-mono text-xs text-mark">{ s.Name }</span> <span class="text-muted-foreground">{ s.What }</span></span>
+						</label>
+					}
+					<div class="flex flex-wrap items-center gap-3">
+						@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+							Save scopes
+						}
+						@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": "ui/keys/revoke", "data-body": jsonBody("id", k.ID), "data-confirm": "Revoke " + k.Name + "? Agents using it stop working."}}) {
+							Revoke
+						}
+						<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
+					</div>
+				</form>
+			</div>
+		}
+	</details>
+}
+
+func keyRail(k APIKey) string {
+	if k.LastUsedAt == nil {
+		return ""
+	}
+	return "ok"
+}
+
+func keyLine(k APIKey) string {
+	return lastUsed(k) + " · key " + k.Prefix + "… · made by " + k.CreatedBy
+}
+
+// AddAgent offers both ways in: an agent Prospector runs, or one of your own with a key.
+templ AddAgent(q *Req, d AgentsData, none bool) {
+	<div class="flex flex-col gap-3 rounded-[14px] border-2 border-dashed border-input p-4">
+		<span class="font-heading text-[15px] font-bold">Add an agent</span>
+		if q.Owner() {
+			<details class="rounded-xl border-2 border-ink bg-card p-3.5" open?={ none }>
+				<summary class="cursor-pointer">
+					<b>Prospector runs it</b>
+					<span class="block text-sm text-muted-foreground">An OpenAI-compatible endpoint or Anthropic, a model and a key. It works the tasks you hand it, with search and the tools you allow.</span>
+				</summary>
+				<div class="mt-3">
+					@AgentForm(d.Own.New)
+				</div>
+			</details>
+		}
+		<details class="rounded-xl border-2 border-ink bg-card p-3.5">
+			<summary class="cursor-pointer">
+				<b>Your own agent connects</b>
+				<span class="block text-sm text-muted-foreground">Claude Code or any MCP client, with a key that has only the scopes it needs. No key can mark anything sent, change settings or reach another organisation.</span>
+			</summary>
+			<div class="mt-3 flex flex-col gap-3">
+				<div>@Label("MCP endpoint")@Code(d.Base + "mcp")</div>
+				<div>
+					@Label("Claude Code")
+					@Code("claude mcp add --transport http prospector " + d.Base + "mcp \\\n  --header \"Authorization: Bearer $PROSPECTOR_KEY\"")
+				</div>
+				<div>
+					@Label("REST")
+					@Code("GET  " + d.Base + "api/v1/search?q=…\nGET  " + d.Base + "api/v1/companies/{id or name}\nGET  " + d.Base + "api/v1/due\nGET  " + d.Base + "api/v1/tasks\nGET  " + d.Base + "api/v1/tasks/{id}\nPOST " + d.Base + "api/v1/companies   {name, domain, facts: [{field, value, source_url}], task}\nPOST " + d.Base + "api/v1/facts       {company, field, value, source_url}\nPOST " + d.Base + "api/v1/contacts    {company, name, title, email, source_url}\nPOST " + d.Base + "api/v1/drafts      {contact_id, kind, text}\nPOST " + d.Base + "api/v1/notes       {task, company, kind, text}\nPOST " + d.Base + "api/v1/requests/finish {request}")
+				</div>
+				if q.Owner() {
+					<form data-form="ui/keys" data-reset="true" class="flex flex-col gap-3 rounded-lg bg-muted p-4">
+						<label class="flex flex-col gap-1.5">
+							@Label("New key name")
+							<input name="name" required placeholder="research-bot" class={ fieldClass }/>
+						</label>
+						<fieldset class="flex flex-col gap-1.5">
+							<legend class="mb-1">@Label("Scopes")</legend>
+							for _, s := range Scopes {
+								<label class="flex items-start gap-2.5 text-sm">
+									<input type="checkbox" name="scopes" value={ s.Name } data-multi="true" checked?={ s.Name == "read" || s.Name == "research:write" } class="mt-1 size-4 accent-[var(--primary)]"/>
+									<span><span class="font-mono text-xs text-mark">{ s.Name }</span> <span class="text-muted-foreground">{ s.What }</span></span>
+								</label>
+							}
+						</fieldset>
+						<div>
+							@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+								Create key
+							}
+						</div>
+						<p data-result class="select-all break-all font-mono text-sm text-[var(--ok)]" role="status"></p>
+					</form>
+				} else {
+					@Meta("An owner makes keys.")
+				}
+			</div>
+		</details>
+	</div>
+}
+
+// agentPath and agentMethod are where an agent's form goes in the API.
+func agentPath(v AgentView) string {
+	if v.ID == 0 {
+		return "api/v1/agents"
+	}
+	return "api/v1/agents/" + strconv.FormatInt(v.ID, 10)
+}
+
+func agentMethod(v AgentView) string {
+	if v.ID == 0 {
+		return "POST"
+	}
+	return "PUT"
+}
+
+func agentFallbackMinutes(v AgentView) int {
+	if v.FallbackMinutes == 0 {
+		return 15
+	}
+	return v.FallbackMinutes
+}
+
+func agentModelsID(v AgentView) string {
+	if v.ID == 0 {
+		return "agent-models-new"
+	}
+	return "agent-models-" + strconv.FormatInt(v.ID, 10)
+}
+
+templ AgentForm(v AgentView) {
+	<form data-form={ agentPath(v) } data-method={ agentMethod(v) } data-refresh="true" class="flex flex-col gap-3">
+		@Row("Name") {
+			<input name="name" value={ v.Name } placeholder="Claude, ChatGPT, the gateway…" autocomplete="off" class={ fieldClass }/>
+			@Meta("What it is called on the task page and in the record.")
+		}
+		@Row("Kind") {
+			<select name="kind" class={ fieldClass }>
+				for _, k := range AgentKinds {
+					<option value={ k.Key } selected?={ k.Key == v.Kind || (v.Kind == "" && k.Key == kindOpenAI) }>{ k.Label }</option>
+				}
+			</select>
+			@Meta("Anthropic reaches Claude through Anthropic's own API with its official SDK; OpenAI-compatible is ChatGPT, OpenRouter, a gateway of your own, or a model you run yourself behind llama.cpp or vLLM.")
+		}
+		@Row("Endpoint") {
+			<input name="base_url" value={ v.BaseURL } placeholder="https://openrouter.ai/api/v1" autocomplete="off" class={ fieldClass }/>
+			@Meta("For OpenAI-compatible, the address its /models and /chat/completions are under, such as https://api.openai.com/v1. For Anthropic, leave it empty for Anthropic's own.")
+		}
+		@Row("API key") {
+			<input name="api_key" type="password" autocomplete="new-password" placeholder={ agentKeyHint(v) } class={ fieldClass }/>
+			@Meta("Never shown again. Changing the endpoint needs it entered again.")
+		}
+		@Row("Model") {
+			<input name="model" value={ v.Model } list={ agentModelsID(v) } autocomplete="off" placeholder="one the endpoint lists" class={ fieldClass }/>
+			<datalist id={ agentModelsID(v) }>
+				for _, m := range v.ModelList() {
+					<option value={ m }></option>
+				}
+			</datalist>
+			@Meta(agentModelHint(v))
+		}
+		@Row("Thinking") {
+			<span class="flex items-start gap-2.5 pt-2 text-sm">
+				<input type="checkbox" name="thinking_off" checked?={ v.ThinkingOff } class="mt-0.5 size-4 accent-[var(--primary)]"/>
+				<span>Off: answer without thinking first</span>
+			</span>
+			@Meta("For OpenAI-compatible only. A thinking model you run yourself, such as Qwen, can be too slow to think before every tool call.")
+		}
+		@Row("Search") {
+			<input name="search_url" value={ v.SearchURL } placeholder="https://searx.example.com" autocomplete="off" class={ fieldClass }/>
+			@Meta("A SearXNG instance you run: free, open-source search, with json among its search.formats. The agent searches through it, and reads pages itself, with no paid search service.")
+		}
+		@Row("Tools") {
+			<input name="tools_url" value={ v.ToolsURL } placeholder="https://mcp.example.com/mcp" autocomplete="off" class={ fieldClass }/>
+			@Meta("An MCP server, such as a gateway's federated /mcp. It's sent the endpoint's key only when it's on the same address.")
+		}
+		if len(v.Others) > 0 {
+			@Row("Fallback") {
+				<div class="flex flex-wrap items-center gap-2">
+					<select name="fallback" data-number="true" class={ fieldClass }>
+						<option value="0">None: wait however long it takes</option>
+						for _, o := range v.Others {
+							<option value={ strconv.FormatInt(o.ID, 10) } selected?={ o.ID == v.FallbackID }>{ o.Name }</option>
+						}
+					</select>
+					<span class="text-sm text-muted-foreground">after</span>
+					<input type="number" name="fallback_minutes" min="1" value={ strconv.Itoa(agentFallbackMinutes(v)) } class={ fieldClass }/>
+					<span class="text-sm text-muted-foreground">minutes</span>
+				</div>
+				@Meta("When its endpoint stays limited or away this long, the agent hands its task to the one chosen here, which carries on from the task's notes.")
+			}
+		}
+		if tools := v.ToolList(); len(tools) > 0 {
+			@Row("Allowed tools") {
+				<div class="flex flex-col gap-1.5 pt-1.5">
+					for _, t := range tools {
+						<label class="flex items-start gap-2.5 text-sm">
+							<input type="checkbox" name="tools" value={ t.Name } data-multi="true" checked?={ v.Allows(t.Name) } class="mt-0.5 size-4 accent-[var(--primary)]"/>
+							<span><span class="font-mono text-xs">{ t.Name }</span> <span class="text-muted-foreground">{ t.Description }</span></span>
+						</label>
+					}
+				</div>
+				@Meta("The agent uses only the tools ticked here. LinkedIn's terms forbid automated access, logged-in browsers included: prefer search and fetch tools to browser and captcha ones.")
+			}
+		}
+		<div class="flex flex-wrap items-center gap-3">
+			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+				if v.ID == 0 {
+					Add and check
+				} else {
+					Save and check
+				}
+			}
+			if v.ID != 0 {
+				@button.Button(button.Props{Size: button.SizeSm, Variant: button.VariantOutline, Attributes: templ.Attributes{"data-post": agentPath(v), "data-method": "DELETE",
+					"data-confirm": "Delete " + v.Name + "? Its runs stop and its key is revoked; what it found stays."}}) {
+					Delete
+				}
+			}
+			<p data-result class="text-sm text-[var(--ok)]" role="status"></p>
+		</div>
+	</form>
+}
+
+func agentKeyHint(v AgentView) string {
+	if v.HasKey {
+		return "saved: leave empty to keep it"
+	}
+	return ""
+}
+
+func agentModelHint(v AgentView) string {
+	if n := len(v.ModelList()); n > 0 {
+		return "The endpoint lists " + plural(n, "model") + "; a router model that picks one per request works too."
+	}
+	return "Saving fetches the endpoint's list to choose from."
 }
 
 func scoreText(sc AgentScore) string {

@@ -195,6 +195,7 @@ type ExportAgent struct {
 	// FallsBackTo is the agent that takes over after FallbackMinutes of waiting.
 	FallsBackTo     string `json:"falls_back_to,omitempty"`
 	FallbackMinutes int    `json:"fallback_minutes,omitempty"`
+	ThinkingOff     bool   `json:"thinking_off,omitempty"`
 }
 
 type ExportMail struct {
@@ -262,7 +263,8 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			names[a.ID] = a.Name
 		}
 		for _, a := range agents {
-			e := ExportAgent{Name: a.Name, Kind: a.Kind, Endpoint: a.BaseURL, Model: a.Model, ToolsURL: a.ToolsURL, SearchURL: a.SearchURL, Tools: a.AllowedTools()}
+			e := ExportAgent{Name: a.Name, Kind: a.Kind, Endpoint: a.BaseURL, Model: a.Model, ToolsURL: a.ToolsURL, SearchURL: a.SearchURL, Tools: a.AllowedTools(),
+				ThinkingOff: a.ThinkingOff}
 			if next, ok := names[a.FallbackID]; ok {
 				e.FallsBackTo, e.FallbackMinutes = next, a.FallbackMinutes
 			}

@@ -120,7 +120,7 @@ func agentOut(c Agent) api.Agent {
 	}
 	return api.Agent{Id: c.ID, Name: c.Name, Kind: api.AgentKind(c.Kind), BaseUrl: c.BaseURL, Model: c.Model, ToolsUrl: c.ToolsURL, SearchUrl: c.SearchURL,
 		Models: nonNil(c.ModelList()), Tools: tools, AllowedTools: nonNil(c.AllowedTools()), Fallback: c.FallbackID, FallbackMinutes: c.FallbackMinutes,
-		Problem: c.Problem, CheckedAt: c.CheckedAt, HasKey: c.APIKey != "", Ready: c.Ready(), UpdatedBy: c.UpdatedBy, UpdatedAt: c.UpdatedAt}
+		ThinkingOff: c.ThinkingOff, Problem: c.Problem, CheckedAt: c.CheckedAt, HasKey: c.APIKey != "", Ready: c.Ready(), UpdatedBy: c.UpdatedBy, UpdatedAt: c.UpdatedAt}
 }
 
 func runOut(r AgentRun) api.Run {
@@ -141,7 +141,7 @@ func settingsIn(id int64, b *api.AgentSettings) (AgentSettingsIn, error) {
 		return AgentSettingsIn{}, errors.New("send the agent's settings")
 	}
 	return AgentSettingsIn{ID: id, Name: b.Name, Kind: b.Kind, BaseURL: b.BaseUrl, APIKey: b.ApiKey, Model: b.Model, ToolsURL: b.ToolsUrl, SearchURL: b.SearchUrl,
-		Tools: nonNil(b.Tools), Fallback: b.Fallback, FallbackMinutes: b.FallbackMinutes}, nil
+		Tools: nonNil(b.Tools), Fallback: b.Fallback, FallbackMinutes: b.FallbackMinutes, ThinkingOff: b.ThinkingOff}, nil
 }
 
 // savedMessage says how a save went, for a person.
