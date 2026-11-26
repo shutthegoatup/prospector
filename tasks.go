@@ -561,6 +561,24 @@ type TaskView struct {
 	Status    string
 	// Last is the latest thing an agent did for the task, picking it up included.
 	Last *Event
+	// Withheld counts the people agents tried to add for the task and were refused,
+	// by why; who they were is kept nowhere.
+	Withheld map[string]int
+}
+
+// LeftOut are the companies the task came to that were already held, and still aren't
+// up for review, oldest find first: what it found that isn't new. One rejected before
+// that someone has since judged otherwise is theirs now, not left out.
+func (v TaskView) LeftOut() []TaskCompany {
+	var out []TaskCompany
+	for _, c := range v.Companies {
+		if c.Held == "" || c.Stage == CompanyReview || (c.Held == heldRejected && c.Stage != CompanyRejected) {
+			continue
+		}
+		out = append(out, c)
+	}
+	slices.SortStableFunc(out, func(a, b TaskCompany) int { return a.Since.Compare(b.Since) })
+	return out
 }
 
 type RequestView struct {
@@ -579,6 +597,8 @@ type TaskCompany struct {
 	Name  string    `json:"name"`
 	Stage string    `json:"stage" jsonschema:"review, qualified or rejected: don't suggest a rejected company again"`
 	Since time.Time `json:"since"`
+	// Held is how the company already stood when the task first came to it.
+	Held string `json:"held,omitempty" jsonschema:"set when the company was already held when this task first came to it: rejected, customer, open_deal or qualified. It isn't a new find"`
 }
 
 type TaskPerson struct {
@@ -695,7 +715,8 @@ func (s *Store) taskViews(tx *gorm.DB, org int64, tasks []Task, now time.Time) (
 		v := &out[i]
 		v.Task = t
 		events := eventsOf[t.ID]
-		companySince, personSince := map[int64]time.Time{}, map[int64]time.Time{}
+		companySince, personSince, heldAs := map[int64]time.Time{}, map[int64]time.Time{}, map[int64]string{}
+		v.Withheld = map[string]int{}
 		for j, e := range events {
 			if strings.HasPrefix(e.User, "agent:") {
 				v.Last = &events[j]
@@ -703,6 +724,12 @@ func (s *Store) taskViews(tx *gorm.DB, org int64, tasks []Task, now time.Time) (
 			// A note about a company isn't a find: it is often why the company was passed over.
 			if strings.HasPrefix(e.Action, "note:") {
 				continue
+			}
+			if e.Action == actionWithheld && e.Value != nil {
+				v.Withheld[*e.Value]++
+			}
+			if e.Action == actionHeld && e.CompanyID != nil && e.Value != nil {
+				heldAs[*e.CompanyID] = *e.Value
 			}
 			if e.CompanyID != nil {
 				if _, seen := companySince[*e.CompanyID]; !seen {
@@ -717,7 +744,7 @@ func (s *Store) taskViews(tx *gorm.DB, org int64, tasks []Task, now time.Time) (
 		}
 		for _, id := range slices.Sorted(maps.Keys(companySince)) {
 			if c, here := companies[id]; here {
-				v.Companies = append(v.Companies, TaskCompany{ID: c.ID, Name: c.Name, Stage: c.Stage, Since: companySince[id]})
+				v.Companies = append(v.Companies, TaskCompany{ID: c.ID, Name: c.Name, Stage: c.Stage, Since: companySince[id], Held: heldAs[id]})
 			}
 		}
 		// A task for an offering judges its companies by that offering's verdicts.
@@ -816,8 +843,9 @@ type TaskBrief struct {
 	Status     string     `json:"status" jsonschema:"waiting (nobody is on it), working (an agent changed something in the last half hour, or holds an open request) or done"`
 	Open       []AskedOut `json:"open_requests" jsonschema:"what people have asked for that nobody has finished"`
 	Found      TaskCounts `json:"found"`
-	Want       int        `json:"want,omitempty" jsonschema:"about how many companies the person wants found; absent when they gave no number. Once found.companies reaches it, finish the request unless it asks for more"`
+	Want       int        `json:"want,omitempty" jsonschema:"about how many companies the person wants found; absent when they gave no number. Once found.companies less left_out reaches it, finish the request unless it asks for more"`
 	Review     int        `json:"to_review" jsonschema:"of the companies found, how many wait for a person to qualify or reject them"`
+	LeftOut    int        `json:"left_out" jsonschema:"of the companies found, how many were already held, such as customers or ones rejected before: they don't count towards want"`
 	LastBy     string     `json:"last_agent,omitempty"`
 	LastAt     *time.Time `json:"last_agent_at,omitempty"`
 	LastDid    string     `json:"last_agent_action,omitempty" jsonschema:"what that agent last did: task:pickup when it only picked the task up"`
@@ -891,6 +919,7 @@ func brief(v TaskView, who Actor) TaskBrief {
 			b.Review++
 		}
 	}
+	b.LeftOut = len(v.LeftOut())
 	for _, r := range v.Open() {
 		b.Open = append(b.Open, asked(r, who))
 	}

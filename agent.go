@@ -175,6 +175,11 @@ func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddComp
 		} else if err := foundForOwn(tx, org, c.ID); err != nil {
 			return err
 		}
+		if !created {
+			if err := s.heldWhenFound(tx, org, who, c, out.Stage); err != nil {
+				return err
+			}
+		}
 		added := 0
 		for _, f := range in.Facts {
 			_, had, err := addFact(tx, org, c.ID, f, who.Name)
@@ -232,6 +237,9 @@ func (s *Store) AgentAddFact(org int64, who Actor, in AddFactIn) (*AddFactOut, e
 			return err
 		}
 		if err := forOffering(tx, org, who, c.ID); err != nil {
+			return err
+		}
+		if err := s.heldWhenReached(tx, org, who, c); err != nil {
 			return err
 		}
 		f, had, err := addFact(tx, org, c.ID, in.FactIn, who.Name)
@@ -299,6 +307,7 @@ func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContact
 		return nil, errors.New("linkedin must be an https link")
 	}
 	if err := s.allowed(o, in.Email, in.Linkedin); err != nil {
+		s.withheld(o.ID, who, withheldNeverContact)
 		return nil, err
 	}
 	if err := s.checkMailDomains(in.Email); err != nil {
@@ -309,6 +318,9 @@ func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContact
 		return nil, err
 	}
 	if err := erased(s.db, o.ID, in.Name, c.Name, in.Email, in.Linkedin); err != nil {
+		if errors.Is(err, errErased) {
+			s.withheld(o.ID, who, withheldErased)
+		}
 		return nil, err
 	}
 	person := strings.TrimSpace(in.Name)
@@ -326,6 +338,9 @@ func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContact
 			return err
 		}
 		if err := forOffering(tx, o.ID, who, c.ID); err != nil {
+			return err
+		}
+		if err := s.heldWhenReached(tx, o.ID, who, c); err != nil {
 			return err
 		}
 		var people []Contact

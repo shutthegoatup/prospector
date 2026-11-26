@@ -1081,6 +1081,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/tasks/{id}/left-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What a task found that isn't new
+         * @description The companies the task came to that were already held when it first did, and still
+         *     aren't up for review: rejected before, a customer, in an open conversation or
+         *     qualified already. How a company stood when the task first came to it is what
+         *     counts; what happens to it afterwards doesn't. A rejected one can be put up for
+         *     review again with `reviewCompany`, naming the task's offering.
+         *
+         *     Beside them, how many times an agent working the task was refused a person on the
+         *     never-contact list or erased on request. Who they were is kept nowhere, so a person
+         *     refused twice counts twice.
+         */
+        get: operations["listLeftOut"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/tasks/{id}": {
         parameters: {
             query?: never;
@@ -2879,6 +2911,8 @@ export interface components {
             want?: number;
             /** @description Of the companies found, how many wait for a person to qualify or reject them. */
             to_review: number;
+            /** @description Of the companies found, how many were already held, such as customers or ones rejected before; they don't count towards want. */
+            left_out: number;
             last_agent?: string;
             /** Format: date-time */
             last_agent_at?: string;
@@ -2894,6 +2928,11 @@ export interface components {
             stage: string;
             /** Format: date-time */
             since: string;
+            /**
+             * @description Set when the company was already held when the task first came to it: it isn't a new find.
+             * @enum {string}
+             */
+            held?: "rejected" | "customer" | "open_deal" | "qualified";
         };
         TaskPerson: {
             /** Format: int64 */
@@ -6058,6 +6097,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskStarted"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listLeftOut: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of the companies left out, oldest find first, and the refusals. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["TaskCompany"][];
+                        next_cursor?: string;
+                        /**
+                         * Format: int64
+                         * @description The task's offering, to name when putting a rejected company up for review again; 0 is the organisation's own.
+                         */
+                        offering: number;
+                        /** @description Companies rejected before. */
+                        rejected: number;
+                        /** @description Companies that were customers. */
+                        customer: number;
+                        /** @description Companies in an open conversation. */
+                        open_deal: number;
+                        /** @description Companies qualified already, with nothing under way. */
+                        qualified: number;
+                        /** @description Times a person on the never-contact list was refused. */
+                        never_contact: number;
+                        /** @description Times a person erased on request was refused. */
+                        erased: number;
+                    };
                 };
             };
             default: components["responses"]["Problem"];

@@ -1627,6 +1627,54 @@ paths:
               schema: { $ref: "#/components/schemas/TaskStarted" }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/tasks/{id}/left-out:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listLeftOut
+      tags: [tasks]
+      summary: What a task found that isn't new
+      description: |
+        The companies the task came to that were already held when it first did, and still
+        aren't up for review: rejected before, a customer, in an open conversation or
+        qualified already. How a company stood when the task first came to it is what
+        counts; what happens to it afterwards doesn't. A rejected one can be put up for
+        review again with `reviewCompany`, naming the task's offering.
+
+        Beside them, how many times an agent working the task was refused a person on the
+        never-contact list or erased on request. Who they were is kept nowhere, so a person
+        refused twice counts twice.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of the companies left out, oldest find first, and the refusals.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, offering, rejected, customer, open_deal, qualified, never_contact, erased]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/TaskCompany" }
+                  next_cursor: { type: string }
+                  offering: { type: integer, format: int64, description: "The task's offering, to name when putting a rejected company up for review again; 0 is the organisation's own." }
+                  rejected: { type: integer, description: Companies rejected before. }
+                  customer: { type: integer, description: Companies that were customers. }
+                  open_deal: { type: integer, description: Companies in an open conversation. }
+                  qualified: { type: integer, description: "Companies qualified already, with nothing under way." }
+                  never_contact: { type: integer, description: Times a person on the never-contact list was refused. }
+                  erased: { type: integer, description: Times a person erased on request was refused. }
+        default: { $ref: "#/components/responses/Problem" }
+
   /o/{org}/api/v1/tasks/{id}:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -3929,7 +3977,7 @@ components:
 
     TaskBrief:
       type: object
-      required: [id, title, status, open_requests, found, to_review, offering_id]
+      required: [id, title, status, open_requests, found, to_review, left_out, offering_id]
       properties:
         id: { type: integer, format: int64 }
         title: { type: string }
@@ -3941,6 +3989,7 @@ components:
         found: { $ref: "#/components/schemas/TaskCounts" }
         want: { type: integer, description: "About how many companies the person wants found; absent when they gave no number." }
         to_review: { type: integer, description: "Of the companies found, how many wait for a person to qualify or reject them." }
+        left_out: { type: integer, description: "Of the companies found, how many were already held, such as customers or ones rejected before; they don't count towards want." }
         last_agent: { type: string }
         last_agent_at: { type: string, format: date-time, x-go-type-skip-optional-pointer: false }
         last_agent_action: { type: string, description: "What that agent last did: `task:pickup` when it only picked the task up." }
@@ -3954,6 +4003,7 @@ components:
         name: { type: string }
         stage: { type: string, description: "`review`, `qualified` or `rejected`: a rejected company is not to be suggested again." }
         since: { type: string, format: date-time }
+        held: { type: string, enum: [rejected, customer, open_deal, qualified], description: "Set when the company was already held when the task first came to it: it isn't a new find." }
 
     TaskPerson:
       type: object
