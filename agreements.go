@@ -162,7 +162,7 @@ func (s *Store) RemoveAgreement(org, id int64) error {
 			}
 			return errors.New("only a draft agreement can be removed; one that was sent is kept")
 		}
-		for _, part := range []any{&AgreementFile{}, &AgreementRecipient{}, &AgreementField{}} {
+		for _, part := range []any{&AgreementFile{}, &AgreementRecipient{}, &AgreementField{}, &AgreementEvent{}} {
 			if err := tx.Where("org_id = ? and agreement_id = ?", org, id).Delete(part).Error; err != nil {
 				return err
 			}

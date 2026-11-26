@@ -55,6 +55,8 @@ var orgExportHolds = map[string]string{
 	"campaign_recipients":  "campaign_mail",
 	"agreement_recipients": "agreement_recipients",
 	"agreement_fields":     "agreement_fields",
+	"agreement_events":     "agreement_events",
+	"seal_keys":            "not exported: the organisation's private key for sealing agreements; its certificate is in every PDF it sealed",
 	"suggestions":          "suggested_details",
 	"tasks":                "tasks",
 	"task_requests":        "task_requests",

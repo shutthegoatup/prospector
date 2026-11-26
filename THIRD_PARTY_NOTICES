@@ -36,3 +36,9 @@ assets/js/prepare.js bundles, and assets/js/pdf.worker.min.mjs is, pdf.js
 (https://github.com/mozilla/pdf.js, Copyright Mozilla Foundation and contributors),
 under the Apache License, Version 2.0; the full text is in assets/js/pdf.js.LICENSE.txt
 and is served with them.
+
+
+The typefaces in sealfonts/ are Noto Sans (Copyright 2022 The Noto Project Authors) and
+Great Vibes (Copyright 2010 The Great Vibes Pro Project Authors). They are embedded in the
+binary and, as subsets, in the agreements it seals, under the SIL Open Font License,
+Version 1.1; the full text is in sealfonts/OFL.txt.
