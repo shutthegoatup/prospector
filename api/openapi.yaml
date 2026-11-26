@@ -1044,7 +1044,11 @@ paths:
       operationId: createTask
       tags: [tasks]
       summary: Start a task
-      description: A task is a brief for agents and people to work together; its brief becomes its first request.
+      description: |
+        A task is a brief for agents and people to work together; its brief becomes its first
+        request. Name Prospector's own agents in `agents` to start each on it at once: a key
+        then needs `agents:run` as well. An agent that can't start is said in `not_started`,
+        and the task is made all the same.
       security:
         - session: []
         - bearer: ["tasks:write"]
@@ -1055,10 +1059,10 @@ paths:
             schema: { $ref: "#/components/schemas/TaskNew" }
       responses:
         "201":
-          description: The task, started.
+          description: The task, started, with the runs of the agents named.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Task" }
+              schema: { $ref: "#/components/schemas/TaskStarted" }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/tasks/{id}:
@@ -1874,6 +1878,24 @@ components:
       properties:
         title: { type: string, description: "A few words naming the task. Empty, it takes the brief's first line; longer than 60 characters, it is cut." }
         brief: { type: string, maxLength: 4000, description: "What is wanted: the task's first request." }
+        agents:
+          type: array
+          items: { type: integer, format: int64 }
+          description: Prospector's own agents to start on the task, each on its own request.
+
+    TaskStarted:
+      allOf:
+        - $ref: "#/components/schemas/Task"
+        - type: object
+          required: [runs, not_started]
+          properties:
+            runs:
+              type: array
+              items: { $ref: "#/components/schemas/Run" }
+            not_started:
+              type: array
+              items: { type: string }
+              description: For each agent named that couldn't start, why.
 
     TaskChange:
       type: object

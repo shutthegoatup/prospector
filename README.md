@@ -35,7 +35,9 @@ Companies found by agents, imports and people wait here to be qualified or rejec
 
 ![Research: two companies an agent found, with sourced facts and a suggested contact](docs/images/research.png)
 
-### Tasks: write a brief, hand it to an agent
+### Find: write a brief, hand it to an agent
+
+At the top of Research, write who you're looking for, tick which of Prospector's own agents go after it, and press Find. The brief becomes a task: its search shows above the queue with who is working on it and what it has found, and "Show these" narrows the queue to its companies, beside the agents' notes and a box to ask for more. A task's own page keeps every request, note and run.
 
 Write what you want found. An agent picks the task up and what it finds waits in Research, tied to the task. Anyone can ask for more later, and a different agent can carry on: it is shown the brief, every request, what has already been found and what a person rejected, and the notes earlier agents left on what they skipped.
 
@@ -241,7 +243,7 @@ The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml),
 | `enquiries:delete` | `DELETE /api/v1/enquiries/{id}`: delete an enquiry for good |
 | `contacts:write` | Add people straight to outreach (`POST /api/v1/people`) and change their details and where their conversation stands (`PATCH /api/v1/contacts/{id}`) |
 | `research:review` | The review a person otherwise does: qualify or reject companies, pick suggested people for outreach, accept or dismiss details agents found. An agent's `research:write` key can't approve its own research |
-| `tasks:write` | Start tasks, ask them for more, mark their requests done or not, and close and reopen them, through `/api/v1/tasks` and `/api/v1/task-requests` |
+| `tasks:write` | Start tasks (naming agents to start on one at once needs `agents:run` too), ask them for more, mark their requests done or not, and close and reopen them, through `/api/v1/tasks` and `/api/v1/task-requests` |
 | `agents:run` | Start and stop Prospector's own agents on a task, and list a task's runs |
 | `agents:configure` | Add, change and delete Prospector's own agents: endpoint, key, model, tools and fallback. Owner-level: a signed-in member needs to be an owner |
 | `settings:write` | `PATCH /api/v1/settings`: change the organisation's settings, from its waits and wording to its never-contact list and enquiry sites; send only what changes. Owner-level, like `agents:configure`. `GET /api/v1/settings` reads them with `read` |

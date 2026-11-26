@@ -16,11 +16,25 @@ func requestOut(r TaskRequest) api.TaskRequest {
 
 func (s apiServer) CreateTask(ctx context.Context, in api.CreateTaskRequestObject) (api.CreateTaskResponseObject, error) {
 	q := reqFrom(ctx)
+	if len(in.Body.Agents) > 0 && q.Key != nil && !q.Key.Has("agents:run") {
+		return nil, refused("starting agents on the task needs the agents:run scope as well")
+	}
 	t, err := s.a.s.CreateTask(q.Org.ID, in.Body.Title, in.Body.Brief, q.Actor())
 	if err != nil {
 		return nil, err
 	}
-	return api.CreateTask201JSONResponse(taskOut(*t)), nil
+	out := taskOut(*t)
+	started := api.TaskStarted{Id: out.Id, Title: out.Title, CreatedBy: out.CreatedBy, CreatedAt: out.CreatedAt, ClosedAt: out.ClosedAt,
+		Runs: []api.Run{}, NotStarted: []string{}}
+	for _, agent := range in.Body.Agents {
+		run, err := s.a.StartRun(q.Org.ID, t.ID, agent, q.Actor())
+		if err != nil {
+			started.NotStarted = append(started.NotStarted, err.Error())
+			continue
+		}
+		started.Runs = append(started.Runs, runOut(*run))
+	}
+	return api.CreateTask201JSONResponse(started), nil
 }
 
 func (s apiServer) ChangeTask(ctx context.Context, in api.ChangeTaskRequestObject) (api.ChangeTaskResponseObject, error) {
