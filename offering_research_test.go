@@ -73,7 +73,9 @@ func TestEachOfferingHasAResearchQueueOfItsOwn(t *testing.T) {
 		}
 	}
 	code, body = asKey(t, "GET", base+"?task="+itoa(task.ID), secret, nil)
-	var queue struct{ OfferingId int64 `json:"offering_id"` }
+	var queue struct {
+		OfferingId int64 `json:"offering_id"`
+	}
 	if json.Unmarshal([]byte(body), &queue); code != http.StatusOK || queue.OfferingId != roles.ID {
 		t.Fatalf("a task's queue should say whose it is, so what is done on it goes there: %d %s", code, body)
 	}
