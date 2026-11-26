@@ -551,35 +551,26 @@ func (s *Store) customerSetStep(a *CustomerAccess, step int64, done bool) error 
 		case done && st.DoneOn != nil, !done && (st.DoneOn == nil || st.DoneBy != customerActor):
 			return nil
 		case !done:
-			updates = map[string]any{"done_on": nil, "done_by": ""}
+			updates = map[string]any{"done_on": nil, "done_by": "", "done_entry": 0}
 		}
 		marked := tx.Model(&OnboardingStep{}).Where("id = ? and org_id = ? and done_by = ?", st.ID, org, st.DoneBy).Updates(updates)
 		if marked.Error != nil || marked.RowsAffected == 0 {
 			return marked.Error
 		}
 		if done {
-			return s.log(tx, org, a.Contact.ID, &a.Onboarding.CompanyID, customerActor, action, nonEmpty(st.Name))
+			entry := Event{OrgID: org, ContactID: a.Contact.ID, CompanyID: &a.Onboarding.CompanyID, User: customerActor, Action: action, Value: nonEmpty(st.Name), At: time.Now()}
+			if err := tx.Create(&entry).Error; err != nil {
+				return err
+			}
+			return tx.Model(&OnboardingStep{}).Where("id = ?", st.ID).Update("done_entry", entry.ID).Error
 		}
-		// Taking a mark back removes its entry, not adds one: someone outside pressing the
-		// two buttons in turn can't fill the company's history.
-		// Theirs, and from the day they marked it: another onboarding at the company can have
-		// a step of the same name, marked by someone else or by them on another day.
-		var entries []Event
-		if err := tx.Where("org_id = ? and company_id = ? and contact_id = ? and \"user\" = ? and action = ? and value = ?", org, a.Onboarding.CompanyID, a.Contact.ID, customerActor, "onboard:done", st.Name).
-			Order("id desc").Find(&entries).Error; err != nil {
-			return err
-		}
-		if len(entries) == 0 {
+		// Taking a mark back removes the entry it wrote, not adds one: someone outside
+		// pressing the two buttons in turn can't fill the company's history. A mark made
+		// before steps kept their entry leaves it, since which one is theirs isn't known.
+		if st.DoneEntry == 0 {
 			return nil
 		}
-		entry := entries[0]
-		for _, e := range entries {
-			if e.At.Local().Format(dayLayout) == deref(st.DoneOn) {
-				entry = e
-				break
-			}
-		}
-		return tx.Delete(&entry).Error
+		return tx.Where("org_id = ? and id = ? and action = ?", org, st.DoneEntry, "onboard:done").Delete(&Event{}).Error
 	})
 }
 

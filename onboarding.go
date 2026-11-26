@@ -36,6 +36,8 @@ type OnboardingStep struct {
 	Due    *string `json:"due"`
 	DoneOn *string `json:"done_on"`
 	DoneBy string  `gorm:"not null;default:''" json:"done_by"`
+	// DoneEntry is the history entry a customer's mark wrote, which taking it back removes.
+	DoneEntry int64 `gorm:"not null;default:0" json:"done_entry"`
 }
 
 const (
@@ -163,7 +165,7 @@ func (s *Store) SetOnboardingStep(org, id int64, field, value, actor string) err
 		case "done":
 			switch {
 			case value == "":
-				updates["done_on"], updates["done_by"], action = nil, "", "onboard:undone"
+				updates["done_on"], updates["done_by"], updates["done_entry"], action = nil, "", 0, "onboard:undone"
 			case value != "yes":
 				return fmt.Errorf("a step is done (yes) or not (empty), not %q", value)
 			case st.DoneOn != nil:
