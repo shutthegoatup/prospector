@@ -6,7 +6,11 @@
     "types": "openapi-typescript ../api/openapi.yaml -o src/api.d.ts",
     "check": "tsc --noEmit",
     "build": "npm run types && npm run check && npm test && node build.mjs && vite build && vite build -c vite.form.config.ts && vite build -c vite.site.config.ts && node prerender.mjs",
-    "test": "node --test src/*.test.ts"
+    "test": "node --test src/*.test.ts",
+    "lint": "oxlint",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint:api": "spectral lint ../api/openapi.yaml --ruleset ../api/.spectral.yaml"
   },
   "dependencies": {
     "@tanstack/react-query": "5.108.4",
