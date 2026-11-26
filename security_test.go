@@ -1153,9 +1153,14 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 			t.Errorf("GET %s in a browser: %d %s %s, want %d as a problem", path, code, ctype, body, want)
 		}
 	}
-	code, _, body := get(client, "POST", "/api/v1/session", map[string]string{"Accept": browser["Accept"], "Sec-Fetch-Site": "cross-site", "content-type": "application/json"})
+	crossSite := map[string]string{"Accept": browser["Accept"], "Sec-Fetch-Site": "cross-site", "content-type": "application/json"}
+	code, _, body := get(client, "POST", "/c/some-link", crossSite)
 	if code != http.StatusForbidden || !styled(body) || !strings.Contains(body, "This request came from another site.") {
-		t.Fatalf("a sign-in from another site, in a browser: %d, styled=%v", code, styled(body))
+		t.Fatalf("a form from another site, in a browser: %d, styled=%v", code, styled(body))
+	}
+	code, ctype, body := get(client, "POST", "/api/v1/session", crossSite)
+	if code != http.StatusForbidden || ctype != "application/problem+json" || !strings.Contains(body, "this request came from another site") {
+		t.Fatalf("a sign-in from another site, in a browser: %d %s %s, want a problem", code, ctype, body)
 	}
 	if h := func() http.Header {
 		req, _ := http.NewRequest("GET", srv.URL+"/no/such/page", nil)
@@ -1187,7 +1192,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, ctype, body := get(http.DefaultClient, "GET", "/o/alpha/api/v1/companies/nope", map[string]string{"Accept": "text/html", "Authorization": "Bearer " + key})
+	code, ctype, body = get(http.DefaultClient, "GET", "/o/alpha/api/v1/companies/nope", map[string]string{"Accept": "text/html", "Authorization": "Bearer " + key})
 	if code != http.StatusNotFound || ctype != "application/problem+json" || styled(body) {
 		t.Fatalf("an agent's error: %d %s, styled=%v", code, ctype, styled(body))
 	}
@@ -1214,7 +1219,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	}
 	said, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	if res.StatusCode != http.StatusUnauthorized || !strings.Contains(string(said), `"code":"wrong_login"`) || styled(string(said)) {
+	if res.StatusCode != http.StatusUnauthorized || !strings.Contains(string(said), `"type":"/api/problems/wrong_login"`) || styled(string(said)) {
 		t.Fatalf("a wrong password in a browser: %d %s", res.StatusCode, said)
 	}
 	method, _ := http.NewRequest("DELETE", srv.URL+"/login", nil)

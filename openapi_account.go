@@ -24,7 +24,7 @@ func (a *App) accountCaller(next http.Handler) http.Handler {
 	})
 }
 
-var errSignedOut = coded{http.StatusUnauthorized, api.SignedOut, "signed out", 0}
+var errSignedOut = typed{http.StatusUnauthorized, api.ProblemTypeSignedOut, "signed out", 0}
 
 func signedInFrom(ctx context.Context) (*Req, error) {
 	q := reqFrom(ctx)
@@ -90,7 +90,7 @@ func (s apiServer) SignIn(ctx context.Context, in api.SignInRequestObject) (api.
 	case wait > 0:
 		return nil, throttledFor(wait)
 	case errors.Is(err, errWrongLogin):
-		return nil, coded{http.StatusUnauthorized, api.WrongLogin, err.Error(), 0}
+		return nil, typed{http.StatusUnauthorized, api.ProblemTypeWrongLogin, err.Error(), 0}
 	case err != nil:
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func (s apiServer) RequestPasswordReset(_ context.Context, in api.RequestPasswor
 	return api.RequestPasswordReset202Response{}, nil
 }
 
-var errLinkUsed = coded{http.StatusGone, api.LinkUsed, errBadLink.Error(), 0}
+var errLinkUsed = typed{http.StatusGone, api.ProblemTypeLinkUsed, errBadLink.Error(), 0}
 
 func (s apiServer) GetPasswordReset(_ context.Context, in api.GetPasswordResetRequestObject) (api.GetPasswordResetResponseObject, error) {
 	u, err := s.a.s.PasswordTokenUser(in.Token)

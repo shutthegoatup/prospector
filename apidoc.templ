@@ -126,6 +126,17 @@ templ APIPage(doc APIDoc) {
 Content-Type: application/problem+json
 
 {"type":"about:blank","title":"Forbidden","status":403,"detail":"this key lacks the agents:configure scope"}` }</code></pre>
+						<p>Each operation lists the statuses it can answer with. A problem a client can act on without reading <code>detail</code> has a <code>type</code> that links here:</p>
+						<dl class="api-fields">
+							for _, p := range doc.Problems {
+								<div class="api-field" id={ problemAnchor(p.Name) }>
+									<dt><code>{ p.Type }</code></dt>
+									<dd>
+										@Spans(p.About)
+									</dd>
+								</div>
+							}
+						</dl>
 					</section>
 					for _, g := range doc.Groups {
 						<section class="api-section">
@@ -175,7 +186,7 @@ Content-Type: application/problem+json
 												for _, r := range o.Responses {
 													<div class="api-field">
 														<dt>
-															<span class={ "api-code-tag", templ.KV("is-bad", r.Code == "4xx · 5xx") }>{ r.Code }</span>
+															<span class={ "api-code-tag", templ.KV("is-bad", r.Code >= "400") }>{ r.Code }</span>
 															if r.Type != "" {
 																@TypeName(doc, r.Type)
 															}
