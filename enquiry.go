@@ -306,7 +306,7 @@ func (s *Store) EnquiryCounts(org int64) map[string]int {
 		Spam        bool
 		N           int
 	}
-	logged(s.in(org).Model(&Enquiry{}).Select("kind, state, spam, count(*) as n").Group("kind, state, spam").Scan(&rows))
+	_ = logged(s.in(org).Model(&Enquiry{}).Select("kind, state, spam, count(*) as n").Group("kind, state, spam").Scan(&rows))
 	out := map[string]int{}
 	for _, r := range rows {
 		if r.Spam {
@@ -470,7 +470,7 @@ func (s *Store) aroundEnquiries(org int64, rows []Enquiry) (enquiriesAround, err
 	}
 	if len(ids) > 0 {
 		var companies []Company
-		logged(s.in(org).Where("id in ?", ids).Find(&companies))
+		_ = logged(s.in(org).Where("id in ?", ids).Find(&companies))
 		for _, c := range companies {
 			out.Companies[c.ID] = c.Name
 		}

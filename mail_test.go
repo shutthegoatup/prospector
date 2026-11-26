@@ -10,7 +10,6 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/mail"
-	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -120,21 +119,6 @@ func signIn(t *testing.T, c *http.Client, srv *httptest.Server, email, password 
 	}
 	res.Body.Close()
 	return res.StatusCode == http.StatusOK
-}
-
-func postForm(t *testing.T, c *http.Client, u string, form url.Values) (int, string) {
-	t.Helper()
-	req, _ := http.NewRequest("POST", u, strings.NewReader(form.Encode()))
-	req.Header.Set("content-type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "text/html")
-	res, err := c.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-	var b strings.Builder
-	bufio.NewReader(res.Body).WriteTo(&b)
-	return res.StatusCode, b.String()
 }
 
 func TestMailIsOffUntilConfigured(t *testing.T) {

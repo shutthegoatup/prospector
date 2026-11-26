@@ -325,7 +325,7 @@ func (a *App) customerMailOn(org int64) bool {
 }
 
 func (s *Store) dropCustomerLink(token string) {
-	logged(s.db.Where("token_hash = ?", hashToken(token)).Delete(&CustomerLink{}))
+	_ = logged(s.db.Where("token_hash = ?", hashToken(token)).Delete(&CustomerLink{}))
 }
 
 func (a *App) customerLinkMail(ctx context.Context, org *Org, to, token string) error {

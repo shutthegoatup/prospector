@@ -34,10 +34,10 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 		}
 		var have Contact
 		known := s.in(org).Where("key = ?", d.Key).First(&have).Error == nil
-		if email != nil && !(known && stored(d.Email, have.Email)) {
+		if email != nil && !(known && stored(d.Email, have.Email)) { //nolint:staticcheck // unless it's already stored
 			blocked = append(blocked, fmt.Sprintf("%s in %s (%v)", d.Key, d.File, email))
 		}
-		if link != nil && !(known && stored(d.Linkedin, have.Linkedin)) {
+		if link != nil && !(known && stored(d.Linkedin, have.Linkedin)) { //nolint:staticcheck // unless it's already stored
 			blocked = append(blocked, fmt.Sprintf("%s in %s (%v)", d.Key, d.File, link))
 		}
 	}

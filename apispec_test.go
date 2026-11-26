@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/shutthegoatup/prospector/api"
 )
 
@@ -29,7 +30,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	spec, err := api.GetSwagger()
+	spec, err := api.GetSpec()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -65,7 +66,7 @@ func TestMain(m *testing.M) {
 
 func TestEveryOperationNamesItsErrors(t *testing.T) {
 	t.Parallel()
-	spec, err := api.GetSwagger()
+	spec, err := api.GetSpec()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +130,7 @@ func TestAProblemToActOnLinksToWhatItMeans(t *testing.T) {
 
 func TestEveryProblemTypeHasItsTitle(t *testing.T) {
 	t.Parallel()
-	spec, err := api.GetSwagger()
+	spec, err := api.GetSpec()
 	if err != nil {
 		t.Fatal(err)
 	}

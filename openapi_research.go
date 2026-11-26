@@ -6,8 +6,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/shutthegoatup/prospector/api"
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
 func (s apiServer) AddPerson(ctx context.Context, in api.AddPersonRequestObject) (api.AddPersonResponseObject, error) {

@@ -104,7 +104,7 @@ func (s *Store) takesMail(ctx context.Context, domain string) mailAnswer {
 	answer := askDNS(asking, s.dns, domain)
 	if answer != mailUnknown {
 		row := MailDomain{Domain: domain, TakesMail: answer == mailTaken, CheckedAt: time.Now()}
-		logged(s.db.Clauses(clause.OnConflict{UpdateAll: true}).Create(&row))
+		_ = logged(s.db.Clauses(clause.OnConflict{UpdateAll: true}).Create(&row))
 	}
 	return answer
 }
@@ -119,7 +119,7 @@ func answerOf(takes bool) mailAnswer {
 // noMailDomains are the domains known not to take mail, for pages that mustn't wait on DNS.
 func (s *Store) noMailDomains() map[string]bool {
 	var domains []string
-	logged(s.db.Model(&MailDomain{}).Where("takes_mail = ? and checked_at > ?", false, time.Now().Add(-mailRefusedFor)).Pluck("domain", &domains))
+	_ = logged(s.db.Model(&MailDomain{}).Where("takes_mail = ? and checked_at > ?", false, time.Now().Add(-mailRefusedFor)).Pluck("domain", &domains))
 	out := make(map[string]bool, len(domains))
 	for _, d := range domains {
 		out[d] = true

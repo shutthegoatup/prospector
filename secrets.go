@@ -164,7 +164,7 @@ func sealedVersion(stored string) int {
 		KID string `json:"kid"`
 	}
 	raw, _ := base64.RawURLEncoding.DecodeString(stored[:strings.IndexByte(stored, '.')])
-	json.Unmarshal(raw, &header)
+	_ = json.Unmarshal(raw, &header)
 	return plainVersion(header.KID)
 }
 
@@ -312,7 +312,7 @@ func (s *Store) resealOne(in sealedColumn, row storedSecret) (moved, raced bool,
 func (s *Store) resealAtStart() {
 	if s.keys == nil {
 		var clear int64
-		logged(s.db.Model(&SSOConnection{}).Where("client_secret <> ''").Count(&clear))
+		_ = logged(s.db.Model(&SSOConnection{}).Where("client_secret <> ''").Count(&clear))
 		if clear > 0 {
 			log.Printf("secrets: PROSPECTOR_SECRET_KEYS isn't set: single sign-on secrets kept as stored, which none can be changed from: %d", clear)
 		}
@@ -329,7 +329,7 @@ func (s *Store) resealAtStart() {
 	// An API key can't be moved until it is next shown, so an old key that is removed
 	// first takes with it whichever haven't been used since.
 	var hashes []string
-	logged(s.db.Model(&APIKey{}).Where("revoked_at is null").Pluck("hash", &hashes))
+	_ = logged(s.db.Model(&APIKey{}).Where("revoked_at is null").Pluck("hash", &hashes))
 	waiting := 0
 	for _, h := range hashes {
 		if s.keys.lookupBehind(h) {

@@ -612,7 +612,7 @@ func (a *App) addSSODomain(org int64, raw string) (*SSODomain, error) {
 		return nil, fmt.Errorf("a domain looks like example.com, not %q", raw)
 	}
 	var n int64
-	logged(a.s.in(org).Model(&SSODomain{}).Count(&n))
+	_ = logged(a.s.in(org).Model(&SSODomain{}).Count(&n))
 	if n >= maxSSODomains {
 		return nil, fmt.Errorf("an organisation can have %d domains", maxSSODomains)
 	}

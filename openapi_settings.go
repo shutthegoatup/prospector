@@ -93,8 +93,8 @@ func settingsDiff(a, b api.Settings) []string {
 	var was, now map[string]any
 	ja, _ := json.Marshal(a)
 	jb, _ := json.Marshal(b)
-	json.Unmarshal(ja, &was)
-	json.Unmarshal(jb, &now)
+	_ = json.Unmarshal(ja, &was)
+	_ = json.Unmarshal(jb, &now)
 	var changed []string
 	for k, v := range now {
 		if !reflect.DeepEqual(was[k], v) {

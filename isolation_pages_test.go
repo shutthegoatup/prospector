@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/shutthegoatup/prospector/api"
 )
 

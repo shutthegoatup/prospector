@@ -90,7 +90,7 @@ func pdfPages(data []byte) (int, error) {
 		}
 		return 0, fmt.Errorf("that PDF can't be read to place fields on it: %v", err)
 	}
-	if ctx.XRefTable.Encrypt != nil || ctx.E != nil {
+	if ctx.XRefTable.Encrypt != nil || ctx.E != nil { //nolint:staticcheck // the xref table's, unlike ctx.E
 		return 0, errors.New("that PDF is encrypted: save it without protection first")
 	}
 	if signedPDF(ctx.XRefTable, data) {

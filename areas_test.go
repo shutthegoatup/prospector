@@ -12,7 +12,7 @@ import (
 // A write the spec adds without saying whose work it is would be open to everyone.
 func TestEveryAPIWriteNamesItsArea(t *testing.T) {
 	t.Parallel()
-	spec, err := api.GetSwagger()
+	spec, err := api.GetSpec()
 	if err != nil {
 		t.Fatal(err)
 	}

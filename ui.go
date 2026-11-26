@@ -58,7 +58,7 @@ func (a *App) nav(q *Req) Nav {
 		}
 	}
 	var companies int64
-	logged(a.s.in(q.Org.ID).Model(&Company{}).Count(&companies))
+	_ = logged(a.s.in(q.Org.ID).Model(&Company{}).Count(&companies))
 	n.Companies = int(companies)
 	return n
 }
