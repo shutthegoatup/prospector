@@ -90,7 +90,9 @@ export function TodayPage() {
   // On LinkedIn adds: o opens the first card's profile and copies its note, a marks it added, s skips.
   // Until a changed filter's list comes, the first card is still the old list's.
   const stale = useRef(false);
-  stale.current = list.isPlaceholderData;
+  useEffect(() => {
+    stale.current = list.isPlaceholderData;
+  });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || typing() || stale.current) return;

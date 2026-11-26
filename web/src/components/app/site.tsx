@@ -81,6 +81,7 @@ export function SiteButton({ look = "ink", big, small, className, ...props }: Co
         className,
       )}
     >
+      {/* oxlint-disable-next-line jsx-a11y/anchor-has-content -- its text comes in props.children */}
       <a {...props} />
     </Button>
   );

@@ -116,6 +116,7 @@ function AddForm({ draft, settings, popup }: { draft?: Draft; settings?: Setting
           type="url"
           value={values.linkedin}
           onChange={set("linkedin")}
+          // oxlint-disable-next-line jsx-a11y/no-autofocus -- opened to add someone, the first empty field is where typing starts
           autoFocus={draft?.linkedin === ""}
           disabled={loading}
           placeholder="https://www.linkedin.com/in/…"
@@ -128,6 +129,7 @@ function AddForm({ draft, settings, popup }: { draft?: Draft; settings?: Setting
             required
             value={values.name}
             onChange={set("name")}
+            // oxlint-disable-next-line jsx-a11y/no-autofocus -- as above
             autoFocus={draft !== undefined && draft.linkedin !== "" && draft.name === ""}
             disabled={loading}
             className={box}
@@ -182,6 +184,7 @@ function Faster({ name, bookmarklet }: { name?: string; bookmarklet?: string }) 
       <p className="text-muted-foreground">
         Drag this to your bookmarks bar. On someone's LinkedIn profile, click it: this form opens filled in with their name, role and company.
       </p>
+      {/* oxlint-disable-next-line jsx-a11y/anchor-is-valid -- its javascript: address is set from an effect, as React won't render one */}
       <a ref={link} className="self-start rounded-lg border border-dashed border-primary px-3 py-2 font-medium text-mark" data-bookmarklet draggable="true">
         + <Text value={name} w="8ch" />
       </a>

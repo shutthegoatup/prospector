@@ -574,6 +574,7 @@ function AgentForm({
         <Input name="model" defaultValue={v?.model} list={modelsID} autoComplete="off" placeholder="one the endpoint lists" className={fieldClass} />
         <datalist id={modelsID}>
           {models.map((m) => (
+            // oxlint-disable-next-line jsx-a11y/control-has-associated-label -- a suggestion for the input, which has the label
             <option key={m} value={m} />
           ))}
         </datalist>
@@ -932,6 +933,7 @@ function VendorCard({ vendor: e, n, up, down }: { vendor?: Enricher; n: number; 
 
   return (
     <details className={cardClass} data-state={rail}>
+      {/* oxlint-disable-next-line jsx-a11y/control-has-associated-label -- labelled by the agent's name inside it */}
       <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         <span className="flex flex-wrap items-start justify-between gap-3 px-4 pt-4 pb-3">
           <span className="flex min-w-0 flex-col gap-0.5">
