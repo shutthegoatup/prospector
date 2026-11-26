@@ -6,6 +6,7 @@ import { CampaignsPage } from "@/pages/Campaigns";
 import { EnquiriesPage } from "@/pages/Enquiries";
 import { OnboardingPage } from "@/pages/Onboarding";
 import { ResearchPage } from "@/pages/Research";
+import { SubscriptionsPage } from "@/pages/Subscriptions";
 import { SessionContext } from "@/session";
 
 const mount = document.getElementById("app");
@@ -22,6 +23,7 @@ if (mount) {
               <Route path="campaigns" element={<CampaignsPage />} />
               <Route path="onboarding" element={<OnboardingPage />} />
               <Route path="enquiries" element={<EnquiriesPage />} />
+              <Route path="subscriptions" element={<SubscriptionsPage />} />
             </Routes>
           </BrowserRouter>
         </QueryClientProvider>
