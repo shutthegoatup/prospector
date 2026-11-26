@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -36,37 +38,30 @@ func (s apiServer) ChangeSettings(ctx context.Context, in api.ChangeSettingsRequ
 	if err != nil {
 		return nil, err
 	}
+	before := settingsOut(o)
 	c, set := in.Body, &o.Settings
-	var changed []string
-	put := func(name string, to *string, v *string) {
-		if v != nil && *v != *to {
-			*to, changed = *v, append(changed, name)
-		}
-	}
-	putInt := func(name string, to *int, v *int32) {
-		if v != nil && int(*v) != *to {
-			*to, changed = int(*v), append(changed, name)
-		}
-	}
-	put("name", &o.Name, c.Name)
-	put("color", &o.Color, c.Color)
-	putInt("email_after_days", &set.EmailAfterDays, c.EmailAfterDays)
-	putInt("followup_after_days", &set.FollowupAfterDays, c.FollowupAfterDays)
-	put("note_template", &set.NoteTemplate, c.NoteTemplate)
-	put("pitch", &set.Pitch, c.Pitch)
-	put("never_contact", &set.NeverContact, c.NeverContact)
-	put("look_for", &set.LookFor, c.LookFor)
-	put("agent_guidance", &set.AgentGuidance, c.AgentGuidance)
-	put("enquiry_sites", &set.EnquirySites, c.EnquirySites)
-	put("onboarding_steps", &set.OnboardingSteps, c.OnboardingSteps)
-	put("currency", &set.Currency, c.Currency)
-	put("postal_address", &set.PostalAddress, c.PostalAddress)
-	if c.IncorporatedOnly != nil && *c.IncorporatedOnly != set.IncorporatedOnly {
-		set.IncorporatedOnly, changed = *c.IncorporatedOnly, append(changed, "incorporated_only")
+	put(&o.Name, c.Name)
+	put(&o.Color, c.Color)
+	putInt(&set.EmailAfterDays, c.EmailAfterDays)
+	putInt(&set.FollowupAfterDays, c.FollowupAfterDays)
+	put(&set.NoteTemplate, c.NoteTemplate)
+	put(&set.Pitch, c.Pitch)
+	put(&set.NeverContact, c.NeverContact)
+	put(&set.LookFor, c.LookFor)
+	put(&set.AgentGuidance, c.AgentGuidance)
+	put(&set.EnquirySites, c.EnquirySites)
+	put(&set.OnboardingSteps, c.OnboardingSteps)
+	put(&set.Currency, c.Currency)
+	put(&set.PostalAddress, c.PostalAddress)
+	if c.IncorporatedOnly != nil {
+		set.IncorporatedOnly = *c.IncorporatedOnly
 	}
 	if err := checkOrg(o); err != nil {
 		return nil, err
 	}
+	// Compared as they take effect, so the page sending back the defaults it showed, or
+	// "gbp" for GBP, isn't a change.
+	changed := settingsDiff(before, settingsOut(o))
 	who := Actor{Name: q.Actor()}
 	if q.Key != nil {
 		who.KeyID = q.Key.ID
@@ -78,6 +73,35 @@ func (s apiServer) ChangeSettings(ctx context.Context, in api.ChangeSettingsRequ
 		s.a.dropMCPServers()
 	}
 	return api.ChangeSettings200JSONResponse(settingsOut(o)), nil
+}
+
+func put(to, v *string) {
+	if v != nil {
+		*to = *v
+	}
+}
+
+func putInt(to *int, v *int32) {
+	if v != nil {
+		*to = int(*v)
+	}
+}
+
+// settingsDiff names the fields, as the API spells them, that differ between a and b.
+func settingsDiff(a, b api.Settings) []string {
+	var was, now map[string]any
+	ja, _ := json.Marshal(a)
+	jb, _ := json.Marshal(b)
+	json.Unmarshal(ja, &was)
+	json.Unmarshal(jb, &now)
+	var changed []string
+	for k, v := range now {
+		if was[k] != v {
+			changed = append(changed, k)
+		}
+	}
+	slices.Sort(changed)
+	return changed
 }
 
 // checkOrg refuses settings that can't be worked with, and tidies the name and currency.

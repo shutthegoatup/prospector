@@ -493,7 +493,7 @@ var Scopes = []struct{ Name, What string }{
 	{"tasks:write", "start tasks, ask them for more, mark their requests done or not, and close and reopen them"},
 	{"agents:run", "start and stop Prospector's own agents on tasks"},
 	{"agents:configure", "add, change and delete Prospector's own agents, their endpoints, keys and tools"},
-	{"settings:write", "change the organisation's settings: its name, waits and wording, never-contact list, what it looks for, enquiry sites, onboarding steps, currency and postal address"},
+	{"settings:write", "change the organisation's settings: its name and colour, waits and wording, the guidance sent to every agent, never-contact list, what it looks for, enquiry sites, onboarding steps, currency, postal address and whether to email only incorporated companies"},
 }
 
 func validScope(s string) bool {

@@ -78,3 +78,37 @@ func TestSettingsChangeThroughTheAPIOnlyWhatIsSent(t *testing.T) {
 		t.Fatalf("an owner changing the currency: %d %s", code, body)
 	}
 }
+
+func TestOnlyWhatTakesEffectDifferentlyIsAChange(t *testing.T) {
+	s, o, srv, ada := signedIn(t)
+	url := srv.URL + "/o/alpha/api/v1/settings"
+	changes := func() []string {
+		var out []string
+		var events []Event
+		s.db.Where("org_id = ? and action = ?", o.ID, "settings:change").Order("id").Find(&events)
+		for _, e := range events {
+			out = append(out, deref(e.Value))
+		}
+		return out
+	}
+	// The page sends back every field as it showed them, defaults included.
+	_, body := call(t, ada, "GET", url, "", nil)
+	var shown map[string]any
+	if err := json.Unmarshal([]byte(body), &shown); err != nil {
+		t.Fatal(err)
+	}
+	shown["pitch"] = "We make {company} faster."
+	if code, body := call(t, ada, "PATCH", url, "application/json", shown); code != http.StatusOK {
+		t.Fatalf("saving the page as shown: %d %s", code, body)
+	}
+	if got := changes(); len(got) != 1 || got[0] != "pitch" {
+		t.Fatalf("only the pitch changed, but the history says %q", got)
+	}
+	currency := strings.ToLower(shown["currency"].(string))
+	if code, body := call(t, ada, "PATCH", url, "application/json", map[string]any{"currency": currency, "name": " " + o.Name + " "}); code != http.StatusOK {
+		t.Fatalf("sending what is already there: %d %s", code, body)
+	}
+	if got := changes(); len(got) != 1 {
+		t.Fatalf("a currency in lower case and a padded name changed nothing, but the history says %q", got)
+	}
+}
