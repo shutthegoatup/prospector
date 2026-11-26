@@ -156,6 +156,68 @@ func TestFieldsLieOnTheDocumentForItsSigners(t *testing.T) {
 
 // Erasing someone takes them off what they were to sign; removing a member does too,
 // and removing the draft takes its recipients and fields with it.
+// Once an agreement has gone out, who it went to is part of its record: erasing them,
+// removing a member or a restore without them detaches them and leaves the row.
+func TestAnAgreementThatWentOutKeepsWhoItWentTo(t *testing.T) {
+	s, o, _, _, a, hannah, _ := preparing(t)
+	grace := must(s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
+	if err := s.AddMember(o.ID, grace.ID, "member", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	h := must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	g := must(s.AddRecipient(o, a.ID, RecipientSigner, nil, &grace.ID, "Ada Lovelace"))
+	must(s.PutAgreementFields(o.ID, a.ID, []AgreementField{{RecipientID: h.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.1, W: 0.3, H: 0.05}}))
+	draft := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Still a draft", "Ada Lovelace"))
+	must(s.AddRecipient(o, draft.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	if err := s.db.Model(&Agreement{}).Where("id = ?", a.ID).Update("status", "sent").Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.ErasePerson(o.ID, hannah.ID, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RemoveMember(o.ID, grace.ID, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	var rows []AgreementRecipient
+	if err := s.db.Where("agreement_id = ?", a.ID).Order("id").Find(&rows).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 2 || rows[0].ID != h.ID || rows[0].ContactID != nil || rows[1].ID != g.ID || rows[1].UserID != nil {
+		t.Errorf("who a sent agreement went to, after erasing and removing them: %+v", rows)
+	}
+	var fields int64
+	if err := s.db.Model(&AgreementField{}).Where("agreement_id = ?", a.ID).Count(&fields).Error; err != nil || fields != 1 {
+		t.Errorf("the sent agreement's fields: %d (%v)", fields, err)
+	}
+	if left := must(s.AgreementRecipients(o.ID, draft.ID)); len(left) != 0 {
+		t.Errorf("the draft kept the erased person: %+v", left)
+	}
+}
+
+// An operation that names no key scope is for people signed in: a key is refused,
+// whatever scopes it has.
+func TestAnOperationWithoutAKeyScopeRefusesKeys(t *testing.T) {
+	a := &App{s: tempStore(t)}
+	ran := false
+	handler := a.apiScope(map[string][]string{})(func(context.Context, http.ResponseWriter, *http.Request, any) (any, error) {
+		ran = true
+		return nil, nil
+	}, "SomethingForPeopleOnly")
+	var all []string
+	for _, sc := range Scopes {
+		all = append(all, sc.Name)
+	}
+	ctx := context.WithValue(context.Background(), reqKey{}, &Req{Key: &APIKey{Scopes: strings.Join(all, " ")}})
+	w := httptest.NewRecorder()
+	if _, err := handler(ctx, w, httptest.NewRequest("POST", "/", nil), nil); err != nil {
+		t.Fatal(err)
+	}
+	if ran || w.Code != http.StatusForbidden {
+		t.Errorf("a key with every scope on an operation that names none: ran %v, %d", ran, w.Code)
+	}
+}
+
 func TestAnAgreementsRecipientsGoWithWhoTheyStandFor(t *testing.T) {
 	s, o, _, _, a, hannah, theo := preparing(t)
 	grace := must(s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
