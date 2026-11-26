@@ -331,6 +331,12 @@ func (s *Store) replaceContacts(org int64, rows []Contact, absent []string) (int
 		if err := follow(tx, org, before, rows); err != nil {
 			return err
 		}
+		// A snapshot can name an offering removed since it was taken: those people are
+		// then the organisation's own, as removing it would have made them.
+		if err := tx.Model(&Contact{}).Where("org_id = ? and offering_id <> 0 and offering_id not in (?)", org,
+			tx.Model(&Offering{}).Select("id").Where("org_id = ?", org)).Update("offering_id", 0).Error; err != nil {
+			return err
+		}
 		return linkCompanies(tx, org, nil)
 	})
 	return len(rows), err

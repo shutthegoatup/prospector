@@ -60,7 +60,8 @@ func TestPeopleAreReachedForTheOfferingTheyWerePickedFor(t *testing.T) {
 		t.Fatalf("rejecting for the organisation's own should take only its people out of the queue: %v", due)
 	}
 
-	if _, err := s.Restore(o.ID, must(s.SnapshotText(o.ID))); err != nil {
+	snapshot := must(s.SnapshotText(o.ID))
+	if _, err := s.Restore(o.ID, snapshot); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.in(o.ID).Where("id = ?", ctoPerson.ID).First(&picked).Error; err != nil || picked.OfferingID != cto.ID {
@@ -76,6 +77,42 @@ func TestPeopleAreReachedForTheOfferingTheyWerePickedFor(t *testing.T) {
 	}
 	if err := s.in(o.ID).Where("id = ?", ctoPerson.ID).First(&picked).Error; err != nil || picked.OfferingID != 0 {
 		t.Fatalf("removing an offering should hand its people to the organisation's own: %d %v", picked.OfferingID, err)
+	}
+	// A snapshot from before the removal names an offering that is no longer there.
+	if _, err := s.Restore(o.ID, snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.in(o.ID).Where("id = ?", ctoPerson.ID).First(&picked).Error; err != nil || picked.OfferingID != 0 {
+		t.Fatalf("a restore naming a removed offering should leave them the organisation's own: %d %v", picked.OfferingID, err)
+	}
+}
+
+func TestPickingForAnOfferingLeavesTheCompanysOwnStage(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	o.Settings.NoteTemplate, o.Settings.Pitch = "Hello {first} from {org}.", "Our own pitch for {company}."
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	plain := must(s.AddOffering(o.ID, Offering{Name: "Agency partners"}, "Ada"))
+	task := must(s.CreateTaskFor(o.ID, plain.ID, "", "Find agencies", "Ada"))
+	scout := Actor{Name: "agent:scout", KeyID: 2}
+	co := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Quayside Talent", Domain: "quayside.example", Task: task.ID}))
+	p := must(s.AgentAddContact(o, scout, AddContactIn{Company: co.Name, Name: "Rhea Moss", Title: "Contract lead",
+		SourceURL: "https://quayside.example/team", Task: task.ID}))
+	if err := s.PickContact(o.ID, o, p.ID, "Ada"); err != nil {
+		t.Fatal(err)
+	}
+	if got := companyRow(t, s, o.ID, co.ID).Stage; got != CompanyReview {
+		t.Fatalf("picking someone only for an offering changed the company's own stage to %s", got)
+	}
+	var c Contact
+	if err := s.in(o.ID).Where("id = ?", p.ID).First(&c).Error; err != nil || deref(c.Note) != "Hello Rhea from "+o.Name+"." {
+		t.Fatalf("an offering without a note of its own should use the organisation's: %q %v", deref(c.Note), err)
+	}
+	script := scriptText(callScript(c, "Rhea Moss", Voice{Org: "alpha", Pitch: o.Settings.Pitch, Pitches: map[int64]string{plain.ID: ""}}))
+	if !strings.Contains(script, "Our own pitch for Quayside Talent.") {
+		t.Fatalf("an offering without a pitch of its own should use the organisation's: %s", script)
 	}
 }
 
