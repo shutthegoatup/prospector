@@ -314,23 +314,22 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 			a.finishIfDone(c)
 			return
 		}
-		claimed := a.s.db.Model(&CampaignRecipient{}).Where("id = ? and status = ?", r.ID, MailQueued).
-			Updates(map[string]any{"status": MailSending, "claimed_at": time.Now()})
-		if !stored(claimed) {
-			return
-		}
-		if claimed.RowsAffected == 0 {
-			continue
-		}
 		if !a.sendOne(ctx, o, c, via, gate, customers, r) {
 			return
 		}
 	}
 }
 
-// sendOne sends one claimed mail and settles it. It reports whether the round should go
-// on: not once the mail server can't be reached, nor once the campaign stops.
+// sendOne checks one queued mail, claims it and sends it. The claim is where it is
+// decided: it holds only while the row is still queued to the address that was checked,
+// so an erasure or a cancel that lands first leaves nothing to send. It reports whether
+// the round should go on: not once the mail server can't be reached, nor once the
+// campaign stops.
 func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, gate *mailGate, customers map[int64]bool, r CampaignRecipient) bool {
+	skip := func(reason string) bool {
+		return stored(a.s.db.Model(&CampaignRecipient{}).Where("id = ? and status = ?", r.ID, MailQueued).
+			Updates(map[string]any{"status": MailSkipped, "reason": reason}))
+	}
 	settle := func(status, reason string) bool {
 		updates := map[string]any{"status": status, "reason": reason}
 		if status == MailSent {
@@ -341,14 +340,9 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 		}
 		return stored(a.s.db.Model(&CampaignRecipient{}).Where("id = ?", r.ID).Updates(updates))
 	}
-	// Stopped since the round began: this one goes back with the rest.
+	// Stopped since the round began: this one stays with the rest.
 	var now Campaign
 	if !stored(a.s.db.Where("id = ?", c.ID).First(&now)) || now.Status != CampaignSending {
-		if now.Status == CampaignCancelled {
-			settle(MailCancelled, "")
-		} else {
-			settle(MailQueued, "")
-		}
 		return false
 	}
 	// Checked again as it goes: someone may have unsubscribed since it was sent.
@@ -359,7 +353,6 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 		read := a.s.db.Where("org_id = ? and id = ?", o.ID, *r.ContactID).Limit(1).Find(&who)
 		if read.Error != nil && c.Kind == KindService {
 			log.Printf("campaign %d: checking a mail: %v", c.ID, read.Error)
-			settle(MailQueued, "")
 			return false
 		}
 		if read.Error == nil && read.RowsAffected > 0 {
@@ -370,20 +363,19 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 	// so that is checked again too: a subscription may have ended since it was queued.
 	if c.Kind == KindService && (!found || who.Status == ContactSuggested || who.Declined != nil ||
 		who.CompanyID == nil || !customers[*who.CompanyID]) {
-		return settle(MailSkipped, "no longer a customer")
+		return skip("no longer a customer")
 	}
 	// An address made unreadable since it was queued, as erasure does, is nobody's.
 	if _, err := bareAddress(r.Address); err != nil {
-		return settle(MailSkipped, "no longer one email address")
+		return skip("no longer one email address")
 	}
 	if why := gate.whyFor(c.Kind, r.Address, link); why != nil {
 		because, known := leftOutBecause(why)
 		if !known {
 			log.Printf("campaign %d: checking a mail: %v", c.ID, why)
-			settle(MailQueued, "")
 			return false
 		}
-		return settle(MailSkipped, because)
+		return skip(because)
 	}
 	foot := c.Body + "\n\n-- \n" + o.Name + "\n" + strings.TrimSpace(o.Settings.PostalAddress) + "\n\n"
 	var token, unsubscribe, body string
@@ -394,11 +386,18 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 		var err error
 		if token, err = a.s.unsubscribeLink(a.s.db, o.ID, r.Address); err != nil {
 			log.Printf("campaign %d: %v", c.ID, err)
-			settle(MailQueued, "")
 			return false
 		}
 		unsubscribe = a.base + "/u/" + token
 		body = foot + "You are getting this because you are in touch with " + o.Name + ". To stop these mails: " + unsubscribe + "\n"
+	}
+	// The link is made before the claim, so an erasure landing any time after deletes it;
+	// one made after the claim could outlast an erasure and keep its address.
+	claimed := a.s.db.Model(&CampaignRecipient{}).Where("id = ? and status = ? and address = ?", r.ID, MailQueued, r.Address).
+		Updates(map[string]any{"status": MailSending, "claimed_at": time.Now()})
+	if !stored(claimed) || claimed.RowsAffected == 0 {
+		a.s.dropUnsubscribeLink(token)
+		return claimed.Error == nil
 	}
 	sendCtx, cancel := context.WithTimeout(ctx, sendLimit)
 	defer cancel()
