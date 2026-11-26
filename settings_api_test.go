@@ -9,6 +9,31 @@ import (
 	"github.com/shutthegoatup/prospector/api"
 )
 
+// What the organisation looks for comes back as a list, which a change must still be
+// compared against rather than failing the request.
+func TestSettingsChangeWithALookForList(t *testing.T) {
+	s, o, srv, _ := signedIn(t)
+	o.Settings.LookFor = "careers_page: a page of open roles\nats (must): an applicant tracking system"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	secret, _, err := s.CreateKey(o.ID, "robot", []string{"settings:write"}, "Ada Lovelace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	url := srv.URL + "/o/alpha/api/v1/settings"
+	if code, body := asKey(t, "PATCH", url, secret, map[string]any{"pitch": "We help {company}."}); code != http.StatusOK {
+		t.Fatalf("changing the pitch with a look-for list set: %d %s", code, body)
+	}
+	code, body := asKey(t, "PATCH", url, secret, map[string]any{"look_for": "careers_page: a page of open roles"})
+	if code != http.StatusOK || !strings.Contains(body, `"look_for":"careers_page: a page of open roles"`) {
+		t.Fatalf("changing the look-for list itself: %d %s", code, body)
+	}
+	if activity, _ := s.AgentActivity(o.ID, 1); len(activity) == 0 || !strings.Contains(activity[0].Value, "look_for") {
+		t.Fatalf("the change should be in the history, naming what changed: %+v", activity)
+	}
+}
+
 func TestSettingsChangeThroughTheAPIOnlyWhatIsSent(t *testing.T) {
 	s, o, srv, ada := signedIn(t)
 	o.Settings.Pitch, o.Settings.NeverContact = "We help {company}.", "rival.example"

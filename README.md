@@ -120,6 +120,7 @@ prospector serve                                          # http://127.0.0.1:876
 | `SMTP_USERNAME`, `SMTP_PASSWORD` | What that server asks for, if anything |
 | `PROSPECTOR_SECRET_KEYS` | The server's secret keys, newest first: `2:<64 hex>,1:<64 hex>`. Needed for an organisation's single sign-on and for a mail server of its own (see [Secret keys](#secret-keys)) |
 | `PROSPECTOR_GOOGLE_CLIENT_ID`, `PROSPECTOR_GOOGLE_CLIENT_SECRET` | Offer "Continue with Google" on the sign-in page. The same pair exists for `MICROSOFT` and `LINKEDIN`. Each needs `PROSPECTOR_URL` (see [Signing in](#signing-in)) |
+| `PROSPECTOR_SECURITY_CONTACT` | Where to report a security problem with this server, as a `mailto:`, `https://` or `tel:` address. It is served as the `Contact` of `/.well-known/security.txt`, which isn't served without it |
 | `TZ` | The time zone "today" is counted in |
 | `PROSPECTOR_ORG` | Default organisation for CLI commands (`--org=` overrides it) |
 | `PROSPECTOR_KEY` | API key for `push` and `pull` |
@@ -225,7 +226,7 @@ The first key in the list seals and signs; every key in the list opens and verif
 
 Each organisation has an MCP endpoint at `/o/<slug>/mcp` (streamable HTTP) and a JSON API at `/o/<slug>/api/v1/…`. Create keys on the Agents & API page or with `prospector key add <org> <name> <scope>…`.
 
-The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml), served at `/api/openapi.json` and drawn as a readable contract at `/api`. Both are public, like the front page, since they hold no data. Prospector's own pages use the same API with the signed-in session, so whatever the app can do a key can be given. The spec is moving over a part at a time; agents and their runs are first.
+The API is described by an OpenAPI spec, [`api/openapi.yaml`](api/openapi.yaml), served at `/api/openapi.json` and drawn as a readable contract at `/api`. Both are public, like the front page, since they hold no data. `/llms.txt` lists the same operations for a language model, with links into `/api`; `/robots.txt` and `/sitemap.xml` let crawlers read the public pages and keep them out of an organisation's, and `/.well-known/security.txt` says where to report a security problem once `PROSPECTOR_SECURITY_CONTACT` is set. Prospector's own pages use the same API with the signed-in session, so whatever the app can do a key can be given. The spec is moving over a part at a time; agents and their runs are first.
 
 | Scope | Allows |
 |---|---|

@@ -13,7 +13,7 @@ func TestReactPagesMountInTheLayout(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("the React Research page: %d", code)
 	}
-	for _, want := range []string{`<div id="app" data-org="alpha" data-sales="true" data-support="true"></div>`, `<script type="module" src="/assets/app/main.js?v=`, "Research</span>"} {
+	for _, want := range []string{`<div id="app" data-org="alpha" data-sales="true" data-support="true" data-no-refresh="true"></div>`, `<script type="module" src="/assets/app/main.js?v=`, "Research</span>"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the React page is missing %q", want)
 		}
