@@ -1,4 +1,4 @@
-import path from "node:path";
+import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
@@ -8,7 +8,7 @@ import { defineConfig } from "vite";
 // remain, so nothing here processes CSS.
 export default defineConfig({
   plugins: [react()],
-  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+  resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   base: "/assets/app/",
   build: {
     outDir: "../assets/app",
@@ -16,7 +16,7 @@ export default defineConfig({
     target: "es2022",
     cssCodeSplit: false,
     rollupOptions: {
-      input: path.resolve(__dirname, "src/main.tsx"),
+      input: fileURLToPath(new URL("./src/main.tsx", import.meta.url)),
       output: {
         entryFileNames: "main.js",
         chunkFileNames: "chunks/[name].js",
