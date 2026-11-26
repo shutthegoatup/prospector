@@ -70,7 +70,7 @@ export function ResearchPage() {
           </ActionButton>
           {sales && (
             <ActionButton size="sm" asChild>
-              <a href={`/o/${org}/add`}>+ Add person</a>
+              <a href={`/o/${org}/app/add`}>+ Add person</a>
             </ActionButton>
           )}
         </div>
@@ -520,7 +520,7 @@ function CompanyCard({ company: c, open }: { company: Company; open: boolean }) 
             {c.people.length === 0 && (
               <p className="py-2 text-sm text-muted-foreground">
                 None yet.{" "}
-                {sales && <a href={`/o/${org}/add?company=${encodeURIComponent(c.name)}`}>Add someone</a>}
+                {sales && <a href={`/o/${org}/app/add?company=${encodeURIComponent(c.name)}`}>Add someone</a>}
               </p>
             )}
             {c.people.map((p) => (

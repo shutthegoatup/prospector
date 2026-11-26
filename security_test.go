@@ -688,6 +688,7 @@ func TestContentPolicy(t *testing.T) {
 		"/o/alpha/conversations", "/o/alpha/companies", "/o/alpha/companies/" + strconv.FormatInt(company.ID, 10),
 		"/o/alpha/add", "/o/alpha/add?popup=1&name=Hannah", "/o/alpha/settings", "/o/alpha/agents", "/o/alpha/enquiries", "/o/alpha/subscriptions", "/o/alpha/onboarding", "/o/alpha/campaigns", "/c", "/u/never-made",
 		"/o/alpha/tasks", "/o/alpha/tasks?closed=1", "/o/alpha/tasks/" + strconv.FormatInt(task.ID, 10), "/o/alpha/app/research", "/o/alpha/app/campaigns", "/o/alpha/app/onboarding",
+		"/o/alpha/app/add", "/o/alpha/app/add?popup=1&name=Hannah",
 		"/o/alpha/agreements/" + strconv.FormatInt(must(s.AddAgreement(o.ID, company.ID, "Service agreement", "test")).ID, 10) + "/prepare"}
 	check := func(page, marker string) {
 		t.Helper()
@@ -1063,6 +1064,9 @@ func TestPublicURL(t *testing.T) {
 	}
 	if body := page(srv, c, "/o/alpha/add"); !strings.Contains(body, "https://prospector.example.com/o/alpha/add?popup=1") {
 		t.Fatal("the bookmarklet doesn't use the address that was set")
+	}
+	if body := page(srv, c, "/o/alpha/api/v1/people/draft"); !strings.Contains(body, "https://prospector.example.com/o/alpha/app/add?popup=1") {
+		t.Fatalf("the API's bookmarklet doesn't use the address that was set: %s", body)
 	}
 	if _, c, _ := signIn(&App{s: s, base: "http://10.0.0.5:8766"}, nil); c.Secure {
 		t.Fatal("an http address marked the cookie Secure")

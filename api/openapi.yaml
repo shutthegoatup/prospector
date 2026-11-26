@@ -1727,6 +1727,42 @@ paths:
               schema: { $ref: "#/components/schemas/PersonAdded" }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/people/draft:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: draftPerson
+      tags: [people]
+      summary: A person to add, read from a LinkedIn profile
+      description: What the add form starts with when the bookmarklet opens it from someone's profile, and the bookmarklet itself. Nothing is saved; add them with `addPerson`.
+      parameters:
+        - name: url
+          in: query
+          description: The profile's address; anything after `?` is dropped.
+          schema: { type: string }
+        - name: name
+          in: query
+          description: The profile page's title, which leads with their name.
+          schema: { type: string }
+        - name: headline
+          in: query
+          description: Their headline, like `Head of Marketing at Larkmoor Yachts`, read for their role and company.
+          schema: { type: string }
+        - name: company
+          in: query
+          description: Their company, in place of the one the headline gives.
+          schema: { type: string }
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The person as far as the profile says.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PersonDraft" }
+        default: { $ref: "#/components/responses/Problem" }
+
   /o/{org}/api/v1/contacts/{id}:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -2094,6 +2130,16 @@ components:
         email: { type: string }
         note: { type: string, description: "The note to send them with the connection request." }
         added: { type: boolean, description: "Already connected on LinkedIn: their email comes up next." }
+
+    PersonDraft:
+      type: object
+      required: [linkedin, name, title, company, bookmarklet]
+      properties:
+        linkedin: { type: string, description: "Their profile's address." }
+        name: { type: string }
+        title: { type: string }
+        company: { type: string }
+        bookmarklet: { type: string, description: "A `javascript:` link to keep in the bookmarks bar: clicked on a LinkedIn profile, it opens the add form filled in from it." }
 
     PersonAdded:
       type: object

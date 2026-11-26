@@ -90,7 +90,7 @@ templ Layout(n Nav, content templ.Component) {
 						</div>
 					</details>
 					if canDo(ctx, areaSales) {
-						@button.Button(button.Props{Href: n.Base() + "add", Class: "w-full"}) {
+						@button.Button(button.Props{Href: n.Base() + navPath("add"), Class: "w-full"}) {
 							+ Add person
 						}
 					}
