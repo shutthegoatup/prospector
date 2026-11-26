@@ -31,8 +31,11 @@ func TestFindStartsTheChosenAgentsOnANewSearch(t *testing.T) {
 			t.Errorf("Research should offer to find, sending Gateway: missing %s", want)
 		}
 	}
-	if strings.Contains(page, `href="/o/alpha/tasks"`) {
+	if strings.Contains(page, "<span>Tasks</span>") {
 		t.Error("the sidebar still has Tasks, which Research now does")
+	}
+	if !strings.Contains(page, `href="/o/alpha/tasks" class="text-[13px] text-mark underline">Every search, closed ones too`) {
+		t.Error("Research should still lead to every search, closed ones and those past the first few")
 	}
 
 	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/tasks", "application/json",

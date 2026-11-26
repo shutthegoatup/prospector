@@ -84,13 +84,18 @@ templ ResearchView(q *Req, d ResearchData) {
 	if canDo(ctx, areaSales) {
 		@FindBox(q, d)
 	}
-	if len(d.Searches) > 0 {
-		<div class="mb-5 flex flex-col gap-2" aria-label="Searches">
-			for _, s := range d.Searches {
-				@SearchStrip(q, s, d.Agents, searchID(d) == s.ID)
-			}
+	<div class="mb-5 flex flex-col gap-2" aria-label="Searches">
+		<div class="flex flex-wrap items-baseline justify-between gap-2">
+			@Label("Searches")
+			<a href={ templ.SafeURL(q.Base() + "tasks") } class="text-[13px] text-mark underline">Every search, closed ones too</a>
 		</div>
-	}
+		for _, s := range d.Searches {
+			@SearchStrip(q, s, d.Agents, searchID(d) == s.ID)
+		}
+		if len(d.Searches) == 0 {
+			<p class="text-sm text-muted-foreground">No search open.</p>
+		}
+	</div>
 	<div class="flex flex-wrap items-start gap-6">
 		<div class="flex min-w-0 flex-[999_1_520px] flex-col gap-3">
 			<nav class="flex flex-wrap items-center gap-2" aria-label="Filter">
