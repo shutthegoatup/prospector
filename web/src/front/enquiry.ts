@@ -1,5 +1,5 @@
-export const hostedPrice = "£5";
-const perUser = 5;
+export const perUser = 5;
+export const hostedPrice = `£${perUser}`;
 
 export function seatTotal(users: string): string {
   const n = Math.max(1, Math.min(500, Math.round(Number(users) || 1)));

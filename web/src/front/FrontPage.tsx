@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { EnquiryForm } from "./EnquiryForm";
-import { formShows, hostedPrice, seatTotal } from "./enquiry";
+import { formShows, hostedPrice, perUser, seatTotal } from "./enquiry";
 
 export const repoURL = "https://github.com/shutthegoatup/prospector";
 
@@ -348,7 +348,7 @@ function Pricing({ canSend }: { canSend: boolean }) {
             <div className="lp-price">
               <b>
                 <small>£</small>
-                {hostedPrice.slice(1)}
+                {perUser}
               </b>
               <span>a user a month</span>
             </div>

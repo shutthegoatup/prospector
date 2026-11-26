@@ -365,7 +365,7 @@ node build-css.mjs <node_modules with tailwindcss v4>   # or the standalone tail
 (cd web && npm ci && npm run build)                      # the React app and the templ pages' script
 ```
 
-The app inside an organisation is a React front end in `web/` (TanStack Router, its addresses `/o/<org>/today`, `/o/<org>/companies/<id>`, `/o/<org>/agreements/<id>/prepare` and so on); the server answers each of those addresses with the same page and the app reads and changes everything through the API. Only the pages outside an organisation's app are server-rendered with templ: sign-in, password reset and single sign-on, starting a first organisation, the front page, a customer's onboarding page, unsubscribing, the `/api` reference and error pages.
+The app inside an organisation is a React front end in `web/` (TanStack Router, its addresses `/o/<org>/today`, `/o/<org>/companies/<id>`, `/o/<org>/agreements/<id>/prepare` and so on); the server answers each of those addresses with the same page and the app reads and changes everything through the API. Only the pages outside an organisation's app are server-rendered with templ: sign-in, password reset and single sign-on, starting a first organisation, a customer's onboarding page, unsubscribing, the `/api` reference and error pages. The front page at `/` is React too, in `web/src/front`, prerendered to HTML at build time.
 
 `assets/css/output.css`, the built app and scripts and `*_templ.go` are committed, so a plain `go build` needs neither Node nor Tailwind.
 

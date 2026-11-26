@@ -1,13 +1,13 @@
 import { StrictMode } from "react";
 import { renderToString } from "react-dom/server";
+import { hostedPrice } from "./enquiry";
 import { FrontPage } from "./FrontPage";
 
 // The server swaps this for its asset version, and stamps the enquiry form's address
 // on the mount, as it serves the page.
 export const versionMark = "__ASSET_VERSION__";
 
-const description =
-  "A prospecting and customer workbench for small teams selling to named accounts: research, deals, agreements, subscriptions and onboarding on one company record. Agents research and draft; you decide what they may send. Free to self-host, or hosted for £5 a user a month.";
+const description = `A prospecting and customer workbench for small teams selling to named accounts: research, deals, agreements, subscriptions and onboarding on one company record. Agents research and draft; you decide what they may send. Free to self-host, or hosted for ${hostedPrice} a user a month.`;
 
 export function frontDocument(): string {
   const asset = (path: string) => `/assets/${path}?v=${versionMark}`;
