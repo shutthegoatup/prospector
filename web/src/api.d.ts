@@ -1203,6 +1203,82 @@ export interface paths {
         patch: operations["decideSuggestion"];
         trace?: never;
     };
+    "/o/{org}/api/v1/enrichers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /** The organisation's enrichment vendors */
+        get: operations["listEnrichers"];
+        /**
+         * Add a vendor, or change the one of that kind
+         * @description An empty `api_key` keeps the saved one. The key is sealed under the server's key and
+         *     never shown again. Vendors are asked lowest `position` first, and each no more than
+         *     `monthly_limit` times a calendar month (UTC); 0 stops it being asked.
+         */
+        put: operations["saveEnricher"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/enrichers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a vendor and its key */
+        delete: operations["deleteEnricher"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/contacts/{id}/enrich": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the vendors for details someone lacks
+         * @description For each field, the vendors that look for it are asked in order until one finds it,
+         *     each lookup counting toward that vendor's month. What is found waits under Details to
+         *     check for a person to accept, marked with the vendor that found it. A field they already
+         *     have is not looked for, nor one a vendor was asked about in the last 30 days. Nobody on the never-contact
+         *     list, at a domain on it, or who declined is looked up, and a find that belongs to
+         *     someone erased or on the list is dropped.
+         */
+        post: operations["enrichContact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/settings": {
         parameters: {
             query?: never;
@@ -1583,6 +1659,45 @@ export interface components {
         Tool: {
             name: string;
             description: string;
+        };
+        /**
+         * @description The vendors Prospector can ask. `hunter` is Hunter.io, which finds work emails.
+         * @enum {string}
+         */
+        EnricherKind: "hunter";
+        EnricherSettings: {
+            kind: components["schemas"]["EnricherKind"];
+            /** @description The vendor's key for your account; empty keeps the saved one. */
+            api_key?: string;
+            /** @description Lower is asked first. */
+            position?: number;
+            /** @description Lookups a calendar month, at most. */
+            monthly_limit: number;
+        };
+        Enricher: {
+            /** Format: int64 */
+            id: number;
+            kind: components["schemas"]["EnricherKind"];
+            position: number;
+            monthly_limit: number;
+            used_this_month: number;
+            /** @description Which of email, phone and linkedin it looks for. */
+            fields: string[];
+            has_key: boolean;
+            updated_by: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        EnrichResult: {
+            field: string;
+            /** @description The vendor whose answer this is. */
+            vendor?: string;
+            /**
+             * @description `suggested` waits for a person to accept; `none` is that no vendor found it; `has` that they have one already, or it was suggested before; `skipped` that no vendor could be asked or the find may not be kept; `failed` that a vendor couldn't be reached.
+             * @enum {string}
+             */
+            outcome: "suggested" | "none" | "has" | "skipped" | "failed";
+            detail?: string;
         };
         /** @enum {string} */
         RunStatus: "running" | "waiting" | "finished" | "stopped" | "failed";
@@ -4116,6 +4231,128 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listEnrichers: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every vendor, in the order they are asked. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Enricher"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    saveEnricher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnricherSettings"];
+            };
+        };
+        responses: {
+            /** @description The vendor as saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Enricher"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteEnricher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    enrichContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    fields: ("email" | "phone" | "linkedin")[];
+                    /**
+                     * Format: int64
+                     * @description The task this is for, if any.
+                     */
+                    task?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description What came of each field. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        results: components["schemas"]["EnrichResult"][];
+                    };
+                };
             };
             default: components["responses"]["Problem"];
         };
