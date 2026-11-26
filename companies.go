@@ -314,28 +314,42 @@ func (s *Store) researchFor(org int64, filter string, page int, task int64) ([]R
 // by fit; past it, they come newest first as everywhere else.
 const searchFitCap = 500
 
-// rankedResearch is one search's companies to review, best fit first: fit is worked
-// out from facts, so they are ranked here rather than in SQL.
+// rankedResearch is one search's companies to review, best fit first, a page of them.
 func (s *Store) rankedResearch(org int64, set OrgSettings, task int64, page int) ([]ResearchRow, Page, bool, error) {
-	q, order, err := s.researchQuery(org, "review", task)
+	rows, ranked, err := s.rankedRows(org, set, task)
 	if err != nil {
 		return nil, Page{}, false, err
 	}
-	var total int64
-	if err := q.Session(&gorm.Session{}).Count(&total).Error; err != nil {
-		return nil, Page{}, false, err
-	}
-	if total > searchFitCap {
+	if !ranked {
 		rows, pg, err := s.researchFor(org, "review", page, task)
 		return rows, pg, false, err
 	}
+	pg := pageOf(page, researchPageSize, len(rows))
+	return rows[pg.offset():min(len(rows), pg.offset()+pg.Size)], pg, true, nil
+}
+
+// rankedRows are all of one search's companies to review, best fit first: fit is worked
+// out from facts, so they are ranked here rather than in SQL. A search with more than
+// searchFitCap gives none, and false.
+func (s *Store) rankedRows(org int64, set OrgSettings, task int64) ([]ResearchRow, bool, error) {
+	q, order, err := s.researchQuery(org, "review", task)
+	if err != nil {
+		return nil, false, err
+	}
+	var total int64
+	if err := q.Session(&gorm.Session{}).Count(&total).Error; err != nil {
+		return nil, false, err
+	}
+	if total > searchFitCap {
+		return nil, false, nil
+	}
 	var companies []Company
 	if err := q.Order(order).Limit(searchFitCap).Find(&companies).Error; err != nil {
-		return nil, Page{}, false, err
+		return nil, false, err
 	}
 	rows, err := s.researchRows(org, companies)
 	if err != nil {
-		return nil, Page{}, false, err
+		return nil, false, err
 	}
 	fits := make(map[int64]Fit, len(rows))
 	for _, r := range rows {
@@ -350,8 +364,48 @@ func (s *Store) rankedResearch(org int64, set OrgSettings, task int64, page int)
 		}
 		return 0
 	})
-	pg := pageOf(page, researchPageSize, len(rows))
-	return rows[pg.offset():min(len(rows), pg.offset()+pg.Size)], pg, true, nil
+	return rows, true, nil
+}
+
+// researchList is a page of the Research queue for the API: the rows the page shows, in
+// its order, with a cursor rather than a page number.
+func (s *Store) researchList(org int64, set OrgSettings, filter string, task int64, in PageIn) ([]ResearchRow, bool, string, error) {
+	switch {
+	case filter == "review" && task != 0:
+		rows, ranked, err := s.rankedRows(org, set, task)
+		if err != nil {
+			return nil, false, "", err
+		}
+		if ranked {
+			page, next, err := listPage(rows, in.Limit, in.Cursor)
+			return page, true, next, err
+		}
+	case filter == "details":
+		rows, err := s.detailsToCheck(org, task)
+		if err != nil {
+			return nil, false, "", err
+		}
+		page, next, err := listPage(rows, in.Limit, in.Cursor)
+		return page, false, next, err
+	}
+	at, err := in.at(1)
+	if err != nil {
+		return nil, false, "", err
+	}
+	q, order, err := s.researchQuery(org, filter, task)
+	if err != nil {
+		return nil, false, "", err
+	}
+	var companies []Company
+	if err := q.Order(order).Limit(in.size() + 1).Offset(int(at[0])).Find(&companies).Error; err != nil {
+		return nil, false, "", err
+	}
+	next := ""
+	if len(companies) > in.size() {
+		companies, next = companies[:in.size()], cursorOf(at[0]+int64(in.size()))
+	}
+	rows, err := s.researchRows(org, companies)
+	return rows, false, next, err
 }
 
 func (s *Store) ResearchCount(org int64, filter string) int {
