@@ -93,6 +93,32 @@ func TestATaskFindsCompaniesForItsOffering(t *testing.T) {
 	if v, err := s.AgentTask(o.ID, scout, task.Id, PageIn{}); err != nil || v.Offering != nil {
 		t.Fatalf("a closed task whose offering was removed should still read: %+v %v", v, err)
 	}
+	if err := s.SetTaskClosed(o.ID, task.Id, false, "Ada"); err == nil || !strings.Contains(err.Error(), "removed") {
+		t.Fatalf("reopening a task whose offering was removed: %v", err)
+	}
+}
+
+func TestWhateverAnAgentWorksOnForAnOfferingWaitsInItsReview(t *testing.T) {
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	agencies := must(s.AddOffering(o.ID, Offering{Name: "Agency partners"}, "Ada"))
+	task := must(s.CreateTaskFor(o.ID, agencies.ID, "", "Find agencies", "Ada"))
+	scout := Actor{Name: "agent:scout", KeyID: 3}
+	// Known before the task, and reached through a person and a fact rather than add_company.
+	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Quayside Talent", Domain: "quayside.example"}))
+	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Fernhill Search", Domain: "fernhill.example"}))
+	must(s.AgentAddContact(o, scout, AddContactIn{Company: "Quayside Talent", Name: "Rhea Moss", Title: "Contract lead",
+		SourceURL: "https://quayside.example/team", Task: task.ID}))
+	must(s.AgentAddFact(o.ID, scout, AddFactIn{Company: "Fernhill Search", Task: task.ID,
+		FactIn: FactIn{Field: "agency_focus", Value: "Contract cloud roles", SourceURL: "https://fernhill.example/practice"}}))
+
+	waiting := map[string]bool{}
+	for _, v := range must(s.Judged(o.ID, agencies.ID, CompanyReview)) {
+		waiting[v.Company] = true
+	}
+	if !waiting["Quayside Talent"] || !waiting["Fernhill Search"] {
+		t.Fatalf("companies an agent worked on for the offering should wait in its review: %v", waiting)
+	}
 }
 
 func TestExistingTasksAreForTheOrganisationsOwnOffering(t *testing.T) {

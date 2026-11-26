@@ -91,11 +91,6 @@ func (s *Store) CreateTask(org int64, title, brief, by string) (*Task, error) {
 
 // CreateTaskFor starts a task finding companies for an offering; 0 is the organisation's own.
 func (s *Store) CreateTaskFor(org, offering int64, title, brief, by string) (*Task, error) {
-	if offering != 0 {
-		if _, err := s.Offering(org, offering); err != nil {
-			return nil, err
-		}
-	}
 	brief, err := words(brief, maxBrief, "the brief")
 	if err != nil {
 		return nil, err
@@ -109,6 +104,11 @@ func (s *Store) CreateTaskFor(org, offering int64, title, brief, by string) (*Ta
 	}
 	t := Task{OrgID: org, Title: title, CreatedBy: by, OfferingID: offering}
 	return &t, s.db.Transaction(func(tx *gorm.DB) error {
+		if offering != 0 {
+			if _, err := heldOffering(tx, org, offering); err != nil {
+				return err
+			}
+		}
 		if err := tx.Create(&t).Error; err != nil {
 			return err
 		}
@@ -134,6 +134,14 @@ func (s *Store) onTask(org int64, who Actor, task int64) (Actor, error) {
 	}
 	t, err := openTask(s.db, org, task)
 	if err != nil {
+		return who, err
+	}
+	// Only a release from before offerings could have removed one an open task is for.
+	if _, err := s.offeringOf(org, t.OfferingID); err != nil {
+		var gone notFound
+		if errors.As(err, &gone) {
+			return who, conflict(fmt.Sprintf("the offering task %d was finding companies for has been removed: stop, and leave a note saying so", task))
+		}
 		return who, err
 	}
 	who.Task, who.Offering = task, t.OfferingID
@@ -244,6 +252,15 @@ func (s *Store) SetTaskClosed(org, task int64, closed bool, by string) error {
 		}
 		if closed == (t.ClosedAt != nil) {
 			return nil
+		}
+		if !closed && t.OfferingID != 0 {
+			if _, err := heldOffering(tx, org, t.OfferingID); err != nil {
+				var gone notFound
+				if errors.As(err, &gone) {
+					return conflict("the offering this task was finding companies for has been removed: start a new task instead")
+				}
+				return err
+			}
 		}
 		var at *time.Time
 		action := "task:open"

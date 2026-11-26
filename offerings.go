@@ -231,6 +231,17 @@ func putUpForReview(tx *gorm.DB, org, offering, company int64, actor string) (st
 	return stage, tx.Model(&Verdict{}).Select("stage").Where("org_id = ? and offering_id = ? and company_id = ?", org, offering, company).Scan(&stage).Error
 }
 
+// forOffering puts a company an agent works on for a task up for review by the task's
+// offering, if it is for one. The company is held already, so the offering comes second
+// here as everywhere.
+func forOffering(tx *gorm.DB, org int64, who Actor, company int64) error {
+	if who.Offering == 0 {
+		return nil
+	}
+	_, err := putUpForReview(tx, org, who.Offering, company, who.Name)
+	return err
+}
+
 // offeringStages is where each of these companies stands for an offering; one not yet
 // judged for it is up for review.
 func offeringStages(tx *gorm.DB, org, offering int64, companies []int64) (map[int64]string, error) {
