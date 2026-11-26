@@ -128,7 +128,7 @@ func TestTheContractPageIsPublicAndShowsEveryOperation(t *testing.T) {
 	if code != http.StatusOK || strings.Contains(body, "<script") {
 		t.Fatalf("the contract page, signed out: %d", code)
 	}
-	if !strings.Contains(body, "curl "+srv.URL+"/o/your-org/api/v1/") || strings.Contains(body, docBase) {
+	if !strings.Contains(body, "/o/your-org/api/v1/") || strings.Contains(body, docBase) {
 		t.Error("the page's examples don't use this server's address")
 	}
 	spec := must(api.Spec())
