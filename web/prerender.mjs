@@ -3,7 +3,7 @@
 // Search engines, link previews and readers without script get the whole page; the
 // front page's script only adds its enquiry form.
 import { writeFile } from "node:fs/promises";
-import { apiReference, landing } from "./site-build/render.js";
+import { apiReference, hostedPrice, landing } from "./site-build/render.js";
 
 const head = (title, description, styles) =>
   [
@@ -33,7 +33,7 @@ await writeFile(
   page(
     head(
       "Prospector · A few hundred accounts, one queue a day",
-      "A prospecting and customer workbench for small teams selling to named accounts: research, deals, subscriptions and onboarding on one company record. Agents research and draft; you decide what they may send.",
+      `A prospecting and customer workbench for small teams selling to named accounts: research, deals, agreements, subscriptions and onboarding on one company record. Agents research and draft; you decide what they may send. Free to self-host, or hosted for ${hostedPrice} a user a month.`,
       ["landing"],
     ) + `\n    <script type="module" src="/assets/app/site.js"></script>`,
     "lp",

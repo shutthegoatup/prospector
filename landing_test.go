@@ -270,3 +270,21 @@ func TestTheFrontPageTellsTheTruthAboutKeys(t *testing.T) {
 		t.Error("the front page still says no key can change settings")
 	}
 }
+
+// The front page prices both ways of running Prospector. The hosted plan's buttons lead
+// to the enquiry form, so the built page leaves them to the form's script.
+func TestFrontPagePricing(t *testing.T) {
+	_, _, srv, _ := signedIn(t)
+	_, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil)
+	for _, want := range []string{`id="pricing"`, `href="#pricing"`, "Self-hosted", "for any number of users", "a user a month", "Prices exclude VAT", `<div class="lp-cta" id="hosted-cta"></div>`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the front page's pricing lacks %q", want)
+		}
+	}
+	if !strings.Contains(body, `<small>£</small>0</b>`) || !strings.Contains(body, `<small>£</small>5</b>`) {
+		t.Error("the front page doesn't show self-hosting free and hosting at £5")
+	}
+	if strings.Contains(body, `href="#contact"`) {
+		t.Error("the built front page links to an enquiry form it may not have")
+	}
+}

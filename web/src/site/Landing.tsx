@@ -3,6 +3,9 @@ import { createPortal } from "react-dom";
 
 const repoURL = "https://github.com/shutthegoatup/prospector";
 
+const perUser = 5;
+export const hostedPrice = `£${perUser}`;
+
 function Brand() {
   return (
     <a className="lp-brand" href="/">
@@ -34,7 +37,7 @@ export function Landing() {
               <a href="#loop">How it works</a>
               <a href="#customers">Customers</a>
               <a href="#agents">Agents</a>
-              <a href="#start">Get started</a>
+              <a href="#pricing">Pricing</a>
             </div>
             <a className="lp-btn is-small" href="/login">
               Sign in
@@ -42,7 +45,7 @@ export function Landing() {
           </nav>
           <div className="lp-hero-grid">
             <div className="lp-hero-copy">
-              <p className="lp-label">Account-based prospecting for small teams</p>
+              <p className="lp-label">Prospects and customers for small teams</p>
               <h1>
                 <span>A few hundred accounts.</span>
                 <span>One queue a day.</span>
@@ -51,15 +54,15 @@ export function Landing() {
                 </span>
               </h1>
               <p className="lp-lede">
-                Prospector is a prospecting workbench for teams selling to named accounts. Agents research companies and draft messages. People qualify, decide
-                and send.
+                Prospector is a workbench for teams selling to named accounts, from the first fact about a company to its signed agreement. Agents research and
+                draft. People qualify, decide and send.
               </p>
               <div className="lp-cta">
-                <a className="lp-btn is-primary" href="#start">
-                  Get started
+                <a className="lp-btn is-primary" href="#pricing">
+                  Start for {hostedPrice} a user
                 </a>
-                <a className="lp-btn" href="#loop">
-                  See how it works
+                <a className="lp-btn" href="#start">
+                  Self-host free
                 </a>
               </div>
             </div>
@@ -113,11 +116,13 @@ export function Landing() {
               <span className="lp-tag">01 · Research</span>
               <h3>Facts with the link they came from</h3>
               <p>
-                Say who you're looking for and send an agent after them. What agents, imports and people find waits here until someone qualifies or rejects it.
-                Nothing reaches outreach on its own. Sell more than one thing? Each offering gets its own look-for list and review, so a company that is wrong
-                for one can still be right for another.
+                Say who you're looking for and send an agent after them. Ask for about so many companies and watch how far the search has got. What it finds
+                that you already have is left out, and nothing reaches outreach until someone qualifies it.
               </p>
-              <p>Every fact keeps its source. Pick a suggested person and they move into outreach with a note from your template.</p>
+              <p>
+                Sell more than one thing? Each offering gets its own look-for list and queue, so a company that is wrong for one can still be right for another.
+                Every fact keeps its source.
+              </p>
             </div>
             <Shot
               file="research.webp"
@@ -169,8 +174,8 @@ export function Landing() {
             <p className="lp-label">After it's won</p>
             <h2>The customer stays on the same record.</h2>
             <p>
-              Deals, what they're on, getting them live, what they write in about and what you write to them all, on the company you prospected. Each has its
-              operations in the published API.
+              Deals, the contract, what they're on, getting them live, what they write in about and what you write to them, all on the company you
+              prospected. Each has its operations in the published API.
             </p>
           </div>
           <div className="lp-grid">
@@ -178,20 +183,23 @@ export function Landing() {
               <h3>Deals with a value</h3>
               <p>Each conversation carries what it's worth, who has it and when it should close. Start a second one for a renewal or an expansion.</p>
             </div>
+            <div className="lp-cell is-violet">
+              <h3>Agreements, ready to sign</h3>
+              <p>
+                Upload the contract as a PDF. It is kept exactly as uploaded and checked against its hash on every download. Choose who signs and in what
+                order, and drag their fields onto the pages. Sending for signature comes next.
+              </p>
+            </div>
             <div className="lp-cell is-gold">
               <h3>Subscriptions and their notice</h3>
-              <p>
-                What each customer is on, for how long, and the notice it needs. Today flags one a month before its date to give notice or renew, and a renewal
-                deal starts from it.
-              </p>
+              <p>What each customer is on, for how long, and the notice it needs. Today flags one a month before its date, and a renewal deal starts from it.</p>
             </div>
             <div className="lp-cell is-green">
               <h3>Onboarding to go-live</h3>
-              <p>Your steps and theirs, dated from the start. A won deal offers to start one, and late steps come back to Today.</p>
-            </div>
-            <div className="lp-cell is-violet">
-              <h3>A page for the customer</h3>
-              <p>Invite someone at the company to a page of their own steps, opened from an emailed link with no password. They mark theirs done.</p>
+              <p>
+                Your steps and theirs, dated from the start. The customer gets a page of their own steps from an emailed link, no password, and marks theirs
+                done. Late steps come back to Today.
+              </p>
             </div>
             <div className="lp-cell is-coral">
               <h3>Enquiries answered</h3>
@@ -272,6 +280,9 @@ export function Landing() {
                     Record subscriptions and work customers' onboarding<code>customers:write</code>
                   </li>
                   <li>
+                    Set out who signs an agreement and place their fields<code>agreements:write</code>
+                  </li>
+                  <li>
                     Email a reply to someone who wrote in<code>enquiries:reply</code>
                   </li>
                   <li>
@@ -286,6 +297,7 @@ export function Landing() {
               <div>
                 <h3 className="lp-tag is-coral">No key can</h3>
                 <ul>
+                  <li>Sign an agreement</li>
                   <li>Send mail without a scope that says so, or to anyone on your never-contact list or erased on request</li>
                   <li>
                     Make or revoke API keys. Only <code>settings:write</code> can change your organisation's settings, <code>team:write</code> its members,{" "}
@@ -309,7 +321,10 @@ export function Landing() {
           <div className="lp-grid">
             <div className="lp-cell is-coral">
               <h3>A never-contact list that holds</h3>
-              <p>Domains, email addresses and LinkedIn profiles. It applies to agents, imports and edits alike.</p>
+              <p>
+                Domains, companies, email addresses and LinkedIn profiles. A never-contact company stays on file but out of review and outreach. It applies to
+                agents, imports and edits alike.
+              </p>
             </div>
             <div className="lp-cell is-gold">
               <h3>Calls at a sensible hour</h3>
@@ -321,23 +336,30 @@ export function Landing() {
             </div>
             <div className="lp-cell is-violet">
               <h3>Several organisations, one login</h3>
-              <p>Each has its own prospects, wording, team and keys. None can see another's.</p>
+              <p>
+                Each has its own prospects, wording, team and keys. None can see another's. Sign in with a password, Google, Microsoft, LinkedIn or your
+                organisation's own single sign-on.
+              </p>
             </div>
             <div className="lp-cell is-coral">
               <h3>Bring your own files</h3>
               <p>Import companies from CSV and drafts from markdown. Re-importing never clears a date or an edit made in the app.</p>
             </div>
             <div className="lp-cell is-gold">
-              <h3>Your data stays with you</h3>
-              <p>Prospector runs on your own server, on SQLite or Postgres. Nobody else holds your prospect list.</p>
+              <h3>Your data stays yours</h3>
+              <p>
+                Host it yourself on SQLite or Postgres, or let us. An owner can download everything the organisation holds as one file, and erase a person who
+                asks to be forgotten.
+              </p>
             </div>
           </div>
         </div>
       </section>
+      <Pricing />
       <section className="lp-install" id="start">
         <div className="lp-wrap lp-install-grid">
           <div>
-            <p className="lp-label">Get started</p>
+            <p className="lp-label">Self-host</p>
             <h2>Set up in four commands.</h2>
             <p className="lp-lede">
               Prospector is one program for Linux or macOS. Download it, name your organisation, add yourself and start working the list.
@@ -377,8 +399,9 @@ export function Landing() {
       <footer className="lp-foot">
         <div className="lp-wrap">
           <Brand />
-          <span>Prospecting for small teams with a named list.</span>
+          <span>Prospects and customers for small teams with a named list.</span>
           <nav aria-label="Footer">
+            <a href="#pricing">Pricing</a>
             <a href={repoURL}>GitHub</a>
             <a href={`${repoURL}/releases`}>Releases</a>
             <a href="/login">Sign in</a>
@@ -386,6 +409,74 @@ export function Landing() {
         </div>
       </footer>
     </>
+  );
+}
+
+function Pricing() {
+  return (
+    <section className="lp-section" id="pricing">
+      <div className="lp-wrap">
+        <div className="lp-section-head">
+          <p className="lp-label">Pricing</p>
+          <h2>Run it yourself for nothing, or let us run it.</h2>
+          <p>Both are the same program with every feature. The only difference is who looks after the server.</p>
+        </div>
+        <div className="lp-prices">
+          <div className="lp-plan is-green">
+            <div className="lp-plan-top">
+              <h3>Self-hosted</h3>
+              <span className="lp-label">Linux or macOS</span>
+            </div>
+            <p className="lp-plan-for">For a team with a server and someone happy to look after it.</p>
+            <div className="lp-price">
+              <b>
+                <small>£</small>0
+              </b>
+              <span>for any number of users</span>
+            </div>
+            <ul>
+              <li>Every feature, including agents, campaigns and agreements</li>
+              <li>One program on your own server, with SQLite or Postgres</li>
+              <li>Your own mail server, models and search</li>
+              <li>Upgrade when you choose, from the releases page</li>
+              <li>Help through GitHub issues</li>
+            </ul>
+            <div className="lp-cta">
+              <a className="lp-btn is-primary" href="#start">
+                Download Prospector
+              </a>
+            </div>
+          </div>
+          <div className="lp-plan is-dark is-gold">
+            <div className="lp-plan-top">
+              <h3>Hosted</h3>
+              <span className="lp-label">We run it</span>
+            </div>
+            <p className="lp-plan-for">For a team that would rather sell than run a server.</p>
+            <div className="lp-price">
+              <b>
+                <small>£</small>
+                {perUser}
+              </b>
+              <span>a user a month</span>
+            </div>
+            <ul>
+              <li>Every feature, the same as self-hosted</li>
+              <li>We run the server and its Postgres database, with backups</li>
+              <li>Each release installed as it ships</li>
+              <li>Sign-in and reset mail sent for you. Campaigns still go through your own mail server</li>
+              <li>Help by email from the people who build it</li>
+            </ul>
+            <div className="lp-cta" id="hosted-cta" />
+            <p className="lp-plan-small">A user is anyone who signs in to one of your organisations. API keys and agents are free. Prices exclude VAT.</p>
+          </div>
+        </div>
+        <div className="lp-same">
+          <strong>No lock-in.</strong>
+          <p>An owner can download everything the organisation holds as one file, whenever they like, hosted or not.</p>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -417,8 +508,9 @@ async function send(to: string, body: string): Promise<Outcome> {
   return "failed";
 }
 
-// EnquiryForm is the front page's contact section, with its link in the page's nav.
-export function EnquiryForm({ intake, nav }: { intake: string; nav: Element | null }) {
+// EnquiryForm is the front page's contact section, with its link in the page's nav and
+// the hosted plan's buttons, which lead nowhere where there is no form.
+export function EnquiryForm({ intake, nav, hosted }: { intake: string; nav: Element | null; hosted: Element | null }) {
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState("");
   const submit = async (e: FormEvent<HTMLFormElement>) => {
@@ -445,12 +537,24 @@ export function EnquiryForm({ intake, nav }: { intake: string; nav: Element | nu
   return (
     <>
       {nav && createPortal(<a href="#contact">Contact</a>, nav)}
+      {hosted &&
+        createPortal(
+          <>
+            <a className="lp-btn is-primary" href="#contact">
+              Start hosted
+            </a>
+            <a className="lp-btn" href="#contact">
+              Ask a question
+            </a>
+          </>,
+          hosted,
+        )}
       <section className="lp-contact" id="contact">
         <div className="lp-wrap lp-contact-grid">
           <div>
             <p className="lp-label">Contact</p>
             <h2>Ask us anything.</h2>
-            <p className="lp-lede">A question, a demo, or help getting it running. Someone will write back to the address you give.</p>
+            <p className="lp-lede">Hosting, a question, a demo, or help getting it running. Someone will write back to the address you give.</p>
           </div>
           <form className="lp-form" onSubmit={submit}>
             <label>
@@ -467,7 +571,8 @@ export function EnquiryForm({ intake, nav }: { intake: string; nav: Element | nu
             </label>
             <label>
               What it's about
-              <select name="kind">
+              <select name="kind" defaultValue="sales">
+                <option value="signup">Hosted Prospector</option>
                 <option value="sales">A question</option>
                 <option value="demo">See it running</option>
                 <option value="support">Help running it</option>

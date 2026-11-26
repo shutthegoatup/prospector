@@ -18,7 +18,7 @@ if (site && mount) {
   if (intake) {
     createRoot(mount).render(
       <StrictMode>
-        <EnquiryForm intake={intake} nav={document.querySelector(".lp-links")} />
+        <EnquiryForm intake={intake} nav={document.querySelector(".lp-links")} hosted={document.getElementById("hosted-cta")} />
       </StrictMode>,
     );
   }

@@ -7515,6 +7515,177 @@
    ],
    "ops": [
     {
+     "anchor": "op-listCompanyRoles",
+     "method": "GET",
+     "tone": "is-green",
+     "path": "/o/{org}/api/v1/companies/{id}/roles",
+     "summary": "The roles found at a company",
+     "about": [
+      {
+       "text": "Junked ones included, with who junked them and why, so one can be put back."
+      }
+     ],
+     "scope": "read",
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      },
+      {
+       "name": "limit",
+       "type": {
+        "name": "integer"
+       },
+       "about": [
+        {
+         "text": "How many to return. 50 if left out; 200 at most."
+        }
+       ]
+      },
+      {
+       "name": "cursor",
+       "type": {
+        "name": "string"
+       },
+       "about": [
+        {
+         "text": "The "
+        },
+        {
+         "text": "next_cursor",
+         "code": true
+        },
+        {
+         "text": " of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters."
+        }
+       ]
+      },
+      {
+       "name": "offering",
+       "type": {
+        "name": "integer"
+       },
+       "about": [
+        {
+         "text": "Only those for this offering."
+        }
+       ]
+      }
+     ],
+     "responses": [
+      {
+       "code": "200",
+       "about": "By offering, oldest first.",
+       "type": {
+        "name": "object"
+       }
+      },
+      {
+       "code": "4xx · 5xx",
+       "bad": true,
+       "about": "What went wrong, as RFC 9457 problem JSON.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl https://prospector.invalid/o/your-org/api/v1/companies/{id}/roles \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
+     "anchor": "op-addRole",
+     "method": "POST",
+     "tone": "is-gold",
+     "path": "/o/{org}/api/v1/companies/{id}/roles",
+     "summary": "Add a role open at a company, for an offering that has roles",
+     "about": [
+      {
+       "text": "It waits for review, and brings the company back to review for the offering. A role already there, by its posting or else its title, is a conflict, as is the title of one junked, and a company a person rejected for the offering."
+      }
+     ],
+     "scope": "research:write",
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      }
+     ],
+     "body": {
+      "of": {
+       "name": "RoleNew",
+       "link": "#schema-RoleNew"
+      },
+      "fields": [
+       {
+        "name": "offering",
+        "type": {
+         "name": "integer"
+        },
+        "about": [
+         {
+          "text": "An offering that has roles."
+         }
+        ],
+        "required": true
+       },
+       {
+        "name": "title",
+        "type": {
+         "name": "string"
+        },
+        "about": [],
+        "required": true
+       },
+       {
+        "name": "details",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       },
+       {
+        "name": "source_url",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "The posting."
+         }
+        ]
+       }
+      ]
+     },
+     "responses": [
+      {
+       "code": "201",
+       "about": "The role, added.",
+       "type": {
+        "name": "Role",
+        "link": "#schema-Role"
+       }
+      },
+      {
+       "code": "4xx · 5xx",
+       "bad": true,
+       "about": "What went wrong, as RFC 9457 problem JSON.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/companies/{id}/roles \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"offering\": 1, \"title\": \"…\", \"details\": \"…\", \"source_url\": \"…\"}'"
+    },
+    {
      "anchor": "op-listCompanyVerdicts",
      "method": "GET",
      "tone": "is-green",
@@ -7677,6 +7848,13 @@
         "required": true
        },
        {
+        "name": "has_roles",
+        "type": {
+         "name": "boolean"
+        },
+        "about": []
+       },
+       {
         "name": "look_for",
         "type": {
          "name": "string"
@@ -7718,7 +7896,7 @@
        }
       }
      ],
-     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/offerings \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"name\": \"…\", \"look_for\": \"…\", \"note_template\": \"…\", \"pitch\": \"…\"}'"
+     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/offerings \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"name\": \"…\", \"has_roles\": true, \"look_for\": \"…\", \"note_template\": \"…\"}'"
     },
     {
      "anchor": "op-changeOffering",
@@ -7749,6 +7927,13 @@
        "link": "#schema-OfferingChange"
       },
       "fields": [
+       {
+        "name": "has_roles",
+        "type": {
+         "name": "boolean?"
+        },
+        "about": []
+       },
        {
         "name": "look_for",
         "type": {
@@ -7798,7 +7983,7 @@
        }
       }
      ],
-     "curl": "curl -X PATCH https://prospector.invalid/o/your-org/api/v1/offerings/{id} \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"look_for\": \"…\", \"name\": \"…\", \"note_template\": \"…\", \"pitch\": \"…\"}'"
+     "curl": "curl -X PATCH https://prospector.invalid/o/your-org/api/v1/offerings/{id} \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"has_roles\": true, \"look_for\": \"…\", \"name\": \"…\", \"note_template\": \"…\"}'"
     },
     {
      "anchor": "op-removeOffering",
@@ -7921,6 +8106,91 @@
       }
      ],
      "curl": "curl https://prospector.invalid/o/your-org/api/v1/offerings/{id}/verdicts \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
+     "anchor": "op-judgeRole",
+     "method": "PATCH",
+     "tone": "is-violet",
+     "path": "/o/{org}/api/v1/roles/{id}",
+     "summary": "Pursue or junk a role, or put it back",
+     "about": [
+      {
+       "text": "The company's verdict for the role's offering follows: up for review while a role waits, else qualified while one is pursued, and rejected once every one is junked. While it has roles, the company itself can't be judged for the offering. Junking sends nothing to anyone."
+      }
+     ],
+     "scope": "research:review",
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      }
+     ],
+     "body": {
+      "of": {
+       "name": "RoleJudgement",
+       "link": "#schema-RoleJudgement"
+      },
+      "fields": [
+       {
+        "name": "stage",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "pursued",
+          "code": true
+         },
+         {
+          "text": " qualifies the company for the offering once no role waits; once every role is junked it is rejected for it; "
+         },
+         {
+          "text": "review",
+          "code": true
+         },
+         {
+          "text": " puts a role back."
+         }
+        ],
+        "required": true
+       },
+       {
+        "name": "reason",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "Why, for a junked role only."
+         }
+        ]
+       }
+      ]
+     },
+     "responses": [
+      {
+       "code": "200",
+       "about": "The role as it now is.",
+       "type": {
+        "name": "Role",
+        "link": "#schema-Role"
+       }
+      },
+      {
+       "code": "4xx · 5xx",
+       "bad": true,
+       "about": "What went wrong, as RFC 9457 problem JSON.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X PATCH https://prospector.invalid/o/your-org/api/v1/roles/{id} \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"stage\": \"…\", \"reason\": \"…\"}'"
     }
    ]
   },
@@ -15312,6 +15582,18 @@
      "required": true
     },
     {
+     "name": "has_roles",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [
+      {
+       "text": "Companies are judged for it by their roles, each pursued or junked: the company's verdict follows from them. Can't be turned off while it has roles."
+      }
+     ],
+     "required": true
+    },
+    {
      "name": "id",
      "type": {
       "name": "integer"
@@ -15440,6 +15722,13 @@
    "enum": [],
    "fields": [
     {
+     "name": "has_roles",
+     "type": {
+      "name": "boolean?"
+     },
+     "about": []
+    },
+    {
      "name": "look_for",
      "type": {
       "name": "string?"
@@ -15482,6 +15771,13 @@
      },
      "about": [],
      "required": true
+    },
+    {
+     "name": "has_roles",
+     "type": {
+      "name": "boolean"
+     },
+     "about": []
     },
     {
      "name": "look_for",
@@ -16482,6 +16778,18 @@
       }
      ],
      "required": true
+    },
+    {
+     "name": "roles",
+     "type": {
+      "name": "Role[]",
+      "link": "#schema-Role"
+     },
+     "about": [
+      {
+       "text": "Its roles for the offering in view, when that offering has roles; oldest first."
+      }
+     ]
     }
    ]
   },
@@ -16679,6 +16987,226 @@
      },
      "about": [],
      "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-Role",
+   "name": "Role",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "by",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Who last pursued, junked or put it back; empty until someone does."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "company_id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "created_at",
+     "type": {
+      "name": "date-time"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "details",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Rate, length, IR35, location and the like, in one line."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "found_by",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "offering_id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "reason",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Why it was junked, as whoever junked it said it."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "stage",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "task_id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "The task it was found for; 0 for none."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "title",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "updated_at",
+     "type": {
+      "name": "date-time"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "url",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The posting, or the page that shows the role is open; empty for none."
+      }
+     ],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-RoleJudgement",
+   "name": "RoleJudgement",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "stage",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "pursued",
+       "code": true
+      },
+      {
+       "text": " qualifies the company for the offering once no role waits; once every role is junked it is rejected for it; "
+      },
+      {
+       "text": "review",
+       "code": true
+      },
+      {
+       "text": " puts a role back."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "reason",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Why, for a junked role only."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "anchor": "schema-RoleNew",
+   "name": "RoleNew",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "offering",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "An offering that has roles."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "title",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "details",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "source_url",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The posting."
+      }
+     ]
     }
    ]
   },
