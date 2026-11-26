@@ -194,8 +194,14 @@ func (p Page) offset() int { return (p.N - 1) * p.Size }
 
 const researchPageSize = 30
 
-func (s *Store) researchQuery(org int64, filter string) (*gorm.DB, string, error) {
+func (s *Store) researchQuery(org int64, filter string, task int64) (*gorm.DB, string, error) {
 	q := s.in(org).Model(&Company{})
+	if task != 0 {
+		// What a task found is what was done for it, or noted for it, at a company.
+		done := s.db.Model(&Event{}).Select("company_id").Where("org_id = ? and task_id = ?", org, task)
+		noted := s.db.Model(&TaskNote{}).Select("company_id").Where("org_id = ? and task_id = ?", org, task)
+		q = q.Where("(id in (?) or id in (?))", done, noted)
+	}
 	switch filter {
 	case "review":
 		return q.Where("stage = ?", CompanyReview), "created_at desc, id desc", nil
@@ -259,8 +265,8 @@ func (s *Store) researchRows(org int64, companies []Company) ([]ResearchRow, err
 
 // detailsToCheck can't be paged in SQL: whether a suggestion still needs checking
 // depends on comparing it with what the person holds now, the way a person would.
-func (s *Store) detailsToCheck(org int64) ([]ResearchRow, error) {
-	q, order, err := s.researchQuery(org, "details")
+func (s *Store) detailsToCheck(org, task int64) ([]ResearchRow, error) {
+	q, order, err := s.researchQuery(org, "details", task)
 	if err != nil {
 		return nil, err
 	}
@@ -274,15 +280,20 @@ func (s *Store) detailsToCheck(org int64) ([]ResearchRow, error) {
 }
 
 func (s *Store) Research(org int64, filter string, page int) ([]ResearchRow, Page, error) {
+	return s.researchFor(org, filter, page, 0)
+}
+
+// researchFor is Research narrowed to what one task found, or all of it for task 0.
+func (s *Store) researchFor(org int64, filter string, page int, task int64) ([]ResearchRow, Page, error) {
 	if filter == "details" {
-		rows, err := s.detailsToCheck(org)
+		rows, err := s.detailsToCheck(org, task)
 		if err != nil {
 			return nil, Page{}, err
 		}
 		pg := pageOf(page, researchPageSize, len(rows))
 		return rows[pg.offset():min(len(rows), pg.offset()+pg.Size)], pg, nil
 	}
-	q, order, err := s.researchQuery(org, filter)
+	q, order, err := s.researchQuery(org, filter, task)
 	if err != nil {
 		return nil, Page{}, err
 	}
@@ -300,11 +311,15 @@ func (s *Store) Research(org int64, filter string, page int) ([]ResearchRow, Pag
 }
 
 func (s *Store) ResearchCount(org int64, filter string) int {
+	return s.researchCount(org, filter, 0)
+}
+
+func (s *Store) researchCount(org int64, filter string, task int64) int {
 	if filter == "details" {
-		rows, _ := s.detailsToCheck(org)
+		rows, _ := s.detailsToCheck(org, task)
 		return len(rows)
 	}
-	q, _, err := s.researchQuery(org, filter)
+	q, _, err := s.researchQuery(org, filter, task)
 	if err != nil {
 		return 0
 	}
@@ -314,9 +329,13 @@ func (s *Store) ResearchCount(org int64, filter string) int {
 }
 
 func (s *Store) ResearchCounts(org int64) map[string]int {
+	return s.researchCountsFor(org, 0)
+}
+
+func (s *Store) researchCountsFor(org, task int64) map[string]int {
 	out := map[string]int{}
 	for _, f := range ResearchFilters {
-		out[f.Key] = s.ResearchCount(org, f.Key)
+		out[f.Key] = s.researchCount(org, f.Key, task)
 	}
 	return out
 }

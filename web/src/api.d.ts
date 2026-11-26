@@ -687,7 +687,10 @@ export interface paths {
         put?: never;
         /**
          * Start a task
-         * @description A task is a brief for agents and people to work together; its brief becomes its first request.
+         * @description A task is a brief for agents and people to work together; its brief becomes its first
+         *     request. Name Prospector's own agents in `agents` to start each on it at once: a key
+         *     then needs `agents:run` as well. An agent that can't start is said in `not_started`,
+         *     and the task is made all the same.
          */
         post: operations["createTask"];
         delete?: never;
@@ -1386,6 +1389,13 @@ export interface components {
             title: string;
             /** @description What is wanted: the task's first request. */
             brief: string;
+            /** @description Prospector's own agents to start on the task, each on its own request. */
+            agents?: number[];
+        };
+        TaskStarted: components["schemas"]["Task"] & {
+            runs: components["schemas"]["Run"][];
+            /** @description For each agent named that couldn't start, why. */
+            not_started: string[];
         };
         TaskChange: {
             closed: boolean;
@@ -3151,13 +3161,13 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The task, started. */
+            /** @description The task, started, with the runs of the agents named. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Task"];
+                    "application/json": components["schemas"]["TaskStarted"];
                 };
             };
             default: components["responses"]["Problem"];
