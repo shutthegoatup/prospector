@@ -4459,7 +4459,7 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
-        /** @description `throttled`: too many tries. */
+        /** @description `throttled`: too many tries, or too many requests. */
         Throttled: {
             headers: {
                 /** @description Seconds until the next try counts. */
@@ -4795,6 +4795,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -4829,6 +4830,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -4858,6 +4860,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -4892,6 +4895,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -4920,6 +4924,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -4958,6 +4963,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -4999,6 +5005,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5028,6 +5035,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5056,6 +5064,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5093,6 +5102,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5127,6 +5137,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5155,6 +5166,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5191,6 +5203,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5228,6 +5241,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5265,6 +5279,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5304,6 +5319,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5342,6 +5358,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5377,6 +5394,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
             502: components["responses"]["NotSent"];
         };
@@ -5413,6 +5431,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5452,6 +5471,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5486,6 +5506,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5514,6 +5535,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5548,6 +5570,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5587,6 +5610,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
             502: components["responses"]["NotSent"];
         };
@@ -5616,6 +5640,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5657,6 +5682,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5691,6 +5717,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5719,6 +5746,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5753,6 +5781,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5799,6 +5828,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5836,6 +5866,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5875,6 +5906,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5903,6 +5935,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5937,6 +5970,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -5971,6 +6005,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6010,6 +6045,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6055,6 +6091,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6083,6 +6120,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6111,6 +6149,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6151,6 +6190,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6185,6 +6225,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6222,6 +6263,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6259,6 +6301,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6287,6 +6330,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6326,6 +6370,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6360,6 +6405,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6388,6 +6434,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6422,6 +6469,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6464,6 +6512,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6519,6 +6568,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6565,6 +6615,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6599,6 +6650,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6656,6 +6708,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6691,6 +6744,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6725,6 +6779,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6756,6 +6811,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6794,6 +6850,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6832,6 +6889,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6870,6 +6928,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6906,6 +6965,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6937,6 +6997,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6968,6 +7029,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -6999,6 +7061,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7037,6 +7100,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7071,6 +7135,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7099,6 +7164,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7141,6 +7207,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7180,6 +7247,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7218,6 +7286,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7247,6 +7316,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7275,6 +7345,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7313,6 +7384,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7343,6 +7415,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7382,6 +7455,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
             413: components["responses"]["TooLarge"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7420,6 +7494,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7465,6 +7540,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7494,6 +7570,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7534,6 +7611,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7572,6 +7650,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7610,6 +7689,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7659,6 +7739,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7687,6 +7768,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7723,6 +7805,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7757,6 +7840,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7794,6 +7878,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7826,6 +7911,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7858,6 +7944,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7890,6 +7977,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7925,6 +8013,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7962,6 +8051,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -7995,6 +8085,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8023,6 +8114,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8067,6 +8159,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8095,6 +8188,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8128,6 +8222,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8165,6 +8260,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8199,6 +8295,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8227,6 +8324,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8261,6 +8359,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8301,6 +8400,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8339,6 +8439,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8379,6 +8480,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8414,6 +8516,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8448,6 +8551,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8493,6 +8597,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8530,6 +8635,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8559,6 +8665,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8599,6 +8706,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8639,6 +8747,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8672,6 +8781,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8701,6 +8811,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8740,6 +8851,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8768,6 +8880,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8801,6 +8914,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8829,6 +8943,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8861,6 +8976,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8937,6 +9053,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -8979,6 +9096,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -9008,6 +9126,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -9048,6 +9167,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -9076,6 +9196,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -9109,6 +9230,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -9139,6 +9261,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
             502: components["responses"]["NotSent"];
         };
@@ -9168,6 +9291,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -9201,6 +9325,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -9238,6 +9363,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -9275,6 +9401,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -9304,6 +9431,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -9336,6 +9464,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };
@@ -9369,6 +9498,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
     };

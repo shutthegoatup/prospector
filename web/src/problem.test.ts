@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mustGoFirst, problemText, problemType } from "./problem.ts";
+import { mustGoFirst, problemText, problemType, retryQuery } from "./problem.ts";
+
+test("a throttled read isn't tried again; another failure is, three times", () => {
+  assert.equal(retryQuery(0, { type: "/api/problems/throttled", status: 429 }), false);
+  assert.equal(retryQuery(0, { title: "Bad Gateway", status: 502 }), true);
+  assert.equal(retryQuery(3, { title: "Bad Gateway", status: 502 }), false);
+});
 
 test("an API problem says its detail", () => {
   assert.equal(problemText({ title: "Forbidden", status: 403, detail: "this key lacks the agents:configure scope" }, "Forbidden", 403), "this key lacks the agents:configure scope");

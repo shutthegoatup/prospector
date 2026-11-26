@@ -22,3 +22,9 @@ export function mustGoFirst(error: unknown): boolean {
   const t = problemType(error);
   return t === "/api/problems/must_change_password" || t === "/api/problems/sso_required";
 }
+
+// retryQuery is React Query's retry: trying a throttled read again would only spend
+// the rest of the caller's requests.
+export function retryQuery(failures: number, error: unknown): boolean {
+  return failures < 3 && problemType(error) !== "/api/problems/throttled";
+}
