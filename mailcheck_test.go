@@ -39,6 +39,7 @@ func (f *fakeDNS) LookupHost(_ context.Context, name string) ([]string, error) {
 }
 
 func TestWhetherADomainTakesMail(t *testing.T) {
+	t.Parallel()
 	dns := &fakeDNS{
 		mx: map[string][]*net.MX{
 			"larkmoor.example": {{Host: "mx.larkmoor.example.", Pref: 10}},
@@ -65,6 +66,7 @@ func TestWhetherADomainTakesMail(t *testing.T) {
 }
 
 func TestAnAgentsAddressOnADomainThatTakesNoMailIsTurnedAway(t *testing.T) {
+	t.Parallel()
 	s, o, _, _ := signedIn(t)
 	dns := &fakeDNS{mx: map[string][]*net.MX{"corvane.example": {{Host: "mx.corvane.example."}}},
 		fail: map[string]bool{"mx flaky.example": true}}
@@ -109,6 +111,7 @@ func TestAnAgentsAddressOnADomainThatTakesNoMailIsTurnedAway(t *testing.T) {
 }
 
 func TestAddressesAlreadyHereAreCheckedAFewAtATime(t *testing.T) {
+	t.Parallel()
 	s, o, _, _ := signedIn(t)
 	person(t, s, o, "Hannah Pryce", "Larkmoor Yachts", "hannah@larkmoor.example", true)
 	person(t, s, o, "Jo Marsh", "Larkmoor Yachts", "jo@larkmoor.example, jo.marsh@marsh.example", true)
@@ -136,6 +139,7 @@ func TestAddressesAlreadyHereAreCheckedAFewAtATime(t *testing.T) {
 }
 
 func TestTheDaysCardWarnsOfADetailThatCantBeRight(t *testing.T) {
+	t.Parallel()
 	now := time.Now()
 	texts := func(c Contact, noMail map[string]bool) string {
 		var out []string
@@ -165,6 +169,7 @@ func TestTheDaysCardWarnsOfADetailThatCantBeRight(t *testing.T) {
 }
 
 func TestACampaignLeavesOutAnAddressWhoseDomainTakesNoMail(t *testing.T) {
+	t.Parallel()
 	s, o, _, _ := signedIn(t)
 	person(t, s, o, "Hannah Pryce", "Larkmoor Yachts", "hannah@larkmoor.example", true)
 	person(t, s, o, "Sven Dahl", "Nordkap Boats", "sven@nordkap.example", true)
@@ -190,6 +195,7 @@ func TestACampaignLeavesOutAnAddressWhoseDomainTakesNoMail(t *testing.T) {
 }
 
 func TestErasingSomeoneForgetsWhatWasAskedAboutTheirDomain(t *testing.T) {
+	t.Parallel()
 	s, o, _, _ := signedIn(t)
 	p := person(t, s, o, "Hannah Pryce", "Larkmoor Yachts", "hannah@pryce.example", true)
 	s.db.Create(&MailDomain{Domain: "pryce.example", TakesMail: true, CheckedAt: time.Now()})

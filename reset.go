@@ -108,7 +108,7 @@ func (s *Store) RedeemPasswordToken(token, password string) error {
 	if len(password) < 10 {
 		return errors.New("passwords need at least 10 characters")
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), passwordCost)
 	if err != nil {
 		return err
 	}

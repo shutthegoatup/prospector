@@ -3216,6 +3216,8 @@ export interface components {
             pending: components["schemas"]["PendingDetail"][];
             /** @description Each vendor's latest lookup for them within the last 30 days, newest first. A vendor isn't asked again about the same detail until its lookup is older than that. */
             lookups: components["schemas"]["Lookup"][];
+            /** @description Why nothing about them may be sent to a data vendor (they declined, or they or their company is on the never-contact list), or empty if they can be looked up. */
+            unlookable: string;
         };
         Lookup: {
             /** @description email, phone or linkedin. */

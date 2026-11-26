@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -12,6 +10,7 @@ import (
 const fourSteps = "them: Name a project lead, 2 days\nthem: Send your product files, 7 days\n\nKick-off call, 10 days\nus: Go live"
 
 func TestOnboardingStepsAreReadALineEach(t *testing.T) {
+	t.Parallel()
 	plan, err := OrgSettings{OnboardingSteps: fourSteps}.Onboarding()
 	if err != nil {
 		t.Fatal(err)
@@ -41,6 +40,7 @@ func TestOnboardingStepsAreReadALineEach(t *testing.T) {
 }
 
 func TestACustomerIsOnboardedStepByStep(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	person := repliedPerson(t, s, o, "Hannah Pryce")
@@ -165,6 +165,7 @@ func TestACustomerIsOnboardedStepByStep(t *testing.T) {
 }
 
 func TestOnboardingIsWorkedFromItsPages(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	person := repliedPerson(t, s, o, "Hannah Pryce")
 	company := *person.CompanyID
@@ -232,10 +233,8 @@ func TestOnboardingIsWorkedFromItsPages(t *testing.T) {
 
 // A database written before onboarding existed has companies and neither table.
 func TestADatabaseFromBeforeOnboardingOpens(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	t.Parallel()
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)
@@ -262,6 +261,7 @@ func TestADatabaseFromBeforeOnboardingOpens(t *testing.T) {
 }
 
 func TestAWonDealOffersOnboarding(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	won := repliedPerson(t, s, o, "Hannah Pryce")
 	open := repliedPerson(t, s, o, "Tom Ellery")
@@ -322,6 +322,7 @@ func TestAWonDealOffersOnboarding(t *testing.T) {
 
 // Once every step is done the won card says so, and the way to start another is the company page.
 func TestAWonDealSaysWhenItsCompanyIsOnboarded(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	won := repliedPerson(t, s, o, "Hannah Pryce")
 	if err := s.Update(o.ID, won.ID, "stage", "won", "Ada Lovelace"); err != nil {
@@ -343,6 +344,7 @@ func TestAWonDealSaysWhenItsCompanyIsOnboarded(t *testing.T) {
 }
 
 func TestARobotWorksOnboardingAsItsScopesAllow(t *testing.T) {
+	t.Parallel()
 	s, srv, _, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	other := mustOrg(t, s, "beta")

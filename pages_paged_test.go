@@ -10,6 +10,7 @@ import (
 )
 
 func TestTheTasksPageHasPages(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	rows := make([]Task, taskPageSize+2)
 	for i := range rows {
@@ -74,6 +75,7 @@ func apiPages(t *testing.T, client *http.Client, u string) []apiPage {
 }
 
 func TestTheEnquiriesPageHasPages(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	rows := make([]Enquiry, enquiryPageSize+1)
 	for i := range rows {

@@ -177,6 +177,7 @@ func signInAs(t *testing.T, srv *httptest.Server, email, password string) *http.
 // database themselves, so every one of them is tried here the same way: by the owner
 // of a second organisation, with the first one's ids and what would find its rows.
 func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	first := seedFirst(t, s)
 	// A run still going, since stopping one only looks among those.

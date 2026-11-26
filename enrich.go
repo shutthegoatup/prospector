@@ -153,6 +153,23 @@ type EnrichIn struct {
 	Task      int64    `json:"task,omitempty" jsonschema:"the id of the task this is for, if any"`
 }
 
+// unlookable says why nothing about someone may be sent to a vendor, or "" if it may:
+// they declined, or they or their company's domain is on the never-contact list.
+func (set OrgSettings) unlookable(c Contact, domain string) string {
+	if c.Declined != nil {
+		return "they declined: nothing about them is looked up"
+	}
+	if err := set.listed(deref(c.Email), deref(c.Linkedin)); err != nil {
+		return err.Error()
+	}
+	if domain != "" {
+		if err := set.listed("someone@"+domain, ""); err != nil {
+			return err.Error()
+		}
+	}
+	return ""
+}
+
 // Enrich asks the organisation's vendors, in its order, for the details someone lacks.
 // What is found waits as a suggestion for a person to accept, like any agent's find.
 func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]EnrichAsked, error) {
@@ -173,9 +190,6 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 	if strings.HasPrefix(c.Key, "org:") {
 		return nil, errors.New("that is a company's own row, not a person")
 	}
-	if c.Declined != nil {
-		return nil, conflict("they declined: nothing about them is looked up")
-	}
 	var co Company
 	if c.CompanyID != nil {
 		if err := s.db.Where("org_id = ? and id = ?", o.ID, *c.CompanyID).Limit(1).Find(&co).Error; err != nil {
@@ -183,14 +197,8 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 		}
 	}
 	domain := strings.ToLower(strings.TrimSpace(co.Domain))
-	// Nothing about someone the organisation mustn't contact leaves for a vendor.
-	if err := s.allowed(o, deref(c.Email), deref(c.Linkedin)); err != nil {
-		return nil, conflict(err.Error())
-	}
-	if domain != "" {
-		if err := s.allowed(o, "someone@"+domain, ""); err != nil {
-			return nil, conflict(err.Error())
-		}
+	if why := o.Settings.unlookable(c, domain); why != "" {
+		return nil, conflict(why)
 	}
 	person := enrichPerson{Name: displayName(c), Domain: domain, Company: co.Name, Linkedin: deref(c.Linkedin)}
 	enrichers, err := s.Enrichers(o.ID)

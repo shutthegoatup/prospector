@@ -20,6 +20,7 @@ func walkRuns(t *testing.T, s *Store, org int64, limit int) []Run {
 }
 
 func TestARunLongerThanAPageReadsIsShownNewestFirst(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	start := time.Now().Add(-100 * time.Hour).Truncate(time.Second)
@@ -47,6 +48,7 @@ func TestARunLongerThanAPageReadsIsShownNewestFirst(t *testing.T) {
 }
 
 func TestRunsThatEndedTogetherShareAPage(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	at := time.Now().Add(-10 * time.Hour).Truncate(time.Second)
@@ -63,6 +65,7 @@ func TestRunsThatEndedTogetherShareAPage(t *testing.T) {
 }
 
 func TestWalkingRunsCarriesOnPastALongOne(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	start := time.Now().Add(-200 * time.Hour).Truncate(time.Second)

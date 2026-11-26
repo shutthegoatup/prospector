@@ -34,6 +34,7 @@ func researched(p offeringQueue) map[string]api.ResearchCompany {
 }
 
 func TestEachOfferingHasAResearchQueueOfItsOwn(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	secret, _, err := s.CreateKey(o.ID, "robot", []string{"read", "research:review"}, "Ada Lovelace")
 	if err != nil {
@@ -148,6 +149,7 @@ func TestEachOfferingHasAResearchQueueOfItsOwn(t *testing.T) {
 }
 
 func TestRemovingAnOfferingBringsWhatItFoundIntoTheOrganisationsOwnReview(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO"}, "Ada"))
 	task := must(s.CreateTaskFor(o.ID, cto.ID, "", "Find scale-ups", "Ada"))
@@ -182,6 +184,7 @@ func TestRemovingAnOfferingBringsWhatItFoundIntoTheOrganisationsOwnReview(t *tes
 }
 
 func TestExistingCompaniesAreInTheOrganisationsOwnReview(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "Larkmoor"}))

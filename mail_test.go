@@ -138,6 +138,7 @@ func postForm(t *testing.T, c *http.Client, u string, form url.Values) (int, str
 }
 
 func TestMailIsOffUntilConfigured(t *testing.T) {
+	t.Parallel()
 	for name, configure := range map[string]func(*App){
 		"no server":         func(a *App) { a.mail = nil },
 		"no PROSPECTOR_URL": func(a *App) { a.base = "" },
@@ -162,6 +163,7 @@ func TestMailIsOffUntilConfigured(t *testing.T) {
 }
 
 func TestPasswordReset(t *testing.T) {
+	t.Parallel()
 	s, srv, ada, box := mailSite(t, nil)
 	if _, body := call(t, http.DefaultClient, "GET", srv.URL+"/api/v1/sign-in", "", nil); !strings.Contains(body, `"forgot":true`) {
 		t.Fatal("the sign-in page doesn't offer a reset")
@@ -249,6 +251,7 @@ func TestPasswordReset(t *testing.T) {
 }
 
 func TestResetLinksEnd(t *testing.T) {
+	t.Parallel()
 	s, srv, _, _ := mailSite(t, nil)
 	u := must(s.UserByEmail("ada@example.com"))
 
@@ -271,6 +274,7 @@ func TestResetLinksEnd(t *testing.T) {
 }
 
 func TestSignedOutFormsRefuseOtherSites(t *testing.T) {
+	t.Parallel()
 	s, srv, _, box := mailSite(t, nil)
 	token := must(s.InviteToken(must(s.UserByEmail("ada@example.com")).ID))
 	for _, path := range []string{"/api/v1/password-resets", "/api/v1/password-resets/" + token} {
@@ -308,6 +312,7 @@ func TestSignedOutFormsRefuseOtherSites(t *testing.T) {
 }
 
 func TestInvitationByEmail(t *testing.T) {
+	t.Parallel()
 	s, srv, ada, box := mailSite(t, nil)
 	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json", map[string]string{"email": "grace@example.com", "name": "Grace Hopper"})
 	if code != http.StatusCreated || strings.Contains(body, "first password") || !strings.Contains(body, "emailed a link") {
@@ -388,6 +393,7 @@ func TestInvitationByEmail(t *testing.T) {
 }
 
 func TestOrganisationMailServer(t *testing.T) {
+	t.Parallel()
 	s, srv, ada, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	save := func(c *http.Client, in map[string]any) (int, string) {
@@ -474,6 +480,7 @@ func TestOrganisationMailServer(t *testing.T) {
 }
 
 func TestMailPasswordNeedsAKey(t *testing.T) {
+	t.Parallel()
 	s, srv, ada, _ := mailSite(t, func(a *App) { a.s.keys = nil })
 	code, body := call(t, ada, "PUT", srv.URL+"/o/alpha/api/v1/mail-server", "application/json",
 		map[string]any{"host": "smtp.alpha.example", "port": 587, "username": "u", "password": "s3cret-smtp-pass", "sender": "a@alpha.example"})
@@ -488,6 +495,7 @@ func TestMailPasswordNeedsAKey(t *testing.T) {
 // Whoever runs an organisation's mail server reads what it carries, so a link to
 // choose the password of an account that was already here never goes through it.
 func TestAnotherOrganisationsMailServerNeverCarriesAnExistingAccountsLink(t *testing.T) {
+	t.Parallel()
 	s, srv, ada, box := mailSite(t, nil)
 	if code, _ := call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json", map[string]string{"email": "grace@example.com", "name": "Grace Hopper"}); code != http.StatusCreated {
 		t.Fatal("adding Grace")
@@ -528,6 +536,7 @@ func TestAnotherOrganisationsMailServerNeverCarriesAnExistingAccountsLink(t *tes
 }
 
 func TestAResetGivesAProviderOnlyAccountAPassword(t *testing.T) {
+	t.Parallel()
 	s, srv, _, box := mailSite(t, nil)
 	dan := must(s.CreateUser("dan@example.com", "Dan Okafor", "a first password"))
 	if err := s.db.Model(&User{}).Where("id = ?", dan.ID).Update("password_hash", unusableHash()).Error; err != nil {
@@ -547,6 +556,7 @@ func TestAResetGivesAProviderOnlyAccountAPassword(t *testing.T) {
 }
 
 func TestAMailPasswordFollowsAKeyChange(t *testing.T) {
+	t.Parallel()
 	s, srv, ada, _ := mailSite(t, nil)
 	code, body := call(t, ada, "PUT", srv.URL+"/o/alpha/api/v1/mail-server", "application/json",
 		map[string]any{"host": "smtp.alpha.example", "port": 587, "username": "u", "password": "s3cret-smtp-pass", "sender": "a@alpha.example"})
@@ -577,6 +587,7 @@ func TestAMailPasswordFollowsAKeyChange(t *testing.T) {
 }
 
 func TestMailFromEnv(t *testing.T) {
+	t.Parallel()
 	env := func(pairs ...string) func(string) string {
 		return func(k string) string {
 			for i := 0; i < len(pairs); i += 2 {
@@ -700,6 +711,7 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 }
 
 func TestSMTPSend(t *testing.T) {
+	t.Parallel()
 	f := newFakeSMTP(t, nil)
 	host, port, _ := net.SplitHostPort(f.addr)
 	n, _ := strconv.Atoi(port)
@@ -738,6 +750,7 @@ func TestSMTPSend(t *testing.T) {
 
 // A real provider is never on this machine, so these are the paths it takes.
 func TestSMTPNeedsTLS(t *testing.T) {
+	t.Parallel()
 	from, to := &mail.Address{Address: "site@prospector.example"}, &mail.Address{Address: "grace@example.com"}
 	via := MailServer{Host: "example.com", Port: 587, Username: "user", Password: "pass", From: from.Address}
 	dial := func(f *fakeSMTP) net.Conn {

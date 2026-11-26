@@ -11,6 +11,7 @@ import (
 )
 
 func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
@@ -115,6 +116,7 @@ func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
 }
 
 func TestASuggestionCantGetPastTheNeverContactListOrAnErasure(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
@@ -164,6 +166,7 @@ func TestASuggestionCantGetPastTheNeverContactListOrAnErasure(t *testing.T) {
 }
 
 func TestSuggestionsAreInBothExports(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
@@ -185,6 +188,7 @@ func TestSuggestionsAreInBothExports(t *testing.T) {
 }
 
 func TestDetailsSentUnderAnotherNameAreNobodys(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
@@ -229,6 +233,7 @@ func TestDetailsSentUnderAnotherNameAreNobodys(t *testing.T) {
 }
 
 func TestOneOfSeveralAddressesIsAlreadyHeld(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
@@ -245,6 +250,7 @@ func TestOneOfSeveralAddressesIsAlreadyHeld(t *testing.T) {
 }
 
 func TestErasingSomeoneCoversWhatWasSuggestedForThem(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
@@ -288,6 +294,7 @@ func TestErasingSomeoneCoversWhatWasSuggestedForThem(t *testing.T) {
 }
 
 func TestARestoreDropsSuggestionsForPeopleItDrops(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
@@ -311,6 +318,7 @@ func TestARestoreDropsSuggestionsForPeopleItDrops(t *testing.T) {
 
 // "Now get their phone numbers": the number waits for a person, and the task shows who it was found for.
 func TestADetailFoundForATaskWaitsAndCountsTowardsTheTask(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
@@ -329,6 +337,7 @@ func TestADetailFoundForATaskWaitsAndCountsTowardsTheTask(t *testing.T) {
 }
 
 func TestAnAgentsGuessesDontPileUpOnOnePerson(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
@@ -368,6 +377,7 @@ func TestAnAgentsGuessesDontPileUpOnOnePerson(t *testing.T) {
 }
 
 func TestARestoreDoesntHandASuggestionToWhoeverGotTheId(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}

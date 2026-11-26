@@ -22,6 +22,7 @@ func navOwner(t *testing.T, client *http.Client, site string) bool {
 }
 
 func TestErasePerson(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	do := func(err error) {
@@ -180,6 +181,7 @@ func TestErasePerson(t *testing.T) {
 }
 
 func TestOnlyAProfileOrAddressIdentifiesSomeone(t *testing.T) {
+	t.Parallel()
 	if got := identifiers(1, "Hannah Pryce", "", "", "https://www.linkedin.com/search/results/people/?keywords=Larkmoor%20marketing"); len(got) != 0 {
 		t.Fatal("a LinkedIn search link, or a name with no company, counts as a person")
 	}

@@ -21,6 +21,7 @@ func verdictFor(t *testing.T, s *Store, org, offering, company int64) Verdict {
 }
 
 func TestEachRoleAtACompanyIsPursuedOrJunkedOnItsOwn(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	secret, _, err := s.CreateKey(o.ID, "robot", []string{"read", "research:write", "research:review"}, "Ada Lovelace")
 	if err != nil {
@@ -121,6 +122,7 @@ func TestEachRoleAtACompanyIsPursuedOrJunkedOnItsOwn(t *testing.T) {
 }
 
 func TestANewRoleAtACompanyRuledOutIsANewFindForTheTask(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	roles := must(s.AddOffering(o.ID, Offering{Name: "Contract roles", HasRoles: true}, "Ada"))
@@ -149,6 +151,7 @@ func TestANewRoleAtACompanyRuledOutIsANewFindForTheTask(t *testing.T) {
 }
 
 func TestRolesAreKeptOnlyForAnOfferingThatHasThem(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO"}, "Ada"))
@@ -194,6 +197,7 @@ func TestRolesAreKeptOnlyForAnOfferingThatHasThem(t *testing.T) {
 }
 
 func TestOfferingsFromBeforeRolesHaveNone(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	must(s.AddOffering(o.ID, Offering{Name: "Interim CTO"}, "Ada"))
@@ -209,6 +213,7 @@ func TestOfferingsFromBeforeRolesHaveNone(t *testing.T) {
 }
 
 func TestARoleAnAgentAddsMustCiteAPageItWasShown(t *testing.T) {
+	t.Parallel()
 	got := sources("add_role", map[string]any{"title": "Platform engineer", "source_url": "https://northwind.example/jobs/2"})
 	if len(got) != 1 || got[0] != "https://northwind.example/jobs/2" {
 		t.Fatalf("add_role's posting should be checked against the pages the run has seen: %v", got)
@@ -216,6 +221,7 @@ func TestARoleAnAgentAddsMustCiteAPageItWasShown(t *testing.T) {
 }
 
 func TestANewRoleAtACompanyAlreadyPursuedWaitsForReview(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	roles := must(s.AddOffering(o.ID, Offering{Name: "Contract roles", HasRoles: true}, "Ada"))
@@ -253,6 +259,7 @@ func TestANewRoleAtACompanyAlreadyPursuedWaitsForReview(t *testing.T) {
 }
 
 func TestAVerdictThatFollowsRolesIsntSetByHand(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	roles := must(s.AddOffering(o.ID, Offering{Name: "Contract roles", HasRoles: true}, "Ada"))

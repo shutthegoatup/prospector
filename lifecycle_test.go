@@ -40,6 +40,7 @@ func everyContact() []Contact {
 }
 
 func TestContactStageNames(t *testing.T) {
+	t.Parallel()
 	d := str("2020-01-01")
 	for _, tc := range []struct {
 		c    Contact
@@ -64,6 +65,7 @@ func TestContactStageNames(t *testing.T) {
 }
 
 func TestPipelineTakesTheFurthestContact(t *testing.T) {
+	t.Parallel()
 	d := str("2020-01-01")
 	for _, tc := range []struct {
 		name   string
@@ -93,6 +95,7 @@ func TestPipelineTakesTheFurthestContact(t *testing.T) {
 // The queues and the board are SQL; the names shown for a contact are Go. Both must
 // read a contact's standing the same way.
 func TestQueriesAgreeWithPhase(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	all := everyContact()
@@ -150,6 +153,7 @@ func TestQueriesAgreeWithPhase(t *testing.T) {
 }
 
 func TestRejectedCompanysPeopleLeaveTheQueues(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	co := Company{OrgID: o.ID, Name: "Larkmoor", Stage: CompanyQualified}
@@ -218,6 +222,7 @@ func TestRejectedCompanysPeopleLeaveTheQueues(t *testing.T) {
 }
 
 func TestStageIsOneOfTheBoardsColumns(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	c := Contact{OrgID: o.ID, Key: "hannah", File: "test", Person: str("Hannah Pryce")}
@@ -249,6 +254,7 @@ func TestStageIsOneOfTheBoardsColumns(t *testing.T) {
 }
 
 func TestMarkChecksApplyToEveryCaller(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	suggested := Contact{OrgID: o.ID, Key: "jonas", File: "test", Person: str("Jonas Weber"), Status: ContactSuggested}
@@ -272,6 +278,7 @@ func TestMarkChecksApplyToEveryCaller(t *testing.T) {
 }
 
 func TestMarkDateIsJudgedInLocalTime(t *testing.T) {
+	t.Parallel()
 	east := time.FixedZone("east", 2*60*60)
 	justAfterMidnight := time.Date(2024, 3, 10, 0, 30, 0, 0, east)
 	if err := markDate("2024-03-10", justAfterMidnight); err != nil {
@@ -283,6 +290,7 @@ func TestMarkDateIsJudgedInLocalTime(t *testing.T) {
 }
 
 func TestPickingSomeoneQualifiesTheirCompanyOnTheRecord(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	co := Company{OrgID: o.ID, Name: "Larkmoor", Stage: CompanyReview}

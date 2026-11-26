@@ -7,6 +7,7 @@ import (
 )
 
 func TestACompanysHistoryAndNotesHavePages(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	co := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "Larkmoor"}))
 	var events []Event
@@ -67,6 +68,7 @@ func TestACompanysHistoryAndNotesHavePages(t *testing.T) {
 }
 
 func TestAgentActivityHasPages(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	events := make([]Event, activityPageSize+4)
 	for i := range events {

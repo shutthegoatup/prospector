@@ -10,6 +10,7 @@ import (
 )
 
 func TestATaskFindsCompaniesForItsOffering(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO", LookFor: "trigger: a CTO leaving or a funding round"}, "Ada"))
 	secret, _, err := s.CreateKey(o.ID, "robot", []string{"tasks:write", "read"}, "Ada Lovelace")
@@ -99,6 +100,7 @@ func TestATaskFindsCompaniesForItsOffering(t *testing.T) {
 }
 
 func TestWhateverAnAgentWorksOnForAnOfferingWaitsInItsReview(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	agencies := must(s.AddOffering(o.ID, Offering{Name: "Agency partners"}, "Ada"))
@@ -122,6 +124,7 @@ func TestWhateverAnAgentWorksOnForAnOfferingWaitsInItsReview(t *testing.T) {
 }
 
 func TestExistingTasksAreForTheOrganisationsOwnOffering(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	old := must(s.CreateTask(o.ID, "", "Find makers of kayaks", "Ada"))

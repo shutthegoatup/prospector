@@ -22,6 +22,7 @@ func queries(t *testing.T, s *Store, do func()) (n int) {
 }
 
 func TestTheTaskListTakesNoMoreQueriesForMoreTasks(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
