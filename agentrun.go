@@ -79,7 +79,7 @@ const (
 
 // The tools of Prospector's own the agent is given: research only, nothing that
 // reaches a person.
-var ownTools = []string{"get_task", "search", "get_company", "add_company", "add_fact", "add_contact", "task_note", "finish_request"}
+var ownTools = []string{"get_task", "search", "get_company", "add_company", "add_fact", "add_role", "add_contact", "task_note", "finish_request"}
 
 type agentRuns struct {
 	mu     sync.Mutex
@@ -715,7 +715,7 @@ func sources(name string, args map[string]any) []string {
 		}
 	}
 	switch name {
-	case "add_fact", "add_contact":
+	case "add_fact", "add_contact", "add_role":
 		pick(args)
 	case "add_company":
 		// Its configurator, platform and builder are stored as facts sourced from this.

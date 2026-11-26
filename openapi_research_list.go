@@ -56,8 +56,20 @@ func (s apiServer) ListResearch(ctx context.Context, in api.ListResearchRequestO
 	out.Body.Items, out.Body.Ranked, out.Body.NextCursor = []api.ResearchCompany{}, ranked, next
 	out.Body.OfferingId = offering
 	out.Body.Counts = s.a.s.researchCountsFor(q.Org.ID, offering, in.Params.Task)
+	ids := make([]int64, len(rows))
+	for i, r := range rows {
+		ids[i] = r.ID
+	}
+	roles, err := s.a.s.rolesAt(q.Org.ID, offering, ids)
+	if err != nil {
+		return nil, err
+	}
 	for _, r := range rows {
-		out.Body.Items = append(out.Body.Items, researchOut(set, r))
+		c := researchOut(set, r)
+		for _, role := range roles[r.ID] {
+			c.Roles = append(c.Roles, roleOut(role))
+		}
+		out.Body.Items = append(out.Body.Items, c)
 	}
 	return out, nil
 }
