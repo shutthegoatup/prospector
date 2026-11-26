@@ -562,13 +562,22 @@ func (s *Store) customerSetStep(a *CustomerAccess, step int64, done bool) error 
 		}
 		// Taking a mark back removes its entry, not adds one: someone outside pressing the
 		// two buttons in turn can't fill the company's history.
-		var entry Event
-		err := tx.Where("org_id = ? and company_id = ? and \"user\" = ? and action = ? and value = ?", org, a.Onboarding.CompanyID, customerActor, "onboard:done", st.Name).Order("id desc").First(&entry).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		// Theirs, and from the day they marked it: another onboarding at the company can have
+		// a step of the same name, marked by someone else or by them on another day.
+		var entries []Event
+		if err := tx.Where("org_id = ? and company_id = ? and contact_id = ? and \"user\" = ? and action = ? and value = ?", org, a.Onboarding.CompanyID, a.Contact.ID, customerActor, "onboard:done", st.Name).
+			Order("id desc").Find(&entries).Error; err != nil {
+			return err
+		}
+		if len(entries) == 0 {
 			return nil
 		}
-		if err != nil {
-			return err
+		entry := entries[0]
+		for _, e := range entries {
+			if e.At.Local().Format(dayLayout) == deref(st.DoneOn) {
+				entry = e
+				break
+			}
 		}
 		return tx.Delete(&entry).Error
 	})

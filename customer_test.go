@@ -617,3 +617,69 @@ func TestACustomersMarksKeepTheHistoryHonest(t *testing.T) {
 		t.Errorf("after erasing them: %d entries still theirs (%v), done %v", theirs, err, done())
 	}
 }
+
+func TestTakingBackAMarkRemovesOnlyThatMarksEntry(t *testing.T) {
+	s, srv, member, box := mailSite(t, nil)
+	o := must(s.OrgBySlug("alpha"))
+	o.Settings.OnboardingSteps = "them: Send your product files"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	ivo := must(s.QuickAddPerson(o, QuickAdd{Name: "Ivo Marsh", Company: "Larkmoor Yachts", Email: "ivo@larkmoor.example"}, "Ada Lovelace"))
+	if *ivo.CompanyID != *hannah.CompanyID {
+		t.Fatal("they should work at the same company")
+	}
+	// Two onboardings at one company, from the same steps, each with its own person.
+	browser := func(contact int64) (*http.Client, OnboardingStep) {
+		t.Helper()
+		ob := must(s.StartOnboarding(o.ID, OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
+		ageCustomerLinks(t, s)
+		if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": contact}); code != http.StatusNoContent {
+			t.Fatalf("inviting: %d %s", code, body)
+		}
+		c := newMailClient()
+		as(t, c, "POST", srv.URL+customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1])
+		for _, row := range must(s.Onboardings(o.ID, 0, today())) {
+			if row.ID == ob.ID {
+				return c, row.Steps[0]
+			}
+		}
+		t.Fatal("no such onboarding")
+		return nil, OnboardingStep{}
+	}
+	hers, herStep := browser(hannah.ID)
+	his, hisStep := browser(ivo.ID)
+	as(t, hers, "POST", srv.URL+"/c/steps/"+itoa(herStep.ID)+"/done")
+	as(t, his, "POST", srv.URL+"/c/steps/"+itoa(hisStep.ID)+"/done")
+
+	as(t, hers, "POST", srv.URL+"/c/steps/"+itoa(herStep.ID)+"/undone")
+	var left []Event
+	if err := s.db.Where("org_id = ? and action = ?", o.ID, "onboard:done").Find(&left).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(left) != 1 || left[0].ContactID != ivo.ID {
+		t.Errorf("taking back her mark left %+v, not his entry alone", left)
+	}
+
+	// The same person on two onboardings: taking back the one marked yesterday removes
+	// yesterday's entry, not today's.
+	again, againStep := browser(hannah.ID)
+	as(t, hers, "POST", srv.URL+"/c/steps/"+itoa(herStep.ID)+"/done")
+	yesterday := time.Now().AddDate(0, 0, -1)
+	if err := s.db.Model(&OnboardingStep{}).Where("id = ?", herStep.ID).Update("done_on", yesterday.Format(dayLayout)).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.Model(&Event{}).Where("org_id = ? and action = ? and contact_id = ?", o.ID, "onboard:done", hannah.ID).Update("at", yesterday).Error; err != nil {
+		t.Fatal(err)
+	}
+	as(t, again, "POST", srv.URL+"/c/steps/"+itoa(againStep.ID)+"/done")
+	as(t, hers, "POST", srv.URL+"/c/steps/"+itoa(herStep.ID)+"/undone")
+	left = nil
+	if err := s.db.Where("org_id = ? and action = ? and contact_id = ?", o.ID, "onboard:done", hannah.ID).Find(&left).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(left) != 1 || left[0].At.Local().Format(dayLayout) != today() {
+		t.Errorf("taking back yesterday's mark left %+v, not today's entry alone", left)
+	}
+}
