@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"html"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -68,10 +70,21 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 	srv := httptest.NewServer((&App{s: s, frontOrg: "alpha"}).Routes())
 	t.Cleanup(srv.Close)
 	visitor := &http.Client{}
-	const form = `data-intake="/o/alpha/intake"`
+	// The page carries where its form posts, and the address it works at, for its script.
+	formOf := func(body string) (intake, origin string) {
+		m := regexp.MustCompile(`<div id="site" data-page="([^"]*)">`).FindStringSubmatch(body)
+		if m == nil {
+			return "", ""
+		}
+		var got struct{ Intake, Origin string }
+		if err := json.Unmarshal([]byte(html.UnescapeString(m[1])), &got); err != nil {
+			t.Fatalf("the front page's form: %v", err)
+		}
+		return got.Intake, got.Origin
+	}
 
 	// Named, but the organisation hasn't listed this address: a form would only be refused.
-	if _, body := call(t, visitor, "GET", srv.URL+"/", "", nil); strings.Contains(body, "data-intake") || strings.Contains(body, "<script") {
+	if _, body := call(t, visitor, "GET", srv.URL+"/", "", nil); strings.Contains(body, "data-page") || strings.Contains(body, "<script") {
 		t.Fatal("the front page has a form its organisation wouldn't take enquiries from")
 	}
 	takeEnquiriesFrom(t, s, o, "https://www.alpha.example\n"+srv.URL)
@@ -83,7 +96,7 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 	page, _ := io.ReadAll(res.Body)
 	res.Body.Close()
 	body := string(page)
-	if !strings.Contains(body, form) || !strings.Contains(body, `href="#contact"`) {
+	if intake, _ := formOf(body); intake != "/o/alpha/intake" {
 		t.Fatal("the front page has no enquiry form")
 	}
 	if !strings.Contains(res.Header.Get("Content-Security-Policy"), "connect-src 'self'") {
@@ -92,7 +105,7 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 	if found := regexp.MustCompile(`(?i)<script(?: [^>]*)?>[^<]|<[^>]*\son[a-z]+\s*=`).FindString(body); found != "" {
 		t.Errorf("the front page has an inline script or handler: %s", found)
 	}
-	script := regexp.MustCompile(`<script src="(/assets/js/landing\.js[^"]*)"`).FindStringSubmatch(body)
+	script := regexp.MustCompile(`<script type="module" src="(/assets/app/site\.js[^"]*)"`).FindStringSubmatch(body)
 	if script == nil {
 		t.Fatal("the form's script isn't loaded")
 	}
@@ -125,15 +138,15 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 	// route would refuse what it sent.
 	told := httptest.NewServer((&App{s: s, frontOrg: "alpha", base: "https://Crm.alpha.example:443"}).Routes())
 	t.Cleanup(told.Close)
-	if _, body := call(t, visitor, "GET", told.URL+"/", "", nil); strings.Contains(body, "data-intake") {
+	if _, body := call(t, visitor, "GET", told.URL+"/", "", nil); strings.Contains(body, "data-page") {
 		t.Error("the form shows for an address the organisation hasn't listed")
 	}
 	takeEnquiriesFrom(t, s, o, "https://crm.alpha.example")
-	if _, body := call(t, visitor, "GET", told.URL+"/", "", nil); !strings.Contains(body, form+` data-origin="https://crm.alpha.example"`) {
+	if _, body := call(t, visitor, "GET", told.URL+"/", "", nil); func() bool { i, o := formOf(body); return i != "/o/alpha/intake" || o != "https://crm.alpha.example" }() {
 		t.Error("the form doesn't name the origin it works on")
 	}
-	script2, _ := assetFS.ReadFile("assets/js/landing.js")
-	if !strings.Contains(string(script2), "form.dataset.origin === location.origin") {
+	script2, _ := os.ReadFile("web/src/site/main.tsx")
+	if !strings.Contains(string(script2), "got.origin === window.location.origin") {
 		t.Error("the script shows the form whatever address the page was reached at")
 	}
 
@@ -143,7 +156,7 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 		t.Cleanup(plain.Close)
 		takeEnquiriesFrom(t, s, o, plain.URL)
 		code, body := call(t, visitor, "GET", plain.URL+"/", "", nil)
-		if code != http.StatusOK || !strings.Contains(body, "One queue a day.") || strings.Contains(body, "data-intake") || strings.Contains(body, "<script") {
+		if code != http.StatusOK || !strings.Contains(body, "One queue a day.") || strings.Contains(body, "data-page") || strings.Contains(body, "<script") {
 			t.Errorf("a server whose front organisation is %q: %d, with a form or without the page", slug, code)
 		}
 	}
@@ -162,7 +175,7 @@ func TestFrontOrgIsMadeOnce(t *testing.T) {
 	}
 	srv := httptest.NewServer((&App{s: s, frontOrg: frontOrgSlug, base: address}).Routes())
 	t.Cleanup(srv.Close)
-	if _, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil); !strings.Contains(body, `data-intake="/o/prospector/intake" data-origin="`+address+`"`) {
+	if _, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil); !strings.Contains(body, `&quot;intake&quot;:&quot;/o/prospector/intake&quot;,&quot;origin&quot;:&quot;`+address+`&quot;`) {
 		t.Error("a server told its address starts without the front page's form")
 	}
 

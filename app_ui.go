@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
-	"regexp"
 	"strings"
-	"sync"
 )
 
 // appPages are the pages the React app (web/src/router.tsx) draws. Each is served the
@@ -35,15 +33,8 @@ func (a *App) appRoutes(mux *http.ServeMux) {
 	}))
 }
 
-// shellHTML is the page Vite builds from web/index.html, with the version on each of
-// the app's own files so a browser can keep them until the next release.
-var shellHTML = sync.OnceValues(func() ([]byte, error) {
-	b, err := assetFS.ReadFile("assets/app/index.html")
-	if err != nil {
-		return nil, err
-	}
-	return regexp.MustCompile(`((?:src|href)="/assets/[^"?]+)"`).ReplaceAll(b, []byte(`$1?v=`+assetVersion+`"`)), nil
-})
+// shellHTML is the page Vite builds from web/index.html.
+var shellHTML = builtPage("index.html", nil)
 
 // writeShell answers with the app's shell carrying page: what the server already decided
 // a page shows, for the pages with no API to ask (an error, the start of a first

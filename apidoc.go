@@ -12,7 +12,7 @@ import (
 )
 
 // The page at /api is the API's contract, drawn from api/openapi.yaml as people read
-// it: public, as the spec itself is, and with no script.
+// it: public, as the spec itself is, and with no script (see apidoc_view.go).
 
 type APIDoc struct {
 	Title, Version string
@@ -60,23 +60,6 @@ type APISchema struct {
 type APIField struct {
 	Name, Type, About string
 	Required, Write   bool
-}
-
-// apiDocPage serves /api, read once from the embedded spec.
-func (a *App) apiDocPage() http.HandlerFunc {
-	spec, err := api.Spec()
-	if err != nil {
-		log.Fatalf("the API spec: %v", err)
-	}
-	doc := apiDocOf(spec)
-	return func(w http.ResponseWriter, r *http.Request) {
-		view := doc
-		view.Base = a.baseURL(r)
-		w.Header().Set("content-type", "text/html; charset=utf-8")
-		if err := APIPage(view).Render(r.Context(), w); err != nil {
-			log.Print(err)
-		}
-	}
 }
 
 func apiDocOf(spec *openapi3.T) APIDoc {
