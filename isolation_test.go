@@ -338,7 +338,9 @@ var saysNothingBack = map[string]bool{
 	"Mark": true, "Update": true, "SetCompanyStage": true, "PickContact": true, "DecideSuggestion": true,
 	"AgentDraft": true, "AgentMark": true, "AgentFinish": true, "AgentAddFact": true, "AgentAddContact": true,
 	"AskTask": true, "SetRequestDone": true, "SetTaskClosed": true, "DeleteNote": true, "DeleteEnquiry": true,
-	"StartDeal": true, "ChangeDeal": true, "RemoveDeal": true,
+	"StartDeal": true, "ChangeDeal": true, "RemoveDeal": true, "JudgeCompany": true, "RemoveOffering": true,
+	// AddOffering and ChangeOffering answer with the offering the call gave them.
+	"AddOffering": true, "ChangeOffering": true,
 	"AddSubscription": true, "ChangeSubscription": true, "ChangeSubscriptionFields": true, "RemoveSubscription": true, "StartRenewal": true, "SetEnquiry": true, "ConverseEnquiry": true, "SetEnquiryFields": true, "ChangeDealFields": true, "SetDealFields": true, "HearEnquiry": true,
 	"StartOnboarding": true, "SetOnboardingStep": true, "RemoveOnboarding": true, "InviteCustomer": true, "RevokeCustomer": true, "Suppress": true, "Unsuppress": true, "AddCampaign": true, "Audience": true, "RemoveCampaign": true, "ResumeCampaign": true, "AddAgreement": true, "PutAgreementFile": true, "RemoveAgreement": true,
 	"ErasePerson": true, "Import": true, "ImportLegacy": true, "Restore": true,
