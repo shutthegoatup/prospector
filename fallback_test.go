@@ -18,9 +18,6 @@ func TestAWaitingAgentHandsItsTaskToItsFallback(t *testing.T) {
 	if got := must(r.a.saveAgent(ctx, r.o.ID, in, "Ada Lovelace")); got.FallbackID != claudeID || got.FallbackMinutes != 15 {
 		t.Fatalf("a fallback should be kept, waiting 15 minutes unless told: %+v", got)
 	}
-	if v := r.a.ownAgents(r.o.ID); len(v.Agents) != 2 || len(v.Agents[0].Others) != 1 || len(v.New.Others) != 2 {
-		t.Fatalf("each form should offer the other agents as fallbacks: %+v", v)
-	}
 
 	// The gateway's day is spent, an hour off; Claude is free.
 	gateway.chat = func(int, map[string]any) (int, string) {

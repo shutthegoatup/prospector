@@ -284,10 +284,10 @@ func TestAnOutageDoesNotReadAsThePersonsMistake(t *testing.T) {
 		return res.StatusCode, string(said)
 	}
 	domain := func(name string) (int, string) {
-		return call(t, client, "POST", srv.URL+"/o/alpha/ui/sso/domain", "application/json", map[string]string{"domain": name})
+		return call(t, client, "POST", srv.URL+"/o/alpha/api/v1/sso/domains", "application/json", map[string]string{"domain": name})
 	}
 
-	if code, body := domain("alpha.example"); code != http.StatusOK {
+	if code, body := domain("alpha.example"); code != http.StatusCreated {
 		t.Fatalf("listing a domain: %d %s", code, body)
 	}
 	if code, body := domain("alpha.example"); code != http.StatusConflict || !strings.Contains(body, "alpha.example is already listed") {

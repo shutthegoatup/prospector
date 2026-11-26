@@ -383,7 +383,7 @@ func TestTasksOverMCPAndThePages(t *testing.T) {
 	if code, _ := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/task-requests/2", "application/json", map[string]any{"done": false}); code != http.StatusOK {
 		t.Fatalf("reopen a request: %d", code)
 	}
-	if code, _ := call(t, client, "POST", srv.URL+"/o/alpha/ui/note/delete", "application/json", map[string]any{"id": 1}); code != http.StatusOK {
+	if code, _ := call(t, client, "DELETE", srv.URL+"/o/alpha/api/v1/notes/1", "application/json", nil); code != http.StatusNoContent {
 		t.Fatalf("delete a note: %d", code)
 	}
 	if page := read("tasks/1") + read("tasks/1/notes"); strings.Contains(page, "runs marketing") || strings.Contains(page, "done_by:agent:claude") {

@@ -17,7 +17,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/a-h/templ"
 	"github.com/shutthegoatup/prospector/api"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -230,7 +229,7 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 			switch {
 			case strings.Contains(r.URL.Path, "/api/v1/"):
 				writeCoded(w, status, code, text)
-			case r.Method == http.MethodGet && r.Header.Get("X-Fragment") == "":
+			case r.Method == http.MethodGet:
 				http.Redirect(w, r, to, http.StatusSeeOther)
 			default:
 				http.Error(w, text, status)
@@ -282,16 +281,6 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (a *App) owner(next http.HandlerFunc) http.HandlerFunc {
-	return a.member(func(w http.ResponseWriter, r *http.Request) {
-		if !reqOf(r).Owner() {
-			http.Error(w, "only an owner of this organisation can change that", http.StatusForbidden)
-			return
-		}
-		next(w, r)
-	})
-}
-
 // agent authenticates an API key for the organisation in the URL and checks its scope.
 func (a *App) agent(scope string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -315,23 +304,6 @@ func (a *App) agent(scope string, next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		next(w, r.WithContext(context.WithValue(r.Context(), reqKey{}, &Req{Org: org, Key: k})))
-	}
-}
-
-func idParam(r *http.Request, name string) int64 {
-	n, _ := strconv.ParseInt(r.PathValue(name), 10, 64)
-	return n
-}
-
-// page renders a whole page, or only its content when the page script refreshes it.
-func (a *App) page(w http.ResponseWriter, r *http.Request, active string, content templ.Component) {
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	view := content
-	if r.Header.Get("X-Fragment") == "" {
-		view = Layout(a.nav(reqOf(r), active), content)
-	}
-	if err := view.Render(r.Context(), w); err != nil {
-		log.Print(err)
 	}
 }
 
@@ -371,7 +343,6 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /c/{token}/again", a.customerAgain)
 	mux.HandleFunc("GET /{$}", a.front)
 	mux.HandleFunc("GET /api", a.apiDocPage())
-	mux.HandleFunc("POST /orgs", a.member(a.newOrg))
 	mux.HandleFunc("GET /password", a.member(a.passwordPage))
 	mux.HandleFunc("POST /password", a.member(a.changePassword))
 
@@ -380,28 +351,8 @@ func (a *App) Routes() http.Handler {
 		http.Redirect(w, r, q.Base()+landing(q.Member), http.StatusSeeOther)
 	}))
 	a.appRoutes(mux)
-	a.taskRoutes(mux)
 	mux.HandleFunc("OPTIONS "+intakePattern, a.intakePreflight)
 	mux.HandleFunc("POST "+intakePattern, a.intake)
-
-	mux.HandleFunc("POST /o/{org}/ui/mark", a.works(areaSales, a.uiMark))
-	mux.HandleFunc("POST /o/{org}/ui/voice", a.member(a.uiVoice))
-	mux.HandleFunc("POST /o/{org}/ui/member", a.owner(a.uiMember))
-	mux.HandleFunc("POST /o/{org}/ui/member/remove", a.owner(a.uiRemoveMember))
-	mux.HandleFunc("POST /o/{org}/ui/mail", a.owner(a.uiMail))
-	mux.HandleFunc("POST /o/{org}/ui/mail/test", a.owner(a.uiMailTest))
-	mux.HandleFunc("POST /o/{org}/ui/sso", a.owner(a.uiSSO))
-	mux.HandleFunc("POST /o/{org}/ui/sso/domain", a.owner(a.uiSSODomain))
-	mux.HandleFunc("POST /o/{org}/ui/sso/domain/remove", a.owner(a.uiSSODomainRemove))
-	mux.HandleFunc("POST /o/{org}/ui/sso/verify", a.owner(a.uiSSOVerify))
-	mux.HandleFunc("POST /o/{org}/ui/export", a.owner(a.uiExport))
-	mux.HandleFunc("POST /o/{org}/ui/export-org", a.owner(a.uiExportOrg))
-	mux.HandleFunc("POST /o/{org}/ui/erase", a.owner(a.uiErase))
-	mux.HandleFunc("POST /o/{org}/ui/keys", a.owner(a.uiKey))
-	mux.HandleFunc("POST /o/{org}/ui/keys/revoke", a.owner(a.uiRevoke))
-	mux.HandleFunc("POST /o/{org}/ui/keys/scopes", a.owner(a.uiKeyScopes))
-	mux.HandleFunc("POST /o/{org}/ui/member/role", a.owner(a.uiMemberRole))
-	mux.HandleFunc("POST /o/{org}/ui/member/areas", a.owner(a.uiMemberAreas))
 
 	a.apiRoutes(mux)
 	a.routeAPI(mux)
@@ -710,19 +661,6 @@ func (a *App) passwordChange(r *http.Request, u *User, current, next string) (de
 		device = a.deviceCookie(r, changed)
 	}
 	return device, 0, nil
-}
-
-func (a *App) newOrg(w http.ResponseWriter, r *http.Request) {
-	var in struct{ Name string }
-	if !decode(w, r, &in) {
-		return
-	}
-	o, err := newOrgFor(a.s, reqOf(r), in.Name)
-	if err != nil {
-		fail(w, err, statusOf(err))
-		return
-	}
-	writeJSON(w, map[string]string{"go": "/o/" + o.Slug + "/settings"})
 }
 
 // serve starts even with no users: every page needs a sign-in, so nobody gets in

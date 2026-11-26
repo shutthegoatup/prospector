@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"slices"
 	"sort"
 	"strconv"
@@ -542,16 +541,6 @@ func contracted(rows []SubscriptionRow) string {
 	}
 	sort.Strings(parts)
 	return strings.Join(parts, " + ")
-}
-
-func (a *App) subscriptionsPage(w http.ResponseWriter, r *http.Request) {
-	q := reqOf(r)
-	rows, err := a.s.Subscriptions(q.Org.ID, 0, today())
-	if err != nil {
-		fail(w, err, http.StatusInternalServerError)
-		return
-	}
-	a.page(w, r, "subscriptions", SubscriptionsView(q, rows, today()))
 }
 
 // StartRenewal opens a renewal deal for a subscription with someone at its company who

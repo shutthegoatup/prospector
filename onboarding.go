@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"regexp"
 	"sort"
 	"strconv"
@@ -305,27 +304,4 @@ func (s *Store) Onboardings(org, company int64, day string) ([]OnboardingRow, er
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rank(rows[i]) < rank(rows[j]) })
 	return rows, nil
-}
-
-func (a *App) onboardingPage(w http.ResponseWriter, r *http.Request) {
-	q := reqOf(r)
-	rows, err := a.s.Onboardings(q.Org.ID, 0, today())
-	if err != nil {
-		fail(w, err, http.StatusInternalServerError)
-		return
-	}
-	if err := a.customerControls(q.Org.ID, rows); err != nil {
-		fail(w, err, http.StatusInternalServerError)
-		return
-	}
-	plan, _ := q.Org.Settings.Onboarding()
-	a.page(w, r, "onboarding", OnboardingView(q, rows, len(plan), today()))
-}
-
-// prefixedIf is text when on, else nothing.
-func prefixedIf(on bool, text string) string {
-	if on {
-		return text
-	}
-	return ""
 }

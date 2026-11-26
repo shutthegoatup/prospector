@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"regexp"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -335,20 +334,6 @@ func (s *Store) researchFor(org int64, filter string, page int, task int64) ([]R
 // searchFitCap is how many companies to review one search may have and still be ranked
 // by fit; past it, they come newest first as everywhere else.
 const searchFitCap = 500
-
-// rankedResearch is one search's companies to review, best fit first, a page of them.
-func (s *Store) rankedResearch(org int64, set OrgSettings, task int64, page int) ([]ResearchRow, Page, bool, error) {
-	rows, ranked, err := s.rankedRows(org, set, task)
-	if err != nil {
-		return nil, Page{}, false, err
-	}
-	if !ranked {
-		rows, pg, err := s.researchFor(org, "review", page, task)
-		return rows, pg, false, err
-	}
-	pg := pageOf(page, researchPageSize, len(rows))
-	return rows[pg.offset():min(len(rows), pg.offset()+pg.Size)], pg, true, nil
-}
 
 // rankedRows are all of one search's companies to review, best fit first: fit is worked
 // out from facts, so they are ranked here rather than in SQL. A search with more than
@@ -928,13 +913,4 @@ func ParseLinkedIn(title, headline string) (name, role, company string) {
 		return name, strings.TrimSpace(headline[:i]), strings.TrimSpace(headline[i+3:])
 	}
 	return name, headline, ""
-}
-
-func sortedKeys(m map[string]int) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }

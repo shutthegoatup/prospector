@@ -141,8 +141,8 @@ func TestMailIsOffUntilConfigured(t *testing.T) {
 			t.Errorf("%s: the sign-in page offers a reset it can't send", name)
 		}
 		// A new member's first password is still shown, as before there was mail.
-		code, body := call(t, client, "POST", srv.URL+"/o/alpha/ui/member", "application/json", map[string]string{"email": "grace@example.com", "name": "Grace"})
-		if code != http.StatusOK || !strings.Contains(body, "first password") {
+		code, body := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json", map[string]string{"email": "grace@example.com", "name": "Grace"})
+		if code != http.StatusCreated || !strings.Contains(body, "first password") {
 			t.Errorf("%s: adding a member: %d %s", name, code, body)
 		}
 		box.take(t, 0)
@@ -299,8 +299,8 @@ func TestSignedOutFormsRefuseOtherSites(t *testing.T) {
 
 func TestInvitationByEmail(t *testing.T) {
 	s, srv, ada, box := mailSite(t, nil)
-	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/member", "application/json", map[string]string{"email": "grace@example.com", "name": "Grace Hopper"})
-	if code != http.StatusOK || strings.Contains(body, "first password") || !strings.Contains(body, "emailed a link") {
+	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json", map[string]string{"email": "grace@example.com", "name": "Grace Hopper"})
+	if code != http.StatusCreated || strings.Contains(body, "first password") || !strings.Contains(body, "emailed a link") {
 		t.Fatalf("adding a member: %d %s", code, body)
 	}
 	mail := box.take(t, 1)[0]
@@ -325,22 +325,22 @@ func TestInvitationByEmail(t *testing.T) {
 	}
 
 	// Someone added again before choosing a password is sent the link again.
-	if code, _ := call(t, ada, "POST", srv.URL+"/o/alpha/ui/member", "application/json", map[string]string{"email": "alan@example.com", "name": "Alan"}); code != http.StatusOK {
+	if code, _ := call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json", map[string]string{"email": "alan@example.com", "name": "Alan"}); code != http.StatusCreated {
 		t.Fatal("adding Alan")
 	}
 	first := linkIn(t, box.take(t, 1)[0])
 	alan := must(s.UserByEmail("alan@example.com"))
 	// Straight away nothing more is sent, so adding someone repeatedly can't fill their inbox.
-	code, body = call(t, ada, "POST", srv.URL+"/o/alpha/ui/member", "application/json", map[string]string{"email": "alan@example.com"})
-	if code != http.StatusOK || !strings.Contains(body, "a moment ago") || strings.Contains(body, "first password") {
+	code, body = call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json", map[string]string{"email": "alan@example.com"})
+	if code != http.StatusCreated || !strings.Contains(body, "a moment ago") || strings.Contains(body, "first password") {
 		t.Fatalf("adding Alan again at once: %d %s", code, body)
 	}
 	box.take(t, 0)
 	if err := s.db.Model(&PasswordToken{}).Where("user_id = ?", alan.ID).Update("created_at", time.Now().Add(-2*resetGap)).Error; err != nil {
 		t.Fatal(err)
 	}
-	code, body = call(t, ada, "POST", srv.URL+"/o/alpha/ui/member", "application/json", map[string]string{"email": "alan@example.com"})
-	if code != http.StatusOK || !strings.Contains(body, "emailed a link") || strings.Contains(body, "first password") {
+	code, body = call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json", map[string]string{"email": "alan@example.com"})
+	if code != http.StatusCreated || !strings.Contains(body, "emailed a link") || strings.Contains(body, "first password") {
 		t.Fatalf("adding Alan again: %d %s", code, body)
 	}
 	if again := linkIn(t, box.take(t, 1)[0]); again == first {
@@ -364,15 +364,15 @@ func TestInvitationByEmail(t *testing.T) {
 	if err := s.AddMember(other.ID, must(s.UserByEmail("ada@example.com")).ID, "owner", "Ada"); err != nil {
 		t.Fatal(err)
 	}
-	if code, _ := call(t, ada, "POST", srv.URL+"/o/beta/ui/member", "application/json", map[string]string{"email": "grace@example.com"}); code != http.StatusOK {
+	if code, _ := call(t, ada, "POST", srv.URL+"/o/beta/api/v1/members", "application/json", map[string]string{"email": "grace@example.com"}); code != http.StatusCreated {
 		t.Fatalf("adding an existing account: %d", code)
 	}
 	box.take(t, 0)
 
 	// When the mail can't be sent the owner is told why and given the password instead.
 	box.fail = errors.New("smtp.site.example refused the username and password")
-	code, body = call(t, ada, "POST", srv.URL+"/o/alpha/ui/member", "application/json", map[string]string{"email": "edsger@example.com", "name": "Edsger"})
-	if code != http.StatusOK || !strings.Contains(body, "refused the username") || !strings.Contains(body, "first password") {
+	code, body = call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json", map[string]string{"email": "edsger@example.com", "name": "Edsger"})
+	if code != http.StatusCreated || !strings.Contains(body, "refused the username") || !strings.Contains(body, "first password") {
 		t.Fatalf("adding a member when mail fails: %d %s", code, body)
 	}
 }
@@ -382,7 +382,7 @@ func TestOrganisationMailServer(t *testing.T) {
 	o := must(s.OrgBySlug("alpha"))
 	save := func(c *http.Client, in map[string]any) (int, string) {
 		t.Helper()
-		return call(t, c, "POST", srv.URL+"/o/alpha/ui/mail", "application/json", in)
+		return call(t, c, "PUT", srv.URL+"/o/alpha/api/v1/mail-server", "application/json", in)
 	}
 	server := map[string]any{"host": "smtp.alpha.example", "port": 587, "username": "alpha-user", "password": "s3cret-smtp-pass", "sender": "Alpha <hello@alpha.example>"}
 
@@ -411,7 +411,7 @@ func TestOrganisationMailServer(t *testing.T) {
 	}
 
 	// Invitations to this organisation now leave through its server, as its address.
-	if code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/member", "application/json", map[string]string{"email": "grace@example.com", "name": "Grace"}); code != http.StatusOK {
+	if code, body := call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json", map[string]string{"email": "grace@example.com", "name": "Grace"}); code != http.StatusCreated {
 		t.Fatalf("adding a member: %d %s", code, body)
 	}
 	via := box.take(t, 1)[0].via
@@ -424,7 +424,7 @@ func TestOrganisationMailServer(t *testing.T) {
 		t.Fatalf("a reset was sent through %+v", via)
 	}
 
-	if code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/mail/test", "application/json", map[string]any{}); code != http.StatusOK || !strings.Contains(body, "ada@example.com") {
+	if code, body := call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/mail-server/test", "application/json", map[string]any{}); code != http.StatusOK || !strings.Contains(body, "ada@example.com") {
 		t.Fatalf("test message: %d %s", code, body)
 	}
 	if got := box.take(t, 1)[0]; got.To != "ada@example.com" || got.via.Host != "smtp.alpha.example" {
@@ -465,7 +465,7 @@ func TestOrganisationMailServer(t *testing.T) {
 
 func TestMailPasswordNeedsAKey(t *testing.T) {
 	s, srv, ada, _ := mailSite(t, func(a *App) { a.s.keys = nil })
-	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/mail", "application/json",
+	code, body := call(t, ada, "PUT", srv.URL+"/o/alpha/api/v1/mail-server", "application/json",
 		map[string]any{"host": "smtp.alpha.example", "port": 587, "username": "u", "password": "s3cret-smtp-pass", "sender": "a@alpha.example"})
 	if code != http.StatusBadRequest || !strings.Contains(body, "no secret key") {
 		t.Fatalf("saving a password with nothing to seal it: %d %s", code, body)
@@ -479,7 +479,7 @@ func TestMailPasswordNeedsAKey(t *testing.T) {
 // choose the password of an account that was already here never goes through it.
 func TestAnotherOrganisationsMailServerNeverCarriesAnExistingAccountsLink(t *testing.T) {
 	s, srv, ada, box := mailSite(t, nil)
-	if code, _ := call(t, ada, "POST", srv.URL+"/o/alpha/ui/member", "application/json", map[string]string{"email": "grace@example.com", "name": "Grace Hopper"}); code != http.StatusOK {
+	if code, _ := call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json", map[string]string{"email": "grace@example.com", "name": "Grace Hopper"}); code != http.StatusCreated {
 		t.Fatal("adding Grace")
 	}
 	box.take(t, 1)
@@ -495,11 +495,11 @@ func TestAnotherOrganisationsMailServerNeverCarriesAnExistingAccountsLink(t *tes
 	}
 	theirs := newMailClient()
 	signIn(t, theirs, srv, "mallory@example.com", "mallory's password")
-	if code, body := call(t, theirs, "POST", srv.URL+"/o/beta/ui/mail", "application/json",
+	if code, body := call(t, theirs, "PUT", srv.URL+"/o/beta/api/v1/mail-server", "application/json",
 		map[string]any{"host": "smtp.mallory.example", "port": 587, "sender": "m@mallory.example"}); code != http.StatusOK {
 		t.Fatalf("saving beta's mail server: %d %s", code, body)
 	}
-	if code, body := call(t, theirs, "POST", srv.URL+"/o/beta/ui/member", "application/json", map[string]string{"email": "grace@example.com"}); code != http.StatusOK {
+	if code, body := call(t, theirs, "POST", srv.URL+"/o/beta/api/v1/members", "application/json", map[string]string{"email": "grace@example.com"}); code != http.StatusCreated {
 		t.Fatalf("adding Grace to beta: %d %s", code, body)
 	}
 	for _, m := range box.take(t, 1) {
@@ -509,7 +509,7 @@ func TestAnotherOrganisationsMailServerNeverCarriesAnExistingAccountsLink(t *tes
 	}
 
 	// Someone the request itself creates is still invited through the organisation's server.
-	if code, _ := call(t, theirs, "POST", srv.URL+"/o/beta/ui/member", "application/json", map[string]string{"email": "new@example.com", "name": "New"}); code != http.StatusOK {
+	if code, _ := call(t, theirs, "POST", srv.URL+"/o/beta/api/v1/members", "application/json", map[string]string{"email": "new@example.com", "name": "New"}); code != http.StatusCreated {
 		t.Fatal("adding someone new to beta")
 	}
 	if m := box.take(t, 1)[0]; m.via.Host != "smtp.mallory.example" {
@@ -538,7 +538,7 @@ func TestAResetGivesAProviderOnlyAccountAPassword(t *testing.T) {
 
 func TestAMailPasswordFollowsAKeyChange(t *testing.T) {
 	s, srv, ada, _ := mailSite(t, nil)
-	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/ui/mail", "application/json",
+	code, body := call(t, ada, "PUT", srv.URL+"/o/alpha/api/v1/mail-server", "application/json",
 		map[string]any{"host": "smtp.alpha.example", "port": 587, "username": "u", "password": "s3cret-smtp-pass", "sender": "a@alpha.example"})
 	if code != http.StatusOK {
 		t.Fatalf("saving the mail server: %d %s", code, body)

@@ -167,9 +167,14 @@ func statusOf(err error) int {
 	var away notSent
 	var clash conflict
 	var no refused
+	var theirs elsewhere
 	switch {
 	case errors.As(err, &no):
 		return http.StatusForbidden
+	// Another server that couldn't be reached is the caller's to sort out, such as an
+	// issuer they typed: not ours, even when the network is what said no.
+	case errors.As(err, &theirs) && !fromDatabase(err):
+		return http.StatusBadRequest
 	case errors.As(err, &away):
 		return http.StatusBadGateway
 	case errors.As(err, &missing), errors.Is(err, gorm.ErrRecordNotFound):
