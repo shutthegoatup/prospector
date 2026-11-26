@@ -203,7 +203,7 @@ func localTime(tz string, now time.Time) *Local {
 	return l
 }
 
-func badges(c Contact, name string, now time.Time) []Badge {
+func badges(c Contact, name string, now time.Time, noMail map[string]bool) []Badge {
 	var b []Badge
 	phone := deref(c.Phone)
 	if l := localTime(deref(c.Tz), now); l != nil {
@@ -222,6 +222,15 @@ func badges(c Contact, name string, now time.Time) []Badge {
 	}
 	if strings.Contains(deref(c.Flags), "INFERRED") {
 		b = append(b, Badge{"Email may be a guess: verify", "warn"})
+	}
+	if dead := deadAddress(deref(c.Email), noMail); dead != "" {
+		b = append(b, Badge{dead[strings.IndexByte(dead, '@')+1:] + " takes no mail: find another address", "warn"})
+	}
+	if role := roleAddress(deref(c.Email)); role != "" && !strings.HasPrefix(c.Key, "org:") {
+		b = append(b, Badge{role + " is a shared inbox: ask for " + name + "'s own", ""})
+	}
+	if phoneLooksWrong(phone) {
+		b = append(b, Badge{"Phone number isn't one any country uses: check it", "warn"})
 	}
 	if deref(c.Email) == "" {
 		b = append(b, Badge{"No email on file", ""})
@@ -278,7 +287,7 @@ func status(c Contact) string {
 var stateRank = map[string]int{"ok": 0, "warn": 1, "stop": 2}
 
 // MakeCard turns one contact due at one step into what the page shows.
-func MakeCard(step string, raw Contact, v Voice, now time.Time) Card {
+func MakeCard(step string, raw Contact, v Voice, now time.Time, noMail map[string]bool) Card {
 	people := alternates(deref(raw.Person))
 	c := forPerson(raw, people)
 	name := displayName(c)
@@ -287,7 +296,7 @@ func MakeCard(step string, raw Contact, v Voice, now time.Time) Card {
 		title = c.Title
 	}
 	card := Card{Contact: c, Step: step, Name: name, Title: title, People: people,
-		Badges: badges(c, name, now), Held: c.Hold != nil, Status: status(c)}
+		Badges: badges(c, name, now, noMail), Held: c.Hold != nil, Status: status(c)}
 	if l := localTime(deref(c.Tz), now); l != nil {
 		card.State = l.State
 	}
@@ -348,12 +357,12 @@ func todayRank(c Card) int {
 }
 
 // Today merges every step's queue into one list, with counts per step.
-func Today(byStep map[string][]Contact, v Voice, now time.Time) ([]Card, map[string]int) {
+func Today(byStep map[string][]Contact, v Voice, now time.Time, noMail map[string]bool) ([]Card, map[string]int) {
 	var cards []Card
 	counts := map[string]int{}
 	for _, s := range Steps {
 		for _, c := range byStep[s.Key] {
-			cards = append(cards, MakeCard(s.Key, c, v, now))
+			cards = append(cards, MakeCard(s.Key, c, v, now, noMail))
 		}
 		counts[s.Key] = len(byStep[s.Key])
 	}

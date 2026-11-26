@@ -699,6 +699,8 @@ func serve(a *App, addr string) error {
 	go a.keepRunsGoing(context.Background(), 30*time.Second)
 	// Campaigns being sent go on being sent, here or by another server.
 	go a.keepSending(context.Background(), sendEvery)
+	a.s.dns = net.DefaultResolver
+	go a.keepCheckingMail(context.Background(), 10*time.Minute)
 	log.Printf("listening on http://%s", addr)
 	// A release is installed by stopping this process, so every merge sends one of these.
 	asked, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

@@ -131,6 +131,9 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if len(emails) > 0 {
 			gone = tx.Where("org_id = ? and (contact_id = ? or email in ?)", org, id, emails)
 		}
+		if err := forgetMailDomains(tx, emails); err != nil {
+			return err
+		}
 		// The mails a campaign sent them stay counted, and say nothing of who they were.
 		recipients := tx.Model(&CampaignRecipient{}).Where("org_id = ? and contact_id = ?", org, id)
 		if len(emails) > 0 {
