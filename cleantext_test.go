@@ -10,6 +10,7 @@ import (
 )
 
 func TestNULEscapesAreDroppedFromJSON(t *testing.T) {
+	t.Parallel()
 	for in, want := range map[string]string{
 		`{"name":"Acme\u0000 Boats"}`:      `{"name":"Acme Boats"}`,
 		`{"name":"\u0000\u0000"}`:          `{"name":""}`,
@@ -31,6 +32,7 @@ func TestNULEscapesAreDroppedFromJSON(t *testing.T) {
 // Postgres won't keep a NUL or bytes that aren't UTF-8, so neither reaches it: what a
 // person sends is kept without them, on both databases alike.
 func TestTextArrivesWithoutWhatPostgresWontKeep(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	if code, body := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/people", "application/json",
 		json.RawMessage(`{"name":"Hannah\u0000 Pryce","company":"Larkmoor\u0000 Yachts"}`)); code != http.StatusCreated {

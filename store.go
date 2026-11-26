@@ -267,8 +267,20 @@ var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
 	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &EnquiryMessage{}, &Suppression{}, &UnsubscribeLink{}, &Campaign{}, &CampaignRecipient{}, &Agreement{}, &AgreementFile{}, &AgreementRecipient{}, &AgreementField{}, &AgreementEvent{}, &SealKey{}, &Suggestion{},
 	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}, &Agent{}, &AgentRun{}, &Deal{}, &Subscription{}, &Onboarding{}, &OnboardingStep{}, &CustomerGrant{}, &CustomerLink{}, &CustomerSession{}, &MailDomain{}, &Enricher{}, &EnrichUsage{}, &Offering{}, &Verdict{}, &Role{}}
 
-// Open takes a postgres:// URL or a SQLite file path.
+// Open takes a postgres:// URL or a SQLite file path, and brings its schema up to date.
 func Open(dsn string) (*Store, error) {
+	s, err := connect(dsn)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.migrate(); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// connect opens a database without touching its schema.
+func connect(dsn string) (*Store, error) {
 	var dialector gorm.Dialector
 	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
 		dialector = postgres.Open(dsn)
@@ -282,25 +294,25 @@ func Open(dsn string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := db.AutoMigrate(models...); err != nil {
-		return nil, err
+	return &Store{db: db}, nil
+}
+
+func (s *Store) migrate() error {
+	if err := s.db.AutoMigrate(models...); err != nil {
+		return err
 	}
-	if err := moveAssetColumns(db); err != nil {
-		return nil, err
+	if err := moveAssetColumns(s.db); err != nil {
+		return err
 	}
-	if err := allowSeveralDeals(db); err != nil {
-		return nil, err
+	if err := allowSeveralDeals(s.db); err != nil {
+		return err
 	}
-	s := &Store{db: db}
 	s.oneNameWhateverItsCapitals()
 	s.indexSearch()
-	if err := migrateAgentConfigs(db); err != nil {
-		return nil, err
+	if err := migrateAgentConfigs(s.db); err != nil {
+		return err
 	}
-	if err := oneGoingRunPerAgent(db); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return oneGoingRunPerAgent(s.db)
 }
 
 // oneGoingRunPerAgent has the database hold that an agent works a task once at a time,

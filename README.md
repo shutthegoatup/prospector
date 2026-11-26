@@ -359,9 +359,8 @@ Re-importing refreshes text from the files but never clears a date or edit recor
 ```sh
 (cd web && npm ci && npm run build)                      # the React app, which the binary embeds: first
 go build .                                               # or goreleaser build --snapshot --clean
-go test ./...                                            # SQLite
-PROSPECTOR_TEST_PG=postgres://… go test -p 1 ./...      # an empty, disposable Postgres database; tables are dropped
-PROSPECTOR_WRITE_APIDOC=1 go test -run TestTheAPIReferenceIsBuiltFromTheSpec .  # after editing the spec, for /api
+PROSPECTOR_TEST_PG=postgres://… go test ./...           # a Postgres it may create and drop databases on
+PROSPECTOR_TEST_PG=postgres://… PROSPECTOR_WRITE_APIDOC=1 go test -run TestTheAPIReferenceIsBuiltFromTheSpec .  # after editing the spec, for /api
 node build-css.mjs <node_modules with tailwindcss v4>   # or the standalone tailwindcss CLI
 ```
 

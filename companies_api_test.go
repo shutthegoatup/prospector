@@ -11,6 +11,7 @@ import (
 )
 
 func TestTheCompaniesListComesThroughTheAPIWithItsFilters(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
@@ -63,6 +64,7 @@ func TestTheCompaniesListComesThroughTheAPIWithItsFilters(t *testing.T) {
 }
 
 func TestACompanysPageComesThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
@@ -128,6 +130,7 @@ func TestACompanysPageComesThroughTheAPI(t *testing.T) {
 }
 
 func TestOnlyReviewersDeleteAgentsNotes(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
@@ -162,6 +165,7 @@ func TestOnlyReviewersDeleteAgentsNotes(t *testing.T) {
 }
 
 func TestOnlyAnOwnerExportsOrErasesAPersonThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	hannah := repliedPerson(t, s, o, "Hannah Pryce")
@@ -207,6 +211,7 @@ func TestOnlyAnOwnerExportsOrErasesAPersonThroughTheAPI(t *testing.T) {
 }
 
 func TestReadingCompaniesNeedsTheReadScope(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	co := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout", KeyID: 1}, AddCompanyIn{Name: "Larkmoor Yachts"}))
 	writer, _ := must2(s.CreateKey(o.ID, "scout", []string{"research:write"}, "Ada Lovelace"))

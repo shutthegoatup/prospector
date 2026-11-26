@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -23,6 +21,7 @@ func repliedPerson(t *testing.T, s *Store, o *Org, name string) *Contact {
 }
 
 func TestMoneyIsReadAndWritten(t *testing.T) {
+	t.Parallel()
 	for text, want := range map[string]int64{"14,000": 1400000, "£14000.5": 1400050, "14 000.50": 1400050, "": 0, ".5": 50, "0": 0} {
 		if got, err := parseMoney(text); err != nil || got != want {
 			t.Errorf("%q read as %d (%v), want %d", text, got, err, want)
@@ -52,6 +51,7 @@ func TestMoneyIsReadAndWritten(t *testing.T) {
 }
 
 func TestADealIsValuedOnceSomeoneReplies(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	u := must(s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery"))
@@ -111,6 +111,7 @@ func TestADealIsValuedOnceSomeoneReplies(t *testing.T) {
 }
 
 func TestADealIsInBothExportsAndGoesWithItsPerson(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	c := repliedPerson(t, s, o, "Hannah Pryce")
@@ -139,6 +140,7 @@ func TestADealIsInBothExportsAndGoesWithItsPerson(t *testing.T) {
 }
 
 func TestADealKeepsItsCurrencyWhenTheSettingChanges(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	c := repliedPerson(t, s, o, "Hannah Pryce")
@@ -171,6 +173,7 @@ func TestADealKeepsItsCurrencyWhenTheSettingChanges(t *testing.T) {
 }
 
 func TestADealFollowsItsPersonThroughARestore(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	stays, goes := repliedPerson(t, s, o, "Hannah Pryce"), repliedPerson(t, s, o, "Tom Ellery")
@@ -195,10 +198,8 @@ func TestADealFollowsItsPersonThroughARestore(t *testing.T) {
 
 // A database written before deals existed has replied contacts and no deals table.
 func TestADatabaseFromBeforeDealsOpens(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	t.Parallel()
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)
@@ -228,6 +229,7 @@ func TestADatabaseFromBeforeDealsOpens(t *testing.T) {
 }
 
 func TestTheBoardShowsWhatAStageIsWorth(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	first, second := repliedPerson(t, s, o, "Hannah Pryce"), repliedPerson(t, s, o, "Tom Ellery")
 	update := func(id int64, field, value string) (int, string) {
@@ -308,10 +310,8 @@ func (dealV1) TableName() string { return "deals" }
 // A database from the first release with deals has rows without a seq, and an index
 // that allows each contact one deal.
 func TestDealsFromTheFirstReleaseBecomeTheConversationsOwn(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	t.Parallel()
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)
@@ -363,6 +363,7 @@ func TestDealsFromTheFirstReleaseBecomeTheConversationsOwn(t *testing.T) {
 }
 
 func TestAnotherDealWithSomeoneInConversation(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	quiet := must(s.QuickAddPerson(o, QuickAdd{Name: "Sven Dahl", Company: "Nordkap Boats"}, "Ada Lovelace"))
@@ -468,6 +469,7 @@ func TestAnotherDealWithSomeoneInConversation(t *testing.T) {
 }
 
 func TestARenewalIsStartedAndWorkedFromTheBoard(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	c := repliedPerson(t, s, o, "Hannah Pryce")
 	if code, body := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/deals", "application/json", map[string]any{"contact": c.ID, "kind": "renewal"}); code != http.StatusCreated {
@@ -504,6 +506,7 @@ func TestARenewalIsStartedAndWorkedFromTheBoard(t *testing.T) {
 
 // A renewal has no card on Today, so the side panel says how many need moving on.
 func TestTodayPointsAtDealsThatNeedANextStep(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	c := repliedPerson(t, s, o, "Hannah Pryce")
 	// Today's side panel points at deals to move on when its summary counts any; the
@@ -555,6 +558,7 @@ func TestTodayPointsAtDealsThatNeedANextStep(t *testing.T) {
 }
 
 func TestARobotWorksDealsAndEnquiriesAsItsScopesAllow(t *testing.T) {
+	t.Parallel()
 	s, o, srv, owner := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	key := func(org int64, scopes ...string) string {

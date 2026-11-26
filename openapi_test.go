@@ -37,6 +37,7 @@ func asKey(t *testing.T, method, u, key string, body any) (int, string) {
 }
 
 func TestARobotWorksAgentsThroughTheAPIAsItsScopesAllow(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	s, srv, _ := agentSite(t, fake)
 	o := must(s.OrgBySlug("alpha"))
@@ -122,6 +123,7 @@ func TestARobotWorksAgentsThroughTheAPIAsItsScopesAllow(t *testing.T) {
 }
 
 func TestTheContractPageIsPublicAndShowsEveryOperation(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	_, srv, _ := agentSite(t, fake)
 	code, body := call(t, newMailClient(), "GET", srv.URL+"/api", "", nil)
@@ -152,6 +154,7 @@ func TestTheContractPageIsPublicAndShowsEveryOperation(t *testing.T) {
 }
 
 func TestTheSpecIsServedAndEveryOperationNamesAScopeAKeyCanHave(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	_, srv, _ := agentSite(t, fake)
 	code, body := call(t, newMailClient(), "GET", srv.URL+"/api/openapi.json", "", nil)

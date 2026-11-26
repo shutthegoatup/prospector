@@ -10,6 +10,7 @@ import (
 )
 
 func TestExportPerson(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	do := func(err error) {

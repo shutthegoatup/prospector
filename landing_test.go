@@ -14,6 +14,7 @@ import (
 )
 
 func TestFrontPage(t *testing.T) {
+	t.Parallel()
 	_, _, srv, member := signedIn(t)
 	visitor := &http.Client{}
 
@@ -65,6 +66,7 @@ func TestFrontPage(t *testing.T) {
 }
 
 func TestFrontPageEnquiryForm(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	srv := httptest.NewServer((&App{s: s, frontOrg: "alpha"}).Routes())
@@ -163,6 +165,7 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 }
 
 func TestFrontOrgIsMadeOnce(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	mustOrg(t, s, "alpha")
 	const address = "https://crm.alpha.example"
@@ -204,6 +207,7 @@ func TestFrontOrgIsMadeOnce(t *testing.T) {
 
 // A server with no form on its front page says why at start-up, and how to put it right.
 func TestTheServerSaysWhyTheFrontPageHasNoForm(t *testing.T) {
+	t.Parallel()
 	const address = "https://crm.alpha.example"
 	for name, c := range map[string]struct {
 		base, sites, want string
@@ -227,6 +231,7 @@ func TestTheServerSaysWhyTheFrontPageHasNoForm(t *testing.T) {
 // The app shares the front page's light palette: a page left on the old dark class
 // would turn the components' dark variants back on.
 func TestAppUsesTheLightPalette(t *testing.T) {
+	t.Parallel()
 	_, _, srv, member := signedIn(t)
 	for _, page := range []string{"/o/alpha/today", "/o/alpha/settings"} {
 		_, body := call(t, member, "GET", srv.URL+page, "", nil)
@@ -247,6 +252,7 @@ func TestAppUsesTheLightPalette(t *testing.T) {
 // The front page says what a key may do. It names only scopes that exist, and every
 // scope that lets a key send mail is on it, so the page cannot promise no key sends.
 func TestTheFrontPageTellsTheTruthAboutKeys(t *testing.T) {
+	t.Parallel()
 	_, _, srv, _ := signedIn(t)
 	_, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil)
 	named := regexp.MustCompile(`<code>([a-z]+(?::[a-z]+)?)</code>`).FindAllStringSubmatch(body, -1)
@@ -276,6 +282,7 @@ func TestTheFrontPageTellsTheTruthAboutKeys(t *testing.T) {
 // not a plan. Each plan's button leads to the enquiry form, so the built page leaves it
 // to the form's script.
 func TestFrontPagePricing(t *testing.T) {
+	t.Parallel()
 	_, _, srv, _ := signedIn(t)
 	_, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil)
 	start := strings.Index(body, `id="pricing"`)
@@ -307,6 +314,7 @@ func TestFrontPagePricing(t *testing.T) {
 // The site's sections, cards and API operations are headings, so they can be navigated
 // as such: built from components that draw divs, they would quietly stop being.
 func TestSitePagesKeepTheirHeadings(t *testing.T) {
+	t.Parallel()
 	_, _, srv, _ := signedIn(t)
 	visitor := &http.Client{}
 	_, front := call(t, visitor, "GET", srv.URL+"/", "", nil)

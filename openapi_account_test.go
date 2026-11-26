@@ -48,6 +48,7 @@ func freshBrowser() *http.Client {
 }
 
 func TestSigningInAndOutThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	b := freshBrowser()
 	session := srv.URL + "/api/v1/session"
@@ -110,6 +111,7 @@ func TestSigningInAndOutThroughTheAPI(t *testing.T) {
 
 // Another site can't sign a browser in to an account of its choosing.
 func TestSigningInFromAnotherSiteIsRefused(t *testing.T) {
+	t.Parallel()
 	_, _, srv, _ := signedIn(t)
 	b := freshBrowser()
 	res := asBrowser(t, b, "POST", srv.URL+"/api/v1/session", api.SignIn{Email: "ada@example.com", Password: "correct horse battery"},
@@ -120,6 +122,7 @@ func TestSigningInFromAnotherSiteIsRefused(t *testing.T) {
 }
 
 func TestSigningInThroughTheAPIIsThrottled(t *testing.T) {
+	t.Parallel()
 	_, _, srv, _ := signedIn(t)
 	b := freshBrowser()
 	var res *http.Response
@@ -138,6 +141,7 @@ func TestSigningInThroughTheAPIIsThrottled(t *testing.T) {
 // A browser still holding the device cookie from when it was kept to /login sends that
 // one first; once a password change has made it worthless, the newer one still counts.
 func TestABrowserWithAnOldDeviceCookieStillCountsByItself(t *testing.T) {
+	t.Parallel()
 	s, _, srv, _ := signedIn(t)
 	ada := must(s.UserByEmail("ada@example.com"))
 	stale := newDeviceToken(ada)
@@ -173,6 +177,7 @@ func TestABrowserWithAnOldDeviceCookieStillCountsByItself(t *testing.T) {
 // Someone on a password their inviter saw can ask who they are and choose their own,
 // and the organisation's API says why it won't answer rather than redirecting.
 func TestAFirstPasswordIsChangedThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	grace := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
 	if err := s.db.Model(grace).Update("must_change_password", true).Error; err != nil {
@@ -208,6 +213,7 @@ func TestAFirstPasswordIsChangedThroughTheAPI(t *testing.T) {
 }
 
 func TestResettingAPasswordThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	_, srv, ada, box := mailSite(t, nil)
 	asked := srv.URL + "/api/v1/password-resets"
 	for _, email := range []string{"nobody@example.com", "Ada@Example.com"} {
@@ -244,6 +250,7 @@ func TestResettingAPasswordThroughTheAPI(t *testing.T) {
 }
 
 func TestNoPasswordResetWithoutMail(t *testing.T) {
+	t.Parallel()
 	_, _, srv, _ := signedIn(t)
 	if res := asBrowser(t, freshBrowser(), "POST", srv.URL+"/api/v1/password-resets", map[string]string{"email": "ada@example.com"}); res.StatusCode != http.StatusNotFound {
 		t.Fatalf("asking for a link from a server that sends no mail: %s", res.Status)
@@ -256,6 +263,7 @@ func TestNoPasswordResetWithoutMail(t *testing.T) {
 }
 
 func TestFindingSingleSignOnThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	alpha := mustOrg(t, s, "alpha")
 	mustUser(t, s, alpha, "ada@alpha.example", "Ada Lovelace", "owner")

@@ -11,6 +11,7 @@ import (
 
 // The React Conversations page reads the board, cards and all, from the API.
 func TestTheBoardIsReadThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, owner := signedIn(t)
 	o.Settings.OnboardingSteps = "them: Send your product files, 7 days\nus: Go live"
 	if err := s.SaveOrg(o); err != nil {
@@ -126,6 +127,7 @@ func TestTheBoardIsReadThroughTheAPI(t *testing.T) {
 
 // What the board's cards offer, the API refuses to anyone whose work it isn't.
 func TestTheBoardsWritesAreRefusedOutsideTheirArea(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	o.Settings.OnboardingSteps = "us: Go live"
 	if err := s.SaveOrg(o); err != nil {

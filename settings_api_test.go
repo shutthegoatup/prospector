@@ -12,6 +12,7 @@ import (
 // What the organisation looks for comes back as a list, which a change must still be
 // compared against rather than failing the request.
 func TestSettingsChangeWithALookForList(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	o.Settings.LookFor = "careers_page: a page of open roles\nats (must): an applicant tracking system"
 	if err := s.SaveOrg(o); err != nil {
@@ -35,6 +36,7 @@ func TestSettingsChangeWithALookForList(t *testing.T) {
 }
 
 func TestSettingsChangeThroughTheAPIOnlyWhatIsSent(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	o.Settings.Pitch, o.Settings.NeverContact = "We help {company}.", "rival.example"
 	if err := s.SaveOrg(o); err != nil {
@@ -105,6 +107,7 @@ func TestSettingsChangeThroughTheAPIOnlyWhatIsSent(t *testing.T) {
 }
 
 func TestOnlyWhatTakesEffectDifferentlyIsAChange(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	url := srv.URL + "/o/alpha/api/v1/settings"
 	changes := func() []string {

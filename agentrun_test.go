@@ -87,6 +87,7 @@ func messagesOf(body map[string]any) []map[string]any {
 }
 
 func TestTheAgentWorksATaskToTheEnd(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	fake.chat = func(n int, _ map[string]any) (int, string) {
@@ -166,6 +167,7 @@ func TestTheAgentWorksATaskToTheEnd(t *testing.T) {
 }
 
 func TestTheAgentWaitsOutAnEndpointsLimit(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	fake.chat = func(n int, _ map[string]any) (int, string) {
@@ -184,6 +186,7 @@ func TestTheAgentWaitsOutAnEndpointsLimit(t *testing.T) {
 }
 
 func TestTheAgentWorksThroughOutagesButNotAWrongModel(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	fake.chat = func(n int, _ map[string]any) (int, string) {
@@ -239,6 +242,7 @@ func TestTheAgentWorksThroughOutagesButNotAWrongModel(t *testing.T) {
 }
 
 func TestAPersonStopsTheAgent(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	fake.chat = func(n int, _ map[string]any) (int, string) {
@@ -261,6 +265,7 @@ func TestAPersonStopsTheAgent(t *testing.T) {
 }
 
 func TestARunCarriesOnAfterItsServerStops(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	fake.chat = func(int, map[string]any) (int, string) {
@@ -312,6 +317,7 @@ func TestFreshStartsKeepARunsContextBounded(t *testing.T) {
 }
 
 func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	s, srv, ada := agentSite(t, fake)
 	o := must(s.OrgBySlug("alpha"))
@@ -423,6 +429,7 @@ func waitFor(t *testing.T, done func() bool) {
 }
 
 func TestAToolNobodyTickedIsntRun(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	fake.chat = func(n int, _ map[string]any) (int, string) {
@@ -451,6 +458,7 @@ func TestAToolNobodyTickedIsntRun(t *testing.T) {
 }
 
 func TestOneServerDoesntTakeOverARunItIsDriving(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	var once sync.Once
@@ -477,6 +485,7 @@ func TestOneServerDoesntTakeOverARunItIsDriving(t *testing.T) {
 }
 
 func TestOnlyOneRunStartsOnATask(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	release := make(chan struct{})
@@ -510,6 +519,7 @@ func TestOnlyOneRunStartsOnATask(t *testing.T) {
 }
 
 func TestARunCarriedOnKeepsItsOwnClaim(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	fake.chat = func(int, map[string]any) (int, string) {
@@ -530,6 +540,7 @@ func TestARunCarriedOnKeepsItsOwnClaim(t *testing.T) {
 }
 
 func TestTheSourceGuardHoldsForEveryWayToCiteAPage(t *testing.T) {
+	t.Parallel()
 	ts := &turnState{seen: map[string]bool{}}
 	ts.see(`See https://en.wikipedia.org/wiki/Acme_(company). And (https://larkmoor.example/team) and {"u":"https://x.example/a?b=1&c=2"}`)
 	for _, u := range []string{"https://en.wikipedia.org/wiki/Acme_(company)", "https://larkmoor.example/team", "https://x.example/a?b=1&c=2"} {
@@ -561,6 +572,7 @@ func TestTheSourceGuardHoldsForEveryWayToCiteAPage(t *testing.T) {
 }
 
 func TestARunStartingLeavesOtherKeysClaimsAlone(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	bk := must(r.s.agentKey(must(r.s.AgentByID(r.o.ID, r.agent))))
@@ -580,6 +592,7 @@ func TestARunStartingLeavesOtherKeysClaimsAlone(t *testing.T) {
 }
 
 func TestTheAgentCantCiteAPageItWasntShownAnyOtherWay(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	fake.chat = func(n int, _ map[string]any) (int, string) {
@@ -596,6 +609,7 @@ func TestTheAgentCantCiteAPageItWasntShownAnyOtherWay(t *testing.T) {
 }
 
 func TestNextToNoRetryAfterBacksOffAsAnOutageDoes(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	fake.chat = func(n int, _ map[string]any) (int, string) {
@@ -612,6 +626,7 @@ func TestNextToNoRetryAfterBacksOffAsAnOutageDoes(t *testing.T) {
 }
 
 func TestRevokingTheAgentsKeyStopsItsRun(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	fake.chat = func(n int, _ map[string]any) (int, string) {

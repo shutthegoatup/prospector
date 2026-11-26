@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -14,6 +12,7 @@ import (
 )
 
 func TestMonthsAreAddedWithoutSpillingIntoTheNext(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		from string
 		n    int
@@ -30,6 +29,7 @@ func TestMonthsAreAddedWithoutSpillingIntoTheNext(t *testing.T) {
 }
 
 func TestWhereASubscriptionStands(t *testing.T) {
+	t.Parallel()
 	day := func(s string) *string { return &s }
 	yearly := Subscription{Start: "2026-01-12", TermMonths: 12, Then: ThenRenews, NoticeDays: 60, Per: PerYear}
 	withNotice := func(on string) Subscription { s := yearly; s.NoticeOn = day(on); return s }
@@ -90,6 +90,7 @@ func TestWhereASubscriptionStands(t *testing.T) {
 }
 
 func TestASubscriptionIsRecordedAgainstACompany(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	person := repliedPerson(t, s, o, "Hannah Pryce")
@@ -193,6 +194,7 @@ func TestASubscriptionIsRecordedAgainstACompany(t *testing.T) {
 }
 
 func TestSubscriptionsAreRecordedAndChangedFromThePages(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	person := repliedPerson(t, s, o, "Hannah Pryce")
 	company := *person.CompanyID
@@ -257,10 +259,8 @@ func dueSubs(t *testing.T, client *http.Client, site string) int {
 
 // A database written before subscriptions existed has companies and no such table.
 func TestADatabaseFromBeforeSubscriptionsOpens(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	t.Parallel()
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)
@@ -285,6 +285,7 @@ func TestADatabaseFromBeforeSubscriptionsOpens(t *testing.T) {
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
 
 func TestTodayPointsAtSubscriptionsComingDue(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	person := repliedPerson(t, s, o, "Hannah Pryce")
 	now := mustDay(today())
@@ -373,6 +374,7 @@ func TestTodayPointsAtSubscriptionsComingDue(t *testing.T) {
 }
 
 func TestARenewalDealIsStartedFromASubscription(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	hannah := repliedPerson(t, s, o, "Hannah Pryce")
 	quiet := must(s.QuickAddPerson(o, QuickAdd{Name: "Tom Ellery", Company: "Larkmoor Yachts"}, "Ada Lovelace"))
@@ -458,10 +460,8 @@ func TestARenewalDealIsStartedFromASubscription(t *testing.T) {
 
 // A database from before a deal could point at a subscription has deals without the column.
 func TestDealsFromBeforeRenewalsPointedAtSubscriptions(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	t.Parallel()
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)
@@ -490,6 +490,7 @@ func TestDealsFromBeforeRenewalsPointedAtSubscriptions(t *testing.T) {
 }
 
 func TestARobotWorksSubscriptionsAsItsScopesAllow(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	key := func(org int64, scopes ...string) string {
@@ -568,6 +569,7 @@ func TestARobotWorksSubscriptionsAsItsScopesAllow(t *testing.T) {
 
 // The React page reads from the list what the server-rendered one worked out itself.
 func TestTheSubscriptionsListCarriesWhatThePageShows(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	hannah := repliedPerson(t, s, o, "Hannah Pryce")
 	subs := srv.URL + "/o/alpha/api/v1/subscriptions"

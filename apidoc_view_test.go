@@ -14,6 +14,7 @@ const docViewFile = "web/src/site/apidoc.json"
 // The /api reference is built from the spec as it is. Run with PROSPECTOR_WRITE_APIDOC=1
 // to write it after changing api/openapi.yaml, then build web/.
 func TestTheAPIReferenceIsBuiltFromTheSpec(t *testing.T) {
+	t.Parallel()
 	spec, err := api.Spec()
 	if err != nil {
 		t.Fatal(err)
@@ -35,6 +36,7 @@ func TestTheAPIReferenceIsBuiltFromTheSpec(t *testing.T) {
 }
 
 func TestTheServersAddressGoesIntoTheReference(t *testing.T) {
+	t.Parallel()
 	page := []byte(`<code>curl ` + docBase + `/o/your-org/api/v1/today</code>`)
 	if got := string(withBase(page, `https://crm.example/"><b>`)); got != `<code>curl https://crm.example/&#34;&gt;&lt;b&gt;/o/your-org/api/v1/today</code>` {
 		t.Errorf("%s", got)

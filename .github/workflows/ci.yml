@@ -43,10 +43,16 @@ jobs:
           git diff --exit-code
 
       - run: go vet ./...
-      - name: Test on SQLite
-        run: go test ./...
-      - name: Test on Postgres
-        run: go test -count=1 -p 1 ./...
+      # A throwaway database needn't survive a crash, and syncing every commit to disk
+      # is most of what a test spends.
+      - name: Don't make the test database durable
+        run: |
+          psql "$PROSPECTOR_TEST_PG" -c "alter system set fsync = off" -c "alter system set synchronous_commit = off" \
+            -c "alter system set full_page_writes = off" -c "select pg_reload_conf()"
+        env:
+          PROSPECTOR_TEST_PG: postgres://postgres:test@localhost:5432/prospector?sslmode=disable
+      - name: Test
+        run: go test -count=1 ./...
         env:
           PROSPECTOR_TEST_PG: postgres://postgres:test@localhost:5432/prospector?sslmode=disable
 

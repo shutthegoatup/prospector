@@ -10,8 +10,6 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -113,6 +111,7 @@ func atCompany(t *testing.T, s *Store, o *Org, name, company, domain string) *Co
 }
 
 func TestAVendorsKeyIsSealedAndNeverShown(t *testing.T) {
+	t.Parallel()
 	s, o, api, client, _ := enrichSignedIn(t)
 	if code, body := call(t, client, "PUT", api+"/enrichers", "application/json", map[string]any{"kind": "hunter", "monthly_limit": 10}); code != http.StatusBadRequest || !strings.Contains(body, "api_key is needed") {
 		t.Errorf("a vendor without a key: %d %s", code, body)
@@ -141,6 +140,7 @@ func TestAVendorsKeyIsSealedAndNeverShown(t *testing.T) {
 }
 
 func TestAVendorsFindWaitsForAPersonMarkedWithTheVendor(t *testing.T) {
+	t.Parallel()
 	s, o, api, client, f := enrichSignedIn(t)
 	hannah := atCompany(t, s, o, "Hannah Pryce", "Larkmoor Yachts", "larkmoor.example")
 	f.found["Hannah Pryce@larkmoor.example"] = "hannah.pryce@larkmoor.example"
@@ -193,6 +193,7 @@ func TestAVendorsFindWaitsForAPersonMarkedWithTheVendor(t *testing.T) {
 }
 
 func TestAVendorIsAskedNoMoreThanItsMonthAllows(t *testing.T) {
+	t.Parallel()
 	s, o, api, client, f := enrichSignedIn(t)
 	call(t, client, "PUT", api+"/enrichers", "application/json", map[string]any{"kind": "hunter", "api_key": hunterTestKey, "monthly_limit": 1})
 	a := atCompany(t, s, o, "Tom Ellery", "Larkmoor Yachts", "larkmoor.example")
@@ -217,6 +218,7 @@ func TestAVendorIsAskedNoMoreThanItsMonthAllows(t *testing.T) {
 }
 
 func TestNobodyTheOrganisationMustntContactIsLookedUp(t *testing.T) {
+	t.Parallel()
 	s, o, api, client, f := enrichSignedIn(t)
 	call(t, client, "PUT", api+"/enrichers", "application/json", map[string]any{"kind": "hunter", "api_key": hunterTestKey, "monthly_limit": 10})
 	listed := atCompany(t, s, o, "Sven Dahl", "Nordkap Boats", "nordkap.example")
@@ -273,6 +275,7 @@ func TestNobodyTheOrganisationMustntContactIsLookedUp(t *testing.T) {
 }
 
 func TestOnlyAKeyGivenTheScopeSpendsOnVendors(t *testing.T) {
+	t.Parallel()
 	s, o, api, client, _ := enrichSignedIn(t)
 	call(t, client, "PUT", api+"/enrichers", "application/json", map[string]any{"kind": "hunter", "api_key": hunterTestKey, "monthly_limit": 10})
 	c := atCompany(t, s, o, "Tom Ellery", "Larkmoor Yachts", "larkmoor.example")
@@ -305,6 +308,7 @@ func reread(t *testing.T, s *Store, id int64) *Contact {
 }
 
 func TestAVendorIsToldTheWholeNameOfSomeoneAnAgentAdded(t *testing.T) {
+	t.Parallel()
 	s, o, api, client, f := enrichSignedIn(t)
 	call(t, client, "PUT", api+"/enrichers", "application/json", map[string]any{"kind": "hunter", "api_key": hunterTestKey, "monthly_limit": 10})
 	must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "Bergholm", Domain: "bergholm.example"}))
@@ -320,6 +324,7 @@ func TestAVendorIsToldTheWholeNameOfSomeoneAnAgentAdded(t *testing.T) {
 }
 
 func TestAnAgentWithTheScopeCanEnrichThroughMCP(t *testing.T) {
+	t.Parallel()
 	s, o, api, client, f := enrichSignedIn(t)
 	call(t, client, "PUT", api+"/enrichers", "application/json", map[string]any{"kind": "hunter", "api_key": hunterTestKey, "monthly_limit": 10})
 	c := atCompany(t, s, o, "Hannah Pryce", "Larkmoor Yachts", "larkmoor.example")
@@ -345,10 +350,8 @@ func TestAnAgentWithTheScopeCanEnrichThroughMCP(t *testing.T) {
 }
 
 func TestADatabaseFromBeforeVendorsOpens(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	t.Parallel()
+	dsn := freshDatabase(t)
 	old := must(Open(dsn))
 	if err := old.db.Migrator().DropTable(models...); err != nil {
 		t.Fatal(err)
@@ -387,6 +390,7 @@ func TestADatabaseFromBeforeVendorsOpens(t *testing.T) {
 }
 
 func TestResearchSaysWhatVendorsFoundAndWhenTheyCanBeAskedAgain(t *testing.T) {
+	t.Parallel()
 	s, o, api, client, f := enrichSignedIn(t)
 	s.dns = &fakeDNS{mx: map[string][]*net.MX{"larkmoor.example": {{Host: "mx.larkmoor.example."}}}}
 	hannah := atCompany(t, s, o, "Hannah Pryce", "Larkmoor Yachts", "larkmoor.example")

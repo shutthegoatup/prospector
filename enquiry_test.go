@@ -56,6 +56,7 @@ func doRequest(t *testing.T, req *http.Request) (int, string) {
 }
 
 func TestFormEnquiryIsKept(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	intake := srv.URL + "/o/alpha/intake"
 	enquiry := EnquiryIn{Kind: "demo", Name: "Hannah Pryce", Email: "Hannah@Quay.example", Company: "Quay Marine",
@@ -106,6 +107,7 @@ func TestFormEnquiryIsKept(t *testing.T) {
 }
 
 func TestEnquiryOddities(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	takeEnquiriesFrom(t, s, o, formSite)
 	intake := srv.URL + "/o/alpha/intake"
@@ -155,6 +157,7 @@ func TestEnquiryOddities(t *testing.T) {
 }
 
 func TestEnquiryFindsWhoSentIt(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	takeEnquiriesFrom(t, s, o, formSite)
 	known, err := s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Quay Marine", Email: "hannah@quay.example"}, "Ada Lovelace")
@@ -219,6 +222,7 @@ func TestEnquiryFindsWhoSentIt(t *testing.T) {
 }
 
 func TestEnquiryFromAProduct(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	api := srv.URL + "/o/alpha/api/v1/enquiries"
@@ -267,6 +271,7 @@ func TestEnquiryFromAProduct(t *testing.T) {
 }
 
 func TestEnquirySitesSetting(t *testing.T) {
+	t.Parallel()
 	_, _, srv, client := signedIn(t)
 	save := func(sites string) (int, string) {
 		return call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/settings", "application/json",
@@ -289,6 +294,7 @@ func TestEnquirySitesSetting(t *testing.T) {
 }
 
 func TestEnquiryGuardStaysBounded(t *testing.T) {
+	t.Parallel()
 	var g enquiryGuard
 	for i := range maxTracked {
 		if !g.allow(fmt.Sprint("sender ", i), enquiriesPerSender) {

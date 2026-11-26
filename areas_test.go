@@ -11,6 +11,7 @@ import (
 
 // A write the spec adds without saying whose work it is would be open to everyone.
 func TestEveryAPIWriteNamesItsArea(t *testing.T) {
+	t.Parallel()
 	spec, err := api.GetSwagger()
 	if err != nil {
 		t.Fatal(err)
@@ -32,6 +33,7 @@ func TestEveryAPIWriteNamesItsArea(t *testing.T) {
 }
 
 func TestEachAreaChangesOnlyItsOwnWork(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	grace := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
 	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")
@@ -180,6 +182,7 @@ func memberAreas(e *OrgExport) []string {
 }
 
 func TestMembershipsGainAreasWithRowsInThem(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	grace := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")

@@ -13,6 +13,7 @@ import (
 // A release is installed by stopping the server, so what is in hand when that
 // happens has to be finished, not cut.
 func TestStoppingFinishesWhatIsInHand(t *testing.T) {
+	t.Parallel()
 	a := &App{s: tempStore(t)}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -69,6 +70,7 @@ func TestStoppingFinishesWhatIsInHand(t *testing.T) {
 }
 
 func TestStoppingDoesntWaitForeverForAStream(t *testing.T) {
+	t.Parallel()
 	a := &App{s: tempStore(t)}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

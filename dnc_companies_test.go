@@ -10,6 +10,7 @@ import (
 )
 
 func TestTheNeverContactListCoversACompanyByItsDomain(t *testing.T) {
+	t.Parallel()
 	set := OrgSettings{NeverContact: "nordkap.example, ines@larkmoor.example\nhttps://www.linkedin.com/in/li-never, https://halvard.example/"}
 	for domain, want := range map[string]bool{
 		"nordkap.example": true, "shop.nordkap.example": true, "https://www.nordkap.example/": true, "halvard.example": true,
@@ -24,6 +25,7 @@ func TestTheNeverContactListCoversACompanyByItsDomain(t *testing.T) {
 // A company on a never-contact domain is kept and built on, but nobody is asked to
 // review it: a search lists it as left out. The list is read as it is now.
 func TestANeverContactCompanyIsKeptButLeftOut(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	o.Settings.NeverContact = "nordkap.example"
 	if err := s.SaveOrg(o); err != nil {
@@ -77,6 +79,7 @@ func TestANeverContactCompanyIsKeptButLeftOut(t *testing.T) {
 // An offering's search leaves a never-contact company out the same way, and a customer
 // on such a domain is left out once.
 func TestANeverContactCompanyIsLeftOutOfAnOfferingsSearchToo(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO"}, "Ada"))

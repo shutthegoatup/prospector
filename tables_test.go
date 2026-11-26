@@ -86,6 +86,7 @@ var personExportHolds = map[string]string{
 }
 
 func TestEveryTableIsInTheExportsOrSaysWhyNot(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	check := func(table string, holds map[string]string, export any, name string) {
 		field, listed := holds[table]
@@ -146,6 +147,7 @@ func pointingAt(t *testing.T, s *Store, org, contact int64) func() map[string]in
 }
 
 func TestWhateverPointsAtAPersonGoesWhenTheyDo(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	add := func(name string) *Contact {
@@ -177,6 +179,7 @@ func TestWhateverPointsAtAPersonGoesWhenTheyDo(t *testing.T) {
 // follow moves what points at a contact when a restore gives them another id, table by
 // table from pointAtContacts.
 func TestARestoreMovesEveryTableThatPointsAtAContact(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	moved := map[string]bool{}
 	for _, m := range pointAtContacts {
