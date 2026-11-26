@@ -668,6 +668,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/research": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The Research queue, as the page shows it
+         * @description Companies waiting on a person, under one of the page's filters, each with its
+         *     answer to everything the organisation looks for and its fit. Narrowed to one
+         *     task's search, the companies to review come best fit first (`ranked`): none
+         *     missing a must, then most met, then fewest left unknown. Otherwise newest first,
+         *     or as each filter orders them.
+         */
+        get: operations["listResearch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/tasks": {
         parameters: {
             query?: never;
@@ -1174,7 +1201,7 @@ export interface paths {
         head?: never;
         /**
          * Qualify a company, reject it, or put it back for review
-         * @description A rejected company is one agents are told not to suggest again.
+         * @description A company rejected for the organisation's own offering is one agents are told not to suggest again; a verdict for another offering leaves the company's own stage as it was.
          */
         patch: operations["reviewCompany"];
         trace?: never;
@@ -1308,6 +1335,112 @@ export interface paths {
         patch: operations["changeSettings"];
         trace?: never;
     };
+    "/o/{org}/api/v1/offerings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What the organisation sells besides what its settings describe
+         * @description The organisation's own offering, whose look-for list is in Settings and whose verdict on
+         *     a company is the company's stage, isn't listed. Reviewing a company or starting a task
+         *     names it as offering 0.
+         */
+        get: operations["listOfferings"];
+        put?: never;
+        /**
+         * Add something the organisation sells
+         * @description For a member, only an owner.
+         */
+        post: operations["addOffering"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/offerings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove an offering, with every verdict made for it
+         * @description The history keeps what was decided. For a member, only an owner.
+         */
+        delete: operations["removeOffering"];
+        options?: never;
+        head?: never;
+        /**
+         * Change an offering's name or wording
+         * @description Send only what changes. For a member, only an owner.
+         */
+        patch: operations["changeOffering"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/offerings/{id}/verdicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Where companies stand for an offering
+         * @description Rejected ones included, with who decided, when and why, so one ruled out by mistake
+         *     can be found and put back for review.
+         */
+        get: operations["listVerdicts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/companies/{id}/verdicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Where one company stands for each offering it has been judged for
+         * @description Its stage for the organisation's own offering is the company's stage, not listed here.
+         */
+        get: operations["listCompanyVerdicts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1335,6 +1468,8 @@ export interface components {
             never_contact: string;
             /** @description What makes a company a fit, one `name: what counts` per line. */
             look_for: string;
+            /** @description `look_for` read: each thing in order, with its hint and whether it is a must (`(must)` after its name). */
+            readonly looking_for: components["schemas"]["LookFor"][];
             /** @description Sent to every agent when it connects. */
             agent_guidance: string;
             /** @description Sites whose forms may post enquiries, one address per line, like `https://www.example.com`. Empty takes none. */
@@ -1384,6 +1519,51 @@ export interface components {
             /** @description Email only incorporated companies. */
             incorporated_only?: boolean | null;
         };
+        Offering: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /** @description What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list. */
+            look_for: string;
+            /** @description Its pitch line, kept for when people are reached for it; nothing uses it yet. */
+            pitch: string;
+            /** @description Its connection note, kept for when people are picked for it; nothing uses it yet. */
+            note_template: string;
+            updated_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        OfferingNew: {
+            name: string;
+            look_for?: string;
+            pitch?: string;
+            note_template?: string;
+        };
+        OfferingChange: {
+            name?: string | null;
+            look_for?: string | null;
+            pitch?: string | null;
+            note_template?: string | null;
+        };
+        Verdict: {
+            /** Format: int64 */
+            offering_id: number;
+            /** Format: int64 */
+            company_id: number;
+            /** @description The company's name. */
+            company: string;
+            /** @enum {string} */
+            stage: "review" | "qualified" | "rejected";
+            fit: string;
+            /** @description Why, as whoever decided said it. */
+            reason: string;
+            /** @description Who decided. */
+            by: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
         ContactChange: {
             /** @description Their name. */
             person?: string | null;
@@ -1413,8 +1593,15 @@ export interface components {
         CompanyReview: {
             /** @enum {string} */
             stage: "review" | "qualified" | "rejected";
-            /** @description Why, in a few words; kept with the company. Empty leaves it as it was. */
+            /** @description Why, in a few words; kept with the company, or with the verdict when an offering is named. Empty leaves it as it was. */
             fit?: string;
+            /**
+             * Format: int64
+             * @description The offering this is a verdict for; 0 or left out is the organisation's own, which is the company's stage.
+             */
+            offering?: number;
+            /** @description Why, kept with a verdict for an offering; refused for the organisation's own. */
+            reason?: string;
         };
         PersonNew: {
             name: string;
@@ -1550,8 +1737,110 @@ export interface components {
             title: string;
             /** @description What is wanted: the task's first request. */
             brief: string;
+            /**
+             * Format: int64
+             * @description What the task finds companies for: agents are given its look-for fields, and what they find waits in its review. 0 or left out is the organisation's own.
+             */
+            offering?: number;
             /** @description Prospector's own agents to start on the task, each on its own request. */
             agents?: number[];
+        };
+        ResearchCompany: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            domain: string;
+            country: string;
+            segment: string;
+            /** @enum {string} */
+            stage: "review" | "qualified" | "rejected";
+            /** @description The fit grade a person or agent gave, A, B or C; empty for none. */
+            grade: string;
+            found_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** @description Each thing the organisation looks for, in its order, with the latest answer. */
+            criteria: components["schemas"]["Criterion"][];
+            fit: components["schemas"]["Fit"];
+            /** @description Why it fits, in the words of whoever added it; empty for none. */
+            why: string;
+            /** @description The facts besides the answers, older answers among them, oldest first. */
+            facts: components["schemas"]["ResearchFact"][];
+            people: components["schemas"]["ResearchPerson"][];
+        };
+        LookFor: {
+            field: string;
+            hint: string;
+            must: boolean;
+        };
+        ResearchFact: {
+            /** Format: int64 */
+            id: number;
+            field: string;
+            value: string;
+            source_url: string;
+            /** @enum {string} */
+            answer: "yes" | "no" | "unknown";
+            inferred: boolean;
+            by: string;
+            /** Format: date-time */
+            at: string;
+        };
+        ResearchPerson: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            title: string;
+            /** @description `suggested` until someone picks them. */
+            status: string;
+            /** @description `verified`, `guess`, or empty. */
+            email_status: string;
+            linkedin: string;
+            /** @description The first page that shows them. */
+            source_url: string;
+            /** @description New details an agent found for them, waiting to be accepted. */
+            pending: components["schemas"]["PendingDetail"][];
+        };
+        PendingDetail: {
+            /**
+             * Format: int64
+             * @description The suggestion: decide it at /api/v1/suggestions/{id}.
+             */
+            id: number;
+            field: string;
+            value: string;
+            /** @description What the person holds now; empty for nothing. */
+            current: string;
+            source_url: string;
+            by: string;
+            /** Format: date-time */
+            at: string;
+        };
+        Criterion: {
+            field: string;
+            must: boolean;
+            /** @enum {string} */
+            state: "met" | "not_met" | "not_found" | "unchecked";
+            /** @description The answer in a sentence; for not_found, where the agent looked. */
+            value?: string;
+            source_url?: string;
+            /** @description Read from a job advert, a third party or an old page. */
+            inferred?: boolean;
+            by?: string;
+            /**
+             * Format: date-time
+             * @description When the answer was given; null when unchecked.
+             */
+            at?: string | null;
+        };
+        Fit: {
+            of: number;
+            met: number;
+            not_found: number;
+            unchecked: number;
+            musts_missed: number;
+            /** @description As the page says it, such as "3 of 4 · 1 not found". */
+            text: string;
         };
         TaskStarted: components["schemas"]["Task"] & {
             runs: components["schemas"]["Run"][];
@@ -1565,6 +1854,11 @@ export interface components {
             /** Format: int64 */
             id: number;
             title: string;
+            /**
+             * Format: int64
+             * @description What the task finds companies for; 0 is the organisation's own.
+             */
+            offering_id: number;
             created_by: string;
             /** Format: date-time */
             created_at: string;
@@ -1788,6 +2082,16 @@ export interface components {
             live_on: string;
             /** @description Who at the company has been let see their steps. */
             invites: components["schemas"]["OnboardingInvite"][];
+            /** @description People at the company with an email address here, who could be invited. */
+            invitable: components["schemas"]["Invitable"][];
+            /** @description Whether a link can be emailed at all: the organisation has a mail server and the server knows its public address. */
+            can_invite: boolean;
+        };
+        Invitable: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            email: string;
         };
         OnboardingStep: {
             /** Format: int64 */
@@ -3238,6 +3542,8 @@ export interface operations {
                     "application/json": {
                         items: components["schemas"]["Campaign"][];
                         next_cursor?: components["schemas"]["NextCursor"];
+                        /** @description Why nothing can be sent yet (the organisation's own mail server, a postal address or the site's address missing); empty when a campaign can be sent. */
+                        not_ready: string;
                     };
                 };
             };
@@ -3356,6 +3662,50 @@ export interface operations {
                         going: number;
                         /** @description How many are left out. */
                         left_out: number;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listResearch: {
+        parameters: {
+            query?: {
+                /** @description `review` to qualify or reject, `contact` qualified with nobody picked, `verify` with a guessed email, `details` with a new detail for someone to accept, `rejected`. */
+                filter?: "review" | "contact" | "verify" | "details" | "rejected";
+                /** @description Only what this task's search found. */
+                task?: number;
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of the queue. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ResearchCompany"][];
+                        /** @description Whether the companies come best fit first. A search with more than 500 to review comes newest first. */
+                        ranked: boolean;
+                        /** @description How many each filter holds, narrowed to the task when one is given. What the organisation looks for is in the settings, as looking_for. */
+                        counts: {
+                            [key: string]: number;
+                        };
+                        /** @description Set when there is more: pass it as cursor for the rest. */
+                        next_cursor?: string;
                     };
                 };
             };
@@ -4404,6 +4754,189 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Settings"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listOfferings: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description By name. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Offering"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addOffering: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferingNew"];
+            };
+        };
+        responses: {
+            /** @description The offering, added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Offering"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    removeOffering: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    changeOffering: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferingChange"];
+            };
+        };
+        responses: {
+            /** @description The offering as it now is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Offering"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listVerdicts: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+                /** @description Only those at this stage. */
+                stage?: "review" | "qualified" | "rejected";
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The latest decided first. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Verdict"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCompanyVerdicts: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description By offering. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Verdict"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
                 };
             };
             default: components["responses"]["Problem"];

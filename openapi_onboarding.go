@@ -15,7 +15,10 @@ func stepOut(st OnboardingStep) api.OnboardingStep {
 
 func onboardingOut(row OnboardingRow, invites []CustomerInvite) api.Onboarding {
 	out := api.Onboarding{Id: row.ID, CompanyId: row.CompanyID, Company: row.Company, Name: row.Name, Start: row.Start, CreatedAt: row.CreatedAt,
-		Steps: []api.OnboardingStep{}, Done: row.Done, Late: row.Late, LiveOn: row.LiveOn, Invites: []api.OnboardingInvite{}}
+		Steps: []api.OnboardingStep{}, Done: row.Done, Late: row.Late, LiveOn: row.LiveOn, Invites: []api.OnboardingInvite{}, Invitable: []api.Invitable{}, CanInvite: row.MailOn}
+	for _, p := range row.Invitable {
+		out.Invitable = append(out.Invitable, api.Invitable{Id: p.ID, Name: displayName(p), Email: deref(p.Email)})
+	}
 	for _, st := range row.Steps {
 		out.Steps = append(out.Steps, stepOut(st))
 	}
@@ -31,13 +34,13 @@ func (s apiServer) onboardings(org, company int64) ([]api.Onboarding, error) {
 	if err != nil {
 		return nil, err
 	}
-	invites, err := s.a.s.CustomerInvites(org)
-	if err != nil {
+	// Who has been and could be invited, and whether mail can go, as the page shows them.
+	if err := s.a.customerControls(org, rows); err != nil {
 		return nil, err
 	}
 	out := []api.Onboarding{}
 	for _, row := range rows {
-		out = append(out, onboardingOut(row, invites[row.ID]))
+		out = append(out, onboardingOut(row, row.Invites))
 	}
 	return out, nil
 }

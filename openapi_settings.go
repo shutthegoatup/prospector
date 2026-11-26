@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -16,7 +17,7 @@ func settingsOut(o *Org) api.Settings {
 	return api.Settings{Name: o.Name, Color: o.Color, EmailAfterDays: int32(set.EmailAfterDays), FollowupAfterDays: int32(set.FollowupAfterDays),
 		NoteTemplate: set.NoteTemplate, Pitch: set.Pitch, NeverContact: set.NeverContact, LookFor: set.LookFor, AgentGuidance: set.AgentGuidance,
 		EnquirySites: set.EnquirySites, OnboardingSteps: set.OnboardingSteps, Currency: set.Currency, PostalAddress: set.PostalAddress,
-		IncorporatedOnly: set.IncorporatedOnly}
+		IncorporatedOnly: set.IncorporatedOnly, LookingFor: lookingFor(o.Settings)}
 }
 
 func (s apiServer) GetSettings(ctx context.Context, _ api.GetSettingsRequestObject) (api.GetSettingsResponseObject, error) {
@@ -96,7 +97,7 @@ func settingsDiff(a, b api.Settings) []string {
 	json.Unmarshal(jb, &now)
 	var changed []string
 	for k, v := range now {
-		if was[k] != v {
+		if !reflect.DeepEqual(was[k], v) {
 			changed = append(changed, k)
 		}
 	}
