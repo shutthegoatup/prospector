@@ -375,7 +375,6 @@ func (a *App) Routes() http.Handler {
 		http.Redirect(w, r, q.Base()+landing(q.Member), http.StatusSeeOther)
 	}))
 	a.appRoutes(mux)
-	mux.HandleFunc("GET /o/{org}/agreements/{id}/prepare", a.member(a.prepareAgreement))
 	a.taskRoutes(mux)
 	mux.HandleFunc("OPTIONS "+intakePattern, a.intakePreflight)
 	mux.HandleFunc("POST "+intakePattern, a.intake)

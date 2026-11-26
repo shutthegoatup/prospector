@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
@@ -45,6 +46,29 @@ func (s apiServer) CreateAgreement(ctx context.Context, in api.CreateAgreementRe
 		return nil, err
 	}
 	return api.CreateAgreement201JSONResponse(agreementOut(*a)), nil
+}
+
+func (s apiServer) GetAgreement(ctx context.Context, in api.GetAgreementRequestObject) (api.GetAgreementResponseObject, error) {
+	q := reqFrom(ctx)
+	p, err := s.a.s.Preparing(q.Org, in.Id)
+	if err != nil {
+		return nil, err
+	}
+	a := agreementOut(p.Agreement)
+	out := api.AgreementOverview{Id: a.Id, CompanyId: a.CompanyId, Name: a.Name, Status: api.AgreementOverviewStatus(a.Status), FileName: a.FileName, FileSize: a.FileSize,
+		FileHash: a.FileHash, PageCount: a.PageCount, Round: a.Round, InOrder: a.InOrder, CreatedBy: a.CreatedBy, UpdatedBy: a.UpdatedBy, CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt,
+		Company: p.Company.Name, Problem: p.Problem, People: []api.Invitable{}, Members: []api.Invitable{}}
+	for _, c := range p.People {
+		if !p.on(c.ID, 0) {
+			out.People = append(out.People, api.Invitable{Id: c.ID, Name: displayName(c), Email: strings.TrimSpace(deref(c.Email))})
+		}
+	}
+	for _, m := range p.Members {
+		if !p.on(0, m.UserID) {
+			out.Members = append(out.Members, api.Invitable{Id: m.UserID, Name: m.Name, Email: m.Email})
+		}
+	}
+	return api.GetAgreement200JSONResponse(out), nil
 }
 
 func (s apiServer) ChangeAgreement(ctx context.Context, in api.ChangeAgreementRequestObject) (api.ChangeAgreementResponseObject, error) {

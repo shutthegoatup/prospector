@@ -1837,6 +1837,24 @@ paths:
     parameters:
       - $ref: "#/components/parameters/org"
       - $ref: "#/components/parameters/id"
+    get:
+      operationId: getAgreement
+      tags: [agreements]
+      summary: One agreement, with what preparing it needs
+      description: |
+        The agreement with its company's name, why its document can't be read if it can't,
+        and who could still be added to it: people at its company with one email address and
+        not on the never-contact list, and members.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The agreement.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgreementOverview" }
+        default: { $ref: "#/components/responses/Problem" }
     patch:
       operationId: changeAgreement
       tags: [agreements]
@@ -4701,6 +4719,22 @@ components:
         updated_by: { type: string }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+    AgreementOverview:
+      allOf:
+        - $ref: "#/components/schemas/Agreement"
+        - type: object
+          required: [company, problem, people, members]
+          properties:
+            company: { type: string, description: "The company's name." }
+            problem: { type: string, description: "Why the document can't be read to place fields on it; empty when it can." }
+            people:
+              type: array
+              items: { $ref: "#/components/schemas/Invitable" }
+              description: People at the company who could still be added, by contact id.
+            members:
+              type: array
+              items: { $ref: "#/components/schemas/Invitable" }
+              description: Members who could still be added, by user id.
     AgreementRecipient:
       type: object
       required: [id, agreement_id, position, role, name, email, created_by, created_at]

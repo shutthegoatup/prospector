@@ -16,6 +16,11 @@ func (a *App) appRoutes(mux *http.ServeMux) {
 	}
 	mux.HandleFunc("GET /o/{org}/companies/{id}", a.member(a.shell))
 	mux.HandleFunc("GET /o/{org}/tasks/{id}", a.member(a.shell))
+	// An agreement's PDF is drawn with pdf.js, which needs WebAssembly for some images.
+	mux.HandleFunc("GET /o/{org}/agreements/{id}/prepare", a.member(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", pdfPolicy)
+		a.shell(w, r)
+	}))
 	// Where the React pages lived while the sidebar was still the server's; bookmarklets
 	// already dragged to a bar still open the add form there.
 	mux.HandleFunc("GET /o/{org}/app/{page...}", a.member(func(w http.ResponseWriter, r *http.Request) {
