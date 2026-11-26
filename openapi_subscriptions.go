@@ -8,40 +8,47 @@ import (
 	"github.com/shutthegoatup/prospector/api"
 )
 
-func subscriptionOut(r SubscriptionRow) api.Subscription {
-	return api.Subscription{Id: r.ID, CompanyId: r.CompanyID, Company: r.Company, Name: r.Name, Amount: r.Amount, Currency: r.Currency, Per: r.Per,
+func subscriptionOut(r SubscriptionRow, day string) api.Subscription {
+	out := api.Subscription{Id: r.ID, CompanyId: r.CompanyID, Company: r.Company, Name: r.Name, Amount: r.Amount, Currency: r.Currency, Per: r.Per,
 		Start: r.Start, TermMonths: r.TermMonths, Then: r.Then, NoticeDays: r.NoticeDays, NoticeOn: deref(r.NoticeOn), EndedOn: deref(r.EndedOn),
 		Status: api.SubscriptionStatus(r.Status), TermEnd: r.TermEnd, CancelBy: r.CancelBy, CancelEnds: r.Out, Ends: r.Ends, Renewing: r.Renewing,
-		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+		Figure: r.Figure(), Soon: r.Soon(day), People: []api.SubscriptionPerson{}, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+	for _, p := range r.People {
+		out.People = append(out.People, api.SubscriptionPerson{Id: p.ID, Name: displayName(p)})
+	}
+	return out
 }
 
 // subscription is one as the API gives it, with where it stands today.
 func (s apiServer) subscription(org, company, id int64) (api.Subscription, error) {
-	rows, err := s.a.s.Subscriptions(org, company, today())
+	day := today()
+	rows, err := s.a.s.Subscriptions(org, company, day)
 	if err != nil {
 		return api.Subscription{}, err
 	}
 	for _, r := range rows {
 		if r.ID == id {
-			return subscriptionOut(r), nil
+			return subscriptionOut(r, day), nil
 		}
 	}
 	return api.Subscription{}, noSuch("no subscription %d", id)
 }
 
 func (s apiServer) ListSubscriptions(ctx context.Context, in api.ListSubscriptionsRequestObject) (api.ListSubscriptionsResponseObject, error) {
-	rows, err := s.a.s.Subscriptions(reqFrom(ctx).Org.ID, in.Params.Company, today())
+	day := today()
+	rows, err := s.a.s.Subscriptions(reqFrom(ctx).Org.ID, in.Params.Company, day)
 	if err != nil {
 		return nil, err
 	}
+	worth := contracted(rows)
 	rows, next, err := listPage(rows, in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
 	out := api.ListSubscriptions200JSONResponse{Headers: api.ListSubscriptions200ResponseHeaders{Link: nextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor = []api.Subscription{}, next
+	out.Body.Items, out.Body.NextCursor, out.Body.Contracted = []api.Subscription{}, next, worth
 	for _, r := range rows {
-		out.Body.Items = append(out.Body.Items, subscriptionOut(r))
+		out.Body.Items = append(out.Body.Items, subscriptionOut(r, day))
 	}
 	return out, nil
 }

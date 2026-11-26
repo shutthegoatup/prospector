@@ -34,7 +34,7 @@ var opArea = map[string]string{
 	"StartDeal": areaSales, "ChangeDeal": areaSales, "RemoveDeal": areaSales, "ChangeOwnDeal": areaSales,
 	"StartRun": areaSales, "StopRun": areaSales,
 	"CreateTask": areaSales, "ChangeTask": areaSales, "AskTask": areaSales, "ChangeTaskRequest": areaSales,
-	"AddNote": areaSales, "FinishRequest": areaSales,
+	"AddNote": areaSales, "FinishRequest": areaSales, "DeleteNote": areaSales,
 	"AddPerson": areaSales, "ChangeContact": areaSales, "PickContact": areaSales, "ReviewCompany": areaSales, "DecideSuggestion": areaSales,
 	"ConverseEnquiry": areaAny, "AddSuppression": areaAny, "RemoveSuppression": areaSales,
 	"CreateCampaign": areaSales, "ChangeCampaign": areaSales, "RemoveCampaign": areaSales,
@@ -43,6 +43,7 @@ var opArea = map[string]string{
 	"AddAgreementRecipient": areaSales, "ChangeAgreementRecipient": areaSales, "RemoveAgreementRecipient": areaSales, "PutAgreementFields": areaSales,
 	"EnrichContact": areaSales,
 	"CreateAgent":   "", "UpdateAgent": "", "DeleteAgent": "", "DeleteEnquiry": "", "ChangeSettings": "", "SaveEnricher": "", "DeleteEnricher": "",
+	"AddOffering": "", "ChangeOffering": "", "RemoveOffering": "",
 }
 
 func (m *Membership) Works(area string) bool {

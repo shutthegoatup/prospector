@@ -9,7 +9,10 @@ import (
 
 // reactPages are the pages the React app (web/src/main.tsx) has; each lights up its own
 // sidebar entry. A page moved to React is listed here and routed in main.tsx.
-var reactPages = []string{"research", "campaigns", "onboarding", "add"}
+var reactPages = []string{"research", "campaigns", "onboarding", "enquiries", "subscriptions", "tasks", "add"}
+
+// reactUnder are React pages without a sidebar entry of their own, and the entry they light.
+var reactUnder = map[string]string{"tasks": "research"}
 
 // reactPage serves a React page inside the usual layout: the server keeps the sidebar
 // while pages move over one at a time, and the page reads everything through the API.
@@ -28,7 +31,11 @@ func (a *App) reactPage(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	a.page(w, r, page, ReactMount(q))
+	active := page
+	if under, ok := reactUnder[page]; ok {
+		active = under
+	}
+	a.page(w, r, active, ReactMount(q))
 }
 
 // navPath is where the sidebar sends a page: its React version once it has one.

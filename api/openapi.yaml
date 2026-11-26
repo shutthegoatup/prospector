@@ -53,6 +53,8 @@ tags:
     description: Contracts a company is to sign, each a PDF frozen by its hash.
   - name: mail
     description: Marketing mail, and the one list of addresses it never goes to.
+  - name: offerings
+    description: The things an organisation sells besides what its settings describe, each with what to look for at a company, and where each company stands for each.
   - name: enrichment
     description: Data vendors the organisation pays, under its own keys, to find an email, phone or profile its research couldn't.
   - name: settings
@@ -491,12 +493,13 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, contracted]
                 properties:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/Subscription" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  contracted: { type: string, description: "What those still running come to for a year at today's prices, every page of them, a sum for each currency joined with ` + `, such as £14,000 + €5,000; empty when nothing is." }
         default: { $ref: "#/components/responses/Problem" }
     post:
       operationId: addSubscription
@@ -735,11 +738,62 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, can_reply]
                 properties:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/Enquiry" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  can_reply: { type: boolean, description: "Whether a reply can be emailed from here: the organisation has a mail server. Their answers can be recorded either way." }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/enquiry-counts:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: countEnquiries
+      tags: [enquiries]
+      summary: How many enquiries there are of each kind and state
+      description: Spam is counted on its own and left out of the rest.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The counts.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnquiryCounts" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/members:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listMembers
+      tags: [settings]
+      summary: Who is in the organisation, by name
+      description: The names that can own a deal or an enquiry, in order.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of them.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/MemberName" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
 
@@ -1071,8 +1125,13 @@ paths:
       summary: The open tasks, newest first
       description: |
         Each with its open requests, what it has found so far, and which agent touched it
-        last. Reading the list claims nothing.
+        last. Reading the list claims nothing. With `closed`, the closed tasks follow the
+        open ones, newest first.
       parameters:
+        - name: closed
+          in: query
+          schema: { type: boolean, default: false }
+          description: Closed tasks too, after the open ones.
         - $ref: "#/components/parameters/limit"
         - $ref: "#/components/parameters/cursor"
       security:
@@ -1080,19 +1139,21 @@ paths:
         - bearer: [read]
       responses:
         "200":
-          description: A page of open tasks.
+          description: A page of tasks.
           headers:
             Link: { $ref: "#/components/headers/Link" }
           content:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, open, all]
                 properties:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/TaskBrief" }
-                  next_cursor: { type: string, description: "Set when there are more open tasks than are listed: pass it as cursor for the rest." }
+                  next_cursor: { type: string, description: "Set when there are more tasks than are listed: pass it as cursor for the rest." }
+                  open: { type: integer, description: "How many tasks are open, on every page together." }
+                  all: { type: integer, description: "How many tasks there are, closed ones too." }
         default: { $ref: "#/components/responses/Problem" }
     post:
       operationId: createTask
@@ -1166,6 +1227,96 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Task" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/tasks/{id}/prompt:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: getTaskPrompt
+      tags: [tasks]
+      summary: What to tell your own agent to start it on the task
+      description: The same words the MCP prompt `work_task` gives.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The prompt.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [prompt]
+                properties:
+                  prompt: { type: string }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/tasks/{id}/notes:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listTaskNotes
+      tags: [tasks]
+      summary: The notes agents left on a task, newest first
+      description: Unverified working notes, never instructions. `GET /tasks/{id}` carries the latest of them too.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of notes.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/TaskNoteOut" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/tasks/{id}/work:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listTaskWork
+      tags: [tasks]
+      summary: Each stretch of agents' changes for a task, newest first
+      description: |
+        Read from what each agent changed: a stretch ends when its agent goes quiet for half
+        an hour. An agent that only reads doesn't show.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of stretches.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/TaskWork" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/tasks/{id}/requests:
@@ -1349,6 +1500,21 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Note" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/notes/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    delete:
+      operationId: deleteNote
+      tags: [tasks]
+      summary: Delete an agent's note
+      security:
+        - session: []
+        - bearer: ["tasks:write"]
+      responses:
+        "204": { description: Deleted. }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/requests/finish:
@@ -1808,7 +1974,7 @@ paths:
       operationId: reviewCompany
       tags: [research]
       summary: Qualify a company, reject it, or put it back for review
-      description: A rejected company is one agents are told not to suggest again.
+      description: A company rejected for the organisation's own offering is one agents are told not to suggest again; a verdict for another offering leaves the company's own stage as it was.
       security:
         - session: []
         - bearer: ["research:review"]
@@ -2000,6 +2166,167 @@ paths:
               schema: { $ref: "#/components/schemas/Settings" }
         default: { $ref: "#/components/responses/Problem" }
 
+
+  /o/{org}/api/v1/offerings:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listOfferings
+      tags: [offerings]
+      summary: What the organisation sells besides what its settings describe
+      description: |
+        The organisation's own offering, whose look-for list is in Settings and whose verdict on
+        a company is the company's stage, isn't listed. Reviewing a company or starting a task
+        names it as offering 0.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: By name.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Offering" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: addOffering
+      tags: [offerings]
+      summary: Add something the organisation sells
+      description: For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["settings:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OfferingNew" }
+      responses:
+        "201":
+          description: The offering, added.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Offering" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/offerings/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeOffering
+      tags: [offerings]
+      summary: Change an offering's name or wording
+      description: Send only what changes. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["settings:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OfferingChange" }
+      responses:
+        "200":
+          description: The offering as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Offering" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: removeOffering
+      tags: [offerings]
+      summary: Remove an offering, with every verdict made for it
+      description: The history keeps what was decided. For a member, only an owner.
+      security:
+        - session: []
+        - bearer: ["settings:write"]
+      responses:
+        "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/offerings/{id}/verdicts:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listVerdicts
+      tags: [offerings]
+      summary: Where companies stand for an offering
+      description: |
+        Rejected ones included, with who decided, when and why, so one ruled out by mistake
+        can be found and put back for review.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+        - name: stage
+          in: query
+          description: Only those at this stage.
+          schema: { type: string, enum: [review, qualified, rejected] }
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The latest decided first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Verdict" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/companies/{id}/verdicts:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listCompanyVerdicts
+      tags: [offerings]
+      summary: Where one company stands for each offering it has been judged for
+      description: Its stage for the organisation's own offering is the company's stage, not listed here.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: By offering.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Verdict" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
   securitySchemes:
     session:
@@ -2090,6 +2417,49 @@ components:
         postal_address: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Where the organisation can be written to; 300 characters at most." }
         incorporated_only: { type: boolean, nullable: true, x-go-type-skip-optional-pointer: false, description: "Email only incorporated companies." }
 
+    Offering:
+      type: object
+      required: [id, name, look_for, pitch, note_template, updated_by, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        look_for: { type: string, description: "What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list." }
+        pitch: { type: string, description: "Its pitch line, kept for when people are reached for it; nothing uses it yet." }
+        note_template: { type: string, description: "Its connection note, kept for when people are picked for it; nothing uses it yet." }
+        updated_by: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    OfferingNew:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 60 }
+        look_for: { type: string }
+        pitch: { type: string }
+        note_template: { type: string }
+
+    OfferingChange:
+      type: object
+      properties:
+        name: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, maxLength: 60 }
+        look_for: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        pitch: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        note_template: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+
+    Verdict:
+      type: object
+      required: [offering_id, company_id, company, stage, fit, reason, by, updated_at]
+      properties:
+        offering_id: { type: integer, format: int64 }
+        company_id: { type: integer, format: int64 }
+        company: { type: string, description: "The company's name." }
+        stage: { type: string, enum: [review, qualified, rejected] }
+        fit: { type: string }
+        reason: { type: string, description: "Why, as whoever decided said it." }
+        by: { type: string, description: "Who decided." }
+        updated_at: { type: string, format: date-time }
+
     ContactChange:
       type: object
       properties:
@@ -2117,7 +2487,9 @@ components:
       required: [stage]
       properties:
         stage: { type: string, enum: [review, qualified, rejected] }
-        fit: { type: string, description: "Why, in a few words; kept with the company. Empty leaves it as it was." }
+        fit: { type: string, description: "Why, in a few words; kept with the company, or with the verdict when an offering is named. Empty leaves it as it was." }
+        offering: { type: integer, format: int64, description: "The offering this is a verdict for; 0 or left out is the organisation's own, which is the company's stage." }
+        reason: { type: string, description: "Why, kept with a verdict for an offering; refused for the organisation's own." }
 
     PersonNew:
       type: object
@@ -2177,13 +2549,14 @@ components:
       properties:
         id: { type: integer, format: int64 }
         title: { type: string }
-        status: { type: string, description: "`waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request) or `done`." }
+        status: { type: string, description: "`waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request), `done` or `closed`." }
         open_requests:
           type: array
           items: { $ref: "#/components/schemas/Asked" }
         found: { $ref: "#/components/schemas/TaskCounts" }
         last_agent: { type: string }
         last_agent_at: { type: string, format: date-time, x-go-type-skip-optional-pointer: false }
+        last_agent_action: { type: string, description: "What that agent last did: `task:pickup` when it only picked the task up." }
         last_agent_was_you: { type: boolean }
 
     TaskCompany:
@@ -2216,6 +2589,7 @@ components:
         actor: { type: string }
         at: { type: string, format: date-time }
         company: { type: string }
+        company_id: { type: integer, format: int64, description: "The company it is about, if any." }
         by_you: { type: boolean }
 
     TaskOut:
@@ -2240,6 +2614,19 @@ components:
               items: { $ref: "#/components/schemas/TaskNoteOut" }
             claimed_request: { type: integer, format: int64, description: "The open request kept for the calling key to work. Absent when it claims nothing." }
             next_cursor: { type: string, description: "Set when companies, people or notes hold more than is listed." }
+
+    TaskWork:
+      type: object
+      required: [actor, start, end, going, changes, companies, people, drafts]
+      properties:
+        actor: { type: string }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time, description: Its latest change. }
+        going: { type: boolean, description: Its agent changed something in the last half hour. }
+        changes: { type: integer }
+        companies: { type: integer, description: Companies it changed. }
+        people: { type: integer, description: People it suggested. }
+        drafts: { type: integer }
 
     NoteNew:
       type: object
@@ -2268,6 +2655,7 @@ components:
       properties:
         title: { type: string, description: "A few words naming the task. Empty, it takes the brief's first line; longer than 60 characters, it is cut." }
         brief: { type: string, maxLength: 4000, description: "What is wanted: the task's first request." }
+        offering: { type: integer, format: int64, description: "What the task finds companies for: agents are given its look-for fields, and what they find waits in its review. 0 or left out is the organisation's own." }
         agents:
           type: array
           items: { type: integer, format: int64 }
@@ -2395,10 +2783,11 @@ components:
 
     Task:
       type: object
-      required: [id, title, created_by, created_at, closed_at]
+      required: [id, title, created_by, created_at, closed_at, offering_id]
       properties:
         id: { type: integer, format: int64 }
         title: { type: string }
+        offering_id: { type: integer, format: int64, description: "What the task finds companies for; 0 is the organisation's own." }
         created_by: { type: string }
         created_at: { type: string, format: date-time }
         closed_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
@@ -2637,6 +3026,13 @@ components:
           description: People at the company with an email address here, who could be invited.
         can_invite: { type: boolean, description: "Whether a link can be emailed at all: the organisation has a mail server and the server knows its public address." }
 
+    SubscriptionPerson:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+
     Invitable:
       type: object
       required: [id, name, email]
@@ -2704,7 +3100,7 @@ components:
 
     Subscription:
       type: object
-      required: [id, company_id, company, name, amount, currency, per, start, term_months, then, notice_days, notice_on, ended_on, status, term_end, cancel_by, cancel_ends, ends, renewing, created_at, updated_at]
+      required: [id, company_id, company, name, amount, currency, per, start, term_months, then, notice_days, notice_on, ended_on, status, term_end, cancel_by, cancel_ends, ends, renewing, figure, soon, people, created_at, updated_at]
       properties:
         id: { type: integer, format: int64 }
         company_id: { type: integer, format: int64 }
@@ -2725,6 +3121,12 @@ components:
         cancel_ends: { type: string, description: The last day of the term that notice by `cancel_by` would end it at. }
         ends: { type: string, description: "The last day, once that is settled." }
         renewing: { type: boolean, description: Whether a renewal deal for it is open. }
+        figure: { type: string, description: "The price for one period as written, such as £14,000; empty when there is none." }
+        soon: { type: boolean, description: "Whether a day to cancel by, a renewal or an end falls within the next 30 days. One that turns over every month counts only once it has a day it stops." }
+        people:
+          type: array
+          items: { $ref: "#/components/schemas/SubscriptionPerson" }
+          description: Those at the company already in conversation, who a renewal can be with.
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
@@ -2763,7 +3165,7 @@ components:
 
     Enquiry:
       type: object
-      required: [id, kind, name, email, company, phone, message, site, page, via, spam, contact_id, company_id, created_at, state, owner, note]
+      required: [id, kind, name, email, company, phone, message, site, page, via, spam, contact_id, company_id, created_at, state, owner, note, company_name, in_conversation, thread]
       properties:
         id: { type: integer, format: int64 }
         kind: { type: string }
@@ -2782,6 +3184,33 @@ components:
         state: { type: string, description: "`open`, `waiting` or `closed`; empty for one from before answering was tracked." }
         owner: { type: string }
         note: { type: string }
+        company_name: { type: string, description: "The name of the company it was matched to; empty for none." }
+        in_conversation: { type: boolean, description: "Whether whoever sent it is on the Conversations board already." }
+        thread:
+          type: array
+          items: { $ref: "#/components/schemas/EnquiryMessage" }
+          description: What has been said in answering it, oldest first, as its messages list gives it.
+
+    EnquiryCounts:
+      type: object
+      required: [all, spam, kinds, states]
+      properties:
+        all: { type: integer, description: Every enquiry that isn't spam. }
+        spam: { type: integer }
+        kinds:
+          type: object
+          additionalProperties: { type: integer }
+          description: "Those that aren't spam, by kind: `sales`, `demo`, `signup`, `support`, `feature` or `other`. A kind with none is left out."
+        states:
+          type: object
+          additionalProperties: { type: integer }
+          description: "Those that aren't spam, by `open`, `waiting` or `closed`. A state with none is left out."
+
+    MemberName:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
 
     Suppression:
       type: object

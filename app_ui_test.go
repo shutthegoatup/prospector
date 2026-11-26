@@ -18,7 +18,7 @@ func TestReactPagesMountInTheLayout(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("the React Research page: %d", code)
 	}
-	for _, want := range []string{`<div id="app" data-org="alpha" data-sales="true" data-support="true" data-no-refresh="true"></div>`, `<script type="module" src="/assets/app/main.js?v=`, "Research</span>"} {
+	for _, want := range []string{`<div id="app" data-org="alpha" data-sales="true" data-support="true" data-no-refresh="true" data-owner="true"></div>`, `<script type="module" src="/assets/app/main.js?v=`, "Research</span>"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the React page is missing %q", want)
 		}
@@ -37,12 +37,20 @@ func TestReactPagesMountInTheLayout(t *testing.T) {
 	// The sidebar sends each page React has to it.
 	_, today := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil)
 	for _, p := range reactPages {
+		if _, under := reactUnder[p]; under {
+			continue
+		}
 		if !strings.Contains(today, `href="/o/alpha/app/`+p+`"`) {
 			t.Errorf("the sidebar doesn't send %s to its React page", p)
 		}
 	}
 	if !strings.Contains(today, `href="/o/alpha/today"`) {
 		t.Error("a page still on the server lost its sidebar link")
+	}
+	// A task's page lights Research, as the server's tasks pages do.
+	_, task := call(t, client, "GET", srv.URL+"/o/alpha/app/tasks/7", "", nil)
+	if !strings.Contains(task, `href="/o/alpha/app/research" class="flex items-center justify-between rounded-lg bg-primary`) {
+		t.Error("the React task page should light Research in the sidebar")
 	}
 
 	// A campaign that can't be sent says why, for the page to show.
