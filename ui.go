@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"log"
 	"net/http"
@@ -576,18 +577,30 @@ func (a *App) uiVoice(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Email string `json:"email"`
-		Name  string `json:"name"`
-		Role  string `json:"role"`
-	}
+	var in memberIn
 	if !decode(w, r, &in) {
 		return
 	}
+	msg, err := a.addMember(r.Context(), reqOf(r), in)
+	if err != nil {
+		fail(w, err, http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]string{"message": msg})
+}
+
+type memberIn struct {
+	Email string `json:"email"`
+	Name  string `json:"name"`
+	Role  string `json:"role"`
+}
+
+// addMember puts someone on the team, making them an account if they have none, and
+// says how they get in.
+func (a *App) addMember(ctx context.Context, q *Req, in memberIn) (string, error) {
 	if in.Role != "owner" && in.Role != "member" {
 		in.Role = "member"
 	}
-	q := reqOf(r)
 	u, err := a.s.UserByEmail(in.Email)
 	password := ""
 	if err != nil {
@@ -598,16 +611,14 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 		err = a.s.AddMember(q.Org.ID, u.ID, in.Role, u.Name)
 	}
 	if err != nil {
-		fail(w, err, http.StatusBadRequest)
-		return
+		return "", err
 	}
 	msg := u.Email + " added to " + q.Org.Name + "."
 	// Someone who never chose a password is sent the link again, so a lost one isn't the end.
 	if password != "" || u.MustChangePassword {
-		sent, err := a.invite(r.Context(), q, u, password != "")
+		sent, err := a.invite(ctx, q, u, password != "")
 		if sent {
-			writeJSON(w, map[string]string{"message": msg + " They've been emailed a link to choose their password; it lasts 7 days."})
-			return
+			return msg + " They've been emailed a link to choose their password; it lasts 7 days.", nil
 		}
 		if errors.Is(err, errTooSoon) {
 			msg += " They were emailed a link to choose their password a moment ago, so no other was sent."
@@ -620,7 +631,7 @@ func (a *App) uiMember(w http.ResponseWriter, r *http.Request) {
 	if password != "" {
 		msg += " Their first password, shown once: " + password + " (they choose their own when they first sign in)"
 	}
-	writeJSON(w, map[string]string{"message": msg})
+	return msg, nil
 }
 
 func (a *App) uiRemoveMember(w http.ResponseWriter, r *http.Request) {

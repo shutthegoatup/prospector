@@ -15,11 +15,17 @@ import { ResearchPage } from "@/pages/Research";
 import { TaskPage } from "@/pages/Task";
 import { TasksPage } from "@/pages/Tasks";
 import { SubscriptionsPage } from "@/pages/Subscriptions";
+import { SettingsPage } from "@/pages/Settings";
 import { SessionContext } from "@/session";
 
 const mount = document.getElementById("app");
 if (mount) {
-  const session = { org: mount.dataset.org ?? "", sales: mount.dataset.sales === "true", support: mount.dataset.support === "true", owner: mount.dataset.owner === "true" };
+  const session = {
+    org: mount.dataset.org ?? "",
+    sales: mount.dataset.sales === "true",
+    support: mount.dataset.support === "true",
+    owner: mount.dataset.owner === "true",
+  };
   const queries = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false } } });
   createRoot(mount).render(
     <StrictMode>
@@ -40,6 +46,7 @@ if (mount) {
               <Route path="tasks/:id" element={<TaskPage />} />
               <Route path="enquiries" element={<EnquiriesPage />} />
               <Route path="subscriptions" element={<SubscriptionsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
             </Routes>
           </BrowserRouter>
         </QueryClientProvider>
