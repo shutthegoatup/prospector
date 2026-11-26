@@ -120,9 +120,14 @@ type Company struct {
 	Hold         *string `json:"hold"`
 	// FoundFor is the offering a company was first found for: until the organisation's
 	// own offering looks at it, it stays out of the organisation's own review.
-	FoundFor  int64     `gorm:"not null;default:0" json:"found_for"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	FoundFor int64 `gorm:"not null;default:0" json:"found_for"`
+	// CohortID is the cohort it is in, 0 before the organisation has any. CohortWhy is
+	// the rule that put it there, empty when the catch-all took it for want of one.
+	CohortID     int64     `gorm:"not null;default:0" json:"cohort_id"`
+	CohortByHand bool      `gorm:"not null;default:false" json:"cohort_by_hand"`
+	CohortWhy    string    `gorm:"not null;default:''" json:"cohort_why"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 const (
@@ -265,7 +270,7 @@ type Store struct {
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
 	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &EnquiryMessage{}, &Suppression{}, &UnsubscribeLink{}, &Campaign{}, &CampaignRecipient{}, &Agreement{}, &AgreementFile{}, &AgreementRecipient{}, &AgreementField{}, &AgreementEvent{}, &SealKey{}, &Suggestion{},
-	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}, &Agent{}, &AgentRun{}, &Deal{}, &Subscription{}, &Onboarding{}, &OnboardingStep{}, &CustomerGrant{}, &CustomerLink{}, &CustomerSession{}, &MailDomain{}, &Enricher{}, &EnrichUsage{}, &Offering{}, &Verdict{}, &Role{}}
+	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}, &Agent{}, &AgentRun{}, &Deal{}, &Subscription{}, &Onboarding{}, &OnboardingStep{}, &CustomerGrant{}, &CustomerLink{}, &CustomerSession{}, &MailDomain{}, &Enricher{}, &EnrichUsage{}, &Offering{}, &Verdict{}, &Role{}, &Cohort{}, &CohortRule{}}
 
 // Open takes a postgres:// URL or a SQLite file path.
 func Open(dsn string) (*Store, error) {
@@ -463,6 +468,9 @@ func (s *Store) mark(org, id int64, step, date string, who Actor, note string) e
 		if err := tx.Model(&c).Updates(updates).Error; err != nil {
 			return err
 		}
+		if err := placeContactCompany(tx, org, c.CompanyID); err != nil {
+			return err
+		}
 		value := date
 		if note != "" {
 			value += " · " + note
@@ -516,6 +524,11 @@ func (s *Store) set(tx *gorm.DB, org, id int64, field, value, actor string) erro
 	}
 	if err := tx.Model(&c).Update(field, v).Error; err != nil {
 		return err
+	}
+	if field == "stage" {
+		if err := placeContactCompany(tx, org, c.CompanyID); err != nil {
+			return err
+		}
 	}
 	if field == "phone" {
 		if err := tx.Model(&c).Update("tz", GuessTZ(value, deref(c.Maker))).Error; err != nil {

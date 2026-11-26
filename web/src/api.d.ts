@@ -2033,6 +2033,141 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/cohorts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The organisation's cohorts, in the order their rules are tried
+         * @description The catch-all is last. Each comes with its rules and how many companies are in it.
+         *     An organisation with no cohorts has every company in none.
+         */
+        get: operations["listCohorts"];
+        put?: never;
+        /**
+         * Add a cohort
+         * @description It goes just before the catch-all; the first one added is the catch-all. Every
+         *     company is placed again by the rules. For a member, only an owner.
+         */
+        post: operations["createCohort"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/cohorts/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Who saving a cohort would move
+         * @description Saves nothing. Given a cohort as it would be (a new one for cohort 0), the companies
+         *     that saving it would move in and out, and those put somewhere by hand that would stay
+         *     where they are. It is worked out by saving and taking it back, so it is what saving does.
+         */
+        post: operations["previewCohort"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/cohorts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a cohort and its rules
+         * @description Its companies, those put there by hand too, are placed again by the rules. Removing
+         *     the catch-all makes the last cohort left the catch-all; removing the last leaves every
+         *     company in none. For a member, only an owner.
+         */
+        delete: operations["deleteCohort"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a cohort, its rules included
+         * @description Send only what changes; rules, when sent, replace them all. Making a cohort the
+         *     catch-all moves it last. Every company is placed again. For a member, only an owner.
+         */
+        patch: operations["updateCohort"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/cohorts/{id}/position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Move a cohort up or down the order its rules are tried in
+         * @description The catch-all stays last. Every company is placed again. For a member, only an owner.
+         */
+        put: operations["moveCohort"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/companies/{id}/cohort": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put a company in a cohort by hand, or back to its rules
+         * @description `{"cohort": id}` puts it there by hand, where it stays whatever its rules say;
+         *     `{"by_rule": true}` puts it back where its rules say. Only a person signed in: no key
+         *     can, whatever its scopes, since agents read a company's cohort but its rules or people set it.
+         */
+        put: operations["setCompanyCohort"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/companies/{id}/roles": {
         parameters: {
             query?: never;
@@ -3257,6 +3392,105 @@ export interface components {
          * @enum {string}
          */
         Pipeline: "research" | "outreach" | "replied" | "meeting" | "proposal" | "won" | "lost" | "rejected";
+        /** @description A cohort as a company names it; id 0 and an empty name before the organisation has any. */
+        CohortRef: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            colour: string;
+        };
+        CohortRule: {
+            /**
+             * @description What the rule looks at. `segment` is matched on what the segment says the company is,
+             *     before " for ", " to ", " serving " or " with ", a word matching any that starts with it;
+             *     `offering` is what anyone there is being reached for, or what the company was found for
+             *     (0 is the organisation's own); `conversation_stage` is anyone's there in conversation;
+             *     `deal_value` is its largest open deal and `pays_a_year` its live subscriptions for a
+             *     year, both in the organisation's currency only; `billed` is how a live subscription is
+             *     priced; `deal_kind` is the kind of any deal there that wasn't lost.
+             * @enum {string}
+             */
+            field: "segment" | "country" | "offering" | "conversation_stage" | "deal_value" | "pays_a_year" | "billed" | "deal_kind" | "found_by";
+            /**
+             * @description `at_least` for deal_value and pays_a_year, `is` for billed, `any_of` for the rest; left out, the field's own.
+             * @enum {string}
+             */
+            op?: "any_of" | "at_least" | "is";
+            /** @description For any_of, a comma list; for at_least, an amount in the currency's hundredths; for billed, monthly or yearly. */
+            value: string;
+        };
+        Cohort: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /** @description Its place in the order rules are tried, from 0; the catch-all is last. */
+            position: number;
+            /** @description One of #7b8cff, #ff9f43, #35c58a, #f06595, #a77bff, #22b8cf, #e0b43c, #b08968. */
+            colour: string;
+            /** @description What these companies are, as research agents are told it. */
+            who_they_are: string;
+            /** @description Takes every company no rule does. */
+            catch_all: boolean;
+            /** @description Any one of them puts a company here, unless an earlier cohort's rule took it. */
+            rules: components["schemas"]["CohortRule"][];
+            /** @description How many companies are in it. */
+            companies: number;
+            /** @description How many of them were put there by hand. */
+            by_hand: number;
+            updated_by: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CohortNew: {
+            name: string;
+            /** @description One of the palette; left out, one not yet used. */
+            colour?: string;
+            who_they_are?: string;
+            /** @description Make it the catch-all, last in the order. */
+            catch_all?: boolean;
+            rules?: components["schemas"]["CohortRule"][];
+        };
+        CohortChange: {
+            name?: string | null;
+            colour?: string | null;
+            who_they_are?: string | null;
+            /** @description true makes it the catch-all, last in the order; there is always one, so another is made it instead of this one being unmade. */
+            catch_all?: boolean | null;
+            /** @description Replaces every rule it has. */
+            rules?: components["schemas"]["CohortRule"][] | null;
+        };
+        CohortPreviewRequest: {
+            /**
+             * Format: int64
+             * @description The cohort being changed; 0 for one being added.
+             */
+            cohort: number;
+            change: components["schemas"]["CohortChange"];
+        };
+        CohortMove: {
+            /** Format: int64 */
+            company_id: number;
+            company: string;
+            from: components["schemas"]["CohortRef"];
+            to: components["schemas"]["CohortRef"];
+        };
+        CohortPreview: {
+            moving_in: components["schemas"]["CohortMove"][];
+            moving_out: components["schemas"]["CohortMove"][];
+            /** @description Put somewhere by hand, so they stay, though the rules would move them into or out of it; `to` is where the rules would put them. */
+            kept_by_hand: components["schemas"]["CohortMove"][];
+            /** @description Open deals in a currency other than the organisation's, which no deal_value rule weighs. */
+            other_currency_deals: number;
+        };
+        CompanyCohort: {
+            /**
+             * Format: int64
+             * @description The cohort to put it in by hand.
+             */
+            cohort?: number;
+            /** @description Put it back where its rules say. */
+            by_rule?: boolean;
+        };
         CompanyRow: {
             /** Format: int64 */
             id: number;
@@ -3268,6 +3502,11 @@ export interface components {
             /** @description How many people are held there. */
             people: number;
             pipeline: components["schemas"]["Pipeline"];
+            cohort: components["schemas"]["CohortRef"];
+            /** @description The rule that put it in its cohort; empty when the catch-all took it because no rule did, or it was put there by hand. */
+            cohort_why: string;
+            /** @description Put in its cohort by hand, where it stays whatever its rules say. */
+            cohort_by_hand: boolean;
         };
         CompanyOverview: {
             /** Format: int64 */
@@ -3294,6 +3533,11 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             pipeline: components["schemas"]["Pipeline"];
+            cohort: components["schemas"]["CohortRef"];
+            /** @description The rule that put it in its cohort; empty when the catch-all took it because no rule did, or it was put there by hand. */
+            cohort_why: string;
+            /** @description Put in its cohort by hand, where it stays whatever its rules say. */
+            cohort_by_hand: boolean;
             /** @description How many times anyone there was reached out to: added on LinkedIn, emailed, followed up or called. */
             touches: number;
             /** @description Each thing the organisation looks for, in its order, with the latest answer. */
@@ -7715,6 +7959,204 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    listCohorts: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description In order. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Cohort"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createCohort: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CohortNew"];
+            };
+        };
+        responses: {
+            /** @description The cohort, added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cohort"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    previewCohort: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CohortPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Who would move. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CohortPreview"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteCohort: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateCohort: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CohortChange"];
+            };
+        };
+        responses: {
+            /** @description The cohort as it now is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cohort"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    moveCohort: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Where it goes, counting from 0; past the last before the catch-all is just before it. */
+                    position: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Moved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    setCompanyCohort: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyCohort"];
+            };
+        };
+        responses: {
+            /** @description Placed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     listCompanyRoles: {
         parameters: {
             query?: {
@@ -7911,6 +8353,8 @@ export interface operations {
     listCompanyHistory: {
         parameters: {
             query?: {
+                /** @description Only this kind of thing, such as `company:cohort` for its moves between cohorts. */
+                action?: string;
                 /** @description How many to return. 50 if left out; 200 at most. */
                 limit?: components["parameters"]["limit"];
                 /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */

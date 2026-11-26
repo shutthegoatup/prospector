@@ -476,7 +476,7 @@ func (s *Store) Logout(token string) error {
 
 // Scopes an API key can carry. None can change members or keys or reach another org; only enquiries:reply, customers:invite and campaigns:send send mail, and only import skips review.
 var Scopes = []struct{ Name, What string }{
-	{"read", "search companies and people, read what's due and the tasks people wrote, read deals, subscriptions, onboardings and enquiries with what was said in answering them, and read the organisation's settings, its never-contact list and agent guidance included, and what it sells with where each company stands for each"},
+	{"read", "search companies and people, read what's due and the tasks people wrote, read deals, subscriptions, onboardings and enquiries with what was said in answering them, and read the organisation's settings, its never-contact list and agent guidance included, what it sells with where each company stands for each, and its cohorts with the one each company is in"},
 	{"research:write", "add companies, facts and suggested contacts (they wait in Research), and leave notes on tasks"},
 	{"drafts:write", "write draft notes and emails, marked as written by the agent"},
 	{"outcomes:write", "record what happened (added, accepted, sent, called, replied, declined, hold), shown as the agent's"},
@@ -498,7 +498,7 @@ var Scopes = []struct{ Name, What string }{
 	{"tasks:write", "start tasks, ask them for more, mark their requests done or not, close and reopen them, and delete the notes agents left on them"},
 	{"agents:run", "start and stop Prospector's own agents on tasks"},
 	{"agents:configure", "add, change and delete Prospector's own agents, their endpoints, keys and tools"},
-	{"settings:write", "change the organisation's settings: its name and colour, waits and wording, the guidance sent to every agent, never-contact list, what it looks for, enquiry sites, onboarding steps, currency, postal address and whether to email only incorporated companies"},
+	{"settings:write", "change the organisation's settings: its name and colour, waits and wording, the guidance sent to every agent, never-contact list, what it looks for, its cohorts and their rules, enquiry sites, onboarding steps, currency, postal address and whether to email only incorporated companies"},
 	{"team:write", "add people to the team, change their roles and areas, and take them out: as strong as an owner, since it can make one"},
 	{"mail:configure", "set the organisation's outgoing mail server, its username and password"},
 	{"sso:configure", "set up single sign-on: the provider, its client secret, the email domains it speaks for and whether it is required"},
@@ -627,6 +627,11 @@ func (s *Store) ChangeSettings(o *Org, who Actor, changed []string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(o).Select("name", "color", "settings").Updates(o).Error; err != nil {
 			return err
+		}
+		if slices.Contains(changed, "currency") {
+			if _, err := placeAll(tx, o.ID, today()); err != nil {
+				return err
+			}
 		}
 		return s.logAs(tx, o.ID, 0, nil, who, "settings:change", &what)
 	})

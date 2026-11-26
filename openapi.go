@@ -104,7 +104,7 @@ func (a *App) apiScope(scopes map[string][]string) api.StrictMiddlewareFunc {
 			switch {
 			// One that names no key scope is for people signed in, never a key.
 			case q.Key != nil && (keyless[op] || len(need) == 0):
-				refuseKeys(w)
+				refuseKeys(w, op)
 				return nil, nil
 			case q.Key != nil && !slices.ContainsFunc(need, q.Key.Has):
 				challenge(w, http.StatusForbidden, "insufficient_scope", need[0], "this key lacks the "+strings.Join(need, " or ")+" scope")

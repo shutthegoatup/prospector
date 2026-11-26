@@ -144,6 +144,9 @@ func (s *Store) setDeal(tx *gorm.DB, org, contact int64, field, value, actor str
 	if err := tx.Model(&d).Updates(updates).Error; err != nil {
 		return err
 	}
+	if err := placeContactCompany(tx, org, c.CompanyID); err != nil {
+		return err
+	}
 	return s.log(tx, org, contact, c.CompanyID, actor, "deal:"+field, nonEmpty(logged))
 }
 
@@ -285,6 +288,9 @@ func (s *Store) StartDeal(org, contact int64, kind, actor string) (*Deal, error)
 		if err := tx.Create(&d).Error; err != nil {
 			return err
 		}
+		if err := placeContactCompany(tx, org, c.CompanyID); err != nil {
+			return err
+		}
 		return s.log(tx, org, contact, c.CompanyID, actor, "deal:start", &kind)
 	})
 	if err != nil {
@@ -360,6 +366,9 @@ func (s *Store) changeDeal(tx *gorm.DB, org, id int64, field, value, actor strin
 		if err := tx.Model(&d).Updates(updates).Error; err != nil {
 			return err
 		}
+		if err := placeContactCompany(tx, org, c.CompanyID); err != nil {
+			return err
+		}
 		return s.log(tx, org, c.ID, c.CompanyID, actor, "deal:"+field, nonEmpty(logged))
 	}
 }
@@ -373,6 +382,9 @@ func (s *Store) RemoveDeal(org, id int64, actor string) error {
 			return err
 		}
 		if err := tx.Delete(&d).Error; err != nil {
+			return err
+		}
+		if err := placeContactCompany(tx, org, c.CompanyID); err != nil {
 			return err
 		}
 		return s.log(tx, org, c.ID, c.CompanyID, actor, "deal:remove", &d.Kind)

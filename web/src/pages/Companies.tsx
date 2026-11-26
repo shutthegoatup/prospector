@@ -8,6 +8,7 @@ import { plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { pipelines } from "@/search";
 import { useSession } from "@/session";
+import { CohortChip } from "@/components/app/cohort";
 
 type Pipeline = components["schemas"]["Pipeline"];
 
@@ -152,6 +153,7 @@ export function CompaniesPage() {
                 </span>
               </span>
               <span className="flex items-center gap-2">
+                <CohortChip cohort={r.cohort} why={r.cohort_why} byHand={r.cohort_by_hand} />
                 {r.grade && <span className="font-mono text-xs text-mark">{r.grade}</span>}
                 <StageTag stage={r.pipeline} />
               </span>

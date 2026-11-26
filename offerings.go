@@ -196,6 +196,12 @@ func (s *Store) RemoveOffering(org, id int64, actor string) error {
 		if err := tx.Delete(o).Error; err != nil {
 			return err
 		}
+		if err := dropOffering(tx, org, id); err != nil {
+			return err
+		}
+		if _, err := placeAll(tx, org, today()); err != nil {
+			return err
+		}
 		return s.log(tx, org, 0, nil, actor, "offering:removed", &o.Name)
 	})
 }
@@ -294,7 +300,11 @@ func forOffering(tx *gorm.DB, org int64, who Actor, company int64) error {
 }
 
 func foundForOwn(tx *gorm.DB, org, company int64) error {
-	return tx.Model(&Company{}).Where("org_id = ? and id = ? and found_for <> 0", org, company).Update("found_for", 0).Error
+	res := tx.Model(&Company{}).Where("org_id = ? and id = ? and found_for <> 0", org, company).Update("found_for", 0)
+	if res.Error != nil || res.RowsAffected == 0 {
+		return res.Error
+	}
+	return placeCompany(tx, org, company)
 }
 
 // offeringStages is where each of these companies stands for an offering; one not yet

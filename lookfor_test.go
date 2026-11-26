@@ -33,7 +33,7 @@ func TestLookForAssets(t *testing.T) {
 	}
 	o, _ = s.OrgBySlug("alpha")
 	k := &APIKey{Scopes: "research:write"}
-	if g := agentInstructions(o, k); !strings.Contains(g, "- careers_page: a jobs page on their site") || !strings.Contains(g, "- ats: the applicant tracking system") {
+	if g := agentInstructions(o, k, nil); !strings.Contains(g, "- careers_page: a jobs page on their site") || !strings.Contains(g, "- ats: the applicant tracking system") {
 		t.Fatalf("agents aren't told what to look for: %q", g)
 	}
 

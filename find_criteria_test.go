@@ -112,7 +112,7 @@ func TestEachCriterionIsMetNotMetOrNotFound(t *testing.T) {
 	}
 
 	k := &APIKey{Scopes: "research:write"}
-	if g := agentInstructions(o, k); !strings.Contains(g, "- configurator (must): a product configurator") || !strings.Contains(g, "unknown when you looked and couldn't tell") {
+	if g := agentInstructions(o, k, nil); !strings.Contains(g, "- configurator (must): a product configurator") || !strings.Contains(g, "unknown when you looked and couldn't tell") {
 		t.Fatalf("agents aren't told to answer each criterion: %q", g)
 	}
 }

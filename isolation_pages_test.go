@@ -138,6 +138,7 @@ var stopsShort = map[string]string{
 	"POST /o/{org}/api/v1/agreements/1/recipients": "names a contact or a member, and both are sent",
 	"POST /o/{org}/api/v1/campaigns":               "the same word is never both a kind and an audience",
 	"POST /o/{org}/api/v1/campaigns/1/resume":      "needs a mail server to send through",
+	"POST /o/{org}/api/v1/cohorts":                 "a colour is one of the palette, which no other field takes",
 	"POST /o/{org}/api/v1/campaigns/1/send":        "needs a mail server to send through",
 	"POST /o/{org}/api/v1/enquiries/1/replies":     "needs a mail server to send through",
 	"POST /o/{org}/api/v1/onboardings/1/invites":   "needs a mail server to send through",

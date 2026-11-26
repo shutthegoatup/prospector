@@ -67,6 +67,8 @@ var orgExportHolds = map[string]string{
 	"agents":               "agents",
 	"offerings":            "offerings",
 	"verdicts":             "verdicts",
+	"cohorts":              "cohorts",
+	"cohort_rules":         "cohort_rules",
 	"roles":                "roles",
 	"enrichers":            "enrichment_vendors",
 	"enrich_usages":        "not exported: how many lookups each vendor was asked this month, which only its limit needs",

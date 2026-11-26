@@ -10,6 +10,7 @@ import { Pager, StageTag, usePages } from "@/pages/Companies";
 import { OnboardingCard, today } from "@/pages/Onboarding";
 import { safeHref } from "@/lib/links";
 import { useOfferings } from "@/lib/offerings";
+import { CohortChip, CohortDot } from "@/components/app/cohort";
 import { useSession } from "@/session";
 
 type Overview = components["schemas"]["CompanyOverview"];
@@ -90,6 +91,7 @@ export function CompanyPage() {
         <Head c={c} />
         {c.why && <p className="text-sm text-muted-foreground">{c.why}</p>}
         <WhereItStands c={c} />
+        <CohortCard c={c} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-lg bg-muted p-3">
             <Eyebrow>Looking for</Eyebrow>
@@ -173,7 +175,10 @@ function Head({ c }: { c: Overview }) {
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h1 className="font-heading text-3xl font-bold tracking-tight">{c.name}</h1>
-        <Meta>{[c.domain, c.country, c.segment, c.grade ? "fit " + c.grade : ""].filter((p) => p.trim()).join(" · ")}</Meta>
+        <div className="flex flex-wrap items-center gap-2">
+          <CohortChip cohort={c.cohort} why={c.cohort_why} byHand={c.cohort_by_hand} />
+          <Meta>{[c.domain, c.country, c.segment, c.grade ? "fit " + c.grade : ""].filter((p) => p.trim()).join(" · ")}</Meta>
+        </div>
       </div>
       <div className="flex items-center gap-2">
         <StageTag stage={c.pipeline} />
@@ -258,6 +263,99 @@ function WhereItStands({ c }: { c: Overview }) {
         })}
       </div>
       <Failed errors={[verdicts.error, review.error]} />
+    </div>
+  );
+}
+
+// CohortCard is the cohort a company is in and why, moving it there by hand, and its
+// moves between cohorts.
+function CohortCard({ c }: { c: Overview }) {
+  const { org, sales, owner } = useSession();
+  const refresh = useRefresh();
+  const cohorts = $api.useQuery("get", "/o/{org}/api/v1/cohorts", { params: { path: { org }, query: { limit: 200 } } });
+  const moves = $api.useQuery("get", "/o/{org}/api/v1/companies/{id}/history", {
+    params: { path: { org, id: c.id }, query: { action: "company:cohort", limit: 20 } },
+  });
+  const place = $api.useMutation("put", "/o/{org}/api/v1/companies/{id}/cohort", { onSuccess: refresh });
+  const rows = cohorts.data?.items ?? [];
+  if (rows.length === 0 || c.cohort.id === 0) return <Failed errors={[cohorts.error]} />;
+  const last = moves.data?.items[0];
+  let why: ReactNode = "by rule: " + c.cohort_why;
+  if (c.cohort_by_hand) {
+    why = ["by hand", last && actor(last.actor), last && stamp(last.at)].filter(Boolean).join(" · ");
+  } else if (c.cohort_why === "") {
+    why = (
+      <>
+        no rule matched, so the catch-all has it: move it by hand
+        {owner ? (
+          <>
+            , or give a cohort a rule that takes it in{" "}
+            <Link to="/o/$org/settings" params={{ org }}>
+              Settings
+            </Link>
+          </>
+        ) : null}
+      </>
+    );
+  }
+  const move = (body: { cohort: number } | { by_rule: true }) => place.mutate({ params: { path: { org, id: c.id } }, body });
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border-2 border-ink p-4">
+      <Eyebrow>Cohort</Eyebrow>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <b className="flex items-center gap-2">
+          <CohortDot colour={c.cohort.colour} />
+          {c.cohort.name}
+          {!c.cohort_by_hand && c.cohort_why === "" && "?"}
+        </b>
+        <Meta>{c.cohort_by_hand ? "by hand" : "by rule"}</Meta>
+      </div>
+      <p className="font-mono text-xs text-foreground">{why}</p>
+      {sales && (
+        <div role="radiogroup" aria-label="Move it by hand" className="flex flex-col gap-1 border-t border-dashed border-border pt-2">
+          <Meta>Move it by hand</Meta>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {rows.map((k) => (
+              <label key={k.id} className="flex cursor-pointer items-center gap-2 py-1 text-sm">
+                <input
+                  type="radio"
+                  name={`cohort-${c.id}`}
+                  checked={c.cohort.id === k.id}
+                  disabled={place.isPending}
+                  onChange={() => move({ cohort: k.id })}
+                />
+                <CohortDot colour={k.colour} />
+                {k.name}
+              </label>
+            ))}
+          </div>
+          {c.cohort_by_hand ? (
+            <div>
+              <ActionButton quiet size="xs" disabled={place.isPending} onClick={() => move({ by_rule: true })}>
+                Back to by rule
+              </ActionButton>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <ActionButton quiet size="xs" disabled={place.isPending} onClick={() => move({ cohort: c.cohort!.id })}>
+                Keep it here by hand
+              </ActionButton>
+              <Meta>Moved or kept by hand, it stays put when the rules or what they read change, until someone sets it back to by rule.</Meta>
+            </div>
+          )}
+        </div>
+      )}
+      {moves.data && moves.data.items.length > 0 && (
+        <div className="border-t border-dashed border-border pt-2">
+          <Meta>History</Meta>
+          {moves.data.items.map((h, i) => (
+            <p key={`${h.at}-${i}`} className="font-mono text-xs text-muted-foreground">
+              {stamp(h.at)} · {actor(h.actor)} · {h.value}
+            </p>
+          ))}
+        </div>
+      )}
+      <Failed errors={[cohorts.error, moves.error, place.error]} />
     </div>
   );
 }

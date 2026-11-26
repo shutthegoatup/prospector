@@ -121,7 +121,7 @@
     "code": true
    },
    {
-    "text": " to change the organisation's settings and its enrichment vendors; "
+    "text": " to change the organisation's settings, its cohorts and its enrichment vendors; "
    },
    {
     "text": "team:write",
@@ -222,7 +222,7 @@
  "scopes": [
   {
    "name": "read",
-   "what": "search companies and people, read what's due and the tasks people wrote, read deals, subscriptions, onboardings and enquiries with what was said in answering them, and read the organisation's settings, its never-contact list and agent guidance included, and what it sells with where each company stands for each"
+   "what": "search companies and people, read what's due and the tasks people wrote, read deals, subscriptions, onboardings and enquiries with what was said in answering them, and read the organisation's settings, its never-contact list and agent guidance included, what it sells with where each company stands for each, and its cohorts with the one each company is in"
   },
   {
    "name": "research:write",
@@ -313,7 +313,7 @@
   },
   {
    "name": "settings:write",
-   "what": "change the organisation's settings: its name and colour, waits and wording, the guidance sent to every agent, never-contact list, what it looks for, enquiry sites, onboarding steps, currency, postal address and whether to email only incorporated companies",
+   "what": "change the organisation's settings: its name and colour, waits and wording, the guidance sent to every agent, never-contact list, what it looks for, its cohorts and their rules, enquiry sites, onboarding steps, currency, postal address and whether to email only incorporated companies",
    "owner": true
   },
   {
@@ -2497,6 +2497,24 @@
        },
        "about": [],
        "required": true
+      },
+      {
+       "name": "action",
+       "type": {
+        "name": "string"
+       },
+       "about": [
+        {
+         "text": "Only this kind of thing, such as "
+        },
+        {
+         "text": "company:cohort",
+         "code": true
+        },
+        {
+         "text": " for its moves between cohorts."
+        }
+       ]
       },
       {
        "name": "limit",
@@ -7515,6 +7533,177 @@
    ],
    "ops": [
     {
+     "anchor": "op-listCompanyRoles",
+     "method": "GET",
+     "tone": "is-green",
+     "path": "/o/{org}/api/v1/companies/{id}/roles",
+     "summary": "The roles found at a company",
+     "about": [
+      {
+       "text": "Junked ones included, with who junked them and why, so one can be put back."
+      }
+     ],
+     "scope": "read",
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      },
+      {
+       "name": "limit",
+       "type": {
+        "name": "integer"
+       },
+       "about": [
+        {
+         "text": "How many to return. 50 if left out; 200 at most."
+        }
+       ]
+      },
+      {
+       "name": "cursor",
+       "type": {
+        "name": "string"
+       },
+       "about": [
+        {
+         "text": "The "
+        },
+        {
+         "text": "next_cursor",
+         "code": true
+        },
+        {
+         "text": " of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters."
+        }
+       ]
+      },
+      {
+       "name": "offering",
+       "type": {
+        "name": "integer"
+       },
+       "about": [
+        {
+         "text": "Only those for this offering."
+        }
+       ]
+      }
+     ],
+     "responses": [
+      {
+       "code": "200",
+       "about": "By offering, oldest first.",
+       "type": {
+        "name": "object"
+       }
+      },
+      {
+       "code": "4xx · 5xx",
+       "bad": true,
+       "about": "What went wrong, as RFC 9457 problem JSON.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl https://prospector.invalid/o/your-org/api/v1/companies/{id}/roles \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
+     "anchor": "op-addRole",
+     "method": "POST",
+     "tone": "is-gold",
+     "path": "/o/{org}/api/v1/companies/{id}/roles",
+     "summary": "Add a role open at a company, for an offering that has roles",
+     "about": [
+      {
+       "text": "It waits for review, and brings the company back to review for the offering. A role already there, by its posting or else its title, is a conflict, as is the title of one junked, and a company a person rejected for the offering."
+      }
+     ],
+     "scope": "research:write",
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      }
+     ],
+     "body": {
+      "of": {
+       "name": "RoleNew",
+       "link": "#schema-RoleNew"
+      },
+      "fields": [
+       {
+        "name": "offering",
+        "type": {
+         "name": "integer"
+        },
+        "about": [
+         {
+          "text": "An offering that has roles."
+         }
+        ],
+        "required": true
+       },
+       {
+        "name": "title",
+        "type": {
+         "name": "string"
+        },
+        "about": [],
+        "required": true
+       },
+       {
+        "name": "details",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       },
+       {
+        "name": "source_url",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "The posting."
+         }
+        ]
+       }
+      ]
+     },
+     "responses": [
+      {
+       "code": "201",
+       "about": "The role, added.",
+       "type": {
+        "name": "Role",
+        "link": "#schema-Role"
+       }
+      },
+      {
+       "code": "4xx · 5xx",
+       "bad": true,
+       "about": "What went wrong, as RFC 9457 problem JSON.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/companies/{id}/roles \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"offering\": 1, \"title\": \"…\", \"details\": \"…\", \"source_url\": \"…\"}'"
+    },
+    {
      "anchor": "op-listCompanyVerdicts",
      "method": "GET",
      "tone": "is-green",
@@ -7677,6 +7866,13 @@
         "required": true
        },
        {
+        "name": "has_roles",
+        "type": {
+         "name": "boolean"
+        },
+        "about": []
+       },
+       {
         "name": "look_for",
         "type": {
          "name": "string"
@@ -7718,7 +7914,7 @@
        }
       }
      ],
-     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/offerings \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"name\": \"…\", \"look_for\": \"…\", \"note_template\": \"…\", \"pitch\": \"…\"}'"
+     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/offerings \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"name\": \"…\", \"has_roles\": true, \"look_for\": \"…\", \"note_template\": \"…\"}'"
     },
     {
      "anchor": "op-changeOffering",
@@ -7749,6 +7945,13 @@
        "link": "#schema-OfferingChange"
       },
       "fields": [
+       {
+        "name": "has_roles",
+        "type": {
+         "name": "boolean?"
+        },
+        "about": []
+       },
        {
         "name": "look_for",
         "type": {
@@ -7798,7 +8001,7 @@
        }
       }
      ],
-     "curl": "curl -X PATCH https://prospector.invalid/o/your-org/api/v1/offerings/{id} \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"look_for\": \"…\", \"name\": \"…\", \"note_template\": \"…\", \"pitch\": \"…\"}'"
+     "curl": "curl -X PATCH https://prospector.invalid/o/your-org/api/v1/offerings/{id} \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"has_roles\": true, \"look_for\": \"…\", \"name\": \"…\", \"note_template\": \"…\"}'"
     },
     {
      "anchor": "op-removeOffering",
@@ -7921,6 +8124,587 @@
       }
      ],
      "curl": "curl https://prospector.invalid/o/your-org/api/v1/offerings/{id}/verdicts \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
+     "anchor": "op-judgeRole",
+     "method": "PATCH",
+     "tone": "is-violet",
+     "path": "/o/{org}/api/v1/roles/{id}",
+     "summary": "Pursue or junk a role, or put it back",
+     "about": [
+      {
+       "text": "The company's verdict for the role's offering follows: up for review while a role waits, else qualified while one is pursued, and rejected once every one is junked. While it has roles, the company itself can't be judged for the offering. Junking sends nothing to anyone."
+      }
+     ],
+     "scope": "research:review",
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      }
+     ],
+     "body": {
+      "of": {
+       "name": "RoleJudgement",
+       "link": "#schema-RoleJudgement"
+      },
+      "fields": [
+       {
+        "name": "stage",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "pursued",
+          "code": true
+         },
+         {
+          "text": " qualifies the company for the offering once no role waits; once every role is junked it is rejected for it; "
+         },
+         {
+          "text": "review",
+          "code": true
+         },
+         {
+          "text": " puts a role back."
+         }
+        ],
+        "required": true
+       },
+       {
+        "name": "reason",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "Why, for a junked role only."
+         }
+        ]
+       }
+      ]
+     },
+     "responses": [
+      {
+       "code": "200",
+       "about": "The role as it now is.",
+       "type": {
+        "name": "Role",
+        "link": "#schema-Role"
+       }
+      },
+      {
+       "code": "4xx · 5xx",
+       "bad": true,
+       "about": "What went wrong, as RFC 9457 problem JSON.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X PATCH https://prospector.invalid/o/your-org/api/v1/roles/{id} \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"stage\": \"…\", \"reason\": \"…\"}'"
+    }
+   ]
+  },
+  {
+   "name": "cohorts",
+   "about": [
+    {
+     "text": "The kinds of company an organisation sells to. Companies fall into them by the rules an owner sets, or by hand, and the last is the catch-all for whatever no rule takes."
+    }
+   ],
+   "ops": [
+    {
+     "anchor": "op-listCohorts",
+     "method": "GET",
+     "tone": "is-green",
+     "path": "/o/{org}/api/v1/cohorts",
+     "summary": "The organisation's cohorts, in the order their rules are tried",
+     "about": [
+      {
+       "text": "The catch-all is last. Each comes with its rules and how many companies are in it. An organisation with no cohorts has every company in none."
+      }
+     ],
+     "scope": "read",
+     "params": [
+      {
+       "name": "limit",
+       "type": {
+        "name": "integer"
+       },
+       "about": [
+        {
+         "text": "How many to return. 50 if left out; 200 at most."
+        }
+       ]
+      },
+      {
+       "name": "cursor",
+       "type": {
+        "name": "string"
+       },
+       "about": [
+        {
+         "text": "The "
+        },
+        {
+         "text": "next_cursor",
+         "code": true
+        },
+        {
+         "text": " of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters."
+        }
+       ]
+      }
+     ],
+     "responses": [
+      {
+       "code": "200",
+       "about": "In order.",
+       "type": {
+        "name": "object"
+       }
+      },
+      {
+       "code": "4xx · 5xx",
+       "bad": true,
+       "about": "What went wrong, as RFC 9457 problem JSON.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl https://prospector.invalid/o/your-org/api/v1/cohorts \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
+     "anchor": "op-createCohort",
+     "method": "POST",
+     "tone": "is-gold",
+     "path": "/o/{org}/api/v1/cohorts",
+     "summary": "Add a cohort",
+     "about": [
+      {
+       "text": "It goes just before the catch-all; the first one added is the catch-all. Every company is placed again by the rules. For a member, only an owner."
+      }
+     ],
+     "scope": "settings:write",
+     "owner_only": true,
+     "params": [],
+     "body": {
+      "of": {
+       "name": "CohortNew",
+       "link": "#schema-CohortNew"
+      },
+      "fields": [
+       {
+        "name": "name",
+        "type": {
+         "name": "string"
+        },
+        "about": [],
+        "required": true
+       },
+       {
+        "name": "catch_all",
+        "type": {
+         "name": "boolean"
+        },
+        "about": [
+         {
+          "text": "Make it the catch-all, last in the order."
+         }
+        ]
+       },
+       {
+        "name": "colour",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "One of the palette; left out, one not yet used."
+         }
+        ]
+       },
+       {
+        "name": "rules",
+        "type": {
+         "name": "CohortRule[]",
+         "link": "#schema-CohortRule"
+        },
+        "about": []
+       },
+       {
+        "name": "who_they_are",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       }
+      ]
+     },
+     "responses": [
+      {
+       "code": "201",
+       "about": "The cohort, added.",
+       "type": {
+        "name": "Cohort",
+        "link": "#schema-Cohort"
+       }
+      },
+      {
+       "code": "4xx · 5xx",
+       "bad": true,
+       "about": "What went wrong, as RFC 9457 problem JSON.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/cohorts \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"name\": \"…\", \"catch_all\": true, \"colour\": \"…\", \"rules\": []}'"
+    },
+    {
+     "anchor": "op-previewCohort",
+     "method": "POST",
+     "tone": "is-gold",
+     "path": "/o/{org}/api/v1/cohorts/preview",
+     "summary": "Who saving a cohort would move",
+     "about": [
+      {
+       "text": "Saves nothing. Given a cohort as it would be (a new one for cohort 0), the companies that saving it would move in and out, and those put somewhere by hand that would stay where they are. It is worked out by saving and taking it back, so it is what saving does."
+      }
+     ],
+     "scope": "read",
+     "params": [],
+     "body": {
+      "of": {
+       "name": "CohortPreviewRequest",
+       "link": "#schema-CohortPreviewRequest"
+      },
+      "fields": [
+       {
+        "name": "change",
+        "type": {
+         "name": "CohortChange",
+         "link": "#schema-CohortChange"
+        },
+        "about": [],
+        "required": true
+       },
+       {
+        "name": "cohort",
+        "type": {
+         "name": "integer"
+        },
+        "about": [
+         {
+          "text": "The cohort being changed; 0 for one being added."
+         }
+        ],
+        "required": true
+       }
+      ]
+     },
+     "responses": [
+      {
+       "code": "200",
+       "about": "Who would move.",
+       "type": {
+        "name": "CohortPreview",
+        "link": "#schema-CohortPreview"
+       }
+      },
+      {
+       "code": "4xx · 5xx",
+       "bad": true,
+       "about": "What went wrong, as RFC 9457 problem JSON.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/cohorts/preview \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"change\": \"…\", \"cohort\": 1}'"
+    },
+    {
+     "anchor": "op-updateCohort",
+     "method": "PATCH",
+     "tone": "is-violet",
+     "path": "/o/{org}/api/v1/cohorts/{id}",
+     "summary": "Change a cohort, its rules included",
+     "about": [
+      {
+       "text": "Send only what changes; rules, when sent, replace them all. Making a cohort the catch-all moves it last. Every company is placed again. For a member, only an owner."
+      }
+     ],
+     "scope": "settings:write",
+     "owner_only": true,
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      }
+     ],
+     "body": {
+      "of": {
+       "name": "CohortChange",
+       "link": "#schema-CohortChange"
+      },
+      "fields": [
+       {
+        "name": "catch_all",
+        "type": {
+         "name": "boolean?"
+        },
+        "about": [
+         {
+          "text": "true makes it the catch-all, last in the order; there is always one, so another is made it instead of this one being unmade."
+         }
+        ]
+       },
+       {
+        "name": "colour",
+        "type": {
+         "name": "string?"
+        },
+        "about": []
+       },
+       {
+        "name": "name",
+        "type": {
+         "name": "string?"
+        },
+        "about": []
+       },
+       {
+        "name": "rules",
+        "type": {
+         "name": "CohortRule[]?",
+         "link": "#schema-CohortRule"
+        },
+        "about": [
+         {
+          "text": "Replaces every rule it has."
+         }
+        ]
+       },
+       {
+        "name": "who_they_are",
+        "type": {
+         "name": "string?"
+        },
+        "about": []
+       }
+      ]
+     },
+     "responses": [
+      {
+       "code": "200",
+       "about": "The cohort as it now is.",
+       "type": {
+        "name": "Cohort",
+        "link": "#schema-Cohort"
+       }
+      },
+      {
+       "code": "4xx · 5xx",
+       "bad": true,
+       "about": "What went wrong, as RFC 9457 problem JSON.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X PATCH https://prospector.invalid/o/your-org/api/v1/cohorts/{id} \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"catch_all\": true, \"colour\": \"…\", \"name\": \"…\", \"rules\": \"…\"}'"
+    },
+    {
+     "anchor": "op-deleteCohort",
+     "method": "DELETE",
+     "tone": "is-coral",
+     "path": "/o/{org}/api/v1/cohorts/{id}",
+     "summary": "Remove a cohort and its rules",
+     "about": [
+      {
+       "text": "Its companies, those put there by hand too, are placed again by the rules. Removing the catch-all makes the last cohort left the catch-all; removing the last leaves every company in none. For a member, only an owner."
+      }
+     ],
+     "scope": "settings:write",
+     "owner_only": true,
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      }
+     ],
+     "responses": [
+      {
+       "code": "204",
+       "about": "Removed."
+      },
+      {
+       "code": "4xx · 5xx",
+       "bad": true,
+       "about": "What went wrong, as RFC 9457 problem JSON.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X DELETE https://prospector.invalid/o/your-org/api/v1/cohorts/{id} \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
+     "anchor": "op-moveCohort",
+     "method": "PUT",
+     "tone": "is-violet",
+     "path": "/o/{org}/api/v1/cohorts/{id}/position",
+     "summary": "Move a cohort up or down the order its rules are tried in",
+     "about": [
+      {
+       "text": "The catch-all stays last. Every company is placed again. For a member, only an owner."
+      }
+     ],
+     "scope": "settings:write",
+     "owner_only": true,
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      }
+     ],
+     "body": {
+      "fields": [
+       {
+        "name": "position",
+        "type": {
+         "name": "integer"
+        },
+        "about": [
+         {
+          "text": "Where it goes, counting from 0; past the last before the catch-all is just before it."
+         }
+        ],
+        "required": true
+       }
+      ]
+     },
+     "responses": [
+      {
+       "code": "204",
+       "about": "Moved."
+      },
+      {
+       "code": "4xx · 5xx",
+       "bad": true,
+       "about": "What went wrong, as RFC 9457 problem JSON.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X PUT https://prospector.invalid/o/your-org/api/v1/cohorts/{id}/position \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"position\": 1}'"
+    },
+    {
+     "anchor": "op-setCompanyCohort",
+     "method": "PUT",
+     "tone": "is-violet",
+     "path": "/o/{org}/api/v1/companies/{id}/cohort",
+     "summary": "Put a company in a cohort by hand, or back to its rules",
+     "about": [
+      {
+       "text": "{\"cohort\": id}",
+       "code": true
+      },
+      {
+       "text": " puts it there by hand, where it stays whatever its rules say; "
+      },
+      {
+       "text": "{\"by_rule\": true}",
+       "code": true
+      },
+      {
+       "text": " puts it back where its rules say. Only a person signed in: no key can, whatever its scopes, since agents read a company's cohort but its rules or people set it."
+      }
+     ],
+     "scope": "research:review",
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      }
+     ],
+     "body": {
+      "of": {
+       "name": "CompanyCohort",
+       "link": "#schema-CompanyCohort"
+      },
+      "fields": [
+       {
+        "name": "by_rule",
+        "type": {
+         "name": "boolean"
+        },
+        "about": [
+         {
+          "text": "Put it back where its rules say."
+         }
+        ]
+       },
+       {
+        "name": "cohort",
+        "type": {
+         "name": "integer"
+        },
+        "about": [
+         {
+          "text": "The cohort to put it in by hand."
+         }
+        ]
+       }
+      ]
+     },
+     "responses": [
+      {
+       "code": "204",
+       "about": "Placed."
+      },
+      {
+       "code": "4xx · 5xx",
+       "bad": true,
+       "about": "What went wrong, as RFC 9457 problem JSON.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X PUT https://prospector.invalid/o/your-org/api/v1/companies/{id}/cohort \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"by_rule\": true, \"cohort\": 1}'"
     }
    ]
   },
@@ -12089,6 +12873,549 @@
    ]
   },
   {
+   "anchor": "schema-Cohort",
+   "name": "Cohort",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "by_hand",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "How many of them were put there by hand."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "catch_all",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [
+      {
+       "text": "Takes every company no rule does."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "colour",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "One of #7b8cff, #ff9f43, #35c58a, #f06595, #a77bff, #22b8cf, #e0b43c, #b08968."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "companies",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "How many companies are in it."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "name",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "position",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "Its place in the order rules are tried, from 0; the catch-all is last."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "rules",
+     "type": {
+      "name": "CohortRule[]",
+      "link": "#schema-CohortRule"
+     },
+     "about": [
+      {
+       "text": "Any one of them puts a company here, unless an earlier cohort's rule took it."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "updated_at",
+     "type": {
+      "name": "date-time"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "updated_by",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "who_they_are",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "What these companies are, as research agents are told it."
+      }
+     ],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-CohortChange",
+   "name": "CohortChange",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "catch_all",
+     "type": {
+      "name": "boolean?"
+     },
+     "about": [
+      {
+       "text": "true makes it the catch-all, last in the order; there is always one, so another is made it instead of this one being unmade."
+      }
+     ]
+    },
+    {
+     "name": "colour",
+     "type": {
+      "name": "string?"
+     },
+     "about": []
+    },
+    {
+     "name": "name",
+     "type": {
+      "name": "string?"
+     },
+     "about": []
+    },
+    {
+     "name": "rules",
+     "type": {
+      "name": "CohortRule[]?",
+      "link": "#schema-CohortRule"
+     },
+     "about": [
+      {
+       "text": "Replaces every rule it has."
+      }
+     ]
+    },
+    {
+     "name": "who_they_are",
+     "type": {
+      "name": "string?"
+     },
+     "about": []
+    }
+   ]
+  },
+  {
+   "anchor": "schema-CohortMove",
+   "name": "CohortMove",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "company",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "company_id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "from",
+     "type": {
+      "name": "CohortRef",
+      "link": "#schema-CohortRef"
+     },
+     "about": [
+      {
+       "text": "A cohort as a company names it; id 0 and an empty name before the organisation has any."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "to",
+     "type": {
+      "name": "CohortRef",
+      "link": "#schema-CohortRef"
+     },
+     "about": [
+      {
+       "text": "A cohort as a company names it; id 0 and an empty name before the organisation has any."
+      }
+     ],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-CohortNew",
+   "name": "CohortNew",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "name",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "catch_all",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [
+      {
+       "text": "Make it the catch-all, last in the order."
+      }
+     ]
+    },
+    {
+     "name": "colour",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "One of the palette; left out, one not yet used."
+      }
+     ]
+    },
+    {
+     "name": "rules",
+     "type": {
+      "name": "CohortRule[]",
+      "link": "#schema-CohortRule"
+     },
+     "about": []
+    },
+    {
+     "name": "who_they_are",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    }
+   ]
+  },
+  {
+   "anchor": "schema-CohortPreview",
+   "name": "CohortPreview",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "kept_by_hand",
+     "type": {
+      "name": "CohortMove[]",
+      "link": "#schema-CohortMove"
+     },
+     "about": [
+      {
+       "text": "Put somewhere by hand, so they stay, though the rules would move them into or out of it; "
+      },
+      {
+       "text": "to",
+       "code": true
+      },
+      {
+       "text": " is where the rules would put them."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "moving_in",
+     "type": {
+      "name": "CohortMove[]",
+      "link": "#schema-CohortMove"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "moving_out",
+     "type": {
+      "name": "CohortMove[]",
+      "link": "#schema-CohortMove"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "other_currency_deals",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "Open deals in a currency other than the organisation's, which no deal_value rule weighs."
+      }
+     ],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-CohortPreviewRequest",
+   "name": "CohortPreviewRequest",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "change",
+     "type": {
+      "name": "CohortChange",
+      "link": "#schema-CohortChange"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "cohort",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "The cohort being changed; 0 for one being added."
+      }
+     ],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-CohortRef",
+   "name": "CohortRef",
+   "about": [
+    {
+     "text": "A cohort as a company names it; id 0 and an empty name before the organisation has any."
+    }
+   ],
+   "enum": [],
+   "fields": [
+    {
+     "name": "colour",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "name",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-CohortRule",
+   "name": "CohortRule",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "field",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "What the rule looks at. "
+      },
+      {
+       "text": "segment",
+       "code": true
+      },
+      {
+       "text": " is matched on what the segment says the company is, before \" for \", \" to \", \" serving \" or \" with \", a word matching any that starts with it; "
+      },
+      {
+       "text": "offering",
+       "code": true
+      },
+      {
+       "text": " is what anyone there is being reached for, or what the company was found for (0 is the organisation's own); "
+      },
+      {
+       "text": "conversation_stage",
+       "code": true
+      },
+      {
+       "text": " is anyone's there in conversation; "
+      },
+      {
+       "text": "deal_value",
+       "code": true
+      },
+      {
+       "text": " is its largest open deal and "
+      },
+      {
+       "text": "pays_a_year",
+       "code": true
+      },
+      {
+       "text": " its live subscriptions for a year, both in the organisation's currency only; "
+      },
+      {
+       "text": "billed",
+       "code": true
+      },
+      {
+       "text": " is how a live subscription is priced; "
+      },
+      {
+       "text": "deal_kind",
+       "code": true
+      },
+      {
+       "text": " is the kind of any deal there that wasn't lost."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "value",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "For any_of, a comma list; for at_least, an amount in the currency's hundredths; for billed, monthly or yearly."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "op",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "at_least",
+       "code": true
+      },
+      {
+       "text": " for deal_value and pays_a_year, "
+      },
+      {
+       "text": "is",
+       "code": true
+      },
+      {
+       "text": " for billed, "
+      },
+      {
+       "text": "any_of",
+       "code": true
+      },
+      {
+       "text": " for the rest; left out, the field's own."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "anchor": "schema-CompanyCohort",
+   "name": "CompanyCohort",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "by_rule",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [
+      {
+       "text": "Put it back where its rules say."
+      }
+     ]
+    },
+    {
+     "name": "cohort",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "The cohort to put it in by hand."
+      }
+     ]
+    }
+   ]
+  },
+  {
    "anchor": "schema-CompanyOverview",
    "name": "CompanyOverview",
    "about": [],
@@ -12101,6 +13428,43 @@
       "link": "#schema-Agreement"
      },
      "about": [],
+     "required": true
+    },
+    {
+     "name": "cohort",
+     "type": {
+      "name": "CohortRef",
+      "link": "#schema-CohortRef"
+     },
+     "about": [
+      {
+       "text": "A cohort as a company names it; id 0 and an empty name before the organisation has any."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "cohort_by_hand",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [
+      {
+       "text": "Put in its cohort by hand, where it stays whatever its rules say."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "cohort_why",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The rule that put it in its cohort; empty when the catch-all took it because no rule did, or it was put there by hand."
+      }
+     ],
      "required": true
     },
     {
@@ -12452,6 +13816,43 @@
    "about": [],
    "enum": [],
    "fields": [
+    {
+     "name": "cohort",
+     "type": {
+      "name": "CohortRef",
+      "link": "#schema-CohortRef"
+     },
+     "about": [
+      {
+       "text": "A cohort as a company names it; id 0 and an empty name before the organisation has any."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "cohort_by_hand",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [
+      {
+       "text": "Put in its cohort by hand, where it stays whatever its rules say."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "cohort_why",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The rule that put it in its cohort; empty when the catch-all took it because no rule did, or it was put there by hand."
+      }
+     ],
+     "required": true
+    },
     {
      "name": "country",
      "type": {
@@ -15312,6 +16713,18 @@
      "required": true
     },
     {
+     "name": "has_roles",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [
+      {
+       "text": "Companies are judged for it by their roles, each pursued or junked: the company's verdict follows from them. Can't be turned off while it has roles."
+      }
+     ],
+     "required": true
+    },
+    {
      "name": "id",
      "type": {
       "name": "integer"
@@ -15440,6 +16853,13 @@
    "enum": [],
    "fields": [
     {
+     "name": "has_roles",
+     "type": {
+      "name": "boolean?"
+     },
+     "about": []
+    },
+    {
      "name": "look_for",
      "type": {
       "name": "string?"
@@ -15482,6 +16902,13 @@
      },
      "about": [],
      "required": true
+    },
+    {
+     "name": "has_roles",
+     "type": {
+      "name": "boolean"
+     },
+     "about": []
     },
     {
      "name": "look_for",
@@ -16482,6 +17909,18 @@
       }
      ],
      "required": true
+    },
+    {
+     "name": "roles",
+     "type": {
+      "name": "Role[]",
+      "link": "#schema-Role"
+     },
+     "about": [
+      {
+       "text": "Its roles for the offering in view, when that offering has roles; oldest first."
+      }
+     ]
     }
    ]
   },
@@ -16679,6 +18118,226 @@
      },
      "about": [],
      "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-Role",
+   "name": "Role",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "by",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Who last pursued, junked or put it back; empty until someone does."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "company_id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "created_at",
+     "type": {
+      "name": "date-time"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "details",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Rate, length, IR35, location and the like, in one line."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "found_by",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "offering_id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "reason",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Why it was junked, as whoever junked it said it."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "stage",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "task_id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "The task it was found for; 0 for none."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "title",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "updated_at",
+     "type": {
+      "name": "date-time"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "url",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The posting, or the page that shows the role is open; empty for none."
+      }
+     ],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-RoleJudgement",
+   "name": "RoleJudgement",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "stage",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "pursued",
+       "code": true
+      },
+      {
+       "text": " qualifies the company for the offering once no role waits; once every role is junked it is rejected for it; "
+      },
+      {
+       "text": "review",
+       "code": true
+      },
+      {
+       "text": " puts a role back."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "reason",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Why, for a junked role only."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "anchor": "schema-RoleNew",
+   "name": "RoleNew",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "offering",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "An offering that has roles."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "title",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "details",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "source_url",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The posting."
+      }
+     ]
     }
    ]
   },

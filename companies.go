@@ -131,24 +131,33 @@ const historyPageSize = 50
 
 // History is one page of what happened at a company, newest first.
 func (s *Store) History(org, company int64, page int) ([]HistoryItem, Page, error) {
-	total, err := s.historyCount(org, company)
+	total, err := s.historyCount(org, company, "")
 	if err != nil {
 		return nil, Page{}, err
 	}
 	pg := pageOf(page, historyPageSize, total)
-	out, err := s.historyAt(org, company, pg.offset(), pg.Size)
+	out, err := s.historyAt(org, company, "", pg.offset(), pg.Size)
 	return out, pg, err
 }
 
-func (s *Store) historyCount(org, company int64) (int, error) {
+// companyEvents are a company's events, or only those of one action when it isn't empty.
+func (s *Store) companyEvents(org, company int64, action string) *gorm.DB {
+	q := s.in(org).Model(&Event{}).Where("company_id = ?", company)
+	if action != "" {
+		q = q.Where("action = ?", action)
+	}
+	return q
+}
+
+func (s *Store) historyCount(org, company int64, action string) (int, error) {
 	var total int64
-	err := s.in(org).Model(&Event{}).Where("company_id = ?", company).Count(&total).Error
+	err := s.companyEvents(org, company, action).Count(&total).Error
 	return int(total), err
 }
 
-func (s *Store) historyAt(org, company int64, offset, limit int) ([]HistoryItem, error) {
+func (s *Store) historyAt(org, company int64, action string, offset, limit int) ([]HistoryItem, error) {
 	var events []Event
-	if err := s.in(org).Where("company_id = ?", company).Order("at desc, id desc").Limit(limit).Offset(offset).Find(&events).Error; err != nil {
+	if err := s.companyEvents(org, company, action).Order("at desc, id desc").Limit(limit).Offset(offset).Find(&events).Error; err != nil {
 		return nil, err
 	}
 	names := map[int64]string{}
@@ -482,6 +491,9 @@ func (s *Store) SetCompanyStage(org, id int64, stage, fit, actor string) error {
 		if res.Error != nil || res.RowsAffected == 0 {
 			return missing(res.Error, "no company %d", id)
 		}
+		if err := placeCompany(tx, org, id); err != nil {
+			return err
+		}
 		return s.log(tx, org, 0, &id, actor, "company:"+stage, nonEmpty(fit))
 	})
 }
@@ -553,6 +565,9 @@ func (s *Store) PickContactFor(org int64, o *Org, id int64, offeringID *int64, a
 					return err
 				}
 			}
+		}
+		if err := placeContactCompany(tx, org, c.CompanyID); err != nil {
+			return err
 		}
 		return s.log(tx, org, id, c.CompanyID, actor, "pick", nil)
 	})
@@ -862,6 +877,9 @@ func (s *Store) QuickAddPerson(o *Org, in QuickAdd, actor string) (*Contact, err
 			return err
 		}
 		if err := s.log(tx, o.ID, out.ID, companyID, actor, "add:person", nil); err != nil {
+			return err
+		}
+		if err := placeContactCompany(tx, o.ID, companyID); err != nil {
 			return err
 		}
 		if strings.TrimSpace(in.Note) != "" {

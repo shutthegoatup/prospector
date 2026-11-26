@@ -317,7 +317,7 @@ export function Landing() {
             </div>
             <div className="lp-cell is-green">
               <h3>The full history</h3>
-              <p>Every company shows who did what and when, people and agents alike.</p>
+              <p>Every company shows who did what and when, people and agents alike. Companies fall into cohorts by rules you set, or by hand.</p>
             </div>
             <div className="lp-cell is-violet">
               <h3>Several organisations, one login</h3>
