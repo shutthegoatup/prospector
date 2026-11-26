@@ -1127,7 +1127,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	}
 	browser := map[string]string{"Accept": "text/html,application/xhtml+xml,*/*;q=0.8"}
 	styled := func(body string) bool {
-		return dataPage.MatchString(body) && strings.Contains(body, "/assets/css/output.css")
+		return dataPage.MatchString(body) && strings.Contains(body, `data-page="{&quot;page&quot;:&quot;problem&quot;`) && strings.Contains(body, "/assets/css/output.css")
 	}
 
 	for path, want := range map[string]string{
