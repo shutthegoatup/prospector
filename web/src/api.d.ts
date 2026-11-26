@@ -481,6 +481,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/enquiry-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * How many enquiries there are of each kind and state
+         * @description Spam is counted on its own and left out of the rest.
+         */
+        get: operations["countEnquiries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Who is in the organisation, by name
+         * @description The names that can own a deal or an enquiry, in order.
+         */
+        get: operations["listMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/enquiries/{id}": {
         parameters: {
             query?: never;
@@ -2299,6 +2345,28 @@ export interface components {
             state: string;
             owner: string;
             note: string;
+            /** @description The name of the company it was matched to; empty for none. */
+            company_name: string;
+            /** @description Whether whoever sent it is on the Conversations board already. */
+            in_conversation: boolean;
+            /** @description What has been said in answering it, oldest first, as its messages list gives it. */
+            thread: components["schemas"]["EnquiryMessage"][];
+        };
+        EnquiryCounts: {
+            /** @description Every enquiry that isn't spam. */
+            all: number;
+            spam: number;
+            /** @description Those that aren't spam, by kind: `sales`, `demo`, `signup`, `support`, `feature` or `other`. A kind with none is left out. */
+            kinds: {
+                [key: string]: number;
+            };
+            /** @description Those that aren't spam, by `open`, `waiting` or `closed`. A state with none is left out. */
+            states: {
+                [key: string]: number;
+            };
+        };
+        MemberName: {
+            name: string;
         };
         Suppression: {
             /** Format: int64 */
@@ -3348,6 +3416,65 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["Enquiry"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                        /** @description Whether a reply can be emailed from here: the organisation has a mail server. Their answers can be recorded either way. */
+                        can_reply: boolean;
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    countEnquiries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The counts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnquiryCounts"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listMembers: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of them. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MemberName"][];
                         next_cursor?: components["schemas"]["NextCursor"];
                     };
                 };

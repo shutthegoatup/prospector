@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
 )
@@ -55,4 +56,39 @@ func (s apiServer) RecordEnquiryAnswer(ctx context.Context, in api.RecordEnquiry
 		return nil, err
 	}
 	return api.RecordEnquiryAnswer201JSONResponse(messageOut(*m)), nil
+}
+
+func (s apiServer) CountEnquiries(ctx context.Context, _ api.CountEnquiriesRequestObject) (api.CountEnquiriesResponseObject, error) {
+	out := api.CountEnquiries200JSONResponse{Kinds: map[string]int{}, States: map[string]int{}}
+	for key, n := range s.a.s.EnquiryCounts(reqFrom(ctx).Org.ID) {
+		state, isState := strings.CutPrefix(key, "state:")
+		switch {
+		case key == "":
+			out.All = n
+		case key == "spam":
+			out.Spam = n
+		case isState:
+			out.States[state] = n
+		default:
+			out.Kinds[key] = n
+		}
+	}
+	return out, nil
+}
+
+func (s apiServer) ListMembers(ctx context.Context, in api.ListMembersRequestObject) (api.ListMembersResponseObject, error) {
+	members, err := s.a.s.Members(reqFrom(ctx).Org.ID)
+	if err != nil {
+		return nil, err
+	}
+	members, next, err := listPage(members, in.Params.Limit, in.Params.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListMembers200JSONResponse{Headers: api.ListMembers200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out.Body.Items, out.Body.NextCursor = []api.MemberName{}, next
+	for _, m := range members {
+		out.Body.Items = append(out.Body.Items, api.MemberName{Name: m.Name})
+	}
+	return out, nil
 }

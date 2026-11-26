@@ -479,49 +479,58 @@ func (a *App) enquiriesPage(w http.ResponseWriter, r *http.Request) {
 		fail(w, err, http.StatusInternalServerError)
 		return
 	}
-	var ids []int64
-	for _, e := range rows {
-		if e.CompanyID != nil {
-			ids = append(ids, *e.CompanyID)
-		}
-	}
-	names := map[int64]string{}
-	if len(ids) > 0 {
-		var companies []Company
-		logged(a.s.in(q.Org.ID).Where("id in ?", ids).Find(&companies))
-		for _, c := range companies {
-			names[c.ID] = c.Name
-		}
-	}
 	members, err := a.s.Members(q.Org.ID)
 	if err != nil {
 		fail(w, err, http.StatusInternalServerError)
 		return
 	}
-	talking := map[int64]bool{}
-	var senders []int64
-	for _, e := range rows {
-		if e.ContactID != nil {
-			senders = append(senders, *e.ContactID)
-		}
-	}
-	if len(senders) > 0 {
-		var on []int64
-		if err := a.s.in(q.Org.ID).Model(&Contact{}).Where("id in ?", senders).Where(inConversation).Pluck("id", &on).Error; err != nil {
-			fail(w, err, http.StatusInternalServerError)
-			return
-		}
-		for _, id := range on {
-			talking[id] = true
-		}
-	}
-	threads, err := a.s.EnquiryThreads(q.Org.ID, enquiryIDs(rows))
+	around, err := a.s.aroundEnquiries(q.Org.ID, rows)
 	if err != nil {
 		fail(w, err, http.StatusInternalServerError)
 		return
 	}
 	via, _ := a.mailFor(q.Org.ID)
-	a.page(w, r, "enquiries", EnquiriesView(q, EnquiriesData{Filter: f, Rows: rows, Page: pg, Counts: a.s.EnquiryCounts(q.Org.ID), Companies: names, Members: members, Talking: talking, Threads: threads, MailOn: via != nil}))
+	a.page(w, r, "enquiries", EnquiriesView(q, EnquiriesData{Filter: f, Rows: rows, Page: pg, Counts: a.s.EnquiryCounts(q.Org.ID), Companies: around.Companies, Members: members, Talking: around.Talking, Threads: around.Threads, MailOn: via != nil}))
+}
+
+// enquiriesAround is what is shown beside a page of enquiries: the companies they
+// matched, which senders are on the Conversations board, and what has been said since.
+type enquiriesAround struct {
+	Companies map[int64]string
+	Talking   map[int64]bool
+	Threads   map[int64][]EnquiryMessage
+}
+
+func (s *Store) aroundEnquiries(org int64, rows []Enquiry) (enquiriesAround, error) {
+	out := enquiriesAround{Companies: map[int64]string{}, Talking: map[int64]bool{}}
+	var ids, senders []int64
+	for _, e := range rows {
+		if e.CompanyID != nil {
+			ids = append(ids, *e.CompanyID)
+		}
+		if e.ContactID != nil {
+			senders = append(senders, *e.ContactID)
+		}
+	}
+	if len(ids) > 0 {
+		var companies []Company
+		logged(s.in(org).Where("id in ?", ids).Find(&companies))
+		for _, c := range companies {
+			out.Companies[c.ID] = c.Name
+		}
+	}
+	if len(senders) > 0 {
+		var on []int64
+		if err := s.in(org).Model(&Contact{}).Where("id in ?", senders).Where(inConversation).Pluck("id", &on).Error; err != nil {
+			return out, err
+		}
+		for _, id := range on {
+			out.Talking[id] = true
+		}
+	}
+	var err error
+	out.Threads, err = s.EnquiryThreads(org, enquiryIDs(rows))
+	return out, err
 }
 
 // ConverseEnquiry puts whoever sent an enquiry on the Conversations board: writing in is
