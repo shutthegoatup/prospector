@@ -373,6 +373,8 @@ var saysNothingBack = map[string]bool{
 	"StartDeal": true, "ChangeDeal": true, "RemoveDeal": true, "JudgeCompany": true, "RemoveOffering": true,
 	// AddOffering and ChangeOffering answer with the offering the call gave them.
 	"AddOffering": true, "ChangeOffering": true,
+	// AddRole and AgentAddRole answer with the role the call gave them, or an id.
+	"AddRole": true, "AgentAddRole": true,
 	"AddSubscription": true, "ChangeSubscription": true, "ChangeSubscriptionFields": true, "RemoveSubscription": true, "StartRenewal": true, "SetEnquiry": true, "ConverseEnquiry": true, "SetEnquiryFields": true, "ChangeDealFields": true, "SetDealFields": true, "HearEnquiry": true,
 	"StartOnboarding": true, "SetOnboardingStep": true, "RemoveOnboarding": true, "InviteCustomer": true, "RevokeCustomer": true, "Suppress": true, "Unsuppress": true, "AddCampaign": true, "Audience": true, "RemoveCampaign": true, "ResumeCampaign": true, "AddAgreement": true, "PutAgreementFile": true, "RemoveAgreement": true,
 	// Recipients and fields come back as ids, places and kinds; who they are is AgreementRecipients'.

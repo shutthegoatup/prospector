@@ -157,6 +157,7 @@ type OrgExport struct {
 	Verdicts      []Verdict            `json:"verdicts"`
 	Cohorts       []Cohort             `json:"cohorts"`
 	CohortRules   []CohortRule         `json:"cohort_rules"`
+	Roles         []Role               `json:"roles"`
 	History       []ExportRecord       `json:"history"`
 	Erased        int64                `json:"people_erased"`
 }
@@ -298,7 +299,7 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			out.Enrichers = append(out.Enrichers, ExportEnricher{Kind: e.Kind, Position: e.Position, MonthlyLimit: e.MonthlyLimit})
 		}
 		mine := func() *gorm.DB { return tx.Where("org_id = ?", org).Order("id") }
-		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Onboardings, &out.OnboardSteps, &out.Access, &out.Enquiries, &out.EnquiryThread, &out.Suppressed, &out.Campaigns, &out.Agreements, &out.Recipients, &out.Fields, &out.Events, &out.CampaignMail, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes, &out.Offerings, &out.Verdicts, &out.Cohorts, &out.CohortRules} {
+		for _, rows := range []any{&out.Companies, &out.Facts, &out.Contacts, &out.Deals, &out.Subs, &out.Onboardings, &out.OnboardSteps, &out.Access, &out.Enquiries, &out.EnquiryThread, &out.Suppressed, &out.Campaigns, &out.Agreements, &out.Recipients, &out.Fields, &out.Events, &out.CampaignMail, &out.Suggested, &out.Tasks, &out.TaskRequests, &out.TaskNotes, &out.Offerings, &out.Verdicts, &out.Roles, &out.Cohorts, &out.CohortRules} {
 			if err := mine().Find(rows).Error; err != nil {
 				return err
 			}

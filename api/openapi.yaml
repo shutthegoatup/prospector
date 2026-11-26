@@ -3125,6 +3125,93 @@ paths:
       responses:
         "204": { description: Placed. }
         default: { $ref: "#/components/responses/Problem" }
+  /o/{org}/api/v1/companies/{id}/roles:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listCompanyRoles
+      tags: [offerings]
+      summary: The roles found at a company
+      description: Junked ones included, with who junked them and why, so one can be put back.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+        - name: offering
+          in: query
+          description: Only those for this offering.
+          schema: { type: integer, format: int64 }
+          x-go-type-skip-optional-pointer: false
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: By offering, oldest first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Role" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: addRole
+      tags: [offerings]
+      summary: Add a role open at a company, for an offering that has roles
+      description: |
+        It waits for review, and brings the company back to review for the offering. A role
+        already there, by its posting or else its title, is a conflict, as is the title of one
+        junked, and a company a person rejected for the offering.
+      security:
+        - session: []
+        - bearer: ["research:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RoleNew" }
+      responses:
+        "201":
+          description: The role, added.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Role" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/roles/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: judgeRole
+      tags: [offerings]
+      summary: Pursue or junk a role, or put it back
+      description: |
+        The company's verdict for the role's offering follows: up for review while a role waits,
+        else qualified while one is pursued, and rejected once every one is junked. While it has
+        roles, the company itself can't be judged for the offering. Junking sends nothing to anyone.
+      security:
+        - session: []
+        - bearer: ["research:review"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RoleJudgement" }
+      responses:
+        "200":
+          description: The role as it now is.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Role" }
+        default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/companies:
     parameters:
@@ -3927,10 +4014,11 @@ components:
 
     Offering:
       type: object
-      required: [id, name, look_for, looking_for, pitch, note_template, updated_by, created_at, updated_at]
+      required: [id, name, look_for, looking_for, pitch, note_template, has_roles, updated_by, created_at, updated_at]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
+        has_roles: { type: boolean, description: "Companies are judged for it by their roles, each pursued or junked: the company's verdict follows from them. Can't be turned off while it has roles." }
         look_for: { type: string, description: "What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list." }
         looking_for:
           type: array
@@ -3950,6 +4038,7 @@ components:
         look_for: { type: string }
         pitch: { type: string }
         note_template: { type: string }
+        has_roles: { type: boolean }
 
     OfferingChange:
       type: object
@@ -3958,6 +4047,41 @@ components:
         look_for: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
         pitch: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
         note_template: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        has_roles: { type: boolean, nullable: true, x-go-type-skip-optional-pointer: false }
+
+    Role:
+      type: object
+      required: [id, offering_id, company_id, title, url, details, stage, reason, by, found_by, task_id, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        offering_id: { type: integer, format: int64 }
+        company_id: { type: integer, format: int64 }
+        title: { type: string }
+        url: { type: string, description: "The posting, or the page that shows the role is open; empty for none." }
+        details: { type: string, description: "Rate, length, IR35, location and the like, in one line." }
+        stage: { type: string, enum: [review, pursued, junked] }
+        reason: { type: string, description: "Why it was junked, as whoever junked it said it." }
+        by: { type: string, description: "Who last pursued, junked or put it back; empty until someone does." }
+        found_by: { type: string }
+        task_id: { type: integer, format: int64, description: "The task it was found for; 0 for none." }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    RoleNew:
+      type: object
+      required: [offering, title]
+      properties:
+        offering: { type: integer, format: int64, description: "An offering that has roles." }
+        title: { type: string, maxLength: 200 }
+        source_url: { type: string, description: "The posting." }
+        details: { type: string, maxLength: 300 }
+
+    RoleJudgement:
+      type: object
+      required: [stage]
+      properties:
+        stage: { type: string, enum: [review, pursued, junked], description: "`pursued` qualifies the company for the offering once no role waits; once every role is junked it is rejected for it; `review` puts a role back." }
+        reason: { type: string, description: "Why, for a junked role only." }
 
     Verdict:
       type: object
@@ -4220,10 +4344,11 @@ components:
               type: object
               x-go-type-skip-optional-pointer: false
               description: What the task finds companies for, when it isn't the organisation's own offering.
-              required: [id, name, guidance]
+              required: [id, name, has_roles, guidance]
               properties:
                 id: { type: integer, format: int64 }
                 name: { type: string }
+                has_roles: { type: boolean, description: "Agents add each role they find with add_role." }
                 guidance: { type: string, description: "What agents are told to look for and how to judge companies for it, in place of the organisation's own look-for list." }
             requests:
               type: array
@@ -4314,6 +4439,10 @@ components:
         people:
           type: array
           items: { $ref: "#/components/schemas/ResearchPerson" }
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/Role" }
+          description: Its roles for the offering in view, when that offering has roles; oldest first.
 
     LookFor:
       type: object
