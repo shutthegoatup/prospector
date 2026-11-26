@@ -906,12 +906,13 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, not_ready]
                 properties:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/Campaign" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  not_ready: { type: string, description: "Why nothing can be sent yet (the organisation's own mail server, a postal address or the site's address missing); empty when a campaign can be sent." }
         default: { $ref: "#/components/responses/Problem" }
     post:
       operationId: createCampaign

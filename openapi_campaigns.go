@@ -120,6 +120,9 @@ func (s apiServer) ListCampaigns(ctx context.Context, in api.ListCampaignsReques
 		return nil, err
 	}
 	out.Body.Items, out.Body.NextCursor = items, next
+	if err := s.a.sendable(reqFrom(ctx).Org); err != nil {
+		out.Body.NotReady = err.Error()
+	}
 	return out, nil
 }
 
