@@ -354,10 +354,31 @@ func customerHeaders(w http.ResponseWriter) {
 
 func (a *App) customerRender(w http.ResponseWriter, r *http.Request, code int, v CustomerView) {
 	customerHeaders(w)
-	w.WriteHeader(code)
-	if err := CustomerPage(v).Render(r.Context(), w); err != nil {
-		log.Print(err)
+	shown := customerShown{Page: "customer", State: v.State, Token: v.Token, Org: v.Org, Email: v.Email, Day: v.Day, Steps: []customerStepShown{}}
+	for _, st := range v.Steps {
+		shown.Steps = append(shown.Steps, customerStepShown{st.ID, st.Name, st.Due, st.DoneOn, st.DoneBy == customerActor})
 	}
+	writeShell(w, code, shown, "This page needs a browser with JavaScript.\n")
+}
+
+// customerShown is CustomerView as the page gets it. A step says only whether the
+// customer marked it, never which member did.
+type customerShown struct {
+	Page  string              `json:"page"`
+	State string              `json:"state"`
+	Token string              `json:"token,omitempty"`
+	Org   string              `json:"org,omitempty"`
+	Email string              `json:"email,omitempty"`
+	Day   string              `json:"day,omitempty"`
+	Steps []customerStepShown `json:"steps"`
+}
+
+type customerStepShown struct {
+	ID     int64   `json:"id"`
+	Name   string  `json:"name"`
+	Due    *string `json:"due"`
+	DoneOn *string `json:"done_on"`
+	Mine   bool    `json:"mine"`
 }
 
 // CustomerView is what a customer's page shows. It holds no teammate's name and no
@@ -370,7 +391,6 @@ type CustomerView struct {
 	Org   string
 	Email string
 	Steps []OnboardingStep
-	Done  int
 	Day   string
 }
 
@@ -460,11 +480,6 @@ func (a *App) customerPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := CustomerView{State: "steps", Org: acc.Org.Name, Email: deref(acc.Contact.Email), Steps: steps, Day: today()}
-	for _, st := range steps {
-		if st.DoneOn != nil {
-			v.Done++
-		}
-	}
 	a.customerRender(w, r, http.StatusOK, v)
 }
 

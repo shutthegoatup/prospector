@@ -3,7 +3,6 @@ module github.com/shutthegoatup/prospector
 go 1.27.4
 
 require (
-	github.com/Oudwins/tailwind-merge-go v0.2.3
 	github.com/a-h/templ v0.3.1118
 	github.com/anthropics/anthropic-sdk-go/v2 v2.15.0
 	github.com/coreos/go-oidc/v3 v3.21.0
@@ -30,7 +29,6 @@ require (
 	github.com/a-h/parse v0.0.42 // indirect
 	github.com/andybalholm/brotli v1.3.0 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
-	github.com/axadrn/shadcn-templ/v2 v2.0.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
@@ -40,7 +38,6 @@ require (
 	github.com/digitorus/pkcs7 v0.0.0-20260914070511-d678ea5ea03f // indirect
 	github.com/digitorus/timestamp v0.0.0-20250524132541-c45532741eea // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/evanw/esbuild v0.28.2 // indirect
 	github.com/fatih/color v1.19.0 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
@@ -98,6 +95,5 @@ require (
 
 tool (
 	github.com/a-h/templ/cmd/templ
-	github.com/axadrn/shadcn-templ/v2/cmd/shadcn-templ
 	github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 )
