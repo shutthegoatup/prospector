@@ -357,8 +357,7 @@ func (a *App) ssoPage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	http.SetCookie(w, &http.Cookie{Name: askedCookie, Value: "1", Path: "/login/sso", MaxAge: 600, HttpOnly: true,
-		Secure: a.secure(r), SameSite: http.SameSiteStrictMode})
+	http.SetCookie(w, a.askedCookie(r))
 	w.Header().Set("content-type", "text/html; charset=utf-8")
 	if err := SSOPage(v).Render(r.Context(), w); err != nil {
 		log.Print(err)
@@ -370,6 +369,11 @@ func (a *App) ssoPage(w http.ResponseWriter, r *http.Request) {
 // can be walked through a provider of somebody else's choosing, and into the account
 // it names, by a link alone.
 const askedCookie = "sso-asked"
+
+func (a *App) askedCookie(r *http.Request) *http.Cookie {
+	return &http.Cookie{Name: askedCookie, Value: "1", Path: "/login/sso", MaxAge: 600, HttpOnly: true,
+		Secure: a.secure(r), SameSite: http.SameSiteStrictMode}
+}
 
 func ssoStartURL(org *Org, email, next string) string {
 	return "/login/sso/start?" + url.Values{"org": {org.Slug}, "email": {email}, "next": {next}}.Encode()
