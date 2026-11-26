@@ -3,7 +3,7 @@ import { type FormEvent, type ReactNode, useState } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, Meta, PageHead, Section, useRefresh } from "@/components/app";
-import { Bar, Loading, placeholders, Text } from "@/components/app/skeleton";
+import { Bar, Loading, placeholders, Settled, Text } from "@/components/app/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { actor, plural, stamp } from "@/lib/format";
@@ -44,7 +44,8 @@ export function AgentsPage() {
         and connect with a key, which works for this organisation only. What any of them adds waits in Research for a person; agents can draft, but
         only people send.
       </p>
-      <div className="flex flex-wrap items-start gap-5">
+      {/* Its sections stack, and each list's length decides where the next one starts. */}
+      <Settled className="flex flex-wrap items-start gap-5">
         <div className="flex min-w-0 flex-[3_1_560px] flex-col gap-5">
           <Roster agents={agents.data?.items} keys={keys.data?.items} connect={connect.data} />
           <DataVendors />
@@ -62,7 +63,7 @@ export function AgentsPage() {
           </Section>
           <Activity />
         </div>
-      </div>
+      </Settled>
     </>
   );
 }

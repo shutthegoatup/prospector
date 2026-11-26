@@ -4,7 +4,7 @@ import { Link, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, FilterChip, Meta, PageHead, Pill, RailCard, useRefresh, Whose } from "@/components/app";
-import { Bar, Loading, placeholders, Text } from "@/components/app/skeleton";
+import { Bar, Loading, placeholders, Settled, Text } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { actor, plural } from "@/lib/format";
@@ -177,39 +177,35 @@ export function TodayPage() {
           </div>
           {shown > cards.length && <Meta>{`Showing the first ${cards.length} of ${shown}. Clear some, or filter by step above.`}</Meta>}
         </section>
-        <aside className="flex min-w-0 flex-[1_1_260px] flex-col gap-4">
-          <div className="panel flex flex-col gap-1 p-5">
-            <Eyebrow>Do now</Eyebrow>
-            {list.data && s && todo.length === 0 && <p className="pt-1.5 text-sm text-muted-foreground">Nothing due right now.</p>}
-            {!(list.data && s) && !list.error && !summary.error && (
-              <Loading busy className="flex flex-col gap-1">
-                {Array.from({ length: placeholders }, (_, i) => (
-                  <DoNow key={i} />
-                ))}
-              </Loading>
-            )}
-            {todo.map((t) => (
-              <DoNow key={t.label} t={t} />
-            ))}
-          </div>
-          {/* With the summary too, so it comes in with the Do now list rather than after it. */}
-          {(s || summary.error) && later > 0 && (
-            <div className="panel flex flex-col gap-2.5 p-5">
-              <Eyebrow>Later</Eyebrow>
-              <p className="text-sm text-muted-foreground">{plural(later, "call")} outside office hours right now</p>
+        <aside className="min-w-0 flex-[1_1_260px]">
+          {/* The Do now list's length decides where the panels under it start, so the column shows once it is all in. */}
+          <Settled className="flex flex-col gap-4">
+            <div className="panel flex flex-col gap-1 p-5">
+              <Eyebrow>Do now</Eyebrow>
+              {list.data && s && todo.length === 0 && <p className="pt-1.5 text-sm text-muted-foreground">Nothing due right now.</p>}
+              {todo.map((t) => (
+                <DoNow key={t.label} t={t} />
+              ))}
             </div>
-          )}
-          {(s || !summary.error) && (
-            <div className="panel flex flex-col gap-3 p-5">
-              <Eyebrow>Last 7 days</Eyebrow>
-              <div className="grid grid-cols-2 gap-3">
-                <Stat n={s?.week.touches} label="touches" />
-                <Stat n={s?.week.replies} label="replies" />
-                <Stat n={s?.week.meetings} label="meetings" />
-                <Stat n={s?.week.researched} label="researched" />
+            {/* With the summary too, so it comes in with the Do now list rather than after it. */}
+            {(s || summary.error) && later > 0 && (
+              <div className="panel flex flex-col gap-2.5 p-5">
+                <Eyebrow>Later</Eyebrow>
+                <p className="text-sm text-muted-foreground">{plural(later, "call")} outside office hours right now</p>
               </div>
-            </div>
-          )}
+            )}
+            {(s || !summary.error) && (
+              <div className="panel flex flex-col gap-3 p-5">
+                <Eyebrow>Last 7 days</Eyebrow>
+                <div className="grid grid-cols-2 gap-3">
+                  <Stat n={s?.week.touches} label="touches" />
+                  <Stat n={s?.week.replies} label="replies" />
+                  <Stat n={s?.week.meetings} label="meetings" />
+                  <Stat n={s?.week.researched} label="researched" />
+                </div>
+              </div>
+            )}
+          </Settled>
         </aside>
       </div>
     </>

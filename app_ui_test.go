@@ -44,7 +44,7 @@ func TestTheAppIsOneShellAtEveryPage(t *testing.T) {
 		if res.StatusCode != http.StatusOK {
 			t.Fatalf("%s: %d", p, res.StatusCode)
 		}
-		if !strings.Contains(body, `<div id="app"></div>`) || !strings.Contains(body, `src="/assets/app/main.js?v=`+assetVersion+`"`) {
+		if !strings.Contains(body, `<div id="app"></div>`) || !regexp.MustCompile(`src="/assets/app/main-[A-Za-z0-9_-]{8}\.js"`).MatchString(body) {
 			t.Errorf("%s isn't the app's shell: %s", p, body)
 		}
 		if strings.Contains(body, "/assets/js/app.js") {
@@ -71,7 +71,14 @@ func TestTheAppIsOneShellAtEveryPage(t *testing.T) {
 	if res, _ := get(t, client, srv.URL+"/o/nope/today"); res.StatusCode != http.StatusNotFound {
 		t.Errorf("an organisation you aren't in: %d", res.StatusCode)
 	}
-	if res, _ := get(t, client, srv.URL+"/assets/app/main.js?v="+assetVersion); res.StatusCode != http.StatusOK || !strings.Contains(res.Header.Get("Cache-Control"), "immutable") {
+	// The script carries no version: the chunks import it by its bare name, and under two
+	// addresses it would run twice, with two Reacts.
+	_, shell := get(t, client, srv.URL+"/o/alpha/today")
+	script := regexp.MustCompile(`src="(/assets/app/main-[^"]+)"`).FindStringSubmatch(shell)
+	if script == nil {
+		t.Fatal("the shell names no script")
+	}
+	if res, _ := get(t, client, srv.URL+script[1]); res.StatusCode != http.StatusOK || !strings.Contains(res.Header.Get("Cache-Control"), "immutable") {
 		t.Errorf("the app's script: %d %s", res.StatusCode, res.Header.Get("Cache-Control"))
 	}
 	// Each page is a chunk the script fetches by its own name, without the version: named
@@ -85,7 +92,7 @@ func TestTheAppIsOneShellAtEveryPage(t *testing.T) {
 			t.Errorf("%s isn't named for its content, so it can't be kept for good", c)
 		}
 	}
-	if res, _ := get(t, client, srv.URL+strings.TrimPrefix(chunks[0], "assets")); res.StatusCode != http.StatusOK || !strings.Contains(res.Header.Get("Cache-Control"), "immutable") {
+	if res, _ := get(t, client, srv.URL+"/"+chunks[0]); res.StatusCode != http.StatusOK || !strings.Contains(res.Header.Get("Cache-Control"), "immutable") {
 		t.Errorf("a page's chunk: %d %s", res.StatusCode, res.Header.Get("Cache-Control"))
 	}
 

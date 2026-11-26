@@ -22,6 +22,7 @@ Tests call `t.Parallel()` and get a database from `tempStore(t)` (one migrated t
   - draws the sidebar itself (`web/src/components/app/layout.tsx`) from `GET /o/{org}/api/v1/nav`, which also gives the pages `useSession()`;
   - reads and writes only through the typed client (`$api` in `web/src/client.ts`, openapi-react-query over the spec). Anything it needs that the API lacks goes into `api/openapi.yaml` first;
   - builds from shadcn/ui. `web/src/components/ui/` is exactly what `npx shadcn@latest add <name>` writes (run it in `web/`): never edit those files. Prospector's look goes in wrappers in `web/src/components/app/`;
+  - draws while its data loads, and nothing already on screen moves when it arrives (`web/src/components/app/skeleton.tsx`). A row, card or heading is one component with its data optional, showing a `Bar` one line tall in place of each piece of text; a list shows `placeholders` rows of it; a query whose filters or page change keeps its previous data (`keepPreviousData`, never on a query for one entity); a block whose presence or size depends on data and sits above others is held back, or the parts stacked under it go in `Settled`; placeholders stop when a load fails. Each page is its own chunk (the `pages` table in `router.tsx`), named for its content;
   - takes its styles from the shared `assets/css/output.css`, so rebuild the CSS after adding classes;
   - is built with `npm run build` in `web/`, which writes `assets/app/index.html` and `assets/app/main.js` (not committed).
 

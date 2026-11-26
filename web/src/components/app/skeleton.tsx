@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
+import { type ReactNode, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 // A component's loading state is the same component drawn without its data: each piece
@@ -23,6 +24,29 @@ export function Text({ value, w, className }: { value: ReactNode | undefined; w:
 export function Loading({ busy, children, className }: { busy: boolean; children: ReactNode; className?: string }) {
   return (
     <div aria-busy={busy || undefined} className={className}>
+      {children}
+    </div>
+  );
+}
+
+// Settled keeps a region hidden until the queries under way when it appeared have all
+// answered, for parts stacked on each other whose sizes only the data decides: they
+// then show at once, in place, instead of pushing each other about as each arrives.
+export function Settled({ children, className }: { children: ReactNode; className?: string }) {
+  const client = useQueryClient();
+  const fetching = useIsFetching();
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (settled) return;
+    // The queries start as the region mounts, after this render counted them, so look
+    // again once they have.
+    const frame = requestAnimationFrame(() => {
+      if (client.isFetching() === 0) setSettled(true);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [client, fetching, settled]);
+  return (
+    <div aria-busy={!settled || undefined} className={cn(!settled && "invisible", className)}>
       {children}
     </div>
   );

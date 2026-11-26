@@ -17,10 +17,13 @@ var assetFS embed.FS
 
 // webBuilt reports whether the binary was built after the web app, which writes these.
 func webBuilt(fsys fs.FS) error {
-	for _, name := range []string{"app/index.html", "app/main.js", "app/site.html", "app/site.js", "app/api.html", "js/pdf.worker.min.mjs"} {
+	for _, name := range []string{"app/index.html", "app/site.html", "app/site.js", "app/api.html", "js/pdf.worker.min.mjs"} {
 		if _, err := fs.Stat(fsys, "assets/"+name); err != nil {
 			return fmt.Errorf("built without the web app (no assets/%s): run `npm ci && npm run build` in web/, then build again", name)
 		}
+	}
+	if scripts, _ := fs.Glob(fsys, "assets/app/main-*.js"); len(scripts) == 0 {
+		return fmt.Errorf("built without the web app (no assets/app/main-*.js): run `npm ci && npm run build` in web/, then build again")
 	}
 	return nil
 }
@@ -53,7 +56,7 @@ func assetHandler() http.Handler {
 		// Embedded files carry no date to revalidate against, so anything not cached
 		// for good is fetched again on every page. A font that changes gets a new name, and
 		// so does each of the app's chunks, named for its content when it is built.
-		if strings.HasPrefix(r.URL.Path, "fonts/") || strings.HasPrefix(r.URL.Path, "app/chunks/") || r.URL.Query().Get("v") == assetVersion {
+		if strings.HasPrefix(r.URL.Path, "fonts/") || strings.HasPrefix(r.URL.Path, "app/chunks/") || strings.HasPrefix(r.URL.Path, "app/main-") || r.URL.Query().Get("v") == assetVersion {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		} else {
 			w.Header().Set("Cache-Control", "no-cache")
