@@ -97,6 +97,9 @@ func (a *App) keepSigning(ctx context.Context, every time.Duration) {
 // signingRound is one go of the loop; safe beside another server doing the same.
 func (a *App) signingRound(ctx context.Context, now time.Time) {
 	logged(a.s.db.Model(&AgreementMail{}).Where("status = ? and next_at < ?", mailSending, now.Add(-10*time.Minute)).Update("status", mailQueued))
+	// Spent sessions and links open nothing; what they did is in the events.
+	logged(a.s.db.Where("expires_at < ?", now.Add(-24*time.Hour)).Delete(&SignerSession{}))
+	logged(a.s.db.Where("expires_at < ?", now.Add(-24*time.Hour)).Delete(&SignerLink{}))
 	if err := a.s.expireAgreements(now); err != nil {
 		log.Printf("ending agreements whose time ran out: %v", err)
 	}
@@ -320,7 +323,8 @@ func (a *App) writeAndSend(ctx context.Context, m AgreementMail) error {
 			kind = ""
 		case mailDeclined:
 			var sender User
-			if ag.SentByUser == 0 || tx.First(&sender, ag.SentByUser).Error != nil {
+			// Only to a sender who is still a member: someone who has left hears nothing of it.
+			if ag.SentByUser == 0 || tx.First(&sender, ag.SentByUser).Error != nil || tx.Where("org_id = ? and user_id = ?", o.ID, ag.SentByUser).First(&Membership{}).Error != nil {
 				return errNoMailToSend
 			}
 			to = sender.Email

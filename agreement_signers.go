@@ -62,9 +62,6 @@ type AgreementRecipient struct {
 	// Erased is someone erased on their request after it went out: kept as the
 	// agreement's record, left out of exports.
 	Erased bool `gorm:"not null;default:false" json:"-"`
-	// Codes is how many signing codes have been mailed to them on the day CodesOn.
-	Codes   int    `gorm:"not null;default:0" json:"-"`
-	CodesOn string `gorm:"not null;default:''" json:"-"`
 }
 
 // AgreementField is a place on a page that one signer fills in. X, Y, W and H are
@@ -162,15 +159,17 @@ func (s *Store) agreementPages(org int64, a *Agreement) (int, error) {
 	return n, s.in(org).Model(&Agreement{}).Where("id = ? and file_hash = ?", a.ID, a.FileHash).Update("page_count", n).Error
 }
 
+// draft is a draft to change, its row locked, so a change and sending it take turns: no
+// change lands on an agreement just sent.
 func (s *Store) draft(tx *gorm.DB, org, id int64) (*Agreement, error) {
-	var a Agreement
-	if err := tx.Where("org_id = ? and id = ?", org, id).First(&a).Error; err != nil {
-		return nil, missing(err, "no agreement %d", id)
+	a, err := lockAgreement(tx, org, id)
+	if err != nil {
+		return nil, err
 	}
 	if a.Status != AgreementDraft {
 		return nil, errNotDraft
 	}
-	return &a, nil
+	return a, nil
 }
 
 // AgreementRecipients are an agreement's signers in their order, then those who get a copy.

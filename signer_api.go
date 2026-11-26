@@ -70,7 +70,9 @@ func (s signerServer) view(g *Signing) (signer.Signing, error) {
 			Signed bool   `json:"signed"`
 			You    bool   `json:"you"`
 		}{}}
-	if !g.Session.Proven {
+	// Before the code, and once it can no longer be signed or downloaded, only who is asking
+	// and what.
+	if !g.Session.Proven || codesFor(g) != nil {
 		return out, nil
 	}
 	out.Name, out.Message, out.Pages, out.ExpiresAt = g.Recipient.SentName, g.Agreement.Message, g.Agreement.PageCount, g.Agreement.ExpiresAt

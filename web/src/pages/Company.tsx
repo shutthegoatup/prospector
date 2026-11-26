@@ -764,7 +764,7 @@ function SignStatus({ a }: { a: Agreement }) {
             Download the signed copy
           </a>
         )}
-        {sales && a.status === "sent" && (
+        {sales && (a.status === "sent" || (a.status === "sealing" && a.seal_problem !== "")) && (
           <ActionButton
             quiet
             size="xs"

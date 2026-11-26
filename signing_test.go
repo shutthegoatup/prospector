@@ -288,7 +288,9 @@ func TestASentAgreementCanBeWithdrawnDeclinedOrRunOut(t *testing.T) {
 	})
 }
 
-// A code can be tried five times; a link takes thirty wrong codes in all.
+// A code can be tried five times, and a link mails ten codes a day. Whoever has a
+// forwarded copy can waste a link's codes, never its signer's: a link sent again starts
+// afresh, and wrong guesses never close the session the signer already proved.
 func TestASignersCodeCantBeGuessed(t *testing.T) {
 	x := newSigningSite(t)
 	must(x.s.SendAgreement(x.o, x.a.ID, SendIn{}, x.ada, "Ada Lovelace"))
@@ -306,11 +308,31 @@ func TestASignersCodeCantBeGuessed(t *testing.T) {
 	if err := x.s.ProveSigning(must(x.s.SigningBySession(session)), session, code, "", ""); err == nil {
 		t.Error("the right code was taken after five wrong ones")
 	}
-	if err := x.s.db.Model(&SignerLink{}).Where("recipient_id = ?", x.hRecip.ID).Update("failures", linkFailures).Error; err != nil {
+
+	// The signer proves her own browser; then someone else burns the link's codes.
+	real, _ := x.proveAs(link, "hannah@larkmoor.example")
+	if err := x.s.db.Model(&SignerLink{}).Where("recipient_id = ?", x.hRecip.ID).
+		Updates(map[string]any{"codes": codesADay, "codes_on": time.Now().UTC().Format(time.DateOnly)}).Error; err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := x.s.OpenSigning(strings.TrimPrefix(link, testSite+"/s/"), ""); err == nil {
-		t.Error("a link with thirty wrong codes still opens")
+	other, og := must2(x.s.OpenSigning(strings.TrimPrefix(link, testSite+"/s/"), ""))
+	if _, err := x.s.SigningCode(og, other, "", "", nil); err == nil {
+		t.Error("an eleventh code from one link in a day")
+	}
+	if g := must(x.s.SigningBySession(real)); !g.Session.Proven {
+		t.Error("the signer's own proven session closed")
+	}
+	if err := x.s.db.Model(&AgreementMail{}).Where("recipient_id = ?", x.hRecip.ID).Update("created_at", time.Now().Add(-time.Hour)).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := x.s.ResendLink(x.o.ID, x.a.ID, x.hRecip.ID, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	x.round()
+	_, fresh := x.mailTo("hannah@larkmoor.example")
+	session2, g2 := must2(x.s.OpenSigning(strings.TrimPrefix(fresh, testSite+"/s/"), ""))
+	if _, err := x.s.SigningCode(g2, session2, "", "", nil); err != nil {
+		t.Errorf("a code from a link sent again: %v", err)
 	}
 }
 

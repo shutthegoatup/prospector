@@ -121,6 +121,10 @@ func (s *Store) SendAgreement(o *Org, id int64, in SendIn, user *User, actor str
 	if utf8.RuneCountInString(in.Subject) > 200 || utf8.RuneCountInString(in.Message) > 2000 {
 		return nil, errors.New("a subject is 200 characters at most and a message 2,000")
 	}
+	checked, err := draftPrint(s.db, o.ID, a)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.sendable(o, a, actor); err != nil {
 		return nil, err
 	}
@@ -137,6 +141,11 @@ func (s *Store) SendAgreement(o *Org, id int64, in SendIn, user *User, actor str
 		}
 		if a.Status != AgreementDraft {
 			return errNotDraft
+		}
+		// What was checked is what goes: a change that landed between the checks and the
+		// lock sends nothing.
+		if got, err := draftPrint(tx, o.ID, a); err != nil || got != checked {
+			return errors.Join(err, errors.New("it changed while it was being sent: check it and send it again"))
 		}
 		parties, err := s.recipientsIn(tx, o.ID, id)
 		if err != nil {
@@ -176,6 +185,35 @@ func (s *Store) SendAgreement(o *Org, id int64, in SendIn, user *User, actor str
 		return nil, err
 	}
 	return s.Agreement(o.ID, id)
+}
+
+// draftPrint is everything about a draft that sending checks: its document, who it goes
+// to and in what order, and its fields.
+func draftPrint(db *gorm.DB, org int64, a *Agreement) (string, error) {
+	var parties []AgreementRecipient
+	if err := db.Where("org_id = ? and agreement_id = ?", org, a.ID).Order("id").Find(&parties).Error; err != nil {
+		return "", err
+	}
+	var fields []AgreementField
+	if err := db.Where("org_id = ? and agreement_id = ?", org, a.ID).Order("id").Find(&fields).Error; err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s|%v|%s\n", a.FileHash, a.InOrder, a.Name)
+	for _, p := range parties {
+		var contact, user int64
+		if p.ContactID != nil {
+			contact = *p.ContactID
+		}
+		if p.UserID != nil {
+			user = *p.UserID
+		}
+		fmt.Fprintf(&b, "%d %d %s %d %d\n", p.ID, p.Position, p.Role, contact, user)
+	}
+	for _, f := range fields {
+		fmt.Fprintf(&b, "%d %d %d %s %g %g %g %g %q\n", f.ID, f.RecipientID, f.Page, f.Kind, f.X, f.Y, f.W, f.H, f.Label)
+	}
+	return hashBytes([]byte(b.String())), nil
 }
 
 func countSigners(ps []Party) int {
@@ -413,15 +451,19 @@ func (s *Store) VoidAgreement(org, id int64, reason, actor string) (*Agreement, 
 		if err != nil {
 			return err
 		}
-		switch a.Status {
-		case AgreementSent:
-		case AgreementSealing:
+		switch {
+		case a.Status == AgreementSent:
+		// Once everyone has signed it can be withdrawn only if sealing has failed, so one
+		// that can't be sealed isn't stuck for good.
+		case a.Status == AgreementSealing && a.SealProblem != "":
+		case a.Status == AgreementSealing:
 			return errors.New("everyone has signed: it is being sealed, and can't be withdrawn")
 		default:
 			return errNotSent
 		}
-		if err := tx.Model(&Agreement{}).Where("id = ? and status = ?", id, AgreementSent).Updates(map[string]any{"status": AgreementVoided, "updated_by": actor}).Error; err != nil {
-			return err
+		res := tx.Model(&Agreement{}).Where("id = ? and status = ?", id, a.Status).Updates(map[string]any{"status": AgreementVoided, "updated_by": actor})
+		if res.Error != nil || res.RowsAffected == 0 {
+			return errors.Join(res.Error, errNotSent)
 		}
 		detail := "Withdrawn by " + actor
 		if reason != "" {

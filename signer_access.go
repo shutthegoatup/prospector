@@ -28,8 +28,6 @@ const (
 	codeTries       = 5
 	codeGap         = time.Minute
 	codesADay       = 10
-	// linkFailures is how many wrong codes, all told, kill a link: a new one has to be sent.
-	linkFailures = 30
 	// copyLife is how long the link to a sealed copy lasts.
 	copyLife = 90 * 24 * time.Hour
 )
@@ -45,7 +43,10 @@ type SignerLink struct {
 	RecipientID int64     `gorm:"index;not null"`
 	TokenHash   string    `gorm:"uniqueIndex;not null"`
 	ExpiresAt   time.Time `gorm:"not null"`
-	Failures    int       `gorm:"not null;default:0"`
+	// Codes is how many codes have been mailed from this link on the day CodesOn: a link
+	// sent again starts afresh, so someone who wastes one link's codes can't lock its signer out.
+	Codes   int    `gorm:"not null;default:0"`
+	CodesOn string `gorm:"not null;default:''"`
 	CreatedAt   time.Time
 }
 
@@ -84,7 +85,7 @@ type Signing struct {
 
 func (s *Store) signingFor(sess SignerSession) (*Signing, error) {
 	g := Signing{Session: sess}
-	if err := s.db.First(&g.Link, sess.LinkID).Error; err != nil || time.Now().After(g.Link.ExpiresAt) || g.Link.Failures >= linkFailures {
+	if err := s.db.First(&g.Link, sess.LinkID).Error; err != nil || time.Now().After(g.Link.ExpiresAt) {
 		return nil, errNoSigning
 	}
 	if err := s.db.Where("org_id = ? and id = ?", g.Link.OrgID, g.Link.RecipientID).First(&g.Recipient).Error; err != nil || g.Recipient.Erased {
@@ -160,7 +161,7 @@ func (s *Store) SigningCode(g *Signing, token, ip, browser string, send func(to,
 		return "", errors.New("a code went a moment ago: give it a minute, then ask again")
 	}
 	day := now.UTC().Format(time.DateOnly)
-	res = s.db.Model(&AgreementRecipient{}).Where("id = ? and not (codes_on = ? and codes >= ?)", g.Recipient.ID, day, codesADay).
+	res = s.db.Model(&SignerLink{}).Where("id = ? and not (codes_on = ? and codes >= ?)", g.Link.ID, day, codesADay).
 		Updates(map[string]any{"codes": gorm.Expr("case when codes_on = ? then codes + 1 else 1 end", day), "codes_on": day})
 	if res.Error != nil || res.RowsAffected == 0 {
 		logged(s.db.Model(&SignerSession{}).Where("id = ?", g.Session.ID).Update("code_hash", ""))
@@ -196,8 +197,10 @@ func (s *Store) SigningCode(g *Signing, token, ip, browser string, send func(to,
 // six digits alone would be found from their hash in moments.
 func codeHash(session, code string) string { return hashToken(session + ":" + code) }
 
-// ProveSigning checks a code a browser gives back. Five wrong tries end that code;
-// thirty, all told, end the link.
+// ProveSigning checks a code a browser gives back. Five wrong tries end that code; with
+// ten codes a day from a link, that is fifty guesses a day at a million codes. Wrong
+// guesses never end the link itself, which would let whoever had a forwarded copy of it
+// lock out the person it was sent to.
 func (s *Store) ProveSigning(g *Signing, token, code, ip, browser string) error {
 	if err := codesFor(g); err != nil {
 		return err
@@ -219,8 +222,7 @@ func (s *Store) ProveSigning(g *Signing, token, code, ip, browser string) error 
 	}
 	rid := g.Recipient.ID
 	if subtle.ConstantTimeCompare([]byte(codeHash(token, code)), []byte(sess.CodeHash)) != 1 {
-		return errors.Join(s.db.Model(&SignerLink{}).Where("id = ?", g.Link.ID).Update("failures", gorm.Expr("failures + 1")).Error,
-			errors.New("that isn't the code: check the latest email"))
+		return errors.New("that isn't the code: check the latest email")
 	}
 	until := time.Now().Add(sessionProven)
 	if g.Agreement.ExpiresAt != nil && g.Agreement.Status == AgreementSent && g.Agreement.ExpiresAt.Before(until) {

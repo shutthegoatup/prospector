@@ -199,7 +199,7 @@ func TestAgreementsFromBeforeSendingCanBeSentAfterTheUpgrade(t *testing.T) {
 	must(old.PutAgreementFields(o.ID, a.ID, []AgreementField{{RecipientID: r.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.7, W: 0.3, H: 0.05}}))
 	for model, columns := range map[any][]string{
 		&Agreement{}:          {"sent_at", "sent_by", "sent_by_user", "sent_org", "expires_at", "subject", "message", "sealed_hash", "seal_problem", "completed_at"},
-		&AgreementRecipient{}: {"sent_name", "sent_email", "status", "signed_at", "typed_name", "signed_via", "decline_reason", "erased", "codes", "codes_on"},
+		&AgreementRecipient{}: {"sent_name", "sent_email", "status", "signed_at", "typed_name", "signed_via", "decline_reason", "erased"},
 		&AgreementField{}:     {"label", "value"},
 	} {
 		for _, c := range columns {
@@ -225,5 +225,55 @@ func TestAgreementsFromBeforeSendingCanBeSentAfterTheUpgrade(t *testing.T) {
 	}
 	if got := must(s.Agreement(o.ID, a.ID)); got.Status != AgreementSealing {
 		t.Errorf("after its only signer signed: %s", got.Status)
+	}
+}
+
+// One that can't be sealed can be withdrawn once a try has failed, so it isn't stuck.
+func TestAnAgreementThatWontSealCanBeWithdrawn(t *testing.T) {
+	x := newSigningSite(t)
+	must(x.s.SendAgreement(x.o, x.a.ID, SendIn{}, x.ada, "Ada Lovelace"))
+	if err := x.s.db.Model(&Agreement{}).Where("id = ?", x.a.ID).Update("status", AgreementSealing).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := x.s.VoidAgreement(x.o.ID, x.a.ID, "", "Ada Lovelace"); err == nil {
+		t.Error("withdrawn while it was being sealed")
+	}
+	if err := x.s.db.Model(&Agreement{}).Where("id = ?", x.a.ID).Update("seal_problem", "the key wouldn't open").Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := x.s.VoidAgreement(x.o.ID, x.a.ID, "", "Ada Lovelace"); err != nil {
+		t.Errorf("withdrawing one that won't seal: %v", err)
+	}
+}
+
+// Once sent, a draft's fields can't be changed under its signers.
+func TestASentAgreementTakesNoMoreChanges(t *testing.T) {
+	x := newSigningSite(t)
+	must(x.s.SendAgreement(x.o, x.a.ID, SendIn{}, x.ada, "Ada Lovelace"))
+	if _, err := x.s.PutAgreementFields(x.o.ID, x.a.ID, nil); err == nil {
+		t.Error("its fields changed after it was sent")
+	}
+}
+
+// A sender who has left the organisation hears nothing of a decline.
+func TestADeclineIsntMailedToASenderWhoLeft(t *testing.T) {
+	x := newSigningSite(t)
+	must(x.s.SendAgreement(x.o, x.a.ID, SendIn{}, x.ada, "Ada Lovelace"))
+	x.round()
+	_, link := x.mailTo("hannah@larkmoor.example")
+	_, g := x.proveAs(link, "hannah@larkmoor.example")
+	must(x.s.SignerDeclines(g, "No", Who{}))
+	grace := must(x.s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
+	if err := x.s.AddMember(x.o.ID, grace.ID, "owner", "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := x.s.RemoveMember(x.o.ID, x.ada.ID, "Grace Hopper"); err != nil {
+		t.Fatal(err)
+	}
+	x.round()
+	for _, to := range x.box.to() {
+		if to == "ada@example.com" {
+			t.Error("the decline went to a sender who has left")
+		}
 	}
 }
