@@ -131,9 +131,6 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if len(emails) > 0 {
 			gone = tx.Where("org_id = ? and (contact_id = ? or email in ?)", org, id, emails)
 		}
-		if err := forgetAddresses(tx, org, emails); err != nil {
-			return err
-		}
 		// The mails a campaign sent them stay counted, and say nothing of who they were.
 		recipients := tx.Model(&CampaignRecipient{}).Where("org_id = ? and contact_id = ?", org, id)
 		if len(emails) > 0 {
@@ -143,6 +140,11 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if err := recipients.Updates(map[string]any{"contact_id": nil, "address": gorm.Expr("'erased:' || id"), "name": "",
 			"status": gorm.Expr("case when status = ? then ? else status end", MailQueued, MailSkipped),
 			"reason": gorm.Expr("case when status = ? then ? else reason end", MailQueued, "erased on request")}).Error; err != nil {
+			return err
+		}
+		// After their mail is taken: a send claims its mail only once its unsubscribe link
+		// is made, so a claim made first has a link this sees, and one made later fails.
+		if err := forgetAddresses(tx, org, emails); err != nil {
 			return err
 		}
 		// With what was said in answering them: their words, and ours to them.
