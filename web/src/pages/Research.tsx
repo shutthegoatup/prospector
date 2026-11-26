@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
-import { ActionButton, Eyebrow, Failed, FilterChip, Meta, Pill, Section, type Tone, useRefresh } from "@/components/app";
+import { ActionButton, Eyebrow, Failed, FilterChip, Meta, Pill, Section, type Tone, useRefresh, Whose } from "@/components/app";
 import { actor, day, stamp } from "@/lib/format";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
@@ -80,6 +80,7 @@ export function ResearchPage() {
         outreach until someone qualifies it and picks a contact. Every fact keeps the link it came from.
       </p>
 
+      <Whose area="sales" work="Research is" can={sales} />
       {sales && <FindBox agents={ready} lookingFor={settings.data?.looking_for ?? []} />}
 
       <div className="mb-5 flex flex-col gap-2" aria-label="Searches">

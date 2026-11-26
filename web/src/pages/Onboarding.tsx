@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
-import { ActionButton, Empty, Eyebrow, Failed, Meta, PageHead, Pill, type Tone, useRefresh } from "@/components/app";
+import { ActionButton, Empty, Eyebrow, Failed, Meta, PageHead, Pill, type Tone, useRefresh, Whose } from "@/components/app";
 import { Input } from "@/components/ui/input";
 import { actor, plural } from "@/lib/format";
 import { useSession } from "@/session";
@@ -30,7 +30,7 @@ function stepMeta(s: Step, day: string) {
 }
 
 export function OnboardingPage() {
-  const { org } = useSession();
+  const { org, support } = useSession();
   const list = $api.useQuery("get", "/o/{org}/api/v1/onboardings", { params: { path: { org }, query: { limit: 200 } } });
   const settings = $api.useQuery("get", "/o/{org}/api/v1/settings", { params: { path: { org } } });
   const planned = (settings.data?.onboarding_steps ?? "").split("\n").filter((l) => l.trim()).length;
@@ -42,6 +42,7 @@ export function OnboardingPage() {
         The steps between a signature and a live customer. Each onboarding is a copy of your steps, made the day it starts, so changing them in
         Settings later leaves the ones running as they are. Start one from a company's page. Ones running late come first.
       </p>
+      <Whose area="support" work="Onboarding is" can={support} />
       {settings.data && planned === 0 && (
         <Empty title="No steps written yet" hint="An owner writes the steps under Settings, one a line. Then start an onboarding from a company's page." />
       )}
