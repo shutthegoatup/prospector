@@ -133,7 +133,7 @@ func (s *Store) SigningBySession(token string) (*Signing, error) {
 
 // SigningCode makes a code for a session to give back, and says where to mail it. A
 // session has one live code; codes go a minute apart at most, and ten a day to a person.
-func (s *Store) SigningCode(g *Signing, token, ip, browser string) (code string, err error) {
+func (s *Store) SigningCode(g *Signing, token, ip, browser string, send func(to, code string) error) (code string, err error) {
 	now := time.Now()
 	if g.Session.CodeSentAt != nil && now.Sub(*g.Session.CodeSentAt) < codeGap {
 		return "", errors.New("a code went a moment ago: give it a minute, then ask again")
@@ -152,10 +152,21 @@ func (s *Store) SigningCode(g *Signing, token, ip, browser string) (code string,
 	}
 	code = fmt.Sprintf("%06d", n.Int64())
 	expires := now.Add(codeLife)
+	if err := s.db.Model(&SignerSession{}).Where("id = ?", g.Session.ID).Updates(map[string]any{
+		"code_hash": codeHash(token, code), "code_expires": expires, "code_tries": 0, "code_sent_at": now,
+	}).Error; err != nil {
+		return "", err
+	}
+	// The record says a code went only once the mail server has taken it. One that
+	// didn't go leaves nothing to enter, and asking again isn't held back.
+	if send != nil {
+		if err := send(g.Recipient.SentEmail, code); err != nil {
+			logged(s.db.Model(&SignerSession{}).Where("id = ?", g.Session.ID).Updates(map[string]any{"code_hash": "", "code_sent_at": nil}))
+			return "", fmt.Errorf("the code couldn't be emailed just now: try again in a moment (%w)", err)
+		}
+	}
 	err = s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&SignerSession{}).Where("id = ?", g.Session.ID).Updates(map[string]any{
-			"code_hash": codeHash(token, code), "code_expires": expires, "code_tries": 0, "code_sent_at": now, "opened": true,
-		}).Error; err != nil {
+		if err := tx.Model(&SignerSession{}).Where("id = ?", g.Session.ID).Update("opened", true).Error; err != nil {
 			return err
 		}
 		rid := g.Recipient.ID

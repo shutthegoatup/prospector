@@ -400,6 +400,7 @@ func (a *App) Routes() http.Handler {
 
 	a.apiRoutes(mux)
 	a.routeAPI(mux)
+	a.routeSigning(mux)
 	a.wellKnownRoutes(mux)
 
 	sameOrigin := http.NewCrossOriginProtection()

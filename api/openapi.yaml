@@ -17,7 +17,8 @@ info:
     `campaigns:write` to write campaigns and keep the list of addresses marketing mail
     never goes to; `campaigns:send` to send, cancel and resume a campaign;
     `agreements:write` to start agreements, upload their documents and set out who signs
-    them and where; `enrich:spend` to ask the organisation's enrichment vendors, at its cost,
+    them and where; `agreements:send` to send them for signature, email a signer their link
+    again and withdraw them; `enrich:spend` to ask the organisation's enrichment vendors, at its cost,
     for someone's email, phone or profile; `people:privacy` to export everything held on a
     person and erase them on their request; `settings:write` to change the organisation's
     settings and its enrichment vendors; `team:write` to add and remove members and change
@@ -2043,6 +2044,200 @@ paths:
         - bearer: ["agreements:write"]
       responses:
         "204": { description: Removed. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agreements/{id}/send:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: sendAgreement
+      tags: [agreements]
+      summary: Send a draft for signature
+      description: |
+        Freezes who it goes to and where each signs, and emails the first signer (or every
+        signer, when they sign in any order) a link, through the organisation's own mail
+        server. Refused while anything is missing, anyone on it can't be mailed (the
+        never-contact list), any name couldn't be drawn on the sealed copy, or a dry run of
+        sealing fails. Signers outside the organisation sign with an emailed code and their
+        typed name; members sign signed in.
+      security:
+        - session: []
+        - bearer: ["agreements:send"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subject: { type: string, maxLength: 200, description: "The mail's subject; \"Please sign: <name>\" if empty." }
+                message: { type: string, maxLength: 2000, description: "A note to the signers, in their mail and on the page once they've given the code." }
+                days: { type: integer, minimum: 1, maximum: 60, description: "How many days it can be signed for; 14 if left out." }
+      responses:
+        "200":
+          description: The agreement, sent.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Agreement" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agreements/{id}/void:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: voidAgreement
+      tags: [agreements]
+      summary: Withdraw an agreement out for signature
+      description: Nobody can sign it after, and the signers already sent it are emailed that it was withdrawn. Refused once everyone has signed.
+      security:
+        - session: []
+        - bearer: ["agreements:send"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: The agreement, withdrawn.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Agreement" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agreements/{id}/recipients/{recipient}/resend:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+      - name: recipient
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    post:
+      operationId: resendAgreementLink
+      tags: [agreements]
+      summary: Email a signer whose turn it is their link again
+      description: Five minutes apart at most.
+      security:
+        - session: []
+        - bearer: ["agreements:send"]
+      responses:
+        "204": { description: Queued. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agreements/{id}/sign:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: signAgreementAsMember
+      tags: [agreements]
+      summary: Sign your own place on an agreement, signed in
+      description: |
+        Only the member the place is for, when it's their turn; never another member, an owner
+        included, and never an API key, whatever its scopes.
+      security:
+        - session: []
+        # Named for the spec's rule; no key may make this one, whatever its scopes (keyless).
+        - bearer: ["agreements:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SignByMember" }
+      responses:
+        "200":
+          description: The agreement.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Agreement" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agreements/{id}/decline:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: declineAgreementAsMember
+      tags: [agreements]
+      summary: Decline your own place on an agreement, signed in
+      security:
+        - session: []
+        # Named for the spec's rule; no key may make this one, whatever its scopes (keyless).
+        - bearer: ["agreements:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: The agreement.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Agreement" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agreements/{id}/sealed:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: getSealedAgreement
+      tags: [agreements]
+      summary: Download the signed and sealed copy
+      description: The PDF with every signer's fields filled in and its certificate as the last page, sealed with the organisation's key. Checked against its SHA-256 as it is read.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The sealed PDF.
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agreements/{id}/events:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listAgreementEvents
+      tags: [agreements]
+      summary: What happened to an agreement once it went out, in order
+      description: Each event carries the hash of the one before it, so a change after the fact shows; the list is checked as it is read.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: Oldest first.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AgreementEvent" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/agreements/{id}/fields:
@@ -4703,12 +4898,25 @@ components:
         or erased. Anything promotional in it makes it marketing, whatever it is called.
     Agreement:
       type: object
-      required: [id, company_id, name, status, file_name, file_size, file_hash, page_count, round, in_order, created_by, updated_by, created_at, updated_at]
+      required: [id, company_id, name, status, file_name, file_size, file_hash, page_count, round, in_order, created_by, updated_by, created_at, updated_at, sent_by, subject, message, sealed_hash]
       properties:
         id: { type: integer, format: int64 }
         company_id: { type: integer, format: int64 }
         name: { type: string }
-        status: { type: string, enum: [draft], description: "Every agreement is a draft until sending arrives." }
+        status:
+          type: string
+          enum: [draft, sent, sealing, completed, declined, voided, expired]
+          description: |
+            draft until it is sent; sent while it is out for signature; sealing once everyone has
+            signed, for the moment it takes to seal; completed once sealed. declined, voided
+            (withdrawn) and expired (its time ran out) are where it ended unsigned.
+        sent_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
+        sent_by: { type: string }
+        expires_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false, description: "Until when it can be signed." }
+        subject: { type: string, description: "The subject its signers' mail went with." }
+        message: { type: string, description: "What the sender wrote to its signers." }
+        sealed_hash: { type: string, description: "The sealed copy's SHA-256, once completed." }
+        completed_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
         file_name: { type: string, description: "Empty until a document is uploaded." }
         file_size: { type: integer, format: int64, description: In bytes. }
         file_hash: { type: string, description: "The document's SHA-256, in hex; empty until one is uploaded." }
@@ -4723,10 +4931,16 @@ components:
       allOf:
         - $ref: "#/components/schemas/Agreement"
         - type: object
-          required: [company, problem, people, members]
+          required: [company, problem, people, members, missing, cant_send, my_turn]
           properties:
             company: { type: string, description: "The company's name." }
             problem: { type: string, description: "Why the document can't be read to place fields on it; empty when it can." }
+            missing:
+              type: array
+              items: { type: string }
+              description: What the draft still lacks before it can be sent.
+            cant_send: { type: string, description: "Why this server can't send it for this organisation (its own mail server, its public address); empty when it can." }
+            my_turn: { type: boolean, description: "Whether it's the signed-in member's turn to sign it." }
             people:
               type: array
               items: { $ref: "#/components/schemas/Invitable" }
@@ -4745,8 +4959,14 @@ components:
         role: { type: string, enum: [signer, copy] }
         contact_id: { type: integer, format: int64, nullable: true, x-go-type-skip-optional-pointer: false }
         member_id: { type: integer, format: int64, nullable: true, x-go-type-skip-optional-pointer: false, description: "A member's user id." }
-        name: { type: string, description: "As they are named now; sending will freeze it." }
-        email: { type: string, description: "Where it will go; sending will freeze it." }
+        name: { type: string, description: "As they are named now; once sent, as it was sent." }
+        email: { type: string, description: "Where it will go; once sent, where it went." }
+        status:
+          type: string
+          enum: ["", waiting, due, signed, declined]
+          description: Once sent, where a signer stands; empty for a draft and for someone who gets a copy.
+        signed_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
+        decline_reason: { type: string }
         created_by: { type: string }
         created_at: { type: string, format: date-time }
     AgreementFieldIn:
@@ -4760,14 +4980,41 @@ components:
         y: { type: number, minimum: 0, maximum: 1, description: "From the page's top edge, as a fraction of its height." }
         w: { type: number, minimum: 0.01, maximum: 1 }
         h: { type: number, minimum: 0.01, maximum: 1 }
+        label: { type: string, maxLength: 80, description: "What a text field or tick box asks of the signer; needed for those before sending." }
     AgreementField:
       allOf:
         - $ref: "#/components/schemas/AgreementFieldIn"
         - type: object
-          required: [id, round]
+          required: [id, round, value]
           properties:
             id: { type: integer, format: int64 }
             round: { type: integer }
+            value: { type: string, description: "What the signer filled in, once signed." }
+    AgreementEvent:
+      type: object
+      required: [id, at, kind, actor, detail, hash]
+      properties:
+        id: { type: integer, format: int64 }
+        at: { type: string, format: date-time }
+        kind: { type: string }
+        actor: { type: string }
+        recipient_id: { type: integer, format: int64, nullable: true, x-go-type-skip-optional-pointer: false }
+        detail: { type: string }
+        hash: { type: string, description: "This event's SHA-256, over it and the hash of the one before." }
+    SignByMember:
+      type: object
+      required: [typed_name, consent]
+      properties:
+        typed_name: { type: string, maxLength: 120 }
+        consent: { type: boolean }
+        values:
+          type: array
+          items:
+            type: object
+            required: [field, value]
+            properties:
+              field: { type: integer, format: int64 }
+              value: { type: string, maxLength: 200 }
     Said:
       type: object
       required: [message]

@@ -77,7 +77,7 @@ func (x *signingSite) proveAs(link, address string) (string, *Signing) {
 	if err != nil {
 		x.t.Fatalf("opening %s: %v", link, err)
 	}
-	code, err := x.s.SigningCode(g, session, "203.0.113.24", "Firefox on macOS")
+	code, err := x.s.SigningCode(g, session, "203.0.113.24", "Firefox on macOS", nil)
 	if err != nil {
 		x.t.Fatal(err)
 	}
@@ -114,8 +114,8 @@ func TestAnAgreementIsSentSignedInOrderAndSealed(t *testing.T) {
 	if _, err := x.s.SignerSigns(g, SignIn{Typed: "Hannah Pryce", Consent: true}, who); err == nil {
 		t.Error("signed without the emailed code")
 	}
-	code := must(x.s.SigningCode(g, session, who.IP, who.Browser))
-	if _, err := x.s.SigningCode(must(x.s.SigningBySession(session)), session, who.IP, who.Browser); err == nil {
+	code := must(x.s.SigningCode(g, session, who.IP, who.Browser, nil))
+	if _, err := x.s.SigningCode(must(x.s.SigningBySession(session)), session, who.IP, who.Browser, nil); err == nil {
 		t.Error("a second code went straight after the first")
 	}
 	g = must(x.s.SigningBySession(session))
@@ -282,7 +282,7 @@ func TestASignersCodeCantBeGuessed(t *testing.T) {
 	x.round()
 	_, link := x.mailTo("hannah@larkmoor.example")
 	session, g := must2(x.s.OpenSigning(strings.TrimPrefix(link, testSite+"/s/")))
-	code := must(x.s.SigningCode(g, session, "", ""))
+	code := must(x.s.SigningCode(g, session, "", "", nil))
 	wrong := "000000"
 	if code == wrong {
 		wrong = "111111"
