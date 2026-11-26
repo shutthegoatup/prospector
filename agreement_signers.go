@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/pdfcpu/pdfcpu/pkg/api"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu"
@@ -48,6 +49,19 @@ type AgreementRecipient struct {
 	UserID      *int64    `gorm:"index" json:"member_id"`
 	CreatedBy   string    `gorm:"not null;default:''" json:"created_by"`
 	CreatedAt   time.Time `json:"created_at"`
+	// What follows is set when the agreement is sent and as it is signed. SentName and
+	// SentEmail are who it went to, frozen then: the record of a sent agreement doesn't
+	// change when the person's details do, or when they are detached from it.
+	SentName      string     `gorm:"not null;default:''" json:"sent_name"`
+	SentEmail     string     `gorm:"not null;default:''" json:"sent_email"`
+	Status        string     `gorm:"not null;default:''" json:"status"`
+	SignedAt      *time.Time `json:"signed_at"`
+	TypedName     string     `gorm:"not null;default:''" json:"typed_name"`
+	SignedVia     string     `gorm:"not null;default:''" json:"signed_via"`
+	DeclineReason string     `gorm:"not null;default:''" json:"decline_reason"`
+	// Erased is someone erased on their request after it went out: kept as the
+	// agreement's record, left out of exports.
+	Erased bool `gorm:"not null;default:false" json:"-"`
 }
 
 // AgreementField is a place on a page that one signer fills in. X, Y, W and H are
@@ -65,6 +79,10 @@ type AgreementField struct {
 	Y           float64 `gorm:"not null;default:0" json:"y"`
 	W           float64 `gorm:"not null;default:0" json:"w"`
 	H           float64 `gorm:"not null;default:0" json:"h"`
+	// Label says what a text field or tick box asks of the signer.
+	Label string `gorm:"not null;default:''" json:"label"`
+	// Value is what the signer filled in, once they sign.
+	Value string `gorm:"not null;default:''" json:"value"`
 }
 
 // fieldKinds are what a signer can be asked to fill in. Signature is the one every
@@ -374,7 +392,7 @@ func (s *Store) PutAgreementFields(org, id int64, fields []AgreementField) ([]Ag
 			if err := fieldFits(f, pages, ok); err != nil {
 				return fmt.Errorf("field %d: %w", i+1, err)
 			}
-			out = append(out, AgreementField{OrgID: org, AgreementID: id, Round: a.Round, RecipientID: f.RecipientID, Page: f.Page, Kind: f.Kind, X: f.X, Y: f.Y, W: f.W, H: f.H})
+			out = append(out, AgreementField{OrgID: org, AgreementID: id, Round: a.Round, RecipientID: f.RecipientID, Page: f.Page, Kind: f.Kind, X: f.X, Y: f.Y, W: f.W, H: f.H, Label: strings.Join(strings.Fields(f.Label), " ")})
 		}
 		if err := tx.Where("org_id = ? and agreement_id = ? and round = ?", org, id, a.Round).Delete(&AgreementField{}).Error; err != nil {
 			return err
@@ -401,6 +419,8 @@ func fieldFits(f AgreementField, pages int, signers map[int64]bool) error {
 		return fmt.Errorf("a field is one of %s", strings.Join(fieldKinds, ", "))
 	case f.Page < 1 || f.Page > pages:
 		return fmt.Errorf("the document has pages 1 to %d", pages)
+	case utf8.RuneCountInString(f.Label) > 80:
+		return errors.New("a field's label is 80 characters at most")
 	}
 	for _, v := range []float64{f.X, f.Y, f.W, f.H} {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
@@ -431,6 +451,9 @@ func (s *Store) Readiness(org int64, a Agreement) ([]string, error) {
 	for _, f := range fs {
 		if f.Kind == "signature" {
 			signs[f.RecipientID] = true
+		}
+		if (f.Kind == "text" || f.Kind == "tick") && f.Label == "" {
+			missingParts = append(missingParts, fmt.Sprintf("Say what the %s on page %d is for.", map[string]string{"text": "text field", "tick": "tick box"}[f.Kind], f.Page))
 		}
 	}
 	signers := 0

@@ -25,6 +25,10 @@ var acrossOrganisations = map[string]bool{
 	"CustomerByToken": true,
 	// An unsubscribe link names its organisation itself; whoever holds it has no session.
 	"UnsubscribeByToken": true,
+	// A signer has only the secret in their link or cookie; the session they get from it
+	// names one recipient, and every step after takes that session, never an organisation.
+	"OpenSigning": true, "SigningBySession": true, "SigningCode": true, "ProveSigning": true,
+	"SignerSigns": true, "SignerDeclines": true, "SignerDocument": true,
 	// These take a row that already names its organisation, which their callers read with it.
 	"SaveOrgMail": true, "SaveSSO": true,
 }
@@ -363,7 +367,9 @@ var saysNothingBack = map[string]bool{
 	"AddSubscription": true, "ChangeSubscription": true, "ChangeSubscriptionFields": true, "RemoveSubscription": true, "StartRenewal": true, "SetEnquiry": true, "ConverseEnquiry": true, "SetEnquiryFields": true, "ChangeDealFields": true, "SetDealFields": true, "HearEnquiry": true,
 	"StartOnboarding": true, "SetOnboardingStep": true, "RemoveOnboarding": true, "InviteCustomer": true, "RevokeCustomer": true, "Suppress": true, "Unsuppress": true, "AddCampaign": true, "Audience": true, "RemoveCampaign": true, "ResumeCampaign": true, "AddAgreement": true, "PutAgreementFile": true, "RemoveAgreement": true,
 	// Recipients and fields come back as ids, places and kinds; who they are is AgreementRecipients'.
-	"AddRecipient": true, "ChangeRecipient": true, "TrySeal": true, "RemoveRecipient": true, "PutAgreementFields": true, "AgreementFields": true, "Readiness": true,
+	"AddRecipient": true, "ChangeRecipient": true, "TrySeal": true, "MemberSign": true, "MemberDecline": true,
+	// The seeded agreement is a draft: sending, sealing and their steps refuse it, saying nothing of it.
+	"ResendLink": true, "SealedDocument": true, "VoidAgreement": true, "SendAgreement": true, "RemoveRecipient": true, "PutAgreementFields": true, "AgreementFields": true, "Readiness": true,
 	"ErasePerson": true, "Import": true, "ImportLegacy": true, "Restore": true,
 	"ResearchCount": true, "ResearchCounts": true, "EnquiryCounts": true, "Week": true, "AgentMarks": true, "Touches": true,
 	"AddEnquiry": true, "AgentNote": true, "CreateKey": true, "CreateTask": true, "CreateTaskFor": true, "QuickAddPerson": true,

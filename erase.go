@@ -102,6 +102,9 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 		if err := dropCustomerGrants(tx, org, tx.Where("org_id = ? and contact_id = ?", org, id), false); err != nil {
 			return err
 		}
+		if err := eraseFromAgreements(tx, org, id, actor); err != nil {
+			return err
+		}
 		if err := dropRecipients(tx, tx.Where("org_id = ? and contact_id = ?", org, id)); err != nil {
 			return err
 		}

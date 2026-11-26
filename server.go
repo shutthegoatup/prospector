@@ -714,6 +714,9 @@ func serve(a *App, addr string) error {
 	go a.keepRunsGoing(context.Background(), 30*time.Second)
 	// Campaigns being sent go on being sent, here or by another server.
 	go a.keepSending(context.Background(), sendEvery)
+	// Agreements' mail goes, those everyone has signed are sealed, and those whose time ran
+	// out end, here or by another server.
+	go a.keepSigning(context.Background(), 30*time.Second)
 	go a.keepCheckingMail(context.Background(), 10*time.Minute)
 	log.Printf("listening on http://%s", addr)
 	// A release is installed by stopping this process, so every merge sends one of these.
