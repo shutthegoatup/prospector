@@ -84,7 +84,11 @@ Subscriptions lists them all, the one that needs someone soonest first, with the
 
 ### Agreements: the contract as a PDF
 
-From a company's page, start an agreement and upload the contract as a PDF, 10 MB at most. Prospector keeps the file exactly as uploaded with its SHA-256, checks it against that hash whenever it is downloaded, and always hands it back as a download. It doesn't read what the contract says, and it is not for deeds or anything that must be witnessed or notarised. For now an agreement is a draft: sending it for signature comes later, with what the signer sees, the record of who signed what, and the sealed copy that goes to everyone. The organisation's export carries each agreement and its hash, not the file.
+From a company's page, start an agreement and upload the contract as a PDF, 10 MB at most. Prospector keeps the file exactly as uploaded with its SHA-256, checks it against that hash whenever it is downloaded, and always hands it back as a download. It doesn't read what the contract says, and it is not for deeds or anything that must be witnessed or notarised. A PDF that is password-protected, encrypted or already signed is refused, as it couldn't later be filled in and sealed.
+
+**Prepare for signing** sets out who signs and where. Add signers from the company's people (one email address each, not on the never-contact list) or from your members, in the order they sign or all at once, and anyone else who gets a copy. Then place each signer's fields on the pages (signature, initials, name, date signed, text, tick box) by dragging them on. The page shows what is still missing before it could go. Recipients and fields are in the API (`agreements:write`), and erasing a person or removing a member takes them off a draft.
+
+For now an agreement is a draft: sending it for signature comes later, with what the signer sees, the record of who signed what, and the sealed copy that goes to everyone. The organisation's export carries each agreement, its hash, its recipients and fields, not the file.
 
 ### Also
 

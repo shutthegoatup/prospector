@@ -17,7 +17,8 @@ import (
 
 // Agreement is a contract a company is to sign: the document as it will be sent, frozen
 // by its hash. Prospector doesn't read what it says, and isn't for deeds or anything
-// that must be witnessed. Signing comes later; for now an agreement is a draft.
+// that must be witnessed. While it is a draft its signers and their fields are set out;
+// sending it comes later.
 type Agreement struct {
 	ID        int64  `gorm:"primaryKey" json:"id"`
 	OrgID     int64  `gorm:"index:idx_agreements_company,priority:1;not null" json:"-"`
@@ -26,9 +27,15 @@ type Agreement struct {
 	Status    string `gorm:"not null;default:'draft'" json:"status"`
 	// FileName, FileSize and FileHash describe the document; the bytes are kept apart,
 	// so a list of agreements never carries them. FileHash is its SHA-256, in hex.
-	FileName  string    `gorm:"not null;default:''" json:"file_name"`
-	FileSize  int64     `gorm:"not null;default:0" json:"file_size"`
-	FileHash  string    `gorm:"not null;default:''" json:"file_hash"`
+	FileName string `gorm:"not null;default:''" json:"file_name"`
+	FileSize int64  `gorm:"not null;default:0" json:"file_size"`
+	FileHash string `gorm:"not null;default:''" json:"file_hash"`
+	// PageCount is the document's pages, 0 before one is uploaded.
+	PageCount int `gorm:"not null;default:0" json:"page_count"`
+	// Round counts the versions sent for signing; changes asked for start the next.
+	Round int `gorm:"not null;default:1" json:"round"`
+	// InOrder is whether signers sign one after another, in their order, or all at once.
+	InOrder   bool      `gorm:"not null;default:true" json:"in_order"`
 	CreatedBy string    `gorm:"not null;default:''" json:"created_by"`
 	UpdatedBy string    `gorm:"not null;default:''" json:"updated_by"`
 	CreatedAt time.Time `json:"created_at"`
@@ -94,7 +101,7 @@ func (s *Store) AddAgreement(org, company int64, name, actor string) (*Agreement
 	if err := s.in(org).Where("id = ?", company).First(&Company{}).Error; err != nil {
 		return nil, missing(err, "no company %d", company)
 	}
-	a := Agreement{OrgID: org, CompanyID: company, Name: name, Status: AgreementDraft, CreatedBy: actor, UpdatedBy: actor}
+	a := Agreement{OrgID: org, CompanyID: company, Name: name, Status: AgreementDraft, Round: 1, InOrder: true, CreatedBy: actor, UpdatedBy: actor}
 	return &a, s.db.Create(&a).Error
 }
 
@@ -116,12 +123,20 @@ func (s *Store) Agreements(org, company int64) ([]Agreement, error) {
 	return out, q.Order("id desc").Find(&out).Error
 }
 
-func (s *Store) RenameAgreement(org, id int64, name, actor string) (*Agreement, error) {
-	name, err := agreementName(name)
-	if err != nil {
-		return nil, err
+// ChangeAgreement renames a draft, or says whether its signers sign in order.
+func (s *Store) ChangeAgreement(org, id int64, name *string, inOrder *bool, actor string) (*Agreement, error) {
+	change := map[string]any{"updated_by": actor}
+	if name != nil {
+		n, err := agreementName(*name)
+		if err != nil {
+			return nil, err
+		}
+		change["name"] = n
 	}
-	res := s.in(org).Model(&Agreement{}).Where("id = ? and status = ?", id, AgreementDraft).Updates(map[string]any{"name": name, "updated_by": actor})
+	if inOrder != nil {
+		change["in_order"] = *inOrder
+	}
+	res := s.in(org).Model(&Agreement{}).Where("id = ? and status = ?", id, AgreementDraft).Updates(change)
 	if res.Error != nil {
 		return nil, res.Error
 	}
@@ -147,12 +162,18 @@ func (s *Store) RemoveAgreement(org, id int64) error {
 			}
 			return errors.New("only a draft agreement can be removed; one that was sent is kept")
 		}
-		return tx.Where("org_id = ? and agreement_id = ?", org, id).Delete(&AgreementFile{}).Error
+		for _, part := range []any{&AgreementFile{}, &AgreementRecipient{}, &AgreementField{}} {
+			if err := tx.Where("org_id = ? and agreement_id = ?", org, id).Delete(part).Error; err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
 // PutAgreementFile keeps a draft's document, replacing any before it. It has to be a
-// PDF, so what is signed is what was seen, and it is hashed as it arrives.
+// PDF Prospector can later fill in and seal, so what is signed is what was seen, and it
+// is hashed as it arrives. Fields on pages the new one doesn't have go.
 func (s *Store) PutAgreementFile(org, id int64, name string, data []byte, actor string) (*Agreement, error) {
 	if len(data) > agreementFileLimit {
 		return nil, fmt.Errorf("a document is %d MB at most", agreementFileLimit>>20)
@@ -160,11 +181,15 @@ func (s *Store) PutAgreementFile(org, id int64, name string, data []byte, actor 
 	if !bytes.HasPrefix(data, []byte("%PDF-")) {
 		return nil, errors.New("that isn't a PDF: save the agreement as a PDF first")
 	}
+	pages, err := pdfPages(data)
+	if err != nil {
+		return nil, err
+	}
 	sum := sha256.Sum256(data)
 	var a Agreement
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.db.Transaction(func(tx *gorm.DB) error {
 		res := tx.Model(&Agreement{}).Where("org_id = ? and id = ? and status = ?", org, id, AgreementDraft).
-			Updates(map[string]any{"file_name": fileName(name), "file_size": int64(len(data)), "file_hash": hex.EncodeToString(sum[:]), "updated_by": actor})
+			Updates(map[string]any{"file_name": fileName(name), "file_size": int64(len(data)), "file_hash": hex.EncodeToString(sum[:]), "page_count": pages, "updated_by": actor})
 		if res.Error != nil {
 			return res.Error
 		}
@@ -178,6 +203,9 @@ func (s *Store) PutAgreementFile(org, id int64, name string, data []byte, actor 
 			return err
 		}
 		if err := tx.Create(&AgreementFile{AgreementID: id, OrgID: org, Data: data}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("org_id = ? and agreement_id = ? and page > ?", org, id, pages).Delete(&AgreementField{}).Error; err != nil {
 			return err
 		}
 		return tx.Where("org_id = ? and id = ?", org, id).First(&a).Error
