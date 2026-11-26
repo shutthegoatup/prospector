@@ -18,15 +18,17 @@ import (
 // The organisation's own offering, number 0, is never stored: its wording is in Settings
 // and its verdict on a company is the company's own stage, as before offerings existed.
 type Offering struct {
-	ID           int64     `gorm:"primaryKey" json:"id"`
-	OrgID        int64     `gorm:"uniqueIndex:idx_offering_name,priority:1;not null" json:"-"`
-	Name         string    `gorm:"uniqueIndex:idx_offering_name,priority:2;not null" json:"name"`
-	LookFor      string    `gorm:"not null;default:''" json:"look_for"`
-	Pitch        string    `gorm:"not null;default:''" json:"pitch"`
-	NoteTemplate string    `gorm:"not null;default:''" json:"note_template"`
-	UpdatedBy    string    `gorm:"not null;default:''" json:"updated_by"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID           int64  `gorm:"primaryKey" json:"id"`
+	OrgID        int64  `gorm:"uniqueIndex:idx_offering_name,priority:1;not null" json:"-"`
+	Name         string `gorm:"uniqueIndex:idx_offering_name,priority:2;not null" json:"name"`
+	LookFor      string `gorm:"not null;default:''" json:"look_for"`
+	Pitch        string `gorm:"not null;default:''" json:"pitch"`
+	NoteTemplate string `gorm:"not null;default:''" json:"note_template"`
+	// HasRoles: companies are judged for it by their roles, each pursued or junked.
+	HasRoles  bool      `gorm:"not null;default:false" json:"has_roles"`
+	UpdatedBy string    `gorm:"not null;default:''" json:"updated_by"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Verdict is where a company stands for one offering other than the organisation's own.
@@ -121,15 +123,25 @@ func (s *Store) ChangeOffering(org, id int64, change func(*Offering), actor stri
 		if o, err = heldOffering(tx, org, id); err != nil {
 			return err
 		}
+		had := o.HasRoles
 		change(o)
 		if err := o.check(); err != nil {
 			return err
+		}
+		if had && !o.HasRoles {
+			var n int64
+			if err := tx.Model(&Role{}).Where("org_id = ? and offering_id = ?", org, o.ID).Count(&n).Error; err != nil {
+				return err
+			}
+			if n > 0 {
+				return conflict(fmt.Sprintf("%s has %d roles, so it keeps them", o.Name, n))
+			}
 		}
 		if err := nameFree(tx, org, o.ID, o.Name); err != nil {
 			return err
 		}
 		o.UpdatedBy = actor
-		if err := tx.Model(o).Select("name", "look_for", "pitch", "note_template", "updated_by", "updated_at").Updates(o).Error; err != nil {
+		if err := tx.Model(o).Select("name", "look_for", "pitch", "note_template", "has_roles", "updated_by", "updated_at").Updates(o).Error; err != nil {
 			return err
 		}
 		return s.log(tx, org, 0, nil, actor, "offering:changed", &o.Name)
@@ -148,7 +160,7 @@ func nameFree(tx *gorm.DB, org, id int64, name string) error {
 	return nil
 }
 
-// RemoveOffering deletes an offering and every verdict made for it; the history keeps
+// RemoveOffering deletes an offering with every verdict and role kept for it; the history keeps
 // what was decided. People being reached for it are then reached for the organisation's
 // own, and companies found only for it come up in the organisation's own review.
 func (s *Store) RemoveOffering(org, id int64, actor string) error {
@@ -173,6 +185,9 @@ func (s *Store) RemoveOffering(org, id int64, actor string) error {
 			return conflict(fmt.Sprintf("%d open tasks are finding companies for %s: close them first", open, o.Name))
 		}
 		if err := tx.Where("org_id = ? and offering_id = ?", org, id).Delete(&Verdict{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("org_id = ? and offering_id = ?", org, id).Delete(&Role{}).Error; err != nil {
 			return err
 		}
 		if err := tx.Model(&Contact{}).Where("org_id = ? and offering_id = ?", org, id).Update("offering_id", 0).Error; err != nil {

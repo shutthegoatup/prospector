@@ -2033,6 +2033,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/companies/{id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The roles found at a company
+         * @description Junked ones included, with who junked them and why, so one can be put back.
+         */
+        get: operations["listCompanyRoles"];
+        put?: never;
+        /**
+         * Add a role open at a company, for an offering that has roles
+         * @description It waits for review, and brings the company back to review for the offering if every
+         *     role before it was junked. A role already there, by its posting or else its title, is a
+         *     conflict.
+         */
+        post: operations["addRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/roles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Pursue or junk a role, or put it back
+         * @description The company's verdict for the role's offering follows: qualified while a role is pursued,
+         *     up for review while one waits, rejected once every one is junked. Junking sends nothing
+         *     to anyone.
+         */
+        patch: operations["judgeRole"];
+        trace?: never;
+    };
     "/o/{org}/api/v1/companies": {
         parameters: {
             query?: never;
@@ -2644,6 +2700,8 @@ export interface components {
             /** Format: int64 */
             id: number;
             name: string;
+            /** @description Companies are judged for it by their roles, each pursued or junked: the company's verdict follows from them. Can't be turned off while it has roles. */
+            has_roles: boolean;
             /** @description What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list. */
             look_for: string;
             /** @description `look_for`, read into its fields. */
@@ -2663,12 +2721,63 @@ export interface components {
             look_for?: string;
             pitch?: string;
             note_template?: string;
+            has_roles?: boolean;
         };
         OfferingChange: {
             name?: string | null;
             look_for?: string | null;
             pitch?: string | null;
             note_template?: string | null;
+            has_roles?: boolean | null;
+        };
+        Role: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            offering_id: number;
+            /** Format: int64 */
+            company_id: number;
+            title: string;
+            /** @description The posting, or the page that shows the role is open; empty for none. */
+            url: string;
+            /** @description Rate, length, IR35, location and the like, in one line. */
+            details: string;
+            /** @enum {string} */
+            stage: "review" | "pursued" | "junked";
+            /** @description Why it was junked, as whoever junked it said it. */
+            reason: string;
+            /** @description Who last pursued, junked or put it back; empty until someone does. */
+            by: string;
+            found_by: string;
+            /**
+             * Format: int64
+             * @description The task it was found for; 0 for none.
+             */
+            task_id: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        RoleNew: {
+            /**
+             * Format: int64
+             * @description An offering that has roles.
+             */
+            offering: number;
+            title: string;
+            /** @description The posting. */
+            source_url?: string;
+            details?: string;
+        };
+        RoleJudgement: {
+            /**
+             * @description `pursued` qualifies the company for the offering; once every role is junked it is rejected for it; `review` puts a role back.
+             * @enum {string}
+             */
+            stage: "review" | "pursued" | "junked";
+            /** @description Why, for a junked role only. */
+            reason?: string;
         };
         Verdict: {
             /** Format: int64 */
@@ -2969,6 +3078,8 @@ export interface components {
                 /** Format: int64 */
                 id: number;
                 name: string;
+                /** @description Agents add each role they find with add_role. */
+                has_roles: boolean;
                 /** @description What agents are told to look for and how to judge companies for it, in place of the organisation's own look-for list. */
                 guidance: string;
             };
@@ -3066,6 +3177,8 @@ export interface components {
             /** @description The facts besides the answers, older answers among them, oldest first. */
             facts: components["schemas"]["ResearchFact"][];
             people: components["schemas"]["ResearchPerson"][];
+            /** @description Its roles for the offering in view, when that offering has roles; oldest first. */
+            roles?: components["schemas"]["Role"][];
         };
         LookFor: {
             field: string;
@@ -7597,6 +7710,100 @@ export interface operations {
                         items: components["schemas"]["Verdict"][];
                         next_cursor?: components["schemas"]["NextCursor"];
                     };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCompanyRoles: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+                /** @description Only those for this offering. */
+                offering?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description By offering, oldest first. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Role"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleNew"];
+            };
+        };
+        responses: {
+            /** @description The role, added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    judgeRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleJudgement"];
+            };
+        };
+        responses: {
+            /** @description The role as it now is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"];
                 };
             };
             default: components["responses"]["Problem"];

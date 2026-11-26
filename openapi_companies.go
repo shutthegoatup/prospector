@@ -243,7 +243,7 @@ func historyText(h HistoryItem) string {
 		"add:facts": "added facts", "add:fact": "added a fact", "add:contact": "suggested a contact",
 		"add:person": "added", "pick": "picked for outreach", "company:qualified": "qualified the company",
 		"company:rejected": "rejected the company", "company:review": "sent back to review",
-		"verdict:qualified": "qualified it for an offering", "verdict:rejected": "junked it for an offering", "verdict:review": "sent it back to review for an offering",
+		"verdict:qualified": "qualified it for an offering", "verdict:rejected": "junked it for an offering", "verdict:review": "sent it back to review for an offering", "add:role": "added a role", "role:pursued": "pursued a role", "role:junked": "junked a role", "role:review": "put a role back for review",
 		"offering:added": "added an offering", "offering:changed": "changed an offering", "offering:removed": "removed an offering",
 		"erase": "erased a person on request", "enquiry": "sent an enquiry",
 		"suggest:email": "suggested an email", "suggest:phone": "suggested a phone number", "suggest:linkedin": "suggested a LinkedIn profile",

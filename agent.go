@@ -573,9 +573,20 @@ type OfferingStanding struct {
 	Reason   string `json:"reason,omitempty"`
 }
 
+type RoleBrief struct {
+	ID       int64  `json:"id"`
+	Offering string `json:"offering"`
+	Title    string `json:"title"`
+	URL      string `json:"url,omitempty"`
+	Details  string `json:"details,omitempty"`
+	Stage    string `json:"stage" jsonschema:"review, pursued or junked"`
+	Reason   string `json:"reason,omitempty" jsonschema:"why a person junked it"`
+}
+
 type CompanyDetail struct {
 	Company   Company            `json:"company"`
 	Standing  []OfferingStanding `json:"standing,omitempty" jsonschema:"where the company stands for each other thing the organisation sells that it has been judged for; company.stage is for the organisation's own"`
+	Roles     []RoleBrief        `json:"roles,omitempty" jsonschema:"the roles found here for offerings that have them; don't add a junked one again"`
 	Facts     []Fact             `json:"facts"`
 	People    []PersonBrief      `json:"people"`
 	LastAgent *LastAgent         `json:"last_agent,omitempty" jsonschema:"the agent that last changed this company, if any"`
@@ -646,6 +657,9 @@ func (s *Store) AgentCompany(org int64, who Actor, ref string, page PageIn) (*Co
 	}
 	out := &CompanyDetail{Company: *c, People: []PersonBrief{}, History: []Happened{}, Notes: []NoteOut{}}
 	if out.Standing, err = s.standing(org, c.ID); err != nil {
+		return nil, err
+	}
+	if out.Roles, err = s.roleBriefs(org, c.ID); err != nil {
 		return nil, err
 	}
 	out.Facts, at[0] = afterID(facts, func(f Fact) int64 { return f.ID }, at[0], size)

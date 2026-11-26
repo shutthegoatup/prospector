@@ -894,6 +894,7 @@ type NoteOut struct {
 type TaskOffering struct {
 	ID       int64  `json:"id"`
 	Name     string `json:"name"`
+	HasRoles bool   `json:"has_roles" jsonschema:"true when companies are judged for it by their roles: add each with add_role"`
 	Guidance string `json:"guidance" jsonschema:"what to look for and how to judge companies for this offering; it takes the place of the organisation's own look-for list for this task"`
 }
 
@@ -1046,9 +1047,7 @@ func (s *Store) agentTaskPage(org int64, who Actor, id int64, page PageIn, now t
 	if o, err := s.offeringOf(org, v.OfferingID); err != nil && !errors.As(err, &gone) {
 		return nil, err
 	} else if o != nil {
-		out.Offering = &TaskOffering{ID: o.ID, Name: o.Name, Guidance: "This task finds companies for " + o.Name + ". " +
-			"The stage on each company here, and in what add_company answers, is for " + o.Name + ": skip one rejected for it. " +
-			"A company rejected only for something else is still worth adding for this.\n\n" + lookForList(o.Name, o.LookFor)}
+		out.Offering = &TaskOffering{ID: o.ID, Name: o.Name, HasRoles: o.HasRoles, Guidance: offeringGuidance(o)}
 	}
 	for _, r := range v.Requests {
 		out.Requests = append(out.Requests, asked(r, who))
@@ -1165,4 +1164,17 @@ func taskPrompt(o *Org, t Task) string {
 		"Then do what the open request it keeps for you (claimed_request) asks. If another agent holds every open request, stop and say so. Pass task %d on everything you add, so it counts toward this task. Something already in Prospector that fits still counts: add it again with the task and it is linked, not duplicated. "+
 		"Leave a task_note when you skip a company or find nothing, saying why, and call finish_request with the request's id when it is done.",
 		t.ID, o.Name, t.Title, t.ID, t.ID)
+}
+
+// offeringGuidance is what an agent on a task for an offering is told about it.
+func offeringGuidance(o *Offering) string {
+	said := "This task finds companies for " + o.Name + ". "
+	if o.HasRoles {
+		said += "For " + o.Name + " each role open at a company is judged on its own: add the company with add_company, then each role " +
+			"with add_role, citing its posting. The stage on each company here is for " + o.Name + "; a rejected one had every role junked, " +
+			"and a new role there is still worth adding. get_company lists the roles already found: don't add a junked one again. "
+	} else {
+		said += "The stage on each company here, and in what add_company answers, is for " + o.Name + ": skip one rejected for it. "
+	}
+	return said + "A company rejected only for something else is still worth adding for this.\n\n" + lookForList(o.Name, o.LookFor)
 }
