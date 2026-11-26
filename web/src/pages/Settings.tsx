@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { type FormEvent, type ReactNode, useState } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
@@ -91,9 +92,9 @@ export function SettingsPage() {
           <Section title="Agents">
             <p className="text-sm">
               Prospector's own agents, and keys for yours, are set up on{" "}
-              <a href={`/o/${org}/agents`} className="text-mark underline">
+              <Link to="/o/$org/agents" params={{ org }} className="text-mark underline">
                 Agents
-              </a>
+              </Link>
               .
             </p>
           </Section>

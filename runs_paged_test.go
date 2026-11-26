@@ -1,9 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
-	"strings"
 	"testing"
 	"time"
 )
@@ -77,13 +74,19 @@ func TestRecentRunsHavePages(t *testing.T) {
 		}
 	}
 
-	code, body := call(t, client, "GET", srv.URL+"/o/alpha/agents", "", nil)
-	if code != http.StatusOK || !strings.Contains(body, "Older →") || strings.Contains(body, "← Latest") || !strings.Contains(body, "runs_before=") {
-		t.Fatalf("the Agents page doesn't offer older runs: %d", code)
+	// The Agents page walks the same stretches through the API: each whole on one page,
+	// newest first, the long one that carries on first.
+	var work []map[string]any
+	for _, pg := range apiPages(t, client, srv.URL+"/o/alpha/api/v1/agent-work?limit=7") {
+		work = append(work, pg.Items...)
 	}
-	older := fmt.Sprintf("%s/o/alpha/agents?runs_before=%d", srv.URL, next.UnixNano())
-	if _, body := call(t, client, "GET", older, "", nil); !strings.Contains(body, "← Latest") {
-		t.Fatal("a page of older runs doesn't lead back to the latest")
+	if len(work) != 31 || work[0]["actor"] != "agent:third" || work[0]["changes"] != float64(20) {
+		t.Fatalf("the agents' work through the API: %d stretches, first %v", len(work), work[0])
+	}
+	for i, w := range work[1:] {
+		if w["changes"] != float64(3) {
+			t.Errorf("stretch %d holds %v changes, want 3: one was split across pages", i+1, w["changes"])
+		}
 	}
 }
 

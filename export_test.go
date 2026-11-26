@@ -52,7 +52,7 @@ func TestExportPerson(t *testing.T) {
 	}
 	res.Body.Close()
 
-	companyPage := srv.URL + "/o/alpha/companies/" + strconv.FormatInt(*hannah.CompanyID, 10)
+	companyHistory := srv.URL + "/o/alpha/api/v1/companies/" + strconv.FormatInt(*hannah.CompanyID, 10) + "/history"
 	export := func(client *http.Client, id int64) (int, string) {
 		return call(t, client, "POST", srv.URL+"/o/alpha/ui/export", "application/json", map[string]int64{"id": id})
 	}
@@ -82,11 +82,12 @@ func TestExportPerson(t *testing.T) {
 	if early != 0 {
 		t.Fatalf("%d refused exports were written into the history", early)
 	}
-	if _, page := call(t, bob, "GET", companyPage, "", nil); strings.Contains(page, "ui/export") {
-		t.Fatal("the company page offers the export to someone who isn't an owner")
+	// The company page offers the export to whoever the nav says is an owner.
+	if !navOwner(t, ada, srv.URL) || navOwner(t, bob, srv.URL) {
+		t.Fatal("the nav should offer the export to an owner alone")
 	}
-	if _, page := call(t, ada, "GET", companyPage, "", nil); !strings.Contains(page, `data-download="ui/export"`) {
-		t.Fatal("the company page gives an owner no way to export a person")
+	if code, _ := call(t, bob, "POST", srv.URL+"/o/alpha/api/v1/contacts/"+strconv.FormatInt(hannah.ID, 10)+"/export", "application/json", struct{}{}); code != http.StatusForbidden {
+		t.Fatalf("a member who isn't an owner exported someone through the API: %d", code)
 	}
 
 	code, body := export(ada, hannah.ID)
@@ -130,8 +131,8 @@ func TestExportPerson(t *testing.T) {
 	if len(noted) != 1 || noted[0].ContactID != hannah.ID || noted[0].Value != nil || noted[0].User == "" {
 		t.Fatalf("the history should note one export of her, by name and with no details: %+v", noted)
 	}
-	if _, page := call(t, ada, "GET", companyPage, "", nil); !strings.Contains(page, "exported what is held on them") {
-		t.Fatal("the company page doesn't show that she was exported")
+	if _, history := call(t, ada, "GET", companyHistory, "", nil); !strings.Contains(history, "exported what is held on them") {
+		t.Fatalf("the company's history doesn't show that she was exported: %s", history)
 	}
 
 	row := Contact{OrgID: o.ID, Key: "pair", File: "test", Person: str("Jonas Weber, CMO; Ines Duarte, Head of Digital")}

@@ -1,14 +1,16 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
 func repliedPerson(t *testing.T, s *Store, o *Org, name string) *Contact {
@@ -264,16 +266,28 @@ func TestTheBoardShowsWhatAStageIsWorth(t *testing.T) {
 		t.Fatalf("valuing a deal in the new currency: %d %s", code, body)
 	}
 
-	_, page := call(t, client, "GET", srv.URL+"/o/alpha/conversations", "", nil)
-	for _, want := range []string{"£14,000", "€5,000", "£14,000 + €5,000", "Ada Lovelace", `data-field="deal_close_date"`} {
-		if !strings.Contains(page, want) {
-			t.Errorf("the board doesn't show %q", want)
-		}
+	// Each card keeps its own currency, so the stage's worth adds them up side by side.
+	values := map[int64]string{}
+	for _, c := range boardCards(t, client, srv.URL) {
+		values[c.ContactId] = c.Value + " " + c.Owner
 	}
-	_, page = call(t, client, "GET", srv.URL+"/o/alpha/settings", "", nil)
-	if !strings.Contains(page, `name="currency" value="EUR"`) {
-		t.Error("Settings doesn't show the currency that was saved")
+	if values[first.ID] != "£14,000 Ada Lovelace" || values[second.ID] != "€5,000 " {
+		t.Errorf("the board's cards: %v", values)
 	}
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/settings", "", nil); !strings.Contains(body, `"currency":"EUR"`) {
+		t.Errorf("Settings doesn't read back the currency that was saved: %s", body)
+	}
+}
+
+// boardCards are the Conversations board's cards, as its page reads them.
+func boardCards(t *testing.T, c *http.Client, base string) []api.DealCard {
+	t.Helper()
+	code, body := call(t, c, "GET", base+"/o/alpha/api/v1/conversations?limit=200", "", nil)
+	var out struct{ Items []api.DealCard }
+	if code != http.StatusOK || json.Unmarshal([]byte(body), &out) != nil {
+		t.Fatalf("the board: %d %s", code, body)
+	}
+	return out.Items
 }
 
 // dealV1 is the deals table as the first release with deals made it: one per contact.
@@ -469,16 +483,21 @@ func TestARenewalIsStartedAndWorkedFromTheBoard(t *testing.T) {
 	if code, _ := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/deals/"+itoa(renewal.ID), "application/json", map[string]any{"stage": "signed"}); code == http.StatusOK {
 		t.Error("a renewal was moved to a stage there isn't")
 	}
-	_, page := call(t, client, "GET", srv.URL+"/o/alpha/conversations", "", nil)
-	for _, want := range []string{"Renewal", "with Hannah Pryce", "£9,500", `data-deal="` + strconv.FormatInt(renewal.ID, 10) + `"`, `data-form="api/v1/deals"`, "No next step yet"} {
-		if !strings.Contains(page, want) {
-			t.Errorf("the board doesn't show %q", want)
+	renewalCard := func() *api.DealCard {
+		for _, card := range boardCards(t, client, srv.URL) {
+			if card.Id == renewal.ID {
+				return &card
+			}
 		}
+		return nil
+	}
+	if card := renewalCard(); card == nil || card.Kind != "renewal" || card.Person != "Hannah Pryce" || card.Value != "£9,500" || card.Seq == 0 || card.NextStep != "" {
+		t.Errorf("the board's card for the renewal: %+v", card)
 	}
 	if code, body := call(t, client, "DELETE", srv.URL+"/o/alpha/api/v1/deals/"+itoa(renewal.ID), "", nil); code != http.StatusNoContent {
 		t.Fatalf("removing the renewal: %d %s", code, body)
 	}
-	if _, page = call(t, client, "GET", srv.URL+"/o/alpha/conversations", "", nil); strings.Contains(page, "with Hannah Pryce") {
+	if card := renewalCard(); card != nil {
 		t.Error("a removed renewal is still on the board")
 	}
 }
@@ -487,28 +506,34 @@ func TestARenewalIsStartedAndWorkedFromTheBoard(t *testing.T) {
 func TestTodayPointsAtDealsThatNeedANextStep(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	c := repliedPerson(t, s, o, "Hannah Pryce")
-	const prompt = "Move renewals and other deals on"
-	// The sidebar's count of open conversations, which a renewal adds to.
-	sidebar := regexp.MustCompile(`Conversations</span>\s*<span[^>]*>(\d+)</span>`)
-	open := func(page string) string {
-		if m := sidebar.FindStringSubmatch(page); m != nil {
-			return m[1]
+	// Today's side panel points at deals to move on when its summary counts any; the
+	// sidebar counts open conversations, which a renewal adds to.
+	state := func() (prompt bool, open int) {
+		t.Helper()
+		_, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/today/summary", "", nil)
+		var sum api.TodaySummary
+		if err := json.Unmarshal([]byte(body), &sum); err != nil {
+			t.Fatalf("today's summary: %s", body)
 		}
-		return "none"
+		_, body = call(t, client, "GET", srv.URL+"/o/alpha/api/v1/nav", "", nil)
+		var n api.Nav
+		if err := json.Unmarshal([]byte(body), &n); err != nil {
+			t.Fatalf("the nav: %s", body)
+		}
+		return sum.Deals > 0, n.Counts.Conversations
 	}
-	_, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil)
-	if strings.Contains(page, prompt) || open(page) != "1" {
-		t.Fatalf("before any renewal: prompt shown %v, sidebar counts %s", strings.Contains(page, prompt), open(page))
+	if prompt, open := state(); prompt || open != 1 {
+		t.Fatalf("before any renewal: prompt shown %v, sidebar counts %d", prompt, open)
 	}
 	renewal := must(s.StartDeal(o.ID, c.ID, "renewal", "Ada Lovelace"))
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); !strings.Contains(page, prompt) || open(page) != "2" {
-		t.Errorf("with a renewal that has no next step: prompt shown %v, sidebar counts %s", strings.Contains(page, prompt), open(page))
+	if prompt, open := state(); !prompt || open != 2 {
+		t.Errorf("with a renewal that has no next step: prompt shown %v, sidebar counts %d", prompt, open)
 	}
 	if err := s.ChangeDeal(o.ID, renewal.ID, "stage", "won", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(page, prompt) || open(page) != "1" {
-		t.Errorf("once the renewal is won: prompt shown %v, sidebar counts %s", strings.Contains(page, prompt), open(page))
+	if prompt, open := state(); prompt || open != 1 {
+		t.Errorf("once the renewal is won: prompt shown %v, sidebar counts %d", prompt, open)
 	}
 	if err := s.ChangeDeal(o.ID, renewal.ID, "stage", "proposal", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
@@ -518,13 +543,13 @@ func TestTodayPointsAtDealsThatNeedANextStep(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(page, prompt) {
+	if prompt, _ := state(); prompt {
 		t.Error("Today still points at a renewal whose next step is a long way off")
 	}
 	if err := s.ChangeDeal(o.ID, renewal.ID, "next_date", "2020-01-01", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if _, page := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); !strings.Contains(page, prompt) {
+	if prompt, _ := state(); !prompt {
 		t.Error("Today says nothing of a renewal whose next step is overdue")
 	}
 }

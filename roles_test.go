@@ -23,8 +23,12 @@ func TestChangingSomeonesRole(t *testing.T) {
 		return code
 	}
 
-	if _, body := call(t, ada, "GET", base+"settings", "", nil); !strings.Contains(body, "Make owner") {
-		t.Fatal("an owner isn't offered to make a member an owner")
+	// Settings offers Make owner, to an owner, for each member the team list names as one.
+	if _, body := call(t, ada, "GET", base+"api/v1/nav", "", nil); !strings.Contains(body, `"owner":true`) {
+		t.Fatalf("an owner isn't offered to make a member an owner: %s", body)
+	}
+	if _, body := call(t, ada, "GET", base+"api/v1/members", "", nil); !strings.Contains(body, `"email":"grace@example.com","name":"Grace Hopper","role":"member"`) {
+		t.Fatalf("the team list doesn't say who is a member: %s", body)
 	}
 	if code, _ := role(asGrace, grace.ID, "owner"); code != http.StatusForbidden {
 		t.Fatalf("a member made themself an owner: %d", code)
@@ -98,8 +102,12 @@ func TestChangingAKeysScopes(t *testing.T) {
 		return names
 	}
 
-	if _, body := call(t, ada, "GET", base+"agents", "", nil); !strings.Contains(body, "Change scopes") {
-		t.Fatal("an owner isn't offered to change a key's scopes")
+	// The Agents page offers Change scopes, to an owner, on each key the list names.
+	if _, body := call(t, ada, "GET", base+"api/v1/nav", "", nil); !strings.Contains(body, `"owner":true`) {
+		t.Fatalf("an owner isn't offered to change a key's scopes: %s", body)
+	}
+	if _, body := call(t, ada, "GET", base+"api/v1/keys", "", nil); !strings.Contains(body, `"name":"bot"`) {
+		t.Fatalf("the key list doesn't name the key: %s", body)
 	}
 	if code, _ := call(t, bearer, "POST", base+"api/v1/companies", "application/json", company); code != http.StatusForbidden {
 		t.Fatalf("a read key wrote: %d", code)

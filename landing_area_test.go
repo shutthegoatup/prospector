@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 )
@@ -42,7 +43,15 @@ func TestSomeoneInSupportOnlyStartsOnEnquiries(t *testing.T) {
 	if got := starts(ada, "/"); got != "/o/alpha/today" {
 		t.Errorf("an owner starts on %q", got)
 	}
-	if _, page := call(t, ada, "GET", srv.URL+"/o/alpha/companies", "", nil); !strings.Contains(page, `href="/o/alpha/"`) || strings.Contains(page, `href="/o/alpha/today" class="flex items-center gap-3`) {
+	// The switcher opens each organisation at /o/{slug}/, which sends its member on as above.
+	if _, nav := call(t, ada, "GET", srv.URL+"/o/alpha/api/v1/nav", "", nil); !strings.Contains(nav, `"slug":"alpha"`) {
+		t.Errorf("the nav doesn't list the organisations to switch to: %s", nav)
+	}
+	layout, err := os.ReadFile("web/src/components/app/layout.tsx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(layout), "href={`/o/${o.slug}/`}") {
 		t.Error("the organisation switcher doesn't open an organisation where its member starts")
 	}
 }

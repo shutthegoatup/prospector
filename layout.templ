@@ -40,7 +40,7 @@ templ OrgMark(name, color string, size string) {
 }
 
 templ NavItem(n Nav, key, label string, count int) {
-	<a href={ templ.SafeURL(n.Base() + navPath(key)) } class={ navLink(n, key) }>
+	<a href={ templ.SafeURL(n.Base() + key) } class={ navLink(n, key) }>
 		<span>{ label }</span>
 		if area, ok := pageArea[key]; ok && !canDo(ctx, area) {
 			<span class="rounded border border-border px-1 font-mono text-[11px] uppercase tracking-wider opacity-70" title="You can read this page, not change it">view</span>
@@ -90,7 +90,7 @@ templ Layout(n Nav, content templ.Component) {
 						</div>
 					</details>
 					if canDo(ctx, areaSales) {
-						@button.Button(button.Props{Href: n.Base() + navPath("add"), Class: "w-full"}) {
+						@button.Button(button.Props{Href: n.Base() + "add", Class: "w-full"}) {
 							+ Add person
 						}
 					}

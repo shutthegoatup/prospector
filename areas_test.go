@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -52,7 +53,7 @@ func TestEachAreaChangesOnlyItsOwnWork(t *testing.T) {
 	}
 	reads := func(cl *http.Client, who string) {
 		t.Helper()
-		for _, p := range []string{"today", "research", "conversations", "companies", "enquiries", "subscriptions", "onboarding", "api/v1/deals", "api/v1/enquiries"} {
+		for _, p := range []string{"today", "research", "conversations", "companies", "enquiries", "subscriptions", "onboarding", "api/v1/today", "api/v1/research", "api/v1/conversations", "api/v1/companies", "api/v1/subscriptions", "api/v1/onboardings", "api/v1/deals", "api/v1/enquiries"} {
 			if code, _ := call(t, cl, "GET", base+p, "", nil); code != http.StatusOK {
 				t.Errorf("%s can't read %s: %d", who, p, code)
 			}
@@ -72,10 +73,31 @@ func TestEachAreaChangesOnlyItsOwnWork(t *testing.T) {
 		t.Fatalf("a member changed their own areas: %d", code)
 	}
 
-	areas("support")
-	if _, page := call(t, ada, "GET", base+"settings", "", nil); !strings.Contains(page, "member · support") {
-		t.Error("the Team list doesn't say what someone works on")
+	// The Team list reads what each member works on; the sidebar says it to them.
+	works := func(want []string, work string) {
+		t.Helper()
+		_, body := call(t, ada, "GET", base+"api/v1/members?limit=200", "", nil)
+		var team struct{ Items []api.Member }
+		json.Unmarshal([]byte(body), &team)
+		var got []string
+		for _, m := range team.Items {
+			if m.UserId == grace.ID {
+				for _, ar := range m.Areas {
+					got = append(got, string(ar))
+				}
+			}
+		}
+		if strings.Join(got, " ") != strings.Join(want, " ") {
+			t.Errorf("the Team list says Grace works on %v, want %v", got, want)
+		}
+		_, body = call(t, asGrace, "GET", base+"api/v1/nav", "", nil)
+		var n api.Nav
+		if json.Unmarshal([]byte(body), &n) != nil || n.Work != work {
+			t.Errorf("Grace's sidebar says %q, want %q", n.Work, work)
+		}
 	}
+	areas("support")
+	works([]string{"support"}, "member · support")
 	task := func(cl *http.Client) (int, string) {
 		return call(t, cl, "POST", base+"api/v1/tasks", "application/json", map[string]any{"title": "Yachts", "brief": "Yacht builders."})
 	}
@@ -104,9 +126,7 @@ func TestEachAreaChangesOnlyItsOwnWork(t *testing.T) {
 	}
 
 	areas()
-	if _, page := call(t, ada, "GET", base+"settings", "", nil); !strings.Contains(page, "reads only") {
-		t.Error("someone with no area isn't shown as reading only")
-	}
+	works(nil, "member · reads only")
 	for name, try := range map[string]func(*http.Client) (int, string){"sales": sales, "support": support} {
 		if code, _ := try(asGrace); code != http.StatusForbidden {
 			t.Errorf("someone with no area did %s work: %d", name, code)

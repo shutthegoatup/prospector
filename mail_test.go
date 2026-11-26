@@ -211,7 +211,7 @@ func TestPasswordReset(t *testing.T) {
 	}
 	res.Body.Close()
 
-	if _, body := call(t, ada, "GET", srv.URL+"/o/alpha/settings", "", nil); strings.Contains(body, "Your password") {
+	if code, _ := call(t, ada, "GET", srv.URL+"/o/alpha/api/v1/me", "", nil); code != http.StatusUnauthorized {
 		t.Error("the session from before the reset still works")
 	}
 	if signIn(t, newMailClient(), srv, "ada@example.com", "correct horse battery") {
@@ -314,7 +314,10 @@ func TestInvitationByEmail(t *testing.T) {
 	if !signIn(t, grace, srv, "grace@example.com", "grace's own password") {
 		t.Fatal("Grace can't sign in with the password she chose")
 	}
-	if _, body := call(t, grace, "GET", srv.URL+"/o/alpha/today", "", nil); strings.Contains(body, "Choose your own password") {
+	if code, body := call(t, grace, "GET", srv.URL+"/o/alpha/api/v1/me", "", nil); code != http.StatusOK {
+		t.Errorf("Grace is asked to change a password nobody else has seen: %d %s", code, body)
+	}
+	if res, _ := get(t, grace, srv.URL+"/o/alpha/today"); res.Request.URL.Path != "/o/alpha/today" {
 		t.Error("Grace is asked to change a password nobody else has seen")
 	}
 	if u := must(s.UserByEmail("grace@example.com")); u.MustChangePassword {
@@ -402,9 +405,9 @@ func TestOrganisationMailServer(t *testing.T) {
 	if strings.Contains(stored.Password, "s3cret") || !sealed(stored.Password) {
 		t.Fatalf("the password is stored unsealed: %q", stored.Password)
 	}
-	_, page := call(t, ada, "GET", srv.URL+"/o/alpha/settings", "", nil)
+	_, page := call(t, ada, "GET", srv.URL+"/o/alpha/api/v1/mail-server", "", nil)
 	if strings.Contains(page, "s3cret") || strings.Contains(page, stored.Password) || !strings.Contains(page, "smtp.alpha.example") {
-		t.Fatal("Settings shows the password, or doesn't show the server")
+		t.Fatalf("the mail server Settings reads gives the password away, or doesn't name the server: %s", page)
 	}
 
 	// Invitations to this organisation now leave through its server, as its address.
@@ -448,8 +451,8 @@ func TestOrganisationMailServer(t *testing.T) {
 	if code, _ := save(member, server); code != http.StatusForbidden {
 		t.Errorf("a member saving the mail server: %d", code)
 	}
-	if code, body := call(t, member, "GET", srv.URL+"/o/alpha/settings", "", nil); code != http.StatusOK || strings.Contains(body, "smtp.elsewhere.example") {
-		t.Errorf("a member's Settings shows the mail server (%d)", code)
+	if code, body := call(t, member, "GET", srv.URL+"/o/alpha/api/v1/mail-server", "", nil); code != http.StatusForbidden || strings.Contains(body, "smtp.elsewhere.example") {
+		t.Errorf("a member is shown the mail server (%d)", code)
 	}
 
 	if code, _ := save(ada, map[string]any{"host": ""}); code != http.StatusOK {

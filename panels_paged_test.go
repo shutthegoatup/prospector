@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
-	"strings"
 	"testing"
 	"time"
 )
@@ -44,22 +42,27 @@ func TestACompanysHistoryAndNotesHavePages(t *testing.T) {
 		t.Fatalf("touches across the whole history: %d, %v", n, err)
 	}
 
-	page := fmt.Sprintf("%s/o/alpha/companies/%d", srv.URL, co.ID)
-	code, body := call(t, client, "GET", page, "", nil)
-	if code != http.StatusOK || strings.Count(body, "Page 1 of 2") != 2 {
-		t.Fatalf("the company's page should offer a second page of its notes and of its history: %d", code)
+	// The company's page reads each list through the API, a page at a time and each on
+	// its own cursor.
+	base := fmt.Sprintf("%s/o/alpha/api/v1/companies/%d/", srv.URL, co.ID)
+	history := apiPages(t, client, base+"history?limit="+fmt.Sprint(historyPageSize))
+	if len(history) != 2 || len(history[0].Items) != historyPageSize || len(history[1].Items) != 10 {
+		t.Fatalf("the company's history should come in two pages: %d", len(history))
 	}
-	if !strings.Contains(body, "?history=2") || !strings.Contains(body, "?notes=2") || strings.Contains(body, "Left note 0.") {
-		t.Fatal("the first page links to neither list's second page, or shows a note that belongs on it")
+	if oldest, _ := time.Parse(time.RFC3339, fmt.Sprint(history[1].Items[9]["at"])); !oldest.Equal(events[0].At) {
+		t.Fatalf("the last page of history should end on the oldest thing: %v", history[1].Items[9]["at"])
 	}
-	// Turning one list's page keeps the other where it was.
-	_, body = call(t, client, "GET", page+"?history=2&notes=2", "", nil)
-	if !strings.Contains(body, "Left note 0.") || strings.Count(body, "Page 2 of 2") != 2 {
-		t.Fatal("the second page of each doesn't show its oldest rows")
+	notePages := apiPages(t, client, base+"notes?limit="+fmt.Sprint(companyNotesPageSize))
+	if len(notePages) != 2 || len(notePages[1].Items) != 3 {
+		t.Fatalf("the company's notes should come in two pages: %d", len(notePages))
 	}
-	// Going back a page of one keeps the other on its second.
-	if !strings.Contains(body, `?history=2"`) || !strings.Contains(body, `?notes=2"`) {
-		t.Fatal("going back a page of notes loses the page of history, or the other way about")
+	for _, n := range notePages[0].Items {
+		if n["text"] == "Left note 0." {
+			t.Fatal("the first page of notes shows one that belongs on the second")
+		}
+	}
+	if notePages[1].Items[2]["text"] != "Left note 0." {
+		t.Fatalf("the second page of notes doesn't end on the oldest: %v", notePages[1].Items[2]["text"])
 	}
 }
 
@@ -80,8 +83,8 @@ func TestAgentActivityHasPages(t *testing.T) {
 	if last, _ := s.AgentActivity(o.ID, 2); len(last) != 4 || !last[3].At.Equal(events[0].At) {
 		t.Fatalf("the last page of activity: %d rows", len(last))
 	}
-	code, body := call(t, client, "GET", srv.URL+"/o/alpha/agents", "", nil)
-	if code != http.StatusOK || !strings.Contains(body, "Page 1 of 2") || !strings.Contains(body, "agents?activity=2") {
-		t.Fatalf("the Agents page doesn't offer the second page of activity: %d", code)
+	pages := apiPages(t, client, srv.URL+"/o/alpha/api/v1/agent-activity?limit="+fmt.Sprint(activityPageSize))
+	if len(pages) != 2 || len(pages[0].Items) != activityPageSize || len(pages[1].Items) != 4 || pages[1].Items[3]["value"] != "fact number 0." {
+		t.Fatalf("agent activity through the API should come in two pages, oldest last: %d", len(pages))
 	}
 }

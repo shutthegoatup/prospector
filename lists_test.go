@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -47,16 +49,25 @@ func TestCompaniesArePaged(t *testing.T) {
 		t.Fatalf("a page before the start should show the first, got %+v", pg)
 	}
 
-	base := srv.URL + "/o/alpha/"
-	_, body := call(t, client, "GET", base+"companies?segment=Yachts+%26+boats&page=2", "", nil)
-	for _, want := range []string{"620 companies", "Maker 051", "Page 2 of 13",
-		`href="/o/alpha/companies?segment=Yachts+%26+boats"`, `href="/o/alpha/companies?page=3&amp;segment=Yachts+%26+boats"`} {
-		if !strings.Contains(body, want) {
-			t.Errorf("page 2 of the segment is missing %q", want)
-		}
+	// The Companies page walks the list 50 at a time by its cursors, and counts the pages from the total.
+	list := srv.URL + "/o/alpha/api/v1/companies?segment=Yachts+%26+boats&limit=50"
+	var first, second struct {
+		Items []struct {
+			Name string `json:"name"`
+		} `json:"items"`
+		NextCursor string `json:"next_cursor"`
+		Total      int    `json:"total"`
 	}
-	if code, body := call(t, client, "GET", base+"companies?page=nonsense", "", nil); code != http.StatusOK || !strings.Contains(body, "Maker 001") {
-		t.Fatalf("a page that isn't a number: %d", code)
+	_, body := call(t, client, "GET", list, "", nil)
+	if json.Unmarshal([]byte(body), &first) != nil || first.Total != 620 || len(first.Items) != 50 || first.Items[0].Name != "Maker 001" || first.NextCursor == "" {
+		t.Fatalf("the segment's first page: %s", body)
+	}
+	_, body = call(t, client, "GET", list+"&cursor="+url.QueryEscape(first.NextCursor), "", nil)
+	if json.Unmarshal([]byte(body), &second) != nil || second.Total != 620 || len(second.Items) != 50 || second.Items[0].Name != "Maker 051" || second.NextCursor == "" {
+		t.Errorf("the segment's second page: %s", body)
+	}
+	if code, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/companies?cursor=nonsense", "", nil); code != http.StatusBadRequest {
+		t.Errorf("a cursor that isn't one: %d %s", code, body)
 	}
 }
 
@@ -188,14 +199,20 @@ func TestResearchIsPaged(t *testing.T) {
 		t.Fatalf("the last page, past the old 200 cap: %d rows, %+v, %+v", len(rows), pg, last)
 	}
 
-	_, body := call(t, client, "GET", srv.URL+"/o/alpha/research?f=review&page=2", "", nil)
-	for _, want := range []string{"Page 2 of 8", `href="/o/alpha/research?f=review"`, `href="/o/alpha/research?f=review&amp;page=3"`} {
-		if !strings.Contains(body, want) {
-			t.Errorf("research page 2 is missing %q", want)
-		}
+	queue := readResearch(t, client, srv.URL+"/o/alpha/api/v1/research?filter=review")
+	var more struct {
+		NextCursor string `json:"next_cursor"`
 	}
-	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/today", "", nil); !strings.Contains(body, "230") {
-		t.Error("Today doesn't count every company waiting for review")
+	json.Unmarshal([]byte(queue.body), &more)
+	if len(queue.Items) == 0 || queue.Items[0].Name != "Maker 230" || more.NextCursor == "" || !strings.Contains(queue.body, `"review":230`) {
+		t.Fatalf("research's first page should count all 230 and lead on to the rest: %d items", len(queue.Items))
+	}
+	next := readResearch(t, client, srv.URL+"/o/alpha/api/v1/research?filter=review&cursor="+url.QueryEscape(more.NextCursor))
+	if len(next.Items) == 0 || next.Items[0].Name != fmt.Sprintf("Maker %03d", 230-len(queue.Items)) {
+		t.Errorf("research's second page starts at %v", next.names())
+	}
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/today/summary", "", nil); !strings.Contains(body, `"review":230`) {
+		t.Errorf("Today doesn't count every company waiting for review: %s", body)
 	}
 }
 

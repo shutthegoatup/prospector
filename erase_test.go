@@ -12,6 +12,16 @@ import (
 
 const hannahEmail = "hannah.pryce@larkmoor.example"
 
+// navOwner is whether the app offers what only an owner may do to whoever client is.
+func navOwner(t *testing.T, client *http.Client, site string) bool {
+	t.Helper()
+	code, body := call(t, client, "GET", site+"/o/alpha/api/v1/nav", "", nil)
+	if code != http.StatusOK {
+		t.Fatalf("the nav: %d %s", code, body)
+	}
+	return strings.Contains(body, `"owner":true`)
+}
+
 func TestErasePerson(t *testing.T) {
 	s, o, srv, ada := signedIn(t)
 	other := mustOrg(t, s, "beta")
@@ -57,11 +67,12 @@ func TestErasePerson(t *testing.T) {
 	if code := erase(ada, placeholder.ID); code == http.StatusOK {
 		t.Fatal("a company's placeholder row was erased as if it were a person")
 	}
-	if _, page := call(t, ada, "GET", srv.URL+"/o/alpha/companies/"+strconv.FormatInt(*hannah.CompanyID, 10), "", nil); !strings.Contains(page, `data-post="ui/erase"`) {
-		t.Fatal("the company page gives an owner no way to erase a person")
+	// The company page offers erasing to whoever the nav says is an owner.
+	if !navOwner(t, ada, srv.URL) || navOwner(t, bob, srv.URL) {
+		t.Fatal("the nav should offer erasing to an owner alone")
 	}
-	if _, page := call(t, bob, "GET", srv.URL+"/o/alpha/companies/"+strconv.FormatInt(*hannah.CompanyID, 10), "", nil); strings.Contains(page, "ui/erase") {
-		t.Fatal("the company page offers erase to someone who isn't an owner")
+	if code, _ := call(t, bob, "POST", srv.URL+"/o/alpha/api/v1/contacts/"+strconv.FormatInt(hannah.ID, 10)+"/erase", "application/json", struct{}{}); code != http.StatusForbidden {
+		t.Fatalf("a member who isn't an owner erased someone through the API: %d", code)
 	}
 	if code := erase(ada, hannah.ID); code != http.StatusOK {
 		t.Fatalf("erase: %d", code)
@@ -100,8 +111,14 @@ func TestErasePerson(t *testing.T) {
 	if _, ok := kept["erase"]; !ok {
 		t.Fatal("nothing records that somebody was erased")
 	}
-	if _, page := call(t, ada, "GET", srv.URL+"/o/alpha/companies/"+strconv.FormatInt(*hannah.CompanyID, 10), "", nil); strings.Contains(page, "Hannah") || !strings.Contains(page, "erased a person on request") {
-		t.Fatal("the company page still names her, or doesn't say someone was erased")
+	company := srv.URL + "/o/alpha/api/v1/companies/" + strconv.FormatInt(*hannah.CompanyID, 10)
+	var page string
+	for _, part := range []string{"/overview", "/history", "/notes"} {
+		_, body := call(t, ada, "GET", company+part, "", nil)
+		page += body
+	}
+	if strings.Contains(page, "Hannah") || !strings.Contains(page, "erased a person on request") {
+		t.Fatalf("the company page still names her, or doesn't say someone was erased: %s", page)
 	}
 
 	if _, err := s.Import(o.ID, readFixtures(t)); err == nil || !strings.Contains(err.Error(), "erased on request") {

@@ -1,16 +1,17 @@
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Failed, Meta, PageHead } from "@/components/app";
 import { Input } from "@/components/ui/input";
 import { plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { pipelines } from "@/search";
 import { useSession } from "@/session";
 
 type Pipeline = components["schemas"]["Pipeline"];
 
-const stages: Pipeline[] = ["research", "outreach", "replied", "meeting", "proposal", "won", "lost", "rejected"];
+const stages: readonly Pipeline[] = pipelines;
 const pageSize = 50;
 
 // StageTag is where a company stands, lit once someone there has answered.
@@ -70,13 +71,13 @@ export function Pager({ n, total, size, next, onNext, onPrevious }: { n: number;
 
 export function CompaniesPage() {
   const { org } = useSession();
-  const [params, setParams] = useSearchParams();
-  const q = params.get("q") ?? "";
-  const segment = params.get("segment") ?? "";
-  const stage = (params.get("stage") ?? "") as Pipeline | "";
-  const pages = usePages(params.toString());
+  const search = useSearch({ from: "/o/$org/companies" });
+  const { q = "", segment = "", stage } = search;
+  const navigate = useNavigate();
+  const filters = JSON.stringify(search);
+  const pages = usePages(filters);
   const list = $api.useQuery("get", "/o/{org}/api/v1/companies", {
-    params: { path: { org }, query: { q: q || undefined, segment: segment || undefined, stage: stage || undefined, limit: pageSize, cursor: pages.cursor } },
+    params: { path: { org }, query: { q: q || undefined, segment: segment || undefined, stage, limit: pageSize, cursor: pages.cursor } },
   });
   const segments = $api.useQuery("get", "/o/{org}/api/v1/segments", { params: { path: { org }, query: { limit: 200 } } });
 
@@ -86,13 +87,13 @@ export function CompaniesPage() {
         {list.data && <span className="font-mono text-xs text-muted-foreground">{plural(list.data.total, "company", "companies")}</span>}
       </PageHead>
       <form
-        key={params.toString()}
+        key={filters}
         className="mb-5 flex flex-wrap gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          const next = new URLSearchParams();
-          for (const [k, v] of new FormData(e.currentTarget)) if (typeof v === "string" && v) next.set(k, v);
-          setParams(next);
+          const form = new FormData(e.currentTarget);
+          const value = (k: string) => (form.get(k) as string | null) || undefined;
+          navigate({ to: "/o/$org/companies", params: { org }, search: { q: value("q"), segment: value("segment"), stage: pipelines.find((p) => p === value("stage")) } });
         }}
       >
         <label className="sr-only" htmlFor="q">
@@ -121,7 +122,7 @@ export function CompaniesPage() {
         <label className="sr-only" htmlFor="stage">
           Stage
         </label>
-        <select id="stage" name="stage" defaultValue={stage} className="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
+        <select id="stage" name="stage" defaultValue={stage ?? ""} className="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
           <option value="">Any stage</option>
           {stages.map((s) => (
             <option key={s} value={s}>
@@ -140,7 +141,8 @@ export function CompaniesPage() {
           {list.data.items.map((r) => (
             <Link
               key={r.id}
-              to={`/companies/${r.id}`}
+              to="/o/$org/companies/$id"
+              params={{ org, id: r.id }}
               className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 text-sm text-foreground no-underline last:border-0 hover:bg-secondary hover:text-foreground"
             >
               <span className="min-w-0">

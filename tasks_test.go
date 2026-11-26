@@ -351,14 +351,23 @@ func TestTasksOverMCPAndThePages(t *testing.T) {
 		t.Fatalf("a read-only key should read tasks and not write to them: %v", names)
 	}
 
-	_, list := call(t, client, "GET", srv.URL+"/o/alpha/tasks", "", nil)
-	if !strings.Contains(list, "Being worked on") || !strings.Contains(list, "1 company, 0 people") || !strings.Contains(list, `href="/o/alpha/tasks/1"`) {
-		t.Fatalf("the Tasks page should show the task, its status and what was found: %s", list)
+	// What the pages read, as text: JSON escapes the angle brackets the agent wrote.
+	read := func(path string) string {
+		t.Helper()
+		code, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/"+path, "", nil)
+		var v any
+		if code != http.StatusOK || json.Unmarshal([]byte(body), &v) != nil {
+			t.Fatalf("GET %s: %d %s", path, code, body)
+		}
+		return fmt.Sprint(v)
 	}
-	_, page := call(t, client, "GET", srv.URL+"/o/alpha/tasks/1", "", nil)
-	for _, want := range []string{"&lt;b&gt;configurator&lt;/b&gt;", "Larkmoor Yachts", "Look for &lt;i&gt;who&lt;/i&gt; runs marketing.", "agent · claude", "Copy prompt", "Ask for more"} {
+	if list := read("tasks"); !strings.Contains(list, "status:working") || !strings.Contains(list, "found:map[companies:1 people:0]") || !strings.Contains(list, "id:1 ") {
+		t.Fatalf("the tasks list should hold the task, its status and what was found: %s", list)
+	}
+	page := read("tasks/1") + read("tasks/1/notes") + read("tasks/1/prompt")
+	for _, want := range []string{"<b>configurator</b>", "Larkmoor Yachts", "Look for <i>who</i> runs marketing.", "agent:claude", "get_task with id 1"} {
 		if !strings.Contains(page, want) {
-			t.Fatalf("the task page is missing %q", want)
+			t.Fatalf("the task's page is missing %q: %s", want, page)
 		}
 	}
 	if code, _ := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/tasks/1/requests", "application/json", map[string]any{"text": "Now some in Switzerland."}); code != http.StatusCreated {
@@ -368,7 +377,7 @@ func TestTasksOverMCPAndThePages(t *testing.T) {
 		t.Fatalf("a request made on the page should reach the agent: %s", got)
 	}
 	tool("finish_request", map[string]any{"request": 2})
-	if _, page = call(t, client, "GET", srv.URL+"/o/alpha/tasks/1", "", nil); !strings.Contains(page, "done, says agent · claude") {
+	if page := read("tasks/1"); !strings.Contains(page, "done_by:agent:claude") {
 		t.Fatal("the task page should say which agent finished the request")
 	}
 	if code, _ := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/task-requests/2", "application/json", map[string]any{"done": false}); code != http.StatusOK {
@@ -377,20 +386,19 @@ func TestTasksOverMCPAndThePages(t *testing.T) {
 	if code, _ := call(t, client, "POST", srv.URL+"/o/alpha/ui/note/delete", "application/json", map[string]any{"id": 1}); code != http.StatusOK {
 		t.Fatalf("delete a note: %d", code)
 	}
-	if _, page = call(t, client, "GET", srv.URL+"/o/alpha/tasks/1", "", nil); strings.Contains(page, "runs marketing") || strings.Contains(page, "done, says") {
+	if page := read("tasks/1") + read("tasks/1/notes"); strings.Contains(page, "runs marketing") || strings.Contains(page, "done_by:agent:claude") {
 		t.Fatal("a deleted note or a reopened request still shows as before")
 	}
-	_, agents := call(t, client, "GET", srv.URL+"/o/alpha/agents", "", nil)
-	if !strings.Contains(agents, "Recent agent work") || !strings.Contains(agents, `href="/o/alpha/tasks/1"`) {
-		t.Fatal("the Agents page should show the run and the task it was for")
+	if work := read("agent-work"); !strings.Contains(work, "actor:agent:claude") || !strings.Contains(work, "tasks:[map[id:1 ") {
+		t.Fatalf("the agents' work should show the run and the task it was for: %s", work)
 	}
 	if code, _ := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/tasks/1", "application/json", map[string]any{"closed": true}); code != http.StatusOK {
 		t.Fatalf("close the task: %d", code)
 	}
-	if _, list = call(t, client, "GET", srv.URL+"/o/alpha/tasks", "", nil); strings.Contains(list, `href="/o/alpha/tasks/1"`) {
-		t.Fatal("a closed task is still in the open list")
+	if list := read("tasks"); !strings.Contains(list, "items:[]") {
+		t.Fatalf("a closed task is still in the open list: %s", list)
 	}
-	if code, _ := call(t, client, "GET", srv.URL+"/o/alpha/tasks/404", "", nil); code != http.StatusNotFound {
+	if code, _ := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/tasks/404", "", nil); code != http.StatusNotFound {
 		t.Fatalf("a task that isn't there: %d", code)
 	}
 }

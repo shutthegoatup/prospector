@@ -2,25 +2,28 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
-// agentCard is the HTML of one of Prospector's agents' cards on the Agents page.
-func agentCard(t *testing.T, s *Store, page, name string) string {
+// agentCard is what one of Prospector's agents' cards on the Agents page says, as the API
+// gives it: its rail, and its state's words with its search and fallback.
+func agentCard(t *testing.T, listed []api.Agent, name string) (string, string) {
 	t.Helper()
-	c := must(s.agentNamed(must(s.OrgBySlug("alpha")).ID, name))
-	at := strings.Index(page, fmt.Sprintf(`id="agent-%d"`, c.ID))
-	if at < 0 {
-		t.Fatalf("the Agents page has no card for %s", name)
+	for _, a := range listed {
+		if a.Name == name {
+			return string(a.State.Rail), strings.Join([]string{a.State.Line, a.State.Todo, a.SearchText, a.FallbackText}, "\n")
+		}
 	}
-	start := strings.LastIndex(page[:at], "<details")
-	end := strings.Index(page[at:], "</details>")
-	return page[start : at+end]
+	t.Fatalf("the Agents page has no card for %s", name)
+	return "", ""
 }
 
 func TestTheAgentsPageSaysWhichAgentsAreReady(t *testing.T) {
@@ -56,41 +59,41 @@ func TestTheAgentsPageSaysWhichAgentsAreReady(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, page := call(t, ada, "GET", srv.URL+"/o/alpha/agents", "", nil)
-	gateway, localCard, spent := agentCard(t, s, page, "Gateway"), agentCard(t, s, page, "Local"), agentCard(t, s, page, "Spent")
-	unpicked := agentCard(t, s, page, "Unpicked")
-	for _, c := range []struct{ html, state, want string }{
-		{gateway, "ok", "✓ Ready"},
-		{gateway, "ok", "Local, after 15 minutes"},
-		{gateway, "ok", "✓ through its tools"},
-		{localCard, "warn", "Runs, but can&#39;t search the web"},
-		{localCard, "warn", "thinking off"},
-		{localCard, "warn", "nobody: it waits"},
+	listed := listedAgents(t, ada, srv.URL)
+	for _, c := range []struct{ name, state, want string }{
+		{"Gateway", "ok", "✓ Ready"},
+		{"Gateway", "ok", "Local, after 15 minutes"},
+		{"Gateway", "ok", "✓ through its tools"},
+		{"Local", "warn", "Runs, but can't search the web"},
+		{"Local", "warn", "nobody: it waits"},
 		// A check refused for its limit leaves an agent that still runs.
-		{spent, "warn", "Last check: Models: the endpoint answered 429"},
-		{unpicked, "stop", "✕ Can&#39;t run"},
-		{unpicked, "stop", "Pick one of the models the endpoint lists."},
+		{"Spent", "warn", "Last check: Models: the endpoint answered 429"},
+		{"Unpicked", "stop", "✕ Can't run"},
+		{"Unpicked", "stop", "Pick one of the models the endpoint lists."},
 	} {
-		if !strings.Contains(c.html, `data-state="`+c.state+`"`) || !strings.Contains(c.html, c.want) {
-			t.Errorf("a card should be %s and say %q:\n%s", c.state, c.want, c.html)
+		if rail, says := agentCard(t, listed, c.name); rail != c.state || !strings.Contains(says, c.want) {
+			t.Errorf("%s's card should be %s and say %q: %s %s", c.name, c.state, c.want, rail, says)
 		}
 	}
-	if !strings.Contains(localCard, `name="thinking_off" checked`) {
-		t.Error("Local's form should have thinking off ticked")
-	}
-	for _, want := range []string{"1 ready", "2 missing something", "1 can&#39;t run", "research-bot", "Connects with a key", "Your own agent connects"} {
-		if !strings.Contains(page, want) {
-			t.Errorf("the Agents page is missing %q", want)
+	for _, a := range listed {
+		if a.ThinkingOff != (a.Name == "Local") {
+			t.Errorf("only Local has thinking off: %s %v", a.Name, a.ThinkingOff)
 		}
 	}
-	// Prospector's agents' own keys belong to their cards, not the list of keys.
-	if strings.Contains(page, builtinKeyName("Gateway")) {
-		t.Error("an agent's built-in key is shown as an outside agent")
+	// Prospector's agents' own keys belong to their cards, not the list of outside keys.
+	code, body := call(t, ada, "GET", srv.URL+"/o/alpha/api/v1/keys?limit=200", "", nil)
+	var keys struct{ Items []api.APIKey }
+	if code != http.StatusOK || json.Unmarshal([]byte(body), &keys) != nil {
+		t.Fatalf("the keys: %d %s", code, body)
 	}
-
-	_, settingsPage := call(t, ada, "GET", srv.URL+"/o/alpha/settings", "", nil)
-	if strings.Contains(settingsPage, `data-form="api/v1/agents"`) || !strings.Contains(settingsPage, `href="/o/alpha/agents"`) {
-		t.Error("Settings should point to the Agents page rather than set agents up itself")
+	var outside []string
+	for _, k := range keys.Items {
+		if !k.Builtin {
+			outside = append(outside, k.Name)
+		}
+	}
+	if strings.Join(outside, " ") != "research-bot" {
+		t.Errorf("the outside agents' keys: %v", outside)
 	}
 
 	// A member sees each agent's state but not its setup.
@@ -102,9 +105,14 @@ func TestTheAgentsPageSaysWhichAgentsAreReady(t *testing.T) {
 	if !signIn(t, grace, srv, "grace@example.com", "correct horse battery") {
 		t.Fatal("Grace can't sign in")
 	}
-	_, page = call(t, grace, "GET", srv.URL+"/o/alpha/agents", "", nil)
-	if !strings.Contains(page, "✓ Ready") || strings.Contains(page, `data-form="api/v1/agents`) || strings.Contains(page, `data-form="ui/keys"`) {
-		t.Error("a member should see the agents' states without their forms")
+	if rail, says := agentCard(t, listedAgents(t, grace, srv.URL), "Gateway"); rail != "ok" || !strings.Contains(says, "✓ Ready") {
+		t.Errorf("a member should see the agents' states: %s %s", rail, says)
+	}
+	if code, _ := saveAgentAt(t, grace, srv.URL, settings("Grace's", nil)); code != http.StatusForbidden {
+		t.Errorf("a member set an agent up: %d", code)
+	}
+	if code, _ := call(t, grace, "POST", srv.URL+"/o/alpha/api/v1/keys", "application/json", map[string]any{"name": "mine", "scopes": []string{"read"}}); code != http.StatusForbidden {
+		t.Errorf("a member made a key: %d", code)
 	}
 }
 
