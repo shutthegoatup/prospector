@@ -7,16 +7,19 @@ require (
 	github.com/a-h/templ v0.3.1118
 	github.com/anthropics/anthropic-sdk-go/v2 v2.15.0
 	github.com/coreos/go-oidc/v3 v3.21.0
+	github.com/digitorus/pdfsign v1.0.0
 	github.com/getkin/kin-openapi v0.153.0
 	github.com/glebarez/go-sqlite v1.23.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-jose/go-jose/v4 v4.1.9
+	github.com/go-pdf/fpdf v0.9.0
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/nyaruka/phonenumbers/v2 v2.1.0
 	github.com/oapi-codegen/runtime v1.9.1
 	github.com/pdfcpu/pdfcpu v0.16.4
 	golang.org/x/crypto v0.59.0
+	golang.org/x/image v0.47.0
 	golang.org/x/net v0.63.0
 	golang.org/x/oauth2 v0.38.0
 	gorm.io/driver/postgres v1.6.3
@@ -33,6 +36,9 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cli/browser v1.3.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
+	github.com/digitorus/pdf v0.3.0 // indirect
+	github.com/digitorus/pkcs7 v0.0.0-20260914070511-d678ea5ea03f // indirect
+	github.com/digitorus/timestamp v0.0.0-20250524132541-c45532741eea // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/evanw/esbuild v0.28.2 // indirect
 	github.com/fatih/color v1.19.0 // indirect
@@ -49,6 +55,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.3 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/mattetti/filebuffer v1.0.1 // indirect
 	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mattn/go-runewidth v0.0.31 // indirect
@@ -76,7 +83,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.33.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go.yaml.in/yaml/v4 v4.0.0 // indirect
-	golang.org/x/image v0.47.0 // indirect
 	golang.org/x/mod v0.43.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect

@@ -443,13 +443,13 @@ func (a *App) addPage(w http.ResponseWriter, r *http.Request) {
 		AddPopup(q, in).Render(r.Context(), w)
 		return
 	}
-	a.page(w, r, "add", AddView(q, in, bookmarklet(a.baseURL(r), q)))
+	a.page(w, r, "add", AddView(q, in, bookmarklet(a.baseURL(r), q, "add")))
 }
 
 // bookmarklet sends the LinkedIn profile you're looking at to the add form. It reads only
 // the page's title and headline, on your click.
-func bookmarklet(site string, q *Req) string {
-	base := site + q.Base() + "add?popup=1"
+func bookmarklet(site string, q *Req, page string) string {
+	base := site + q.Base() + page + "?popup=1"
 	return `javascript:(()=>{const h=(document.querySelector('.text-body-medium')||{}).innerText||'';` +
 		`window.open('` + base + `&url='+encodeURIComponent(location.href)+'&name='+encodeURIComponent(document.title)+'&headline='+encodeURIComponent(h),'prospect','width=520,height=760')})()`
 }
