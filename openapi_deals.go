@@ -22,7 +22,15 @@ func dealOut(d Deal, with Contact, own bool) api.Deal {
 	return out
 }
 
-func (s apiServer) deals(org int64) ([]api.Deal, error) {
+// boardDeal is a deal on the board with the person it is with.
+type boardDeal struct {
+	deal Deal
+	with Contact
+	own  bool
+}
+
+// board is every deal on the Conversations board, by stage in the board's order.
+func (s apiServer) board(org int64) ([]boardDeal, error) {
 	convs, err := s.a.s.Conversations(org)
 	if err != nil {
 		return nil, err
@@ -35,14 +43,26 @@ func (s apiServer) deals(org int64) ([]api.Deal, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := []api.Deal{}
+	var out []boardDeal
 	for _, st := range Stages {
 		for _, c := range convs[st.Key] {
-			out = append(out, dealOut(own[c.ID], c, true))
+			out = append(out, boardDeal{own[c.ID], c, true})
 		}
 		for _, o := range others[st.Key] {
-			out = append(out, dealOut(o.Deal, o.With, false))
+			out = append(out, boardDeal{o.Deal, o.With, false})
 		}
+	}
+	return out, nil
+}
+
+func (s apiServer) deals(org int64) ([]api.Deal, error) {
+	rows, err := s.board(org)
+	if err != nil {
+		return nil, err
+	}
+	out := []api.Deal{}
+	for _, r := range rows {
+		out = append(out, dealOut(r.deal, r.with, r.own))
 	}
 	return out, nil
 }

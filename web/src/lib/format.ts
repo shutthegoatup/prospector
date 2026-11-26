@@ -1,6 +1,7 @@
 // How pages write people, times and counts, as the server-rendered pages do.
 
 export function actor(by: string) {
+  if (by === "customer") return "the customer";
   return by.startsWith("agent:") ? "agent · " + by.slice(6) : by;
 }
 

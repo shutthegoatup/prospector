@@ -132,20 +132,30 @@ const historyPageSize = 50
 
 // History is one page of what happened at a company, newest first.
 func (s *Store) History(org, company int64, page int) ([]HistoryItem, Page, error) {
-	theirs := func() *gorm.DB { return s.in(org).Model(&Event{}).Where("company_id = ?", company) }
-	var total int64
-	if err := theirs().Count(&total).Error; err != nil {
+	total, err := s.historyCount(org, company)
+	if err != nil {
 		return nil, Page{}, err
 	}
-	pg := pageOf(page, historyPageSize, int(total))
+	pg := pageOf(page, historyPageSize, total)
+	out, err := s.historyAt(org, company, pg.offset(), pg.Size)
+	return out, pg, err
+}
+
+func (s *Store) historyCount(org, company int64) (int, error) {
+	var total int64
+	err := s.in(org).Model(&Event{}).Where("company_id = ?", company).Count(&total).Error
+	return int(total), err
+}
+
+func (s *Store) historyAt(org, company int64, offset, limit int) ([]HistoryItem, error) {
 	var events []Event
-	if err := theirs().Order("at desc, id desc").Limit(pg.Size).Offset(pg.offset()).Find(&events).Error; err != nil {
-		return nil, Page{}, err
+	if err := s.in(org).Where("company_id = ?", company).Order("at desc, id desc").Limit(limit).Offset(offset).Find(&events).Error; err != nil {
+		return nil, err
 	}
 	names := map[int64]string{}
 	var people []Contact
 	if err := s.in(org).Where("company_id = ?", company).Find(&people).Error; err != nil {
-		return nil, Page{}, err
+		return nil, err
 	}
 	for _, p := range people {
 		names[p.ID] = displayName(p)
@@ -154,7 +164,7 @@ func (s *Store) History(org, company int64, page int) ([]HistoryItem, Page, erro
 	for i, e := range events {
 		out[i] = HistoryItem{At: e.At, Actor: e.User, Action: e.Action, Value: deref(e.Value), Person: names[e.ContactID]}
 	}
-	return out, pg, nil
+	return out, nil
 }
 
 // Touches counts every time someone at a company was reached out to, whichever page
@@ -587,9 +597,40 @@ func pipeline(c Company, people []Contact) string {
 }
 
 func (s *Store) Companies(org int64, q, segment, stage string, page int) ([]CompanyListRow, Page, error) {
-	people := s.db.Model(&Contact{}).Select("company_id, count(*) as people, "+furthestSQL+" as furthest").
+	db, people := s.companiesQuery(org, q, segment, stage)
+	var total int64
+	if err := db.Session(&gorm.Session{}).Count(&total).Error; err != nil {
+		return nil, Page{}, err
+	}
+	pg := pageOf(page, companiesPageSize, int(total))
+	rows, err := s.companyRows(db, people, pg.offset(), pg.Size)
+	return rows, pg, err
+}
+
+// companiesList is a page of the Companies list for the API, with how many match in all.
+func (s *Store) companiesList(org int64, q, segment, stage string, in PageIn) ([]CompanyListRow, int, string, error) {
+	at, err := in.at(1)
+	if err != nil {
+		return nil, 0, "", err
+	}
+	db, people := s.companiesQuery(org, q, segment, stage)
+	var total int64
+	if err := db.Session(&gorm.Session{}).Count(&total).Error; err != nil {
+		return nil, 0, "", err
+	}
+	rows, err := s.companyRows(db, people, int(at[0]), in.size())
+	next := ""
+	if end := at[0] + int64(in.size()); end < total {
+		next = cursorOf(end)
+	}
+	return rows, int(total), next, err
+}
+
+// companiesQuery is the companies the filters leave, and each company's standing from its people.
+func (s *Store) companiesQuery(org int64, q, segment, stage string) (db, people *gorm.DB) {
+	people = s.db.Model(&Contact{}).Select("company_id, count(*) as people, "+furthestSQL+" as furthest").
 		Where("org_id = ? and company_id is not null and key not like 'org:%'", org).Group("company_id")
-	db := s.db.Model(&Company{}).Where("companies.org_id = ?", org)
+	db = s.db.Model(&Company{}).Where("companies.org_id = ?", org)
 	if q = strings.TrimSpace(strings.ToLower(q)); q != "" {
 		// A union, so each half is answered by its own search index.
 		company, args := s.companyMatch(q)
@@ -614,15 +655,13 @@ func (s *Store) Companies(org int64, q, segment, stage string, page int) ([]Comp
 			db = db.Where("p.furthest = ?", slices.Index(pipelineOrder, stage))
 		}
 	}
-	var total int64
-	if err := db.Session(&gorm.Session{}).Count(&total).Error; err != nil {
-		return nil, Page{}, err
-	}
-	pg := pageOf(page, companiesPageSize, int(total))
+	return db, people
+}
+
+func (s *Store) companyRows(db, people *gorm.DB, offset, limit int) ([]CompanyListRow, error) {
 	var companies []Company
-	err := db.Select("companies.*").Order("companies.name, companies.id").Limit(pg.Size).Offset(pg.offset()).Find(&companies).Error
-	if err != nil {
-		return nil, pg, err
+	if err := db.Select("companies.*").Order("companies.name, companies.id").Limit(limit).Offset(offset).Find(&companies).Error; err != nil {
+		return nil, err
 	}
 	ids := make([]int64, len(companies))
 	for i, c := range companies {
@@ -633,7 +672,7 @@ func (s *Store) Companies(org int64, q, segment, stage string, page int) ([]Comp
 		People, Furthest int
 	}
 	if err := people.Where("company_id in ?", ids).Scan(&standing).Error; err != nil {
-		return nil, pg, err
+		return nil, err
 	}
 	at := map[int64]int{}
 	for i, st := range standing {
@@ -646,13 +685,17 @@ func (s *Store) Companies(org int64, q, segment, stage string, page int) ([]Comp
 			out[i].People, out[i].Pipeline = standing[j].People, pipelineAt(c, standing[j].Furthest)
 		}
 	}
-	return out, pg, nil
+	return out, nil
 }
 
 func (s *Store) Segments(org int64) []string {
-	var out []string
-	logged(s.in(org).Model(&Company{}).Where("segment <> ''").Distinct().Order("segment").Pluck("segment", &out))
+	out, _ := s.segments(org)
 	return out
+}
+
+func (s *Store) segments(org int64) ([]string, error) {
+	var out []string
+	return out, logged(s.in(org).Model(&Company{}).Where("segment <> ''").Distinct().Order("segment").Pluck("segment", &out))
 }
 
 type Stats struct{ Touches, Replies, Meetings, Researched int64 }
@@ -684,17 +727,28 @@ const activityPageSize = 20
 
 // AgentActivity is one page of what agents did, newest first.
 func (s *Store) AgentActivity(org int64, page int) ([]AgentEvent, Page) {
+	events, total := s.agentEvents(org, 0, 0)
+	pg := pageOf(page, activityPageSize, total)
+	events, _ = s.agentEvents(org, pg.offset(), pg.Size)
+	return events, pg
+}
+
+// agentEvents is limit of what agents did from offset, newest first, and how many they
+// did in all; a limit of 0 reads none, only the count.
+func (s *Store) agentEvents(org int64, offset, limit int) ([]AgentEvent, int) {
 	agents := func() *gorm.DB { return s.in(org).Model(&Event{}).Where(`"user" like 'agent:%'`) }
 	var total int64
 	logged(agents().Count(&total))
-	pg := pageOf(page, activityPageSize, int(total))
+	if limit == 0 {
+		return nil, int(total)
+	}
 	var events []Event
-	logged(agents().Order("at desc, id desc").Limit(pg.Size).Offset(pg.offset()).Find(&events))
+	logged(agents().Order("at desc, id desc").Limit(limit).Offset(offset).Find(&events))
 	out := make([]AgentEvent, len(events))
 	for i, e := range events {
 		out[i] = AgentEvent{e.At, strings.TrimPrefix(e.User, "agent:"), e.Action, deref(e.Value)}
 	}
-	return out, pg
+	return out, int(total)
 }
 
 // QuickAdd is the "Add person" form and the LinkedIn bookmarklet: one person straight into the LinkedIn queue.

@@ -449,9 +449,9 @@ function CompanyCard({ company: c, open, enrichers }: { company: Company; open: 
     <article className="panel">
       <div className="flex flex-wrap items-start gap-x-6 gap-y-3 px-5 py-4">
         <div className="min-w-[200px] flex-[2_1_220px]">
-          <a href={`/o/${org}/companies/${c.id}`} className="font-heading text-lg font-semibold text-foreground hover:text-mark">
+          <Link to={`/companies/${c.id}`} className="font-heading text-lg font-semibold text-foreground hover:text-mark">
             {c.name}
-          </a>
+          </Link>
           <p className="font-mono text-xs text-muted-foreground">{[c.country, c.segment, c.domain].filter(Boolean).join(" · ")}</p>
         </div>
         {c.criteria.length > 0 && (
