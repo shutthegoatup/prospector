@@ -186,6 +186,10 @@ func TestOnboardingIsWorkedFromItsPages(t *testing.T) {
 		t.Fatalf("starting an onboarding: %d %s", code, body)
 	}
 	row := must(s.Onboardings(o.ID, 0, today()))[0]
+	// The API says who could be invited and whether a link can go, as the page does.
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/onboardings", "", nil); !strings.Contains(body, `"invitable":[`) || !strings.Contains(body, `"can_invite":false`) {
+		t.Errorf("the onboardings should say who could be invited and that no link can go without mail: %s", body)
+	}
 	for _, path := range []string{"/o/alpha/onboarding", "/o/alpha/companies/" + itoa(company)} {
 		_, page := call(t, client, "GET", srv.URL+path, "", nil)
 		for _, want := range []string{"Leith site", "Send your product files", "3 steps late", "late, was due 2020-01-08", `data-step="` + itoa(row.Steps[0].ID) + `"`, "api/v1/onboarding-steps/"} {

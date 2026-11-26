@@ -1,9 +1,9 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
-import { ActionButton, Eyebrow, FilterChip, Meta, Pill, Section, type Tone } from "@/components/app";
+import { ActionButton, Eyebrow, Failed, FilterChip, Meta, Pill, Section, type Tone, useRefresh, Whose } from "@/components/app";
+import { actor, day, stamp } from "@/lib/format";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/session";
@@ -30,35 +30,6 @@ const empty: Record<Filter, [string, string]> = {
   rejected: ["Nothing here", ""],
 };
 
-function actor(by: string) {
-  return by.startsWith("agent:") ? "agent · " + by.slice(6) : by;
-}
-
-function day(at: string) {
-  return new Date(at).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-}
-
-function stamp(at: string) {
-  const d = new Date(at);
-  return day(at) + " " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-}
-
-// One query refreshes everything the page shows, as a templ page reloads after a change.
-function useRefresh() {
-  const client = useQueryClient();
-  return () => client.invalidateQueries();
-}
-
-// Failed says why a change didn't happen, in the server's words.
-function Failed({ errors }: { errors: ({ detail?: string } | null | undefined)[] }) {
-  const error = errors.find(Boolean);
-  if (!error) return null;
-  return (
-    <p className="w-full text-sm text-[var(--stop)]" role="alert">
-      {error.detail ?? "That didn't work. Reload and try again."}
-    </p>
-  );
-}
 
 export function ResearchPage() {
   const { org, sales } = useSession();
@@ -109,6 +80,7 @@ export function ResearchPage() {
         outreach until someone qualifies it and picks a contact. Every fact keeps the link it came from.
       </p>
 
+      <Whose area="sales" work="Research is" can={sales} />
       {sales && <FindBox agents={ready} lookingFor={settings.data?.looking_for ?? []} />}
 
       <div className="mb-5 flex flex-col gap-2" aria-label="Searches">
