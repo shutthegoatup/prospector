@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -96,7 +97,7 @@ func settingsDiff(a, b api.Settings) []string {
 	json.Unmarshal(jb, &now)
 	var changed []string
 	for k, v := range now {
-		if was[k] != v {
+		if !reflect.DeepEqual(was[k], v) {
 			changed = append(changed, k)
 		}
 	}

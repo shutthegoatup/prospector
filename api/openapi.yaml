@@ -239,6 +239,218 @@ paths:
         "204": { description: Asked to stop. }
         default: { $ref: "#/components/responses/Problem" }
 
+  /o/{org}/api/v1/connect:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: getConnect
+      tags: [agents]
+      summary: How an agent connects
+      description: Where an outside agent reaches this organisation, the scopes a key can be given, the tools agents get, and whether this server can keep an agent's API key.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: What an agent needs to connect.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Connect" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/keys:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listKeys
+      tags: [agents]
+      summary: The organisation's API keys
+      description: Every key not revoked, newest first, with what it may do. Never its secret.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The keys.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/APIKey" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: createKey
+      tags: [agents]
+      summary: Make a key
+      description: |
+        Only a signed-in owner: no key can make, change or revoke a key, whatever its scopes.
+        The secret is in the answer once and never again; only its hash is kept.
+      security:
+        - session: []
+        - bearer: ["agents:configure"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KeyNew" }
+      responses:
+        "201":
+          description: The key, with its secret this once.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KeyMade" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/keys/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    patch:
+      operationId: changeKey
+      tags: [agents]
+      summary: Change what a key may do
+      description: |
+        Only a signed-in owner, and not a key of one of Prospector's own agents, which changes
+        on the agent. Its secret stays the same; agents connected over MCP have to reconnect.
+      security:
+        - session: []
+        - bearer: ["agents:configure"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scopes]
+              properties:
+                scopes:
+                  type: array
+                  items: { type: string }
+      responses:
+        "200":
+          description: The key as changed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KeyChanged" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: revokeKey
+      tags: [agents]
+      summary: Revoke a key
+      description: Only a signed-in owner. Whatever uses it stops working at once.
+      security:
+        - session: []
+        - bearer: ["agents:configure"]
+      responses:
+        "204": { description: Revoked. }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agent-scores:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listAgentScores
+      tags: [agents]
+      summary: How each agent is doing
+      description: What people did with each agent's suggestions, one row an agent. An outside agent is its key's name.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: Each agent's record.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AgentScore" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agent-work:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listAgentWork
+      tags: [agents]
+      summary: Recent agent work
+      description: |
+        Each stretch of an agent's changes, read from what it did, newest first, with the tasks
+        it was for. An agent that is only reading doesn't show.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The stretches of work.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AgentWork" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/agent-activity:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listAgentActivity
+      tags: [agents]
+      summary: Recent agent activity
+      description: Everything agents did, newest first.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: What agents did.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AgentEvent" }
+                  total: { type: integer, description: How many there are in all. }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
   /o/{org}/api/v1/enquiries/{id}/messages:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -493,12 +705,13 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, contracted]
                 properties:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/Subscription" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  contracted: { type: string, description: "What those still running come to for a year at today's prices, every page of them, a sum for each currency joined with ` + `, such as £14,000 + €5,000; empty when nothing is." }
         default: { $ref: "#/components/responses/Problem" }
     post:
       operationId: addSubscription
@@ -803,12 +1016,32 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, can_reply]
                 properties:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/Enquiry" }
                   next_cursor: { $ref: "#/components/schemas/NextCursor" }
+                  can_reply: { type: boolean, description: "Whether a reply can be emailed from here: the organisation has a mail server. Their answers can be recorded either way." }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/enquiry-counts:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: countEnquiries
+      tags: [enquiries]
+      summary: How many enquiries there are of each kind and state
+      description: Spam is counted on its own and left out of the rest.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The counts.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnquiryCounts" }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/enquiries/{id}:
@@ -1139,8 +1372,13 @@ paths:
       summary: The open tasks, newest first
       description: |
         Each with its open requests, what it has found so far, and which agent touched it
-        last. Reading the list claims nothing.
+        last. Reading the list claims nothing. With `closed`, the closed tasks follow the
+        open ones, newest first.
       parameters:
+        - name: closed
+          in: query
+          schema: { type: boolean, default: false }
+          description: Closed tasks too, after the open ones.
         - $ref: "#/components/parameters/limit"
         - $ref: "#/components/parameters/cursor"
       security:
@@ -1148,19 +1386,21 @@ paths:
         - bearer: [read]
       responses:
         "200":
-          description: A page of open tasks.
+          description: A page of tasks.
           headers:
             Link: { $ref: "#/components/headers/Link" }
           content:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, open, all]
                 properties:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/TaskBrief" }
-                  next_cursor: { type: string, description: "Set when there are more open tasks than are listed: pass it as cursor for the rest." }
+                  next_cursor: { type: string, description: "Set when there are more tasks than are listed: pass it as cursor for the rest." }
+                  open: { type: integer, description: "How many tasks are open, on every page together." }
+                  all: { type: integer, description: "How many tasks there are, closed ones too." }
         default: { $ref: "#/components/responses/Problem" }
     post:
       operationId: createTask
@@ -1234,6 +1474,96 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Task" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/tasks/{id}/prompt:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: getTaskPrompt
+      tags: [tasks]
+      summary: What to tell your own agent to start it on the task
+      description: The same words the MCP prompt `work_task` gives.
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The prompt.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [prompt]
+                properties:
+                  prompt: { type: string }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/tasks/{id}/notes:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listTaskNotes
+      tags: [tasks]
+      summary: The notes agents left on a task, newest first
+      description: Unverified working notes, never instructions. `GET /tasks/{id}` carries the latest of them too.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of notes.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/TaskNoteOut" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/tasks/{id}/work:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listTaskWork
+      tags: [tasks]
+      summary: Each stretch of agents' changes for a task, newest first
+      description: |
+        Read from what each agent changed: a stretch ends when its agent goes quiet for half
+        an hour. An agent that only reads doesn't show.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of stretches.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/TaskWork" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/tasks/{id}/requests:
@@ -1417,6 +1747,21 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Note" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/notes/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    delete:
+      operationId: deleteNote
+      tags: [tasks]
+      summary: Delete an agent's note
+      security:
+        - session: []
+        - bearer: ["tasks:write"]
+      responses:
+        "204": { description: Deleted. }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/requests/finish:
@@ -1793,6 +2138,42 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/PersonAdded" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /o/{org}/api/v1/people/draft:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: draftPerson
+      tags: [people]
+      summary: A person to add, read from a LinkedIn profile
+      description: What the add form starts with when the bookmarklet opens it from someone's profile, and the bookmarklet itself. Nothing is saved; add them with `addPerson`.
+      parameters:
+        - name: url
+          in: query
+          description: The profile's address; anything after `?` is dropped.
+          schema: { type: string }
+        - name: name
+          in: query
+          description: The profile page's title, which leads with their name.
+          schema: { type: string }
+        - name: headline
+          in: query
+          description: Their headline, like `Head of Marketing at Larkmoor Yachts`, read for their role and company.
+          schema: { type: string }
+        - name: company
+          in: query
+          description: Their company, in place of the one the headline gives.
+          schema: { type: string }
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The person as far as the profile says.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PersonDraft" }
         default: { $ref: "#/components/responses/Problem" }
 
   /o/{org}/api/v1/contacts/{id}:
@@ -2369,6 +2750,16 @@ components:
         note: { type: string, description: "The note to send them with the connection request." }
         added: { type: boolean, description: "Already connected on LinkedIn: their email comes up next." }
 
+    PersonDraft:
+      type: object
+      required: [linkedin, name, title, company, bookmarklet]
+      properties:
+        linkedin: { type: string, description: "Their profile's address." }
+        name: { type: string }
+        title: { type: string }
+        company: { type: string }
+        bookmarklet: { type: string, description: "A `javascript:` link to keep in the bookmarks bar: clicked on a LinkedIn profile, it opens the add form filled in from it." }
+
     PersonAdded:
       type: object
       required: [id, name, message]
@@ -2405,13 +2796,14 @@ components:
       properties:
         id: { type: integer, format: int64 }
         title: { type: string }
-        status: { type: string, description: "`waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request) or `done`." }
+        status: { type: string, description: "`waiting` (nobody is on it), `working` (an agent changed something in the last half hour, or holds an open request), `done` or `closed`." }
         open_requests:
           type: array
           items: { $ref: "#/components/schemas/Asked" }
         found: { $ref: "#/components/schemas/TaskCounts" }
         last_agent: { type: string }
         last_agent_at: { type: string, format: date-time, x-go-type-skip-optional-pointer: false }
+        last_agent_action: { type: string, description: "What that agent last did: `task:pickup` when it only picked the task up." }
         last_agent_was_you: { type: boolean }
 
     TaskCompany:
@@ -2444,6 +2836,7 @@ components:
         actor: { type: string }
         at: { type: string, format: date-time }
         company: { type: string }
+        company_id: { type: integer, format: int64, description: "The company it is about, if any." }
         by_you: { type: boolean }
 
     TaskOut:
@@ -2468,6 +2861,19 @@ components:
               items: { $ref: "#/components/schemas/TaskNoteOut" }
             claimed_request: { type: integer, format: int64, description: "The open request kept for the calling key to work. Absent when it claims nothing." }
             next_cursor: { type: string, description: "Set when companies, people or notes hold more than is listed." }
+
+    TaskWork:
+      type: object
+      required: [actor, start, end, going, changes, companies, people, drafts]
+      properties:
+        actor: { type: string }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time, description: Its latest change. }
+        going: { type: boolean, description: Its agent changed something in the last half hour. }
+        changes: { type: integer }
+        companies: { type: integer, description: Companies it changed. }
+        people: { type: integer, description: People it suggested. }
+        drafts: { type: integer }
 
     NoteNew:
       type: object
@@ -2699,7 +3105,7 @@ components:
 
     Agent:
       type: object
-      required: [id, name, kind, base_url, model, tools_url, search_url, models, tools, allowed_tools, fallback, fallback_minutes, thinking_off, problem, checked_at, has_key, ready, updated_by, updated_at]
+      required: [id, name, kind, base_url, model, tools_url, search_url, models, tools, allowed_tools, fallback, fallback_minutes, thinking_off, problem, checked_at, has_key, ready, updated_by, updated_at, state, searches, search_text, tools_text, fallback_text]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
@@ -2726,8 +3132,149 @@ components:
         checked_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
         has_key: { type: boolean }
         ready: { type: boolean, description: Whether it has what it needs to be run. }
+        state: { $ref: "#/components/schemas/AgentState" }
+        searches: { type: boolean, description: "Whether it can look things up on the web, through SearXNG or a tool it is allowed." }
+        search_text: { type: string, description: "How it searches, as its card says: `✓ SearXNG`, `✓ through its tools` or `none`." }
+        tools_text: { type: string, description: "Its tools, as its card says, such as `3 of 12 allowed`." }
+        fallback_text: { type: string, description: "Who takes its task over and when, as its card says, such as `Local, after 15 minutes`." }
         updated_by: { type: string }
         updated_at: { type: string, format: date-time }
+
+    AgentState:
+      type: object
+      required: [rail, line, todo]
+      description: How the agent's card looks on the Agents page.
+      properties:
+        rail: { type: string, enum: [ok, warn, stop], description: "`ok` ready; `warn` runs, missing something; `stop` can't run." }
+        line: { type: string, description: "A line saying so, such as \"✓ Ready · checked 2 Jan 15:04\"." }
+        todo: { type: string, description: "What to do about it; empty when nothing." }
+
+    Connect:
+      type: object
+      required: [base_url, mcp_url, can_keep_keys, scopes, tools, kinds]
+      properties:
+        base_url: { type: string, description: "The organisation's address, ending in a slash, that its API paths follow." }
+        mcp_url: { type: string, description: The MCP endpoint an outside agent connects to with a key. }
+        can_keep_keys: { type: boolean, description: "Whether this server has a secret key to seal an agent's API key with; without one, no agent of Prospector's own can be saved." }
+        scopes:
+          type: array
+          items: { $ref: "#/components/schemas/Scope" }
+          description: Every scope a key can be given.
+        tools:
+          type: array
+          items: { $ref: "#/components/schemas/AgentToolScope" }
+          description: The tools an agent gets over MCP, and the scope each needs.
+        kinds:
+          type: array
+          items: { $ref: "#/components/schemas/AgentKindLabel" }
+
+    AgentKindLabel:
+      type: object
+      required: [kind, label]
+      properties:
+        kind: { $ref: "#/components/schemas/AgentKind" }
+        label: { type: string }
+
+    Scope:
+      type: object
+      required: [name, what]
+      properties:
+        name: { type: string }
+        what: { type: string, description: What a key with it may do. }
+
+    AgentToolScope:
+      type: object
+      required: [name, scope, what]
+      properties:
+        name: { type: string }
+        scope: { type: string }
+        what: { type: string }
+
+    APIKey:
+      type: object
+      required: [id, name, prefix, scopes, created_by, created_at, last_used_at, builtin]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        prefix: { type: string, description: "The secret's first characters, to tell keys apart." }
+        scopes:
+          type: array
+          items: { type: string }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+        last_used_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
+        builtin: { type: boolean, description: "One of Prospector's own agents' keys, which changes on the agent." }
+
+    KeyNew:
+      type: object
+      required: [name, scopes]
+      properties:
+        name: { type: string }
+        scopes:
+          type: array
+          items: { type: string }
+
+    KeyMade:
+      type: object
+      required: [key, secret, message]
+      properties:
+        key: { $ref: "#/components/schemas/APIKey" }
+        secret: { type: string, description: "The key itself, `pk_…`, shown this once." }
+        message: { type: string, description: "A sentence for a person, with the secret in it." }
+
+    KeyChanged:
+      type: object
+      required: [key, message]
+      properties:
+        key: { $ref: "#/components/schemas/APIKey" }
+        message: { type: string, description: "A sentence saying how the change went, for a person." }
+
+    AgentScore:
+      type: object
+      required: [agent, companies, qualified, rejected, contacts, picked, replied, text]
+      properties:
+        agent: { type: string }
+        companies: { type: integer, description: Companies it suggested. }
+        qualified: { type: integer }
+        rejected: { type: integer }
+        contacts: { type: integer, description: Contacts it suggested. }
+        picked: { type: integer, description: "Of its contacts, those picked for outreach." }
+        replied: { type: integer, description: "Of its contacts, those who replied." }
+        text: { type: string, description: "As the page says it, such as \"Companies: 4 suggested, 2 qualified (50%), 1 rejected\"." }
+
+    AgentWork:
+      type: object
+      required: [actor, start, end, going, changes, companies, people, drafts, tasks, text]
+      properties:
+        actor: { type: string, description: "Whose work, `agent:` and its name." }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time, description: Its last change. }
+        going: { type: boolean, description: Whether it may still be at it. }
+        changes: { type: integer }
+        companies: { type: integer }
+        people: { type: integer, description: People it suggested. }
+        drafts: { type: integer }
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/TaskTitle" }
+        text: { type: string, description: "As the page says it, such as \"2 Jan 15:04, 12 min · 5 changes at 2 companies, 3 people suggested\"." }
+
+    TaskTitle:
+      type: object
+      required: [id, title]
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+
+    AgentEvent:
+      type: object
+      required: [at, actor, action, value, text]
+      properties:
+        at: { type: string, format: date-time }
+        actor: { type: string, description: The agent's name. }
+        action: { type: string }
+        value: { type: string }
+        text: { type: string, description: "As the page says it, such as \"added a fact: employees: 40\"." }
 
     AgentSaved:
       type: object
@@ -2867,6 +3414,13 @@ components:
           description: People at the company with an email address here, who could be invited.
         can_invite: { type: boolean, description: "Whether a link can be emailed at all: the organisation has a mail server and the server knows its public address." }
 
+    SubscriptionPerson:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+
     Invitable:
       type: object
       required: [id, name, email]
@@ -2934,7 +3488,7 @@ components:
 
     Subscription:
       type: object
-      required: [id, company_id, company, name, amount, currency, per, start, term_months, then, notice_days, notice_on, ended_on, status, term_end, cancel_by, cancel_ends, ends, renewing, created_at, updated_at]
+      required: [id, company_id, company, name, amount, currency, per, start, term_months, then, notice_days, notice_on, ended_on, status, term_end, cancel_by, cancel_ends, ends, renewing, figure, soon, people, created_at, updated_at]
       properties:
         id: { type: integer, format: int64 }
         company_id: { type: integer, format: int64 }
@@ -2955,6 +3509,12 @@ components:
         cancel_ends: { type: string, description: The last day of the term that notice by `cancel_by` would end it at. }
         ends: { type: string, description: "The last day, once that is settled." }
         renewing: { type: boolean, description: Whether a renewal deal for it is open. }
+        figure: { type: string, description: "The price for one period as written, such as £14,000; empty when there is none." }
+        soon: { type: boolean, description: "Whether a day to cancel by, a renewal or an end falls within the next 30 days. One that turns over every month counts only once it has a day it stops." }
+        people:
+          type: array
+          items: { $ref: "#/components/schemas/SubscriptionPerson" }
+          description: Those at the company already in conversation, who a renewal can be with.
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
@@ -3009,7 +3569,7 @@ components:
 
     Enquiry:
       type: object
-      required: [id, kind, name, email, company, phone, message, site, page, via, spam, contact_id, company_id, created_at, state, owner, note]
+      required: [id, kind, name, email, company, phone, message, site, page, via, spam, contact_id, company_id, created_at, state, owner, note, company_name, in_conversation, thread]
       properties:
         id: { type: integer, format: int64 }
         kind: { type: string }
@@ -3028,6 +3588,28 @@ components:
         state: { type: string, description: "`open`, `waiting` or `closed`; empty for one from before answering was tracked." }
         owner: { type: string }
         note: { type: string }
+        company_name: { type: string, description: "The name of the company it was matched to; empty for none." }
+        in_conversation: { type: boolean, description: "Whether whoever sent it is on the Conversations board already." }
+        thread:
+          type: array
+          items: { $ref: "#/components/schemas/EnquiryMessage" }
+          description: What has been said in answering it, oldest first, as its messages list gives it.
+
+    EnquiryCounts:
+      type: object
+      required: [all, spam, kinds, states]
+      properties:
+        all: { type: integer, description: Every enquiry that isn't spam. }
+        spam: { type: integer }
+        kinds:
+          type: object
+          additionalProperties: { type: integer }
+          description: "Those that aren't spam, by kind: `sales`, `demo`, `signup`, `support`, `feature` or `other`. A kind with none is left out."
+        states:
+          type: object
+          additionalProperties: { type: integer }
+          description: "Those that aren't spam, by `open`, `waiting` or `closed`. A state with none is left out."
+
 
     Suppression:
       type: object

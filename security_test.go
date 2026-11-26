@@ -687,8 +687,12 @@ func TestContentPolicy(t *testing.T) {
 	pages := []string{"/login", "/api", "/o/alpha/today", "/o/alpha/today?step=linkedin", "/o/alpha/research", "/o/alpha/research?f=rejected", "/o/alpha/research?f=details",
 		"/o/alpha/conversations", "/o/alpha/companies", "/o/alpha/companies/" + strconv.FormatInt(company.ID, 10),
 		"/o/alpha/add", "/o/alpha/add?popup=1&name=Hannah", "/o/alpha/settings", "/o/alpha/agents", "/o/alpha/enquiries", "/o/alpha/subscriptions", "/o/alpha/onboarding", "/o/alpha/campaigns", "/c", "/u/never-made",
-		"/o/alpha/tasks", "/o/alpha/tasks?closed=1", "/o/alpha/tasks/" + strconv.FormatInt(task.ID, 10), "/o/alpha/app/research", "/o/alpha/app/campaigns", "/o/alpha/app/onboarding", "/o/alpha/app/conversations",
+		"/o/alpha/app/add?popup=1&name=Hannah", "/o/alpha/app/tasks/" + strconv.FormatInt(task.ID, 10),
+		"/o/alpha/tasks", "/o/alpha/tasks?closed=1", "/o/alpha/tasks/" + strconv.FormatInt(task.ID, 10),
 		"/o/alpha/agreements/" + strconv.FormatInt(must(s.AddAgreement(o.ID, company.ID, "Service agreement", "test")).ID, 10) + "/prepare"}
+	for _, p := range reactPages {
+		pages = append(pages, "/o/alpha/app/"+p)
+	}
 	check := func(page, marker string) {
 		t.Helper()
 		code, body := call(t, client, "GET", srv.URL+page, "", nil)
@@ -1063,6 +1067,9 @@ func TestPublicURL(t *testing.T) {
 	}
 	if body := page(srv, c, "/o/alpha/add"); !strings.Contains(body, "https://prospector.example.com/o/alpha/add?popup=1") {
 		t.Fatal("the bookmarklet doesn't use the address that was set")
+	}
+	if body := page(srv, c, "/o/alpha/api/v1/people/draft"); !strings.Contains(body, "https://prospector.example.com/o/alpha/app/add?popup=1") {
+		t.Fatalf("the API's bookmarklet doesn't use the address that was set: %s", body)
 	}
 	if _, c, _ := signIn(&App{s: s, base: "http://10.0.0.5:8766"}, nil); c.Secure {
 		t.Fatal("an http address marked the cookie Secure")
