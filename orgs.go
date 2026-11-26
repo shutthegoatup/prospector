@@ -498,7 +498,11 @@ var Scopes = []struct{ Name, What string }{
 	{"tasks:write", "start tasks, ask them for more, mark their requests done or not, close and reopen them, and delete the notes agents left on them"},
 	{"agents:run", "start and stop Prospector's own agents on tasks"},
 	{"agents:configure", "add, change and delete Prospector's own agents, their endpoints, keys and tools"},
-	{"settings:write", "change the organisation's settings: its name and colour, waits and wording, the guidance sent to every agent, never-contact list, what it looks for, enquiry sites, onboarding steps, currency, postal address and whether to email only incorporated companies, and add, change and remove the things it sells"},
+	{"settings:write", "change the organisation's settings: its name and colour, waits and wording, the guidance sent to every agent, never-contact list, what it looks for, enquiry sites, onboarding steps, currency, postal address and whether to email only incorporated companies"},
+	{"team:write", "add people to the team, change their roles and areas, and take them out: as strong as an owner, since it can make one"},
+	{"mail:configure", "set the organisation's outgoing mail server, its username and password"},
+	{"sso:configure", "set up single sign-on: the provider, its client secret, the email domains it speaks for and whether it is required"},
+	{"org:export", "download everything the organisation holds in one file"},
 }
 
 func validScope(s string) bool {
