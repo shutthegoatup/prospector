@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -345,6 +346,32 @@ func TestErasingSomeoneScrubsTheirCampaignMail(t *testing.T) {
 		if strings.Contains(r.Address, "hannah") || r.Name == "Hannah Pryce" {
 			t.Errorf("her mail still says who she was: %+v", r)
 		}
+	}
+}
+
+// A mail read for sending before its person was erased isn't sent, and leaves no
+// unsubscribe link holding their address.
+func TestAMailReadBeforeAnErasureIsNotSent(t *testing.T) {
+	a, s, o, _, _, box := campaignSite(t)
+	c := must(s.SendCampaign(o, draft(t, s, o).ID, "Ada Lovelace"))
+	via := must(a.campaignMail(o.ID))
+	gate := must(s.gate(s.db, o))
+	hannah := mailOf(t, s, o, c)["hannah@larkmoor.example"]
+
+	if err := s.ErasePerson(o.ID, *hannah.ContactID, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	a.sendOne(context.Background(), o, *c, via, gate, nil, hannah)
+	if got := box.to(); len(got) != 0 {
+		t.Fatalf("mail went to someone erased while it was being sent: %v", got)
+	}
+	var links int64
+	s.db.Model(&UnsubscribeLink{}).Where("address = ?", hannah.Address).Count(&links)
+	if links != 0 {
+		t.Error("an unsubscribe link keeps the erased address")
+	}
+	if r := must(s.CampaignRecipients(o.ID, c.ID)); len(r) != 3 || slices.ContainsFunc(r, func(r CampaignRecipient) bool { return r.Status == MailSending }) {
+		t.Errorf("the mail was claimed after the erasure: %+v", r)
 	}
 }
 
