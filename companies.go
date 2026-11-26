@@ -172,6 +172,7 @@ type ResearchRow struct {
 	Facts      []Fact
 	People     []Contact
 	Pending    map[int64][]PendingDetail
+	Lookups    map[int64][]Lookup
 	Incomplete bool
 }
 
@@ -234,7 +235,7 @@ func (s *Store) researchRows(org int64, companies []Company) ([]ResearchRow, err
 	at := map[int64]int{}
 	ids := make([]int64, len(companies))
 	for i, c := range companies {
-		rows[i].Company, rows[i].Pending = c, map[int64][]PendingDetail{}
+		rows[i].Company, rows[i].Pending, rows[i].Lookups = c, map[int64][]PendingDetail{}, map[int64][]Lookup{}
 		at[c.ID], ids[i] = i, c.ID
 	}
 	var facts []Fact
@@ -249,6 +250,14 @@ func (s *Store) researchRows(org int64, companies []Company) ([]ResearchRow, err
 	if err != nil {
 		return nil, err
 	}
+	personIDs := make([]int64, len(people))
+	for i, p := range people {
+		personIDs[i] = p.ID
+	}
+	looked, err := s.lookups(org, personIDs)
+	if err != nil {
+		return nil, err
+	}
 	for _, f := range facts {
 		r := &rows[at[f.CompanyID]]
 		r.Facts = append(r.Facts, f)
@@ -258,6 +267,9 @@ func (s *Store) researchRows(org int64, companies []Company) ([]ResearchRow, err
 		r.People = append(r.People, p)
 		if waiting := pending[p.ID]; len(waiting) > 0 {
 			r.Pending[p.ID] = waiting
+		}
+		if l := looked[p.ID]; len(l) > 0 {
+			r.Lookups[p.ID] = l
 		}
 	}
 	return rows, nil
