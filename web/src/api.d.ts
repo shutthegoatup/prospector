@@ -1301,7 +1301,13 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * One agreement, with what preparing it needs
+         * @description The agreement with its company's name, why its document can't be read if it can't,
+         *     and who could still be added to it: people at its company with one email address and
+         *     not on the never-contact list, and members.
+         */
+        get: operations["getAgreement"];
         put?: never;
         post?: never;
         /** Remove a draft agreement and its document */
@@ -3218,6 +3224,16 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             updated_at: string;
+        };
+        AgreementOverview: components["schemas"]["Agreement"] & {
+            /** @description The company's name. */
+            company: string;
+            /** @description Why the document can't be read to place fields on it; empty when it can. */
+            problem: string;
+            /** @description People at the company who could still be added, by contact id. */
+            people: components["schemas"]["Invitable"][];
+            /** @description Members who could still be added, by user id. */
+            members: components["schemas"]["Invitable"][];
         };
         AgreementRecipient: {
             /** Format: int64 */
@@ -5378,6 +5394,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Agreement"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getAgreement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The agreement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgreementOverview"];
                 };
             };
             default: components["responses"]["Problem"];
