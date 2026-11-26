@@ -133,3 +133,5 @@ func securityContactFrom(raw string) (string, error) {
 	}
 	return raw, nil
 }
+
+const repoURL = "https://github.com/shutthegoatup/prospector"

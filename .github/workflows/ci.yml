@@ -35,7 +35,6 @@ jobs:
 
       - name: Generated templates, API code and the built app are committed
         run: |
-          go tool templ generate
           go generate ./api
           npm ci --prefix web --no-audit --no-fund
           npm run build --prefix web

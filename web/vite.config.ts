@@ -16,9 +16,10 @@ export default defineConfig({
     target: "es2022",
     cssCodeSplit: false,
     rollupOptions: {
-      input: fileURLToPath(new URL("./index.html", import.meta.url)),
+      // The app, and the script that brings the front page's enquiry form.
+      input: { main: fileURLToPath(new URL("./index.html", import.meta.url)), site: fileURLToPath(new URL("./src/site/main.tsx", import.meta.url)) },
       output: {
-        entryFileNames: "main.js",
+        entryFileNames: "[name].js",
         chunkFileNames: "chunks/[name].js",
         assetFileNames: "[name][extname]",
       },
