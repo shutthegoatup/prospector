@@ -31,7 +31,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@axe-core/playwright": "4.14.0",
+    "@axe-core/playwright": "4.14.1",
     "@formatjs/cli": "6.16.36",
     "@playwright/test": "1.65.1",
     "@stoplight/spectral-cli": "6.17.1",
