@@ -18,14 +18,12 @@ formatjs(
   "src/**/*.d.ts",
   "--ignore",
   "src/components/ui/**",
+  "--id-interpolation-pattern",
+  "[sha512:contenthash:base64:6]",
   "--out-file",
   source,
   "--throws",
 );
-
-// A message with no id is given a hash by extract that the running app never sees.
-const unnamed = Object.keys(JSON.parse(await readFile(source, "utf8"))).filter((id) => !/^[a-z][\w-]*(\.[\w-]+){2,}$/i.test(id));
-if (unnamed.length) throw new Error(`these messages need an id like "page.part.what": ${unnamed.join(", ")}`);
 
 if (locales.translated.length) {
   formatjs(

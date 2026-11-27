@@ -4,12 +4,12 @@ import { intl } from "@/i18n";
 // How pages write people, times and counts, in the language the app speaks.
 
 const m = defineMessages({
-  customer: { id: "format.actor.customer", defaultMessage: "the customer", description: "Who did something, when it was the customer themselves" },
-  justNow: { id: "format.ago.justNow", defaultMessage: "just now", description: "Less than a minute ago" },
+  customer: { id: "w4EZ+4", defaultMessage: "the customer", description: "Who did something, when it was the customer themselves" },
+  justNow: { id: "NJgV5V", defaultMessage: "just now", description: "Less than a minute ago" },
 });
 
 const agent = defineMessage<{ name: string }>({
-  id: "format.actor.agent",
+  id: "dMepNA",
   defaultMessage: "agent · {name}",
   description: "Who did something, when it was one of the organisation's AI agents",
 });

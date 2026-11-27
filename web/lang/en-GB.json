@@ -1,14 +1,14 @@
 {
-  "format.actor.agent": {
+  "NJgV5V": {
+    "defaultMessage": "just now",
+    "description": "Less than a minute ago"
+  },
+  "dMepNA": {
     "defaultMessage": "agent · {name}",
     "description": "Who did something, when it was one of the organisation's AI agents"
   },
-  "format.actor.customer": {
+  "w4EZ+4": {
     "defaultMessage": "the customer",
     "description": "Who did something, when it was the customer themselves"
-  },
-  "format.ago.justNow": {
-    "defaultMessage": "just now",
-    "description": "Less than a minute ago"
   }
 }
