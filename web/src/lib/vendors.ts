@@ -1,4 +1,4 @@
-import { defineMessages } from "react-intl";
+import { defineMessage, defineMessages } from "react-intl";
 import { intl } from "@/i18n";
 import type { components } from "@/api";
 
@@ -8,17 +8,41 @@ export type VendorKind = components["schemas"]["EnricherKind"];
 export const vendorNames: Record<VendorKind, string> = { hunter: "Hunter", prospeo: "Prospeo" };
 
 // What each charges, as its own docs put it, for an owner setting a limit.
-export const vendorCosts: Record<VendorKind, string> = {
-  hunter: "Hunter charges a credit only when it finds an address.",
-  prospeo:
-    "Prospeo charges a credit for an email and ten for a mobile, only when it finds one, and nothing to look up the same person again within 90 days. Each lookup keeps only the detail it was for.",
-};
+const costs = {
+  hunter: defineMessage<{ vendor: string }>({
+    defaultMessage: "{vendor} charges a credit only when it finds an address.",
+    id: "QvJCFf",
+    description: "Under a data vendor's settings: what it charges. {vendor} is its name, Hunter",
+  }),
+  prospeo: defineMessage<{ vendor: string }>({
+    defaultMessage:
+      "{vendor} charges a credit for an email and ten for a mobile, only when it finds one, and nothing to look up the same person again within 90 days. Each lookup keeps only the detail it was for.",
+    id: "lzZnZc",
+    description: "Under a data vendor's settings: what it charges. {vendor} is its name, Prospeo",
+  }),
+} satisfies Record<VendorKind, unknown>;
 
 // What each is sent about a person, matching its adapter.
-export const vendorTold: Record<VendorKind, string> = {
-  hunter: "Hunter is told each person's name and their company's domain.",
-  prospeo: "Prospeo is told each person's name, their company's domain and any LinkedIn profile you hold.",
-};
+const told = {
+  hunter: defineMessage<{ vendor: string; linkedin: string }>({
+    defaultMessage: "{vendor} is told each person's name and their company's domain.",
+    id: "tzSPbm",
+    description: "Under a data vendor's settings: what it is sent about a person. {vendor} is its name, Hunter",
+  }),
+  prospeo: defineMessage<{ vendor: string; linkedin: string }>({
+    defaultMessage: "{vendor} is told each person's name, their company's domain and any {linkedin} profile you hold.",
+    id: "NKZA6e",
+    description: "Under a data vendor's settings: what it is sent about a person. {vendor} is its name, Prospeo; {linkedin} is LinkedIn",
+  }),
+} satisfies Record<VendorKind, unknown>;
+
+export function vendorCosts(kind: VendorKind) {
+  return intl.formatMessage(costs[kind], { vendor: vendorNames[kind] });
+}
+
+export function vendorTold(kind: VendorKind) {
+  return intl.formatMessage(told[kind], { vendor: vendorNames[kind], linkedin: "LinkedIn" });
+}
 
 export const vendorKinds = Object.keys(vendorNames) as VendorKind[];
 

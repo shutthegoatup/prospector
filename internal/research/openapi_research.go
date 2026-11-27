@@ -20,11 +20,12 @@ func (s ResearchAPI) AddPerson(ctx context.Context, in api.AddPersonRequestObjec
 	if err != nil {
 		return nil, err
 	}
-	where := "is in the LinkedIn queue"
+	name := store.DisplayName(*c)
+	said := say.Errorf("%s is in the LinkedIn queue.", name)
 	if b.Added {
-		where = "is marked added; their email comes up in " + request.Plural(q.Org.Settings.WithDefaults().EmailAfterDays, "day")
+		said = say.Errorf("%s is marked added; their email comes up in %d days.", name, q.Org.Settings.WithDefaults().EmailAfterDays)
 	}
-	return api.AddPerson201JSONResponse{Id: c.ID, Name: store.DisplayName(*c), Message: store.DisplayName(*c) + " " + where + "."}, nil
+	return api.AddPerson201JSONResponse{Id: c.ID, Name: name, Message: said.In(request.LanguageFrom(ctx))}, nil
 }
 
 func (s ResearchAPI) ChangeContact(ctx context.Context, in api.ChangeContactRequestObject) (api.ChangeContactResponseObject, error) {

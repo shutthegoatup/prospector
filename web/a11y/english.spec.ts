@@ -29,14 +29,63 @@ const months = [
 const strings = (v: unknown): string[] => (typeof v === "string" ? [v, ...v.split("\n")] : v && typeof v === "object" ? Object.values(v).flatMap(strings) : []);
 // What a LinkedIn profile's address looks like, as Add's empty field shows it.
 const addresses = ["https://www.linkedin.com/in/…"];
-const allowed = ["Prospector", ...addresses, member.name, member.email, reader.name, reader.email, org.name, ...servedWords, ...months, ...strings(seed)];
+// Names of products, and of languages as each names itself (Intl.DisplayNames), are names.
+const products = [
+  "Hunter",
+  "Prospeo",
+  "Claude Code",
+  "Anthropic (Claude)",
+  "OpenAI-compatible",
+  "Okta",
+  "Entra ID",
+  "Google Workspace",
+  "OpenID Connect",
+  "SearXNG",
+  "LinkedIn",
+];
+const languages = ["en-GB", "en-XA"].map((l) => new Intl.DisplayNames([l], { type: "language" }).of(l) ?? l);
+
+const allowed = [
+  "Prospector",
+  ...products,
+  ...languages,
+  ...addresses,
+  member.name,
+  member.email,
+  reader.name,
+  reader.email,
+  org.name,
+  ...servedWords,
+  ...months,
+  ...strings(seed),
+];
 
 // The organisation's own wording (its note template, pitch and the rest, defaults
 // included) is the member's to write, so a page showing it shows data.
 async function orgWords(tab: Page) {
-  const settings = await (await tab.request.get(`/o/${org.slug}/api/v1/settings`)).json();
-  for (const w of strings(settings)) if (!allowed.includes(w)) allowed.push(w);
+  const get = async (path: string) => (await tab.request.get(`/o/${org.slug}/api/v1/${path}`)).json();
+  const settings = await get("settings");
+  // What an agent's last check found is that check's own words, and the names of the API's
+  // scopes and an agent's tools are identifiers.
+  const agents = (await get("agents")) as { items: { problem: string }[] };
+  const connect = (await get("connect")) as { scopes: { name: string }[]; tools: { name: string }[] };
+  const words = [...strings(settings), ...agents.items.map((a) => a.problem), ...connect.scopes.map((x) => x.name), ...connect.tools.map((x) => x.name)];
+  for (const w of words) if (w && !allowed.includes(w)) allowed.push(w);
 }
+
+// Identifiers and addresses a sentence mentions are left as they are in every language:
+// URLs, hosts, email addresses, an API call, scope names like settings:write, tool names
+// like add_fact, and the keys the organisation's own text is read by ({first}, them:, (must)).
+const identifiers = [
+  /\S+:\/\/\S+/g,
+  /\S+@\S+\.\S+/g,
+  /\b[\w-]+(?:\.[\w-]+)*\.(?:example|com)\b/g,
+  /\b(?:GET|POST|PUT|PATCH|DELETE) \S+/g,
+  /\b[a-z]+(?:[:_][a-z]+)+\b/g,
+  /\{\w+\}/g,
+  /\((?:must)\)/g,
+  /\b(?:them|us):/g,
+];
 
 // said is everything a person sees or hears inside the first element matching scope:
 // text, screen-reader-only text included and hidden text not, the attributes read out
@@ -47,7 +96,10 @@ async function said(tab: Page, scope: string): Promise<string[]> {
     if (!root) throw new Error(`nothing matches ${within}`);
     const out: string[] = within === "body" ? [document.title] : [];
     // oxlint-disable-next-line unicorn/consistent-function-scoping -- it runs in the page, so it can't be hoisted out of it
-    const shown = (el: Element) => !el.closest("[aria-hidden=true]") && el.checkVisibility({ visibilityProperty: true });
+    // Text marked as in another language (WCAG 3.1.2), such as a prompt for an agent, is meant to be.
+    const page = document.documentElement.lang;
+    const shown = (el: Element) =>
+      !el.closest("[aria-hidden=true]") && (el.closest("[lang]")?.getAttribute("lang") ?? page) === page && el.checkVisibility({ visibilityProperty: true });
     const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let n = walk.nextNode(); n; n = walk.nextNode()) {
       const el = n.parentElement;
@@ -74,11 +126,12 @@ function english(seen: string[]) {
   // placeholders, such as {first}, stand for whatever went in them.
   const filled = words.filter((w) => /\{\w+\}/.test(w)).map((w) => new RegExp(w.replace(/[.*+?^$()|[\]\\]/g, "\\$&").replace(/\\?\{\w+\\?\}/g, ".*?"), "g"));
   return seen.filter((s) => {
+    // Whole allowed strings first, as an identifier taken out could break one.
     const left = words.reduce(
       (rest, w) => rest.replaceAll(w, ""),
       filled.reduce((rest, t) => rest.replace(t, ""), s),
     );
-    return /[A-Za-z]{2,}/.test(left);
+    return /[A-Za-z]{2,}/.test(identifiers.reduce((rest, t) => rest.replace(t, ""), left));
   });
 }
 
@@ -235,6 +288,10 @@ const appPages: { name: string; files: string[]; path: (tab: Page) => Promise<st
   { name: "onboarding", files: ["src/pages/Onboarding.tsx"], path: async () => "onboarding" },
   { name: "subscriptions", files: ["src/pages/Subscriptions.tsx", "src/components/app/subscription.tsx"], path: async () => "subscriptions" },
   { name: "campaigns", files: ["src/pages/Campaigns.tsx"], path: async () => "campaigns" },
+  { name: "agents", files: ["src/pages/Agents.tsx"], path: async () => "agents" },
+  { name: "tasks", files: ["src/pages/Tasks.tsx"], path: async () => "tasks" },
+  { name: "a task", files: ["src/pages/Task.tsx"], path: async (tab) => `tasks/${await first(tab, "tasks")}` },
+  { name: "settings", files: ["src/pages/Settings.tsx"], path: async () => "settings" },
   {
     name: "an agreement's preparation",
     files: ["src/pages/Prepare.tsx"],
