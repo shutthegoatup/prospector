@@ -4,21 +4,9 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-
-	"github.com/shutthegoatup/prospector/internal/paging"
-	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 type listURLKey struct{}
-
-// pageIn checks what a list was asked for as the other lists do. Zero is the limit
-// left out, which the generated code can't tell from 0 asked for.
-func pageIn(limit int, cursor string) (paging.Page, error) {
-	if limit < 0 {
-		return paging.Page{}, say.New("limit is a whole number, 1 or more")
-	}
-	return paging.Page{Limit: limit, Cursor: cursor}, nil
-}
 
 type requestKey struct{}
 
@@ -41,26 +29,6 @@ func nextLink(ctx context.Context, next string) string {
 	q := at.Query()
 	q.Set("cursor", next)
 	return "<" + at.Path + "?" + q.Encode() + `>; rel="next"`
-}
-
-// listPage is one page of a list already read whole and in its order. Its cursor is
-// how far down the list the page ended, so a row added or gone between two pages
-// moves the rest by one.
-func listPage[T any](all []T, limit int, cursor string) (page []T, next string, err error) {
-	in, err := pageIn(limit, cursor)
-	if err != nil {
-		return nil, "", err
-	}
-	at, err := in.At(1)
-	if err != nil {
-		return nil, "", err
-	}
-	from := min(int(at[0]), len(all))
-	to := min(from+in.Size(), len(all))
-	if to < len(all) {
-		next = paging.Cursor(int64(to))
-	}
-	return all[from:to], next, nil
 }
 
 // noEmptyLink drops the Link header the generated code writes on every page, the last

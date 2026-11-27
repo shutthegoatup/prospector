@@ -10,21 +10,6 @@ import (
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
-func erased(tx *gorm.DB, org int64, person, maker, email, link string) error {
-	ids := identifiers(org, person, maker, email, link)
-	if len(ids) == 0 {
-		return nil
-	}
-	var n int64
-	if err := tx.Model(&Erasure{}).Where("org_id = ? and hash in ?", org, ids).Count(&n).Error; err != nil {
-		return err
-	}
-	if n > 0 {
-		return errErased
-	}
-	return nil
-}
-
 // ErasePerson deletes a contact row and everything that says who it was. A row that
 // names alternates ("A or B") goes whole. The company's history keeps that something
 // happened and when, which the counts are built from, but not to whom.
@@ -153,21 +138,6 @@ func forgetEvents(matching *gorm.DB) error {
 		if err := tx.Model(&Event{}).Where("id = ?", e.ID).
 			Updates(map[string]any{"contact_id": 0, "value": keptValue(e)}).Error; err != nil {
 			return err
-		}
-	}
-	return nil
-}
-
-// keptValue is what an event may still say once its person is gone: a stage, or the
-// day of a mark. Everything else held their details or free text about them.
-func keptValue(e Event) *string {
-	v := deref(e.Value)
-	switch {
-	case e.Action == "set:stage" && validStage(v):
-		return &v
-	case strings.HasPrefix(e.Action, "mark:") && len(v) >= 10:
-		if _, err := time.Parse("2006-01-02", v[:10]); err == nil {
-			return str(v[:10])
 		}
 	}
 	return nil

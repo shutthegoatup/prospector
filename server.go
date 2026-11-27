@@ -16,19 +16,11 @@ import (
 	"syscall"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
-
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/cleantext"
 	"github.com/shutthegoatup/prospector/internal/mailer"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
-
-// dummyHash keeps a wrong email as slow as a wrong password.
-// passwordCost is how hard a password hash is to compute; the tests lower it.
-var passwordCost = bcrypt.DefaultCost
-
-var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("unused"), passwordCost)
 
 const sessionCookie = "session"
 
@@ -547,20 +539,6 @@ func (a *App) frontIntake(r *http.Request) (intake, origin string) {
 		return "", ""
 	}
 	return "/o/" + org.Slug + "/intake", origin
-}
-
-// browserOrigin is an address as a browser names it in Origin: lower case, and
-// without the port when it is the scheme's own.
-func browserOrigin(address string) string {
-	u, err := url.Parse(address)
-	if err != nil {
-		return address
-	}
-	host := u.Host
-	if (u.Scheme == "https" && u.Port() == "443") || (u.Scheme == "http" && u.Port() == "80") {
-		host = strings.TrimSuffix(host, ":"+u.Port())
-	}
-	return strings.ToLower(u.Scheme + "://" + host)
 }
 
 func (a *App) home(w http.ResponseWriter, r *http.Request) {

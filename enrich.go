@@ -14,46 +14,9 @@ import (
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
-// enrichPerson is what a vendor is told about someone: no more than it needs to find them.
-type enrichPerson struct {
-	Name, Domain, Company, Linkedin string
-}
-
-// vendorFind is what a vendor found for one field; an empty Value is a miss.
-type vendorFind struct {
-	Value       string
-	EmailStatus string
-}
-
-type vendor interface {
-	Name() string
-	Fields() []string
-	Find(ctx context.Context, c *http.Client, base, key string, p enrichPerson, field string) (vendorFind, error)
-}
-
-var vendors = map[string]vendor{}
-
-func vendorKinds() []string {
-	var out []string
-	for k := range vendors {
-		out = append(out, k)
-	}
-	slices.Sort(out)
-	return out
-}
-
 const (
-	enrichAgain     = 30 * 24 * time.Hour
 	enrichLookupFor = 20 * time.Second
-	maxMonthlyLimit = 100_000
 )
-
-type EnricherIn struct {
-	Kind         string
-	APIKey       string
-	Position     int
-	MonthlyLimit int
-}
 
 // EnrichAsked is what came of asking for one field.
 type EnrichAsked struct {
@@ -211,16 +174,9 @@ func (a *App) keepFind(o *Org, who Actor, c Contact, field, kind, value, status 
 }
 
 const (
-	lookupFound   = "found"
 	lookupNone    = "none found"
 	lookupNotKept = "found, not kept"
 )
-
-// Lookup is a vendor's latest answer about one detail of one person.
-type Lookup struct {
-	Field, Vendor, Outcome string
-	At                     time.Time
-}
 
 func (a *App) logEnrich(org int64, who Actor, c Contact, field, value string) {
 	noted(a.s.LogEnrich(org, who, c.ID, field, value))

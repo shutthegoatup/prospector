@@ -133,14 +133,4 @@ func newDeviceToken(u *User) string {
 	return nonce + "." + deviceMAC(u, nonce)
 }
 
-func deviceMAC(u *User, nonce string) string {
-	return mac([]byte(u.PasswordHash), "device\x00"+nonce)
-}
-
-// The guard counts under names that say what is being guessed at, so the sign-in
-// form, whatever is typed into it, can't reach the count for anything else.
-func signInBucket(email string) string {
-	return "sign-in\x00" + strings.ToLower(strings.TrimSpace(email))
-}
-
 func changeBucket(u *User) string { return "change\x00" + u.Email }

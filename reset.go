@@ -6,23 +6,9 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"github.com/shutthegoatup/prospector/internal/mailer"
 	"github.com/shutthegoatup/prospector/internal/say"
-)
-
-const (
-	resetLife  = time.Hour
-	inviteLife = 7 * 24 * time.Hour
-	// resetGap is the least time between two reset emails to one account, so the form
-	// can't be used to fill somebody's inbox.
-	resetGap = 5 * time.Minute
-)
-
-var (
-	errTooSoon = say.New("a reset link was sent to this account a moment ago")
-	errBadLink = say.New("this link has expired or has been used: ask for a new one")
 )
 
 // mailSlots bounds the sends running at once; a request past that is dropped rather

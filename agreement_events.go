@@ -1,16 +1,10 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	"gorm.io/gorm"
-
-	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const (
@@ -31,24 +25,6 @@ const (
 	EventCopySent     = "copy_sent"
 )
 
-var errBrokenChain = say.New("the agreement's record has been changed since it was written")
-
-// eventHash is the SHA-256 of everything an event says, the hash before it included.
-func eventHash(e AgreementEvent) string {
-	recipient := int64(0)
-	if e.RecipientID != nil {
-		recipient = *e.RecipientID
-	}
-	// A fixed list in a fixed order: what is hashed can't change with how the struct does.
-	b, _ := json.Marshal([]string{
-		strconv.FormatInt(e.OrgID, 10), strconv.FormatInt(e.AgreementID, 10), strconv.Itoa(e.Round),
-		e.At.UTC().Format(time.RFC3339Nano), e.Kind, e.Actor, strconv.FormatInt(recipient, 10),
-		e.Detail, e.IP, e.UserAgent, e.Prev,
-	})
-	sum := sha256.Sum256(b)
-	return hex.EncodeToString(sum[:])
-}
-
 // recordAgreementEvent adds an event after the last one on its agreement, inside the
 // transaction that made it happen.
 func recordAgreementEvent(tx *gorm.DB, e AgreementEvent) (*AgreementEvent, error) {
@@ -68,17 +44,4 @@ func recordAgreementEvent(tx *gorm.DB, e AgreementEvent) (*AgreementEvent, error
 		return nil, fmt.Errorf("recording what happened to agreement %d: %w", e.AgreementID, err)
 	}
 	return &e, nil
-}
-
-// checkChain is whether events, in order, each follow the one before and say what their
-// hash says they did.
-func checkChain(events []AgreementEvent) error {
-	prev := ""
-	for _, e := range events {
-		if e.Prev != prev || eventHash(e) != e.Hash {
-			return fmt.Errorf("agreement %d, event %d: %w", e.AgreementID, e.ID, errBrokenChain)
-		}
-		prev = e.Hash
-	}
-	return nil
 }

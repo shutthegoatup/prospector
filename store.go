@@ -11,32 +11,10 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-const (
-	CompanyReview    = "review"
-	CompanyQualified = "qualified"
-	CompanyRejected  = "rejected"
-)
-
 var Columns = []string{"id", "key", "file", "section", "fit", "maker", "person", "first",
 	"linkedin", "email", "note", "subject", "body", "followup", "flags",
 	"linkedin_added", "email_sent", "followup_sent", "replied", "declined", "hold",
 	"sources", "phone", "called", "call_notes", "tz", "send_to", "accepted", "message"}
-
-var Editable = map[string]bool{"phone": true, "email": true, "linkedin": true, "sources": true,
-	"call_notes": true, "tz": true, "person": true, "send_to": true, "message": true, "note": true,
-	"body": true, "followup": true, "subject": true,
-	"stage": true, "next_step": true, "next_date": true, "lost_reason": true, "title": true}
-
-// loggedValue are the fields whose new value goes into the history: where a conversation
-// stands and when it is due. The rest are a person's details or free text about them,
-// which their own row already holds, so the history keeps only that they changed.
-var loggedValue = map[string]bool{"stage": true, "next_date": true}
-
-// stringFields are the newer non-pointer columns, which store "" rather than NULL.
-var stringFields = map[string]bool{"stage": true, "next_step": true, "lost_reason": true, "title": true}
-
-var Marks = map[string]string{"linkedin": "linkedin_added", "email": "email_sent", "followup": "followup_sent",
-	"call": "called", "replied": "replied", "declined": "declined", "hold": "hold", "accepted": "accepted"}
 
 // Store is every area's queries, each area a type of its own embedded here so its
 // methods are the store's. They share one core, so a key or resolver set on the store
@@ -59,15 +37,15 @@ type Store struct {
 }
 
 func newStore(c *core) *Store {
-	s := &Store{core: c, identityStore: identityStore{c}, agentStore: agentStore{Core: c}, ssoStore: ssoStore{Core: c},
+	s := &Store{core: c, identityStore: identityStore{Core: c}, agentStore: agentStore{Core: c}, ssoStore: ssoStore{Core: c},
 		suppressionStore: suppressionStore{Core: c}, customerStore: customerStore{Core: c}, dealStore: dealStore{Core: c},
 		subscriptionStore: subscriptionStore{Core: c}, onboardingStore: onboardingStore{Core: c}}
 	// An area that needs another's queries holds that area, not the whole store.
-	s.prospectingStore = prospectingStore{core: c, identity: &s.identityStore, deals: &s.dealStore}
-	s.enquiryStore = enquiryStore{core: c, prospecting: &s.prospectingStore}
-	s.agreementStore = agreementStore{core: c, prospecting: &s.prospectingStore, identity: &s.identityStore}
-	s.outreachStore = outreachStore{core: c, identity: &s.identityStore, suppression: &s.suppressionStore, subscriptions: &s.subscriptionStore}
-	s.researchStore = researchStore{core: c, prospecting: &s.prospectingStore, identity: &s.identityStore, outreach: &s.outreachStore}
+	s.prospectingStore = prospectingStore{Core: c, Identity: &s.identityStore, Sales: &s.dealStore}
+	s.enquiryStore = enquiryStore{Core: c, Prospecting: &s.prospectingStore}
+	s.agreementStore = agreementStore{Core: c, Prospecting: &s.prospectingStore, Identity: &s.identityStore}
+	s.outreachStore = outreachStore{Core: c, Identity: &s.identityStore, Suppression: &s.suppressionStore, Billing: &s.subscriptionStore}
+	s.researchStore = researchStore{Core: c, Prospecting: &s.prospectingStore, Identity: &s.identityStore, Outreach: &s.outreachStore}
 	return s
 }
 
