@@ -16,46 +16,6 @@ import (
 
 func (a *App) apiRoutes(mux *http.ServeMux) {
 	v1 := "/o/{org}/api/v1/"
-	mux.HandleFunc("POST "+v1+"companies", a.agent("research:write", func(w http.ResponseWriter, r *http.Request) {
-		var in AddCompanyIn
-		if decode(w, r, &in) {
-			q := reqOf(r)
-			out, err := a.s.AgentAddCompany(q.Org.ID, q.Agent(), in)
-			respond(w, r, out, err)
-		}
-	}))
-	mux.HandleFunc("POST "+v1+"facts", a.agent("research:write", func(w http.ResponseWriter, r *http.Request) {
-		var in AddFactIn
-		if decode(w, r, &in) {
-			q := reqOf(r)
-			out, err := a.s.AgentAddFact(q.Org.ID, q.Agent(), in)
-			respond(w, r, out, err)
-		}
-	}))
-	mux.HandleFunc("POST "+v1+"contacts", a.agent("research:write", func(w http.ResponseWriter, r *http.Request) {
-		var in AddContactIn
-		if decode(w, r, &in) {
-			q := reqOf(r)
-			out, err := a.s.AgentAddContact(q.Org, q.Agent(), in)
-			respond(w, r, out, err)
-		}
-	}))
-	mux.HandleFunc("POST "+v1+"drafts", a.agent("drafts:write", func(w http.ResponseWriter, r *http.Request) {
-		var in DraftIn
-		if decode(w, r, &in) {
-			q := reqOf(r)
-			respond(w, r, map[string]bool{"ok": true}, a.s.AgentDraft(q.Org.ID, q.Agent(), in))
-		}
-	}))
-	mux.HandleFunc("POST "+v1+"enquiries", a.agent("enquiries:write", func(w http.ResponseWriter, r *http.Request) {
-		var in EnquiryIn
-		if decode(w, r, &in) {
-			q := reqOf(r)
-			in.Trap = ""
-			e, err := a.s.AddEnquiry(q.Org.ID, q.Actor(), in)
-			respond(w, r, e, err)
-		}
-	}))
 	mux.HandleFunc("POST "+v1+"import", a.agent("import", func(w http.ResponseWriter, r *http.Request) {
 		var p ImportPayload
 		if decode(w, r, &p) {

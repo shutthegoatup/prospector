@@ -456,6 +456,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/facts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add one fact about a company, with the page that shows it
+         * @description For agents, with a key; the same as the MCP tool `add_fact`. A fact the company already has from that page isn't added twice.
+         */
+        post: operations["agentAddFact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest a person at a company
+         * @description For agents, with a key; the same as the MCP tool `add_contact`. They wait in Research until a person picks them; someone already at the company comes back as `existed`, with what you sent that they lack in `suggested`.
+         */
+        post: operations["agentAddContact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Write the text a person will send
+         * @description For agents, with a key; the same as the MCP tool `draft_message`. Text a person has edited, or that has already gone out, is refused.
+         */
+        post: operations["agentDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/enquiries/{id}/messages": {
         parameters: {
             query?: never;
@@ -847,7 +916,11 @@ export interface paths {
         /** What people sent in, newest first */
         get: operations["listEnquiries"];
         put?: never;
-        post?: never;
+        /**
+         * Record an enquiry from somewhere other than the form
+         * @description For a back office or another site, with a key: an enquiry as the front page's form would make one, never marked as spam by its trap.
+         */
+        post: operations["agentAddEnquiry"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2161,7 +2234,11 @@ export interface paths {
          */
         get: operations["listCompanies"];
         put?: never;
-        post?: never;
+        /**
+         * Add a company to Research for a person to review
+         * @description For agents, with a key; the same as the MCP tool `add_company`. If its name or domain is already known, the facts it lacks are added to that company.
+         */
+        post: operations["agentAddCompany"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2711,6 +2788,154 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AgentOK: {
+            ok: boolean;
+        };
+        AgentFactIn: {
+            /** @description What the fact is about, e.g. team_page or press, or one of the things the organisation looks for. */
+            field: string;
+            /** @description The fact itself, one sentence; for answer unknown, where you looked. */
+            value: string;
+            /** @description The page that shows it; required unless answer is unknown. */
+            source_url: string;
+            /** @description For something the organisation looks for: yes (the default), no, or unknown. */
+            answer?: string;
+            /** @description Read from a job advert, a third party or an old page rather than their own site. */
+            inferred?: boolean;
+        };
+        AgentAddCompanyIn: {
+            name: string;
+            /** @description The company's own website domain; leave it empty rather than give a shared site. */
+            domain?: string;
+            /** @description ISO country code. */
+            country?: string;
+            segment?: string;
+            /** @description Suggested fit grade A, B or C. */
+            fit?: string;
+            /**
+             * @deprecated
+             * @description Older clients only; add a fact instead.
+             */
+            configurator_url?: string;
+            /**
+             * @deprecated
+             * @description Older clients only; add a fact instead.
+             */
+            platform?: string;
+            /**
+             * @deprecated
+             * @description Older clients only; add a fact instead.
+             */
+            built_by?: string;
+            /** @description Why it fits, one sentence. */
+            why?: string;
+            facts?: components["schemas"]["AgentFactIn"][];
+            /**
+             * Format: int64
+             * @description The task this is for, if any.
+             */
+            task?: number;
+        };
+        AgentAddCompanyOut: {
+            /** Format: int64 */
+            id: number;
+            /** @description The name it is filed under, which can differ from yours if the domain was already known. */
+            name: string;
+            /** @description The company was already known; facts it didn't have were still added. */
+            existed: boolean;
+            stage: string;
+        };
+        AgentAddFactIn: components["schemas"]["AgentFactIn"] & {
+            /** @description The company's id or exact name. */
+            company: string;
+            /**
+             * Format: int64
+             * @description The task this is for, if any.
+             */
+            task?: number;
+        };
+        AgentAddFactOut: components["schemas"]["AgentFact"] & {
+            /** @description The company already had this fact from this page; nothing was added. */
+            existed: boolean;
+        };
+        AgentAddContactIn: {
+            /** @description The company's id or exact name. */
+            company: string;
+            name: string;
+            title?: string;
+            email?: string;
+            /** @description verified when a page you cite shows the address, guess when inferred from a pattern, else empty. */
+            email_status?: string;
+            /** @description Profile URL, found by search, never scraped. */
+            linkedin?: string;
+            phone?: string;
+            /** @description The page that shows this person has this role. */
+            source_url: string;
+            /**
+             * Format: int64
+             * @description The task this is for, if any.
+             */
+            task?: number;
+        };
+        AgentAddContactOut: {
+            /** Format: int64 */
+            id: number;
+            /** @description suggested: waits in Research until a person picks them; empty once picked. */
+            status: string;
+            /** @description This person was already at the company; nothing about them was changed. */
+            existed: boolean;
+            /** @description For someone already here, which of email, phone and linkedin you sent are waiting for a person to accept. */
+            suggested?: string[];
+        };
+        AgentDraftIn: {
+            /** Format: int64 */
+            contact_id: number;
+            /** @description note (LinkedIn request), message (after accepting), email or followup. */
+            kind: string;
+            /** @description The email's subject, for kind email. */
+            subject?: string;
+            text: string;
+            /**
+             * Format: int64
+             * @description The task this is for, if any.
+             */
+            task?: number;
+        };
+        AgentEnquiryIn: {
+            kind?: string;
+            name?: string;
+            email?: string;
+            company?: string;
+            phone?: string;
+            message?: string;
+            page?: string;
+            site?: string;
+            /** @description Ignored for a key, which is never a bot filling a form. */
+            trap?: string;
+        };
+        AgentEnquiry: {
+            /** Format: int64 */
+            id: number;
+            kind: string;
+            name: string;
+            email: string;
+            company: string;
+            phone: string;
+            message: string;
+            site: string;
+            page: string;
+            via: string;
+            spam: boolean;
+            /** Format: int64 */
+            contact_id: number | null;
+            /** Format: int64 */
+            company_id: number | null;
+            /** Format: date-time */
+            created_at: string;
+            state: string;
+            owner: string;
+            note: string;
+        };
         /** @description The latest change an agent made to a company; people's actions don't count. */
         AgentLastAgent: {
             actor: string;
@@ -5666,6 +5891,108 @@ export interface operations {
             500: components["responses"]["ServerError"];
         };
     };
+    agentAddFact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentAddFactIn"];
+            };
+        };
+        responses: {
+            /** @description The fact, and whether it was already there. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentAddFactOut"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    agentAddContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentAddContactIn"];
+            };
+        };
+        responses: {
+            /** @description Who they are now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentAddContactOut"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    agentDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentDraftIn"];
+            };
+        };
+        responses: {
+            /** @description Written. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentOK"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
     listEnquiryMessages: {
         parameters: {
             query?: {
@@ -6434,6 +6761,40 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    agentAddEnquiry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentEnquiryIn"];
+            };
+        };
+        responses: {
+            /** @description The enquiry as recorded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentEnquiry"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
@@ -8977,6 +9338,40 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    agentAddCompany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentAddCompanyIn"];
+            };
+        };
+        responses: {
+            /** @description The company it was filed under. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentAddCompanyOut"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };
