@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"strings"
 	"testing"
@@ -20,24 +18,7 @@ var outsideTheModels = map[string]bool{
 // emptyStore is a database with nothing in it at all, not even the schema.
 func emptyStore(t *testing.T) *Store {
 	t.Helper()
-	id := make([]byte, 4)
-	rand.Read(id)
-	name := testDB.template + "_bare_" + hex.EncodeToString(id)
-	if _, err := testDB.admin.Exec("create database " + name); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { dropDatabase(name) })
-	s, err := connect(databaseURL(name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	limitConnections(s)
-	t.Cleanup(func() {
-		if db, err := s.db.DB(); err == nil {
-			db.Close()
-		}
-	})
-	return s
+	return storeOn(t, testDB.Bare(t))
 }
 
 // tablesOf is every column and index, one line each, for comparing two databases.
