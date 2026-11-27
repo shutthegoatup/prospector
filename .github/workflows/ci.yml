@@ -128,7 +128,12 @@ jobs:
       # go vet is the lint job's (golangci's govet); run again here it is most of the build.
       - name: Test
         run: |
-          names=$(go test -vet=off -list . . | grep '^Test' | sort | awk -v n=3 -v i="$SHARD" 'NR % n == i' | paste -sd'|')
+          # Only the root package's Test functions are shared out: anything else would never run.
+          others=$(go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vx 'github.com/shutthegoatup/prospector' || true)
+          if [ -n "$others" ]; then echo "tests outside the root package aren't run here: $others"; exit 1; fi
+          listed=$(go test -vet=off -list . .)
+          if echo "$listed" | grep -Ev '^(Test|ok )'; then echo "only Test functions are run here"; exit 1; fi
+          names=$(echo "$listed" | grep '^Test' | sort | awk -v n=3 -v i="$SHARD" 'NR % n == i' | paste -sd'|')
           test -n "$names"
           go test -vet=off -count=1 -run "^($names)\$" .
 
