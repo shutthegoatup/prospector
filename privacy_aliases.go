@@ -23,3 +23,5 @@ var parseInserts = privacy.ParseInserts
 var pointAtContacts = privacy.PointAtContacts
 var snapshotColumns = privacy.SnapshotColumns
 var sqlQuote = privacy.SqlQuote
+
+type privacyAPI = privacy.PrivacyAPI
