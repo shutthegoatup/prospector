@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func (s apiServer) ListCompanies(ctx context.Context, in api.ListCompaniesRequestObject) (api.ListCompaniesResponseObject, error) {
@@ -151,7 +152,7 @@ func (s apiServer) ListCompanyHistory(ctx context.Context, in api.ListCompanyHis
 	if err != nil {
 		return nil, err
 	}
-	at, err := page.at(1)
+	at, err := page.At(1)
 	if err != nil {
 		return nil, err
 	}
@@ -159,13 +160,13 @@ func (s apiServer) ListCompanyHistory(ctx context.Context, in api.ListCompanyHis
 	if err != nil {
 		return nil, err
 	}
-	items, err := s.a.s.HistoryAt(org, in.Id, int(at[0]), page.size())
+	items, err := s.a.s.HistoryAt(org, in.Id, int(at[0]), page.Size())
 	if err != nil {
 		return nil, err
 	}
 	next := ""
-	if end := int(at[0]) + page.size(); end < total {
-		next = cursorOf(int64(end))
+	if end := int(at[0]) + page.Size(); end < total {
+		next = paging.Cursor(int64(end))
 	}
 	out := api.ListCompanyHistory200JSONResponse{Headers: api.ListCompanyHistory200ResponseHeaders{Link: nextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor, out.Body.Total = []api.HistoryEntry{}, next, total
@@ -184,17 +185,17 @@ func (s apiServer) ListCompanyNotes(ctx context.Context, in api.ListCompanyNotes
 	if err != nil {
 		return nil, err
 	}
-	at, err := page.at(1)
+	at, err := page.At(1)
 	if err != nil {
 		return nil, err
 	}
-	notes, total, err := s.a.s.CompanyNotes(org, in.Id, int(at[0]), page.size())
+	notes, total, err := s.a.s.CompanyNotes(org, in.Id, int(at[0]), page.Size())
 	if err != nil {
 		return nil, err
 	}
 	next := ""
-	if end := at[0] + int64(page.size()); end < total {
-		next = cursorOf(end)
+	if end := at[0] + int64(page.Size()); end < total {
+		next = paging.Cursor(end)
 	}
 	out := api.ListCompanyNotes200JSONResponse{Headers: api.ListCompanyNotes200ResponseHeaders{Link: nextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor, out.Body.Total = []api.Note{}, next, int(total)

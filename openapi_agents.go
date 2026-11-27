@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // The Agents page's reads and the keys an owner makes for outside agents.
@@ -124,7 +125,7 @@ func (s apiServer) ListAgentWork(ctx context.Context, in api.ListAgentWorkReques
 	if err != nil {
 		return nil, err
 	}
-	at, err := page.at(1)
+	at, err := page.At(1)
 	if err != nil {
 		return nil, err
 	}
@@ -132,10 +133,10 @@ func (s apiServer) ListAgentWork(ctx context.Context, in api.ListAgentWorkReques
 	if at[0] > 0 {
 		before = time.Unix(0, at[0])
 	}
-	runs, titles, older := s.a.s.Runs(reqFrom(ctx).Org.ID, before, page.size())
+	runs, titles, older := s.a.s.Runs(reqFrom(ctx).Org.ID, before, page.Size())
 	var next string
 	if !older.IsZero() {
-		next = cursorOf(older.UnixNano())
+		next = paging.Cursor(older.UnixNano())
 	}
 	now := time.Now()
 	out := api.ListAgentWork200JSONResponse{Headers: api.ListAgentWork200ResponseHeaders{Link: nextLink(ctx, next)}}
@@ -156,14 +157,14 @@ func (s apiServer) ListAgentActivity(ctx context.Context, in api.ListAgentActivi
 	if err != nil {
 		return nil, err
 	}
-	at, err := page.at(1)
+	at, err := page.At(1)
 	if err != nil {
 		return nil, err
 	}
-	events, total := s.a.s.AgentEvents(reqFrom(ctx).Org.ID, int(at[0]), page.size())
+	events, total := s.a.s.AgentEvents(reqFrom(ctx).Org.ID, int(at[0]), page.Size())
 	var next string
 	if end := int(at[0]) + len(events); end < total {
-		next = cursorOf(int64(end))
+		next = paging.Cursor(int64(end))
 	}
 	out := api.ListAgentActivity200JSONResponse{Headers: api.ListAgentActivity200ResponseHeaders{Link: nextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor, out.Body.Total = []api.AgentEvent{}, next, total

@@ -10,22 +10,24 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func (a *App) apiRoutes(mux *http.ServeMux) {
 	v1 := "/o/{org}/api/v1/"
 	mux.HandleFunc("GET "+v1+"search", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
-		page, err := pageFrom(r)
+		page, err := paging.FromRequest(r)
 		if err != nil {
 			apiFail(w, r, err)
 			return
 		}
 		hits, next, err := a.s.AgentSearch(reqOf(r).Org.ID, reqOf(r).Agent(), r.URL.Query().Get("q"), page)
-		linkNext(w, r, next)
+		paging.LinkNext(w, r, next)
 		respond(w, r, SearchOut{hits, next}, err)
 	}))
 	mux.HandleFunc("GET "+v1+"companies/{ref}", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
-		page, err := pageFrom(r)
+		page, err := paging.FromRequest(r)
 		if err != nil {
 			apiFail(w, r, err)
 			return
@@ -35,11 +37,11 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 			apiFail(w, r, err)
 			return
 		}
-		linkNext(w, r, c.NextCursor)
+		paging.LinkNext(w, r, c.NextCursor)
 		writeJSON(w, c)
 	}))
 	mux.HandleFunc("GET "+v1+"due", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
-		page, err := pageFrom(r)
+		page, err := paging.FromRequest(r)
 		if err != nil {
 			apiFail(w, r, err)
 			return
@@ -49,7 +51,7 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 			apiFail(w, r, err)
 			return
 		}
-		linkNext(w, r, due.NextCursor)
+		paging.LinkNext(w, r, due.NextCursor)
 		writeJSON(w, due)
 	}))
 	mux.HandleFunc("POST "+v1+"companies", a.agent("research:write", func(w http.ResponseWriter, r *http.Request) {
@@ -140,7 +142,7 @@ type tasksOut struct {
 
 type taskRef struct {
 	ID int64 `json:"id" jsonschema:"the task's number"`
-	PageIn
+	paging.Page
 }
 
 type factAdded struct {
@@ -182,19 +184,19 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 			})
 		addTool(s, &mcp.Tool{Name: "search", Description: "Find companies and contacts by name, domain, email or notes, a page at a time. Each company says which agent last changed it."},
 			func(_ context.Context, req *mcp.CallToolRequest, in SearchIn) (*mcp.CallToolResult, SearchOut, error) {
-				hits, next, err := a.s.AgentSearch(org.ID, sessionOf(req), in.Query, in.PageIn)
+				hits, next, err := a.s.AgentSearch(org.ID, sessionOf(req), in.Query, in.Page)
 				return nil, SearchOut{hits, next}, err
 			})
 		addTool(s, &mcp.Tool{Name: "get_company", Description: "A company's details, facts with sources, people, and its history: what people and agents did here, newest first. Read the history before researching, so you don't redo work or suggest what a person rejected."},
 			func(_ context.Context, req *mcp.CallToolRequest, in struct {
 				Company string `json:"company" jsonschema:"company id or exact name"`
-				PageIn
+				paging.Page
 			}) (*mcp.CallToolResult, *CompanyDetail, error) {
-				c, err := a.s.AgentCompany(org.ID, sessionOf(req), in.Company, in.PageIn)
+				c, err := a.s.AgentCompany(org.ID, sessionOf(req), in.Company, in.Page)
 				return nil, c, err
 			})
 		addTool(s, &mcp.Tool{Name: "list_due", Description: "What is due on Today, and whether its text is written yet, a page at a time."},
-			func(_ context.Context, req *mcp.CallToolRequest, in PageIn) (*mcp.CallToolResult, *DueOut, error) {
+			func(_ context.Context, req *mcp.CallToolRequest, in paging.Page) (*mcp.CallToolResult, *DueOut, error) {
 				o, err := current()
 				if err != nil {
 					return nil, nil, err
@@ -203,13 +205,13 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 				return nil, due, err
 			})
 		addTool(s, &mcp.Tool{Name: "list_tasks", Description: "The open tasks people have written for agents, newest first and a page at a time: what each asks for, what is still unfinished, and whether another agent is on it now."},
-			func(_ context.Context, req *mcp.CallToolRequest, in PageIn) (*mcp.CallToolResult, tasksOut, error) {
+			func(_ context.Context, req *mcp.CallToolRequest, in paging.Page) (*mcp.CallToolResult, tasksOut, error) {
 				tasks, next, err := a.s.AgentTasks(org.ID, sessionOf(req), in)
 				return nil, tasksOut{tasks, next}, err
 			})
 		addTool(s, &mcp.Tool{Name: "get_task", Description: "Everything needed to carry a task on: the brief in the person's words, what has been asked since, the companies and people already found, and the notes other agents left. Read it before working a task; people see that you picked it up. With a key that can add research, it also keeps an open request for you (claimed_request): work that one. If other agents hold every open request, leave the task to them."},
 			func(_ context.Context, req *mcp.CallToolRequest, in taskRef) (*mcp.CallToolResult, *TaskOut, error) {
-				out, err := a.s.AgentTask(org.ID, sessionOf(req), in.ID, in.PageIn)
+				out, err := a.s.AgentTask(org.ID, sessionOf(req), in.ID, in.Page)
 				return nil, out, err
 			})
 		s.AddPrompt(&mcp.Prompt{Name: "work_task", Description: "Start on a task a person wrote in Prospector.",

@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
@@ -25,14 +27,14 @@ func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
 	if err != nil || task.Title != "Yacht builders with an online configurator." {
 		t.Fatalf("create task: %+v %v", task, err)
 	}
-	if list := must(firstOf(s.AgentTasks(o.ID, scout, PageIn{}))); len(list) != 1 || list[0].Status != TaskWaiting || len(list[0].Open) != 1 || list[0].LastBy != "" {
+	if list := must(firstOf(s.AgentTasks(o.ID, scout, paging.Page{}))); len(list) != 1 || list[0].Status != TaskWaiting || len(list[0].Open) != 1 || list[0].LastBy != "" {
 		t.Fatalf("a new task should be waiting with its brief open: %+v", list)
 	}
-	first := must(s.AgentTask(o.ID, scout, task.ID, PageIn{}))
+	first := must(s.AgentTask(o.ID, scout, task.ID, paging.Page{}))
 	if !strings.HasPrefix(first.Brief, "Yacht builders") || len(first.Companies) != 0 || len(first.Requests) != 1 {
 		t.Fatalf("the brief as an agent first reads it: %+v", first)
 	}
-	if list := must(firstOf(s.AgentTasks(o.ID, second, PageIn{}))); list[0].Status != TaskWorking || list[0].LastBy != "agent:scout" || list[0].LastYou {
+	if list := must(firstOf(s.AgentTasks(o.ID, second, paging.Page{}))); list[0].Status != TaskWorking || list[0].LastBy != "agent:scout" || list[0].LastYou {
 		t.Fatalf("picking a task up should show before anything is added: %+v", list[0])
 	}
 
@@ -50,7 +52,7 @@ func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := must(s.AgentTask(o.ID, second, task.ID, PageIn{}))
+	got := must(s.AgentTask(o.ID, second, task.ID, paging.Page{}))
 	if len(got.Companies) != 1 || got.Companies[0].Name != "Larkmoor Yachts" || got.Companies[0].Stage != CompanyRejected {
 		t.Fatalf("the next agent should see what was found, and that a person rejected it: %+v", got.Companies)
 	}
@@ -83,7 +85,7 @@ func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
 	if err := s.AgentFinish(o.ID, second, FinishIn{Request: got.Open[1].ID}); err != nil {
 		t.Fatal(err)
 	}
-	after := must(s.AgentTask(o.ID, scout, task.ID, PageIn{}))
+	after := must(s.AgentTask(o.ID, scout, task.ID, paging.Page{}))
 	if len(after.Companies) != 2 || after.Companies[0].ID != old.ID || after.Found != (TaskCounts{2, 1}) {
 		t.Fatalf("a company known before the task should count once an agent matches it: %+v", after.Companies)
 	}
@@ -114,7 +116,7 @@ func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
 	if err := s.SetTaskClosed(o.ID, task.ID, true, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if list := must(firstOf(s.AgentTasks(o.ID, scout, PageIn{}))); len(list) != 0 {
+	if list := must(firstOf(s.AgentTasks(o.ID, scout, paging.Page{}))); len(list) != 0 {
 		t.Fatalf("a closed task is still offered to agents: %+v", list)
 	}
 	if _, err := s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Brandtech", Task: task.ID}); err == nil {
@@ -131,10 +133,10 @@ func TestTasksStayInTheirOrganisation(t *testing.T) {
 	a, b := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	task := must(s.CreateTask(a.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
-	if list := must(firstOf(s.AgentTasks(b.ID, scout, PageIn{}))); len(list) != 0 {
+	if list := must(firstOf(s.AgentTasks(b.ID, scout, paging.Page{}))); len(list) != 0 {
 		t.Fatalf("another organisation's tasks are listed: %+v", list)
 	}
-	if _, err := s.AgentTask(b.ID, scout, task.ID, PageIn{}); err == nil {
+	if _, err := s.AgentTask(b.ID, scout, task.ID, paging.Page{}); err == nil {
 		t.Fatal("another organisation's task can be read")
 	}
 	if _, err := s.AgentAddCompany(b.ID, scout, AddCompanyIn{Name: "Corvane", Task: task.ID}); err == nil {
@@ -146,7 +148,7 @@ func TestTasksStayInTheirOrganisation(t *testing.T) {
 	if _, err := s.AskTask(b.ID, task.ID, "More", "Grace Hopper"); err == nil {
 		t.Fatal("a request was added to another organisation's task")
 	}
-	request := must(s.AgentTask(a.ID, scout, task.ID, PageIn{})).Open[0].ID
+	request := must(s.AgentTask(a.ID, scout, task.ID, paging.Page{})).Open[0].ID
 	if err := s.AgentFinish(b.ID, scout, FinishIn{Request: request}); err == nil {
 		t.Fatal("another organisation's request was finished")
 	}
@@ -179,7 +181,7 @@ func TestNotesAreShortAndAboutSomething(t *testing.T) {
 	for i := range 4 {
 		must(s.AgentNote(o.ID, scout, NoteIn{Company: "Larkmoor Yachts", Kind: "dead_end", Text: "Nothing on page " + strconv.Itoa(i+1) + " of the press archive."}))
 	}
-	got := must(s.AgentCompany(o.ID, second, "Larkmoor Yachts", PageIn{}))
+	got := must(s.AgentCompany(o.ID, second, "Larkmoor Yachts", paging.Page{}))
 	if len(got.Notes) != 3 || !strings.Contains(got.Notes[0].Text, "page 4") || got.Notes[0].ByYou || len(got.Facts) != 0 {
 		t.Fatalf("get_company should carry the latest three notes, apart from facts: %+v", got.Notes)
 	}
@@ -216,7 +218,7 @@ func TestErasingAPersonTakesTheNotesAroundThem(t *testing.T) {
 	if len(left) != 1 || left[0].Text != "No configurator." {
 		t.Fatalf("notes about the erased person's company and its task should be gone, others kept: %+v", left)
 	}
-	for _, shown := range []any{must(s.AgentTask(o.ID, scout, task.ID, PageIn{})), must(s.AgentCompany(o.ID, scout, "Larkmoor Yachts", PageIn{})), must(s.ExportOrg(o.ID, "Ada Lovelace"))} {
+	for _, shown := range []any{must(s.AgentTask(o.ID, scout, task.ID, paging.Page{})), must(s.AgentCompany(o.ID, scout, "Larkmoor Yachts", paging.Page{})), must(s.ExportOrg(o.ID, "Ada Lovelace"))} {
 		if b, _ := json.Marshal(shown); strings.Contains(string(b), "Pryce") {
 			t.Fatalf("an erased person is still named: %s", b)
 		}

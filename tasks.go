@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // A task is a brief a person wrote and the requests made on it since. Nothing an
@@ -313,12 +315,12 @@ func (s *Store) TaskNotesPage(org, task int64, page int) ([]NoteView, Page, erro
 }
 
 // TaskNotes is TaskNotesPage a cursor at a time, for the API.
-func (s *Store) TaskNotes(org, task int64, page PageIn) ([]NoteView, string, error) {
-	at, err := page.at(1)
+func (s *Store) TaskNotes(org, task int64, page paging.Page) ([]NoteView, string, error) {
+	at, err := page.At(1)
 	if err != nil {
 		return nil, "", err
 	}
-	q := s.in(org).Where("task_id = ?", task).Order("id desc").Limit(page.size() + 1)
+	q := s.in(org).Where("task_id = ?", task).Order("id desc").Limit(page.Size() + 1)
 	if at[0] > 0 {
 		q = q.Where("id < ?", at[0])
 	}
@@ -327,9 +329,9 @@ func (s *Store) TaskNotes(org, task int64, page PageIn) ([]NoteView, string, err
 		return nil, "", err
 	}
 	var next string
-	if len(notes) > page.size() {
-		notes = notes[:page.size()]
-		next = cursorOf(notes[len(notes)-1].ID)
+	if len(notes) > page.Size() {
+		notes = notes[:page.Size()]
+		next = paging.Cursor(notes[len(notes)-1].ID)
 	}
 	out, err := s.noteViews(org, notes)
 	return out, next, err
@@ -944,27 +946,27 @@ func brief(v TaskView, who Actor) TaskBrief {
 
 // AgentTasks lists a page of the open tasks, newest first. The cursor is the last
 // task listed, so one opened meanwhile doesn't shift the pages after it.
-func (s *Store) AgentTasks(org int64, who Actor, page PageIn) (briefs []TaskBrief, next string, err error) {
+func (s *Store) AgentTasks(org int64, who Actor, page paging.Page) (briefs []TaskBrief, next string, err error) {
 	return s.TaskBriefs(org, who, false, page)
 }
 
 // TaskBriefs is AgentTasks with the closed tasks too when asked, after the open ones as
 // the tasks page lists them, and only those for one offering when one is given. Its
 // cursor then also says whether it ended among the closed.
-func (s *Store) TaskBriefs(org int64, who Actor, closed bool, page PageIn) ([]TaskBrief, string, error) {
+func (s *Store) TaskBriefs(org int64, who Actor, closed bool, page paging.Page) ([]TaskBrief, string, error) {
 	return s.TaskBriefsFor(org, who, closed, nil, page)
 }
 
-func (s *Store) TaskBriefsFor(org int64, who Actor, closed bool, offering *int64, page PageIn) (briefs []TaskBrief, next string, err error) {
+func (s *Store) TaskBriefsFor(org int64, who Actor, closed bool, offering *int64, page paging.Page) (briefs []TaskBrief, next string, err error) {
 	n := 1
 	if closed {
 		n = 2
 	}
-	at, err := page.at(n)
+	at, err := page.At(n)
 	if err != nil {
 		return nil, "", err
 	}
-	q := s.in(org).Limit(page.size() + 1)
+	q := s.in(org).Limit(page.Size() + 1)
 	if offering != nil {
 		q = q.Where("offering_id = ?", *offering)
 	}
@@ -986,16 +988,16 @@ func (s *Store) TaskBriefsFor(org int64, who Actor, closed bool, offering *int64
 	if err := q.Find(&tasks).Error; err != nil {
 		return nil, "", err
 	}
-	if len(tasks) > page.size() {
-		tasks = tasks[:page.size()]
+	if len(tasks) > page.Size() {
+		tasks = tasks[:page.Size()]
 		last := tasks[len(tasks)-1]
 		switch {
 		case !closed:
-			next = cursorOf(last.ID)
+			next = paging.Cursor(last.ID)
 		case last.ClosedAt != nil:
-			next = cursorOf(1, last.ID)
+			next = paging.Cursor(1, last.ID)
 		default:
-			next = cursorOf(0, last.ID)
+			next = paging.Cursor(0, last.ID)
 		}
 	}
 	views, err := s.taskViews(s.db, org, tasks, time.Now())
@@ -1012,20 +1014,20 @@ func (s *Store) TaskBriefsFor(org int64, who Actor, closed bool, offering *int64
 // AgentTask is everything an agent needs to carry a task on. Fetching it is
 // recorded, so people see the task was picked up before anything is added, and keeps
 // an open request for the agent, so the next one to pick it up takes another.
-func (s *Store) AgentTask(org int64, who Actor, id int64, page PageIn) (*TaskOut, error) {
+func (s *Store) AgentTask(org int64, who Actor, id int64, page paging.Page) (*TaskOut, error) {
 	return s.agentTaskPage(org, who, id, page, time.Now())
 }
 
 // agentTask is the task's first page.
 func (s *Store) agentTask(org int64, who Actor, id int64, now time.Time) (*TaskOut, error) {
-	return s.agentTaskPage(org, who, id, PageIn{}, now)
+	return s.agentTaskPage(org, who, id, paging.Page{}, now)
 }
 
 // agentTaskPage answers with a page of each list a task has grown: the companies and
 // people found for it, oldest first, and the notes left on it, newest first. The
 // cursor holds where each of the three was left. What was asked comes whole.
-func (s *Store) agentTaskPage(org int64, who Actor, id int64, page PageIn, now time.Time) (*TaskOut, error) {
-	at, err := page.at(3)
+func (s *Store) agentTaskPage(org int64, who Actor, id int64, page paging.Page, now time.Time) (*TaskOut, error) {
+	at, err := page.At(3)
 	if err != nil {
 		return nil, err
 	}
@@ -1057,7 +1059,7 @@ func (s *Store) agentTaskPage(org int64, who Actor, id int64, page PageIn, now t
 	}
 	// The task's view holds only its latest notes, so a page of them is read here: all
 	// of them can then be reached.
-	notesFrom := s.in(org).Where("task_id = ?", id).Order("id desc").Limit(page.size() + 1)
+	notesFrom := s.in(org).Where("task_id = ?", id).Order("id desc").Limit(page.Size() + 1)
 	if at[2] > 0 {
 		notesFrom = notesFrom.Where("id < ?", at[2])
 	}
@@ -1065,7 +1067,7 @@ func (s *Store) agentTaskPage(org int64, who Actor, id int64, page PageIn, now t
 	if err := notesFrom.Find(&notes).Error; err != nil {
 		return nil, err
 	}
-	notes, at[2] = beforeID(notes, func(n TaskNote) int64 { return n.ID }, 0, page.size())
+	notes, at[2] = paging.BeforeID(notes, func(n TaskNote) int64 { return n.ID }, 0, page.Size())
 	about := map[int64]string{}
 	for _, n := range notes {
 		if n.CompanyID != 0 {
@@ -1086,10 +1088,10 @@ func (s *Store) agentTaskPage(org int64, who Actor, id int64, page PageIn, now t
 			About: n.CompanyID, ByYou: who.did(Event{User: n.Actor, KeyID: n.KeyID})})
 	}
 	// The counts in the brief are of everything found; only the lists are a page.
-	out.Companies, at[0] = afterID(out.Companies, func(c TaskCompany) int64 { return c.ID }, at[0], page.size())
-	out.People, at[1] = afterID(out.People, func(p TaskPerson) int64 { return p.ID }, at[1], page.size())
-	if at[0] != ranOut || at[1] != ranOut || at[2] != noneBefore {
-		out.NextCursor = cursorOf(at...)
+	out.Companies, at[0] = paging.AfterID(out.Companies, func(c TaskCompany) int64 { return c.ID }, at[0], page.Size())
+	out.People, at[1] = paging.AfterID(out.People, func(p TaskPerson) int64 { return p.ID }, at[1], page.Size())
+	if at[0] != paging.RanOut || at[1] != paging.RanOut || at[2] != paging.NoneBefore {
+		out.NextCursor = paging.Cursor(at...)
 	}
 	if out.Companies == nil {
 		out.Companies = []TaskCompany{}

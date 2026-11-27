@@ -11,6 +11,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // link makes an unsubscribe link for an address, as a marketing mail will.
@@ -31,7 +32,7 @@ func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
 	stranger := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	listed := func(org int64) int {
 		t.Helper()
-		rows, _, err := s.Suppressions(org, PageIn{})
+		rows, _, err := s.Suppressions(org, paging.Page{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -68,7 +69,7 @@ func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("a one-click unsubscribe answered %d", res.StatusCode)
 	}
-	rows, _, _ := s.Suppressions(o.ID, PageIn{})
+	rows, _, _ := s.Suppressions(o.ID, paging.Page{})
 	if len(rows) != 1 || rows[0].Address != "hannah@larkmoor.example" || rows[0].Reason != SuppressUnsubscribed {
 		t.Fatalf("after unsubscribing: %+v", rows)
 	}

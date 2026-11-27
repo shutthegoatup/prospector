@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func suppressionOut(s Suppression) api.Suppression {
@@ -15,7 +16,7 @@ func (s apiServer) ListSuppressions(ctx context.Context, in api.ListSuppressions
 	if in.Params.Limit < 0 {
 		return nil, errors.New("limit is a whole number, 1 or more")
 	}
-	rows, next, err := s.a.s.Suppressions(reqFrom(ctx).Org.ID, PageIn{Limit: in.Params.Limit, Cursor: in.Params.Cursor})
+	rows, next, err := s.a.s.Suppressions(reqFrom(ctx).Org.ID, paging.Page{Limit: in.Params.Limit, Cursor: in.Params.Cursor})
 	if err != nil {
 		return nil, err
 	}
