@@ -12,31 +12,31 @@ import (
 
 // FreeStaleMail gives up, in every organisation, on mails claimed before a time: their
 // server stopped while sending them, so whether they went isn't known.
-func (s *Store) FreeStaleMail(before time.Time) error {
+func (s *outreachStore) FreeStaleMail(before time.Time) error {
 	return s.db.Model(&CampaignRecipient{}).Where("status = ? and claimed_at < ?", MailSending, before).
 		Updates(map[string]any{"status": MailUnknown, "reason": "the server stopped while it was being sent"}).Error
 }
 
 // CampaignsSending is every organisation's campaigns being sent.
-func (s *Store) CampaignsSending() ([]Campaign, error) {
+func (s *outreachStore) CampaignsSending() ([]Campaign, error) {
 	var going []Campaign
 	return going, s.db.Where("status = ?", CampaignSending).Order("id").Find(&going).Error
 }
 
-func (s *Store) MailGate(o *Org) (*mailGate, error) { return s.gate(s.db, o) }
+func (s *outreachStore) MailGate(o *Org) (*mailGate, error) { return s.suppression.gate(s.db, o) }
 
-func (s *Store) UnsubscribeLink(org int64, address string) (string, error) {
-	return s.unsubscribeLink(s.db, org, address)
+func (s *outreachStore) UnsubscribeLink(org int64, address string) (string, error) {
+	return s.suppression.unsubscribeLink(s.db, org, address)
 }
 
 // MailSentSince counts the campaign mails an organisation has sent since a time.
-func (s *Store) MailSentSince(org int64, since time.Time) (int64, error) {
+func (s *outreachStore) MailSentSince(org int64, since time.Time) (int64, error) {
 	var n int64
 	return n, s.in(org).Model(&CampaignRecipient{}).Where("status = ? and sent_at >= ?", MailSent, since).Count(&n).Error
 }
 
 // NextQueued is the campaign's next mail to send, or nil when none is left.
-func (s *Store) NextQueued(org, campaign int64) (*CampaignRecipient, error) {
+func (s *outreachStore) NextQueued(org, campaign int64) (*CampaignRecipient, error) {
 	var r CampaignRecipient
 	res := s.in(org).Where("campaign_id = ? and status = ?", campaign, MailQueued).Order("id").Limit(1).Find(&r)
 	if res.Error != nil || res.RowsAffected == 0 {
@@ -46,21 +46,21 @@ func (s *Store) NextQueued(org, campaign int64) (*CampaignRecipient, error) {
 }
 
 // SkipMail leaves out a mail still queued.
-func (s *Store) SkipMail(org, id int64, reason string) error {
+func (s *outreachStore) SkipMail(org, id int64, reason string) error {
 	return s.in(org).Model(&CampaignRecipient{}).Where("id = ? and status = ?", id, MailQueued).
 		Updates(map[string]any{"status": MailSkipped, "reason": reason}).Error
 }
 
 // ClaimMail holds a mail for sending only while it is still queued to the address that
 // was checked, so an erasure or a cancel that lands first leaves nothing to send.
-func (s *Store) ClaimMail(org, id int64, address string) (bool, error) {
+func (s *outreachStore) ClaimMail(org, id int64, address string) (bool, error) {
 	res := s.in(org).Model(&CampaignRecipient{}).Where("id = ? and status = ? and address = ?", id, MailQueued, address).
 		Updates(map[string]any{"status": MailSending, "claimed_at": time.Now()})
 	return res.RowsAffected > 0, res.Error
 }
 
 // SettleMail records how a claimed mail went; one put back in the queue is no longer claimed.
-func (s *Store) SettleMail(org, id int64, status, reason string) error {
+func (s *outreachStore) SettleMail(org, id int64, status, reason string) error {
 	updates := map[string]any{"status": status, "reason": reason}
 	if status == MailSent {
 		updates["sent_at"] = time.Now()
@@ -72,12 +72,12 @@ func (s *Store) SettleMail(org, id int64, status, reason string) error {
 }
 
 // CampaignWent records a mail that went, which ends any run of failures.
-func (s *Store) CampaignWent(org, id int64) error {
+func (s *outreachStore) CampaignWent(org, id int64) error {
 	return s.in(org).Model(&Campaign{}).Where("id = ?", id).Updates(map[string]any{"failures": 0, "sent_at": time.Now()}).Error
 }
 
 // CampaignFailed counts a mail that didn't plainly go, and says how many have in a row.
-func (s *Store) CampaignFailed(org, id int64) (int, error) {
+func (s *outreachStore) CampaignFailed(org, id int64) (int, error) {
 	if err := s.in(org).Model(&Campaign{}).Where("id = ?", id).Update("failures", gorm.Expr("failures + 1")).Error; err != nil {
 		return 0, err
 	}
@@ -88,13 +88,13 @@ func (s *Store) CampaignFailed(org, id int64) (int, error) {
 	return c.Failures, nil
 }
 
-func (s *Store) PauseCampaign(org, id int64, why string) error {
+func (s *outreachStore) PauseCampaign(org, id int64, why string) error {
 	return s.in(org).Model(&Campaign{}).Where("id = ? and status = ?", id, CampaignSending).
 		Updates(map[string]any{"status": CampaignPaused, "paused": why}).Error
 }
 
 // FinishIfDone marks a campaign sent once nothing of it is waiting or on its way.
-func (s *Store) FinishIfDone(org, id int64) error {
+func (s *outreachStore) FinishIfDone(org, id int64) error {
 	var left int64
 	if err := s.in(org).Model(&CampaignRecipient{}).Where("campaign_id = ? and status in ?", id, []string{MailQueued, MailSending}).Count(&left).Error; err != nil || left > 0 {
 		return err
@@ -104,7 +104,7 @@ func (s *Store) FinishIfDone(org, id int64) error {
 
 // SendCampaign fixes who a draft goes to, as its audience stands now, and sets it
 // going. Asked twice at once, it is sent once.
-func (s *Store) SendCampaign(o *Org, id int64, actor string) (*Campaign, error) {
+func (s *outreachStore) SendCampaign(o *Org, id int64, actor string) (*Campaign, error) {
 	var c Campaign
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("org_id = ? and id = ?", o.ID, id).First(&c).Error; err != nil {
@@ -162,7 +162,7 @@ func (s *Store) SendCampaign(o *Org, id int64, actor string) (*Campaign, error) 
 }
 
 // CancelCampaign stops what hasn't gone. What went stays recorded.
-func (s *Store) CancelCampaign(org, id int64) (*Campaign, error) {
+func (s *outreachStore) CancelCampaign(org, id int64) (*Campaign, error) {
 	var c Campaign
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		res := tx.Model(&Campaign{}).Where("org_id = ? and id = ? and status in ?", org, id, []string{CampaignSending, CampaignPaused}).
@@ -186,7 +186,7 @@ func (s *Store) CancelCampaign(org, id int64) (*Campaign, error) {
 }
 
 // ResumeCampaign sets a paused campaign going again, once someone has looked.
-func (s *Store) ResumeCampaign(org, id int64) (*Campaign, error) {
+func (s *outreachStore) ResumeCampaign(org, id int64) (*Campaign, error) {
 	res := s.in(org).Model(&Campaign{}).Where("id = ? and status = ?", id, CampaignPaused).
 		Updates(map[string]any{"status": CampaignSending, "paused": "", "failures": 0})
 	if res.Error != nil {
@@ -203,7 +203,7 @@ func (s *Store) ResumeCampaign(org, id int64) (*Campaign, error) {
 }
 
 // CampaignTally counts a campaign's mails by how they went.
-func (s *Store) CampaignTally(org int64, ids []int64) (map[int64]map[string]int, error) {
+func (s *outreachStore) CampaignTally(org int64, ids []int64) (map[int64]map[string]int, error) {
 	out := map[int64]map[string]int{}
 	if len(ids) == 0 {
 		return out, nil
@@ -226,7 +226,7 @@ func (s *Store) CampaignTally(org int64, ids []int64) (map[int64]map[string]int,
 	return out, nil
 }
 
-func (s *Store) CampaignRecipients(org, campaign int64) ([]CampaignRecipient, error) {
+func (s *outreachStore) CampaignRecipients(org, campaign int64) ([]CampaignRecipient, error) {
 	if _, err := s.Campaign(org, campaign); err != nil {
 		return nil, err
 	}
@@ -234,7 +234,7 @@ func (s *Store) CampaignRecipients(org, campaign int64) ([]CampaignRecipient, er
 	return out, s.in(org).Where("campaign_id = ?", campaign).Order("id").Find(&out).Error
 }
 
-func (s *Store) DropUnsubscribeLink(token string) {
+func (s *outreachStore) DropUnsubscribeLink(token string) {
 	if token != "" {
 		stored(s.db.Where("token_hash = ?", hashToken(token)).Delete(&UnsubscribeLink{}))
 	}

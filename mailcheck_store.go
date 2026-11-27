@@ -11,7 +11,7 @@ import (
 
 // TakesMail answers from what is kept while it is fresh, and asks DNS otherwise.
 // Without a resolver, as in tests that haven't given one, it never knows.
-func (s *Store) TakesMail(ctx context.Context, domain string) mailAnswer {
+func (s *outreachStore) TakesMail(ctx context.Context, domain string) mailAnswer {
 	if domain == "" {
 		return mailUnknown
 	}
@@ -39,7 +39,7 @@ func (s *Store) TakesMail(ctx context.Context, domain string) mailAnswer {
 }
 
 // NoMailDomains are the domains known not to take mail, for pages that mustn't wait on DNS.
-func (s *Store) NoMailDomains() map[string]bool {
+func (s *outreachStore) NoMailDomains() map[string]bool {
 	var domains []string
 	_ = logged(s.db.Model(&MailDomain{}).Where("takes_mail = ? and checked_at > ?", false, time.Now().Add(-mailRefusedFor)).Pluck("domain", &domains))
 	out := make(map[string]bool, len(domains))
@@ -51,7 +51,7 @@ func (s *Store) NoMailDomains() map[string]bool {
 
 // checkMailDomains asks about each address an agent sends before it is stored, so a
 // made-up domain is turned away while the agent can still look again.
-func (s *Store) checkMailDomains(email string) error {
+func (s *outreachStore) checkMailDomains(email string) error {
 	for _, e := range emailRe.FindAllString(strings.ToLower(email), -1) {
 		if domain := mailDomainOf(e); s.TakesMail(context.Background(), domain) == mailRefused {
 			return errors.New("nothing was stored: " + domain + " takes no mail, so " + e + " can't be right. Leave email out, or find the address on a page")
@@ -60,7 +60,7 @@ func (s *Store) checkMailDomains(email string) error {
 	return nil
 }
 
-func (s *Store) CheckSomeMail(ctx context.Context, most int) {
+func (s *outreachStore) CheckSomeMail(ctx context.Context, most int) {
 	if s.dns == nil {
 		return
 	}
