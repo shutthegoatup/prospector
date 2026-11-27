@@ -10,17 +10,19 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/mailer"
 )
 
 // postbox records what a campaign would send and can be told how each mail goes.
 type postbox struct {
 	mu   sync.Mutex
-	sent []Message
+	sent []mailer.Message
 	// answer, when set, decides how a mail to that address goes.
 	answer func(to string) error
 }
 
-func (p *postbox) send(_ context.Context, _ MailServer, m Message) error {
+func (p *postbox) send(_ context.Context, _ mailer.Server, m mailer.Message) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.answer != nil {
@@ -200,7 +202,7 @@ func TestAMailServerThatIsDownPausesACampaignWithoutLosingAnyone(t *testing.T) {
 	a, s, o, list, member, box := campaignSite(t)
 	c := draft(t, s, o)
 	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
-	box.answer = func(string) error { return fmt.Errorf("%w: reach smtp.alpha.example:587: refused", errUnsent) }
+	box.answer = func(string) error { return fmt.Errorf("%w: reach smtp.alpha.example:587: refused", mailer.ErrUnsent) }
 	for range failuresToPause {
 		a.sendRound(context.Background(), time.Now())
 	}
@@ -238,7 +240,7 @@ func TestAMailThatMayHaveGoneIsNeverSentAgain(t *testing.T) {
 		case "tom@larkmoor.example":
 			return errors.New("connection reset while the message was being written")
 		case "sven@nordkap.example":
-			return fmt.Errorf("%w: 550 no such user", errRefusedRecipient)
+			return fmt.Errorf("%w: 550 no such user", mailer.ErrRefusedRecipient)
 		}
 		return nil
 	}
@@ -445,7 +447,7 @@ func TestCampaignSendingHoldsAtItsEdges(t *testing.T) {
 	}
 	second := draft(t, s, o)
 	must(s.SendCampaign(o, second.ID, "Ada Lovelace"))
-	box.answer = func(string) error { return fmt.Errorf("%w: 550 relaying denied", errRefusedRecipient) }
+	box.answer = func(string) error { return fmt.Errorf("%w: 550 relaying denied", mailer.ErrRefusedRecipient) }
 	a.sendRound(context.Background(), time.Now())
 	refused := 0
 	for _, r := range mailOf(t, s, o, second) {
@@ -501,7 +503,7 @@ func TestAServiceNoticeReachesCustomersWhoUnsubscribedButNobodyElse(t *testing.T
 
 	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
 	a.sendRound(context.Background(), time.Now())
-	sent := map[string]Message{}
+	sent := map[string]mailer.Message{}
 	for _, m := range box.sent {
 		sent[m.To] = m
 	}
