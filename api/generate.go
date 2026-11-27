@@ -9,7 +9,7 @@ import (
 
 //go:generate go tool oapi-codegen -config oapi-codegen.yaml openapi.yaml
 
-// Source is openapi.yaml as written. The generated GetSwagger renames operations to Go's
+// Source is openapi.yaml as written. The generated GetSpec renames operations to Go's
 // taste; what is published keeps the spec's own names.
 //
 //go:embed openapi.yaml

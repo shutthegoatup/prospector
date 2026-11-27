@@ -1,5 +1,5 @@
 import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
@@ -94,7 +94,7 @@ export function TodayPage() {
   // On LinkedIn adds: o opens the first card's profile and copies its note, a marks it added, s skips.
   // Until a changed filter's list comes, the first card is still the old list's.
   const stale = useRef(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     stale.current = list.isPlaceholderData;
   });
   useEffect(() => {

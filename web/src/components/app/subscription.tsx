@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { type ComponentProps, type ReactNode, useEffect, useRef, useState } from "react";
+import { type ComponentProps, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, useRefresh } from "@/components/app";
@@ -41,8 +41,8 @@ export function standingText(s: Subscription) {
 function useCommitted<T extends HTMLInputElement | HTMLSelectElement>(save: (value: string, el: T) => void) {
   const ref = useRef<T>(null);
   const latest = useRef(save);
-  // Kept current after each render, never during one.
-  useEffect(() => {
+  // Kept current after each render, never during one, and before any event can read it.
+  useLayoutEffect(() => {
     latest.current = save;
   });
   useEffect(() => {
