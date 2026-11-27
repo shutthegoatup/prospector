@@ -72,6 +72,57 @@ func TestOnlyTheStoreTouchesTheDatabase(t *testing.T) {
 	}
 }
 
+// TestOnlyStoresTouchTheDatabaseInsideInternal is the rule above for the packages under
+// internal/, where a product's handlers live beside its store: there only the methods of
+// a …Store type, and the functions their transactions are handed to, may reach the core.
+func TestOnlyStoresTouchTheDatabaseInsideInternal(t *testing.T) {
+	t.Parallel()
+	files, err := filepath.Glob("internal/*/*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reach := map[string]bool{"DB": true}
+	for name := range withinTheStore {
+		reach[name] = true
+	}
+	fset := token.NewFileSet()
+	for _, name := range files {
+		pkg := filepath.Base(filepath.Dir(name))
+		// The core itself, and the test fixtures that make databases.
+		if strings.HasSuffix(name, "_test.go") || pkg == "store" || pkg == "dbtest" {
+			continue
+		}
+		f, err := parser.ParseFile(fset, name, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, decl := range f.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil || strings.HasSuffix(receiver(fn), "Store") || handedATransaction(fn) {
+				continue
+			}
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				if sel, ok := n.(*ast.SelectorExpr); ok && reach[sel.Sel.Name] {
+					t.Errorf("%s: %s reaches the database (.%s) outside a store: give the store a method", fset.Position(sel.Pos()), fn.Name.Name, sel.Sel.Name)
+				}
+				return true
+			})
+		}
+	}
+}
+
+// handedATransaction is a function a store method calls with its transaction.
+func handedATransaction(fn *ast.FuncDecl) bool {
+	for _, p := range fn.Type.Params.List {
+		if star, ok := p.Type.(*ast.StarExpr); ok {
+			if sel, ok := star.X.(*ast.SelectorExpr); ok && sel.Sel.Name == "DB" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // withinTheStore are store methods that take or give back a handle on the database, for
 // the store's own code: the core's helpers the areas' queries build on, and one area's
 // query that another's calls inside its own transaction now the two are in different
