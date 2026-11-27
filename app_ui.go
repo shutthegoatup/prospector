@@ -36,13 +36,23 @@ func (a *App) appRoutes(mux *http.ServeMux) {
 // shellHTML is the page Vite builds from web/index.html.
 var shellHTML = builtPage("index.html", nil)
 
+// shellIn is the shell saying it is in lang, which the app reads to load that
+// language's messages before it draws anything.
+func shellIn(lang string) ([]byte, error) {
+	b, err := shellHTML()
+	if err != nil {
+		return nil, err
+	}
+	return bytes.Replace(b, []byte(`<html lang="`+locales.Source+`">`), []byte(`<html lang="`+lang+`">`), 1), nil
+}
+
 // writeShell answers with the app's shell carrying page: what the server already decided
 // a page shows, for the pages with no API to ask (an error, the start of a first
 // organisation, a customer's or an unsubscriber's). Its "page" field names which, and
 // the app draws it in place of whatever the address would route to. With no shell to
 // read, the answer is fallback as plain text.
-func writeShell(w http.ResponseWriter, code int, page any, fallback string) {
-	b, err := shellHTML()
+func writeShell(w http.ResponseWriter, r *http.Request, code int, page any, fallback string) {
+	b, err := shellIn(languageOf(r))
 	var data []byte
 	if err == nil {
 		data, err = json.Marshal(page)
@@ -64,7 +74,7 @@ func writeShell(w http.ResponseWriter, code int, page any, fallback string) {
 
 // shell serves the React app: everything it shows, it reads through the API.
 func (a *App) shell(w http.ResponseWriter, r *http.Request) {
-	b, err := shellHTML()
+	b, err := shellIn(a.pickLanguage(w, r))
 	if err != nil {
 		fail(w, err, http.StatusInternalServerError)
 		return

@@ -18,3 +18,5 @@ node_modules/
 # Written by the web build (npm run build in web/), which goreleaser and the Dockerfile run.
 /assets/app/
 /assets/js/
+# Compiled from web/lang by the web build.
+/web/src/lang/

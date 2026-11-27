@@ -377,7 +377,7 @@ func (a *App) customerRender(w http.ResponseWriter, r *http.Request, code int, v
 	for _, st := range v.Steps {
 		shown.Steps = append(shown.Steps, customerStepShown{st.ID, st.Name, st.Due, st.DoneOn, st.DoneBy == customerActor})
 	}
-	writeShell(w, code, shown, "This page needs a browser with JavaScript.\n")
+	writeShell(w, r, code, shown, "This page needs a browser with JavaScript.\n")
 }
 
 // customerShown is CustomerView as the page gets it. A step says only whether the

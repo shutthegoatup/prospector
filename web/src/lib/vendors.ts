@@ -1,3 +1,4 @@
+import { intl } from "@/i18n";
 import type { components } from "@/api";
 
 export type VendorKind = components["schemas"]["EnricherKind"];
@@ -29,5 +30,5 @@ export const detailNames: Record<string, string> = { email: "email", phone: "mob
 
 // month is the calendar month vendors' lookups are counted in, which is UTC's.
 export function month(at = new Date()) {
-  return at.toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
+  return intl.formatDate(at, { month: "long", timeZone: "UTC" });
 }

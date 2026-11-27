@@ -7,6 +7,7 @@ import { Bar, Loading, Placeholders, placeholders, Settled, Text } from "@/compo
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { actor, plural, stamp } from "@/lib/format";
+import { intl } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { detailNames, month, vendorCosts, vendorKinds, vendorName, vendorTold } from "@/lib/vendors";
 import { useSession } from "@/session";
@@ -825,7 +826,7 @@ function ActivityRow({ e }: { e?: components["schemas"]["AgentEvent"] }) {
 
 // The first day of next month, UTC, when a vendor's lookups start again.
 function nextMonth(now = new Date()) {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+  return intl.formatDate(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1), { day: "numeric", month: "short", timeZone: "UTC" });
 }
 
 function vendorState(e: Enricher): [Rail, string] {

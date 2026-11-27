@@ -313,5 +313,5 @@ func (a *App) unsubscribe(w http.ResponseWriter, r *http.Request) {
 func (a *App) unsubscribeRender(w http.ResponseWriter, r *http.Request, v UnsubscribeView) {
 	customerHeaders(w)
 	v.Page = "unsubscribe"
-	writeShell(w, http.StatusOK, v, "This page needs a browser with JavaScript.\n")
+	writeShell(w, r, http.StatusOK, v, "This page needs a browser with JavaScript.\n")
 }

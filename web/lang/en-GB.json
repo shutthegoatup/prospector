@@ -1,0 +1,14 @@
+{
+  "format.actor.agent": {
+    "defaultMessage": "agent · {name}",
+    "description": "Who did something, when it was one of the organisation's AI agents"
+  },
+  "format.actor.customer": {
+    "defaultMessage": "the customer",
+    "description": "Who did something, when it was the customer themselves"
+  },
+  "format.ago.justNow": {
+    "defaultMessage": "just now",
+    "description": "Less than a minute ago"
+  }
+}

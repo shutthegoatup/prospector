@@ -336,7 +336,7 @@ func (a *App) signInProblem(w http.ResponseWriter, r *http.Request, next string,
 	if next != "" {
 		back += "?" + url.Values{"next": {safeNext(next)}}.Encode()
 	}
-	writeShell(w, code, problemShown{"problem", code, "Couldn't sign in", problem, back}, "Couldn't sign in: "+problem+"\n")
+	writeShell(w, r, code, problemShown{"problem", code, "Couldn't sign in", problem, back}, "Couldn't sign in: "+problem+"\n")
 }
 
 func (a *App) loginWith(w http.ResponseWriter, r *http.Request) {
