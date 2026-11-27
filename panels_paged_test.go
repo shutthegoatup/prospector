@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 )
@@ -88,5 +89,38 @@ func TestAgentActivityHasPages(t *testing.T) {
 	pages := apiPages(t, client, srv.URL+"/o/alpha/api/v1/agent-activity?limit="+fmt.Sprint(activityPageSize))
 	if len(pages) != 2 || len(pages[0].Items) != activityPageSize || len(pages[1].Items) != 4 || pages[1].Items[3]["value"] != "fact number 0." {
 		t.Fatalf("agent activity through the API should come in two pages, oldest last: %d", len(pages))
+	}
+}
+
+// TestAgentActivityPagesThroughEventsAtTheSameMoment: a page is read from where the last
+// one left off, so events that share a moment, as a batch an agent sends does, are
+// each listed once, in order, however the pages fall between them. A person's own
+// events aren't agents', and stay out.
+func TestAgentActivityPagesThroughEventsAtTheSameMoment(t *testing.T) {
+	t.Parallel()
+	s, o, srv, client := signedIn(t)
+	at := time.Date(2020, 1, 1, 9, 0, 0, 0, time.UTC)
+	var events []Event
+	for i := range 7 {
+		// Three moments, two or three events in each.
+		events = append(events, Event{OrgID: o.ID, User: "agent:scout", Action: "add:fact", Value: str(fmt.Sprint("fact ", i)), At: at.Add(time.Duration(i/3) * time.Minute)})
+	}
+	events = append(events, Event{OrgID: o.ID, User: "Ada Lovelace", Action: "note", Value: str("by hand"), At: at})
+	if err := s.db.Create(&events).Error; err != nil {
+		t.Fatal(err)
+	}
+	pages := apiPages(t, client, srv.URL+"/o/alpha/api/v1/agent-activity?limit=2")
+	var seen []string
+	for _, p := range pages {
+		for _, item := range p.Items {
+			seen = append(seen, fmt.Sprint(item["value"]))
+		}
+	}
+	// Newest first, and within a moment the last added first.
+	if want := "fact 6 fact 5 fact 4 fact 3 fact 2 fact 1 fact 0"; strings.Join(seen, " ") != want {
+		t.Fatalf("listed %q, want %q", strings.Join(seen, " "), want)
+	}
+	if len(pages) != 4 {
+		t.Fatalf("seven events two to a page are four pages, not %d", len(pages))
 	}
 }

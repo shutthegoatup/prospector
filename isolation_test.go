@@ -381,7 +381,9 @@ var saysNothingBack = map[string]bool{
 	// Recipients and fields come back as ids, places and kinds; who they are is AgreementRecipients'.
 	"AddRecipient": true, "ChangeRecipient": true, "TrySeal": true, "RemoveRecipient": true, "PutAgreementFields": true, "AgreementFields": true, "Readiness": true,
 	"ErasePerson": true, "Import": true, "ImportLegacy": true, "Restore": true,
-	"ResearchCount": true, "ResearchCounts": true, "EnquiryCounts": true, "Week": true, "AgentMarks": true, "Touches": true,
+	"ResearchCount": true, "ResearchCounts": true,
+	// A cursor of 1 is a place before every event; AgentEvents reads the same rows from the start.
+	"AgentEventsBefore": true, "EnquiryCounts": true, "Week": true, "AgentMarks": true, "Touches": true,
 	"AddEnquiry": true, "AgentNote": true, "CreateKey": true, "CreateTask": true, "CreateTaskFor": true, "CreateTaskWanting": true, "QuickAddPerson": true,
 	// FindOne answers only when one person matches, and Find makes its query. NeverContactCovers reads the organisation it is handed.
 	"FindOne": true, "NeverContactCovers": true,
