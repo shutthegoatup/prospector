@@ -322,6 +322,15 @@ func connect(dsn string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Left alone, the pool keeps two idle connections and opens without limit, so a busy
+	// moment opens Postgres connections over and over, and can open more than it allows.
+	pool, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+	pool.SetMaxOpenConns(20)
+	pool.SetMaxIdleConns(20)
+	pool.SetConnMaxIdleTime(5 * time.Minute)
 	return newStore(&core{db: db}), nil
 }
 

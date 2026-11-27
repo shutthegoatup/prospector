@@ -14,6 +14,14 @@ type Nav struct {
 	Enquiries int
 }
 
+// conversations are the organisation's, read once a request.
+func (a *App) conversations(q *Req) map[string][]Contact {
+	if q.convs == nil {
+		q.convs, _ = a.s.Conversations(q.Org.ID)
+	}
+	return q.convs
+}
+
 func (a *App) dueByStep(q *Req, now time.Time) map[string][]Contact {
 	if q.due != nil {
 		return q.due
@@ -26,7 +34,7 @@ func (a *App) dueByStep(q *Req, now time.Time) map[string][]Contact {
 		}
 		out[s.Key], _ = a.s.Due(q.Org.ID, s.Key, now, q.Org.Settings)
 	}
-	convs, _ := a.s.Conversations(q.Org.ID)
+	convs := a.conversations(q)
 	day := now.Format("2006-01-02")
 	for _, list := range convs {
 		for _, c := range list {
@@ -45,7 +53,7 @@ func (a *App) nav(q *Req) Nav {
 	}
 	n.Research = a.s.ToReview(q.Org.ID)
 	n.Enquiries = a.s.EnquiryCounts(q.Org.ID)["state:"+EnquiryOpen]
-	convs, _ := a.s.Conversations(q.Org.ID)
+	convs := a.conversations(q)
 	for k, list := range convs {
 		if k != "won" && k != "lost" {
 			n.Conversations += len(list)

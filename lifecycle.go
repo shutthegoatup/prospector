@@ -54,7 +54,8 @@ const openContacts = "hold is null and replied is null and declined is null and 
 // it again brings them back as they were. Rejected is for the offering each person is
 // reached for: the company's own stage for the organisation's, a verdict for another.
 const companyNotRejected = "(company_id is null" +
-	" or (offering_id = 0 and company_id not in (select id from companies where stage = '" + CompanyRejected + "'))" +
+	" or (offering_id = 0 and not exists (select 1 from companies c where c.id = contacts.company_id" +
+	" and c.org_id = contacts.org_id and c.stage = '" + CompanyRejected + "'))" +
 	" or (offering_id <> 0 and not exists (select 1 from verdicts v where v.org_id = contacts.org_id" +
 	" and v.offering_id = contacts.offering_id and v.company_id = contacts.company_id and v.stage = '" + CompanyRejected + "')))"
 
