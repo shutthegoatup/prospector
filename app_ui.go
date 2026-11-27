@@ -50,7 +50,7 @@ func writeShell(w http.ResponseWriter, code int, page any, fallback string) {
 	if err != nil {
 		w.Header().Set("content-type", "text/plain; charset=utf-8")
 		w.WriteHeader(code)
-		w.Write([]byte(fallback))
+		_, _ = w.Write([]byte(fallback))
 		return
 	}
 	// json.Marshal already writes <, > and & as escapes, so quotes are all that could
@@ -59,7 +59,7 @@ func writeShell(w http.ResponseWriter, code int, page any, fallback string) {
 	b = bytes.Replace(b, []byte(`<div id="app"></div>`), []byte(`<div id="app" data-page="`+attr+`"></div>`), 1)
 	w.Header().Set("content-type", "text/html; charset=utf-8")
 	w.WriteHeader(code)
-	w.Write(b)
+	_, _ = w.Write(b)
 }
 
 // shell serves the React app: everything it shows, it reads through the API.
@@ -70,5 +70,5 @@ func (a *App) shell(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("content-type", "text/html; charset=utf-8")
-	w.Write(b)
+	_, _ = w.Write(b)
 }

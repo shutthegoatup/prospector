@@ -7,7 +7,16 @@ test("a path on this site is kept", () => {
 });
 
 test("anywhere else goes home", () => {
-  for (const n of [undefined, "", "https://elsewhere.example/", "//elsewhere.example", "/\\elsewhere.example", "/\t/elsewhere.example", "/\n/elsewhere.example", "o/alpha"]) {
+  for (const n of [
+    undefined,
+    "",
+    "https://elsewhere.example/",
+    "//elsewhere.example",
+    "/\\elsewhere.example",
+    "/\t/elsewhere.example",
+    "/\n/elsewhere.example",
+    "o/alpha",
+  ]) {
     assert.equal(safeNext(n), "/", JSON.stringify(n));
   }
 });

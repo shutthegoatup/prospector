@@ -38,11 +38,12 @@ export function AgentsPage() {
     <>
       <PageHead title="Agents & API" />
       <p className="mb-5 max-w-[72ch] text-sm text-muted-foreground">
-        Agents research, add and draft for <b className="text-foreground">
+        Agents research, add and draft for{" "}
+        <b className="text-foreground">
           <Text value={settings.data?.name ?? (settings.error ? "" : undefined)} w="8ch" />
-        </b>. Some Prospector runs itself; others are your own
-        and connect with a key, which works for this organisation only. What any of them adds waits in Research for a person; agents can draft, but
-        only people send.
+        </b>
+        . Some Prospector runs itself; others are your own and connect with a key, which works for this organisation only. What any of them adds waits in
+        Research for a person; agents can draft, but only people send.
       </p>
       {/* Its sections stack, and each list's length decides where the next one starts. */}
       <Settled className="flex flex-wrap items-start gap-5">
@@ -96,17 +97,7 @@ function ToolRow({ t }: { t?: Connect["tools"][number] }) {
 
 // Roster is every agent in one list, each card's offset colour its state; while they load,
 // a tally and a couple of cards in outline.
-function Roster({
-  agents,
-  keys,
-  connect,
-  errors,
-}: {
-  agents?: Agent[];
-  keys?: Key[];
-  connect?: Connect;
-  errors: ({ detail?: string } | null | undefined)[];
-}) {
+function Roster({ agents, keys, connect, errors }: { agents?: Agent[]; keys?: Key[]; connect?: Connect; errors: ({ detail?: string } | null | undefined)[] }) {
   const { owner } = useSession();
   const loaded = agents && keys && connect ? { agents, keys, connect } : undefined;
   const loading = !loaded && !errors.some(Boolean);
@@ -115,7 +106,10 @@ function Roster({
   const tally = (rail: Rail) => (loaded?.agents ?? []).filter((a) => a.state.rail === rail).length;
   const none = loaded !== undefined && loaded.agents.length === 0 && outside.length === 0;
   return (
-    <Section title="Who works here" hint="Every agent in one list: those Prospector runs and those that connect with a key. The colour behind each card is its state.">
+    <Section
+      title="Who works here"
+      hint="Every agent in one list: those Prospector runs and those that connect with a key. The colour behind each card is its state."
+    >
       {loaded && !loaded.connect.can_keep_keys && owner && (
         <p className="text-sm text-[var(--stop)]" role="alert">
           This server has no secret key, so it can't keep an API key: whoever runs it needs to set PROSPECTOR_SECRET_KEYS first.
@@ -224,7 +218,9 @@ function AgentCard({ agent: v, agents, connect }: { agent?: Agent; agents?: Agen
           <AgentFact label="Falls back to" value={v?.fallback_text} rail={v?.fallback === 0 ? "none" : ""} />
         </span>
         {st?.todo && (
-          <span className={cn("mx-4 mb-3 block rounded-lg border border-dashed border-current px-3 py-2 font-mono text-xs", stateText[st.rail])}>{st.todo}</span>
+          <span className={cn("mx-4 mb-3 block rounded-lg border border-dashed border-current px-3 py-2 font-mono text-xs", stateText[st.rail])}>
+            {st.todo}
+          </span>
         )}
       </summary>
       {v && agents && connect && (
@@ -303,9 +299,7 @@ function KeyCard({ k, scopes }: { k: Key; scopes: Scope[] }) {
                 quiet
                 size="sm"
                 type="button"
-                onClick={() =>
-                  window.confirm(`Revoke ${k.name}? Agents using it stop working.`) && revoke.mutate({ params: { path: { org, id: k.id } } })
-                }
+                onClick={() => window.confirm(`Revoke ${k.name}? Agents using it stop working.`) && revoke.mutate({ params: { path: { org, id: k.id } } })}
               >
                 Revoke
               </ActionButton>
@@ -371,8 +365,8 @@ function AddAgent({ none, agents, connect }: { none: boolean; agents?: Agent[]; 
         <summary className="cursor-pointer">
           <b>Your own agent connects</b>
           <span className="block text-sm text-muted-foreground">
-            Claude Code or any MCP client, with a key that has only the scopes it needs. No key can mark anything sent or reach another organisation,
-            and only one with settings:write can change settings.
+            Claude Code or any MCP client, with a key that has only the scopes it needs. No key can mark anything sent or reach another organisation, and only
+            one with settings:write can change settings.
           </span>
         </summary>
         {connect && (
@@ -549,15 +543,15 @@ function AgentForm({
           ))}
         </select>
         <Meta>
-          Anthropic reaches Claude through Anthropic's own API with its official SDK; OpenAI-compatible is ChatGPT, OpenRouter, a gateway of your
-          own, or a model you run yourself behind llama.cpp or vLLM.
+          Anthropic reaches Claude through Anthropic's own API with its official SDK; OpenAI-compatible is ChatGPT, OpenRouter, a gateway of your own, or a
+          model you run yourself behind llama.cpp or vLLM.
         </Meta>
       </Row>
       <Row label="Endpoint">
         <Input name="base_url" defaultValue={v?.base_url} placeholder="https://openrouter.ai/api/v1" autoComplete="off" className={fieldClass} />
         <Meta>
-          For OpenAI-compatible, the address its /models and /chat/completions are under, such as https://api.openai.com/v1. For Anthropic, leave it
-          empty for Anthropic's own.
+          For OpenAI-compatible, the address its /models and /chat/completions are under, such as https://api.openai.com/v1. For Anthropic, leave it empty for
+          Anthropic's own.
         </Meta>
       </Row>
       <Row label="API key">
@@ -574,6 +568,7 @@ function AgentForm({
         <Input name="model" defaultValue={v?.model} list={modelsID} autoComplete="off" placeholder="one the endpoint lists" className={fieldClass} />
         <datalist id={modelsID}>
           {models.map((m) => (
+            // oxlint-disable-next-line jsx-a11y/control-has-associated-label -- a suggestion for the input, which has the label
             <option key={m} value={m} />
           ))}
         </datalist>
@@ -593,8 +588,8 @@ function AgentForm({
       <Row label="Search">
         <Input name="search_url" defaultValue={v?.search_url} placeholder="https://searx.example.com" autoComplete="off" className={fieldClass} />
         <Meta>
-          A SearXNG instance you run: free, open-source search, with json among its search.formats. The agent searches through it, and reads pages
-          itself, with no paid search service.
+          A SearXNG instance you run: free, open-source search, with json among its search.formats. The agent searches through it, and reads pages itself, with
+          no paid search service.
         </Meta>
       </Row>
       <Row label="Tools">
@@ -645,8 +640,8 @@ function AgentForm({
             ))}
           </div>
           <Meta>
-            The agent uses only the tools ticked here. LinkedIn's terms forbid automated access, logged-in browsers included: prefer search and fetch
-            tools to browser and captcha ones.
+            The agent uses only the tools ticked here. LinkedIn's terms forbid automated access, logged-in browsers included: prefer search and fetch tools to
+            browser and captcha ones.
           </Meta>
         </Row>
       )}
@@ -932,6 +927,7 @@ function VendorCard({ vendor: e, n, up, down }: { vendor?: Enricher; n: number; 
 
   return (
     <details className={cardClass} data-state={rail}>
+      {/* oxlint-disable-next-line jsx-a11y/control-has-associated-label -- labelled by the agent's name inside it */}
       <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         <span className="flex flex-wrap items-start justify-between gap-3 px-4 pt-4 pb-3">
           <span className="flex min-w-0 flex-col gap-0.5">
@@ -985,7 +981,15 @@ function VendorCard({ vendor: e, n, up, down }: { vendor?: Enricher; n: number; 
               </label>
               <label className="flex flex-col gap-1.5">
                 <Eyebrow>Lookups a month, at most</Eyebrow>
-                <Input type="number" min={0} max={100000} required value={limit} onChange={(ev) => setLimit(ev.target.value)} className={cn(fieldClass, "w-24")} />
+                <Input
+                  type="number"
+                  min={0}
+                  max={100000}
+                  required
+                  value={limit}
+                  onChange={(ev) => setLimit(ev.target.value)}
+                  className={cn(fieldClass, "w-24")}
+                />
                 <span className="text-xs text-muted-foreground">0 stops it being asked.</span>
               </label>
               <div className="flex flex-wrap items-center gap-2">
@@ -1005,8 +1009,7 @@ function VendorCard({ vendor: e, n, up, down }: { vendor?: Enricher; n: number; 
             </Meta>
           )}
           <p className="text-xs text-muted-foreground">
-            {vendorTold[e.kind]} {vendorCosts[e.kind]} You are bound by its terms for what it returns, and it may keep
-            what it finds in your account with it.
+            {vendorTold[e.kind]} {vendorCosts[e.kind]} You are bound by its terms for what it returns, and it may keep what it finds in your account with it.
           </p>
         </div>
       )}
@@ -1068,7 +1071,9 @@ function AddVendor({ vendors }: { vendors: Enricher[] }) {
           </ActionButton>
         </div>
       )}
-      <p className="text-xs text-muted-foreground">Keys are sealed under the server's key and never shown again. A new vendor goes to the bottom of the list.</p>
+      <p className="text-xs text-muted-foreground">
+        Keys are sealed under the server's key and never shown again. A new vendor goes to the bottom of the list.
+      </p>
       <Failed errors={[add.error]} />
     </form>
   );

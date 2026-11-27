@@ -36,9 +36,7 @@ func TestTheAppIsOneShellAtEveryPage(t *testing.T) {
 	c := repliedPerson(t, s, o, "Hannah Pryce")
 	task := must(s.CreateTask(o.ID, "Kitchen makers", "Heads of procurement", "Ada Lovelace"))
 	pages := []string{"companies/" + itoa(*c.CompanyID), "tasks/" + itoa(task.ID), "add?popup=1&name=Hannah", "today?step=linkedin", "research?f=nonsense&task=x"}
-	for _, p := range appPages {
-		pages = append(pages, p)
-	}
+	pages = append(pages, appPages...)
 	for _, p := range pages {
 		res, body := get(t, client, srv.URL+"/o/alpha/"+p)
 		if res.StatusCode != http.StatusOK {

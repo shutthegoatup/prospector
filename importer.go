@@ -314,7 +314,7 @@ func ReadRepo(repo, ownDomain string) (*ImportPayload, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	records, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		return nil, err

@@ -118,7 +118,10 @@ export function TaskPage() {
         <div className="flex min-w-0 flex-[999_1_480px] flex-col gap-5">
           <AskedSection id={id} requests={t?.requests} last={t && taskLast(t)} open={open} />
           {t && (
-            <Section title="Found" hint="What agents added for this task, or matched to it. Companies and people wait in Research until someone qualifies or picks them.">
+            <Section
+              title="Found"
+              hint="What agents added for this task, or matched to it. Companies and people wait in Research until someone qualifies or picks them."
+            >
               {t.companies.length === 0 && t.people.length === 0 && <p className="text-sm text-muted-foreground">Nothing yet.</p>}
               {t.companies.map((c) => (
                 <div key={c.id} className="flex flex-wrap justify-between gap-2 border-b border-dashed border-border py-2.5 text-sm">
@@ -249,7 +252,12 @@ function Notes({ id }: { id: number }) {
   const { org } = useSession();
   const refresh = useRefresh();
   const [cursor, setCursor] = useState<string | undefined>();
-  const notes = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}/notes", { params: { path: { org, id }, query: { limit: 20, cursor } } }, { placeholderData: keepPreviousData });
+  const notes = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/tasks/{id}/notes",
+    { params: { path: { org, id }, query: { limit: 20, cursor } } },
+    { placeholderData: keepPreviousData },
+  );
   const remove = $api.useMutation("delete", "/o/{org}/api/v1/notes/{id}", { onSuccess: refresh });
   const items = notes.data?.items ?? [];
 
@@ -307,7 +315,12 @@ function Agents({ id, open }: { id: number; open: boolean }) {
   const { org, sales } = useSession();
   const refresh = useRefresh();
   const [cursor, setCursor] = useState<string | undefined>();
-  const runs = $api.useQuery("get", "/o/{org}/api/v1/tasks/{task}/runs", { params: { path: { org, task: id }, query: { limit: 10, cursor } } }, { placeholderData: keepPreviousData });
+  const runs = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/tasks/{task}/runs",
+    { params: { path: { org, task: id }, query: { limit: 10, cursor } } },
+    { placeholderData: keepPreviousData },
+  );
   const agents = $api.useQuery("get", "/o/{org}/api/v1/agents", { params: { path: { org } } });
   const start = $api.useMutation("post", "/o/{org}/api/v1/tasks/{task}/runs", { onSuccess: refresh });
   const stop = $api.useMutation("post", "/o/{org}/api/v1/runs/{id}/stop", { onSuccess: refresh });
@@ -396,7 +409,12 @@ function Prompt({ id }: { id: number }) {
 function WorkSoFar({ id }: { id: number }) {
   const { org } = useSession();
   const [cursor, setCursor] = useState<string | undefined>();
-  const work = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}/work", { params: { path: { org, id }, query: { limit: 10, cursor } } }, { placeholderData: keepPreviousData });
+  const work = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/tasks/{id}/work",
+    { params: { path: { org, id }, query: { limit: 10, cursor } } },
+    { placeholderData: keepPreviousData },
+  );
   const items = work.data?.items ?? [];
 
   return (

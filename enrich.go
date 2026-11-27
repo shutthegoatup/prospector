@@ -123,7 +123,7 @@ func (s *Store) DeleteEnricher(org, id int64) error {
 
 func (s *Store) EnricherUsed(org int64, kind string, now time.Time) int {
 	var u EnrichUsage
-	logged(s.db.Where("org_id = ? and kind = ? and month = ?", org, kind, now.UTC().Format("2006-01")).Limit(1).Find(&u))
+	_ = logged(s.db.Where("org_id = ? and kind = ? and month = ?", org, kind, now.UTC().Format("2006-01")).Limit(1).Find(&u))
 	return u.Calls
 }
 

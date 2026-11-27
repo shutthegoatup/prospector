@@ -1,0 +1,30 @@
+version: "2"
+
+linters:
+  # errcheck, govet, ineffassign, staticcheck and unused.
+  default: standard
+  settings:
+    errcheck:
+      # Closing what has been read, saying goodbye to a mail server after it took the
+      # message, and writing into a buffer can't lose anything worth reporting.
+      exclude-functions:
+        - (io.Closer).Close
+        - (net.Conn).Close
+        - (*net/smtp.Client).Close
+        - (*net/smtp.Client).Quit
+        - (*mime/quotedprintable.Writer).Write
+        - (*mime/quotedprintable.Writer).Close
+  exclusions:
+    rules:
+      # A test's dropped error shows up as the test failing.
+      - path: _test\.go
+        linters: [errcheck]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/shutthegoatup/prospector

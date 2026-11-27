@@ -224,7 +224,7 @@ func TestADocumentIsKeptByteForByte(t *testing.T) {
 			t.Errorf("a document sent as %q: %d", kind, code)
 		}
 	}
-	for given, want := range map[string]string{"..": "agreement.pdf", "evil‮fdp.exe": "evilfdp.exe.pdf", "Contract.PDF": "Contract.PDF"} {
+	for given, want := range map[string]string{"..": "agreement.pdf", "evil\u202efdp.exe": "evilfdp.exe.pdf", "Contract.PDF": "Contract.PDF"} {
 		if got := fileName(given); got != want {
 			t.Errorf("a file named %q is kept as %q, want %q", given, got, want)
 		}

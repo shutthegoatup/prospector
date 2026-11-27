@@ -19,7 +19,7 @@ func TestLookForAssets(t *testing.T) {
 		t.Fatal("an asset without a name was accepted")
 	}
 
-	s, o, srv, client := signedIn(t)
+	s, _, srv, client := signedIn(t)
 	save := func(lookFor string) (int, string) {
 		return call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/settings", "application/json",
 			map[string]any{"name": "Alpha", "color": "#56c5f4", "look_for": lookFor})
@@ -30,7 +30,7 @@ func TestLookForAssets(t *testing.T) {
 	if code, body := save("careers_page: a jobs page on their site\nats: the applicant tracking system they use"); code != http.StatusOK {
 		t.Fatalf("saving what we look for: %d %s", code, body)
 	}
-	o, _ = s.OrgBySlug("alpha")
+	o, _ := s.OrgBySlug("alpha")
 	k := &APIKey{Scopes: "research:write"}
 	if g := agentInstructions(o, k); !strings.Contains(g, "- careers_page: a jobs page on their site") || !strings.Contains(g, "- ats: the applicant tracking system") {
 		t.Fatalf("agents aren't told what to look for: %q", g)

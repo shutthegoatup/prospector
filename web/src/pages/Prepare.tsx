@@ -52,7 +52,9 @@ export function PreparePage() {
 
   const a = agreement.data;
   const all = recipients.data?.items ?? [];
-  const signers: Signer[] = all.filter((r) => r.role === "signer").map((r, i) => ({ id: r.id, name: r.name, colour: colours[i % colours.length] ?? "#ffc233" }));
+  const signers: Signer[] = all
+    .filter((r) => r.role === "signer")
+    .map((r, i) => ({ id: r.id, name: r.name, colour: colours[i % colours.length] ?? "#ffc233" }));
   const copies = all.filter((r) => r.role === "copy");
   const edit = sales && a?.status === "draft";
   const placing = signers.find((s) => s.id === picked) ?? signers[0];
@@ -134,7 +136,12 @@ export function PreparePage() {
                           quiet
                           size="xs"
                           aria-label={`Move ${s.name} up`}
-                          onClick={() => change.mutate({ params: { path: { org, id, recipient: s.id } }, body: { position: all.find((x) => x.id === signers[i - 1]?.id)?.position } })}
+                          onClick={() =>
+                            change.mutate({
+                              params: { path: { org, id, recipient: s.id } },
+                              body: { position: all.find((x) => x.id === signers[i - 1]?.id)?.position },
+                            })
+                          }
                         >
                           ↑
                         </ActionButton>
@@ -145,7 +152,9 @@ export function PreparePage() {
                       <ActionButton
                         quiet
                         size="xs"
-                        onClick={() => window.confirm(`Take ${s.name} off, with their fields?`) && remove.mutate({ params: { path: { org, id, recipient: s.id } } })}
+                        onClick={() =>
+                          window.confirm(`Take ${s.name} off, with their fields?`) && remove.mutate({ params: { path: { org, id, recipient: s.id } } })
+                        }
                       >
                         Remove
                       </ActionButton>
@@ -198,9 +207,7 @@ export function PreparePage() {
           <section className="flex flex-col gap-1.5 panel p-3.5">
             <Eyebrow>Before it can be sent</Eyebrow>
             {known && fields && missing.length === 0 && <p className="font-mono text-xs text-[var(--ok)]">✓ Every signer has a signature field.</p>}
-            {known && fields && missing.map((m) => (
-              <Meta key={m}>· {m}</Meta>
-            ))}
+            {known && fields && missing.map((m) => <Meta key={m}>· {m}</Meta>)}
             <Meta>Sending it for signature comes in the next release. Until then nothing here leaves Prospector.</Meta>
           </section>
         </div>
@@ -314,7 +321,15 @@ function pageInView() {
   return best;
 }
 
-function AddForm({ label, options, onAdd }: { label: string; options: components["schemas"]["Invitable"][]; onAdd: (who: number, role: "signer" | "copy") => void }) {
+function AddForm({
+  label,
+  options,
+  onAdd,
+}: {
+  label: string;
+  options: components["schemas"]["Invitable"][];
+  onAdd: (who: number, role: "signer" | "copy") => void;
+}) {
   const [who, setWho] = useState("");
   const [role, setRole] = useState<"signer" | "copy">("signer");
   return (
@@ -378,7 +393,7 @@ function Pages({
       pdfjs.GlobalWorkerOptions.workerSrc = "/assets/js/pdf.worker.min.mjs";
       const doc = await fetchClient.GET("/o/{org}/api/v1/agreements/{id}/document", { params: { path: { org, id } }, parseAs: "arrayBuffer" });
       if (doc.error || !doc.data) throw new Error("The document couldn't be fetched.");
-      const pdf = await pdfjs.getDocument({ data: new Uint8Array(doc.data), isEvalSupported: false }).promise;
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(doc.data) }).promise;
       const width = Math.min(here.current?.clientWidth || 640, 760);
       const pages: Sheet[] = [];
       for (let n = 1; n <= pdf.numPages; n++) {
@@ -443,7 +458,7 @@ function Canvas({ sheet }: { sheet: Sheet }) {
     const viewport = sheet.page.getViewport({ scale: (sheet.w / sheet.page.getViewport({ scale: 1 }).width) * devicePixelRatio });
     canvas.width = viewport.width;
     canvas.height = viewport.height;
-    const task = sheet.page.render({ canvasContext: canvas.getContext("2d")!, viewport });
+    const task = sheet.page.render({ canvas, viewport });
     return () => task.cancel();
   }, [sheet]);
   return <canvas ref={ref} className="block w-full" />;
@@ -505,7 +520,11 @@ function FieldBox({ f, signer, edit, onMove, onRemove }: { f: Field; signer?: Si
           >
             ×
           </button>
-          <span onPointerDown={(e) => start(e, true)} className="absolute" style={{ right: 0, bottom: 0, width: 10, height: 10, background: colour, cursor: "nwse-resize" }} />
+          <span
+            onPointerDown={(e) => start(e, true)}
+            className="absolute"
+            style={{ right: 0, bottom: 0, width: 10, height: 10, background: colour, cursor: "nwse-resize" }}
+          />
         </>
       )}
     </div>

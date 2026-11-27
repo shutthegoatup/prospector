@@ -320,7 +320,7 @@ func offeringStages(tx *gorm.DB, org, offering int64, companies []int64) (map[in
 // ToReview is how many companies wait for review, counting each offering's queue.
 func (s *Store) ToReview(org int64) int {
 	var n int64
-	logged(s.in(org).Model(&Verdict{}).Where("stage = ?", CompanyReview).Count(&n))
+	_ = logged(s.in(org).Model(&Verdict{}).Where("stage = ?", CompanyReview).Count(&n))
 	return s.ResearchCount(org, "review") + int(n)
 }
 

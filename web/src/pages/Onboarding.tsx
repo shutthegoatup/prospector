@@ -43,8 +43,8 @@ export function OnboardingPage() {
     <>
       <PageHead title="Onboarding" />
       <p className="mb-5 max-w-[70ch] text-sm text-muted-foreground">
-        The steps between a signature and a live customer. Each onboarding is a copy of your steps, made the day it starts, so changing them in
-        Settings later leaves the ones running as they are. Start one from a company's page. Ones running late come first.
+        The steps between a signature and a live customer. Each onboarding is a copy of your steps, made the day it starts, so changing them in Settings later
+        leaves the ones running as they are. Start one from a company's page. Ones running late come first.
       </p>
       <Whose area="support" work="Onboarding is" can={support} />
       {!loading && settings.data && planned === 0 && (
@@ -61,7 +61,9 @@ export function OnboardingPage() {
         </Placeholders>
       ) : (
         <div className="flex max-w-3xl flex-col gap-3">
-          {list.data?.items.map((o) => <OnboardingCard key={o.id} o={o} day={day} />)}
+          {list.data?.items.map((o) => (
+            <OnboardingCard key={o.id} o={o} day={day} />
+          ))}
         </div>
       )}
     </>
@@ -159,8 +161,8 @@ export function OnboardingCard({ o, day, named = true }: { o?: Onboarding; day: 
       <div className="flex flex-col gap-2 border-t border-border pt-2">
         <Eyebrow>Their page</Eyebrow>
         <Meta>
-          Someone you invite is emailed a link to a page showing the steps that are theirs, which they can mark done, and nothing else. It needs
-          no password and opens in one browser at a time.
+          Someone you invite is emailed a link to a page showing the steps that are theirs, which they can mark done, and nothing else. It needs no password and
+          opens in one browser at a time.
         </Meta>
         {o.invites.map((inv) => (
           <div key={inv.id} className="flex flex-wrap items-center justify-between gap-2">

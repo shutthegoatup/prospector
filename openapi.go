@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/shutthegoatup/prospector/api"
 )
 
@@ -23,7 +24,7 @@ var _ api.StrictServerInterface = apiServer{}
 // routeAPI puts the spec's operations on the mux, each behind who-is-asking and the
 // scope its operation names.
 func (a *App) routeAPI(mux *http.ServeMux) {
-	spec, err := api.GetSwagger()
+	spec, err := api.GetSpec()
 	if err != nil {
 		log.Fatalf("the API spec: %v", err)
 	}
@@ -44,7 +45,7 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 	}
 	mux.HandleFunc("GET /api/openapi.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(doc)
+		_, _ = w.Write(doc)
 	})
 
 	strict := api.NewStrictHandlerWithOptions(apiServer{a}, []api.StrictMiddlewareFunc{a.apiScope(scopes), func(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc { return listURL(f) }, uploads, withRequest, a.withSite}, api.StrictHTTPServerOptions{

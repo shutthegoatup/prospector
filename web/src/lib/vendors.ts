@@ -8,7 +8,8 @@ export const vendorNames: Record<VendorKind, string> = { hunter: "Hunter", prosp
 // What each charges, as its own docs put it, for an owner setting a limit.
 export const vendorCosts: Record<VendorKind, string> = {
   hunter: "Hunter charges a credit only when it finds an address.",
-  prospeo: "Prospeo charges a credit for an email and ten for a mobile, only when it finds one, and nothing to look up the same person again within 90 days. Each lookup keeps only the detail it was for.",
+  prospeo:
+    "Prospeo charges a credit for an email and ten for a mobile, only when it finds one, and nothing to look up the same person again within 90 days. Each lookup keeps only the detail it was for.",
 };
 
 // What each is sent about a person, matching its adapter.

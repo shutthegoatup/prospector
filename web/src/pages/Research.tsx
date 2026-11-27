@@ -40,7 +40,6 @@ const empty: Record<Filter, [string, string]> = {
   rejected: ["Nothing here", ""],
 };
 
-
 export function ResearchPage() {
   const { org, sales } = useSession();
   const { f: filter = "review", task, of } = useSearch({ from: "/o/$org/research" });
@@ -50,9 +49,14 @@ export function ResearchPage() {
   useEffect(() => setCursor(undefined), [filter, task, of]);
 
   // A search is for one offering, so its queue is that offering's.
-  const research = $api.useQuery("get", "/o/{org}/api/v1/research", {
-    params: { path: { org }, query: { filter, task, offering: task ? undefined : of, cursor } },
-  }, { placeholderData: keepPreviousData });
+  const research = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/research",
+    {
+      params: { path: { org }, query: { filter, task, offering: task ? undefined : of, cursor } },
+    },
+    { placeholderData: keepPreviousData },
+  );
   // The queue in view as the server has said, not one kept on screen while another loads.
   const settled = research.isPlaceholderData ? undefined : research.data;
   const offerings = useOfferings();
@@ -64,26 +68,42 @@ export function ResearchPage() {
   const enrichers = enrichersQuery.data?.items ?? [];
   const ready = (agents.data?.items ?? []).filter((a) => a.ready);
   // The same query SearchPanel makes, so the search is read once; closed searches aren't in tasks.
-  const chosenQuery = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}", { params: { path: { org, id: task ?? 0 }, query: { limit: 3 } } }, { enabled: !!task });
+  const chosenQuery = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/tasks/{id}",
+    { params: { path: { org, id: task ?? 0 }, query: { limit: 3 } } },
+    { enabled: !!task },
+  );
   const chosen = chosenQuery.data;
   // And the runs it lists, so what comes under it waits for them rather than being pushed down.
-  const chosenRuns = $api.useQuery("get", "/o/{org}/api/v1/tasks/{task}/runs", { params: { path: { org, task: task ?? 0 }, query: { limit: 3 } } }, { enabled: !!task });
+  const chosenRuns = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/tasks/{task}/runs",
+    { params: { path: { org, task: task ?? 0 }, query: { limit: 3 } } },
+    { enabled: !!task },
+  );
   // Whose queue is shown is the server's to say: what is done on it goes to that offering,
   // whether or not the list of offerings has loaded yet.
   const sellingId = research.data?.offering_id ?? (task ? (chosen?.offering_id ?? 0) : (of ?? 0));
   const selling = offerings.find((o) => o.id === sellingId);
   const label = (key: Filter, text: string) => (key === "rejected" && sellingId ? "Junked" : text);
-  const tasks = $api.useQuery("get", "/o/{org}/api/v1/tasks", { params: { path: { org }, query: { limit: 5, offering: sellingId } } }, { placeholderData: keepPreviousData });
+  const tasks = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/tasks",
+    { params: { path: { org }, query: { limit: 5, offering: sellingId } } },
+    { placeholderData: keepPreviousData },
+  );
   const searches = tasks.data?.items ?? [];
   // What sits above the queue is as tall as these make it, so it is drawn, and the queue's
   // outline under it, only once they have all come; after that, picking another search
   // changes it in place rather than taking the page away.
   const [drawn, setDrawn] = useState(false);
-  const above = drawn || (!offered.isPending && !settings.isPending && !agents.isPending && !tasks.isPending && !tasks.isPlaceholderData && (!task || !chosenQuery.isPending));
+  const above =
+    drawn ||
+    (!offered.isPending && !settings.isPending && !agents.isPending && !tasks.isPending && !tasks.isPlaceholderData && (!task || !chosenQuery.isPending));
   if (above && !drawn) setDrawn(true);
   const cardsReady = research.data && !enrichersQuery.isPending;
   const ranked = settled ? settled.ranked && settled.items.length > 0 : !research.error && !!task && filter === "review";
-
 
   return (
     <>
@@ -93,24 +113,35 @@ export function ResearchPage() {
         </h1>
         <div className="flex flex-wrap gap-2">
           <ActionButton quiet size="sm" asChild>
-            <Link to="/o/$org/agents" params={{ org }}>Connect an agent</Link>
+            <Link to="/o/$org/agents" params={{ org }}>
+              Connect an agent
+            </Link>
           </ActionButton>
           {sales && (
             <ActionButton size="sm" asChild>
-              <Link to="/o/$org/add" params={{ org }}>+ Add person</Link>
+              <Link to="/o/$org/add" params={{ org }}>
+                + Add person
+              </Link>
             </ActionButton>
           )}
         </div>
       </header>
       <p className="mb-4 max-w-[70ch] text-sm text-muted-foreground">
-        Say who you're looking for and an agent goes to find them. What agents, jobs and imports find waits here: nothing reaches
-        outreach until someone qualifies it and picks a contact. Every fact keeps the link it came from.
+        Say who you're looking for and an agent goes to find them. What agents, jobs and imports find waits here: nothing reaches outreach until someone
+        qualifies it and picks a contact. Every fact keeps the link it came from.
       </p>
 
       <Whose area="sales" work="Research is" can={sales} />
       {above && (
         <>
-          {sales && <FindBox agents={ready} offering={settled?.offering_id} selling={selling} lookingFor={selling ? selling.looking_for : (settings.data?.looking_for ?? [])} />}
+          {sales && (
+            <FindBox
+              agents={ready}
+              offering={settled?.offering_id}
+              selling={selling}
+              lookingFor={selling ? selling.looking_for : (settings.data?.looking_for ?? [])}
+            />
+          )}
 
           <div className="mb-5 flex flex-col gap-2" aria-label="Searches">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -149,12 +180,26 @@ export function ResearchPage() {
               )}
               <nav className="flex flex-wrap items-center gap-2" aria-label="Filter">
                 {filters.map((f) => (
-                  <FilterChip key={f.key} to="/o/$org/research" params={{ org }} search={{ f: f.key === "review" ? undefined : f.key, task, of }} label={label(f.key, f.label)} count={research.data && (research.data.counts[f.key] ?? 0)} on={f.key === filter} />
+                  <FilterChip
+                    key={f.key}
+                    to="/o/$org/research"
+                    params={{ org }}
+                    search={{ f: f.key === "review" ? undefined : f.key, task, of }}
+                    label={label(f.key, f.label)}
+                    count={research.data && (research.data.counts[f.key] ?? 0)}
+                    on={f.key === filter}
+                  />
                 ))}
                 {task && (
                   <span className="inline-flex items-center gap-1">
                     <Pill tone="agent">From “{chosen?.title ?? `search ${task}`}”</Pill>
-                    <Link to="/o/$org/research" params={{ org }} search={{ f: filter === "review" ? undefined : filter, of: sellingId || undefined }} className="px-1 text-sm text-muted-foreground no-underline" aria-label="Show every search">
+                    <Link
+                      to="/o/$org/research"
+                      params={{ org }}
+                      search={{ f: filter === "review" ? undefined : filter, of: sellingId || undefined }}
+                      className="px-1 text-sm text-muted-foreground no-underline"
+                      aria-label="Show every search"
+                    >
                       ×
                     </Link>
                   </span>
@@ -180,7 +225,10 @@ export function ResearchPage() {
                 </Placeholders>
               )}
               <div className="flex flex-col gap-3">
-                {cardsReady && research.data?.items.map((c, i) => <CompanyCard key={`${sellingId}-${c.id}`} company={c} open={i === 0} enrichers={enrichers} offering={research.data?.offering_id ?? 0} />)}
+                {cardsReady &&
+                  research.data?.items.map((c, i) => (
+                    <CompanyCard key={`${sellingId}-${c.id}`} company={c} open={i === 0} enrichers={enrichers} offering={research.data?.offering_id ?? 0} />
+                  ))}
               </div>
               <nav className="flex justify-between gap-3">
                 <span>
@@ -213,7 +261,17 @@ export function ResearchPage() {
 }
 
 // offering is the queue in view, undefined until the server has said which it is.
-function FindBox({ agents, offering, selling, lookingFor }: { agents: Agent[]; offering?: number; selling?: Offering; lookingFor: components["schemas"]["LookFor"][] }) {
+function FindBox({
+  agents,
+  offering,
+  selling,
+  lookingFor,
+}: {
+  agents: Agent[];
+  offering?: number;
+  selling?: Offering;
+  lookingFor: components["schemas"]["LookFor"][];
+}) {
   const { org } = useSession();
   const navigate = useNavigate();
   const refresh = useRefresh();
@@ -235,7 +293,10 @@ function FindBox({ agents, offering, selling, lookingFor }: { agents: Agent[]; o
       className="panel mb-5 overflow-hidden shadow-[4px_4px_0_var(--edge)]"
       onSubmit={(e) => {
         e.preventDefault();
-        create.mutate({ params: { path: { org } }, body: { title: "", brief, agents: send, offering: offering || undefined, want: want === "" ? undefined : Number(want) } });
+        create.mutate({
+          params: { path: { org } },
+          body: { title: "", brief, agents: send, offering: offering || undefined, want: want === "" ? undefined : Number(want) },
+        });
       }}
     >
       <div className="flex flex-col gap-2.5 px-5 py-4">
@@ -282,10 +343,7 @@ function FindBox({ agents, offering, selling, lookingFor }: { agents: Agent[]; o
                     key={a.id}
                     className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border-[1.5px] border-ink bg-card px-2.5 py-1 text-foreground"
                   >
-                    <Checkbox
-                      checked={send.includes(a.id)}
-                      onCheckedChange={(on) => setPicked(on ? [...send, a.id] : send.filter((id) => id !== a.id))}
-                    />
+                    <Checkbox checked={send.includes(a.id)} onCheckedChange={(on) => setPicked(on ? [...send, a.id] : send.filter((id) => id !== a.id))} />
                     {a.name}
                   </label>
                 ))}
@@ -357,7 +415,9 @@ function SearchStrip({ task, agents, chosen }: { task: TaskBrief; agents: Agent[
       <span className="ml-auto flex flex-wrap gap-2">
         {!chosen && (
           <ActionButton quiet size="sm" asChild>
-            <Link to="/o/$org/research" params={{ org }} search={{ task: id }}>Show these</Link>
+            <Link to="/o/$org/research" params={{ org }} search={{ task: id }}>
+              Show these
+            </Link>
           </ActionButton>
         )}
         {sales &&
@@ -505,7 +565,9 @@ function LeftOutPanel({ id }: { id: number }) {
   return (
     <Section className="gap-2.5 p-5" aria-label="Left out">
       <Eyebrow>Left out · {held + refused}</Eyebrow>
-      <p className="text-[13px] text-muted-foreground">Already here when this search came to them, or on a domain the never-contact list covers: kept, never up for review.</p>
+      <p className="text-[13px] text-muted-foreground">
+        Already here when this search came to them, or on a domain the never-contact list covers: kept, never up for review.
+      </p>
       {counts
         .filter(([, n]) => n > 0)
         .map(([label, n]) => (
@@ -554,8 +616,7 @@ function LeftOutPanel({ id }: { id: number }) {
             </div>
           )}
           <p className="text-[13px] text-muted-foreground">
-            People an agent tried to add and was refused. They can't be included, and who they were isn't kept, so one person
-            tried twice counts twice.
+            People an agent tried to add and was refused. They can't be included, and who they were isn't kept, so one person tried twice counts twice.
           </p>
         </div>
       )}
@@ -622,7 +683,10 @@ function CompanyCard({ company: c, open, enrichers, offering }: { company?: Comp
   const refresh = useRefresh();
   const [grade, setGrade] = useState(c?.grade || "B");
   const patch = $api.useMutation("patch", "/o/{org}/api/v1/companies/{id}", { onSuccess: refresh });
-  const review = { mutate: (v: { params: { path: { org: string; id: number } }; body: { stage: "review" | "qualified" | "rejected"; fit?: string } }) => patch.mutate({ ...v, body: { ...v.body, offering: offering || undefined } }) };
+  const review = {
+    mutate: (v: { params: { path: { org: string; id: number } }; body: { stage: "review" | "qualified" | "rejected"; fit?: string } }) =>
+      patch.mutate({ ...v, body: { ...v.body, offering: offering || undefined } }),
+  };
   const pick = $api.useMutation("post", "/o/{org}/api/v1/contacts/{id}/pick", { onSuccess: refresh });
   const decide = $api.useMutation("patch", "/o/{org}/api/v1/suggestions/{id}", { onSuccess: refresh });
 
@@ -702,7 +766,9 @@ function CompanyCard({ company: c, open, enrichers, offering }: { company?: Comp
         <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-2.5 font-mono text-xs text-muted-foreground hover:text-foreground">
           <span className="transition-transform group-open:rotate-90">›</span>
           <Text
-            value={c && `${c.facts.length} other ${c.facts.length === 1 ? "fact" : "facts"} · ${c.people.length} ${c.people.length === 1 ? "person" : "people"}`}
+            value={
+              c && `${c.facts.length} other ${c.facts.length === 1 ? "fact" : "facts"} · ${c.people.length} ${c.people.length === 1 ? "person" : "people"}`
+            }
             w="18ch"
           />
         </summary>
@@ -729,7 +795,11 @@ function CompanyCard({ company: c, open, enrichers, offering }: { company?: Comp
               {c.people.length === 0 && (
                 <p className="py-2 text-sm text-muted-foreground">
                   None yet.{" "}
-                  {sales && <Link to="/o/$org/add" params={{ org }} search={{ company: c.name }}>Add someone</Link>}
+                  {sales && (
+                    <Link to="/o/$org/add" params={{ org }} search={{ company: c.name }}>
+                      Add someone
+                    </Link>
+                  )}
                 </p>
               )}
               {c.people.map((p) => (
@@ -810,11 +880,7 @@ function Lookups({ person: p, enrichers }: { person: Person; enrichers: Enricher
   // The vendor each detail would go to next: the first, in order, not asked lately and with lookups left.
   const next = wanted.flatMap((field) => {
     const e = enrichers.find(
-      (e) =>
-        e.fields.includes(field) &&
-        e.has_key &&
-        e.used_this_month < e.monthly_limit &&
-        !p.lookups.some((l) => l.field === field && l.vendor === e.kind),
+      (e) => e.fields.includes(field) && e.has_key && e.used_this_month < e.monthly_limit && !p.lookups.some((l) => l.field === field && l.vendor === e.kind),
     );
     return e ? [{ field, vendor: e }] : [];
   });

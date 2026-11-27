@@ -16,8 +16,9 @@ import (
 	sqlite "github.com/glebarez/go-sqlite"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/shutthegoatup/prospector/api"
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
 // notFound is an error about something that isn't here, or isn't this organisation's.

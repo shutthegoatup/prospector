@@ -345,13 +345,13 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 	if err != nil {
 		return RunFailed, "Prospector's own tools couldn't be reached"
 	}
-	defer own.Close()
+	defer func() { _ = own.Close() }()
 	ext, tools, err := a.connectTools(ctx, run, own, cfg, key)
 	if err != nil {
 		return a.ended(ctx, run, err)
 	}
 	if ext != nil {
-		defer ext.Close()
+		defer func() { _ = ext.Close() }()
 	}
 	t := &turnState{app: a, run: run, agent: cfg, own: own, ext: ext, seen: map[string]bool{}, offered: map[string]bool{}, builtin: map[string]bool{}}
 	for _, d := range webTools(cfg) {
@@ -367,7 +367,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 			return a.ended(ctx, run, err)
 		}
 		var task TaskOut
-		json.Unmarshal([]byte(brief), &task)
+		_ = json.Unmarshal([]byte(brief), &task)
 		switch {
 		case task.ID == 0:
 			return RunFailed, "the task can't be read"
@@ -477,7 +477,7 @@ func (a *App) connectTools(ctx context.Context, run *AgentRun, own *mcp.ClientSe
 			return ext, tools, nil
 		}
 		if ext != nil {
-			ext.Close()
+			_ = ext.Close()
 		}
 		if ctx.Err() != nil || !toolsPassing(err) {
 			return nil, nil, err

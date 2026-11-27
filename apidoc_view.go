@@ -98,7 +98,7 @@ func docViewOf(doc APIDoc) docView {
 	spans := func(s string) []docSpan {
 		out := []docSpan{}
 		for _, sp := range codeSpans(s) {
-			out = append(out, docSpan{sp.Text, sp.Code})
+			out = append(out, docSpan(sp))
 		}
 		return out
 	}
@@ -115,7 +115,7 @@ func docViewOf(doc APIDoc) docView {
 		v.Intro = append(v.Intro, spans(p))
 	}
 	for _, s := range doc.Scopes {
-		v.Scopes = append(v.Scopes, docScope{s.Name, s.What, s.Owner})
+		v.Scopes = append(v.Scopes, docScope(s))
 	}
 	for _, g := range doc.Groups {
 		dg := docGroup{Name: g.Name, About: spans(g.About), Ops: []docOp{}}

@@ -464,7 +464,7 @@ func (s *Store) Runs(org int64, before time.Time, limit int) (runs []Run, titles
 		return q
 	}
 	var events []Event
-	logged(agents().Order("at desc, id desc").Limit(runsRead).Find(&events))
+	_ = logged(agents().Order("at desc, id desc").Limit(runsRead).Find(&events))
 	full := len(events) == runsRead
 	for i, j := 0, len(events)-1; i < j; i, j = i+1, j-1 {
 		events[i], events[j] = events[j], events[i]
@@ -481,7 +481,7 @@ func (s *Store) Runs(org int64, before time.Time, limit int) (runs []Run, titles
 				continue
 			}
 			var first Event
-			logged(s.in(org).Where(`key_id = ? and "user" = ? and at >= ?`, r.KeyID, r.Actor, before).Order("at, id").Limit(1).Find(&first))
+			_ = logged(s.in(org).Where(`key_id = ? and "user" = ? and at >= ?`, r.KeyID, r.Actor, before).Order("at, id").Limit(1).Find(&first))
 			cut[key] = first.At
 		}
 		runs = slices.DeleteFunc(runs, func(r Run) bool {
@@ -534,7 +534,7 @@ func (s *Store) Runs(org int64, before time.Time, limit int) (runs []Run, titles
 	titles = map[int64]string{}
 	if len(ids) > 0 {
 		var tasks []Task
-		logged(s.in(org).Where("id in ?", ids).Find(&tasks))
+		_ = logged(s.in(org).Where("id in ?", ids).Find(&tasks))
 		for _, t := range tasks {
 			titles[t.ID] = t.Title
 		}

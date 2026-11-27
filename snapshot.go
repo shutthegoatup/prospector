@@ -232,7 +232,7 @@ func (s *Store) ImportLegacy(org int64, path string) (int, error) {
 		return 0, err
 	}
 	if sqlDB, err := old.DB(); err == nil {
-		defer sqlDB.Close()
+		defer func() { _ = sqlDB.Close() }()
 	}
 	var records []map[string]any
 	if err := old.Table("contacts").Order("id").Find(&records).Error; err != nil {

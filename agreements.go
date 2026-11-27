@@ -215,8 +215,7 @@ func (s *Store) PutAgreementFile(org, id int64, name string, data []byte, actor 
 
 // AgreementFile is a document's bytes, checked against the hash it was kept with.
 func (s *Store) AgreementDocument(org, id int64) (*Agreement, []byte, error) {
-	a, err := s.Agreement(org, id)
-	if err != nil {
+	if _, err := s.Agreement(org, id); err != nil {
 		return nil, nil, err
 	}
 	// The record and its file in one statement, so a replacement committing between two

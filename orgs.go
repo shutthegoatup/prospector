@@ -377,7 +377,7 @@ var errWrongLogin = errors.New("wrong email or password")
 func (s *Store) Login(email, password string) (string, *User, error) {
 	u, err := s.UserByEmail(email)
 	if err != nil {
-		bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
+		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
 		// An address the database won't even compare, such as one holding a NUL, is no
 		// account's. Any other failed look-up says nothing about the password.
 		if !errors.Is(err, gorm.ErrRecordNotFound) && !unstorable(err) {
@@ -387,7 +387,7 @@ func (s *Store) Login(email, password string) (string, *User, error) {
 	}
 	// An account with no password takes as long to refuse as any other.
 	if !u.HasPassword() {
-		bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
+		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
 		return "", nil, errWrongLogin
 	}
 	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
@@ -552,7 +552,7 @@ func (s *Store) KeyFor(secret string) (*APIKey, error) {
 	if s.keys.lookupBehind(k.Hash) {
 		set["hash"] = s.keys.lookup(apiKeys, secret)
 	}
-	logged(s.db.Model(&k).Updates(set))
+	_ = logged(s.db.Model(&k).Updates(set))
 	return &k, nil
 }
 

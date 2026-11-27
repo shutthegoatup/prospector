@@ -61,15 +61,32 @@ const campaigns = createRoute({ getParentRoute: () => org, path: "campaigns", co
 const tasks = createRoute({ getParentRoute: () => org, path: "tasks", validateSearch: tasksSearch, component: page("Tasks", "TasksPage") });
 const task = createRoute({ getParentRoute: () => org, path: "tasks/$id", params: idParams, errorComponent: NotFound, component: page("Task", "TaskPage") });
 const companies = createRoute({ getParentRoute: () => org, path: "companies", validateSearch: companiesSearch, component: page("Companies", "CompaniesPage") });
-const company = createRoute({ getParentRoute: () => org, path: "companies/$id", params: idParams, errorComponent: NotFound, component: page("Company", "CompanyPage") });
+const company = createRoute({
+  getParentRoute: () => org,
+  path: "companies/$id",
+  params: idParams,
+  errorComponent: NotFound,
+  component: page("Company", "CompanyPage"),
+});
 const settings = createRoute({ getParentRoute: () => org, path: "settings", component: page("Settings", "SettingsPage") });
 const agents = createRoute({ getParentRoute: () => org, path: "agents", component: page("Agents", "AgentsPage") });
-const prepare = createRoute({ getParentRoute: () => org, path: "agreements/$id/prepare", params: idParams, errorComponent: NotFound, component: page("Prepare", "PreparePage") });
+const prepare = createRoute({
+  getParentRoute: () => org,
+  path: "agreements/$id/prepare",
+  params: idParams,
+  errorComponent: NotFound,
+  component: page("Prepare", "PreparePage"),
+});
 const add = createRoute({ getParentRoute: () => org, path: "add", validateSearch: addSearch, component: page("Add", "AddPage") });
 
 // Signing in, outside any organisation and its sidebar.
 const signIn = createRoute({ getParentRoute: () => root, path: "login", validateSearch: signInSearch, component: page("SignIn", "SignInPage") });
-const singleSignOn = createRoute({ getParentRoute: () => root, path: "login/sso", validateSearch: singleSignOnSearch, component: page("SignIn", "SingleSignOnPage") });
+const singleSignOn = createRoute({
+  getParentRoute: () => root,
+  path: "login/sso",
+  validateSearch: singleSignOnSearch,
+  component: page("SignIn", "SingleSignOnPage"),
+});
 const forgot = createRoute({ getParentRoute: () => root, path: "forgot", component: page("SignIn", "ForgotPage") });
 const reset = createRoute({ getParentRoute: () => root, path: "reset/$token", component: page("SignIn", "ResetPage") });
 const choosePassword = createRoute({ getParentRoute: () => root, path: "password", component: page("SignIn", "ChoosePasswordPage") });
@@ -80,7 +97,23 @@ const routeTree = root.addChildren([
   forgot,
   reset,
   choosePassword,
-  org.addChildren([today, research, conversations, enquiries, onboarding, subscriptions, campaigns, tasks, task, companies, company, prepare, settings, agents, add]),
+  org.addChildren([
+    today,
+    research,
+    conversations,
+    enquiries,
+    onboarding,
+    subscriptions,
+    campaigns,
+    tasks,
+    task,
+    companies,
+    company,
+    prepare,
+    settings,
+    agents,
+    add,
+  ]),
 ]);
 
 export const router = createRouter({ routeTree, scrollRestoration: true, parseSearch, stringifySearch, defaultPreload: "intent" });

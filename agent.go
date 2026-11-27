@@ -840,7 +840,7 @@ func (s *Store) AgentScores(org int64) []AgentScore {
 		FoundBy, Stage string
 		N              int
 	}
-	logged(s.db.Raw(`select found_by, stage, count(*) as n from companies
+	_ = logged(s.db.Raw(`select found_by, stage, count(*) as n from companies
 		where org_id = ? and found_by like 'agent:%' group by found_by, stage`, org).Scan(&companies))
 	for _, r := range companies {
 		a := get(r.FoundBy)
@@ -856,7 +856,7 @@ func (s *Store) AgentScores(org int64) []AgentScore {
 		Actor                     string
 		Contacts, Picked, Replied int
 	}
-	logged(s.db.Raw(`select e."user" as actor, count(*) as contacts,
+	_ = logged(s.db.Raw(`select e."user" as actor, count(*) as contacts,
 		sum(case when exists (select 1 from events p where p.org_id = e.org_id and p.contact_id = e.contact_id and p.action = 'pick') then 1 else 0 end) as picked,
 		sum(case when c.replied is not null then 1 else 0 end) as replied
 		from events e join contacts c on c.id = e.contact_id
@@ -898,7 +898,7 @@ func (s *Store) AgentMarks(org int64, ids []int64) map[int64]map[string]string {
 		return out
 	}
 	var events []Event
-	logged(s.in(org).Where("contact_id in ? and action like 'mark:%'", ids).Order("at, id").Find(&events))
+	_ = logged(s.in(org).Where("contact_id in ? and action like 'mark:%'", ids).Order("at, id").Find(&events))
 	for _, e := range events {
 		step := strings.TrimPrefix(e.Action, "mark:")
 		if out[e.ContactID] == nil {
