@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // Every list in the spec comes a page at a time, the same way: a list operation added
@@ -82,10 +83,10 @@ func TestAListLeftWholeComesOutAPageAtATime(t *testing.T) {
 	if page, next, err := listPage(all, 0, ""); err != nil || len(page) != 5 || next != "" {
 		t.Fatalf("a list that fits the usual page: %v %q %v", page, next, err)
 	}
-	if _, _, err := listPage(all, 2, "nonsense"); err != errCursor {
+	if _, _, err := listPage(all, 2, "nonsense"); err != paging.ErrCursor {
 		t.Fatalf("a made-up cursor: %v", err)
 	}
-	if page, next, _ := listPage(all, 2, cursorOf(99)); len(page) != 0 || next != "" {
+	if page, next, _ := listPage(all, 2, paging.Cursor(99)); len(page) != 0 || next != "" {
 		t.Fatalf("a cursor past the end: %v %q", page, next)
 	}
 }

@@ -6,6 +6,8 @@ import (
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // Suppress puts an address on the list. Asking twice changes nothing, and an address
@@ -69,12 +71,12 @@ func (s *Store) Unsuppress(org, id int64, actor string) error {
 }
 
 // Suppressions are the list, newest first, a page at a time.
-func (s *Store) Suppressions(org int64, page PageIn) ([]Suppression, string, error) {
-	at, err := page.at(1)
+func (s *Store) Suppressions(org int64, page paging.Page) ([]Suppression, string, error) {
+	at, err := page.At(1)
 	if err != nil {
 		return nil, "", err
 	}
-	if at[0] == noneBefore {
+	if at[0] == paging.NoneBefore {
 		return []Suppression{}, "", nil
 	}
 	q := s.in(org)
@@ -82,14 +84,14 @@ func (s *Store) Suppressions(org int64, page PageIn) ([]Suppression, string, err
 		q = q.Where("id < ?", at[0])
 	}
 	rows := []Suppression{}
-	if err := q.Order("id desc").Limit(page.size() + 1).Find(&rows).Error; err != nil {
+	if err := q.Order("id desc").Limit(page.Size() + 1).Find(&rows).Error; err != nil {
 		return nil, "", err
 	}
-	if len(rows) <= page.size() {
+	if len(rows) <= page.Size() {
 		return rows, "", nil
 	}
-	rows = rows[:page.size()]
-	return rows, cursorOf(rows[len(rows)-1].ID), nil
+	rows = rows[:page.Size()]
+	return rows, paging.Cursor(rows[len(rows)-1].ID), nil
 }
 
 // marketable says why marketing mail can't go to an address, or nil when it can: it

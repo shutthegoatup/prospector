@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func dueNames(t *testing.T, s *Store, o *Org) map[string]bool {
@@ -68,7 +69,7 @@ func TestACompanyIsJudgedForEachOfferingOnItsOwn(t *testing.T) {
 	if err := s.in(o.ID).Model(&Event{}).Where("company_id = ? and action like 'company:%'", company).Count(&own).Error; err != nil || own != 0 {
 		t.Fatalf("a verdict for an offering was logged as the company's own: %d %v", own, err)
 	}
-	detail := must(s.AgentCompany(o.ID, Actor{Name: "agent:robot"}, "Northwind Payments", PageIn{}))
+	detail := must(s.AgentCompany(o.ID, Actor{Name: "agent:robot"}, "Northwind Payments", paging.Page{}))
 	raw, _ := json.Marshal(detail)
 	if said := string(raw); strings.Contains(said, `"company:rejected"`) || !strings.Contains(said, `"verdict:rejected"`) {
 		t.Fatalf("what an agent is told about the company: %s", said)

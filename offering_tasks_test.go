@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func TestATaskFindsCompaniesForItsOffering(t *testing.T) {
@@ -55,7 +56,7 @@ func TestATaskFindsCompaniesForItsOffering(t *testing.T) {
 		t.Fatalf("adding a company rejected for this offering again should say so: %+v", out)
 	}
 
-	view := must(s.AgentTask(o.ID, scout, task.Id, PageIn{}))
+	view := must(s.AgentTask(o.ID, scout, task.Id, paging.Page{}))
 	if view.Offering == nil || view.Offering.Name != "Interim CTO" || !strings.Contains(view.Offering.Guidance, "trigger") {
 		t.Fatalf("an agent should be told what the task is for and what to look for: %+v", view.Offering)
 	}
@@ -67,13 +68,13 @@ func TestATaskFindsCompaniesForItsOffering(t *testing.T) {
 		t.Fatalf("a task's companies should stand as they do for its offering: %v", stages)
 	}
 
-	detail := must(s.AgentCompany(o.ID, scout, "Northwind Payments", PageIn{}))
+	detail := must(s.AgentCompany(o.ID, scout, "Northwind Payments", paging.Page{}))
 	if len(detail.Standing) != 1 || detail.Standing[0].Offering != "Interim CTO" || detail.Standing[0].Reason != "CTO hired in September" {
 		t.Fatalf("an agent reading the company should see where it stands for each offering: %+v", detail.Standing)
 	}
 
 	own := must(s.CreateTask(o.ID, "", "Find more like Larkmoor", "Ada"))
-	if v := must(s.AgentTask(o.ID, scout, own.ID, PageIn{})); v.Offering != nil {
+	if v := must(s.AgentTask(o.ID, scout, own.ID, paging.Page{})); v.Offering != nil {
 		t.Fatalf("a task for the organisation's own offering names none: %+v", v.Offering)
 	}
 
@@ -91,7 +92,7 @@ func TestATaskFindsCompaniesForItsOffering(t *testing.T) {
 	if err := s.RemoveOffering(o.ID, cto.ID, "Ada"); err != nil {
 		t.Fatalf("removing it once its tasks are closed: %v", err)
 	}
-	if v, err := s.AgentTask(o.ID, scout, task.Id, PageIn{}); err != nil || v.Offering != nil {
+	if v, err := s.AgentTask(o.ID, scout, task.Id, paging.Page{}); err != nil || v.Offering != nil {
 		t.Fatalf("a closed task whose offering was removed should still read: %+v %v", v, err)
 	}
 	if err := s.SetTaskClosed(o.ID, task.Id, false, "Ada"); err == nil || !strings.Contains(err.Error(), "removed") {

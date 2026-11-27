@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
@@ -29,7 +31,7 @@ func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
 	if got.Claimed != 0 || got.Requests[0].HeldBy != "agent:scout" || got.Requests[0].Yours || got.Requests[0].Until == nil {
 		t.Fatalf("the second agent should see the brief is the first's: %+v", got)
 	}
-	if list := must(firstOf(s.AgentTasks(o.ID, second, PageIn{}))); list[0].Status != TaskWorking || list[0].Open[0].HeldBy != "agent:scout" {
+	if list := must(firstOf(s.AgentTasks(o.ID, second, paging.Page{}))); list[0].Status != TaskWorking || list[0].Open[0].HeldBy != "agent:scout" {
 		t.Fatalf("list_tasks should say who holds the brief: %+v", list[0])
 	}
 

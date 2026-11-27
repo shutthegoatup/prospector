@@ -11,6 +11,8 @@ import (
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 var (
@@ -415,7 +417,7 @@ func (s *Store) rankedRows(org, offering int64, set OrgSettings, task int64) ([]
 
 // ResearchList is a page of the Research queue for the API: the rows the page shows, in
 // its order, with a cursor rather than a page number.
-func (s *Store) ResearchList(org, offering int64, set OrgSettings, filter string, task int64, in PageIn) ([]ResearchRow, bool, string, error) {
+func (s *Store) ResearchList(org, offering int64, set OrgSettings, filter string, task int64, in paging.Page) ([]ResearchRow, bool, string, error) {
 	switch {
 	case filter == "review" && task != 0:
 		rows, ranked, err := s.rankedRows(org, offering, set, task)
@@ -434,7 +436,7 @@ func (s *Store) ResearchList(org, offering int64, set OrgSettings, filter string
 		page, next, err := listPage(rows, in.Limit, in.Cursor)
 		return page, false, next, err
 	}
-	at, err := in.at(1)
+	at, err := in.At(1)
 	if err != nil {
 		return nil, false, "", err
 	}
@@ -443,12 +445,12 @@ func (s *Store) ResearchList(org, offering int64, set OrgSettings, filter string
 		return nil, false, "", err
 	}
 	var companies []Company
-	if err := q.Order(order).Limit(in.size() + 1).Offset(int(at[0])).Find(&companies).Error; err != nil {
+	if err := q.Order(order).Limit(in.Size() + 1).Offset(int(at[0])).Find(&companies).Error; err != nil {
 		return nil, false, "", err
 	}
 	next := ""
-	if len(companies) > in.size() {
-		companies, next = companies[:in.size()], cursorOf(at[0]+int64(in.size()))
+	if len(companies) > in.Size() {
+		companies, next = companies[:in.Size()], paging.Cursor(at[0]+int64(in.Size()))
 	}
 	rows, err := s.researchRows(org, companies)
 	return rows, false, next, err
@@ -675,8 +677,8 @@ func (s *Store) Companies(org int64, q, segment, stage string, page int) ([]Comp
 }
 
 // CompaniesList is a page of the Companies list for the API, with how many match in all.
-func (s *Store) CompaniesList(org int64, q, segment, stage string, in PageIn) ([]CompanyListRow, int, string, error) {
-	at, err := in.at(1)
+func (s *Store) CompaniesList(org int64, q, segment, stage string, in paging.Page) ([]CompanyListRow, int, string, error) {
+	at, err := in.At(1)
 	if err != nil {
 		return nil, 0, "", err
 	}
@@ -685,10 +687,10 @@ func (s *Store) CompaniesList(org int64, q, segment, stage string, in PageIn) ([
 	if err := db.Session(&gorm.Session{}).Count(&total).Error; err != nil {
 		return nil, 0, "", err
 	}
-	rows, err := s.companyRows(db, people, int(at[0]), in.size())
+	rows, err := s.companyRows(db, people, int(at[0]), in.Size())
 	next := ""
-	if end := at[0] + int64(in.size()); end < total {
-		next = cursorOf(end)
+	if end := at[0] + int64(in.Size()); end < total {
+		next = paging.Cursor(end)
 	}
 	return rows, int(total), next, err
 }

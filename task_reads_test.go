@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // The task reads moved into the spec answer exactly what the store says, which is what
@@ -45,7 +47,7 @@ func TestTheSpecsTaskReadsSayEverythingTheStoreDoes(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("the scout reading the task: %d %s", code, body)
 	}
-	direct := must(s.AgentTask(o.ID, scout, task.ID, PageIn{}))
+	direct := must(s.AgentTask(o.ID, scout, task.ID, paging.Page{}))
 	sameJSON(t, "the task", body, direct)
 	for _, want := range []string{`"held_by"`, `"held_until"`, `"yours":true`, `"done_by"`, `"added_since"`, `"by_you":true`, `"title":"Head of Marketing"`, `"last_agent":"agent:other"`} {
 		if !strings.Contains(body, want) {
@@ -59,7 +61,7 @@ func TestTheSpecsTaskReadsSayEverythingTheStoreDoes(t *testing.T) {
 	}
 	var list struct{ Items json.RawMessage }
 	json.Unmarshal([]byte(body), &list)
-	briefs, _, err := s.AgentTasks(o.ID, scout, PageIn{})
+	briefs, _, err := s.AgentTasks(o.ID, scout, paging.Page{})
 	if err != nil {
 		t.Fatal(err)
 	}
