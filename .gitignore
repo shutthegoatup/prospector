@@ -22,3 +22,7 @@ node_modules/
 /assets/js/
 # Compiled from web/lang by the web build.
 /web/src/lang/
+# Written by npm run a11y in web/.
+/web/a11y/.signed-in.json
+/web/test-results/
+/web/playwright-report/

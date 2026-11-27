@@ -22,6 +22,7 @@
     "react/react-in-jsx-scope": "off",
     "jsx-a11y/label-has-associated-control": ["error", { "controlComponents": ["Input", "Textarea", "Checkbox", "Field", "Choice"], "depth": 4 }],
     "jsx-a11y/prefer-tag-over-role": "off",
+    "jsx-a11y/no-noninteractive-tabindex": ["error", { "roles": ["tabpanel", "region"] }],
     "formatjs/enforce-id": ["error", { "idInterpolationPattern": "[sha512:contenthash:base64:6]" }],
     "formatjs/enforce-description": ["error", "literal"],
     "formatjs/enforce-default-message": ["error", "literal"],

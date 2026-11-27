@@ -11,6 +11,7 @@
     "lint": "oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
+    "a11y": "playwright test",
     "lint:api": "spectral lint ../api/openapi.yaml --ruleset ../api/.spectral.yaml"
   },
   "dependencies": {
@@ -30,7 +31,9 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@formatjs/cli": "6.16.36",
+    "@playwright/test": "1.65.1",
     "@stoplight/spectral-cli": "6.17.1",
     "@types/node": "26.6.11",
     "@types/react": "19.3.3",
