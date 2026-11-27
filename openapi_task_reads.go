@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
@@ -15,18 +14,6 @@ func worker(q *Req) Actor {
 		return q.Agent()
 	}
 	return Actor{Name: q.Actor(), ReadOnly: true}
-}
-
-// recast carries what the store answers into the spec's type of the same JSON, so the
-// API says exactly what these routes always have; a field the spec lacks is caught by
-// the test that compares the two.
-func recast[T any](v any) (T, error) {
-	var out T
-	raw, err := json.Marshal(v)
-	if err == nil {
-		err = json.Unmarshal(raw, &out)
-	}
-	return out, err
 }
 
 func (s apiServer) ListTasks(ctx context.Context, in api.ListTasksRequestObject) (api.ListTasksResponseObject, error) {

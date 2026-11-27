@@ -24,11 +24,15 @@ type apiServer struct {
 	ticketsAPI
 	onboardingAPI
 	marketingAPI
+	crmAPI
+	privacyAPI
 }
 
 // newAPIServer hands each product's operations the part of the store they use.
 func newAPIServer(a *App) apiServer {
 	return apiServer{a: a,
+		privacyAPI:    privacyAPI{Store: &a.s.privacyStore},
+		crmAPI:        crmAPI{Records: &a.s.crmStore},
 		signingAPI:    signingAPI{Store: &a.s.agreementStore},
 		ticketsAPI:    ticketsAPI{Enquiries: &a.s.enquiryStore, Mail: a},
 		onboardingAPI: onboardingAPI{Steps: &a.s.onboardingStore, Customers: &a.s.customerStore, App: a},
