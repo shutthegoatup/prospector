@@ -101,7 +101,6 @@ type SSO = store.SSO
 type core = store.Core
 type idpSpec = store.IdpSpec
 type keyring = store.Keyring
-type mailDNS = store.MailDNS
 type purpose = store.Purpose
 type secretKey = store.SecretKey
 
@@ -142,7 +141,6 @@ var builtinKeyName = store.BuiltinKeyName
 var companyName = store.CompanyName
 var emailRe = store.EmailRe
 var errErased = store.ErrErased
-var errNeverContact = store.ErrNeverContact
 var identifiers = store.Identifiers
 var openTask = store.OpenTask
 var personKey = store.PersonKey

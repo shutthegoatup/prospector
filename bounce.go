@@ -7,9 +7,6 @@ import (
 	"net/http"
 )
 
-// bounceBy is who a bounced address is put on the list by.
-const bounceBy = "Postmark"
-
 // postmarkBounce is the part of Postmark's bounce and spam complaint webhooks that is used.
 type postmarkBounce struct {
 	RecordType string `json:"RecordType"`
