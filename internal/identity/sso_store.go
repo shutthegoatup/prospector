@@ -8,6 +8,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -62,12 +63,12 @@ func (s *SsoStore) AddSSODomain(org int64, domain string) (*store.SSODomain, err
 		return nil, err
 	}
 	if n >= maxSSODomains {
-		return nil, fmt.Errorf("an organisation can have %d domains", maxSSODomains)
+		return nil, say.Errorf("an organisation can have %d domains", maxSSODomains)
 	}
 	d := &store.SSODomain{OrgID: org, Domain: domain, Token: store.RandomToken(20)}
 	if err := s.DB.Create(d).Error; err != nil {
 		if store.BreaksRule(err) {
-			err = store.Conflict(domain + " is already listed")
+			err = store.Conflict{Text: say.Errorf("%s is already listed", domain)}
 		}
 		return nil, err
 	}
@@ -80,7 +81,7 @@ func (s *SsoStore) SSODomain(org int64, domain string) (*store.SSODomain, error)
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}
-		return nil, errors.New("that domain isn't listed")
+		return nil, say.New("that domain isn't listed")
 	}
 	return &d, nil
 }

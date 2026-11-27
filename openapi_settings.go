@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"reflect"
 	"slices"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func settingsOut(o *Org) api.Settings {
@@ -30,7 +30,7 @@ func (s apiServer) GetSettings(ctx context.Context, _ api.GetSettingsRequestObje
 
 func (s apiServer) ChangeSettings(ctx context.Context, in api.ChangeSettingsRequestObject) (api.ChangeSettingsResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send what changes, such as {\"enquiry_sites\": \"https://www.example.com\"}")
+		return nil, say.New("send what changes, such as {\"enquiry_sites\": \"https://www.example.com\"}")
 	}
 	q := reqFrom(ctx)
 	// Read afresh, so what this leaves out is what is saved now rather than what the
@@ -109,10 +109,10 @@ func settingsDiff(a, b api.Settings) []string {
 func checkOrg(o *Org) error {
 	set := &o.Settings
 	if o.Name = strings.TrimSpace(o.Name); o.Name == "" {
-		return errors.New("the organisation needs a name")
+		return say.New("the organisation needs a name")
 	}
 	if set.EmailAfterDays < 0 || set.FollowupAfterDays < 0 || set.EmailAfterDays > 60 || set.FollowupAfterDays > 60 {
-		return errors.New("waits are between 0 and 60 days")
+		return say.New("waits are between 0 and 60 days")
 	}
 	if _, err := enquiryOrigins(set.EnquirySites); err != nil {
 		return err
@@ -124,10 +124,10 @@ func checkOrg(o *Org) error {
 		return err
 	}
 	if utf8.RuneCountInString(set.PostalAddress) > 300 {
-		return errors.New("a postal address is 300 characters at most")
+		return say.New("a postal address is 300 characters at most")
 	}
 	if set.Currency = strings.ToUpper(strings.TrimSpace(set.Currency)); set.Currency != "" && !currencyRe.MatchString(set.Currency) {
-		return errors.New("a currency is three letters, such as GBP, EUR or USD")
+		return say.New("a currency is three letters, such as GBP, EUR or USD")
 	}
 	return nil
 }

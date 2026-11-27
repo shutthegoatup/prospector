@@ -5,6 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -12,13 +13,13 @@ const (
 	maxSSODomains = 20
 )
 
-var ErrNoAccount = errors.New("there's no account here for that address: ask whoever runs your organisation to add you")
+var ErrNoAccount = say.New("there's no account here for that address: ask whoever runs your organisation to add you")
 
-var ErrUnvouched = errors.New("the provider didn't confirm that address is yours, so it can't be matched to an account here")
+var ErrUnvouched = say.New("the provider didn't confirm that address is yours, so it can't be matched to an account here")
 
-var ErrElsewhere = errors.New("that sign-in is linked to an account whose address isn't at this organisation's domains")
+var ErrElsewhere = say.New("that sign-in is linked to an account whose address isn't at this organisation's domains")
 
-var ErrNotMember = errors.New("you aren't a member of that organisation: ask one of its owners to add you")
+var ErrNotMember = say.New("you aren't a member of that organisation: ask one of its owners to add you")
 
 // resolve finds whose sign-in a provider's answer is. A link made before wins; an
 // address makes a new one only when byEmail says the provider may speak for it.

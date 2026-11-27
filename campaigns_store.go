@@ -1,12 +1,12 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"sort"
 	"strings"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // outreachStore is the outreach area's queries: campaigns, sending them, bounces and whether a domain takes mail.
@@ -55,7 +55,7 @@ func (s *outreachStore) ChangeCampaign(org, id int64, changes []Change, actor st
 			return missing(err, "no campaign %d", id)
 		}
 		if c.Status != CampaignDraft {
-			return errors.New("only a draft can be changed")
+			return say.New("only a draft can be changed")
 		}
 		updates := map[string]any{"updated_by": actor}
 		after := c
@@ -85,7 +85,7 @@ func (s *outreachStore) ChangeCampaign(org, id int64, changes []Change, actor st
 			return res.Error
 		}
 		if res.RowsAffected == 0 {
-			return errors.New("only a draft can be changed")
+			return say.New("only a draft can be changed")
 		}
 		return tx.Where("org_id = ? and id = ?", org, id).First(&c).Error
 	})
@@ -105,7 +105,7 @@ func (s *outreachStore) RemoveCampaign(org, id int64) error {
 		if n == 0 {
 			return noSuch("no campaign %d", id)
 		}
-		return errors.New("only a draft can be removed; one that went is kept as a record of what was sent")
+		return say.New("only a draft can be removed; one that went is kept as a record of what was sent")
 	}
 	return nil
 }
@@ -160,7 +160,7 @@ func (s *outreachStore) audience(o *Org, c Campaign, w *audienceWork) ([]Recipie
 		}
 		q = q.Where("company_id in ?", companies)
 	default:
-		return nil, fmt.Errorf("a campaign goes to %q or %q", AudienceConversations, AudienceCustomers)
+		return nil, say.Errorf("a campaign goes to %q or %q", AudienceConversations, AudienceCustomers)
 	}
 	var people []Contact
 	if err := q.Order("id").Find(&people).Error; err != nil {

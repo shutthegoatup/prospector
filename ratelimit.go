@@ -10,6 +10,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // A token bucket per caller: a burst of requests goes straight through, after which they
@@ -91,6 +92,6 @@ func (a *App) limited(w http.ResponseWriter, r *http.Request, who string, limit 
 		return true
 	}
 	seconds := int(math.Ceil(wait.Seconds()))
-	apiFail(w, r, typed{http.StatusTooManyRequests, api.ProblemTypeThrottled, "too many requests: try again in " + plural(seconds, "second"), seconds})
+	apiFail(w, r, typed{http.StatusTooManyRequests, api.ProblemTypeThrottled, say.Errorf("too many requests: try again in %d seconds", seconds), seconds})
 	return false
 }

@@ -14,6 +14,7 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/tz"
 )
 
@@ -40,7 +41,7 @@ func (s *researchStore) CreateTaskFor(org, offering int64, title, brief, by stri
 // CreateTaskWanting is CreateTaskFor asking for about want companies.
 func (s *researchStore) CreateTaskWanting(org, offering int64, want int, title, brief, by string) (*Task, error) {
 	if want < 0 || want > maxWant {
-		return nil, fmt.Errorf("ask for between 1 and %d companies, or leave the number out", maxWant)
+		return nil, say.Errorf("ask for between 1 and %d companies, or leave the number out", maxWant)
 	}
 	brief, err := words(brief, maxBrief, "the brief")
 	if err != nil {
@@ -83,7 +84,7 @@ func (s *researchStore) OnTask(org int64, who Actor, task int64) (Actor, error) 
 	if _, err := s.offeringOf(org, t.OfferingID); err != nil {
 		var gone notFound
 		if errors.As(err, &gone) {
-			return who, conflict(fmt.Sprintf("the offering task %d was finding companies for has been removed: stop, and leave a note saying so", task))
+			return who, conflict{Text: say.Errorf("the offering task %d was finding companies for has been removed: stop, and leave a note saying so", task)}
 		}
 		return who, err
 	}
@@ -195,7 +196,7 @@ func (s *researchStore) SetTaskClosed(org, task int64, closed bool, by string) e
 			if _, err := heldOffering(tx, org, t.OfferingID); err != nil {
 				var gone notFound
 				if errors.As(err, &gone) {
-					return conflict("the offering this task was finding companies for has been removed: start a new task instead")
+					return conflict{Text: say.New("the offering this task was finding companies for has been removed: start a new task instead")}
 				}
 				return err
 			}
@@ -769,10 +770,10 @@ func (s *researchStore) AgentNote(org int64, who Actor, in NoteIn) (*TaskNote, e
 		return nil, err
 	}
 	if noteKindLabel(in.Kind) == in.Kind {
-		return nil, fmt.Errorf("kind is skipped, dead_end or next, not %q", in.Kind)
+		return nil, say.Errorf("kind is skipped, dead_end or next, not %q", in.Kind)
 	}
 	if in.Task == 0 && strings.TrimSpace(in.Company) == "" {
-		return nil, errors.New("a note is about a task, a company or both")
+		return nil, say.New("a note is about a task, a company or both")
 	}
 	if who, err = s.OnTask(org, who, in.Task); err != nil {
 		return nil, err
@@ -909,7 +910,7 @@ func (s *researchStore) ChangeOffering(org, id int64, change func(*Offering), ac
 				return err
 			}
 			if n > 0 {
-				return conflict(fmt.Sprintf("%s has %d roles, so it keeps them", o.Name, n))
+				return conflict{Text: say.Errorf("%s has %d roles, so it keeps them", o.Name, n)}
 			}
 		}
 		if err := nameFree(tx, org, o.ID, o.Name); err != nil {
@@ -946,7 +947,7 @@ func (s *researchStore) RemoveOffering(org, id int64, actor string) error {
 			return err
 		}
 		if open > 0 {
-			return conflict(fmt.Sprintf("%d open tasks are finding companies for %s: close them first", open, o.Name))
+			return conflict{Text: say.Errorf("%d open tasks are finding companies for %s: close them first", open, o.Name)}
 		}
 		if err := tx.Where("org_id = ? and offering_id = ?", org, id).Delete(&Verdict{}).Error; err != nil {
 			return err
@@ -969,12 +970,12 @@ func (s *researchStore) RemoveOffering(org, id int64, actor string) error {
 func (s *researchStore) JudgeCompany(org, offering, company int64, stage, fit, reason, actor string) error {
 	if offering == 0 {
 		if strings.TrimSpace(reason) != "" {
-			return errors.New("a reason is kept with a verdict for an offering; for the organisation's own, say why in fit")
+			return say.New("a reason is kept with a verdict for an offering; for the organisation's own, say why in fit")
 		}
 		return s.prospecting.SetCompanyStage(org, company, stage, fit, actor)
 	}
 	if stage != CompanyQualified && stage != CompanyRejected && stage != CompanyReview {
-		return fmt.Errorf("unknown stage %q", stage)
+		return say.Errorf("unknown stage %q", stage)
 	}
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		o, err := heldOffering(tx, org, offering)
@@ -990,7 +991,7 @@ func (s *researchStore) JudgeCompany(org, offering, company int64, stage, fit, r
 		}
 		if byRoles, err := judgedByRoles(tx, org, o, company); err != nil || byRoles {
 			if byRoles {
-				return conflict(fmt.Sprintf("this company has roles for %s, and where it stands follows them: pursue or junk its roles", o.Name))
+				return conflict{Text: say.Errorf("this company has roles for %s, and where it stands follows them: pursue or junk its roles", o.Name)}
 			}
 			return err
 		}
@@ -1096,7 +1097,7 @@ func (s *researchStore) Judged(org, offering int64, stage string) ([]VerdictRow,
 func (s *researchStore) addRole(tx *gorm.DB, org int64, o *Offering, company int64, in RoleIn, who Actor) (*Role, bool, error) {
 	if had, err := sameRole(tx, org, o.ID, company, in); err != nil || had != nil {
 		if had != nil && had.Stage == RoleJunked {
-			return had, true, conflict(junkedSaid(*had))
+			return had, true, conflict{Text: junkedSaid(*had)}
 		}
 		return had, true, err
 	}
@@ -1108,11 +1109,10 @@ func (s *researchStore) addRole(tx *gorm.DB, org int64, o *Offering, company int
 		return nil, false, err
 	}
 	if v.Stage == CompanyRejected && v.Reason != everyRoleJunked {
-		said := fmt.Sprintf("%s rejected this company for %s", v.By, o.Name)
 		if v.Reason != "" {
-			said += ": " + v.Reason
+			return nil, false, conflict{Text: say.Errorf("%s rejected this company for %s: %s. Don't add its roles", v.By, o.Name, v.Reason)}
 		}
-		return nil, false, conflict(said + ". Don't add its roles")
+		return nil, false, conflict{Text: say.Errorf("%s rejected this company for %s. Don't add its roles", v.By, o.Name)}
 	}
 	r := Role{OrgID: org, OfferingID: o.ID, CompanyID: company, Title: in.Title, URL: in.SourceURL, Details: in.Details,
 		Stage: RoleReview, FoundBy: who.Name, TaskID: who.Task}
@@ -1188,7 +1188,7 @@ func (s *researchStore) AddRole(org, offering, company int64, in RoleIn, actor s
 			return err
 		}
 		if had {
-			return conflict(fmt.Sprintf("%s already has this role, as role %d", o.Name, r.ID))
+			return conflict{Text: say.Errorf("%s already has this role, as role %d", o.Name, r.ID)}
 		}
 		return nil
 	})
@@ -1207,7 +1207,7 @@ func (s *researchStore) companyIn(tx *gorm.DB, org, id int64) (*Company, error) 
 // company's verdict for its offering into line.
 func (s *researchStore) JudgeRole(org, id int64, stage, reason, actor string) (*Role, error) {
 	if stage != RoleReview && stage != RolePursued && stage != RoleJunked {
-		return nil, fmt.Errorf("unknown stage %q: review, pursued or junked", stage)
+		return nil, say.Errorf("unknown stage %q: review, pursued or junked", stage)
 	}
 	reason = strings.TrimSpace(reason)
 	var r Role
@@ -1216,7 +1216,7 @@ func (s *researchStore) JudgeRole(org, id int64, stage, reason, actor string) (*
 			return missing(err, "no role %d", id)
 		}
 		if stage != RoleJunked && reason != "" {
-			return errors.New("a reason is kept only for a junked role")
+			return say.New("a reason is kept only for a junked role")
 		}
 		if err := hold(tx, &Company{}, org, r.CompanyID); err != nil {
 			return err
@@ -1284,7 +1284,7 @@ func (s *researchStore) AgentAddRole(org int64, who Actor, in AddRoleIn) (*AddRo
 		return nil, err
 	}
 	if who.Offering == 0 {
-		return nil, errors.New("add_role is for a task finding roles for an offering that has them; this isn't one, so add the role as an open_roles fact")
+		return nil, say.New("add_role is for a task finding roles for an offering that has them; this isn't one, so add the role as an open_roles fact")
 	}
 	if err := in.check(true); err != nil {
 		return nil, err
@@ -1336,7 +1336,7 @@ func (s *researchStore) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (
 		return nil, err
 	}
 	if in.ConfiguratorURL != "" && !httpURL.MatchString(strings.TrimSpace(in.ConfiguratorURL)) {
-		return nil, errors.New("configurator_url must be an http(s) link")
+		return nil, say.New("configurator_url must be an http(s) link")
 	}
 	for _, f := range in.Facts {
 		if err := checkFact(f); err != nil {
@@ -1452,16 +1452,16 @@ func (s *researchStore) AgentAddContact(o *Org, who Actor, in AddContactIn) (*Ad
 		return nil, err
 	}
 	if strings.TrimSpace(in.Name) == "" {
-		return nil, errors.New("name is required")
+		return nil, say.New("name is required")
 	}
 	if !httpURL.MatchString(strings.TrimSpace(in.SourceURL)) {
-		return nil, errors.New("source_url is required and must start with http")
+		return nil, say.New("source_url is required and must start with http")
 	}
 	if in.EmailStatus != "" && in.EmailStatus != "verified" && in.EmailStatus != "guess" {
-		return nil, errors.New("email_status is verified, guess or empty")
+		return nil, say.New("email_status is verified, guess or empty")
 	}
 	if in.Linkedin != "" && !httpURL.MatchString(strings.TrimSpace(in.Linkedin)) {
-		return nil, errors.New("linkedin must be an https link")
+		return nil, say.New("linkedin must be an https link")
 	}
 	if err := s.prospecting.Allowed(o, in.Email, in.Linkedin); err != nil {
 		s.prospecting.withheld(o.ID, who, withheldNeverContact)
@@ -1533,13 +1533,13 @@ func (s *researchStore) AgentDraft(org int64, who Actor, in DraftIn) error {
 	}
 	field, ok := draftFields[in.Kind]
 	if !ok {
-		return fmt.Errorf("kind is note, message, email or followup, not %q", in.Kind)
+		return say.Errorf("kind is note, message, email or followup, not %q", in.Kind)
 	}
 	if strings.TrimSpace(in.Text) == "" {
-		return errors.New("text is empty")
+		return say.New("text is empty")
 	}
 	if in.Kind == "note" && len([]rune(in.Text)) > 300 {
-		return errors.New("LinkedIn notes are 300 characters at most")
+		return say.New("LinkedIn notes are 300 characters at most")
 	}
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		// A person's edit made meanwhile is then either seen below or lands on top of this.
@@ -1551,7 +1551,7 @@ func (s *researchStore) AgentDraft(org int64, who Actor, in DraftIn) error {
 			return missing(err, "no contact %d", in.ContactID)
 		}
 		if day := draftSent(c, in.Kind); day != "" {
-			return fmt.Errorf("that went out on %s, so its text stays as sent", day)
+			return say.Errorf("that went out on %s, so its text stays as sent", day)
 		}
 		current := map[string]*string{"note": c.Note, "message": c.Message, "body": c.Body, "followup": c.Followup}[field]
 		if deref(current) != "" {
@@ -1560,7 +1560,7 @@ func (s *researchStore) AgentDraft(org int64, who Actor, in DraftIn) error {
 				return err
 			}
 			if person != "" {
-				return fmt.Errorf("%s edited this text, so it is theirs to change", person)
+				return say.Errorf("%s edited this text, so it is theirs to change", person)
 			}
 		}
 		updates := map[string]any{field: strings.TrimSpace(in.Text), "draft_by": who.Name}
@@ -1596,7 +1596,7 @@ func (s *researchStore) lastAgents(org int64, who Actor, companies []int64) (map
 func (s *researchStore) AgentSearch(org int64, who Actor, q string, page paging.Page) (hits []SearchHit, next string, err error) {
 	q = strings.ToLower(strings.TrimSpace(q))
 	if len(q) < 2 {
-		return nil, "", errors.New("search for at least two characters")
+		return nil, "", say.New("search for at least two characters")
 	}
 	at, err := page.At(2)
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // The Settings page offers the owner's parts only to an owner, by the nav's word.
@@ -244,6 +245,15 @@ func TestOutgoingMailThroughTheAPI(t *testing.T) {
 	if got := box.take(t, 1)[0]; got.To != "ada@example.com" || got.via.Password != "s3cret-smtp-pass" {
 		t.Fatalf("the test went %+v", got)
 	}
+	// It goes to whoever asked, so it is in the language they asked in.
+	get(t, ada, srv.URL+"/o/alpha/settings?lang=en-XA")
+	if code, body := call(t, ada, "POST", test, "application/json", nil); code != http.StatusOK || !strings.Contains(body, "[Šéñţ ţö ada@example.com ţĥŕöûĝĥ smtp.alpha.example.]") {
+		t.Fatalf("a test message asked for in another language: %d %s", code, body)
+	}
+	if got := box.take(t, 1)[0]; got.Subject != say.Errorf("Prospector can send mail for %s", "Alpha").In("en-XA") {
+		t.Fatalf("the test's mail isn't in the language it was asked in: %q", got.Subject)
+	}
+	get(t, ada, srv.URL+"/o/alpha/settings?lang=")
 	if code, body := asKey(t, "POST", test, mailer, nil); code != http.StatusForbidden || !strings.Contains(body, "signed-in member") {
 		t.Fatalf("a key, which has no inbox, sent a test: %d %s", code, body)
 	}

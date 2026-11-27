@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log"
 	"net/mail"
 	"strings"
@@ -11,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const (
@@ -35,9 +34,9 @@ func threadText(text string) (string, error) {
 	text = strings.TrimSpace(strings.ReplaceAll(text, "\r\n", "\n"))
 	switch {
 	case text == "":
-		return "", errors.New("write something first")
+		return "", say.New("write something first")
 	case utf8.RuneCountInString(text) > replyLimit:
-		return "", fmt.Errorf("that is longer than %d characters", replyLimit)
+		return "", say.Errorf("that is longer than %d characters", replyLimit)
 	}
 	return text, nil
 }
@@ -46,11 +45,11 @@ func threadText(text string) (string, error) {
 // address, and that address isn't on the never-contact list.
 func answerable(o *Org, e Enquiry) (string, error) {
 	if e.Spam {
-		return "", errors.New("that was marked as spam, so there is nobody to answer")
+		return "", say.New("that was marked as spam, so there is nobody to answer")
 	}
 	to, err := mail.ParseAddress(strings.TrimSpace(e.Email))
 	if err != nil {
-		return "", errors.New("it gave no single email address to answer")
+		return "", say.New("it gave no single email address to answer")
 	}
 	if err := o.Settings.Listed(to.Address, ""); err != nil {
 		return "", err
@@ -58,7 +57,7 @@ func answerable(o *Org, e Enquiry) (string, error) {
 	return to.Address, nil
 }
 
-var errNoReplyMail = errors.New("mail isn't set up, so a reply can't be sent from here: an owner sets a mail server in Settings")
+var errNoReplyMail = say.New("mail isn't set up, so a reply can't be sent from here: an owner sets a mail server in Settings")
 
 // replyEnquiry emails a reply to whoever wrote in, at the address they gave and no
 // other. The mail carries only what was typed for it: nothing they sent us is quoted
@@ -85,7 +84,7 @@ func (a *App) replyEnquiry(ctx context.Context, o *Org, enquiry int64, text, act
 	if sendErr != nil {
 		// The mail server's own words name hosts and addresses, some of them the host's operator's.
 		log.Printf("a reply to enquiry %d wasn't sent: %v", enquiry, sendErr)
-		return nil, notSent{errors.New("the mail server didn't take the reply, and nothing was recorded; try again, or ask an owner to check the mail settings")}
+		return nil, notSent{say.New("the mail server didn't take the reply, and nothing was recorded; try again, or ask an owner to check the mail settings")}
 	}
 	return m, nil
 }

@@ -18,12 +18,11 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // refused is an error about something the caller may not do, whatever it sends.
-type refused string
-
-func (e refused) Error() string { return string(e) }
+type refused struct{ *say.Text }
 
 // ours reports a failure that is the server's rather than the caller's: the database,
 // the network, or the request running out of time. Everything else the store returns
@@ -91,26 +90,36 @@ func (e elsewhere) Unwrap() error { return e.err }
 // failure of the server's: they carry internals and mean nothing to a reader, so they
 // are logged and the caller gets ours instead. Any other answer is the handler's to
 // word, such as a 502 passing on what another server said.
-func telling(where string, err error, code int) (int, string) {
+func telling(where string, err error, code int) (int, say.Sayer) {
 	var clash conflict
 	var theirs elsewhere
 	if errors.As(err, &theirs) && !fromDatabase(err) {
-		return code, err.Error()
+		return code, wordsOf(err)
 	}
 	switch {
 	case breaksRule(err):
 		log.Printf("%s: %v", where, err)
-		return http.StatusConflict, sayTaken
+		return http.StatusConflict, say.New(sayTaken)
 	case unstorable(err):
 		log.Printf("%s: %v", where, err)
-		return http.StatusBadRequest, sayUnstorable
+		return http.StatusBadRequest, say.New(sayUnstorable)
 	case errors.As(err, &clash):
-		return http.StatusConflict, err.Error()
+		return http.StatusConflict, wordsOf(err)
 	case code == http.StatusInternalServerError, code < 500 && (fromDatabase(err) || cutOff(err)):
 		log.Printf("%s: %v", where, err)
-		return http.StatusInternalServerError, sayOurs
+		return http.StatusInternalServerError, say.New(sayOurs)
 	}
-	return code, err.Error()
+	return code, wordsOf(err)
+}
+
+// wordsOf is err's own for a person, when it is the words of one say.Text, and otherwise
+// its text as it stands: another error wrapped round one adds words a catalogue can't know.
+func wordsOf(err error) say.Sayer {
+	var s say.Sayer
+	if errors.As(err, &s) && s.Error() == err.Error() {
+		return s
+	}
+	return say.New(err.Error())
 }
 
 // addTool registers a tool whose errors an agent reads through telling, as a page or
@@ -119,8 +128,9 @@ func addTool[In, Out any](s *mcp.Server, t *mcp.Tool, h mcp.ToolHandlerFor[In, O
 	mcp.AddTool(s, t, func(ctx context.Context, req *mcp.CallToolRequest, in In) (*mcp.CallToolResult, Out, error) {
 		res, out, err := h(ctx, req, in)
 		if err != nil {
+			// An agent reads English, as it reads the rest of the API's descriptions.
 			_, text := telling("tool "+t.Name, err, statusOf(err))
-			err = errors.New(text)
+			err = errors.New(text.Error())
 		}
 		return res, out, err
 	})
@@ -163,28 +173,33 @@ type problem struct {
 
 // problemTitles are the titles of the problems a client acts on, one for each type as
 // RFC 9457 asks.
-var problemTitles = map[api.ProblemType]string{
-	api.ProblemTypeSignedOut:          "Signed out",
-	api.ProblemTypeSessionLimited:     "Signed in for another organisation",
-	api.ProblemTypeWrongLogin:         "Wrong email or password",
-	api.ProblemTypeThrottled:          "Slow down",
-	api.ProblemTypeLinkUsed:           "Link no longer works",
-	api.ProblemTypeMustChangePassword: "Choose your own password",
-	api.ProblemTypeSsoRequired:        "Single sign-on required",
+var problemTitles = map[api.ProblemType]*say.Text{
+	api.ProblemTypeSignedOut:          say.New("Signed out"),
+	api.ProblemTypeSessionLimited:     say.New("Signed in for another organisation"),
+	api.ProblemTypeWrongLogin:         say.New("Wrong email or password"),
+	api.ProblemTypeThrottled:          say.New("Slow down"),
+	api.ProblemTypeLinkUsed:           say.New("Link no longer works"),
+	api.ProblemTypeMustChangePassword: say.New("Choose your own password"),
+	api.ProblemTypeSsoRequired:        say.New("Single sign-on required"),
 }
 
-func writeProblem(w http.ResponseWriter, status int, detail string) {
-	writeTyped(w, status, api.ProblemTypeUntyped, detail)
+func writeProblem(w http.ResponseWriter, r *http.Request, status int, detail say.Sayer) {
+	writeTyped(w, r, status, api.ProblemTypeUntyped, detail)
 }
 
-func writeTyped(w http.ResponseWriter, status int, kind api.ProblemType, detail string) {
-	title, ok := problemTitles[kind]
-	if !ok {
-		kind, title = api.ProblemTypeUntyped, http.StatusText(status)
+// writeTyped answers with a Problem in r's language, which RFC 9457 lets its title and
+// detail be.
+func writeTyped(w http.ResponseWriter, r *http.Request, status int, kind api.ProblemType, detail say.Sayer) {
+	lang := speaking(w, r)
+	title := http.StatusText(status)
+	if t, ok := problemTitles[kind]; ok {
+		title = t.In(lang)
+	} else {
+		kind = api.ProblemTypeUntyped
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(problem{Type: kind, Title: title, Status: status, Detail: detail}); err != nil {
+	if err := json.NewEncoder(w).Encode(problem{Type: kind, Title: title, Status: status, Detail: detail.In(lang)}); err != nil {
 		log.Print(err)
 	}
 }
@@ -193,15 +208,13 @@ func writeTyped(w http.ResponseWriter, status int, kind api.ProblemType, detail 
 type typed struct {
 	status int
 	kind   api.ProblemType
-	detail string
+	*say.Text
 	// retry is the seconds to wait, for a throttled one.
 	retry int
 }
 
-func (e typed) Error() string { return e.detail }
-
 func throttledFor(seconds int) typed {
-	return typed{http.StatusTooManyRequests, api.ProblemTypeThrottled, "too many attempts: try again in " + plural(seconds, "second"), seconds}
+	return typed{http.StatusTooManyRequests, api.ProblemTypeThrottled, say.Errorf("too many attempts: try again in %d seconds", seconds), seconds}
 }
 
 // apiFail answers an API caller with what went wrong. A failure of the server's own is
@@ -212,16 +225,16 @@ func apiFail(w http.ResponseWriter, r *http.Request, err error) {
 		if t.retry > 0 {
 			w.Header().Set("Retry-After", strconv.Itoa(t.retry))
 		}
-		writeTyped(w, t.status, t.kind, t.detail)
+		writeTyped(w, r, t.status, t.kind, t.Text)
 		return
 	}
 	code, detail := telling(r.Method+" "+r.URL.Path, err, statusOf(err))
-	writeProblem(w, code, detail)
+	writeProblem(w, r, code, detail)
 }
 
 // challenge refuses a request for want of a usable key, saying why in the header as
 // RFC 6750 asks, so a client can tell a key to replace from one that can't do this.
-func challenge(w http.ResponseWriter, code int, reason, scope, detail string) {
+func challenge(w http.ResponseWriter, r *http.Request, code int, reason, scope string, detail say.Sayer) {
 	header := `Bearer realm="prospector"`
 	if reason != "" {
 		header += fmt.Sprintf(`, error=%q`, reason)
@@ -230,5 +243,5 @@ func challenge(w http.ResponseWriter, code int, reason, scope, detail string) {
 		header += fmt.Sprintf(`, scope=%q`, scope)
 	}
 	w.Header().Set("WWW-Authenticate", header)
-	writeProblem(w, code, detail)
+	writeProblem(w, r, code, detail)
 }

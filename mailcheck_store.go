@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"time"
 
 	"gorm.io/gorm/clause"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // TakesMail answers from what is kept while it is fresh, and asks DNS otherwise.
@@ -54,7 +55,7 @@ func (s *outreachStore) NoMailDomains() map[string]bool {
 func (s *outreachStore) checkMailDomains(email string) error {
 	for _, e := range emailRe.FindAllString(strings.ToLower(email), -1) {
 		if domain := mailDomainOf(e); s.TakesMail(context.Background(), domain) == mailRefused {
-			return errors.New("nothing was stored: " + domain + " takes no mail, so " + e + " can't be right. Leave email out, or find the address on a page")
+			return say.Errorf("nothing was stored: %s takes no mail, so %s can't be right. Leave email out, or find the address on a page", domain, e)
 		}
 	}
 	return nil

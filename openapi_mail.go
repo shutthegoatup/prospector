@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func suppressionOut(s Suppression) api.Suppression {
@@ -14,7 +14,7 @@ func suppressionOut(s Suppression) api.Suppression {
 
 func (s apiServer) ListSuppressions(ctx context.Context, in api.ListSuppressionsRequestObject) (api.ListSuppressionsResponseObject, error) {
 	if in.Params.Limit < 0 {
-		return nil, errors.New("limit is a whole number, 1 or more")
+		return nil, say.New("limit is a whole number, 1 or more")
 	}
 	rows, next, err := s.a.s.Suppressions(reqFrom(ctx).Org.ID, paging.Page{Limit: in.Params.Limit, Cursor: in.Params.Cursor})
 	if err != nil {
@@ -30,7 +30,7 @@ func (s apiServer) ListSuppressions(ctx context.Context, in api.ListSuppressions
 
 func (s apiServer) AddSuppression(ctx context.Context, in api.AddSuppressionRequestObject) (api.AddSuppressionResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send the address: {\"address\": …}")
+		return nil, say.New("send the address: {\"address\": …}")
 	}
 	q := reqFrom(ctx)
 	row, err := s.a.s.Suppress(q.Org.ID, in.Body.Address, q.Actor())

@@ -12,6 +12,8 @@ import (
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const snapshotSchema = `create table if not exists contacts (
@@ -121,7 +123,7 @@ func parseInsert(text string, named map[string]bool) (*Contact, string, error) {
 	text = text[start:]
 	open := strings.Index(text, marker)
 	if open < 0 {
-		return nil, "", fmt.Errorf("insert without values")
+		return nil, "", say.Errorf("insert without values")
 	}
 	colList := text[len("insert into contacts ("):strings.Index(text, ")")]
 	cols := strings.Split(colList, ", ")
@@ -138,7 +140,7 @@ func parseInsert(text string, named map[string]bool) (*Contact, string, error) {
 			for {
 				j := strings.IndexByte(text[i:], '\'')
 				if j < 0 {
-					return nil, "", fmt.Errorf("unterminated string")
+					return nil, "", say.Errorf("unterminated string")
 				}
 				b.WriteString(text[i : i+j])
 				i += j + 1
@@ -162,7 +164,7 @@ func parseInsert(text string, named map[string]bool) (*Contact, string, error) {
 		text = text[1:]
 	}
 	if len(vals) != len(cols) {
-		return nil, "", fmt.Errorf("%d values for %d columns", len(vals), len(cols))
+		return nil, "", say.Errorf("%d values for %d columns", len(vals), len(cols))
 	}
 	c := Contact{}
 	f, later := c.Fields(), c.Later()
@@ -174,7 +176,7 @@ func parseInsert(text string, named map[string]bool) (*Contact, string, error) {
 		}
 		idx := slices.Index(Columns, name)
 		if idx < 0 {
-			return nil, "", fmt.Errorf("unknown column %q", name)
+			return nil, "", say.Errorf("unknown column %q", name)
 		}
 		switch name {
 		case "id":
@@ -276,7 +278,7 @@ func (s *Store) replaceContacts(org int64, rows []Contact, absent []string) (int
 		}
 		rows = kept
 		if len(rows) == 0 {
-			return errors.New("that holds no contacts to restore, so nothing was replaced: is it the right file?")
+			return say.New("that holds no contacts to restore, so nothing was replaced: is it the right file?")
 		}
 		if err := forgetStrays(tx, org); err != nil {
 			return err

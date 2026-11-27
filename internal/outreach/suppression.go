@@ -1,9 +1,9 @@
 package outreach
 
 import (
-	"errors"
 	"fmt"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -16,7 +16,7 @@ const SuppressAdded = "added"
 var suppressRank = map[string]int{SuppressBounced: 0, SuppressAdded: 1, SuppressUnsubscribed: 2, SuppressComplained: 3}
 
 var (
-	ErrSuppressed = errors.New("that address is on the list not to be mailed")
+	ErrSuppressed = say.New("that address is on the list not to be mailed")
 )
 
 // MailGate holds what keeps marketing mail from an organisation's addresses, read once,

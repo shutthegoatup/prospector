@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func orgSummary(o Org) api.OrgSummary {
@@ -48,10 +48,10 @@ func keyName(q *Req) string {
 func (s apiServer) CreateOrg(ctx context.Context, in api.CreateOrgRequestObject) (api.CreateOrgResponseObject, error) {
 	q := reqFrom(ctx)
 	if q.Key != nil || q.User == nil {
-		return nil, refused("a key belongs to one organisation and can't start another: sign in to do that")
+		return nil, refused{say.New("a key belongs to one organisation and can't start another: sign in to do that")}
 	}
 	if in.Body == nil {
-		return nil, errors.New(`send the organisation's name: {"name": "Acme"}`)
+		return nil, say.New(`send the organisation's name: {"name": "Acme"}`)
 	}
 	o, err := newOrgFor(s.a.s, q, in.Body.Name)
 	if err != nil {
@@ -64,7 +64,7 @@ func (s apiServer) CreateOrg(ctx context.Context, in api.CreateOrgRequestObject)
 // came through another organisation's single sign-on, which opens that one alone.
 func newOrgFor(st *Store, q *Req, name string) (*Org, error) {
 	if q.Session != nil && q.Session.Limited {
-		return nil, refused("you're signed in through one organisation's single sign-on, which opens only that organisation: sign in with a password to start another")
+		return nil, refused{say.New("you're signed in through one organisation's single sign-on, which opens only that organisation: sign in with a password to start another")}
 	}
 	return st.CreateOrgWithOwner("", name, q.User)
 }

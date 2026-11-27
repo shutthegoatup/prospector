@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // voiceOf is who calls and signs for whoever asks. A key is nobody's, so its scripts
@@ -78,7 +78,7 @@ func (s apiServer) ListToday(ctx context.Context, in api.ListTodayRequestObject)
 	cards, counts := Today(s.a.dueByStep(q, now), voice, now, s.a.s.NoMailDomains())
 	filter := string(in.Params.Step)
 	if filter != "" && !in.Params.Step.Valid() {
-		return nil, errors.New("step is call, accepted, email, followup, linkedin or next")
+		return nil, say.New("step is call, accepted, email, followup, linkedin or next")
 	}
 	var shown []Card
 	later := 0

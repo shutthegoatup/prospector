@@ -1,10 +1,11 @@
 package store
 
 import (
-	"fmt"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // Enquiry is something a person sent us: a website form, or a product telling us
@@ -51,7 +52,7 @@ func EnquiryOrigins(setting string) ([]string, error) {
 	for _, line := range strings.FieldsFunc(setting, func(r rune) bool { return r == '\n' || r == ',' || r == ' ' || r == '\r' }) {
 		u, err := url.Parse(line)
 		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
-			return nil, fmt.Errorf("%q isn't a site address: it should look like https://www.example.com", line)
+			return nil, say.Errorf("%q isn't a site address: it should look like https://www.example.com", line)
 		}
 		out = append(out, strings.ToLower(u.Scheme+"://"+u.Host))
 	}

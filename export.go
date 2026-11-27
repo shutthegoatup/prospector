@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // PersonExport is everything held about one contact row, for answering a request
@@ -43,7 +45,7 @@ func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error)
 			return missing(err, "no contact %d", id)
 		}
 		if strings.HasPrefix(c.Key, "org:") {
-			return errors.New("that row stands for a company, not a person")
+			return say.New("that row stands for a company, not a person")
 		}
 		if len(alternates(deref(c.Person))) > 1 {
 			out.Note = "This row names several people; everything here is held against all of them."

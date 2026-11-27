@@ -1,8 +1,6 @@
 package billing
 
 import (
-	"errors"
-	"fmt"
 	"slices"
 	"sort"
 	"strconv"
@@ -10,6 +8,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -19,7 +18,7 @@ type SubscriptionStore struct{ *store.Core }
 func (s *SubscriptionStore) AddSubscription(org int64, in SubscriptionIn, actor string) (*store.Subscription, error) {
 	in.Name = store.Clip(strings.TrimSpace(in.Name), 200)
 	if in.Name == "" {
-		return nil, errors.New("say what they are on")
+		return nil, say.New("say what they are on")
 	}
 	if in.Per == "" {
 		in.Per = store.PerYear
@@ -28,10 +27,10 @@ func (s *SubscriptionStore) AddSubscription(org int64, in SubscriptionIn, actor 
 		in.Then = ThenRenews
 	}
 	if in.Per != store.PerMonth && in.Per != store.PerYear {
-		return nil, fmt.Errorf("a price is for a month or a year, not %q", in.Per)
+		return nil, say.Errorf("a price is for a month or a year, not %q", in.Per)
 	}
 	if !validThen(in.Then) {
-		return nil, fmt.Errorf("unknown end of term %q", in.Then)
+		return nil, say.Errorf("unknown end of term %q", in.Then)
 	}
 	if err := checkTerm(in.TermMonths, in.NoticeDays); err != nil {
 		return nil, err
@@ -101,7 +100,7 @@ func (s *SubscriptionStore) changeSubscription(tx *gorm.DB, org, id int64, field
 		switch field {
 		case "name":
 			if value == "" {
-				return errors.New("say what they are on")
+				return say.New("say what they are on")
 			}
 			updates["name"], logged = store.Clip(value, 200), ""
 		case "amount":
@@ -119,15 +118,15 @@ func (s *SubscriptionStore) changeSubscription(tx *gorm.DB, org, id int64, field
 			}
 		case "per":
 			if value != store.PerMonth && value != store.PerYear {
-				return fmt.Errorf("a price is for a month or a year, not %q", value)
+				return say.Errorf("a price is for a month or a year, not %q", value)
 			}
 			updates["per"] = value
 		case "then":
 			if !validThen(value) {
-				return fmt.Errorf("unknown end of term %q", value)
+				return say.Errorf("unknown end of term %q", value)
 			}
 			if sub.TermMonths == 0 && value != store.ThenRolls {
-				return errors.New("with no months committed it rolls on: say how many months first")
+				return say.New("with no months committed it rolls on: say how many months first")
 			}
 			updates["then"] = value
 		case "start":
@@ -136,7 +135,7 @@ func (s *SubscriptionStore) changeSubscription(tx *gorm.DB, org, id int64, field
 			}
 			for _, later := range []*string{sub.NoticeOn, sub.EndedOn} {
 				if later != nil && value > *later {
-					return errors.New("that is after notice was given or it ended: clear that date first")
+					return say.New("that is after notice was given or it ended: clear that date first")
 				}
 			}
 			updates["start"] = value
@@ -146,14 +145,14 @@ func (s *SubscriptionStore) changeSubscription(tx *gorm.DB, org, id int64, field
 					return err
 				}
 				if value < sub.Start {
-					return errors.New("that is before it started")
+					return say.New("that is before it started")
 				}
 			}
 			updates[field] = store.NonEmpty(value)
 		case "term_months", "notice_days":
 			n, err := strconv.Atoi(value)
 			if err != nil {
-				return fmt.Errorf("%q isn't a number", value)
+				return say.Errorf("%q isn't a number", value)
 			}
 			months, notice := sub.TermMonths, sub.NoticeDays
 			if field == "term_months" {
@@ -169,7 +168,7 @@ func (s *SubscriptionStore) changeSubscription(tx *gorm.DB, org, id int64, field
 				updates["then"] = store.ThenRolls
 			}
 		default:
-			return fmt.Errorf("a subscription has no %q", field)
+			return say.Errorf("a subscription has no %q", field)
 		}
 		if err := tx.Model(&sub).Updates(updates).Error; err != nil {
 			return err
@@ -268,14 +267,14 @@ func (s *SubscriptionStore) StartRenewal(org, subscription, contact int64, actor
 			return store.Missing(err, "no contact %d", contact)
 		}
 		if c.CompanyID == nil || *c.CompanyID != sub.CompanyID {
-			return errors.New("that person is not at the company the subscription is with")
+			return say.New("that person is not at the company the subscription is with")
 		}
 		if c.Replied == nil || c.Declined != nil || c.Status == store.ContactSuggested {
-			return errors.New("a renewal is with someone you are in conversation with")
+			return say.New("a renewal is with someone you are in conversation with")
 		}
 		st := sub.On(store.Today())
 		if st.Status == store.SubEnded {
-			return errors.New("that subscription has ended: record a new one when they come back")
+			return say.New("that subscription has ended: record a new one when they come back")
 		}
 		var open int64
 		if err := tx.Model(&store.Deal{}).Where("org_id = ? and subscription_id = ? and stage not in ?", org, sub.ID, []string{"won", "lost"}).
@@ -283,7 +282,7 @@ func (s *SubscriptionStore) StartRenewal(org, subscription, contact int64, actor
 			return err
 		}
 		if open > 0 {
-			return store.Conflict("a renewal for it is already under way on the Conversations board")
+			return store.Conflict{Text: say.New("a renewal for it is already under way on the Conversations board")}
 		}
 		var last int
 		if err := tx.Model(&store.Deal{}).Where("org_id = ? and contact_id = ?", org, contact).

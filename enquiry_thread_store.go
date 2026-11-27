@@ -1,12 +1,12 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // EnquiryThread is what has been said in answering one enquiry, oldest first.
@@ -57,7 +57,7 @@ func (s *enquiryStore) StartReply(o *Org, enquiry int64, text, actor string) (*E
 			return err
 		}
 		if err := erased(tx, o.ID, "", "", to, ""); err != nil {
-			return errors.New("that address belongs to someone who was erased on request, so nothing is sent to it")
+			return say.New("that address belongs to someone who was erased on request, so nothing is sent to it")
 		}
 		// Replies in a row with no answer between: a card pressed again and again, or a
 		// key in a loop, shouldn't be able to fill someone's inbox from here.
@@ -71,7 +71,7 @@ func (s *enquiryStore) StartReply(o *Org, enquiry int64, text, actor string) (*E
 			return err
 		}
 		if unanswered >= repliesUnanswered {
-			return fmt.Errorf("%d replies have gone with no answer recorded; record what they said, or leave it there", repliesUnanswered)
+			return say.Errorf("%d replies have gone with no answer recorded; record what they said, or leave it there", repliesUnanswered)
 		}
 		now := time.Now()
 		mine := tx.Where("org_id = ? and enquiry_id = ? and ours = ?", o.ID, enquiry, true)
@@ -83,7 +83,7 @@ func (s *enquiryStore) StartReply(o *Org, enquiry int64, text, actor string) (*E
 			return err
 		}
 		if same > 0 {
-			return errors.New("that reply has just been sent; change it to send another")
+			return say.New("that reply has just been sent; change it to send another")
 		}
 		m = &EnquiryMessage{OrgID: o.ID, EnquiryID: enquiry, Ours: true, Text: text, By: actor, CreatedAt: now}
 		return tx.Create(m).Error
@@ -147,7 +147,7 @@ func (s *enquiryStore) HearEnquiry(org, enquiry int64, text, actor string) (*Enq
 			return missing(err, "no enquiry %d", enquiry)
 		}
 		if e.Spam {
-			return errors.New("that was marked as spam, so there is nothing to follow")
+			return say.New("that was marked as spam, so there is nothing to follow")
 		}
 		m = &EnquiryMessage{OrgID: org, EnquiryID: enquiry, Text: text, By: actor, CreatedAt: time.Now()}
 		if err := tx.Create(m).Error; err != nil {

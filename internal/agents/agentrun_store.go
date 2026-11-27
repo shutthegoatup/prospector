@@ -6,6 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -126,7 +127,7 @@ func (s *AgentStore) AgentKey(org int64, c *store.Agent) (*store.APIKey, error) 
 		}
 		res := tx.Model(&store.Agent{}).Where("org_id = ? and id = ?", org, c.ID).Update("key_id", k.ID)
 		if res.Error == nil && res.RowsAffected == 0 {
-			return fmt.Errorf("no agent %d in this organisation", c.ID)
+			return say.Errorf("no agent %d in this organisation", c.ID)
 		}
 		return res.Error
 	})

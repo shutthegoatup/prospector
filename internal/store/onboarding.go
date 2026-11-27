@@ -1,12 +1,12 @@
 package store
 
 import (
-	"errors"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // Onboarding is one customer being set up: a copy of the organisation's steps, made
@@ -66,7 +66,7 @@ func (s OrgSettings) Onboarding() ([]StepPlan, error) {
 		if m := StepDays.FindStringSubmatch(line); m != nil {
 			n, err := strconv.Atoi(m[1])
 			if err != nil || n > 730 {
-				return nil, fmt.Errorf("%q: a step is due within 730 days of the start", line)
+				return nil, say.Errorf("%q: a step is due within 730 days of the start", line)
 			}
 			p.Days, line = n, strings.TrimSpace(line[:len(line)-len(m[0])])
 		}
@@ -79,13 +79,13 @@ func (s OrgSettings) Onboarding() ([]StepPlan, error) {
 			}
 		}
 		if line == "" {
-			return nil, errors.New("every step needs a name: one line has only who does it or when it is due")
+			return nil, say.New("every step needs a name: one line has only who does it or when it is due")
 		}
 		p.Name = Clip(line, 200)
 		out = append(out, p)
 	}
 	if len(out) > MaxOnboardingSteps {
-		return nil, fmt.Errorf("that is %d steps; %d is the most", len(out), MaxOnboardingSteps)
+		return nil, say.Errorf("that is %d steps; %d is the most", len(out), MaxOnboardingSteps)
 	}
 	return out, nil
 }

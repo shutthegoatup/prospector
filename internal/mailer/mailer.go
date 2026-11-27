@@ -17,6 +17,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // Server is an SMTP submission service and the address mail leaves from. Every
@@ -57,16 +59,16 @@ func Loopback(host string) bool {
 
 func (m Server) Check() error {
 	if strings.TrimSpace(m.Host) == "" || strings.ContainsAny(m.Host, " /@\r\n") {
-		return fmt.Errorf("%q isn't a mail server's name", m.Host)
+		return say.Errorf("%q isn't a mail server's name", m.Host)
 	}
 	if m.Port < 1 || m.Port > 65535 || (!Loopback(m.Host) && !mailPorts[m.Port]) {
-		return fmt.Errorf("mail servers listen on 587, 465, 2525 or 25, not %d", m.Port)
+		return say.Errorf("mail servers listen on 587, 465, 2525 or 25, not %d", m.Port)
 	}
 	if strings.ContainsAny(m.From, "\r\n") {
-		return errors.New("the From address can't span lines")
+		return say.New("the From address can't span lines")
 	}
 	if _, err := mail.ParseAddress(m.From); err != nil {
-		return fmt.Errorf("the From address should look like Name <name@example.com>, not %q", m.From)
+		return say.Errorf("the From address should look like Name <name@example.com>, not %q", m.From)
 	}
 	return nil
 }
@@ -92,10 +94,10 @@ func FromEnv(env func(string) string) (*Server, error) {
 var (
 	// ErrUnsent is a failure before the message was handed over: it certainly didn't go,
 	// and can be tried again.
-	ErrUnsent = errors.New("not sent")
+	ErrUnsent = say.New("not sent")
 	// ErrRefusedRecipient is the server refusing the one address: nothing went, and
 	// trying again won't change that.
-	ErrRefusedRecipient = errors.New("the mail server refused the address")
+	ErrRefusedRecipient = say.New("the mail server refused the address")
 )
 
 func unsent(err error) error { return fmt.Errorf("%w: %w", ErrUnsent, err) }
@@ -143,7 +145,7 @@ func submit(conn net.Conn, via Server, from, to *mail.Address, m Message, secure
 	// certificate is usually self-signed, and nothing leaves the machine.
 	if via.Port != 465 && needTLS {
 		if ok, _ := c.Extension("STARTTLS"); !ok {
-			return unsent(fmt.Errorf("%s doesn't offer TLS, so nothing was sent", addr))
+			return unsent(say.Errorf("%s doesn't offer TLS, so nothing was sent", addr))
 		}
 		if err := c.StartTLS(secure); err != nil {
 			return unsent(fmt.Errorf("%s: %w", addr, err))

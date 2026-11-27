@@ -3,11 +3,12 @@ package store
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // Erasure is what stays behind when a person is erased: hashes of what identified
@@ -20,7 +21,7 @@ type Erasure struct {
 	At    time.Time
 }
 
-var ErrErased = errors.New("this person was erased on request and can't be added again")
+var ErrErased = say.New("this person was erased on request and can't be added again")
 
 var EmailRe = regexp.MustCompile(`[^\s,;:<>()"']+@[^\s,;:<>()"']+`)
 

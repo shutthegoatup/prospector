@@ -1,12 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // heldOffering reads an offering with its row held, so it can't be removed or changed
@@ -28,7 +29,7 @@ func nameFree(tx *gorm.DB, org, id int64, name string) error {
 		return err
 	}
 	if n > 0 {
-		return conflict(fmt.Sprintf("there is already an offering called %q", name))
+		return conflict{Text: say.Errorf("there is already an offering called %q", name)}
 	}
 	return nil
 }

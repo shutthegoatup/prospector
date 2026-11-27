@@ -1,13 +1,12 @@
 package sales
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -34,7 +33,7 @@ func (s *DealStore) SetDeal(tx *gorm.DB, org, contact int64, field, value, actor
 		return store.Missing(err, "no contact %d", contact)
 	}
 	if c.Replied == nil {
-		return errors.New("a deal is for someone who has replied; mark the reply first")
+		return say.New("a deal is for someone who has replied; mark the reply first")
 	}
 	var o store.Org
 	if err := tx.First(&o, org).Error; err != nil {
@@ -108,7 +107,7 @@ func (s *DealStore) OwnDeal(org, contact int64) (*store.Deal, error) {
 // expansion or a second piece of new business. It starts at the first stage.
 func (s *DealStore) StartDeal(org, contact int64, kind, actor string) (*store.Deal, error) {
 	if !kindOfDeal(kind) {
-		return nil, fmt.Errorf("unknown kind of deal %q", kind)
+		return nil, say.Errorf("unknown kind of deal %q", kind)
 	}
 	var d store.Deal
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
@@ -121,7 +120,7 @@ func (s *DealStore) StartDeal(org, contact int64, kind, actor string) (*store.De
 			return store.Missing(err, "no contact %d", contact)
 		}
 		if c.Replied == nil || c.Declined != nil || c.Status == store.ContactSuggested {
-			return errors.New("another deal is for someone you are in conversation with")
+			return say.New("another deal is for someone you are in conversation with")
 		}
 		var o store.Org
 		if err := tx.First(&o, org).Error; err != nil {

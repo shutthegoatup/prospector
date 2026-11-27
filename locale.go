@@ -7,6 +7,8 @@ import (
 	"slices"
 
 	"golang.org/x/text/language"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // localesJSON is the one list of the languages Prospector speaks, which the web build
@@ -29,6 +31,9 @@ var locales = func() localeSet {
 	var l localeSet
 	if err := json.Unmarshal(localesJSON, &l); err != nil || l.Source == "" {
 		panic("web/locales.json doesn't say what language the app is written in")
+	}
+	for _, p := range l.Pseudo {
+		say.Pseudo(p)
 	}
 	return l
 }()

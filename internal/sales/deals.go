@@ -1,11 +1,11 @@
 package sales
 
 import (
-	"fmt"
 	"time"
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -44,13 +44,13 @@ func dealChange(tx *gorm.DB, org int64, d store.Deal, currency, field, value str
 		}
 		if value != "" {
 			if _, err := time.Parse("2006-01-02", value); err != nil {
-				return nil, "", fmt.Errorf("%q isn't a date", value)
+				return nil, "", say.Errorf("%q isn't a date", value)
 			}
 		}
 		return map[string]any{field: store.NonEmpty(value)}, value, nil
 	case "kind":
 		if !kindOfDeal(value) {
-			return nil, "", fmt.Errorf("unknown kind of deal %q", value)
+			return nil, "", say.Errorf("unknown kind of deal %q", value)
 		}
 		return map[string]any{"kind": value}, value, nil
 	case "owner":
@@ -61,7 +61,7 @@ func dealChange(tx *gorm.DB, org int64, d store.Deal, currency, field, value str
 				return nil, "", err
 			}
 			if n == 0 {
-				return nil, "", fmt.Errorf("%q isn't a member of this organisation", value)
+				return nil, "", say.Errorf("%q isn't a member of this organisation", value)
 			}
 		}
 		return map[string]any{"owner": value}, value, nil
@@ -70,14 +70,14 @@ func dealChange(tx *gorm.DB, org int64, d store.Deal, currency, field, value str
 		switch field {
 		case "stage":
 			if !store.ValidStage(value) {
-				return nil, "", fmt.Errorf("unknown stage %q", value)
+				return nil, "", say.Errorf("unknown stage %q", value)
 			}
 			return map[string]any{"stage": value}, value, nil
 		case "next_step", "lost_reason":
 			return map[string]any{field: value}, "", nil
 		}
 	}
-	return nil, "", fmt.Errorf("a deal has no %q", field)
+	return nil, "", say.Errorf("a deal has no %q", field)
 }
 
 // OtherDeal is a deal after the conversation's own, with the person it is with.

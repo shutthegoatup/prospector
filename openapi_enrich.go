@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func enricherOut(s *Store, e Enricher, now time.Time) api.Enricher {
@@ -38,7 +38,7 @@ func (s apiServer) ListEnrichers(ctx context.Context, in api.ListEnrichersReques
 
 func (s apiServer) SaveEnricher(ctx context.Context, in api.SaveEnricherRequestObject) (api.SaveEnricherResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New(`send the vendor, such as {"kind": "hunter", "api_key": "…", "monthly_limit": 100}`)
+		return nil, say.New(`send the vendor, such as {"kind": "hunter", "api_key": "…", "monthly_limit": 100}`)
 	}
 	q := reqFrom(ctx)
 	e, err := s.a.s.SaveEnricher(q.Org.ID, EnricherIn{Kind: string(in.Body.Kind), APIKey: in.Body.ApiKey,
@@ -58,7 +58,7 @@ func (s apiServer) DeleteEnricher(ctx context.Context, in api.DeleteEnricherRequ
 
 func (s apiServer) EnrichContact(ctx context.Context, in api.EnrichContactRequestObject) (api.EnrichContactResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New(`send the fields to look for, such as {"fields": ["email"]}`)
+		return nil, say.New(`send the fields to look for, such as {"fields": ["email"]}`)
 	}
 	q := reqFrom(ctx)
 	// Read afresh, so a never-contact entry added a moment ago holds.

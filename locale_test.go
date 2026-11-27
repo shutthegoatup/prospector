@@ -79,3 +79,29 @@ func TestALanguageIsPickedOnlyByName(t *testing.T) {
 		t.Errorf("nothing was picked, yet %v", res.Cookies())
 	}
 }
+
+// A Problem is in the language the pages are, and says so (RFC 9457, RFC 9110 §8.5).
+func TestAProblemIsInTheLanguageThePagesAre(t *testing.T) {
+	t.Parallel()
+	_, _, srv, client := signedIn(t)
+	problem := func() (*http.Response, string) {
+		t.Helper()
+		res, body := get(t, client, srv.URL+"/o/alpha/api/v1/companies/9999999/overview")
+		if res.StatusCode != http.StatusNotFound {
+			t.Fatalf("%d %s", res.StatusCode, body)
+		}
+		return res, body
+	}
+	res, body := problem()
+	if !strings.Contains(body, `"detail":"no company 9999999"`) || res.Header.Get("Content-Language") != locales.Source {
+		t.Errorf("before any is picked: %s %s", res.Header.Get("Content-Language"), body)
+	}
+	if vary := res.Header.Values("Vary"); !strings.Contains(strings.Join(vary, ","), "Accept-Language") || !strings.Contains(strings.Join(vary, ","), "Cookie") {
+		t.Errorf("a cache could hand this to someone reading another language: Vary %q", vary)
+	}
+	get(t, client, srv.URL+"/o/alpha/today?lang=en-XA")
+	res, body = problem()
+	if !strings.Contains(body, `"detail":"[ñö çöɱþáñý 9999999]"`) || res.Header.Get("Content-Language") != "en-XA" {
+		t.Errorf("picked: %s %s", res.Header.Get("Content-Language"), body)
+	}
+}
