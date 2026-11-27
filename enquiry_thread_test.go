@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/mailer"
 )
 
 func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
@@ -56,7 +58,7 @@ func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
 	}
 	// Nothing they sent us is in what we send: a form filled in with someone else's
 	// address can't be made to carry the sender's words to them.
-	wire := string(compose(&mail.Address{Address: "site@prospector.example"}, &mail.Address{Address: got.To}, got.Message, time.Now()))
+	wire := string(mailer.Compose(&mail.Address{Address: "site@prospector.example"}, &mail.Address{Address: got.To}, got.Message, time.Now()))
 	// The Message-ID is random, and once in a while spells one of these words.
 	wire = regexp.MustCompile(`(?m)^Message-ID: .*\r\n`).ReplaceAllString(wire, "")
 	for _, theirs := range []string{"WATCHES", "spam.example", "victim", "Hannah", "Bcc"} {
@@ -238,7 +240,7 @@ func TestAReplyToAddressCannotAddAHeader(t *testing.T) {
 	t.Parallel()
 	from, to := &mail.Address{Address: "site@prospector.example"}, &mail.Address{Address: "hannah@larkmoor.example"}
 	for _, answer := range []string{"ada@example.com\r\nBcc: victim@elsewhere.example", "not an address", ""} {
-		wire := string(compose(from, to, Message{Subject: "Your message", Body: "Hello", ReplyTo: answer}, time.Now()))
+		wire := string(mailer.Compose(from, to, mailer.Message{Subject: "Your message", Body: "Hello", ReplyTo: answer}, time.Now()))
 		if strings.Contains(wire, "Bcc") || strings.Contains(wire, "Reply-To") {
 			t.Errorf("a reply-to of %q made it into the mail:\n%s", answer, wire)
 		}

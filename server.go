@@ -20,6 +20,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/cleantext"
+	"github.com/shutthegoatup/prospector/internal/mailer"
 )
 
 // dummyHash keeps a wrong email as slow as a wrong password.
@@ -45,9 +46,9 @@ type App struct {
 	// securityContact is security.txt's Contact; empty serves no security.txt.
 	securityContact string
 	// mail is the app's own server, for password resets and invitations; nil is none.
-	mail *MailServer
+	mail *mailer.Server
 	// send and later stand in for SMTP and for a goroutine in tests.
-	send  sendFunc
+	send  mailer.SendFunc
 	later func(func())
 	// sending counts the mail still on its way out, which stopping waits for.
 	sending sync.WaitGroup

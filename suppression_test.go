@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/mailer"
 	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
@@ -238,7 +239,7 @@ func TestAMarketingMailCarriesItsOneClickHeaders(t *testing.T) {
 	t.Parallel()
 	from, to := &mail.Address{Address: "news@alpha.example"}, &mail.Address{Address: "hannah@larkmoor.example"}
 	wire := func(unsubscribe string) string {
-		return string(compose(from, to, Message{Subject: "News", Body: "Hello", Unsubscribe: unsubscribe}, time.Now()))
+		return string(mailer.Compose(from, to, mailer.Message{Subject: "News", Body: "Hello", Unsubscribe: unsubscribe}, time.Now()))
 	}
 	got := wire("https://prospector.example/u/abc123")
 	if !strings.Contains(got, "\r\nList-Unsubscribe: <https://prospector.example/u/abc123>\r\n") || !strings.Contains(got, "\r\nList-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n") {
@@ -312,7 +313,7 @@ func TestTheListHoldsAtItsEdges(t *testing.T) {
 
 	from, to := &mail.Address{Address: "news@alpha.example"}, &mail.Address{Address: "hannah@larkmoor.example"}
 	for _, odd := range []string{"https://prospector.example/u/a\tb", "https://prospector.example/u/a\x00b", "https://prospector.example/u/é"} {
-		if wire := string(compose(from, to, Message{Subject: "News", Body: "Hello", Unsubscribe: odd}, time.Now())); strings.Contains(wire, "List-Unsubscribe") {
+		if wire := string(mailer.Compose(from, to, mailer.Message{Subject: "News", Body: "Hello", Unsubscribe: odd}, time.Now())); strings.Contains(wire, "List-Unsubscribe") {
 			t.Errorf("an unsubscribe link of %q made it into a header", odd)
 		}
 	}

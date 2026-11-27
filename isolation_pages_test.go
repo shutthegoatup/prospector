@@ -23,6 +23,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/mailer"
 )
 
 // sourceFiles are the package's own, without tests or generated templates.
@@ -235,7 +236,7 @@ func tryRoutesAsAnotherOrganisation(t *testing.T, gets, posts []string) int {
 		// Whatever domain is asked about shows the first organisation's token, so a check
 		// that found its domain would verify it.
 		txt:  func(context.Context, string) ([]string, error) { return []string{theirs + " token"}, nil },
-		send: func(context.Context, MailServer, Message) error { return errors.New("no mail in this test") }}
+		send: func(context.Context, mailer.Server, mailer.Message) error { return errors.New("no mail in this test") }}
 	app.agentClient = nowhere
 	srv := httptest.NewServer(app.Routes())
 	t.Cleanup(srv.Close)

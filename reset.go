@@ -7,6 +7,8 @@ import (
 	"log"
 	"strings"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/mailer"
 )
 
 const (
@@ -69,20 +71,20 @@ func (a *App) background(f func()) {
 // PROSPECTOR_URL, because a link is never built from what a request claims its host is.
 func (a *App) mailOn() bool { return a.mail != nil && a.base != "" }
 
-func (a *App) deliver(ctx context.Context, via MailServer, m Message) error {
+func (a *App) deliver(ctx context.Context, via mailer.Server, m mailer.Message) error {
 	if a.send != nil {
 		return a.send(ctx, via, m)
 	}
-	return smtpSend(ctx, via, m)
+	return mailer.Send(ctx, via, m)
 }
 
 // mailFor is the organisation's own server when it has one, else the app's, else nil.
-func (a *App) mailFor(org int64) (*MailServer, error) {
+func (a *App) mailFor(org int64) (*mailer.Server, error) {
 	m, err := a.s.OrgMail(org)
 	if err != nil {
 		return a.mail, nil
 	}
-	via := &MailServer{Host: m.Host, Port: m.Port, Username: m.Username, From: m.Sender}
+	via := &mailer.Server{Host: m.Host, Port: m.Port, Username: m.Username, From: m.Sender}
 	if m.Password != "" {
 		if via.Password, err = a.s.keys.open(m.Password); err != nil {
 			return nil, fmt.Errorf("this organisation's mail password can't be read: %w", err)
@@ -103,7 +105,7 @@ func (a *App) sendReset(email string) {
 		}
 		return
 	}
-	err = a.deliver(context.Background(), *a.mail, Message{To: u.Email, Subject: "Reset your Prospector password",
+	err = a.deliver(context.Background(), *a.mail, mailer.Message{To: u.Email, Subject: "Reset your Prospector password",
 		Body: "Someone asked to reset the password for this address at " + a.base + ".\n\n" +
 			"Choose a new one here, within the hour:\n" + a.base + "/reset/" + token + "\n\n" +
 			"If that wasn't you, ignore this email: your password stays as it is.\n"})
@@ -133,7 +135,7 @@ func (a *App) invite(ctx context.Context, q *Req, u *User, created bool) (bool, 
 	if err != nil {
 		return false, err
 	}
-	err = a.deliver(ctx, *via, Message{To: u.Email, Subject: q.Actor() + " added you to " + q.Org.Name + " on Prospector",
+	err = a.deliver(ctx, *via, mailer.Message{To: u.Email, Subject: q.Actor() + " added you to " + q.Org.Name + " on Prospector",
 		Body: q.Actor() + " added you to " + q.Org.Name + " on Prospector, at " + a.base + ".\n\n" +
 			"Choose your password here, within 7 days:\n" + a.base + "/reset/" + token + "\n\n" +
 			"Then sign in with " + u.Email + ".\n"})
@@ -178,9 +180,9 @@ func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 		return true, a.s.DeleteOrgMail(org)
 	}
 	m := &OrgMail{OrgID: org, Host: in.Host, Port: in.Port, Username: strings.TrimSpace(in.Username), Sender: strings.TrimSpace(in.Sender)}
-	err = (MailServer{Host: m.Host, Port: m.Port, From: m.Sender}).check()
+	err = (mailer.Server{Host: m.Host, Port: m.Port, From: m.Sender}).Check()
 	// Only the operator may name this machine, where any port and no TLS are allowed.
-	if err == nil && loopback(m.Host) {
+	if err == nil && mailer.Loopback(m.Host) {
 		err = errors.New("an organisation's mail server can't be this machine")
 	}
 	if err != nil {
@@ -208,7 +210,7 @@ func (a *App) testMail(ctx context.Context, q *Req) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	err = a.deliver(ctx, *via, Message{To: q.User.Email, Subject: "Prospector can send mail for " + q.Org.Name,
+	err = a.deliver(ctx, *via, mailer.Message{To: q.User.Email, Subject: "Prospector can send mail for " + q.Org.Name,
 		Body: "This is the test " + q.Actor() + " asked for in Settings.\n\nIt was sent through " + via.Host + " as " + via.From + ".\n"})
 	if err != nil {
 		return "", notSent{err}

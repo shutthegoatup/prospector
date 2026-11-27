@@ -53,6 +53,8 @@ import (
 	"strings"
 	"time"
 	_ "time/tzdata"
+
+	"github.com/shutthegoatup/prospector/internal/mailer"
 )
 
 // version is set at release time by -ldflags "-X main.version=…".
@@ -204,7 +206,7 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		via, err := mailFromEnv(os.Getenv)
+		via, err := mailer.FromEnv(os.Getenv)
 		if err != nil {
 			return err
 		}
@@ -232,14 +234,14 @@ func run(args []string) error {
 		if arg(rest, 0, "") != "test" || len(rest) < 2 {
 			return fmt.Errorf("usage: prospector mail test <address>")
 		}
-		via, err := mailFromEnv(os.Getenv)
+		via, err := mailer.FromEnv(os.Getenv)
 		if err != nil {
 			return err
 		}
 		if via == nil {
 			return fmt.Errorf("set SMTP_ADDR and MAIL_FROM first")
 		}
-		err = smtpSend(context.Background(), *via, Message{To: rest[1], Subject: "Prospector can send mail",
+		err = mailer.Send(context.Background(), *via, mailer.Message{To: rest[1], Subject: "Prospector can send mail",
 			Body: "This is the test from `prospector mail test`.\n\nIt was sent through " + via.Host + " as " + via.From + ".\n"})
 		if err != nil {
 			return err

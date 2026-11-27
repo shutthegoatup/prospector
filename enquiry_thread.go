@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/shutthegoatup/prospector/internal/mailer"
 )
 
 // EnquiryMessage is one turn in answering an enquiry: a reply we emailed from here, or
@@ -91,9 +93,9 @@ func (a *App) replyEnquiry(ctx context.Context, o *Org, enquiry int64, text, act
 	if err != nil {
 		return nil, err
 	}
-	sendCtx, cancel := context.WithTimeout(ctx, sendLimit)
+	sendCtx, cancel := context.WithTimeout(ctx, mailer.SendLimit)
 	defer cancel()
-	sendErr := a.deliver(sendCtx, *via, Message{To: to, ReplyTo: answers, Subject: "Your message to " + o.Name, Body: m.Text + "\n"})
+	sendErr := a.deliver(sendCtx, *via, mailer.Message{To: to, ReplyTo: answers, Subject: "Your message to " + o.Name, Body: m.Text + "\n"})
 	if err := a.s.SettleReply(o.ID, m, sendErr == nil, actor); err != nil {
 		return nil, err
 	}

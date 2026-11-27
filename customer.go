@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/mailer"
 )
 
 // A customer's page shows someone outside the organisation the onboarding steps that
@@ -145,7 +147,7 @@ func (a *App) customerLinkMail(ctx context.Context, org *Org, to, token string) 
 	if via == nil || a.base == "" {
 		return errNoCustomerMail
 	}
-	return a.deliver(ctx, *via, Message{To: to, Subject: org.Name + ": your onboarding steps",
+	return a.deliver(ctx, *via, mailer.Message{To: to, Subject: org.Name + ": your onboarding steps",
 		Body: org.Name + " has a page showing the steps that are yours while they set you up.\n\n" +
 			"Open it here:\n" + a.base + "/c/" + token + "\n\n" +
 			"The link works once, within 7 days, and opens the page in the browser you use it in. " +
@@ -246,7 +248,7 @@ func (a *App) customerAgain(w http.ResponseWriter, r *http.Request) {
 		if fresh, err := a.s.FreshCustomerLink(acc.Org.ID, acc.Grant.ID); err == nil {
 			org, to := acc.Org, deref(acc.Contact.Email)
 			a.background(func() {
-				ctx, cancel := context.WithTimeout(context.Background(), sendLimit)
+				ctx, cancel := context.WithTimeout(context.Background(), mailer.SendLimit)
 				defer cancel()
 				if err := a.customerLinkMail(ctx, &org, to, fresh); err != nil {
 					// Nothing was sent, so the wait before another try doesn't apply.

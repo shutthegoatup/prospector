@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/mailer"
 )
 
 // CampaignRecipient is one mail of a campaign: whom it is to, and how it went. The rows
@@ -67,7 +69,7 @@ var (
 // meanwhile can't turn into the host's. And it must be a submission server signed in
 // to: one on port 25 with no sign-in would have this host deliver straight to anyone's
 // mail exchanger, as a relay.
-func (a *App) campaignMail(org int64) (*MailServer, error) {
+func (a *App) campaignMail(org int64) (*mailer.Server, error) {
 	m, err := a.s.OrgMail(org)
 	if err != nil {
 		return nil, nil
@@ -75,7 +77,7 @@ func (a *App) campaignMail(org int64) (*MailServer, error) {
 	if m.Username == "" || m.Port == 25 {
 		return nil, errCampaignSubmission
 	}
-	via := &MailServer{Host: m.Host, Port: m.Port, Username: m.Username, From: m.Sender}
+	via := &mailer.Server{Host: m.Host, Port: m.Port, Username: m.Username, From: m.Sender}
 	if m.Password != "" {
 		if via.Password, err = a.s.keys.open(m.Password); err != nil {
 			return nil, fmt.Errorf("this organisation's mail password can't be read: %w", err)
@@ -198,7 +200,7 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 // so an erasure or a cancel that lands first leaves nothing to send. It reports whether
 // the round should go on: not once the mail server can't be reached, nor once the
 // campaign stops.
-func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, gate *mailGate, customers map[int64]bool, r CampaignRecipient) bool {
+func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *mailer.Server, gate *mailGate, customers map[int64]bool, r CampaignRecipient) bool {
 	skip := func(reason string) bool { return noted(a.s.SkipMail(o.ID, r.ID, reason)) }
 	settle := func(status, reason string) bool { return noted(a.s.SettleMail(o.ID, r.ID, status, reason)) }
 	// Stopped since the round began: this one stays with the rest.
@@ -258,21 +260,21 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 		a.s.DropUnsubscribeLink(token)
 		return err == nil
 	}
-	sendCtx, cancel := context.WithTimeout(ctx, sendLimit)
+	sendCtx, cancel := context.WithTimeout(ctx, mailer.SendLimit)
 	defer cancel()
-	sendErr := a.deliver(sendCtx, *via, Message{To: r.Address, Subject: c.Subject, Body: body, Unsubscribe: unsubscribe})
+	sendErr := a.deliver(sendCtx, *via, mailer.Message{To: r.Address, Subject: c.Subject, Body: body, Unsubscribe: unsubscribe})
 	switch {
 	case sendErr == nil:
 		noted(a.s.CampaignWent(o.ID, c.ID))
 		return settle(MailSent, "")
-	case errors.Is(sendErr, errRefusedRecipient):
+	case errors.Is(sendErr, mailer.ErrRefusedRecipient):
 		// One refused address is that address; several in a row is the server refusing
 		// the campaign, which pauses it before the whole list is used up.
 		a.s.DropUnsubscribeLink(token)
 		log.Printf("campaign %d: %v", c.ID, sendErr)
 		settled := settle(MailFailed, "the mail server refused this address")
 		return a.failedToSend(c) && settled
-	case errors.Is(sendErr, errUnsent):
+	case errors.Is(sendErr, mailer.ErrUnsent):
 		// Nothing went, so it waits for the next round, and the round stops: the server
 		// is likely to refuse the next one too.
 		a.s.DropUnsubscribeLink(token)
