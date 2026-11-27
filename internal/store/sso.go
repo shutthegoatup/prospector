@@ -77,3 +77,5 @@ func (k *Keyring) IdpSpec(c *SSO) (IdpSpec, error) {
 	secret, err := k.Open(c.ClientSecret)
 	return IdpSpec{Issuer: c.Issuer, ClientID: c.ClientID, Secret: secret}, err
 }
+
+func UnusableHash() string { return "!" + RandomToken(32) }

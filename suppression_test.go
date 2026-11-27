@@ -17,7 +17,7 @@ import (
 // link makes an unsubscribe link for an address, as a marketing mail will.
 func link(t *testing.T, s *Store, org int64, address string) string {
 	t.Helper()
-	token, err := s.unsubscribeLink(s.DB, org, address)
+	token, err := s.MintUnsubscribeLink(s.DB, org, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,10 +98,10 @@ func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
 	}
 
 	// Marketing mail can't go to them now, whatever the case of the address.
-	if err := s.marketable(s.DB, o, "HANNAH@larkmoor.example", ""); err != errSuppressed {
+	if err := s.Marketable(s.DB, o, "HANNAH@larkmoor.example", ""); err != errSuppressed {
 		t.Errorf("an unsubscribed address is marketable: %v", err)
 	}
-	if err := s.marketable(s.DB, other, "hannah@larkmoor.example", ""); err != nil {
+	if err := s.Marketable(s.DB, other, "hannah@larkmoor.example", ""); err != nil {
 		t.Errorf("the address is held against another organisation: %v", err)
 	}
 }
@@ -219,7 +219,7 @@ func TestErasureAndNeverContactKeepAnAddressUnmailed(t *testing.T) {
 			t.Errorf("erasing her left %d rows of %T with her address (%v)", left, table, err)
 		}
 	}
-	if err := s.marketable(s.DB, o, "hannah@larkmoor.example", ""); err != errErased {
+	if err := s.Marketable(s.DB, o, "hannah@larkmoor.example", ""); err != errErased {
 		t.Errorf("an erased address is marketable: %v", err)
 	}
 
@@ -227,10 +227,10 @@ func TestErasureAndNeverContactKeepAnAddressUnmailed(t *testing.T) {
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.marketable(s.DB, o, "sven@nordkap.example", ""); err == nil {
+	if err := s.Marketable(s.DB, o, "sven@nordkap.example", ""); err == nil {
 		t.Error("an address on the never-contact list is marketable")
 	}
-	if err := s.marketable(s.DB, o, "tom@larkmoor.example", ""); err != nil {
+	if err := s.Marketable(s.DB, o, "tom@larkmoor.example", ""); err != nil {
 		t.Errorf("an address nothing holds against is not marketable: %v", err)
 	}
 }
@@ -286,7 +286,7 @@ func TestTheListHoldsAtItsEdges(t *testing.T) {
 	if err := s.UnsubscribeByToken(token); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.marketable(s.DB, o, "sven@nordkap.example", ""); err != errSuppressed {
+	if err := s.Marketable(s.DB, o, "sven@nordkap.example", ""); err != errSuppressed {
 		t.Errorf("an unsubscribe after the row was taken off was lost: %v", err)
 	}
 

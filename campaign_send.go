@@ -213,7 +213,7 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *mailer.Serve
 	if _, err := bareAddress(r.Address); err != nil {
 		return skip("no longer one email address")
 	}
-	if why := gate.whyFor(c.Kind, r.Address, link); why != nil {
+	if why := gate.WhyFor(c.Kind, r.Address, link); why != nil {
 		because, known := leftOutBecause(why)
 		if !known {
 			log.Printf("campaign %d: checking a mail: %v", c.ID, why)

@@ -134,7 +134,7 @@ func (s *outreachStore) Audience(o *Org, c Campaign) ([]Recipient, error) {
 }
 
 func (s *outreachStore) audienceWork(o *Org) (*audienceWork, error) {
-	g, err := s.suppression.gate(s.DB, o)
+	g, err := s.suppression.Gate(s.DB, o)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +187,7 @@ func (s *outreachStore) audience(o *Org, c Campaign, w *audienceWork) ([]Recipie
 			r.Address = addr
 			if first, twice := seen[addr]; twice {
 				r.LeftOut = "same address as " + first
-			} else if why := w.gate.whyFor(c.Kind, addr, deref(p.Linkedin)); why != nil {
+			} else if why := w.gate.WhyFor(c.Kind, addr, deref(p.Linkedin)); why != nil {
 				because, known := leftOutBecause(why)
 				if !known {
 					return nil, why

@@ -1,6 +1,10 @@
 package store
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // A task is a brief a person wrote and the requests made on it since. Nothing an
 // agent said while working is kept: what it found is the companies, people and
@@ -42,4 +46,12 @@ type TaskNote struct {
 	Kind      string    `json:"kind"`
 	Text      string    `json:"text"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+func OpenTask(tx *gorm.DB, org, id int64) (*Task, error) {
+	var t Task
+	if err := tx.Where("org_id = ? and id = ? and closed_at is null", org, id).First(&t).Error; err != nil {
+		return nil, Missing(err, "no open task %d in this organisation", id)
+	}
+	return &t, nil
 }

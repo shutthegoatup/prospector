@@ -6,8 +6,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"gorm.io/gorm"
 )
 
 const (
@@ -42,14 +40,6 @@ func words(text string, max int, what string) (string, error) {
 		return "", fmt.Errorf("%s is %d characters; %d at most", what, n, max)
 	}
 	return text, nil
-}
-
-func openTask(tx *gorm.DB, org, id int64) (*Task, error) {
-	var t Task
-	if err := tx.Where("org_id = ? and id = ? and closed_at is null", org, id).First(&t).Error; err != nil {
-		return nil, missing(err, "no open task %d in this organisation", id)
-	}
-	return &t, nil
 }
 
 const (

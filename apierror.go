@@ -48,13 +48,6 @@ func unstorable(err error) bool {
 	return breaksRule(err) || errors.As(err, &pg) && strings.HasPrefix(pg.Code, "22")
 }
 
-// breaksRule is the part of unstorable that is a row against one of the database's
-// rules, a unique index among them, and not a character it won't store.
-func breaksRule(err error) bool {
-	var pg *pgconn.PgError
-	return errors.As(err, &pg) && strings.HasPrefix(pg.Code, "23")
-}
-
 const (
 	sayOurs       = "the server couldn't finish that; try again in a moment"
 	sayTaken      = "that couldn't be saved: it clashes with something already here"

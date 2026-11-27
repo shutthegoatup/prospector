@@ -37,3 +37,9 @@ const RunWorking = "running"
 const RunWaiting = "waiting"
 
 func (r AgentRun) Going() bool { return r.Status == RunWorking || r.Status == RunWaiting }
+
+const BuiltinPrefix = "builtin"
+
+// BuiltinKeyName is an agent's name as its key carries it into the record, marked so
+// it isn't taken for a key someone made for an agent of their own.
+func BuiltinKeyName(agent string) string { return agent + " (built in)" }

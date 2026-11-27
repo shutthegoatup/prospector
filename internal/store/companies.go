@@ -100,3 +100,10 @@ func LinkedinPath(link string) string {
 	}
 	return strings.TrimRight(path, "/")
 }
+
+var countryInName = regexp.MustCompile(`\s*\(.*\)\s*$`)
+
+// CompanyName strips the "(UK, group)" tags the drafts put after maker names.
+func CompanyName(maker string) string {
+	return strings.TrimSpace(countryInName.ReplaceAllString(maker, ""))
+}

@@ -67,8 +67,8 @@ var (
 	gladRe      = regexp.MustCompile(` ((?:Would be glad|Glad) to connect[^\n]*)\n?$`)
 	sentDateRe  = regexp.MustCompile(`^## (\d{4}-\d\d-\d\d)`)
 	notSentRe   = regexp.MustCompile(`^- \*\*(On hold|Held back|Waiting)`)
-	personSplit = regexp.MustCompile(`[,;(]`)
-	digitStart  = regexp.MustCompile(`^\d`)
+
+	digitStart = regexp.MustCompile(`^\d`)
 )
 
 func evidence(text, ownDomain string) (string, string) {
@@ -274,11 +274,6 @@ func parseNumbered(name, text, ownDomain string) []Draft {
 	d.Flags = strings.TrimSpace(flags)
 	d.Sources, d.Phone = evidence(text, ownDomain)
 	return []Draft{d}
-}
-
-func personKey(person string) string {
-	words := strings.Fields(personSplit.Split(person, 2)[0])
-	return strings.Join(words[:min(2, len(words))], " ")
 }
 
 // ReadRepo parses a folder laid out as leads/outreach/*.md, leads/prospects.csv and

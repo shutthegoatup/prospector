@@ -157,7 +157,7 @@ func TestABounceIsKeptBesideWhyTheyAreOnTheList(t *testing.T) {
 	s, o, _, _ := signedIn(t)
 	unsubscribe := func(addr string) {
 		t.Helper()
-		if _, err := s.suppress(s.DB, o.ID, addr, SuppressUnsubscribed, ""); err != nil {
+		if _, err := s.SuppressIn(s.DB, o.ID, addr, SuppressUnsubscribed, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -189,13 +189,13 @@ func TestABounceIsKeptBesideWhyTheyAreOnTheList(t *testing.T) {
 	if !maps.Equal(got, want) {
 		t.Errorf("the list:\n got %v\nwant %v", got, want)
 	}
-	g := must(s.gate(s.DB, o))
+	g := must(s.Gate(s.DB, o))
 	for _, addr := range []string{"first@larkmoor.example", "then@larkmoor.example", "added@larkmoor.example"} {
-		if err := g.whyFor(KindService, addr, ""); err != errBounced {
+		if err := g.WhyFor(KindService, addr, ""); err != errBounced {
 			t.Errorf("a service notice to %s, which bounced: %v", addr, err)
 		}
 	}
-	if err := g.whyFor(KindService, "spam@larkmoor.example", ""); err != errComplained {
+	if err := g.WhyFor(KindService, "spam@larkmoor.example", ""); err != errComplained {
 		t.Errorf("a service notice to someone who complained: %v", err)
 	}
 }

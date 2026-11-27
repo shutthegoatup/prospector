@@ -3,7 +3,9 @@ package store
 import (
 	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
 
@@ -28,3 +30,10 @@ func Missing(err error, format string, args ...any) error {
 type Conflict string
 
 func (e Conflict) Error() string { return string(e) }
+
+// BreaksRule is the part of unstorable that is a row against one of the database's
+// rules, a unique index among them, and not a character it won't store.
+func BreaksRule(err error) bool {
+	var pg *pgconn.PgError
+	return errors.As(err, &pg) && strings.HasPrefix(pg.Code, "23")
+}

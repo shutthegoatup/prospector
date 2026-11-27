@@ -1,44 +1,13 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
-	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
-
-var errErased = errors.New("this person was erased on request and can't be added again")
-
-var emailRe = regexp.MustCompile(`[^\s,;:<>()"']+@[^\s,;:<>()"']+`)
-
-// identifiers are the hashes for a name at a company, the addresses in an email field
-// and a LinkedIn profile. A name alone would ban a namesake elsewhere, and only a
-// profile counts as a link: every company placeholder shares one search link.
-func identifiers(org int64, person, maker, email, link string) []string {
-	var out []string
-	add := func(kind, v string) {
-		if v != "" {
-			sum := sha256.Sum256([]byte(fmt.Sprintf("%d\x00%s\x00%s", org, kind, v)))
-			out = append(out, hex.EncodeToString(sum[:]))
-		}
-	}
-	if name, co := strings.ToLower(personKey(person)), strings.ToLower(companyName(maker)); name != "" && co != "" {
-		add("name", name+"\x00"+co)
-	}
-	for _, e := range emailRe.FindAllString(strings.ToLower(email), -1) {
-		add("email", strings.Trim(e, "."))
-	}
-	if p := strings.Split(linkedinPath(link), "/"); len(p) >= 2 && p[0] == "in" {
-		add("linkedin", p[1])
-	}
-	return out
-}
 
 func erased(tx *gorm.DB, org int64, person, maker, email, link string) error {
 	ids := identifiers(org, person, maker, email, link)

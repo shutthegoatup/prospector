@@ -10,8 +10,6 @@ import (
 const (
 	AudienceConversations = "conversations"
 
-	KindMarketing = "marketing"
-
 	CampaignDraft     = "draft"
 	CampaignSending   = "sending"
 	CampaignPaused    = "paused"

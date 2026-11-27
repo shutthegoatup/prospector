@@ -59,8 +59,8 @@ type Store struct {
 }
 
 func newStore(c *core) *Store {
-	s := &Store{core: c, identityStore: identityStore{c}, agentStore: agentStore{c}, ssoStore: ssoStore{c},
-		suppressionStore: suppressionStore{c}, customerStore: customerStore{Core: c}, dealStore: dealStore{Core: c},
+	s := &Store{core: c, identityStore: identityStore{c}, agentStore: agentStore{Core: c}, ssoStore: ssoStore{Core: c},
+		suppressionStore: suppressionStore{Core: c}, customerStore: customerStore{Core: c}, dealStore: dealStore{Core: c},
 		subscriptionStore: subscriptionStore{Core: c}, onboardingStore: onboardingStore{Core: c}}
 	// An area that needs another's queries holds that area, not the whole store.
 	s.prospectingStore = prospectingStore{core: c, identity: &s.identityStore, deals: &s.dealStore}
