@@ -393,7 +393,7 @@ function Pages({
       pdfjs.GlobalWorkerOptions.workerSrc = "/assets/js/pdf.worker.min.mjs";
       const doc = await fetchClient.GET("/o/{org}/api/v1/agreements/{id}/document", { params: { path: { org, id } }, parseAs: "arrayBuffer" });
       if (doc.error || !doc.data) throw new Error("The document couldn't be fetched.");
-      const pdf = await pdfjs.getDocument({ data: new Uint8Array(doc.data), isEvalSupported: false }).promise;
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(doc.data) }).promise;
       const width = Math.min(here.current?.clientWidth || 640, 760);
       const pages: Sheet[] = [];
       for (let n = 1; n <= pdf.numPages; n++) {
@@ -458,7 +458,7 @@ function Canvas({ sheet }: { sheet: Sheet }) {
     const viewport = sheet.page.getViewport({ scale: (sheet.w / sheet.page.getViewport({ scale: 1 }).width) * devicePixelRatio });
     canvas.width = viewport.width;
     canvas.height = viewport.height;
-    const task = sheet.page.render({ canvasContext: canvas.getContext("2d")!, viewport });
+    const task = sheet.page.render({ canvas, viewport });
     return () => task.cancel();
   }, [sheet]);
   return <canvas ref={ref} className="block w-full" />;
