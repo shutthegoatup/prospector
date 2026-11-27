@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // The Agents page's reads and the keys an owner makes for outside agents.
@@ -72,7 +72,7 @@ func (s apiServer) keyByID(org, id int64) (api.APIKey, error) {
 
 func (s apiServer) CreateKey(ctx context.Context, in api.CreateKeyRequestObject) (api.CreateKeyResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send the key's name and scopes")
+		return nil, say.New("send the key's name and scopes")
 	}
 	q := reqFrom(ctx)
 	secret, k, err := s.a.s.CreateKey(q.Org.ID, in.Body.Name, in.Body.Scopes, q.Actor())
@@ -84,7 +84,7 @@ func (s apiServer) CreateKey(ctx context.Context, in api.CreateKeyRequestObject)
 
 func (s apiServer) ChangeKey(ctx context.Context, in api.ChangeKeyRequestObject) (api.ChangeKeyResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send the key's scopes")
+		return nil, say.New("send the key's scopes")
 	}
 	org := reqFrom(ctx).Org.ID
 	if err := s.a.s.SetKeyScopes(org, in.Id, in.Body.Scopes); err != nil {
@@ -176,8 +176,8 @@ func (s apiServer) ListAgentActivity(ctx context.Context, in api.ListAgentActivi
 }
 
 // refuseKeys answers an operation no key may make.
-func refuseKeys(w http.ResponseWriter) {
-	writeProblem(w, http.StatusForbidden, "no key can make, change or revoke a key: an owner does that, signed in")
+func refuseKeys(w http.ResponseWriter, r *http.Request) {
+	writeProblem(w, r, http.StatusForbidden, say.New("no key can make, change or revoke a key: an owner does that, signed in"))
 }
 
 var mcpTools = []struct{ Name, Scope, What string }{

@@ -1,10 +1,11 @@
 package store
 
 import (
-	"fmt"
 	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func DomainOf(u string) string {
@@ -52,7 +53,7 @@ func (set OrgSettings) Listed(email, link string) error {
 			hit = email != "" && (strings.HasSuffix(email, "@"+host) || strings.HasSuffix(email, "."+host))
 		}
 		if hit {
-			return fmt.Errorf("%s is on the never-contact list", raw)
+			return say.Errorf("%s is on the never-contact list", raw)
 		}
 	}
 	return nil
@@ -99,4 +100,11 @@ func LinkedinPath(link string) string {
 		path = path[:i]
 	}
 	return strings.TrimRight(path, "/")
+}
+
+var countryInName = regexp.MustCompile(`\s*\(.*\)\s*$`)
+
+// CompanyName strips the "(UK, group)" tags the drafts put after maker names.
+func CompanyName(maker string) string {
+	return strings.TrimSpace(countryInName.ReplaceAllString(maker, ""))
 }

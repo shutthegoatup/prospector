@@ -27,7 +27,10 @@ func TestOnlyTheStoreTouchesTheDatabase(t *testing.T) {
 	// goes by name alone, so a name both use would fail the other type's calls.
 	// The core's handle on the database, its scoping to an organisation and its history
 	// log are exported from internal/store, but are the store's alone to use.
-	private, others := map[string]bool{"DB": true, "InOrg": true, "Log": true, "LogAs": true}, map[string]bool{}
+	private, others := map[string]bool{"DB": true}, map[string]bool{}
+	for name := range withinTheStore {
+		private[name] = true
+	}
 	for _, name := range files {
 		if strings.HasSuffix(name, "_test.go") {
 			continue
@@ -69,18 +72,32 @@ func TestOnlyTheStoreTouchesTheDatabase(t *testing.T) {
 	}
 }
 
+// withinTheStore are store methods that take or give back a handle on the database, for
+// the store's own code: the core's helpers the areas' queries build on, and one area's
+// query that another's calls inside its own transaction now the two are in different
+// packages. TestOnlyTheStoreTouchesTheDatabase keeps them out of everything else.
+var withinTheStore = map[string]bool{
+	"InOrg": true, "Log": true, "LogAs": true,
+	"SetDeal":             true, // prospecting writes a contact's deal through it
+	"SuppressIn":          true, // a bounce, and an agent's address, suppress within their own work
+	"Gate":                true, // outreach and research ask suppression who may be mailed
+	"Marketable":          true,
+	"MintUnsubscribeLink": true, // a campaign's mail carries a link made in its own transaction
+	// Research holds back a company it finds, and suggests details, inside its own work.
+	"HeldWhenFound": true, "HeldWhenReached": true, "SuggestDetails": true,
+	// The search's query text, which agents' searches build on.
+	"CompanyMatch": true, "ContactMatch": true,
+}
+
 // TestNoStoreMethodHandsOutTheDatabase keeps the rule above from being got round: a
 // method that took or gave back a handle on the database would let its caller query.
 func TestNoStoreMethodHandsOutTheDatabase(t *testing.T) {
 	t.Parallel()
 	handle := reflect.TypeOf(&gorm.DB{})
 	store := reflect.TypeOf(&Store{})
-	// The core's own helpers, which the areas' queries build on; the rule above keeps
-	// them out of everything else.
-	core := map[string]bool{"InOrg": true, "Log": true, "LogAs": true}
 	for i := range store.NumMethod() {
 		m := store.Method(i)
-		if core[m.Name] {
+		if withinTheStore[m.Name] {
 			continue
 		}
 		for j := range m.Type.NumIn() {

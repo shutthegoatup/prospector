@@ -9,19 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"gorm.io/gorm"
-
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const (
-	MailQueued    = "queued"
-	MailSending   = "sending"
-	MailSent      = "sent"
-	MailFailed    = "failed"
-	MailUnknown   = "unknown"
-	MailSkipped   = "skipped"
-	MailCancelled = "cancelled"
 
 	// sendEach is how many of one campaign's mails go in one round, and sendEvery how
 	// often a round runs: about ninety a minute, a pace a mail server takes kindly.
@@ -40,8 +32,8 @@ const (
 )
 
 var (
-	errCampaignMail       = errors.New("a campaign goes through your organisation's own mail server, so an owner sets one in Settings first; the server's own is for sign-in mail")
-	errCampaignSubmission = errors.New("a campaign goes through a mail server you sign in to, with a username and password, on port 587, 465 or 2525; not straight to a recipient's server on port 25")
+	errCampaignMail       = say.New("a campaign goes through your organisation's own mail server, so an owner sets one in Settings first; the server's own is for sign-in mail")
+	errCampaignSubmission = say.New("a campaign goes through a mail server you sign in to, with a username and password, on port 587, 465 or 2525; not straight to a recipient's server on port 25")
 )
 
 // campaignMail is the organisation's own mail server, or nil. Never the server's
@@ -77,10 +69,10 @@ func (a *App) sendable(o *Org) error {
 		return errCampaignMail
 	}
 	if u, err := url.Parse(a.base); a.base == "" || err != nil || u.Scheme != "https" {
-		return errors.New("a campaign's unsubscribe link needs this server's public https address (PROSPECTOR_URL)")
+		return say.New("a campaign's unsubscribe link needs this server's public https address (PROSPECTOR_URL)")
 	}
 	if strings.TrimSpace(o.Settings.PostalAddress) == "" {
-		return errors.New("a campaign has to say where you can be written to: an owner sets the postal address in Settings")
+		return say.New("a campaign has to say where you can be written to: an owner sets the postal address in Settings")
 	}
 	return nil
 }
@@ -107,9 +99,6 @@ func (a *App) sendRound(ctx context.Context, now time.Time) {
 		a.sendSome(ctx, c, now)
 	}
 }
-
-// stored is whether a query went through, logging it when it didn't.
-func stored(res *gorm.DB) bool { return logged(res) == nil }
 
 // noted is stored for what the store answers with.
 func noted(err error) bool {
@@ -213,7 +202,7 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *mailer.Serve
 	if _, err := bareAddress(r.Address); err != nil {
 		return skip("no longer one email address")
 	}
-	if why := gate.whyFor(c.Kind, r.Address, link); why != nil {
+	if why := gate.WhyFor(c.Kind, r.Address, link); why != nil {
 		because, known := leftOutBecause(why)
 		if !known {
 			log.Printf("campaign %d: checking a mail: %v", c.ID, why)

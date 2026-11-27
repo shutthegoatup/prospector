@@ -327,7 +327,7 @@ func TestSearchIndexIsBuiltForExistingRows(t *testing.T) {
 	if _, err := s.QuickAddPerson(o, QuickAdd{Name: "Imogen Vale", Company: "Windrush Marine"}, "test"); err != nil {
 		t.Fatal(err)
 	}
-	s.indexSearch()
+	s.IndexSearch()
 	var built int64
 	if err := s.DB.Raw("select count(*) from pg_indexes where schemaname = current_schema() and indexname in ?", indexes).Scan(&built).Error; err != nil || built != int64(len(indexes)) {
 		t.Fatalf("%d of the %d search indexes were rebuilt: %v", built, len(indexes), err)

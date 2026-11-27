@@ -10,48 +10,13 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
-
-// enrichPerson is what a vendor is told about someone: no more than it needs to find them.
-type enrichPerson struct {
-	Name, Domain, Company, Linkedin string
-}
-
-// vendorFind is what a vendor found for one field; an empty Value is a miss.
-type vendorFind struct {
-	Value       string
-	EmailStatus string
-}
-
-type vendor interface {
-	Name() string
-	Fields() []string
-	Find(ctx context.Context, c *http.Client, base, key string, p enrichPerson, field string) (vendorFind, error)
-}
-
-var vendors = map[string]vendor{}
-
-func vendorKinds() []string {
-	var out []string
-	for k := range vendors {
-		out = append(out, k)
-	}
-	slices.Sort(out)
-	return out
-}
 
 const (
-	enrichAgain     = 30 * 24 * time.Hour
 	enrichLookupFor = 20 * time.Second
-	maxMonthlyLimit = 100_000
 )
-
-type EnricherIn struct {
-	Kind         string
-	APIKey       string
-	Position     int
-	MonthlyLimit int
-}
 
 // EnrichAsked is what came of asking for one field.
 type EnrichAsked struct {
@@ -78,7 +43,7 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 		}
 	}
 	if len(in.Fields) == 0 {
-		return nil, errors.New("fields is needed: which of email, phone and linkedin to look for")
+		return nil, say.New("fields is needed: which of email, phone and linkedin to look for")
 	}
 	found, err := s.ContactByID(o.ID, in.ContactID)
 	if err != nil {
@@ -86,7 +51,7 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 	}
 	c := *found
 	if strings.HasPrefix(c.Key, "org:") {
-		return nil, errors.New("that is a company's own row, not a person")
+		return nil, say.New("that is a company's own row, not a person")
 	}
 	co := &Company{}
 	if c.CompanyID != nil {
@@ -96,7 +61,7 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 	}
 	domain := strings.ToLower(strings.TrimSpace(co.Domain))
 	if why := o.Settings.Unlookable(c, domain); why != "" {
-		return nil, conflict(why)
+		return nil, conflict{Text: say.New(why)}
 	}
 	person := enrichPerson{Name: displayName(c), Domain: domain, Company: co.Name, Linkedin: deref(c.Linkedin)}
 	enrichers, err := s.Enrichers(o.ID)
@@ -107,7 +72,7 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 	for _, field := range in.Fields {
 		field = strings.ToLower(strings.TrimSpace(field))
 		if !slices.Contains(suggestable, field) {
-			return nil, fmt.Errorf("unknown field %q: email, phone or linkedin", field)
+			return nil, say.Errorf("unknown field %q: email, phone or linkedin", field)
 		}
 		if detailOf(c, field) != "" {
 			out = append(out, EnrichAsked{Field: field, Outcome: "has"})
@@ -209,16 +174,9 @@ func (a *App) keepFind(o *Org, who Actor, c Contact, field, kind, value, status 
 }
 
 const (
-	lookupFound   = "found"
 	lookupNone    = "none found"
 	lookupNotKept = "found, not kept"
 )
-
-// Lookup is a vendor's latest answer about one detail of one person.
-type Lookup struct {
-	Field, Vendor, Outcome string
-	At                     time.Time
-}
 
 func (a *App) logEnrich(org int64, who Actor, c Contact, field, value string) {
 	noted(a.s.LogEnrich(org, who, c.ID, field, value))

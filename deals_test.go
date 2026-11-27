@@ -187,7 +187,7 @@ func TestADealFollowsItsPersonThroughARestore(t *testing.T) {
 		t.Fatal(err)
 	}
 	renumbered.ID = goes.ID + 50
-	if _, err := s.replaceContacts(o.ID, []Contact{renumbered}, nil); err != nil {
+	if _, err := s.ReplaceContacts(o.ID, []Contact{renumbered}, nil); err != nil {
 		t.Fatal(err)
 	}
 	deals := must(s.Deals(o.ID))

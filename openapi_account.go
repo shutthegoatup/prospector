@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // The account operations sign people in and out, so they are asked by whoever is there:
@@ -14,7 +15,7 @@ import (
 func (a *App) accountCaller(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if hasKey(r) {
-			writeProblem(w, http.StatusForbidden, "a key can't sign in, sign out or change a password: a person does that in a browser")
+			writeProblem(w, r, http.StatusForbidden, say.New("a key can't sign in, sign out or change a password: a person does that in a browser"))
 			return
 		}
 		// Anyone may send these, so none is let run to more than an address and a password need.
@@ -24,7 +25,7 @@ func (a *App) accountCaller(next http.Handler) http.Handler {
 	})
 }
 
-var errSignedOut = typed{http.StatusUnauthorized, api.ProblemTypeSignedOut, "signed out", 0}
+var errSignedOut = typed{http.StatusUnauthorized, api.ProblemTypeSignedOut, say.New("signed out"), 0}
 
 func signedInFrom(ctx context.Context) (*Req, error) {
 	q := reqFrom(ctx)
@@ -82,7 +83,7 @@ func setCookies(w http.ResponseWriter, cookies []*http.Cookie) {
 
 func (s apiServer) SignIn(ctx context.Context, in api.SignInRequestObject) (api.SignInResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New(`send {"email": "…", "password": "…"}`)
+		return nil, say.New(`send {"email": "…", "password": "…"}`)
 	}
 	r := requestFrom(ctx)
 	token, u, device, wait, err := s.a.passwordSignIn(r, in.Body.Email, in.Body.Password)
@@ -90,7 +91,7 @@ func (s apiServer) SignIn(ctx context.Context, in api.SignInRequestObject) (api.
 	case wait > 0:
 		return nil, throttledFor(wait)
 	case errors.Is(err, errWrongLogin):
-		return nil, typed{http.StatusUnauthorized, api.ProblemTypeWrongLogin, err.Error(), 0}
+		return nil, typed{http.StatusUnauthorized, api.ProblemTypeWrongLogin, errWrongLogin, 0}
 	case err != nil:
 		return nil, err
 	}
@@ -133,7 +134,7 @@ func (s apiServer) ChangePassword(ctx context.Context, in api.ChangePasswordRequ
 		return nil, err
 	}
 	if in.Body == nil {
-		return nil, errors.New(`send {"current": "…", "new": "…"}`)
+		return nil, say.New(`send {"current": "…", "new": "…"}`)
 	}
 	device, wait, err := s.a.passwordChange(requestFrom(ctx), q.User, in.Body.Current, in.Body.New)
 	if wait > 0 {
@@ -168,7 +169,7 @@ func (s apiServer) FindSingleSignOn(ctx context.Context, in api.FindSingleSignOn
 		return nil, noSuch("this server has no address of its own (PROSPECTOR_URL) for a provider to send people back to, so it has no single sign-on")
 	}
 	if in.Body == nil {
-		return nil, errors.New(`send {"email": "…"}`)
+		return nil, say.New(`send {"email": "…"}`)
 	}
 	email := strings.ToLower(strings.TrimSpace(in.Body.Email))
 	orgs, err := s.a.s.SSOOrgsFor(emailDomain(email))
@@ -182,19 +183,19 @@ func (s apiServer) FindSingleSignOn(ctx context.Context, in api.FindSingleSignOn
 	return out, nil
 }
 
-func (s apiServer) RequestPasswordReset(_ context.Context, in api.RequestPasswordResetRequestObject) (api.RequestPasswordResetResponseObject, error) {
+func (s apiServer) RequestPasswordReset(ctx context.Context, in api.RequestPasswordResetRequestObject) (api.RequestPasswordResetResponseObject, error) {
 	if !s.a.mailOn() {
 		return nil, noSuch("this server sends no mail, so it can't email a link: ask whoever runs it to reset your password")
 	}
 	if in.Body == nil {
-		return nil, errors.New(`send {"email": "…"}`)
+		return nil, say.New(`send {"email": "…"}`)
 	}
-	email := in.Body.Email
-	s.a.background(func() { s.a.sendReset(email) })
+	email, lang := in.Body.Email, languageOf(requestFrom(ctx))
+	s.a.background(func() { s.a.sendReset(email, lang) })
 	return api.RequestPasswordReset202Response{}, nil
 }
 
-var errLinkUsed = typed{http.StatusGone, api.ProblemTypeLinkUsed, errBadLink.Error(), 0}
+var errLinkUsed = typed{http.StatusGone, api.ProblemTypeLinkUsed, errBadLink, 0}
 
 func (s apiServer) GetPasswordReset(_ context.Context, in api.GetPasswordResetRequestObject) (api.GetPasswordResetResponseObject, error) {
 	u, err := s.a.s.PasswordTokenUser(in.Token)
@@ -206,7 +207,7 @@ func (s apiServer) GetPasswordReset(_ context.Context, in api.GetPasswordResetRe
 
 func (s apiServer) ResetPassword(ctx context.Context, in api.ResetPasswordRequestObject) (api.ResetPasswordResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New(`send {"password": "…"}`)
+		return nil, say.New(`send {"password": "…"}`)
 	}
 	select {
 	case hashSlots <- struct{}{}:

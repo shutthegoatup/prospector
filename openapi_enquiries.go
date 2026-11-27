@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func messageOut(m EnquiryMessage) api.EnquiryMessage {
@@ -31,7 +31,7 @@ func (s apiServer) ListEnquiryMessages(ctx context.Context, in api.ListEnquiryMe
 
 func (s apiServer) ReplyToEnquiry(ctx context.Context, in api.ReplyToEnquiryRequestObject) (api.ReplyToEnquiryResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send the reply: {\"text\": …}")
+		return nil, say.New("send the reply: {\"text\": …}")
 	}
 	q := reqFrom(ctx)
 	// Their answer goes to the member who wrote. A key has no mailbox of its own.
@@ -48,7 +48,7 @@ func (s apiServer) ReplyToEnquiry(ctx context.Context, in api.ReplyToEnquiryRequ
 
 func (s apiServer) RecordEnquiryAnswer(ctx context.Context, in api.RecordEnquiryAnswerRequestObject) (api.RecordEnquiryAnswerResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send what they said: {\"text\": …}")
+		return nil, say.New("send what they said: {\"text\": …}")
 	}
 	q := reqFrom(ctx)
 	m, err := s.a.s.HearEnquiry(q.Org.ID, in.Id, in.Body.Text, q.Actor())

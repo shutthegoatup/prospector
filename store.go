@@ -11,39 +11,13 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-const (
-	CompanyReview    = "review"
-	CompanyQualified = "qualified"
-	CompanyRejected  = "rejected"
-)
-
-var Columns = []string{"id", "key", "file", "section", "fit", "maker", "person", "first",
-	"linkedin", "email", "note", "subject", "body", "followup", "flags",
-	"linkedin_added", "email_sent", "followup_sent", "replied", "declined", "hold",
-	"sources", "phone", "called", "call_notes", "tz", "send_to", "accepted", "message"}
-
-var Editable = map[string]bool{"phone": true, "email": true, "linkedin": true, "sources": true,
-	"call_notes": true, "tz": true, "person": true, "send_to": true, "message": true, "note": true,
-	"body": true, "followup": true, "subject": true,
-	"stage": true, "next_step": true, "next_date": true, "lost_reason": true, "title": true}
-
-// loggedValue are the fields whose new value goes into the history: where a conversation
-// stands and when it is due. The rest are a person's details or free text about them,
-// which their own row already holds, so the history keeps only that they changed.
-var loggedValue = map[string]bool{"stage": true, "next_date": true}
-
-// stringFields are the newer non-pointer columns, which store "" rather than NULL.
-var stringFields = map[string]bool{"stage": true, "next_step": true, "lost_reason": true, "title": true}
-
-var Marks = map[string]string{"linkedin": "linkedin_added", "email": "email_sent", "followup": "followup_sent",
-	"call": "called", "replied": "replied", "declined": "declined", "hold": "hold", "accepted": "accepted"}
-
 // Store is every area's queries, each area a type of its own embedded here so its
 // methods are the store's. They share one core, so a key or resolver set on the store
 // reaches every area.
 type Store struct {
 	*core
 	researchStore
+	privacyStore
 	outreachStore
 	agreementStore
 	enquiryStore
@@ -59,15 +33,15 @@ type Store struct {
 }
 
 func newStore(c *core) *Store {
-	s := &Store{core: c, identityStore: identityStore{c}, agentStore: agentStore{c}, ssoStore: ssoStore{c},
-		suppressionStore: suppressionStore{c}, customerStore: customerStore{c}, dealStore: dealStore{c},
-		subscriptionStore: subscriptionStore{c}, onboardingStore: onboardingStore{c}}
+	s := &Store{core: c, identityStore: identityStore{Core: c}, agentStore: agentStore{Core: c}, ssoStore: ssoStore{Core: c},
+		suppressionStore: suppressionStore{Core: c}, customerStore: customerStore{Core: c}, dealStore: dealStore{Core: c},
+		subscriptionStore: subscriptionStore{Core: c}, onboardingStore: onboardingStore{Core: c}, privacyStore: privacyStore{Core: c}}
 	// An area that needs another's queries holds that area, not the whole store.
-	s.prospectingStore = prospectingStore{core: c, identity: &s.identityStore, deals: &s.dealStore}
-	s.enquiryStore = enquiryStore{core: c, prospecting: &s.prospectingStore}
-	s.agreementStore = agreementStore{core: c, prospecting: &s.prospectingStore, identity: &s.identityStore}
-	s.outreachStore = outreachStore{core: c, identity: &s.identityStore, suppression: &s.suppressionStore, subscriptions: &s.subscriptionStore}
-	s.researchStore = researchStore{core: c, prospecting: &s.prospectingStore, identity: &s.identityStore, outreach: &s.outreachStore}
+	s.prospectingStore = prospectingStore{Core: c, Identity: &s.identityStore, Sales: &s.dealStore}
+	s.enquiryStore = enquiryStore{Core: c, Prospecting: &s.prospectingStore}
+	s.agreementStore = agreementStore{Core: c, Prospecting: &s.prospectingStore, Identity: &s.identityStore}
+	s.outreachStore = outreachStore{Core: c, Identity: &s.identityStore, Suppression: &s.suppressionStore, Billing: &s.subscriptionStore}
+	s.researchStore = researchStore{Core: c, Prospecting: &s.prospectingStore, Identity: &s.identityStore, Outreach: &s.outreachStore}
 	return s
 }
 
@@ -113,19 +87,6 @@ func connect(dsn string) (*Store, error) {
 	return newStore(&core{DB: db}), nil
 }
 
-// holdOrg and hold make a transaction wait its turn on one row, so a rule that is
-// checked by reading and then kept by writing ("add it unless it is already here")
-// holds when two callers arrive together. Taken before the first read; an organisation
-// before anything in it.
-func holdOrg(tx *gorm.DB, org int64) error {
-	return tx.Exec("update orgs set id = id where id = ?", org).Error
-}
-
-func hold(tx *gorm.DB, model any, org, id int64) error {
-	// UpdateColumn, so holding a company doesn't count as changing it.
-	return tx.Model(model).Where("org_id = ? and id = ?", org, id).UpdateColumn("id", gorm.Expr("id")).Error
-}
-
 // oneNameWhateverItsCapitals backs ensureCompany's look-up with an index. Companies
 // that already differ only in capitals keep it from being built, which costs the
 // check its backing and nothing else, so the server still starts.
@@ -134,25 +95,4 @@ func (s *Store) oneNameWhateverItsCapitals() {
 	if err != nil {
 		log.Printf("companies in one organisation share a name but for its capitals, so nothing but the look-up keeps another out: %v", err)
 	}
-}
-
-// logged is for a query whose caller has nowhere to send an error: a count or a list
-// on its way to a page. The page then shows nothing, and the log says why.
-func logged(res *gorm.DB) error {
-	if res.Error != nil {
-		log.Printf("database: %v", res.Error)
-	}
-	return res.Error
-}
-
-func today() string { return time.Now().Format("2006-01-02") }
-
-func str(v string) *string { return &v }
-
-// nonEmpty is Python's nullif(v, ”).
-func nonEmpty(v string) *string {
-	if v == "" {
-		return nil
-	}
-	return &v
 }

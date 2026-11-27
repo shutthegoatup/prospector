@@ -1,9 +1,9 @@
 package store
 
 import (
-	"errors"
-	"fmt"
 	"strings"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // Phase is where a contact stands. It is never stored: the dated marks on a contact
@@ -69,17 +69,19 @@ func ValidStage(stage string) bool {
 // A conversation may move between any two stages: deals reopen and get corrected.
 func (c Contact) CanEnterStage(stage string) error {
 	if !ValidStage(stage) {
-		return fmt.Errorf("unknown stage %q", stage)
+		return say.Errorf("unknown stage %q", stage)
 	}
 	if c.Replied == nil {
-		return errors.New("a stage is for someone who has replied; mark the reply first")
+		return say.New("a stage is for someone who has replied; mark the reply first")
 	}
 	return nil
 }
 
 func (c Contact) CanMark() error {
 	if c.Status == ContactSuggested {
-		return errors.New("this contact is still a suggestion in Research; a person picks them first")
+		return say.New("this contact is still a suggestion in Research; a person picks them first")
 	}
 	return nil
 }
+
+const InConversation = "replied is not null and declined is null and status <> 'suggested'"

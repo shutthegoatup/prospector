@@ -114,7 +114,7 @@ func TestTheAgentWorksATaskToTheEnd(t *testing.T) {
 		t.Fatalf("the run: %+v", got)
 	}
 
-	c := must(r.s.companyRef(r.o.ID, "Larkmoor Yachts"))
+	c := must(r.s.CompanyRef(r.o.ID, "Larkmoor Yachts"))
 	facts := must(r.s.Facts(r.o.ID, c.ID))
 	if len(facts) != 1 || facts[0].Field != "configurator" {
 		t.Fatalf("only the fact from a page the agent was shown should be stored: %+v", facts)
@@ -565,7 +565,7 @@ func TestTheSourceGuardHoldsForEveryWayToCiteAPage(t *testing.T) {
 	}
 	r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	for _, name := range []string{"Corvane", "Halvard"} {
-		if _, err := r.s.companyRef(r.o.ID, name); err == nil {
+		if _, err := r.s.CompanyRef(r.o.ID, name); err == nil {
 			t.Errorf("%s was added with a source the agent was never shown", name)
 		}
 	}
@@ -603,7 +603,7 @@ func TestTheAgentCantCiteAPageItWasntShownAnyOtherWay(t *testing.T) {
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
 	r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
-	if _, err := r.s.companyRef(r.o.ID, "Ghost Yachts"); err == nil {
+	if _, err := r.s.CompanyRef(r.o.ID, "Ghost Yachts"); err == nil {
 		t.Fatal("a company was added with a platform and builder sourced from nowhere")
 	}
 }

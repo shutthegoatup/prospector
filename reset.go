@@ -6,22 +6,9 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"github.com/shutthegoatup/prospector/internal/mailer"
-)
-
-const (
-	resetLife  = time.Hour
-	inviteLife = 7 * 24 * time.Hour
-	// resetGap is the least time between two reset emails to one account, so the form
-	// can't be used to fill somebody's inbox.
-	resetGap = 5 * time.Minute
-)
-
-var (
-	errTooSoon = errors.New("a reset link was sent to this account a moment ago")
-	errBadLink = errors.New("this link has expired or has been used: ask for a new one")
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // mailSlots bounds the sends running at once; a request past that is dropped rather
@@ -72,10 +59,15 @@ func (a *App) mailFor(org int64) (*mailer.Server, error) {
 	return via, nil
 }
 
-func (a *App) sendReset(email string) {
+// sendReset mails a link to choose a new password, in the language its owner chose, or
+// else in that of whoever asked for it, who is most likely the one who reads it.
+func (a *App) sendReset(email, lang string) {
 	u, err := a.s.UserByEmail(email)
 	if err != nil {
 		return
+	}
+	if u.Language != "" {
+		lang = u.Language
 	}
 	token, err := a.s.ResetToken(u.ID)
 	if err != nil {
@@ -84,10 +76,10 @@ func (a *App) sendReset(email string) {
 		}
 		return
 	}
-	err = a.deliver(context.Background(), *a.mail, mailer.Message{To: u.Email, Subject: "Reset your Prospector password",
-		Body: "Someone asked to reset the password for this address at " + a.base + ".\n\n" +
-			"Choose a new one here, within the hour:\n" + a.base + "/reset/" + token + "\n\n" +
-			"If that wasn't you, ignore this email: your password stays as it is.\n"})
+	err = a.deliver(context.Background(), *a.mail, mailer.Message{To: u.Email, Subject: say.New("Reset your Prospector password").In(lang),
+		Body: say.Errorf("Someone asked to reset the password for this address at %s.\n\n"+
+			"Choose a new one here, within the hour:\n%s\n\n"+
+			"If that wasn't you, ignore this email: your password stays as it is.\n", a.base, a.base+"/reset/"+token).In(lang)})
 	if err != nil {
 		log.Print("password reset: ", err)
 	}
@@ -114,10 +106,15 @@ func (a *App) invite(ctx context.Context, q *Req, u *User, created bool) (bool, 
 	if err != nil {
 		return false, err
 	}
-	err = a.deliver(ctx, *via, mailer.Message{To: u.Email, Subject: q.Actor() + " added you to " + q.Org.Name + " on Prospector",
-		Body: q.Actor() + " added you to " + q.Org.Name + " on Prospector, at " + a.base + ".\n\n" +
-			"Choose your password here, within 7 days:\n" + a.base + "/reset/" + token + "\n\n" +
-			"Then sign in with " + u.Email + ".\n"})
+	// Not the language of whoever added them, who may read another.
+	lang := u.Language
+	if lang == "" {
+		lang = q.Org.Settings.WithDefaults().CustomerLanguage
+	}
+	err = a.deliver(ctx, *via, mailer.Message{To: u.Email, Subject: say.Errorf("%s added you to %s on Prospector", q.Actor(), q.Org.Name).In(lang),
+		Body: say.Errorf("%s added you to %s on Prospector, at %s.\n\n"+
+			"Choose your password here, within 7 days:\n%s\n\n"+
+			"Then sign in with %s.\n", q.Actor(), q.Org.Name, a.base, a.base+"/reset/"+token, u.Email).In(lang)})
 	if err != nil {
 		// Nothing was sent, so the wait before another try doesn't apply.
 		if err := a.s.DropInvites(u.ID); err != nil {
@@ -162,7 +159,7 @@ func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 	err = (mailer.Server{Host: m.Host, Port: m.Port, From: m.Sender}).Check()
 	// Only the operator may name this machine, where any port and no TLS are allowed.
 	if err == nil && mailer.Loopback(m.Host) {
-		err = errors.New("an organisation's mail server can't be this machine")
+		err = say.New("an organisation's mail server can't be this machine")
 	}
 	if err != nil {
 		return false, err
@@ -172,7 +169,7 @@ func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 		m.Password = old.Password
 	} else if in.Password != "" {
 		if a.s.Keyring == nil {
-			return false, errors.New("this server has no secret key, so it can't keep a mail password safely: ask whoever runs it")
+			return false, say.New("this server has no secret key, so it can't keep a mail password safely: ask whoever runs it")
 		}
 		if m.Password, err = a.s.Keyring.Seal(in.Password); err != nil {
 			return false, err
@@ -184,15 +181,17 @@ func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 func (a *App) testMail(ctx context.Context, q *Req) (string, error) {
 	via, err := a.mailFor(q.Org.ID)
 	if err == nil && via == nil {
-		err = errors.New("there is no mail server to test: save one first")
+		err = say.New("there is no mail server to test: save one first")
 	}
 	if err != nil {
 		return "", err
 	}
-	err = a.deliver(ctx, *via, mailer.Message{To: q.User.Email, Subject: "Prospector can send mail for " + q.Org.Name,
-		Body: "This is the test " + q.Actor() + " asked for in Settings.\n\nIt was sent through " + via.Host + " as " + via.From + ".\n"})
+	// It goes to whoever asked for it, so it is in the language they asked in.
+	lang := languageOf(requestFrom(ctx))
+	err = a.deliver(ctx, *via, mailer.Message{To: q.User.Email, Subject: say.Errorf("Prospector can send mail for %s", q.Org.Name).In(lang),
+		Body: say.Errorf("This is the test %s asked for in Settings.\n\nIt was sent through %s as %s.\n", q.Actor(), via.Host, via.From).In(lang)})
 	if err != nil {
 		return "", notSent{err}
 	}
-	return fmt.Sprintf("Sent to %s through %s.", q.User.Email, via.Host), nil
+	return say.Errorf("Sent to %s through %s.", q.User.Email, via.Host).In(lang), nil
 }

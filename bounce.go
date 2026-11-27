@@ -2,23 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"log"
 	"net/http"
-)
-
-const (
-	SuppressBounced    = "bounced"
-	SuppressComplained = "complained"
-)
-
-// bounceBy is who a bounced address is put on the list by.
-const bounceBy = "Postmark"
-
-var (
-	errBounced    = errors.New("mail to that address bounced: it doesn't exist or won't take mail")
-	errComplained = errors.New("they marked a mail as spam")
 )
 
 // postmarkBounce is the part of Postmark's bounce and spam complaint webhooks that is used.

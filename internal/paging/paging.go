@@ -5,10 +5,11 @@ package paging
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"math"
 	"net/http"
 	"strconv"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const (
@@ -30,7 +31,7 @@ func (p Page) Size() int {
 	return min(p.Limit, Most)
 }
 
-var ErrCursor = errors.New("that cursor isn't one this list gave out: leave it out to start from the beginning")
+var ErrCursor = say.New("that cursor isn't one this list gave out: leave it out to start from the beginning")
 
 // Cursor is where a list was left, as numbers only its own list can read. It is
 // opaque to the caller, so what it holds can change without breaking anyone.
@@ -63,7 +64,7 @@ func FromRequest(r *http.Request) (Page, error) {
 	if raw := r.URL.Query().Get("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil || n < 1 {
-			return p, errors.New("limit is a whole number, 1 or more")
+			return p, say.New("limit is a whole number, 1 or more")
 		}
 		p.Limit = n
 	}

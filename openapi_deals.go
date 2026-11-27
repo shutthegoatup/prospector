@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"errors"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // dealOut is a deal as the API gives it. A conversation's own stands where its contact
@@ -89,7 +89,7 @@ func dealChanges(b *api.DealChange) []Change {
 	}{{"kind", b.Kind}, {"amount", b.Amount}, {"close_date", b.CloseDate}, {"owner", b.Owner}, {"stage", b.Stage},
 		{"next_step", b.NextStep}, {"next_date", b.NextDate}, {"lost_reason", b.LostReason}} {
 		if set.value != nil {
-			out = append(out, Change{set.field, *set.value})
+			out = append(out, Change{Field: set.field, Value: *set.value})
 		}
 	}
 	return out
@@ -111,7 +111,7 @@ func (s apiServer) ListDeals(ctx context.Context, in api.ListDealsRequestObject)
 
 func (s apiServer) StartDeal(ctx context.Context, in api.StartDealRequestObject) (api.StartDealResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("say who it is with: {\"contact\": id}")
+		return nil, say.New("say who it is with: {\"contact\": id}")
 	}
 	q := reqFrom(ctx)
 	kind := in.Body.Kind
@@ -131,7 +131,7 @@ func (s apiServer) StartDeal(ctx context.Context, in api.StartDealRequestObject)
 
 func (s apiServer) ChangeDeal(ctx context.Context, in api.ChangeDealRequestObject) (api.ChangeDealResponseObject, error) {
 	if in.Body == nil || len(dealChanges(in.Body)) == 0 {
-		return nil, errors.New("send what to change")
+		return nil, say.New("send what to change")
 	}
 	q := reqFrom(ctx)
 	if err := s.a.s.ChangeDealFields(q.Org.ID, in.Id, dealChanges(in.Body), q.Actor()); err != nil {
@@ -154,10 +154,10 @@ func (s apiServer) RemoveDeal(ctx context.Context, in api.RemoveDealRequestObjec
 
 func (s apiServer) ChangeOwnDeal(ctx context.Context, in api.ChangeOwnDealRequestObject) (api.ChangeOwnDealResponseObject, error) {
 	if in.Body == nil || len(dealChanges(in.Body)) == 0 {
-		return nil, errors.New("send what to change")
+		return nil, say.New("send what to change")
 	}
 	if b := in.Body; b.Stage != nil || b.NextStep != nil || b.NextDate != nil || b.LostReason != nil {
-		return nil, errors.New("a conversation's own deal stands where its contact does: its stage, next step and why it was lost are the contact's")
+		return nil, say.New("a conversation's own deal stands where its contact does: its stage, next step and why it was lost are the contact's")
 	}
 	q := reqFrom(ctx)
 	if err := s.a.s.SetDealFields(q.Org.ID, in.Id, dealChanges(in.Body), q.Actor()); err != nil {
@@ -219,12 +219,12 @@ func (s apiServer) ChangeEnquiry(ctx context.Context, in api.ChangeEnquiryReques
 			value *string
 		}{{"state", b.State}, {"owner", b.Owner}, {"note", b.Note}} {
 			if set.value != nil {
-				changes = append(changes, Change{set.field, *set.value})
+				changes = append(changes, Change{Field: set.field, Value: *set.value})
 			}
 		}
 	}
 	if len(changes) == 0 {
-		return nil, errors.New("send what to change: state, owner or note")
+		return nil, say.New("send what to change: state, owner or note")
 	}
 	q := reqFrom(ctx)
 	if err := s.a.s.SetEnquiryFields(q.Org.ID, in.Id, changes, q.Actor()); err != nil {

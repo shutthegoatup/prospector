@@ -165,7 +165,7 @@ func TestAnAgentSearchesAndReadsTheWebWithNoPaidService(t *testing.T) {
 	if run.Status != RunFinished || run.Added != 1 {
 		t.Fatalf("a run on free search: %+v", run)
 	}
-	facts := must(r.s.Facts(r.o.ID, must(r.s.companyRef(r.o.ID, "Larkmoor Yachts")).ID))
+	facts := must(r.s.Facts(r.o.ID, must(r.s.CompanyRef(r.o.ID, "Larkmoor Yachts")).ID))
 	if len(facts) != 1 || facts[0].SourceURL != page {
 		t.Fatalf("only the fact from the page the agent read should be stored: %+v", facts)
 	}

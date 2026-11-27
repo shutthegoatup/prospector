@@ -6,7 +6,6 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -20,20 +19,22 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 var (
-	errNotStartedHere = errors.New("that sign-in wasn't started in this browser, or it took too long: start again")
-	errWrongIssuer    = errors.New("the answer came from another sign-in provider")
-	errWrongNonce     = errors.New("the provider's answer was issued for another sign-in")
-	errWrongTenant    = errors.New("the provider's answer names an issuer that isn't its tenant's")
+	errNotStartedHere = say.New("that sign-in wasn't started in this browser, or it took too long: start again")
+	errWrongIssuer    = say.New("the answer came from another sign-in provider")
+	errWrongNonce     = say.New("the provider's answer was issued for another sign-in")
+	errWrongTenant    = say.New("the provider's answer names an issuer that isn't its tenant's")
 )
 
 // tenantPlaceholder is how Microsoft's endpoint for every tenant writes its issuer:
 // each ID token then names its own tenant's.
 const tenantPlaceholder = "{tenantid}"
 
-var errManyTenants = errors.New("that issuer signs in every tenant under one registration, so it pins nobody to yours: use your own tenant's issuer")
+var errManyTenants = say.New("that issuer signs in every tenant under one registration, so it pins nobody to yours: use your own tenant's issuer")
 
 type idp struct {
 	spec        idpSpec
@@ -96,13 +97,13 @@ func discoveredIssuer(ctx context.Context, client *http.Client, issuer string) (
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("reading %s: its discovery document answered %s", issuer, res.Status)
+		return "", say.Errorf("reading %s: its discovery document answered %s", issuer, res.Status)
 	}
 	var doc struct {
 		Issuer string `json:"issuer"`
 	}
 	if err := json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&doc); err != nil {
-		return "", fmt.Errorf("reading %s: its discovery document isn't JSON", issuer)
+		return "", say.Errorf("reading %s: its discovery document isn't JSON", issuer)
 	}
 	return doc.Issuer, nil
 }
@@ -198,16 +199,6 @@ func (b *looseBool) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// outsider is who a provider says has signed in.
-type outsider struct {
-	Issuer, Subject    string
-	Email, Name        string
-	Username, HostedBy string
-	// Vouched is the provider saying the address is this person's own. Disowned is
-	// it saying outright that it isn't known to be.
-	Vouched, Disowned bool
-}
-
 type outsiderClaims struct {
 	Email    string     `json:"email"`
 	Verified *looseBool `json:"email_verified"`
@@ -227,7 +218,7 @@ func (p *idp) finish(ctx context.Context, att attempt, answer url.Values) (*outs
 		return nil, errWrongIssuer
 	}
 	if code := answer.Get("error"); code != "" {
-		return nil, fmt.Errorf("the provider refused the sign-in (%.60s)", code)
+		return nil, say.Errorf("the provider refused the sign-in (%.60s)", code)
 	}
 	ctx = oidc.ClientContext(ctx, p.client)
 	var options []oauth2.AuthCodeOption
@@ -261,7 +252,7 @@ func (p *idp) finish(ctx context.Context, att attempt, answer url.Values) (*outs
 			return nil, fmt.Errorf("asking the provider who signed in: %w", err)
 		}
 		if info.Subject != id.Subject {
-			return nil, errors.New("the provider described somebody else")
+			return nil, say.New("the provider described somebody else")
 		}
 		if err := info.Claims(&c); err != nil {
 			return nil, fmt.Errorf("reading who signed in: %w", err)
@@ -382,7 +373,7 @@ var guardedClient = &http.Client{
 		DialContext: (&net.Dialer{Timeout: 5 * time.Second, Control: func(_, address string, _ syscall.RawConn) error {
 			ap, err := netip.ParseAddrPort(address)
 			if err != nil || !publicAddr(ap.Addr()) {
-				return fmt.Errorf("%s isn't a public address", address)
+				return say.Errorf("%s isn't a public address", address)
 			}
 			return nil
 		}}).DialContext,

@@ -84,8 +84,8 @@ func TestAnOrganisationsSealingKeyIsMadeOnceAndKeptSealed(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	key, cert := must2(s.sealKey(o))
-	again, same := must2(s.sealKey(o))
+	key, cert := must2(s.SealKey(o))
+	again, same := must2(s.SealKey(o))
 	if !key.Equal(again) || !cert.Equal(same) {
 		t.Error("a second use made another key")
 	}
@@ -97,7 +97,7 @@ func TestAnOrganisationsSealingKeyIsMadeOnceAndKeptSealed(t *testing.T) {
 		t.Errorf("the private key is stored as %.12q (%v)", stored.Key, err)
 	}
 	other := mustOrg(t, s, "beta")
-	if _, theirs := must2(s.sealKey(other)); theirs.Equal(cert) {
+	if _, theirs := must2(s.SealKey(other)); theirs.Equal(cert) {
 		t.Error("two organisations share a key")
 	}
 
@@ -107,12 +107,12 @@ func TestAnOrganisationsSealingKeyIsMadeOnceAndKeptSealed(t *testing.T) {
 		t.Fatalf("resealing: %d moved (%v)", moved, err)
 	}
 	s.Keyring = mustKeys(t, "2:"+newKey)
-	if after, _ := must2(s.sealKey(o)); !after.Equal(key) {
+	if after, _ := must2(s.SealKey(o)); !after.Equal(key) {
 		t.Error("the key changed when the server's key did")
 	}
 
 	s.Keyring = nil
-	if _, _, err := s.sealKey(mustOrg(t, s, "gamma")); !errors.Is(err, errNoKeys) {
+	if _, _, err := s.SealKey(mustOrg(t, s, "gamma")); !errors.Is(err, errNoKeys) {
 		t.Errorf("making a key without a server secret to keep it under: %v", err)
 	}
 }
@@ -183,13 +183,13 @@ func TestASealedAgreementIsFilledInCertifiedAndShowsAnyChange(t *testing.T) {
 		Signers: []CertificateSigner{{Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Via: "typed name · email code", Typed: "Hannah Pryce", IP: "203.0.113.24", Browser: "Firefox on macOS", SignedAt: when}},
 		Events:  []CertificateEvent{{At: when, Text: "Signed by Hannah Pryce as \"Hannah Pryce\""}}, Consent: signingConsent}
 	stamps := []Stamp{{Page: 3, X: 0.1, Y: 0.7, W: 0.3, H: 0.06, Kind: "signature", Value: "Hannah Pryce"}, {Page: 2, X: 0.1, Y: 0.1, W: 0.03, H: 0.022, Kind: "tick", Value: "✓"}}
-	out := must(s.sealDocument(o, doc, stamps, c))
+	out := must(s.SealDocument(o, doc, stamps, c))
 
 	pages, err := api.PageCount(context.Background(), bytes.NewReader(out.PDF), model.NewDefaultConfiguration())
 	if err != nil || pages != 4 {
 		t.Errorf("the sealed document has %d pages (%v), want the 3 sent and the certificate", pages, err)
 	}
-	_, cert := must2(s.sealKey(o))
+	_, cert := must2(s.SealKey(o))
 	if err := checkSeal(out.PDF, cert); err != nil {
 		t.Fatalf("the seal: %v", err)
 	}
@@ -215,11 +215,11 @@ func TestASealedAgreementIsFilledInCertifiedAndShowsAnyChange(t *testing.T) {
 		c2, st2 := c, slices.Clone(stamps)
 		c2.Signers = slices.Clone(c.Signers)
 		change(&c2, st2)
-		if _, err := s.sealDocument(o, doc, st2, c2); err == nil || !strings.Contains(err.Error(), "can't show") {
+		if _, err := s.SealDocument(o, doc, st2, c2); err == nil || !strings.Contains(err.Error(), "can't show") {
 			t.Errorf("%s the fonts can't draw: %v", what, err)
 		}
 	}
-	_, theirs := must2(s.sealKey(mustOrg(t, s, "beta")))
+	_, theirs := must2(s.SealKey(mustOrg(t, s, "beta")))
 	if err := checkSeal(out.PDF, theirs); err == nil {
 		t.Error("the seal holds for another organisation's key")
 	}

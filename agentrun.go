@@ -10,7 +10,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -21,12 +20,13 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/shutthegoatup/prospector/internal/cleantext"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const (
 	RunFinished = "finished"
-	RunStopped  = "stopped"
-	RunFailed   = "failed"
+
+	RunFailed = "failed"
 )
 
 var (
@@ -41,7 +41,6 @@ var (
 const (
 	completionLimit = 5 * time.Minute
 	maxToolResult   = 12_000
-	builtinPrefix   = "builtin"
 )
 
 // The tools of Prospector's own the agent is given: research only, nothing that
@@ -86,10 +85,6 @@ func runCap(setting string) int {
 	return 8
 }
 
-// builtinKeyName is an agent's name as its key carries it into the record, marked so
-// it isn't taken for a key someone made for an agent of their own.
-func builtinKeyName(agent string) string { return agent + " (built in)" }
-
 // StartRun sets the organisation's agent going on a task.
 func (a *App) StartRun(org, task, agent int64, by string) (*AgentRun, error) {
 	return a.startRun(org, task, agent, by, 0)
@@ -103,12 +98,12 @@ func (a *App) startRun(org, task, agent int64, by string, replacing int64) (*Age
 		return nil, err
 	}
 	if !cfg.Ready() {
-		return nil, fmt.Errorf("%s isn't set up: an owner gives it an endpoint and a model on the Agents page", cfg.Name)
+		return nil, say.Errorf("%s isn't set up: an owner gives it an endpoint and a model on the Agents page", cfg.Name)
 	}
 	if err := a.s.TaskOpen(org, task); err != nil {
 		return nil, err
 	}
-	already := conflict(cfg.Name + " is already working this task")
+	already := conflict{Text: say.Errorf("%s is already working this task", cfg.Name)}
 	if going, err := a.s.RunsOn(org, task, cfg.ID); err != nil {
 		return nil, err
 	} else if going > 0 {
@@ -121,7 +116,7 @@ func (a *App) startRun(org, task, agent int64, by string, replacing int64) (*Age
 	}
 	a.runs.mu.Unlock()
 	if busy >= maxRunning {
-		return nil, fmt.Errorf("this server is already running %d agents: try again when one finishes", busy)
+		return nil, say.Errorf("this server is already running %d agents: try again when one finishes", busy)
 	}
 	now := time.Now()
 	run, err := a.s.AddRun(org, AgentRun{TaskID: task, AgentID: cfg.ID, AgentName: cfg.Name, StartedBy: by, Model: cfg.Model, Status: RunWorking,
@@ -452,7 +447,7 @@ func (a *App) wait(ctx context.Context, run *AgentRun, until time.Time) error {
 		until = time.Now().Add(time.Second)
 	}
 	if goOn, err := a.hold(ctx, run, RunWaiting, &until); err != nil || !goOn {
-		return errors.Join(err, errors.New("stopped while waiting"))
+		return errors.Join(err, say.New("stopped while waiting"))
 	}
 	// The lease goes on being renewed meanwhile; a Stop cancels ctx.
 	return a.pause(ctx, time.Until(until))
@@ -571,21 +566,6 @@ type turnState struct {
 
 var urlPattern = regexp.MustCompile(`https?://[^\s"'<>\[\]{}\\]+`)
 
-func normalURL(raw string) string {
-	raw = strings.TrimRight(raw, ".,;:!?*_`")
-	// A closing bracket belongs to the address only if it opened one, as in
-	// .../Acme_(company); otherwise it closes the sentence around it.
-	for strings.HasSuffix(raw, ")") && strings.Count(raw, ")") > strings.Count(raw, "(") {
-		raw = strings.TrimRight(strings.TrimSuffix(raw, ")"), ".,;:!?*_`")
-	}
-	u, err := url.Parse(raw)
-	if err != nil || u.Host == "" {
-		return ""
-	}
-	u.Fragment, u.Host = "", strings.ToLower(u.Host)
-	return strings.TrimRight(u.String(), "/")
-}
-
 func (t *turnState) see(text string) {
 	for _, m := range urlPattern.FindAllString(text, 2000) {
 		if u := normalURL(m); u != "" {
@@ -632,12 +612,12 @@ func (t *turnState) call(ctx context.Context, name, rawArgs string) (string, err
 	if strings.TrimSpace(rawArgs) != "" {
 		clean, _ := cleantext.DropNULEscapes([]byte(rawArgs), true)
 		if err := json.Unmarshal(clean, &args); err != nil {
-			return "", fmt.Errorf("the arguments for %s weren't a JSON object", name)
+			return "", say.Errorf("the arguments for %s weren't a JSON object", name)
 		}
 	}
 	// Only a tool the run was given, so a page can't talk the model into an unticked one.
 	if !t.offered[name] {
-		return "", fmt.Errorf("there is no tool called %s here", name)
+		return "", say.Errorf("there is no tool called %s here", name)
 	}
 	isOwn := false
 	for _, n := range ownTools {
@@ -650,13 +630,13 @@ func (t *turnState) call(ctx context.Context, name, rawArgs string) (string, err
 		if name == "add_company" {
 			text := func(key string) string { s, _ := args[key].(string); return strings.TrimSpace(s) }
 			if text("configurator_url") == "" && (text("platform") != "" || text("built_by") != "") {
-				return "", errors.New("nothing was stored: a platform or builder needs the configurator_url of the page that shows it")
+				return "", say.New("nothing was stored: a platform or builder needs the configurator_url of the page that shows it")
 			}
 		}
 		// A source the model hasn't been shown is one it made up.
 		for _, src := range sources(name, args) {
 			if !t.seen[normalURL(src)] {
-				return "", fmt.Errorf("nothing was stored: %s wasn't on any page a tool showed you in this run. Cite the page you found it on", src)
+				return "", say.Errorf("nothing was stored: %s wasn't on any page a tool showed you in this run. Cite the page you found it on", src)
 			}
 		}
 		// Everything it adds counts toward the task, whether or not it said so.
@@ -666,7 +646,7 @@ func (t *turnState) call(ctx context.Context, name, rawArgs string) (string, err
 	}
 	web := t.builtin[name]
 	if session == nil && !web {
-		return "", fmt.Errorf("there is no tool called %s", name)
+		return "", say.Errorf("there is no tool called %s", name)
 	}
 	var text string
 	for failures := 0; ; failures++ {
@@ -903,13 +883,13 @@ func (a *App) completeOnce(ctx context.Context, base, key string, body []byte) (
 		if ctx.Err() != nil || errors.Is(err, io.ErrUnexpectedEOF) || errors.As(err, &netErr) {
 			return nil, &unreachable{err}
 		}
-		return nil, errors.New("the endpoint's answer wasn't a chat completion: is the address the one /chat/completions is under?")
+		return nil, say.New("the endpoint's answer wasn't a chat completion: is the address the one /chat/completions is under?")
 	}
 	if reply.Error != nil {
-		return nil, fmt.Errorf("the endpoint said: %s", reply.Error.Message)
+		return nil, say.Errorf("the endpoint said: %s", reply.Error.Message)
 	}
 	if len(reply.Choices) == 0 {
-		return nil, errors.New("the endpoint answered with no message")
+		return nil, say.New("the endpoint answered with no message")
 	}
 	return &reply, nil
 }

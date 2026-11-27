@@ -125,7 +125,7 @@ func TestACampaignIsSentOnceToEachPersonThroughTheOrganisationsOwnServer(t *test
 	if err := s.UnsubscribeByToken(token); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.marketable(s.DB, o, m.To, ""); err != errSuppressed {
+	if err := s.Marketable(s.DB, o, m.To, ""); err != errSuppressed {
 		t.Errorf("after unsubscribing by the mail's link: %v", err)
 	}
 }
@@ -368,7 +368,7 @@ func TestAMailReadBeforeAnErasureIsNotSent(t *testing.T) {
 	a, s, o, _, _, box := campaignSite(t)
 	c := must(s.SendCampaign(o, draft(t, s, o).ID, "Ada Lovelace"))
 	via := must(a.campaignMail(o.ID))
-	gate := must(s.gate(s.DB, o))
+	gate := must(s.Gate(s.DB, o))
 	hannah := mailOf(t, s, o, c)["hannah@larkmoor.example"]
 
 	if err := s.ErasePerson(o.ID, *hannah.ContactID, "Ada Lovelace"); err != nil {
@@ -554,7 +554,7 @@ func TestAServiceNoticeIsCheckedAgainAsItIsSent(t *testing.T) {
 
 	// Changing a draft to a service notice takes it to customers.
 	m := draft(t, s, o)
-	changed := must(s.ChangeCampaign(o.ID, m.ID, []Change{{"kind", KindService}}, "Ada Lovelace"))
+	changed := must(s.ChangeCampaign(o.ID, m.ID, []Change{{Field: "kind", Value: KindService}}, "Ada Lovelace"))
 	if changed.Kind != KindService || changed.Audience != AudienceCustomers {
 		t.Errorf("after making it a service notice: %s to %s", changed.Kind, changed.Audience)
 	}

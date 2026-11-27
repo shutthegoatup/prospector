@@ -9,6 +9,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/shutthegoatup/prospector/internal/dbtest"
+	"github.com/shutthegoatup/prospector/internal/identity"
 )
 
 // testDB is the run's Postgres, with one migrated template copied for each test that
@@ -18,8 +19,8 @@ var testDB *dbtest.Server
 // withDatabases makes the run's databases, runs the tests and drops them again.
 func withDatabases(run func() int) int {
 	// A hash at the real cost takes tens of milliseconds, and most tests sign someone in.
-	passwordCost = bcrypt.MinCost
-	dummyHash, _ = bcrypt.GenerateFromPassword([]byte("unused"), passwordCost)
+	identity.PasswordCost = bcrypt.MinCost
+	identity.DummyHash, _ = bcrypt.GenerateFromPassword([]byte("unused"), identity.PasswordCost)
 
 	srv, stop, err := dbtest.Start(func(url string) error {
 		s, err := Open(url)

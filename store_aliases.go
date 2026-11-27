@@ -2,7 +2,7 @@ package main
 
 import "github.com/shutthegoatup/prospector/internal/store"
 
-// The models and what they need live in internal/store; these keep their names here.
+// What moved to internal/store keeps its name here.
 
 const AudienceCustomers = store.AudienceCustomers
 const ContactSuggested = store.ContactSuggested
@@ -84,16 +84,10 @@ type Verdict = store.Verdict
 var Stages = store.Stages
 var addMonths = store.AddMonths
 var assetKey = store.AssetKey
-var bareDomain = store.BareDomain
-var clip = store.Clip
 var deref = store.Deref
-var domainOf = store.DomainOf
 var enquiryOrigins = store.EnquiryOrigins
 var formatMoney = store.FormatMoney
-var linkedinPath = store.LinkedinPath
 var mustDay = store.MustDay
-var parseDay = store.ParseDay
-var validStage = store.ValidStage
 
 const sealing = store.Sealing
 
@@ -102,7 +96,6 @@ type SSO = store.SSO
 type core = store.Core
 type idpSpec = store.IdpSpec
 type keyring = store.Keyring
-type mailDNS = store.MailDNS
 type purpose = store.Purpose
 type secretKey = store.SecretKey
 
@@ -114,3 +107,31 @@ var lookupVersion = store.LookupVersion
 var mac = store.Mac
 var sealed = store.Sealed
 var sealedVersion = store.SealedVersion
+
+type notFound = store.NotFound
+
+var displayName = store.DisplayName
+var logged = store.Logged
+var missing = store.Missing
+var noSuch = store.NoSuch
+var nonEmpty = store.NonEmpty
+var randomToken = store.RandomToken
+var str = store.Str
+var today = store.Today
+
+type Change = store.Change
+type conflict = store.Conflict
+
+var parseMoney = store.ParseMoney
+
+const builtinPrefix = store.BuiltinPrefix
+
+var bareAddress = store.BareAddress
+var breaksRule = store.BreaksRule
+var builtinKeyName = store.BuiltinKeyName
+var companyName = store.CompanyName
+var emailRe = store.EmailRe
+var errErased = store.ErrErased
+var identifiers = store.Identifiers
+var personKey = store.PersonKey
+var unusableHash = store.UnusableHash

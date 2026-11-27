@@ -6,12 +6,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/go-jose/go-jose/v4"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // Purpose is a job one derived key does, and the HKDF info (RFC 5869 §3.2) that
@@ -21,9 +22,9 @@ type Purpose string
 const // Sealing encrypts what the database holds but mustn't be able to read by itself.
 Sealing Purpose = "prospector: sealed secrets"
 
-var ErrNoKeys = errors.New("no secret key is configured: set PROSPECTOR_SECRET_KEYS (`prospector secret-key` makes one)")
+var ErrNoKeys = say.New("no secret key is configured: set PROSPECTOR_SECRET_KEYS (`prospector secret-key` makes one)")
 
-var ErrUnknownKey = errors.New("sealed under a secret key this server no longer holds")
+var ErrUnknownKey = say.New("sealed under a secret key this server no longer holds")
 
 type SecretKey struct {
 	Kid     string

@@ -420,7 +420,7 @@ func TestACustomersPageClosesWhenTheyNoLongerQualify(t *testing.T) {
 		t.Fatal(err)
 	}
 	kept.ID = hannah.ID + 500
-	if _, err := s.replaceContacts(o.ID, []Contact{kept}, nil); err != nil {
+	if _, err := s.ReplaceContacts(o.ID, []Contact{kept}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if grants := must(s.CustomerInvites(o.ID))[ob.ID]; len(grants) != 1 || grants[0].ContactID != kept.ID || !open() {
@@ -428,7 +428,7 @@ func TestACustomersPageClosesWhenTheyNoLongerQualify(t *testing.T) {
 	}
 	someone := "Someone Else"
 	stranger := Contact{ID: kept.ID + 1, Key: "someone else", File: "restore", Person: &someone}
-	if _, err := s.replaceContacts(o.ID, []Contact{stranger}, nil); err != nil {
+	if _, err := s.ReplaceContacts(o.ID, []Contact{stranger}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if grants := must(s.CustomerInvites(o.ID)); len(grants) != 0 || open() {

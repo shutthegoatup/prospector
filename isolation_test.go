@@ -23,15 +23,15 @@ var acrossOrganisations = map[string]bool{
 	"ResetToken": true, "InviteToken": true, "PasswordTokenUser": true, "RedeemPasswordToken": true,
 	"CreateOrg": true, "CreateOrgWithOwner": true, "EnsureFrontOrg": true, "OrgByID": true, "OrgBySlug": true, "OrgsFor": true,
 	"KeyFor": true, "Reseal": true, "SSOOrgsFor": true, "SocialUser": true, "SSOUser": true,
-	"KnownDevice": true, "DropInvites": true,
+	"KnownDevice": true, "DropInvites": true, "SetLanguage": true,
 	// Finds a customer by the secret in their link or cookie, which is all they have.
 	"CustomerByToken": true, "EndCustomerSession": true, "DropCustomerLink": true,
 	// An unsubscribe link names its organisation itself; whoever holds it has no session.
-	"UnsubscribeByToken": true, "DropUnsubscribeLink": true,
+	"UnsubscribeByToken": true, "DropUnsubscribeLink": true, "UnsubscribeLinkOrg": true,
 	// A webhook names its organisation by slug, and proves it with the secret.
 	"BounceHookOrg": true,
 	// Whether a domain takes mail is the same for everyone who writes to it.
-	"TakesMail": true, "NoMailDomains": true, "CheckSomeMail": true,
+	"TakesMail": true, "NoMailDomains": true, "CheckSomeMail": true, "CheckMailDomains": true,
 	// What the server does as it starts.
 	"ResealAtStart": true, "FrontFormOff": true,
 	// These take a row that already names its organisation, which their callers read with it.
@@ -39,9 +39,8 @@ var acrossOrganisations = map[string]bool{
 	// The server's own sweeps, over every organisation; what they find is then handled
 	// by methods that take its organisation.
 	"LapsedRuns": true, "CampaignsSending": true, "FreeStaleMail": true, "Users": true,
-	// The core's own: what the areas' queries are written with, not queries of their own.
-	// TestOnlyTheStoreTouchesTheDatabase keeps them inside the store.
-	"InOrg": true, "Log": true, "LogAs": true,
+	// The search indexes, built at start-up for everyone's rows.
+	"IndexSearch": true,
 }
 
 // theirs marks what the first organisation holds, so it shows if it turns up elsewhere.
@@ -301,7 +300,7 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			if _, err = s.PutAgreementFields(first.ID, a.ID, []AgreementField{{RecipientID: r.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.1, W: 0.3, H: 0.05}}); err != nil {
 				return err
 			}
-			if _, _, err := s.sealKey(first); err != nil {
+			if _, _, err := s.SealKey(first); err != nil {
 				return err
 			}
 			return s.DB.Transaction(func(tx *gorm.DB) error {
@@ -371,7 +370,17 @@ var saysNothingBack = map[string]bool{
 	"AddMember": true, "RemoveMember": true, "SetRole": true, "SetAreas": true, "SaveVoice": true, "SaveOrg": true, "ChangeSettings": true, "RevokeKey": true, "SetKeyScopes": true, "DeleteOrgMail": true,
 	// A webhook secret is new random words, and the others say yes or no of the caller's own.
 	"NewBounceHook": true, "DropBounceHook": true, "HasBounceHook": true,
-	"Mark": true, "Update": true, "SetCompanyStage": true, "PickContact": true, "PickContactFor": true, "ToReview": true, "DecideSuggestion": true,
+	"Mark": true, "MarkAs": true, "Claim": true, "Withheld": true, "Update": true,
+	// Needs a task read for it; TestAnotherOrganisationCantClaimThroughATaskItWasHanded tries it.
+	"ClaimNext": true,
+	// Answers with how many contacts it put in place.
+	"ReplaceContacts": true,
+	// A key and certificate of its own, made on first use; seal_test.go checks another organisation gets its own.
+	"SealKey": true, "SealDocument": true,
+
+	// Only listed with suggestions waiting; TestTheDetailsCountIsTheDetailsList tries both.
+	"DetailsToCheck": true, "DetailsCount": true,
+	"SetCompanyStage": true, "PickContact": true, "PickContactFor": true, "ToReview": true, "DecideSuggestion": true,
 	"AgentDraft": true, "AgentMark": true, "AgentFinish": true, "AgentAddFact": true, "AgentAddContact": true,
 	"AskTask": true, "SetRequestDone": true, "SetTaskClosed": true, "DeleteNote": true, "DeleteEnquiry": true,
 	"StartDeal": true, "ChangeDeal": true, "RemoveDeal": true, "JudgeCompany": true, "RemoveOffering": true,
@@ -414,7 +423,8 @@ func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {
 	var methods []reflect.Method
 	for i := range store.NumMethod() {
 		m := store.Method(i)
-		if acrossOrganisations[m.Name] {
+		// Not queries of their own but what the store's code writes them with (withinTheStore).
+		if acrossOrganisations[m.Name] || withinTheStore[m.Name] {
 			continue
 		}
 		if m.Type.NumIn() < 2 || (m.Type.In(1).Kind() != reflect.Int64 && m.Type.In(1) != reflect.TypeOf(&Org{})) {

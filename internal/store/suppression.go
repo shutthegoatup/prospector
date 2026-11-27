@@ -1,6 +1,12 @@
 package store
 
-import "time"
+import (
+	"net/mail"
+	"strings"
+	"time"
+
+	"github.com/shutthegoatup/prospector/internal/say"
+)
 
 // Suppression is an address the organisation's marketing mail never goes to again. One
 // list serves every mailing: someone who unsubscribed from one has unsubscribed.
@@ -29,3 +35,15 @@ type UnsubscribeLink struct {
 	TokenHash string    `gorm:"uniqueIndex;not null"`
 	CreatedAt time.Time `gorm:"index"`
 }
+
+var errNotAnAddress = say.New("that isn't one email address")
+
+func BareAddress(address string) (string, error) {
+	at, err := mail.ParseAddress(strings.TrimSpace(address))
+	if err != nil {
+		return "", errNotAnAddress
+	}
+	return strings.ToLower(at.Address), nil
+}
+
+var ErrNeverContact = say.New("on the never-contact list")

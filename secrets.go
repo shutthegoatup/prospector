@@ -18,9 +18,6 @@ const (
 
 	// attempts signs the cookie that carries a sign-in to a provider and back.
 	attempts purpose = "prospector: sign-in attempts"
-	// sessions and apiKeys key what a session token and an API key are stored and found by.
-	sessions purpose = "prospector: sessions"
-	apiKeys  purpose = "prospector: API keys"
 )
 
 var purposes = []purpose{sealing, attempts, sessions, apiKeys}

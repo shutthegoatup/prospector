@@ -31,8 +31,6 @@ type Draft struct {
 	Phone    string  `json:"phone"`
 }
 
-type CompanyRow map[string]string
-
 type SentLogEntry struct {
 	Date string `json:"date"`
 	Line string `json:"line"`
@@ -67,8 +65,8 @@ var (
 	gladRe      = regexp.MustCompile(` ((?:Would be glad|Glad) to connect[^\n]*)\n?$`)
 	sentDateRe  = regexp.MustCompile(`^## (\d{4}-\d\d-\d\d)`)
 	notSentRe   = regexp.MustCompile(`^- \*\*(On hold|Held back|Waiting)`)
-	personSplit = regexp.MustCompile(`[,;(]`)
-	digitStart  = regexp.MustCompile(`^\d`)
+
+	digitStart = regexp.MustCompile(`^\d`)
 )
 
 func evidence(text, ownDomain string) (string, string) {
@@ -86,15 +84,6 @@ func evidence(text, ownDomain string) (string, string) {
 		}
 	}
 	return strings.Join(urls, "\n"), strings.Join(phones, " / ")
-}
-
-func contains(xs []string, x string) bool {
-	for _, v := range xs {
-		if v == x {
-			return true
-		}
-	}
-	return false
 }
 
 // spaced breaks a one-line LinkedIn note into the paragraphs it is pasted as.
@@ -161,13 +150,6 @@ func sections(text string) []mdSection {
 		}
 	}
 	return out
-}
-
-func firstField(s string) string {
-	if f := strings.Fields(s); len(f) > 0 {
-		return f[0]
-	}
-	return ""
 }
 
 func group(re *regexp.Regexp, s string) (string, bool) {
@@ -274,11 +256,6 @@ func parseNumbered(name, text, ownDomain string) []Draft {
 	d.Flags = strings.TrimSpace(flags)
 	d.Sources, d.Phone = evidence(text, ownDomain)
 	return []Draft{d}
-}
-
-func personKey(person string) string {
-	words := strings.Fields(personSplit.Split(person, 2)[0])
-	return strings.Join(words[:min(2, len(words))], " ")
 }
 
 // ReadRepo parses a folder laid out as leads/outreach/*.md, leads/prospects.csv and

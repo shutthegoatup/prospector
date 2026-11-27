@@ -1,9 +1,12 @@
 package store
 
 import (
+	"log"
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 type User struct {
@@ -13,11 +16,17 @@ type User struct {
 	PasswordHash string
 	// MustChangePassword is set while the password is one somebody else has seen.
 	MustChangePassword bool `gorm:"not null;default:false"`
-	CreatedAt          time.Time
+	// Language is the one they chose, which outranks their browser's; empty is none.
+	Language  string `gorm:"not null;default:''"`
+	CreatedAt time.Time
 }
 
 // OrgSettings is what differs between organisations: timings, wording and rules.
 type OrgSettings struct {
+	// CustomerLanguage is what the organisation speaks to someone outside it, and to a
+	// member who hasn't chosen and whose browser asks for nothing Prospector has;
+	// empty is the source language.
+	CustomerLanguage  string `json:"customer_language,omitempty"`
 	EmailAfterDays    int    `json:"email_after_days"`
 	FollowupAfterDays int    `json:"followup_after_days"`
 	Pitch             string `json:"pitch"`
@@ -52,6 +61,9 @@ func (s OrgSettings) WithDefaults() OrgSettings {
 	}
 	if s.Currency == "" {
 		s.Currency = DefaultCurrency
+	}
+	if s.CustomerLanguage == "" {
+		s.CustomerLanguage = say.Source
 	}
 	return s
 }
@@ -246,4 +258,38 @@ func (s *Core) Log(tx *gorm.DB, org, contact int64, company *int64, actor, actio
 
 func (s *Core) LogAs(tx *gorm.DB, org, contact int64, company *int64, who Actor, action string, value *string) error {
 	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: who.Name, KeyID: who.KeyID, TaskID: who.Task, Action: action, Value: value, At: time.Now()}).Error
+}
+
+// HoldOrg and hold make a transaction wait its turn on one row, so a rule that is
+// checked by reading and then kept by writing ("add it unless it is already here")
+// holds when two callers arrive together. Taken before the first read; an organisation
+// before anything in it.
+func HoldOrg(tx *gorm.DB, org int64) error {
+	return tx.Exec("update orgs set id = id where id = ?", org).Error
+}
+
+func Hold(tx *gorm.DB, model any, org, id int64) error {
+	// UpdateColumn, so holding a company doesn't count as changing it.
+	return tx.Model(model).Where("org_id = ? and id = ?", org, id).UpdateColumn("id", gorm.Expr("id")).Error
+}
+
+// Logged is for a query whose caller has nowhere to send an error: a count or a list
+// on its way to a page. The page then shows nothing, and the log says why.
+func Logged(res *gorm.DB) error {
+	if res.Error != nil {
+		log.Printf("database: %v", res.Error)
+	}
+	return res.Error
+}
+
+func Today() string { return time.Now().Format("2006-01-02") }
+
+func Str(v string) *string { return &v }
+
+// NonEmpty is Python's nullif(v, ”).
+func NonEmpty(v string) *string {
+	if v == "" {
+		return nil
+	}
+	return &v
 }

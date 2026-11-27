@@ -1,8 +1,9 @@
 package store
 
 import (
-	"errors"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // Campaign is a marketing mail written once for many: everyone in conversation, or
@@ -42,7 +43,7 @@ const KindService = "service"
 // current customers only, or it is marketing by another name.
 func (c Campaign) Fits() error {
 	if c.Kind == KindService && c.Audience != AudienceCustomers {
-		return errors.New("a service notice goes to current customers only: one to people in conversation is marketing")
+		return say.New("a service notice goes to current customers only: one to people in conversation is marketing")
 	}
 	return nil
 }

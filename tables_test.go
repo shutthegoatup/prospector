@@ -169,7 +169,7 @@ func TestWhateverPointsAtAPersonGoesWhenTheyDo(t *testing.T) {
 
 	stays, dropped := add("Bram Osei"), add("Cleo Marsh")
 	left = pointingAt(t, s, o.ID, dropped.ID)
-	if _, err := s.replaceContacts(o.ID, []Contact{*stays}, nil); err != nil {
+	if _, err := s.ReplaceContacts(o.ID, []Contact{*stays}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if still := left(); len(still) > 0 {

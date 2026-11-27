@@ -63,7 +63,7 @@ func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
 		t.Fatalf("the first agent's note: %+v", got.Notes)
 	}
 	if len(got.Open) != 2 || got.Open[1].Text != "Find some in Switzerland too." || got.Open[1].AskedBy != "Grace Hopper" ||
-		got.Open[0].Since != (TaskCounts{1, 1}) || got.Open[1].Since != (TaskCounts{}) {
+		got.Open[0].Since != (TaskCounts{Companies: 1, People: 1}) || got.Open[1].Since != (TaskCounts{}) {
 		t.Fatalf("open requests, and what each has gained: %+v", got.Open)
 	}
 
@@ -86,7 +86,7 @@ func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
 		t.Fatal(err)
 	}
 	after := must(s.AgentTask(o.ID, scout, task.ID, paging.Page{}))
-	if len(after.Companies) != 2 || after.Companies[0].ID != old.ID || after.Found != (TaskCounts{2, 1}) {
+	if len(after.Companies) != 2 || after.Companies[0].ID != old.ID || after.Found != (TaskCounts{Companies: 2, People: 1}) {
 		t.Fatalf("a company known before the task should count once an agent matches it: %+v", after.Companies)
 	}
 	if len(after.Open) != 1 || !after.Requests[1].Done || after.Requests[1].DoneBy != "agent:second" || after.Requests[1].Since.Companies != 1 {

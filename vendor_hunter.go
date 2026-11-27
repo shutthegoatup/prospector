@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // hunter is Hunter.io's Email Finder: a name and a company's domain give the most
@@ -31,10 +32,10 @@ func (hunter) Find(ctx context.Context, c *http.Client, base, key string, p enri
 	case p.Company != "":
 		q.Set("company", p.Company)
 	default:
-		return vendorFind{}, errors.New("it needs the company's domain or name")
+		return vendorFind{}, say.New("it needs the company's domain or name")
 	}
 	if strings.TrimSpace(p.Name) == "" {
-		return vendorFind{}, errors.New("it needs the person's name")
+		return vendorFind{}, say.New("it needs the person's name")
 	}
 	q.Set("full_name", p.Name)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/v2/email-finder?"+q.Encode(), nil)
@@ -61,7 +62,7 @@ func (hunter) Find(ctx context.Context, c *http.Client, base, key string, p enri
 		} `json:"errors"`
 	}
 	if err := json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&body); err != nil {
-		return vendorFind{}, fmt.Errorf("an answer that isn't JSON (%s)", res.Status)
+		return vendorFind{}, say.Errorf("an answer that isn't JSON (%s)", res.Status)
 	}
 	if res.StatusCode == http.StatusNotFound {
 		return vendorFind{}, nil
