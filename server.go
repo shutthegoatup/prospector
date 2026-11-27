@@ -481,7 +481,7 @@ func (a *App) passwordSignIn(r *http.Request, email, password string) (token str
 	// A browser can hold two: one from when the cookie was kept to /login, which a
 	// password change since has made worthless, and the one that took its place.
 	for _, c := range r.CookiesNamed(deviceCookie) {
-		if device, ok := a.s.knownDevice(email, c.Value); ok {
+		if device, ok := a.s.KnownDevice(email, c.Value); ok {
 			who, known = device, true
 			break
 		}

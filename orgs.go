@@ -164,9 +164,9 @@ func (s *Store) EnsureFrontOrg(base string) error {
 	return err
 }
 
-// frontFormOff says why the front page will have no contact form at base, the address
+// FrontFormOff says why the front page will have no contact form at base, the address
 // people reach the server at, or nothing when it will have one.
-func (s *Store) frontFormOff(base string) string {
+func (s *Store) FrontFormOff(base string) string {
 	o, err := s.OrgBySlug(frontOrgSlug)
 	if err != nil {
 		return err.Error()

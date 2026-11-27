@@ -180,7 +180,7 @@ func TestAnAgentsKeyOutlivesTheServerBeingGivenASecretKey(t *testing.T) {
 	s.keys = nil
 	cookie := newDeviceToken(u)
 	s.keys = keys
-	if _, ok := s.knownDevice(u.Email, cookie); !ok {
+	if _, ok := s.KnownDevice(u.Email, cookie); !ok {
 		t.Fatal("a browser known before there was a key was forgotten")
 	}
 

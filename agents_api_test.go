@@ -26,7 +26,7 @@ func TestTheAPISaysWhatEachAgentsCardSays(t *testing.T) {
 	if code, body := saveAgentAt(t, ada, srv.URL, settings("Local", map[string]any{"thinking_off": true})); code != http.StatusOK {
 		t.Fatalf("adding Local: %d %s", code, body)
 	}
-	local := must(s.agentNamed(o.ID, "Local"))
+	local := must(s.AgentNamed(o.ID, "Local"))
 	code, body := saveAgentAt(t, ada, srv.URL, settings("Gateway", map[string]any{"tools_url": fake.srv.URL + "/mcp",
 		"tools": []string{"brave-search_brave_web_search"}, "fallback": local.ID}))
 	var saved api.AgentSaved
@@ -99,7 +99,7 @@ func TestWhatAgentsDidIsInTheAPI(t *testing.T) {
 	}
 
 	// Activity comes a page at a time, saying how much there is for the page's "Page 1 of 2".
-	_, before := s.agentEvents(o.ID, 0, 0)
+	_, before := s.AgentEvents(o.ID, 0, 0)
 	start := time.Now().Add(-time.Hour)
 	var events []Event
 	for i := range 24 {

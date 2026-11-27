@@ -78,7 +78,7 @@ func TestTasksFromBeforeANumberAskForNone(t *testing.T) {
 	}
 
 	s := must(Open(dsn))
-	if got := must(s.taskRow(o.ID, task.ID)); got.Want != 0 {
+	if got := must(s.TaskByID(o.ID, task.ID)); got.Want != 0 {
 		t.Fatalf("a task from before should ask for no number: %+v", got)
 	}
 }

@@ -28,7 +28,7 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 			}
 			blocked = append(blocked, fmt.Sprintf("%s in %s was erased on request; take them out of the file", d.Key, d.File))
 		}
-		email, link := s.allowed(o, d.Email, ""), s.allowed(o, "", d.Linkedin)
+		email, link := s.Allowed(o, d.Email, ""), s.Allowed(o, "", d.Linkedin)
 		if email == nil && link == nil {
 			continue
 		}

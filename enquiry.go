@@ -284,10 +284,10 @@ func (s *Store) enquiriesMatching(org int64, f EnquiryFilter) *gorm.DB {
 	return q
 }
 
-// enquiriesBefore is a page of the enquiries a filter matches, newest first, after
+// EnquiriesBefore is a page of the enquiries a filter matches, newest first, after
 // the one a cursor names. The cursor is that enquiry's id, so one answered or marked
 // as spam while the list is walked, or one arriving, moves no other between pages.
-func (s *Store) enquiriesBefore(org int64, f EnquiryFilter, page PageIn) (rows []Enquiry, next string, err error) {
+func (s *Store) EnquiriesBefore(org int64, f EnquiryFilter, page PageIn) (rows []Enquiry, next string, err error) {
 	at, err := page.at(1)
 	if err != nil {
 		return nil, "", err
@@ -465,7 +465,7 @@ type enquiriesAround struct {
 	Threads   map[int64][]EnquiryMessage
 }
 
-func (s *Store) aroundEnquiries(org int64, rows []Enquiry) (enquiriesAround, error) {
+func (s *Store) AroundEnquiries(org int64, rows []Enquiry) (enquiriesAround, error) {
 	out := enquiriesAround{Companies: map[int64]string{}, Talking: map[int64]bool{}}
 	var ids, senders []int64
 	for _, e := range rows {
@@ -539,7 +539,7 @@ func (s *Store) ConverseEnquiry(o *Org, id int64, actor string) (*Contact, error
 		}
 	}
 	// Someone put on the never-contact list since they were matched stays off the board.
-	if err := s.allowed(o, deref(c.Email), deref(c.Linkedin)); err != nil {
+	if err := s.Allowed(o, deref(c.Email), deref(c.Linkedin)); err != nil {
 		return nil, err
 	}
 	if c.Declined != nil {

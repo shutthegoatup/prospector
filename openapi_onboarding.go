@@ -133,7 +133,7 @@ func (s apiServer) InviteCustomer(ctx context.Context, in api.InviteCustomerRequ
 	}
 	if err := s.a.customerLinkMail(ctx, q.Org, deref(c.Email), token); err != nil {
 		// Nothing was sent, so the wait before another try doesn't apply.
-		s.a.s.dropCustomerLink(token)
+		s.a.s.DropCustomerLink(token)
 		log.Printf("a customer's link wasn't sent: %v", err)
 		return nil, notSent{errors.New("they were let in, but the mail server didn't take the link; invite them again to send another")}
 	}

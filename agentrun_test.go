@@ -322,7 +322,7 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 	s, srv, ada := agentSite(t, fake)
 	o := must(s.OrgBySlug("alpha"))
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
-	if err := s.AskTask(o.ID, task.ID, "And Italy.", "Ada Lovelace"); err != nil {
+	if _, err := s.AskTask(o.ID, task.ID, "And Italy.", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	start := func(c *http.Client, agent int64) (int, string) {
@@ -361,7 +361,7 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 			"base_url": fake.srv.URL + "/v1", "api_key": agentTestKey, "model": "router/auto"}); code != http.StatusOK {
 			t.Fatalf("setting up %s: %d %s", name, code, body)
 		}
-		agents = append(agents, must(s.agentNamed(o.ID, name)))
+		agents = append(agents, must(s.AgentNamed(o.ID, name)))
 	}
 	if strings.Join(ready(), " ") != "Claude Gateway" || len(going()) != 0 {
 		t.Fatalf("each agent should be ready, and none going: %v %v", ready(), going())
@@ -525,7 +525,7 @@ func TestARunCarriedOnKeepsItsOwnClaim(t *testing.T) {
 	fake.chat = func(int, map[string]any) (int, string) {
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
-	bk := must(r.s.agentKey(must(r.s.AgentByID(r.o.ID, r.agent))))
+	bk := must(r.s.AgentKey(r.o.ID, must(r.s.AgentByID(r.o.ID, r.agent))))
 	now := time.Now()
 	// The claim its run took before the server stopped, under a session that is gone.
 	r.s.db.Create(&RequestClaim{RequestID: r.brief, OrgID: r.o.ID, TaskID: r.task.ID, Holder: fmt.Sprintf("key:%d session:gone", bk.ID),
@@ -575,7 +575,7 @@ func TestARunStartingLeavesOtherKeysClaimsAlone(t *testing.T) {
 	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
-	bk := must(r.s.agentKey(must(r.s.AgentByID(r.o.ID, r.agent))))
+	bk := must(r.s.AgentKey(r.o.ID, must(r.s.AgentByID(r.o.ID, r.agent))))
 	other := fmt.Sprintf("key:%d0 session:abc", bk.ID)
 	now := time.Now()
 	r.s.db.Create(&RequestClaim{RequestID: r.brief, OrgID: r.o.ID, TaskID: r.task.ID, Holder: other, Actor: "agent:claude",
@@ -631,7 +631,7 @@ func TestRevokingTheAgentsKeyStopsItsRun(t *testing.T) {
 	r := newRunSetup(t, fake)
 	fake.chat = func(n int, _ map[string]any) (int, string) {
 		if n == 1 {
-			bk := must(r.s.agentKey(must(r.s.AgentByID(r.o.ID, r.agent))))
+			bk := must(r.s.AgentKey(r.o.ID, must(r.s.AgentByID(r.o.ID, r.agent))))
 			r.s.db.Model(&APIKey{}).Where("id = ?", bk.ID).Update("revoked_at", time.Now())
 		}
 		return 200, chatTools(searchTool, `{"query":"yachts"}`)

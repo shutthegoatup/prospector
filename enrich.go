@@ -127,9 +127,9 @@ func (s *Store) EnricherUsed(org int64, kind string, now time.Time) int {
 	return u.Calls
 }
 
-// spend takes one lookup of a vendor's month, unless its limit is reached. One
+// Spend takes one lookup of a vendor's month, unless its limit is reached. One
 // statement, so two lookups at once can't both take the last.
-func (s *Store) spend(org int64, e Enricher, now time.Time) (bool, error) {
+func (s *Store) Spend(org int64, e Enricher, now time.Time) (bool, error) {
 	month := now.UTC().Format("2006-01")
 	if err := s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&EnrichUsage{OrgID: org, Kind: e.Kind, Month: month}).Error; err != nil {
 		return false, err
@@ -176,7 +176,7 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 	s := a.s
 	if in.Task != 0 {
 		var err error
-		if who, err = s.onTask(o.ID, who, in.Task); err != nil {
+		if who, err = s.OnTask(o.ID, who, in.Task); err != nil {
 			return nil, err
 		}
 	}
@@ -230,7 +230,7 @@ func (a *App) enrichField(ctx context.Context, o *Org, who Actor, c Contact, p e
 		if v == nil || !slices.Contains(v.Fields(), field) || e.APIKey == "" {
 			continue
 		}
-		if when := s.askedLately(o.ID, c.ID, field, e.Kind); when != nil {
+		if when := s.AskedLately(o.ID, c.ID, field, e.Kind); when != nil {
 			if !tried {
 				asked.Detail = v.Name() + " was asked on " + when.Format("2 Jan 2006") + "; it is asked again after " + fmt.Sprint(enrichAgain.Hours()/24) + " days"
 			}
@@ -239,7 +239,7 @@ func (a *App) enrichField(ctx context.Context, o *Org, who Actor, c Contact, p e
 		if !tried {
 			asked.Detail = "every vendor that looks for " + field + " has used this month's lookups"
 		}
-		took, err := s.spend(o.ID, e, time.Now())
+		took, err := s.Spend(o.ID, e, time.Now())
 		if err != nil {
 			return EnrichAsked{Field: field, Vendor: e.Kind, Outcome: "failed", Detail: err.Error()}
 		}
@@ -289,7 +289,7 @@ func (a *App) keepFind(o *Org, who Actor, c Contact, field, kind, value, status 
 	case "linkedin":
 		link = value
 	}
-	if err := s.allowed(o, email, link); err != nil {
+	if err := s.Allowed(o, email, link); err != nil {
 		return EnrichAsked{Field: field, Vendor: kind, Outcome: "skipped", Detail: err.Error()}
 	}
 	if err := s.Erased(o.ID, email, link); err != nil {
@@ -298,7 +298,7 @@ func (a *App) keepFind(o *Org, who Actor, c Contact, field, kind, value, status 
 	if field == "phone" && phoneLooksWrong(value) {
 		return EnrichAsked{Field: field, Vendor: kind, Outcome: "skipped", Detail: "it isn't a number that can be called"}
 	}
-	if field == "email" && s.takesMail(context.Background(), mailDomainOf(value)) == mailRefused {
+	if field == "email" && s.TakesMail(context.Background(), mailDomainOf(value)) == mailRefused {
 		return EnrichAsked{Field: field, Vendor: kind, Outcome: "skipped", Detail: "its domain takes no mail"}
 	}
 	made, err := s.KeepFind(o.ID, who, c.ID, field, kind, value, status)
@@ -333,9 +333,9 @@ func (s *Store) Erased(org int64, email, link string) error {
 	return erased(s.db, org, "", "", email, link)
 }
 
-// askedLately is when a vendor was last asked for this field of this person, if it
+// AskedLately is when a vendor was last asked for this field of this person, if it
 // was recently enough that asking again would only spend a lookup.
-func (s *Store) askedLately(org, contact int64, field, kind string) *time.Time {
+func (s *Store) AskedLately(org, contact int64, field, kind string) *time.Time {
 	var e Event
 	res := s.db.Where("org_id = ? and contact_id = ? and action = ? and value like ? and at > ?", org, contact, "enrich:"+field, kind+":%", time.Now().Add(-enrichAgain)).
 		Order("at desc").Limit(1).Find(&e)
@@ -357,9 +357,9 @@ type Lookup struct {
 	At                     time.Time
 }
 
-// lookups are each vendor's latest lookup per detail for these people, within the
+// lookupsOf are each vendor's latest lookup per detail for these people, within the
 // time a vendor isn't asked again, newest first.
-func (s *Store) lookups(org int64, people []int64) (map[int64][]Lookup, error) {
+func (s *Store) lookupsOf(org int64, people []int64) (map[int64][]Lookup, error) {
 	out := map[int64][]Lookup{}
 	if len(people) == 0 {
 		return out, nil

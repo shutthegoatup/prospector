@@ -324,9 +324,9 @@ func (s *Store) ToReview(org int64) int {
 	return s.ResearchCount(org, "review") + int(n)
 }
 
-// withVerdicts shows Research rows as they stand for an offering: its stage, and its
+// WithVerdicts shows Research rows as they stand for an offering: its stage, and its
 // grade where a person gave one.
-func (s *Store) withVerdicts(org, offering int64, rows []ResearchRow) error {
+func (s *Store) WithVerdicts(org, offering int64, rows []ResearchRow) error {
 	ids := make([]int64, len(rows))
 	for i, r := range rows {
 		ids[i] = r.ID

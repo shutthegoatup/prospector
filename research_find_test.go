@@ -25,7 +25,7 @@ func TestFindStartsTheChosenAgentsOnANewSearch(t *testing.T) {
 		"api_key": agentTestKey, "model": "router/auto"}); code != http.StatusOK {
 		t.Fatalf("adding Gateway: %d %s", code, body)
 	}
-	gateway := must(s.agentNamed(o.ID, "Gateway"))
+	gateway := must(s.AgentNamed(o.ID, "Gateway"))
 
 	// Research offers to find with the agents that are ready, the first of them chosen.
 	_, list := call(t, ada, "GET", srv.URL+"/o/alpha/api/v1/agents", "", nil)

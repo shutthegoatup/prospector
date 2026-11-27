@@ -104,7 +104,7 @@ func (s *Store) AgentByID(org, id int64) (*Agent, error) {
 	return &c, nil
 }
 
-func (s *Store) agentNamed(org int64, name string) (*Agent, error) {
+func (s *Store) AgentNamed(org int64, name string) (*Agent, error) {
 	var c Agent
 	if err := s.db.Where("org_id = ? and name = ?", org, name).Limit(1).Find(&c).Error; err != nil || c.ID == 0 {
 		return nil, errors.Join(err, fmt.Errorf("no agent called %q in this organisation", name))
@@ -554,7 +554,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	c.Allowed = encodeList(allowed)
 	now := time.Now()
 	c.Problem, c.CheckedAt = strings.Join(problems, " "), &now
-	if err := a.s.writeAgent(c); err != nil {
+	if err := a.s.SaveAgentRow(org, c); err != nil {
 		return nil, err
 	}
 	if renamed && c.KeyID != 0 {
@@ -569,15 +569,16 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	return c, nil
 }
 
-// writeAgent stores an agent's settings: a new one is made; an existing one has only
+// SaveAgentRow stores an agent's settings: a new one is made; an existing one has only
 // what an owner edits written, and only while it is still there. Checking an endpoint
 // takes seconds, and an agent deleted meanwhile mustn't come back, nor a key its first
 // run made meanwhile be lost.
-func (s *Store) writeAgent(c *Agent) error {
+func (s *Store) SaveAgentRow(org int64, c *Agent) error {
+	c.OrgID = org
 	if c.ID == 0 {
 		return s.db.Create(c).Error
 	}
-	res := s.db.Model(&Agent{}).Where("id = ? and org_id = ?", c.ID, c.OrgID).
+	res := s.db.Model(&Agent{}).Where("id = ? and org_id = ?", c.ID, org).
 		Select("name", "kind", "base_url", "fallback_id", "fallback_minutes", "thinking_off", "api_key", "model", "tools_url", "search_url", "models", "tools", "allowed", "problem", "checked_at", "updated_by", "updated_at").
 		Updates(c)
 	if res.Error == nil && res.RowsAffected == 0 {

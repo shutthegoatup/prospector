@@ -22,10 +22,17 @@ var acrossOrganisations = map[string]bool{
 	"ResetToken": true, "InviteToken": true, "PasswordTokenUser": true, "RedeemPasswordToken": true,
 	"CreateOrg": true, "CreateOrgWithOwner": true, "EnsureFrontOrg": true, "OrgByID": true, "OrgBySlug": true, "OrgsFor": true,
 	"KeyFor": true, "Reseal": true, "SSOOrgsFor": true, "SocialUser": true, "SSOUser": true,
+	"KnownDevice": true, "DropInvites": true,
 	// Finds a customer by the secret in their link or cookie, which is all they have.
-	"CustomerByToken": true,
+	"CustomerByToken": true, "EndCustomerSession": true, "DropCustomerLink": true,
 	// An unsubscribe link names its organisation itself; whoever holds it has no session.
-	"UnsubscribeByToken": true,
+	"UnsubscribeByToken": true, "DropUnsubscribeLink": true,
+	// A webhook names its organisation by slug, and proves it with the secret.
+	"BounceHookOrg": true,
+	// Whether a domain takes mail is the same for everyone who writes to it.
+	"TakesMail": true, "NoMailDomains": true, "CheckSomeMail": true,
+	// What the server does as it starts.
+	"ResealAtStart": true, "FrontFormOff": true,
 	// These take a row that already names its organisation, which their callers read with it.
 	"SaveOrgMail": true, "SaveSSO": true,
 	// The server's own sweeps, over every organisation; what they find is then handled
@@ -388,6 +395,11 @@ var saysNothingBack = map[string]bool{
 	"DropKeyClaims": true, "KeyRevoked": true, "RequestDone": true,
 	"MailSentSince": true, "NextQueued": true, "SkipMail": true, "ClaimMail": true, "SettleMail": true,
 	"CampaignWent": true, "CampaignFailed": true, "PauseCampaign": true, "FinishIfDone": true,
+	"AgentNamed": true, "SaveAgentRow": true, "OnTask": true, "TaskBriefsFor": true, "HistoryCount": true, "CustomerCompanies": true,
+	"AroundEnquiries": true, "ResearchList": true, "StartReply": true, "SettleReply": true, "MailFailed": true, "CustomerSetStep": true, "RedeemCustomerLink": true,
+	// Each works from what it is handed: settings, rows already read, a vendor, or a page
+	// filter the fuzzing's words don't make.
+	"Allowed": true, "WithVerdicts": true, "Spend": true, "AskedLately": true, "ResearchCountsFor": true,
 }
 
 func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {

@@ -160,7 +160,7 @@ func (s apiServer) ListAgentActivity(ctx context.Context, in api.ListAgentActivi
 	if err != nil {
 		return nil, err
 	}
-	events, total := s.a.s.agentEvents(reqFrom(ctx).Org.ID, int(at[0]), page.size())
+	events, total := s.a.s.AgentEvents(reqFrom(ctx).Org.ID, int(at[0]), page.size())
 	var next string
 	if end := int(at[0]) + len(events); end < total {
 		next = cursorOf(int64(end))

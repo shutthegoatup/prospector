@@ -33,7 +33,7 @@ func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
 		t.Fatalf("list_tasks should say who holds the brief: %+v", list[0])
 	}
 
-	if err := s.AskTask(o.ID, task.ID, "Find ten more in Italy.", "Ada Lovelace"); err != nil {
+	if _, err := s.AskTask(o.ID, task.ID, "Find ten more in Italy.", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	got = must(s.agentTask(o.ID, second, task.ID, now.Add(2*time.Minute)))
@@ -56,7 +56,7 @@ func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
 	if err := s.SetRequestDone(o.ID, more, true, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AskTask(o.ID, task.ID, "And Spain.", "Ada Lovelace"); err != nil {
+	if _, err := s.AskTask(o.ID, task.ID, "And Spain.", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	if got := must(s.agentTask(o.ID, reader, task.ID, now.Add(5*time.Minute))); got.Claimed != 0 || got.Requests[2].HeldBy != "" {
@@ -171,7 +171,7 @@ func TestTwoClientsOnOneKeyTakeDifferentRequests(t *testing.T) {
 	s, o, srv, _ := signedIn(t)
 	key, _, _ := s.CreateKey(o.ID, "claude", []string{"read", "research:write"}, "test")
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
-	if err := s.AskTask(o.ID, task.ID, "And Italy.", "Ada Lovelace"); err != nil {
+	if _, err := s.AskTask(o.ID, task.ID, "And Italy.", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	claimed := func(session *mcp.ClientSession) int64 {

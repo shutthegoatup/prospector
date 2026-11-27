@@ -52,8 +52,8 @@ func (s *Store) HasBounceHook(org int64) bool {
 	return s.db.Model(&BounceHook{}).Where("org_id = ?", org).Count(&n).Error == nil && n > 0
 }
 
-// bounceHookOrg is the organisation a webhook's sign-in is for: its slug and secret.
-func (s *Store) bounceHookOrg(slug, secret string) (*Org, bool) {
+// BounceHookOrg is the organisation a webhook's sign-in is for: its slug and secret.
+func (s *Store) BounceHookOrg(slug, secret string) (*Org, bool) {
 	o, err := s.OrgBySlug(slug)
 	if err != nil || secret == "" {
 		return nil, false
@@ -86,7 +86,7 @@ func (b postmarkBounce) permanent() bool {
 // organisation's slug, and the secret it was given.
 func (a *App) postmarkHook(w http.ResponseWriter, r *http.Request) {
 	slug, secret, _ := r.BasicAuth()
-	o, ok := a.s.bounceHookOrg(slug, secret)
+	o, ok := a.s.BounceHookOrg(slug, secret)
 	if !ok {
 		w.Header().Set("WWW-Authenticate", `Basic realm="prospector"`)
 		http.Error(w, "sign in with your organisation's slug and its bounce webhook secret", http.StatusUnauthorized)
@@ -112,7 +112,7 @@ func (a *App) postmarkHook(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	if err := a.s.mailFailed(o.ID, addr, reason, said); err != nil {
+	if err := a.s.MailFailed(o.ID, addr, reason, said); err != nil {
 		log.Printf("recording a bounce for %s: %v", o.Slug, err)
 		http.Error(w, "the bounce couldn't be recorded; Postmark will try again", http.StatusInternalServerError)
 		return
@@ -120,10 +120,10 @@ func (a *App) postmarkHook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// mailFailed puts an address on the list. A bounce is kept beside any reason it already
+// MailFailed puts an address on the list. A bounce is kept beside any reason it already
 // had, and says so on the last mail that went to it; a complaint is about a mail that
 // arrived, which stays sent.
-func (s *Store) mailFailed(org int64, addr, reason, said string) error {
+func (s *Store) MailFailed(org int64, addr, reason, said string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		if _, err := s.suppress(tx, org, addr, reason, bounceBy); err != nil {
 			return err
@@ -139,6 +139,6 @@ func (s *Store) mailFailed(org int64, addr, reason, said string) error {
 		if found.Error != nil || found.RowsAffected == 0 {
 			return found.Error
 		}
-		return tx.Model(&CampaignRecipient{}).Where("id = ?", last.ID).Updates(map[string]any{"status": MailFailed, "reason": said}).Error
+		return tx.Model(&CampaignRecipient{}).Where("org_id = ? and id = ?", org, last.ID).Updates(map[string]any{"status": MailFailed, "reason": said}).Error
 	})
 }

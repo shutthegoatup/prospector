@@ -308,8 +308,8 @@ func (s *Store) resealOne(in sealedColumn, row storedSecret) (moved, raced bool,
 	return res.RowsAffected > 0, res.RowsAffected == 0, res.Error
 }
 
-// resealAtStart runs when the server starts, since a new key only ever arrives with a restart.
-func (s *Store) resealAtStart() {
+// ResealAtStart runs when the server starts, since a new key only ever arrives with a restart.
+func (s *Store) ResealAtStart() {
 	if s.keys == nil {
 		var clear int64
 		_ = logged(s.db.Model(&SSOConnection{}).Where("client_secret <> ''").Count(&clear))

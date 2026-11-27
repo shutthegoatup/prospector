@@ -116,23 +116,23 @@ func TestAddressesAlreadyHereAreCheckedAFewAtATime(t *testing.T) {
 	person(t, s, o, "Hannah Pryce", "Larkmoor Yachts", "hannah@larkmoor.example", true)
 	person(t, s, o, "Jo Marsh", "Larkmoor Yachts", "jo@larkmoor.example, jo.marsh@marsh.example", true)
 	person(t, s, o, "Sven Dahl", "Nordkap Boats", "sven@nordkap.example", true)
-	s.checkSomeMail(context.Background(), 100)
+	s.CheckSomeMail(context.Background(), 100)
 	var n int64
 	if s.db.Model(&MailDomain{}).Count(&n); n != 0 {
 		t.Fatalf("without a resolver %d domains were kept", n)
 	}
 	dns := &fakeDNS{}
 	s.dns = dns
-	s.checkSomeMail(context.Background(), 2)
+	s.CheckSomeMail(context.Background(), 2)
 	if s.db.Model(&MailDomain{}).Count(&n); n != 2 {
 		t.Errorf("%d domains kept after a round of two", n)
 	}
-	s.checkSomeMail(context.Background(), 2)
+	s.CheckSomeMail(context.Background(), 2)
 	if s.db.Model(&MailDomain{}).Count(&n); n != 3 {
 		t.Errorf("%d domains kept, want each of the three once", n)
 	}
 	dns.asked = nil
-	s.checkSomeMail(context.Background(), 100)
+	s.CheckSomeMail(context.Background(), 100)
 	if len(dns.asked) != 0 {
 		t.Errorf("fresh answers were asked for again: %v", dns.asked)
 	}
@@ -185,7 +185,7 @@ func TestACampaignLeavesOutAnAddressWhoseDomainTakesNoMail(t *testing.T) {
 		t.Errorf("a stale answer left them out: %q", got["Sven Dahl"])
 	}
 	s.dns = &fakeDNS{mx: map[string][]*net.MX{"nordkap.example": {{Host: "mx.nordkap.example."}}}}
-	if s.takesMail(context.Background(), "nordkap.example") != mailTaken {
+	if s.TakesMail(context.Background(), "nordkap.example") != mailTaken {
 		t.Error("asking again didn't find the mail server")
 	}
 	var kept MailDomain

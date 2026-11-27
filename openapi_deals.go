@@ -194,11 +194,11 @@ func (s apiServer) ListEnquiries(ctx context.Context, in api.ListEnquiriesReques
 		return nil, err
 	}
 	org := reqFrom(ctx).Org.ID
-	rows, next, err := s.a.s.enquiriesBefore(org, EnquiryFilter{Kind: p.Kind, Spam: p.Spam, State: p.State}, page)
+	rows, next, err := s.a.s.EnquiriesBefore(org, EnquiryFilter{Kind: p.Kind, Spam: p.Spam, State: p.State}, page)
 	if err != nil {
 		return nil, err
 	}
-	around, err := s.a.s.aroundEnquiries(org, rows)
+	around, err := s.a.s.AroundEnquiries(org, rows)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +234,7 @@ func (s apiServer) ChangeEnquiry(ctx context.Context, in api.ChangeEnquiryReques
 	if err != nil {
 		return nil, err
 	}
-	around, err := s.a.s.aroundEnquiries(q.Org.ID, []Enquiry{*e})
+	around, err := s.a.s.AroundEnquiries(q.Org.ID, []Enquiry{*e})
 	if err != nil {
 		return nil, err
 	}

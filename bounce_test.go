@@ -161,7 +161,7 @@ func TestABounceIsKeptBesideWhyTheyAreOnTheList(t *testing.T) {
 	}
 	bounces := func(addr string) {
 		t.Helper()
-		if err := s.mailFailed(o.ID, addr, SuppressBounced, "it bounced (HardBounce)"); err != nil {
+		if err := s.MailFailed(o.ID, addr, SuppressBounced, "it bounced (HardBounce)"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -172,7 +172,7 @@ func TestABounceIsKeptBesideWhyTheyAreOnTheList(t *testing.T) {
 	must(s.Suppress(o.ID, "added@larkmoor.example", "Ada Lovelace"))
 	bounces("added@larkmoor.example")
 	bounces("spam@larkmoor.example")
-	if err := s.mailFailed(o.ID, "spam@larkmoor.example", SuppressComplained, ""); err != nil {
+	if err := s.MailFailed(o.ID, "spam@larkmoor.example", SuppressComplained, ""); err != nil {
 		t.Fatal(err)
 	}
 	unsubscribe("spam@larkmoor.example")

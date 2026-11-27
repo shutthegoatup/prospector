@@ -1558,7 +1558,7 @@ func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
 	if changed.StatusCode != http.StatusNoContent || renewed == nil || renewed.Path != "/" {
 		t.Fatalf("changing a password while the address is held: %d, device cookie %+v", changed.StatusCode, renewed)
 	}
-	if _, ok := s.knownDevice("bob@example.com", bobs.Value); ok {
+	if _, ok := s.KnownDevice("bob@example.com", bobs.Value); ok {
 		t.Fatal("the device cookie from before the change still verifies")
 	}
 	if code, _ := try("bob@example.com", "bob's new password", renewed.Value); code != http.StatusOK {

@@ -291,7 +291,7 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 	}
 	var customers map[int64]bool
 	if c.Kind == KindService {
-		ids, err := a.s.customerCompanies(o.ID)
+		ids, err := a.s.CustomerCompanies(o.ID)
 		if err != nil {
 			log.Printf("campaign %d: %v", c.ID, err)
 			return
@@ -388,7 +388,7 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 	// The link is made before the claim, so an erasure landing any time after deletes it;
 	// one made after the claim could outlast an erasure and keep its address.
 	if claimed, err := a.s.ClaimMail(o.ID, r.ID, r.Address); !noted(err) || !claimed {
-		a.s.dropUnsubscribeLink(token)
+		a.s.DropUnsubscribeLink(token)
 		return err == nil
 	}
 	sendCtx, cancel := context.WithTimeout(ctx, sendLimit)
@@ -401,14 +401,14 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 	case errors.Is(sendErr, errRefusedRecipient):
 		// One refused address is that address; several in a row is the server refusing
 		// the campaign, which pauses it before the whole list is used up.
-		a.s.dropUnsubscribeLink(token)
+		a.s.DropUnsubscribeLink(token)
 		log.Printf("campaign %d: %v", c.ID, sendErr)
 		settled := settle(MailFailed, "the mail server refused this address")
 		return a.failedToSend(c) && settled
 	case errors.Is(sendErr, errUnsent):
 		// Nothing went, so it waits for the next round, and the round stops: the server
 		// is likely to refuse the next one too.
-		a.s.dropUnsubscribeLink(token)
+		a.s.DropUnsubscribeLink(token)
 		log.Printf("campaign %d: %v", c.ID, sendErr)
 		settle(MailQueued, "")
 		a.failedToSend(c)
@@ -434,7 +434,7 @@ func (a *App) pauseCampaign(c Campaign, why string) {
 	noted(a.s.PauseCampaign(c.OrgID, c.ID, why))
 }
 
-func (s *Store) dropUnsubscribeLink(token string) {
+func (s *Store) DropUnsubscribeLink(token string) {
 	if token != "" {
 		stored(s.db.Where("token_hash = ?", hashToken(token)).Delete(&UnsubscribeLink{}))
 	}

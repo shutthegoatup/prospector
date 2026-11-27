@@ -150,28 +150,28 @@ func (l CustomerLink) opens() bool {
 	return l.UsedAt == nil && l.ExpiresAt.After(time.Now())
 }
 
-// redeemCustomerLink spends a link and opens a session for the browser that sent it.
+// RedeemCustomerLink spends a link and opens a session for the browser that sent it.
 // The link is spent inside the transaction, so two requests can't both use it.
-func (s *Store) redeemCustomerLink(a *CustomerAccess, token string) (string, error) {
+func (s *Store) RedeemCustomerLink(org int64, a *CustomerAccess, token string) (string, error) {
 	session := randomToken(32)
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		now := time.Now()
-		spent := tx.Model(&CustomerLink{}).Where("token_hash = ? and used_at is null and expires_at > ?", hashToken(token), now).Update("used_at", now)
+		spent := tx.Model(&CustomerLink{}).Where("org_id = ? and grant_id = ? and token_hash = ? and used_at is null and expires_at > ?", org, a.Grant.ID, hashToken(token), now).Update("used_at", now)
 		if spent.Error != nil {
 			return spent.Error
 		}
 		if spent.RowsAffected != 1 {
 			return errNoCustomer
 		}
-		if err := tx.Where("org_id = ? and expires_at < ?", a.Grant.OrgID, now).Delete(&CustomerSession{}).Error; err != nil {
+		if err := tx.Where("org_id = ? and expires_at < ?", org, now).Delete(&CustomerSession{}).Error; err != nil {
 			return err
 		}
-		return tx.Create(&CustomerSession{OrgID: a.Grant.OrgID, GrantID: a.Grant.ID, TokenHash: hashToken(session), ExpiresAt: now.Add(customerSessionLife)}).Error
+		return tx.Create(&CustomerSession{OrgID: org, GrantID: a.Grant.ID, TokenHash: hashToken(session), ExpiresAt: now.Add(customerSessionLife)}).Error
 	})
 	return session, err
 }
 
-func (s *Store) endCustomerSession(token string) error {
+func (s *Store) EndCustomerSession(token string) error {
 	return s.db.Where("token_hash = ?", hashToken(token)).Delete(&CustomerSession{}).Error
 }
 
@@ -326,11 +326,11 @@ func (s *Store) CustomerInvites(org int64) (map[int64][]CustomerInvite, error) {
 	return out, nil
 }
 
-// customerSteps are the steps of an onboarding that are the customer's to do. The
+// CustomerSteps are the steps of an onboarding that are the customer's to do. The
 // organisation's own steps were written for its own eyes and are never read for this page.
-func (s *Store) customerSteps(a *CustomerAccess) ([]OnboardingStep, error) {
+func (s *Store) CustomerSteps(org int64, a *CustomerAccess) ([]OnboardingStep, error) {
 	var steps []OnboardingStep
-	return steps, s.db.Where("org_id = ? and onboarding_id = ? and who = ?", a.Grant.OrgID, a.Onboarding.ID, StepTheirs).Order("seq").Find(&steps).Error
+	return steps, s.in(org).Where("onboarding_id = ? and who = ?", a.Onboarding.ID, StepTheirs).Order("seq").Find(&steps).Error
 }
 
 var errNoCustomerMail = errors.New("mail isn't set up, so the link can't be sent: an owner sets a mail server in Settings, and the server needs PROSPECTOR_URL")
@@ -343,7 +343,7 @@ func (a *App) customerMailOn(org int64) bool {
 	return err == nil && via != nil && a.base != ""
 }
 
-func (s *Store) dropCustomerLink(token string) {
+func (s *Store) DropCustomerLink(token string) {
 	_ = logged(s.db.Where("token_hash = ?", hashToken(token)).Delete(&CustomerLink{}))
 }
 
@@ -436,7 +436,7 @@ func (a *App) customerOpen(w http.ResponseWriter, r *http.Request) {
 		a.customerRender(w, r, http.StatusNotFound, CustomerView{State: "none"})
 		return
 	}
-	session, err := a.s.redeemCustomerLink(acc, token)
+	session, err := a.s.RedeemCustomerLink(acc.Grant.OrgID, acc, token)
 	if err != nil {
 		a.customerRender(w, r, http.StatusOK, CustomerView{State: "again", Token: token, Org: acc.Org.Name})
 		return
@@ -460,7 +460,7 @@ func (a *App) customerAgain(w http.ResponseWriter, r *http.Request) {
 				defer cancel()
 				if err := a.customerLinkMail(ctx, &org, to, fresh); err != nil {
 					// Nothing was sent, so the wait before another try doesn't apply.
-					a.s.dropCustomerLink(fresh)
+					a.s.DropCustomerLink(fresh)
 					log.Printf("a customer's link wasn't sent: %v", err)
 				}
 			})
@@ -487,7 +487,7 @@ func (a *App) customerPage(w http.ResponseWriter, r *http.Request) {
 		a.customerRender(w, r, http.StatusOK, CustomerView{State: "none"})
 		return
 	}
-	steps, err := a.s.customerSteps(acc)
+	steps, err := a.s.CustomerSteps(acc.Grant.OrgID, acc)
 	if err != nil {
 		http.Error(w, "the page couldn't be read", http.StatusInternalServerError)
 		return
@@ -498,7 +498,7 @@ func (a *App) customerPage(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) customerLeave(w http.ResponseWriter, r *http.Request) {
 	if _, token := a.customerSession(r); token != "" {
-		if err := a.s.endCustomerSession(token); err != nil {
+		if err := a.s.EndCustomerSession(token); err != nil {
 			log.Print(err)
 		}
 	}
@@ -541,11 +541,10 @@ func (a *App) customerControls(org int64, rows []OnboardingRow) error {
 // A fixed word, not their name: the person is on the history entry, which erasure removes.
 const customerActor = "customer"
 
-// customerSetStep marks one of the customer's own steps done, or takes back a mark they
+// CustomerSetStep marks one of the customer's own steps done, or takes back a mark they
 // made. A step a member marked stays as the member left it, and so does a step that
 // isn't theirs or belongs to another onboarding.
-func (s *Store) customerSetStep(a *CustomerAccess, step int64, done bool) error {
-	org := a.Grant.OrgID
+func (s *Store) CustomerSetStep(org int64, a *CustomerAccess, step int64, done bool) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		// Held and read again inside, so access withdrawn or a person erased a moment ago marks nothing.
 		if err := hold(tx, &CustomerGrant{}, org, a.Grant.ID); err != nil {
@@ -574,7 +573,7 @@ func (s *Store) customerSetStep(a *CustomerAccess, step int64, done bool) error 
 			if err := tx.Create(&entry).Error; err != nil {
 				return err
 			}
-			return tx.Model(&OnboardingStep{}).Where("id = ?", st.ID).Update("done_entry", entry.ID).Error
+			return tx.Model(&OnboardingStep{}).Where("org_id = ? and id = ?", org, st.ID).Update("done_entry", entry.ID).Error
 		}
 		// Taking a mark back removes the entry it wrote, not adds one: someone outside
 		// pressing the two buttons in turn can't fill the company's history. A mark made
@@ -592,7 +591,7 @@ func (a *App) customerStep(done bool) http.HandlerFunc {
 		acc, _ := a.customerSession(r)
 		if acc != nil {
 			id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-			if err := a.s.customerSetStep(acc, id, done); err != nil && !errors.Is(err, errNoCustomer) {
+			if err := a.s.CustomerSetStep(acc.Grant.OrgID, acc, id, done); err != nil && !errors.Is(err, errNoCustomer) {
 				log.Print(err)
 				http.Error(w, "that couldn't be saved", http.StatusInternalServerError)
 				return

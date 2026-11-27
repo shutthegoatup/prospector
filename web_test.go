@@ -259,7 +259,7 @@ func TestAgentsTableGainsSearchWithRowsInIt(t *testing.T) {
 	if err := s.db.AutoMigrate(models...); err != nil {
 		t.Fatalf("adding search to a table with rows: %v", err)
 	}
-	if got := must(s.agentNamed(o.ID, "Gateway")); got.SearchURL != "" {
+	if got := must(s.AgentNamed(o.ID, "Gateway")); got.SearchURL != "" {
 		t.Fatalf("an agent from before search should have none: %+v", got)
 	}
 }

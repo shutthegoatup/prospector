@@ -138,8 +138,8 @@ func openTask(tx *gorm.DB, org, id int64) (*Task, error) {
 	return &t, nil
 }
 
-// onTask ties what an agent is about to do to a task, if it named one.
-func (s *Store) onTask(org int64, who Actor, task int64) (Actor, error) {
+// OnTask ties what an agent is about to do to a task, if it named one.
+func (s *Store) OnTask(org int64, who Actor, task int64) (Actor, error) {
 	if task == 0 {
 		return who, nil
 	}
@@ -178,12 +178,7 @@ func (s *Store) matched(tx *gorm.DB, org int64, who Actor, contact int64, compan
 	return s.logAs(tx, org, contact, company, who, "task:match", nil)
 }
 
-func (s *Store) AskTask(org, task int64, text, by string) error {
-	_, err := s.askTask(org, task, text, by)
-	return err
-}
-
-func (s *Store) askTask(org, task int64, text, by string) (*TaskRequest, error) {
+func (s *Store) AskTask(org, task int64, text, by string) (*TaskRequest, error) {
 	text, err := words(text, maxRequest, "the request")
 	if err != nil {
 		return nil, err
@@ -200,10 +195,8 @@ func (s *Store) askTask(org, task int64, text, by string) (*TaskRequest, error) 
 	})
 }
 
-// taskRow and requestRow are one task, or one request, of the organisation's.
-func (s *Store) TaskByID(org, id int64) (*Task, error) { return s.taskRow(org, id) }
-
-func (s *Store) taskRow(org, id int64) (*Task, error) {
+// TaskByID and RequestByID are one task, or one request, of the organisation's.
+func (s *Store) TaskByID(org, id int64) (*Task, error) {
 	var t Task
 	if err := s.db.Where("org_id = ? and id = ?", org, id).First(&t).Error; err != nil {
 		return nil, missing(err, "no task %d in this organisation", id)
@@ -211,7 +204,7 @@ func (s *Store) taskRow(org, id int64) (*Task, error) {
 	return &t, nil
 }
 
-func (s *Store) requestRow(org, id int64) (*TaskRequest, error) {
+func (s *Store) RequestByID(org, id int64) (*TaskRequest, error) {
 	var r TaskRequest
 	if err := s.db.Where("org_id = ? and id = ?", org, id).First(&r).Error; err != nil {
 		return nil, missing(err, "no request %d in this organisation", id)
@@ -959,10 +952,10 @@ func (s *Store) AgentTasks(org int64, who Actor, page PageIn) (briefs []TaskBrie
 // the tasks page lists them, and only those for one offering when one is given. Its
 // cursor then also says whether it ended among the closed.
 func (s *Store) TaskBriefs(org int64, who Actor, closed bool, page PageIn) ([]TaskBrief, string, error) {
-	return s.taskBriefsFor(org, who, closed, nil, page)
+	return s.TaskBriefsFor(org, who, closed, nil, page)
 }
 
-func (s *Store) taskBriefsFor(org int64, who Actor, closed bool, offering *int64, page PageIn) (briefs []TaskBrief, next string, err error) {
+func (s *Store) TaskBriefsFor(org int64, who Actor, closed bool, offering *int64, page PageIn) (briefs []TaskBrief, next string, err error) {
 	n := 1
 	if closed {
 		n = 2
@@ -1139,7 +1132,7 @@ func (s *Store) AgentNote(org int64, who Actor, in NoteIn) (*TaskNote, error) {
 	if in.Task == 0 && strings.TrimSpace(in.Company) == "" {
 		return nil, errors.New("a note is about a task, a company or both")
 	}
-	if who, err = s.onTask(org, who, in.Task); err != nil {
+	if who, err = s.OnTask(org, who, in.Task); err != nil {
 		return nil, err
 	}
 	n := TaskNote{OrgID: org, TaskID: in.Task, Actor: who.Name, KeyID: who.KeyID, Kind: in.Kind, Text: text}

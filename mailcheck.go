@@ -80,9 +80,9 @@ func askDNS(ctx context.Context, r mailDNS, domain string) mailAnswer {
 	return mailUnknown
 }
 
-// takesMail answers from what is kept while it is fresh, and asks DNS otherwise.
+// TakesMail answers from what is kept while it is fresh, and asks DNS otherwise.
 // Without a resolver, as in tests that haven't given one, it never knows.
-func (s *Store) takesMail(ctx context.Context, domain string) mailAnswer {
+func (s *Store) TakesMail(ctx context.Context, domain string) mailAnswer {
 	if domain == "" {
 		return mailUnknown
 	}
@@ -116,8 +116,8 @@ func answerOf(takes bool) mailAnswer {
 	return mailRefused
 }
 
-// noMailDomains are the domains known not to take mail, for pages that mustn't wait on DNS.
-func (s *Store) noMailDomains() map[string]bool {
+// NoMailDomains are the domains known not to take mail, for pages that mustn't wait on DNS.
+func (s *Store) NoMailDomains() map[string]bool {
 	var domains []string
 	_ = logged(s.db.Model(&MailDomain{}).Where("takes_mail = ? and checked_at > ?", false, time.Now().Add(-mailRefusedFor)).Pluck("domain", &domains))
 	out := make(map[string]bool, len(domains))
@@ -141,7 +141,7 @@ func deadAddress(email string, noMail map[string]bool) string {
 // made-up domain is turned away while the agent can still look again.
 func (s *Store) checkMailDomains(email string) error {
 	for _, e := range emailRe.FindAllString(strings.ToLower(email), -1) {
-		if domain := mailDomainOf(e); s.takesMail(context.Background(), domain) == mailRefused {
+		if domain := mailDomainOf(e); s.TakesMail(context.Background(), domain) == mailRefused {
 			return errors.New("nothing was stored: " + domain + " takes no mail, so " + e + " can't be right. Leave email out, or find the address on a page")
 		}
 	}
@@ -152,7 +152,7 @@ func (s *Store) checkMailDomains(email string) error {
 // round, so people and imports get the same check agents do without waiting on DNS.
 func (a *App) keepCheckingMail(ctx context.Context, every time.Duration) {
 	for {
-		a.s.checkSomeMail(ctx, 100)
+		a.s.CheckSomeMail(ctx, 100)
 		select {
 		case <-ctx.Done():
 			return
@@ -161,7 +161,7 @@ func (a *App) keepCheckingMail(ctx context.Context, every time.Duration) {
 	}
 }
 
-func (s *Store) checkSomeMail(ctx context.Context, most int) {
+func (s *Store) CheckSomeMail(ctx context.Context, most int) {
 	if s.dns == nil {
 		return
 	}
@@ -194,7 +194,7 @@ func (s *Store) checkSomeMail(ctx context.Context, most int) {
 			}
 			asked[domain] = true
 			lookups++
-			s.takesMail(ctx, domain)
+			s.TakesMail(ctx, domain)
 		}
 	}
 }

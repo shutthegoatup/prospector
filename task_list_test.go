@@ -33,7 +33,7 @@ func TestTheTaskListTakesNoMoreQueriesForMoreTasks(t *testing.T) {
 		must(s.AgentAddContact(o, scout, AddContactIn{Company: co.Name, Name: fmt.Sprintf("Ada V%cle", rune(0x61+i)),
 			SourceURL: "https://larkmoor.example/team", Task: task.ID}))
 		must(s.AgentNote(o.ID, second, NoteIn{Task: task.ID, Company: "Larkmoor 0", Kind: "skipped", Text: "No team page"}))
-		if err := s.AskTask(o.ID, task.ID, "And their head of digital", "Nia"); err != nil {
+		if _, err := s.AskTask(o.ID, task.ID, "And their head of digital", "Nia"); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -75,7 +75,7 @@ func (s apiServer) ListToday(ctx context.Context, in api.ListTodayRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	cards, counts := Today(s.a.dueByStep(q, now), voice, now, s.a.s.noMailDomains())
+	cards, counts := Today(s.a.dueByStep(q, now), voice, now, s.a.s.NoMailDomains())
 	filter := string(in.Params.Step)
 	if filter != "" && !in.Params.Step.Valid() {
 		return nil, errors.New("step is call, accepted, email, followup, linkedin or next")
