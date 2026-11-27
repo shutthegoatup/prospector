@@ -8,10 +8,10 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/shutthegoatup/prospector/internal/enquiries"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 // PersonExport is everything held about one contact row, for answering a request
@@ -72,8 +72,8 @@ func (s *PrivacyStore) ExportPerson(org, id int64, actor string) (*PersonExport,
 			return err
 		}
 		out.EnquiryThread = []store.EnquiryMessage{}
-		if ids := enquiries.EnquiryIDs(out.Enquiries); len(ids) > 0 {
-			if err := tx.Where("org_id = ? and enquiry_id in ?", org, ids).Where(enquiries.InThread).Order("id").Find(&out.EnquiryThread).Error; err != nil {
+		if ids := tickets.EnquiryIDs(out.Enquiries); len(ids) > 0 {
+			if err := tx.Where("org_id = ? and enquiry_id in ?", org, ids).Where(tickets.InThread).Order("id").Find(&out.EnquiryThread).Error; err != nil {
 				return err
 			}
 		}

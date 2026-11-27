@@ -3,7 +3,7 @@ package privacy
 import (
 	"gorm.io/gorm"
 
-	"github.com/shutthegoatup/prospector/internal/outreach"
+	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -12,7 +12,7 @@ import (
 func forgetMailDomains(tx *gorm.DB, emails []string) error {
 	var domains []string
 	for _, e := range emails {
-		if d := outreach.MailDomainOf(e); d != "" {
+		if d := marketing.MailDomainOf(e); d != "" {
 			domains = append(domains, d)
 		}
 	}
