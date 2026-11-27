@@ -157,14 +157,14 @@ func (s apiServer) ListAgentActivity(ctx context.Context, in api.ListAgentActivi
 	if err != nil {
 		return nil, err
 	}
-	at, err := page.At(1)
+	at, err := page.At(2)
 	if err != nil {
 		return nil, err
 	}
-	events, total := s.a.s.AgentEvents(reqFrom(ctx).Org.ID, int(at[0]), page.Size())
+	events, nextAt, nextID, total := s.a.s.AgentEventsBefore(reqFrom(ctx).Org.ID, at[0], at[1], page.Size())
 	var next string
-	if end := int(at[0]) + len(events); end < total {
-		next = paging.Cursor(int64(end))
+	if nextAt > 0 {
+		next = paging.Cursor(nextAt, nextID)
 	}
 	out := api.ListAgentActivity200JSONResponse{Headers: api.ListAgentActivity200ResponseHeaders{Link: nextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor, out.Body.Total = []api.AgentEvent{}, next, total

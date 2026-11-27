@@ -1,17 +1,17 @@
 package main
 
 import (
-	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
 )
 
-// Built by the server itself at start-up, best-effort, or by hand in the baseline: not
-// something the models' tags describe.
+// Built by the server itself at start-up, best-effort, or by hand in a migration: not
+// something the models' tags can describe, such as an index on part of a table.
 var outsideTheModels = map[string]bool{
 	"idx_companies_org_name_folded": true, "idx_companies_search": true, "idx_contacts_person_search": true,
-	"idx_contacts_search": true, "idx_agent_runs_one_going": true,
+	"idx_contacts_search": true, "idx_agent_runs_one_going": true, "idx_events_agents": true,
 	"goose_db_version": true, "goose_db_version_pkey": true,
 }
 
@@ -105,7 +105,7 @@ func TestGoingBackAReleaseStillStarts(t *testing.T) {
 	if err := s.migrate(); err != nil {
 		t.Fatal(err)
 	}
-	later := fstest.MapFS{"migrations/00002_later.sql": {Data: []byte("-- +goose Up\ncreate table later_thing (id bigint primary key);\n")}}
+	later := fstest.MapFS{"migrations/99999_later.sql": {Data: []byte("-- +goose Up\ncreate table later_thing (id bigint primary key);\n")}}
 	if err := s.migrateWith(later, "migrations"); err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestGoingBackAReleaseStillStarts(t *testing.T) {
 	if err := s.db.Raw("select version_id from goose_db_version where version_id > 0 order by version_id").Scan(&versions).Error; err != nil {
 		t.Fatal(err)
 	}
-	if fmt.Sprint(versions) != "[1 2]" {
+	if !slices.Contains(versions, 99999) {
 		t.Fatalf("versions recorded: %v", versions)
 	}
 }

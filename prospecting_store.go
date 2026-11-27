@@ -350,10 +350,39 @@ func (s *prospectingStore) ResearchCount(org int64, filter string) int {
 	return s.researchCount(org, 0, filter, 0)
 }
 
+// detailsCount is how many companies detailsToCheck lists, from the same companies in
+// the same order, reading only their people and what was suggested for them: not the
+// facts and lookups the list shows of each.
+func (s *prospectingStore) detailsCount(org, offering, task int64) (int, error) {
+	q, order, err := s.researchQuery(org, offering, "details", task)
+	if err != nil {
+		return 0, err
+	}
+	var ids []int64
+	if err := q.Order(order).Limit(500).Pluck("id", &ids).Error; err != nil || len(ids) == 0 {
+		return 0, err
+	}
+	var people []Contact
+	if err := s.in(org).Where("company_id in ? and key not like 'org:%'", ids).Find(&people).Error; err != nil {
+		return 0, err
+	}
+	pending, err := s.Pending(org, people)
+	if err != nil {
+		return 0, err
+	}
+	waiting := map[int64]bool{}
+	for _, p := range people {
+		if len(pending[p.ID]) > 0 {
+			waiting[*p.CompanyID] = true
+		}
+	}
+	return len(waiting), nil
+}
+
 func (s *prospectingStore) researchCount(org, offering int64, filter string, task int64) int {
 	if filter == "details" {
-		rows, _ := s.detailsToCheck(org, offering, task)
-		return len(rows)
+		n, _ := s.detailsCount(org, offering, task)
+		return n
 	}
 	q, _, err := s.researchQuery(org, offering, filter, task)
 	if err != nil {
@@ -614,6 +643,33 @@ func (s *prospectingStore) AgentEvents(org int64, offset, limit int) ([]AgentEve
 		out[i] = AgentEvent{e.At, strings.TrimPrefix(e.User, "agent:"), e.Action, deref(e.Value)}
 	}
 	return out, int(total)
+}
+
+// AgentEventsBefore is limit of what agents did, newest first, before the event a cursor
+// left off at (its time in microseconds and id; 0 is the start), with where the next
+// page starts, 0 once there is none, and how many there are in all. It reads from where
+// it left off rather than counting past every row before it.
+func (s *prospectingStore) AgentEventsBefore(org, atMicro, id int64, limit int) (events []AgentEvent, nextAt, nextID int64, total int) {
+	agents := func() *gorm.DB { return s.in(org).Model(&Event{}).Where(`"user" like 'agent:%'`) }
+	var n int64
+	_ = logged(agents().Count(&n))
+	q := agents().Order("at desc, id desc").Limit(limit + 1)
+	if atMicro > 0 {
+		at := time.UnixMicro(atMicro)
+		q = q.Where("at < ? or (at = ? and id < ?)", at, at, id)
+	}
+	var rows []Event
+	_ = logged(q.Find(&rows))
+	if len(rows) > limit {
+		rows = rows[:limit]
+		last := rows[len(rows)-1]
+		nextAt, nextID = last.At.UnixMicro(), last.ID
+	}
+	events = make([]AgentEvent, len(rows))
+	for i, e := range rows {
+		events[i] = AgentEvent{e.At, strings.TrimPrefix(e.User, "agent:"), e.Action, deref(e.Value)}
+	}
+	return events, nextAt, nextID, int(n)
 }
 
 func (s *prospectingStore) QuickAddPerson(o *Org, in QuickAdd, actor string) (*Contact, error) {

@@ -64,36 +64,62 @@ func (s *outreachStore) CheckSomeMail(ctx context.Context, most int) {
 	if s.dns == nil {
 		return
 	}
-	var emails []string
-	if err := logged(s.db.Model(&Contact{}).Where("email is not null and email <> ''").Distinct().Pluck("email", &emails)); err != nil {
-		return
-	}
-	var kept []MailDomain
-	if err := logged(s.db.Find(&kept)); err != nil {
-		return
-	}
-	// Fresh answers are passed over without counting, so a round reaches past them.
+	// A batch of people at a time, in the order they were added, until the round's
+	// lookups are spent: a round reads only as far as it needs to.
+	const batch = 1000
 	asked := map[string]bool{}
-	for _, k := range kept {
-		fresh := mailTakenFor
-		if !k.TakesMail {
-			fresh = mailRefusedFor
-		}
-		asked[k.Domain] = time.Since(k.CheckedAt) < fresh
-	}
 	lookups := 0
-	for _, email := range emails {
-		for _, e := range emailRe.FindAllString(strings.ToLower(email), -1) {
-			domain := mailDomainOf(e)
-			if domain == "" || asked[domain] {
-				continue
+	for after := int64(0); ; {
+		var rows []struct {
+			ID    int64
+			Email string
+		}
+		if err := logged(s.db.Model(&Contact{}).Select("id, email").Where("id > ? and email is not null and email <> ''", after).
+			Order("id").Limit(batch).Scan(&rows)); err != nil || len(rows) == 0 {
+			return
+		}
+		after = rows[len(rows)-1].ID
+		domainsOf := map[int64][]string{}
+		var fresh []string
+		for _, r := range rows {
+			for _, e := range emailRe.FindAllString(strings.ToLower(r.Email), -1) {
+				if d := mailDomainOf(e); d != "" {
+					domainsOf[r.ID] = append(domainsOf[r.ID], d)
+					if _, seen := asked[d]; !seen {
+						fresh = append(fresh, d)
+					}
+				}
 			}
-			if lookups >= most || ctx.Err() != nil {
+		}
+		// Fresh answers are passed over without counting, so a round reaches past them.
+		if len(fresh) > 0 {
+			var kept []MailDomain
+			if err := logged(s.db.Where("domain in ?", fresh).Find(&kept)); err != nil {
 				return
 			}
-			asked[domain] = true
-			lookups++
-			s.TakesMail(ctx, domain)
+			for _, k := range kept {
+				good := mailTakenFor
+				if !k.TakesMail {
+					good = mailRefusedFor
+				}
+				asked[k.Domain] = time.Since(k.CheckedAt) < good
+			}
+		}
+		for _, r := range rows {
+			for _, domain := range domainsOf[r.ID] {
+				if asked[domain] {
+					continue
+				}
+				if lookups >= most || ctx.Err() != nil {
+					return
+				}
+				asked[domain] = true
+				lookups++
+				s.TakesMail(ctx, domain)
+			}
+		}
+		if len(rows) < batch {
+			return
 		}
 	}
 }
