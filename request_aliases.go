@@ -23,4 +23,9 @@ var writeProblem = request.WriteProblem
 var writeTyped = request.WriteTyped
 
 // recast is generic, so a wrapper rather than an alias.
-func recast[T any](v any) (T, error) { return request.Recast[T](v) }
+
+type refused = request.Refused
+
+var plural = request.Plural
+var put = request.Put
+var worker = request.Worker

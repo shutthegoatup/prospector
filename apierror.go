@@ -20,9 +20,6 @@ import (
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
-// refused is an error about something the caller may not do, whatever it sends.
-type refused struct{ *say.Text }
-
 // ours reports a failure that is the server's rather than the caller's: the database,
 // the network, or the request running out of time. Everything else the store returns
 // says what the caller got wrong.

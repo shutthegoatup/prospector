@@ -173,11 +173,6 @@ func (a *App) keepFind(o *Org, who Actor, c Contact, field, kind, value, status 
 	return asked
 }
 
-const (
-	lookupNone    = "none found"
-	lookupNotKept = "found, not kept"
-)
-
 func (a *App) logEnrich(org int64, who Actor, c Contact, field, value string) {
 	noted(a.s.LogEnrich(org, who, c.ID, field, value))
 }

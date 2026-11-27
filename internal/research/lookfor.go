@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -57,4 +58,22 @@ func AddConfiguratorFacts(tx *gorm.DB, org, company int64, url, platform, builtB
 	}
 	o.Settings.LookFor = "configurator: a product configurator or builder on their site"
 	return added, tx.Model(&o).Select("settings").Updates(&o).Error
+}
+
+// OtherFacts are the facts not already shown as the answer to something the
+// organisation looks for, older answers among them.
+func OtherFacts(set store.OrgSettings, facts []store.Fact) []store.Fact {
+	shown := map[int64]bool{}
+	for _, a := range prospecting.AssetsFound(set, facts) {
+		if a.Fact != nil {
+			shown[a.Fact.ID] = true
+		}
+	}
+	var out []store.Fact
+	for _, f := range facts {
+		if !shown[f.ID] {
+			out = append(out, f)
+		}
+	}
+	return out
 }

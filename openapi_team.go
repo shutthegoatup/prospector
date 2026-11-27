@@ -26,7 +26,7 @@ func requestFrom(ctx context.Context) *http.Request { return ctx.Value(requestKe
 func someone(ctx context.Context) (*Req, error) {
 	q := reqFrom(ctx)
 	if q.Key != nil || q.User == nil || q.Member == nil {
-		return nil, refused{say.New("an API key is no one's: this is for a signed-in member")}
+		return nil, refused{Text: say.New("an API key is no one's: this is for a signed-in member")}
 	}
 	return q, nil
 }
