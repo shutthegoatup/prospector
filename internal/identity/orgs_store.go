@@ -444,6 +444,11 @@ func (s *IdentityStore) ChangeSettings(o *store.Org, who store.Actor, changed []
 	})
 }
 
+// SetLanguage keeps the language someone chose for themselves, in every organisation.
+func (s *IdentityStore) SetLanguage(user int64, lang string) error {
+	return s.DB.Model(&store.User{}).Where("id = ?", user).Update("language", lang).Error
+}
+
 func (s *IdentityStore) SaveVoice(org, user int64, caller, signature string) error {
 	return s.DB.Model(&store.Membership{}).Where("org_id = ? and user_id = ?", org, user).
 		Updates(map[string]any{"caller_name": strings.TrimSpace(caller), "signature": strings.TrimSpace(signature)}).Error

@@ -142,6 +142,15 @@ func (s *SuppressionStore) MintUnsubscribeLink(tx *gorm.DB, org int64, address s
 // UnsubscribeByToken is the one look-up that starts from a secret and not an
 // organisation. It reports nothing back: a link that was never made and one that was
 // are answered alike.
+// UnsubscribeLinkOrg is the organisation an unsubscribe link is from, to speak its
+// language on the link's page.
+func (s *SuppressionStore) UnsubscribeLinkOrg(token string) (*store.Org, error) {
+	var org store.Org
+	err := s.DB.Joins("join unsubscribe_links on unsubscribe_links.org_id = orgs.id").
+		Where("unsubscribe_links.token_hash = ?", store.HashToken(token)).Take(&org).Error
+	return &org, err
+}
+
 func (s *SuppressionStore) UnsubscribeByToken(token string) error {
 	if token == "" {
 		return nil

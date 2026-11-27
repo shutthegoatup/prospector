@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { actor, plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/session";
+import locales from "../../locales.json";
 
 type Settings = components["schemas"]["Settings"];
 type Me = components["schemas"]["Me"];
@@ -31,6 +32,11 @@ const areas = [
   { name: "sales", what: "research, outreach, deals and tasks for agents" },
   { name: "support", what: "enquiries and their replies, subscriptions and onboarding" },
 ] as const;
+
+const languageName = (code: string) => new Intl.DisplayNames([code], { type: "language" }).of(code) ?? code;
+
+// The languages a person can choose, each named in itself.
+const languages = [locales.source, ...locales.translated].map((code) => ({ code, name: languageName(code) }));
 
 const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -97,6 +103,7 @@ export function SettingsPage() {
         <Failed errors={[settings.error]} />
         <Voice me={me.data} error={me.error} />
         {me.data && <Password me={me.data} />}
+        {me.data && <Language me={me.data} />}
         {answered(me) && <Organisation settings={settings.data} failed={Boolean(settings.error)} />}
         {answered(me) && answered(settings) && <Rest orgName={name} me={me.data} settings={settings.data} />}
       </div>
@@ -160,6 +167,41 @@ function Voice({ me, error }: { me?: Me; error?: { detail?: string } | null }) {
           </>
         )}
         <Failed errors={[error, save.error]} />
+      </Section>
+    </form>
+  );
+}
+
+// Language is yours in every organisation. The page is drawn in it from the start, so
+// a new one takes a reload.
+function Language({ me }: { me: Me }) {
+  const { org } = useSession();
+  const save = $api.useMutation("patch", "/o/{org}/api/v1/me", { onSuccess: () => window.location.reload() });
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    save.mutate({ params: { path: { org } }, body: { language: text(new FormData(e.currentTarget), "language") } });
+  };
+  return (
+    <form onSubmit={submit}>
+      <Section title="Your language" hint="For you in every organisation: the app, mail sent to you, and the server's messages.">
+        <Row label="Language">
+          <select name="language" defaultValue={me.language} className={cn(select, "w-full")}>
+            {/* With none chosen, the page is in what the browser's languages came to. */}
+            <option value="">{me.language ? "Your browser's" : `Your browser's (${languageName(document.documentElement.lang)})`}</option>
+            {languages.map((l) => (
+              <option key={l.code} value={l.code} lang={l.code}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+          <Meta>Your browser's languages are used until you choose one.</Meta>
+        </Row>
+        <div className="flex items-center gap-3">
+          <ActionButton type="submit" size="sm" disabled={save.isPending}>
+            Save
+          </ActionButton>
+        </div>
+        <Failed errors={[save.error]} />
       </Section>
     </form>
   );
@@ -243,6 +285,7 @@ function Organisation({ settings: set, failed }: { settings?: Settings; failed: 
         currency: text(f, "currency"),
         postal_address: text(f, "postal_address"),
         incorporated_only: f.get("incorporated_only") !== null,
+        customer_language: text(f, "customer_language"),
       },
     });
   };
@@ -260,6 +303,16 @@ function Organisation({ settings: set, failed }: { settings?: Settings; failed: 
               defaultValue={set?.color}
               className={cn("h-10 w-20 rounded-lg border border-input bg-muted p-1", loading && "animate-pulse")}
             />
+          </Row>
+          <Row label="Language for customers">
+            <select name="customer_language" defaultValue={set?.customer_language} className={cn(box, "w-full")}>
+              {languages.map((l) => (
+                <option key={l.code} value={l.code} lang={l.code}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+            <Meta>Customers' pages, unsubscribe pages, and mail to customers and new members, for anyone who hasn't chosen.</Meta>
           </Row>
           <Row label="Email after">
             <span className="flex items-center gap-2 text-sm text-muted-foreground">

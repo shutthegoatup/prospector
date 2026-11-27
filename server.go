@@ -553,7 +553,7 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login/sso?"+url.Values{"email": {q.User.Email}}.Encode(), http.StatusSeeOther)
 		return
 	}
-	writeShell(w, r, http.StatusOK, map[string]string{"page": "start"}, "Start an organisation at /api/v1/orgs.\n")
+	writeShell(w, languageOf(r), http.StatusOK, map[string]string{"page": "start"}, "Start an organisation at /api/v1/orgs.\n")
 }
 
 const passwordChanged = "Password changed. Your other sessions are signed out."

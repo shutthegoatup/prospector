@@ -48,11 +48,11 @@ func shellIn(lang string) ([]byte, error) {
 
 // writeShell answers with the app's shell carrying page: what the server already decided
 // a page shows, for the pages with no API to ask (an error, the start of a first
-// organisation, a customer's or an unsubscriber's). Its "page" field names which, and
+// organisation, a customer's or an unsubscriber's), in lang. Its "page" field names which, and
 // the app draws it in place of whatever the address would route to. With no shell to
 // read, the answer is fallback as plain text.
-func writeShell(w http.ResponseWriter, r *http.Request, code int, page any, fallback string) {
-	b, err := shellIn(languageOf(r))
+func writeShell(w http.ResponseWriter, lang string, code int, page any, fallback string) {
+	b, err := shellIn(lang)
 	var data []byte
 	if err == nil {
 		data, err = json.Marshal(page)

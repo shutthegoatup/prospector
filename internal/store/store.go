@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 type User struct {
@@ -14,11 +16,17 @@ type User struct {
 	PasswordHash string
 	// MustChangePassword is set while the password is one somebody else has seen.
 	MustChangePassword bool `gorm:"not null;default:false"`
-	CreatedAt          time.Time
+	// Language is the one they chose, which outranks their browser's; empty is none.
+	Language  string `gorm:"not null;default:''"`
+	CreatedAt time.Time
 }
 
 // OrgSettings is what differs between organisations: timings, wording and rules.
 type OrgSettings struct {
+	// CustomerLanguage is what the organisation speaks to someone outside it, and to a
+	// member who hasn't chosen and whose browser asks for nothing Prospector has;
+	// empty is the source language.
+	CustomerLanguage  string `json:"customer_language,omitempty"`
 	EmailAfterDays    int    `json:"email_after_days"`
 	FollowupAfterDays int    `json:"followup_after_days"`
 	Pitch             string `json:"pitch"`
@@ -53,6 +61,9 @@ func (s OrgSettings) WithDefaults() OrgSettings {
 	}
 	if s.Currency == "" {
 		s.Currency = DefaultCurrency
+	}
+	if s.CustomerLanguage == "" {
+		s.CustomerLanguage = say.Source
 	}
 	return s
 }

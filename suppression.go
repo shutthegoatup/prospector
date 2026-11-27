@@ -13,6 +13,7 @@ type UnsubscribeView struct {
 	// can't be aimed at another route.
 	Token string `json:"token,omitempty"`
 	Done  bool   `json:"done"`
+	lang  string
 }
 
 func (a *App) unsubscribePage(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +23,16 @@ func (a *App) unsubscribePage(w http.ResponseWriter, r *http.Request) {
 	if !linkToken(token) {
 		token = ""
 	}
-	a.unsubscribeRender(w, r, UnsubscribeView{Token: token})
+	a.unsubscribeRender(w, r, UnsubscribeView{Token: token, lang: a.unsubscribeLanguage(token)})
+}
+
+// unsubscribeLanguage is the language of the organisation whose link token is, for a
+// browser that asks for none Prospector has.
+func (a *App) unsubscribeLanguage(token string) string {
+	if org, err := a.s.UnsubscribeLinkOrg(token); err == nil {
+		return org.Settings.CustomerLanguage
+	}
+	return ""
 }
 
 // linkToken is whether a path segment has the shape randomToken(32) gives.
@@ -47,11 +57,11 @@ func (a *App) unsubscribe(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "that couldn't be saved; try the link again", http.StatusInternalServerError)
 		return
 	}
-	a.unsubscribeRender(w, r, UnsubscribeView{Done: true})
+	a.unsubscribeRender(w, r, UnsubscribeView{Done: true, lang: a.unsubscribeLanguage(r.PathValue("token"))})
 }
 
 func (a *App) unsubscribeRender(w http.ResponseWriter, r *http.Request, v UnsubscribeView) {
 	customerHeaders(w)
 	v.Page = "unsubscribe"
-	writeShell(w, r, http.StatusOK, v, "This page needs a browser with JavaScript.\n")
+	writeShell(w, languageFor(r, v.lang), http.StatusOK, v, "This page needs a browser with JavaScript.\n")
 }

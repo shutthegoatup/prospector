@@ -53,6 +53,7 @@
   "PROSPECTOR_AGENT_THINKING is off or on, not %q": "PROSPECTOR_AGENT_THINKING is off or on, not %q",
   "Postmark needs this server's public https address (PROSPECTOR_URL) to post to": "Postmark needs this server's public https address (PROSPECTOR_URL) to post to",
   "Prospector can send mail for %s": "Prospector can send mail for %s",
+  "Prospector isn't translated into %q": "Prospector isn't translated into %q",
   "Reset your Prospector password": "Reset your Prospector password",
   "Sent to %s through %s.": "Sent to %s through %s.",
   "Signed in for another organisation": "Signed in for another organisation",

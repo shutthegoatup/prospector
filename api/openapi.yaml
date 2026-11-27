@@ -3998,10 +3998,10 @@ paths:
     patch:
       operationId: changeMe
       tags: [settings]
-      summary: Change your voice in this organisation
+      summary: Change your voice in this organisation, or your language
       description: |
-        Your caller name, used in call scripts, and your signature, added to copied emails.
-        Send only what changes. A signed-in member only: an API key is no one, so it is refused.
+        Your caller name, used in call scripts, and your signature, added to copied emails;
+        and your language, which is yours in every organisation. Send only what changes. A signed-in member only: an API key is no one, so it is refused.
       security:
         - session: []
         - bearer: [read]
@@ -4707,7 +4707,7 @@ components:
   schemas:
     Settings:
       type: object
-      required: [name, color, email_after_days, followup_after_days, note_template, pitch, never_contact, look_for, looking_for, agent_guidance, enquiry_sites, onboarding_steps, currency, postal_address, incorporated_only]
+      required: [name, color, email_after_days, followup_after_days, note_template, pitch, never_contact, look_for, looking_for, agent_guidance, enquiry_sites, onboarding_steps, currency, postal_address, incorporated_only, customer_language]
       properties:
         name: { type: string, description: "The organisation's name; never empty." }
         color: { type: string, description: "Its colour, like `#56c5f4`." }
@@ -4728,6 +4728,7 @@ components:
         currency: { type: string, description: "The three-letter code deals are valued in." }
         postal_address: { type: string, description: "Where the organisation can be written to; 300 characters at most." }
         incorporated_only: { type: boolean, description: "Email only incorporated companies." }
+        customer_language: { type: string, description: "The language, as a BCP 47 tag, of customers' and unsubscribe pages, mail to customers and to new members, and of a member who hasn't chosen one when their browser asks for none Prospector has." }
 
     SettingsChange:
       type: object
@@ -4746,6 +4747,7 @@ components:
         currency: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "The three-letter code deals are valued in." }
         postal_address: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "Where the organisation can be written to; 300 characters at most." }
         incorporated_only: { type: boolean, nullable: true, x-go-type-skip-optional-pointer: false, description: "Email only incorporated companies." }
+        customer_language: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "One Prospector has been translated into." }
 
     Offering:
       type: object
@@ -5408,8 +5410,10 @@ components:
       description: |
         What went wrong, as RFC 9457 lays it out. Its `title` and `detail` are in the
         language the request is answered in, which `Content-Language` names: the one chosen
-        with `?lang=` on a page (kept in the `lang` cookie), else the best of
-        `Accept-Language` that Prospector has been translated into, else British English.
+        with `?lang=` on a page (kept in the `lang` cookie), else the signed-in member's own
+        (`language` in /me), else the best of `Accept-Language` that Prospector has been
+        translated into, else, for a signed-in member, the organisation's
+        `customer_language`, else British English.
         Act on `type` and `status`, which don't change with it.
       required: [type, title, status]
       additionalProperties: false
@@ -6214,7 +6218,7 @@ components:
         message: { type: string, description: "What happened, for a person." }
     Me:
       type: object
-      required: [user_id, name, email, role, has_password, caller_name, signature]
+      required: [user_id, name, email, role, has_password, caller_name, signature, language]
       properties:
         user_id: { type: integer, format: int64 }
         name: { type: string }
@@ -6223,6 +6227,7 @@ components:
         has_password: { type: boolean, description: "False for someone who signs in only through a provider." }
         caller_name: { type: string, description: "Used in call scripts; empty uses your name." }
         signature: { type: string, description: "Added to copied emails." }
+        language: { type: string, description: "The language you chose, as a BCP 47 tag such as `de`, in every organisation: pages, mail to you and the server's messages. Empty is none, and then your browser's languages decide." }
     OrgSummary:
       type: object
       required: [id, slug, name, color]
@@ -6281,6 +6286,7 @@ components:
       properties:
         caller_name: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
         signature: { type: string, nullable: true, x-go-type-skip-optional-pointer: false }
+        language: { type: string, nullable: true, x-go-type-skip-optional-pointer: false, description: "One Prospector has been translated into, or empty to let your browser decide." }
     Member:
       type: object
       required: [user_id, name, email, role, areas]

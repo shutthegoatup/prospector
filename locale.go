@@ -38,19 +38,29 @@ var locales = func() localeSet {
 	return l
 }()
 
+// speaks is whether lang is one a person can choose: the source or a translation, not
+// a pseudo-locale, which is only for looking at the app with ?lang=.
+func speaks(lang string) bool {
+	return lang == locales.Source || slices.Contains(locales.Translated, lang)
+}
+
 func (l localeSet) offers(lang string) bool {
 	return lang == l.Source || slices.Contains(l.Translated, lang) || slices.Contains(l.Pseudo, lang)
 }
 
-// choose is the language to speak: one chosen by name if it is offered, otherwise the
-// best of the browser's that the app has been translated into, otherwise the source.
-func (l localeSet) choose(chosen, acceptLanguage string) string {
+// choose is the language to speak: one chosen if it is offered, otherwise the best of
+// the browser's that the app has been translated into, otherwise fallback (an
+// organisation's), otherwise the source.
+func (l localeSet) choose(chosen, acceptLanguage, fallback string) string {
 	if l.offers(chosen) {
 		return chosen
 	}
+	if !l.offers(fallback) {
+		fallback = l.Source
+	}
 	wanted, _, err := language.ParseAcceptLanguage(acceptLanguage)
 	if err != nil || len(wanted) == 0 {
-		return l.Source
+		return fallback
 	}
 	have := append([]string{l.Source}, l.Translated...)
 	tags := make([]language.Tag, len(have))
@@ -59,7 +69,7 @@ func (l localeSet) choose(chosen, acceptLanguage string) string {
 	}
 	_, i, confidence := language.NewMatcher(tags).Match(wanted...)
 	if confidence == language.No {
-		return l.Source
+		return fallback
 	}
 	return have[i]
 }
@@ -67,12 +77,31 @@ func (l localeSet) choose(chosen, acceptLanguage string) string {
 const langCookie = "lang"
 
 // languageOf is the language to answer r in.
-func languageOf(r *http.Request) string {
-	chosen := ""
+func languageOf(r *http.Request) string { return languageFor(r, "") }
+
+// languageFor is the language to answer r in: one picked with ?lang=, then the
+// signed-in member's own, then the best of their browser's, then fallback, which is
+// what an organisation speaks to its outsiders and, unless another is given, to its
+// members.
+func languageFor(r *http.Request, fallback string) string {
+	picked := ""
 	if c, err := r.Cookie(langCookie); err == nil {
-		chosen = c.Value
+		picked = c.Value
 	}
-	return locales.choose(chosen, r.Header.Get("Accept-Language"))
+	return spoken(r, picked, fallback)
+}
+
+func spoken(r *http.Request, picked, fallback string) string {
+	// Only a person has a language; a key's caller is answered by its own browser, if any.
+	if q, ok := r.Context().Value(reqKey{}).(*Req); ok && q.User != nil {
+		if !locales.offers(picked) {
+			picked = q.User.Language
+		}
+		if fallback == "" && q.Org != nil {
+			fallback = q.Org.Settings.CustomerLanguage
+		}
+	}
+	return locales.choose(picked, r.Header.Get("Accept-Language"), fallback)
 }
 
 // pickLanguage keeps the language asked for by opening one of the app's pages with
@@ -88,5 +117,5 @@ func (a *App) pickLanguage(w http.ResponseWriter, r *http.Request) string {
 		c.Value, c.MaxAge = "", -1
 	}
 	http.SetCookie(w, c)
-	return locales.choose(c.Value, r.Header.Get("Accept-Language"))
+	return spoken(r, c.Value, "")
 }

@@ -40,13 +40,13 @@ func (a *App) customerLinkMail(ctx context.Context, org *Org, to, token string) 
 	if via == nil || a.base == "" {
 		return errNoCustomerMail
 	}
-	// A customer has no language of their own yet, and the organisation none to stand in.
-	return a.deliver(ctx, *via, mailer.Message{To: to, Subject: say.Errorf("%s: your onboarding steps", org.Name).Error(),
+	lang := org.Settings.WithDefaults().CustomerLanguage
+	return a.deliver(ctx, *via, mailer.Message{To: to, Subject: say.Errorf("%s: your onboarding steps", org.Name).In(lang),
 		Body: say.Errorf("%[1]s has a page showing the steps that are yours while they set you up.\n\n"+
 			"Open it here:\n%[2]s\n\n"+
 			"The link works once, within 7 days, and opens the page in the browser you use it in. "+
 			"To open it somewhere else, use the link again and ask for a fresh one: it is sent to this address.\n\n"+
-			"If you weren't expecting this, ignore it: nothing happens unless the link is opened.\n", org.Name, a.base+"/c/"+token).Error()})
+			"If you weren't expecting this, ignore it: nothing happens unless the link is opened.\n", org.Name, a.base+"/c/"+token).In(lang)})
 }
 
 // customerHeaders are for every page an outsider opens: a link in the address mustn't
@@ -63,7 +63,7 @@ func (a *App) customerRender(w http.ResponseWriter, r *http.Request, code int, v
 	for _, st := range v.Steps {
 		shown.Steps = append(shown.Steps, customerStepShown{st.ID, st.Name, st.Due, st.DoneOn, st.DoneBy == customerActor})
 	}
-	writeShell(w, r, code, shown, "This page needs a browser with JavaScript.\n")
+	writeShell(w, languageFor(r, v.Lang), code, shown, "This page needs a browser with JavaScript.\n")
 }
 
 // customerShown is CustomerView as the page gets it. A step says only whether the
@@ -97,6 +97,9 @@ type CustomerView struct {
 	Email string
 	Steps []OnboardingStep
 	Day   string
+	// Lang is the organisation's language for its customers, for a browser that asks
+	// for none Prospector has.
+	Lang string
 }
 
 // customerLinkPage shows what a mailed link offers, and changes nothing: mail scanners
@@ -112,7 +115,7 @@ func (a *App) customerLinkPage(w http.ResponseWriter, r *http.Request) {
 	if acc.Link.Opens() {
 		state = "open"
 	}
-	a.customerRender(w, r, http.StatusOK, CustomerView{State: state, Token: token, Org: acc.Org.Name})
+	a.customerRender(w, r, http.StatusOK, CustomerView{State: state, Token: token, Org: acc.Org.Name, Lang: acc.Org.Settings.CustomerLanguage})
 }
 
 func (a *App) customerOpen(w http.ResponseWriter, r *http.Request) {
@@ -124,7 +127,7 @@ func (a *App) customerOpen(w http.ResponseWriter, r *http.Request) {
 	}
 	session, err := a.s.RedeemCustomerLink(acc.Grant.OrgID, acc, token)
 	if err != nil {
-		a.customerRender(w, r, http.StatusOK, CustomerView{State: "again", Token: token, Org: acc.Org.Name})
+		a.customerRender(w, r, http.StatusOK, CustomerView{State: "again", Token: token, Org: acc.Org.Name, Lang: acc.Org.Settings.CustomerLanguage})
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: customerCookie, Value: session, Path: "/c", HttpOnly: true, Secure: a.secure(r),
@@ -152,6 +155,7 @@ func (a *App) customerAgain(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
+	// Not in the organisation's language: that would tell a real link from a made-up one.
 	a.customerRender(w, r, http.StatusOK, CustomerView{State: "sent"})
 }
 
@@ -178,7 +182,7 @@ func (a *App) customerPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "the page couldn't be read", http.StatusInternalServerError)
 		return
 	}
-	v := CustomerView{State: "steps", Org: acc.Org.Name, Email: deref(acc.Contact.Email), Steps: steps, Day: today()}
+	v := CustomerView{State: "steps", Org: acc.Org.Name, Email: deref(acc.Contact.Email), Steps: steps, Day: today(), Lang: acc.Org.Settings.CustomerLanguage}
 	a.customerRender(w, r, http.StatusOK, v)
 }
 
