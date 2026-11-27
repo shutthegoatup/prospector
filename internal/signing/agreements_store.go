@@ -32,8 +32,8 @@ import (
 type AgreementStore struct {
 	*store.Core
 	// An agreement is with a company, signed by its people or the organisation's members.
-	Prospecting *prospecting.ProspectingStore
-	Identity    *identity.IdentityStore
+	CRM      *prospecting.CRMStore
+	Identity *identity.IdentityStore
 }
 
 func (s *AgreementStore) AddAgreement(org, company int64, name, actor string) (*store.Agreement, error) {
@@ -456,7 +456,7 @@ func (s *AgreementStore) Preparing(o *store.Org, id int64) (*PreparePage, error)
 	if err != nil {
 		return nil, err
 	}
-	c, err := s.Prospecting.CompanyByID(o.ID, ag.CompanyID)
+	c, err := s.CRM.CompanyByID(o.ID, ag.CompanyID)
 	if err != nil {
 		return nil, store.Missing(err, "no company %d", ag.CompanyID)
 	}
@@ -467,7 +467,7 @@ func (s *AgreementStore) Preparing(o *store.Org, id int64) (*PreparePage, error)
 	var failed [4]error
 	p.Parties, failed[0] = s.AgreementRecipients(o.ID, ag.ID)
 	var people []store.Contact
-	people, failed[1] = s.Prospecting.People(o.ID, c.ID)
+	people, failed[1] = s.CRM.People(o.ID, c.ID)
 	p.Members, failed[2] = s.Identity.Members(o.ID)
 	p.Missing, failed[3] = s.Readiness(o.ID, p.Agreement)
 	if err := errors.Join(failed[:]...); err != nil {

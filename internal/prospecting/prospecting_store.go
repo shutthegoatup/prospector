@@ -20,19 +20,27 @@ import (
 // what is found out about each, and searching them.
 type ProspectingStore struct {
 	*store.Core
-	// An organisation's settings decide who is left out, and a person's stage is the
-	// conversation's deal's.
+	// An organisation's settings decide who is left out.
 	Identity *identity.IdentityStore
-	Sales    *sales.DealStore
+	// The records it finds and qualifies are the CRM's.
+	CRM *CRMStore
 }
 
-func (s *ProspectingStore) CompanyCount(org int64) (int64, error) {
+// CRMStore is the records: companies and the people at them, what is known of each,
+// their history, and searching them.
+type CRMStore struct {
+	*store.Core
+	// A person's next step and date are their conversation's deal's.
+	Sales *sales.DealStore
+}
+
+func (s *CRMStore) CompanyCount(org int64) (int64, error) {
 	var n int64
 	return n, s.InOrg(org).Model(&store.Company{}).Count(&n).Error
 }
 
 // CompanyNotes is one page of the notes left on a company, newest first, and how many there are.
-func (s *ProspectingStore) CompanyNotes(org, company int64, offset, limit int) ([]store.TaskNote, int64, error) {
+func (s *CRMStore) CompanyNotes(org, company int64, offset, limit int) ([]store.TaskNote, int64, error) {
 	var total int64
 	if err := s.InOrg(org).Model(&store.TaskNote{}).Where("company_id = ?", company).Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -41,13 +49,13 @@ func (s *ProspectingStore) CompanyNotes(org, company int64, offset, limit int) (
 	return notes, total, s.InOrg(org).Where("company_id = ?", company).Order("id desc").Limit(limit).Offset(offset).Find(&notes).Error
 }
 
-func (s *ProspectingStore) CompanyByID(org, id int64) (*store.Company, error) {
+func (s *CRMStore) CompanyByID(org, id int64) (*store.Company, error) {
 	var c store.Company
 	return &c, s.InOrg(org).First(&c, id).Error
 }
 
 // CompanyRef resolves an agent's "company" argument: an id or a name.
-func (s *ProspectingStore) CompanyRef(org int64, ref string) (*store.Company, error) {
+func (s *CRMStore) CompanyRef(org int64, ref string) (*store.Company, error) {
 	var c store.Company
 	q := s.InOrg(org)
 	var id int64
@@ -62,18 +70,18 @@ func (s *ProspectingStore) CompanyRef(org int64, ref string) (*store.Company, er
 	return &c, nil
 }
 
-func (s *ProspectingStore) Facts(org, company int64) ([]store.Fact, error) {
+func (s *CRMStore) Facts(org, company int64) ([]store.Fact, error) {
 	var f []store.Fact
 	return f, s.InOrg(org).Where("company_id = ?", company).Order("id").Find(&f).Error
 }
 
-func (s *ProspectingStore) People(org, company int64) ([]store.Contact, error) {
+func (s *CRMStore) People(org, company int64) ([]store.Contact, error) {
 	var c []store.Contact
 	return c, s.InOrg(org).Where("company_id = ? and key not like 'org:%'", company).Order("status desc, id").Find(&c).Error
 }
 
 // History is one page of what happened at a company, newest first.
-func (s *ProspectingStore) History(org, company int64, page int) ([]HistoryItem, Page, error) {
+func (s *CRMStore) History(org, company int64, page int) ([]HistoryItem, Page, error) {
 	total, err := s.HistoryCount(org, company)
 	if err != nil {
 		return nil, Page{}, err
@@ -83,13 +91,13 @@ func (s *ProspectingStore) History(org, company int64, page int) ([]HistoryItem,
 	return out, pg, err
 }
 
-func (s *ProspectingStore) HistoryCount(org, company int64) (int, error) {
+func (s *CRMStore) HistoryCount(org, company int64) (int, error) {
 	var total int64
 	err := s.InOrg(org).Model(&store.Event{}).Where("company_id = ?", company).Count(&total).Error
 	return int(total), err
 }
 
-func (s *ProspectingStore) HistoryAt(org, company int64, offset, limit int) ([]HistoryItem, error) {
+func (s *CRMStore) HistoryAt(org, company int64, offset, limit int) ([]HistoryItem, error) {
 	var events []store.Event
 	if err := s.InOrg(org).Where("company_id = ?", company).Order("at desc, id desc").Limit(limit).Offset(offset).Find(&events).Error; err != nil {
 		return nil, err
@@ -111,7 +119,7 @@ func (s *ProspectingStore) HistoryAt(org, company int64, offset, limit int) ([]H
 
 // Touches counts every time someone at a company was reached out to, whichever page
 // of its history is on show.
-func (s *ProspectingStore) Touches(org, company int64) (int, error) {
+func (s *CRMStore) Touches(org, company int64) (int, error) {
 	var n int64
 	err := s.InOrg(org).Model(&store.Event{}).Where("company_id = ? and action in ?", company,
 		[]string{"mark:linkedin", "mark:email", "mark:followup", "mark:call"}).Count(&n).Error
@@ -426,13 +434,13 @@ func (s *ProspectingStore) SetCompanyStage(org, id int64, stage, fit, actor stri
 }
 
 // PickContact moves a suggested person into outreach, with a note from the org's template.
-func (s *ProspectingStore) PickContact(org int64, o *store.Org, id int64, actor string) error {
+func (s *CRMStore) PickContact(org int64, o *store.Org, id int64, actor string) error {
 	return s.PickContactFor(org, o, id, nil, actor)
 }
 
 // PickContactFor picks someone for an offering, whatever they were suggested for, or for
 // what they were suggested for when it is nil.
-func (s *ProspectingStore) PickContactFor(org int64, o *store.Org, id int64, offeringID *int64, actor string) error {
+func (s *CRMStore) PickContactFor(org int64, o *store.Org, id int64, offeringID *int64, actor string) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var c store.Contact
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
@@ -497,7 +505,7 @@ func (s *ProspectingStore) PickContactFor(org int64, o *store.Org, id int64, off
 	})
 }
 
-func (s *ProspectingStore) Conversations(org int64) (map[string][]store.Contact, error) {
+func (s *CRMStore) Conversations(org int64) (map[string][]store.Contact, error) {
 	var rows []store.Contact
 	if err := s.InOrg(org).Where(store.InConversation).Order("next_date nulls first, id").Find(&rows).Error; err != nil {
 		return nil, err
@@ -509,7 +517,7 @@ func (s *ProspectingStore) Conversations(org int64) (map[string][]store.Contact,
 	return out, nil
 }
 
-func (s *ProspectingStore) Companies(org int64, q, segment, stage string, page int) ([]CompanyListRow, Page, error) {
+func (s *CRMStore) Companies(org int64, q, segment, stage string, page int) ([]CompanyListRow, Page, error) {
 	db, people := s.companiesQuery(org, q, segment, stage)
 	var total int64
 	if err := db.Session(&gorm.Session{}).Count(&total).Error; err != nil {
@@ -521,7 +529,7 @@ func (s *ProspectingStore) Companies(org int64, q, segment, stage string, page i
 }
 
 // CompaniesList is a page of the Companies list for the API, with how many match in all.
-func (s *ProspectingStore) CompaniesList(org int64, q, segment, stage string, in paging.Page) ([]CompanyListRow, int, string, error) {
+func (s *CRMStore) CompaniesList(org int64, q, segment, stage string, in paging.Page) ([]CompanyListRow, int, string, error) {
 	at, err := in.At(1)
 	if err != nil {
 		return nil, 0, "", err
@@ -540,7 +548,7 @@ func (s *ProspectingStore) CompaniesList(org int64, q, segment, stage string, in
 }
 
 // companiesQuery is the companies the filters leave, and each company's standing from its people.
-func (s *ProspectingStore) companiesQuery(org int64, q, segment, stage string) (db, people *gorm.DB) {
+func (s *CRMStore) companiesQuery(org int64, q, segment, stage string) (db, people *gorm.DB) {
 	people = s.DB.Model(&store.Contact{}).Select("company_id, count(*) as people, "+furthestSQL+" as furthest").
 		Where("org_id = ? and company_id is not null and key not like 'org:%'", org).Group("company_id")
 	db = s.DB.Model(&store.Company{}).Where("companies.org_id = ?", org)
@@ -571,7 +579,7 @@ func (s *ProspectingStore) companiesQuery(org int64, q, segment, stage string) (
 	return db, people
 }
 
-func (s *ProspectingStore) companyRows(db, people *gorm.DB, offset, limit int) ([]CompanyListRow, error) {
+func (s *CRMStore) companyRows(db, people *gorm.DB, offset, limit int) ([]CompanyListRow, error) {
 	var companies []store.Company
 	if err := db.Select("companies.*").Order("companies.name, companies.id").Limit(limit).Offset(offset).Find(&companies).Error; err != nil {
 		return nil, err
@@ -601,12 +609,12 @@ func (s *ProspectingStore) companyRows(db, people *gorm.DB, offset, limit int) (
 	return out, nil
 }
 
-func (s *ProspectingStore) Segments(org int64) ([]string, error) {
+func (s *CRMStore) Segments(org int64) ([]string, error) {
 	var out []string
 	return out, store.Logged(s.InOrg(org).Model(&store.Company{}).Where("segment <> ''").Distinct().Order("segment").Pluck("segment", &out))
 }
 
-func (s *ProspectingStore) Week(org int64, now time.Time) Stats {
+func (s *CRMStore) Week(org int64, now time.Time) Stats {
 	since := now.AddDate(0, 0, -7)
 	day := since.Format("2006-01-02")
 	var st Stats
@@ -675,7 +683,7 @@ func (s *ProspectingStore) AgentEventsBefore(org, atMicro, id int64, limit int) 
 	return events, nextAt, nextID, int(n)
 }
 
-func (s *ProspectingStore) QuickAddPerson(o *store.Org, in QuickAdd, actor string) (*store.Contact, error) {
+func (s *CRMStore) QuickAddPerson(o *store.Org, in QuickAdd, actor string) (*store.Contact, error) {
 	in.Name = strings.TrimSpace(in.Name)
 	in.Linkedin = strings.TrimSpace(in.Linkedin)
 	if in.Name == "" {
@@ -735,13 +743,13 @@ func (s *ProspectingStore) QuickAddPerson(o *store.Org, in QuickAdd, actor strin
 }
 
 // Allowed applies the org's never-contact list to an email address or link.
-func (s *ProspectingStore) Allowed(o *store.Org, email, link string) error {
+func (s *CRMStore) Allowed(o *store.Org, email, link string) error {
 	return o.Settings.Listed(email, link)
 }
 
 // NeverContactCovers names the people the list is keeping out of the outreach queues:
 // those who would otherwise be open for a next step.
-func (s *ProspectingStore) NeverContactCovers(o *store.Org) []string {
+func (s *CRMStore) NeverContactCovers(o *store.Org) []string {
 	if strings.TrimSpace(o.Settings.NeverContact) == "" {
 		return nil
 	}
@@ -882,7 +890,7 @@ func (s *ProspectingStore) DecideSuggestion(org, id int64, decision, actor strin
 			}
 			return s.Log(tx, org, c.ID, c.CompanyID, actor, "dismiss:"+sg.Field, nil)
 		}
-		if err := s.set(tx, org, sg.ContactID, sg.Field, sg.Value, actor); err != nil {
+		if err := s.CRM.set(tx, org, sg.ContactID, sg.Field, sg.Value, actor); err != nil {
 			return err
 		}
 		if sg.Field == "email" {
@@ -893,7 +901,7 @@ func (s *ProspectingStore) DecideSuggestion(org, id int64, decision, actor strin
 }
 
 // IndexSearch never stops the server starting: without the index, search scans as it always did.
-func (s *ProspectingStore) IndexSearch() {
+func (s *CRMStore) IndexSearch() {
 	for _, stmt := range postgresSearch {
 		if err := s.DB.Exec(stmt).Error; err != nil {
 			log.Printf("search index unavailable, searching by scan: %v", err)
@@ -903,11 +911,11 @@ func (s *ProspectingStore) IndexSearch() {
 }
 
 // term is already lower case.
-func (s *ProspectingStore) CompanyMatch(term string) (string, []any) {
+func (s *CRMStore) CompanyMatch(term string) (string, []any) {
 	return pgCompanyText + " like ?", []any{"%" + term + "%"}
 }
 
-func (s *ProspectingStore) ContactMatch(term string, maker bool) (string, []any) {
+func (s *CRMStore) ContactMatch(term string, maker bool) (string, []any) {
 	text := pgPersonText
 	if maker {
 		text = pgContactText

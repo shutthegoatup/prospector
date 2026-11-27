@@ -11,7 +11,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/tz"
 )
 
-func (s *ProspectingStore) ContactByID(org, id int64) (*store.Contact, error) {
+func (s *CRMStore) ContactByID(org, id int64) (*store.Contact, error) {
 	var c store.Contact
 	if err := s.InOrg(org).First(&c, id).Error; err != nil {
 		return nil, store.Missing(err, "no contact %d in this organisation", id)
@@ -22,7 +22,7 @@ func (s *ProspectingStore) ContactByID(org, id int64) (*store.Contact, error) {
 // Due returns one outreach step's queue for an organisation.
 // People on the never-contact list are left out here rather than marked, so the list
 // and the queue can't drift apart: listing someone hides them, unlisting brings them back.
-func (s *ProspectingStore) Due(org int64, step string, now time.Time, set store.OrgSettings) ([]store.Contact, error) {
+func (s *CRMStore) Due(org int64, step string, now time.Time, set store.OrgSettings) ([]store.Contact, error) {
 	set = set.WithDefaults()
 	var rows []store.Contact
 	q := s.InOrg(org).Model(&store.Contact{}).Where(companyNotRejected)
@@ -58,11 +58,11 @@ func (s *ProspectingStore) Due(org int64, step string, now time.Time, set store.
 	return due, nil
 }
 
-func (s *ProspectingStore) Mark(org, id int64, step, date, actor string) error {
+func (s *CRMStore) Mark(org, id int64, step, date, actor string) error {
 	return s.MarkAs(org, id, step, date, store.Actor{Name: actor}, "")
 }
 
-func (s *ProspectingStore) MarkAs(org, id int64, step, date string, who store.Actor, note string) error {
+func (s *CRMStore) MarkAs(org, id int64, step, date string, who store.Actor, note string) error {
 	column, ok := Marks[step]
 	if !ok {
 		return say.Errorf("unknown step %q", step)
@@ -93,7 +93,7 @@ func (s *ProspectingStore) MarkAs(org, id int64, step, date string, who store.Ac
 	})
 }
 
-func (s *ProspectingStore) Update(org, id int64, field, value, actor string) error {
+func (s *CRMStore) Update(org, id int64, field, value, actor string) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		if of, ok := strings.CutPrefix(field, "deal_"); ok {
 			return s.Sales.SetDeal(tx, org, id, of, value, actor)
@@ -104,7 +104,7 @@ func (s *ProspectingStore) Update(org, id int64, field, value, actor string) err
 
 // ChangeContactFields makes several changes to a person, or none: one that is refused
 // takes back those before it.
-func (s *ProspectingStore) ChangeContactFields(org, id int64, changes []store.Change, actor string) error {
+func (s *CRMStore) ChangeContactFields(org, id int64, changes []store.Change, actor string) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		for _, c := range changes {
 			if err := s.set(tx, org, id, c.Field, c.Value, actor); err != nil {
@@ -115,7 +115,7 @@ func (s *ProspectingStore) ChangeContactFields(org, id int64, changes []store.Ch
 	})
 }
 
-func (s *ProspectingStore) set(tx *gorm.DB, org, id int64, field, value, actor string) error {
+func (s *CRMStore) set(tx *gorm.DB, org, id int64, field, value, actor string) error {
 	if !Editable[field] {
 		return say.Errorf("%q can't be edited", field)
 	}
@@ -170,14 +170,14 @@ func (s *ProspectingStore) set(tx *gorm.DB, org, id int64, field, value, actor s
 }
 
 // Find matches the CLI's name argument against person, maker or first name.
-func (s *ProspectingStore) Find(org int64, name string) ([]store.Contact, error) {
+func (s *CRMStore) Find(org int64, name string) ([]store.Contact, error) {
 	var rows []store.Contact
 	like := "%" + strings.ToLower(name) + "%"
 	err := s.InOrg(org).Where("lower(person) like ? or lower(maker) like ? or first = ?", like, like, name).Find(&rows).Error
 	return rows, err
 }
 
-func (s *ProspectingStore) FindOne(org int64, name string) (*store.Contact, error) {
+func (s *CRMStore) FindOne(org int64, name string) (*store.Contact, error) {
 	rows, err := s.Find(org, name)
 	if err != nil {
 		return nil, err

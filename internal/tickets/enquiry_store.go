@@ -18,7 +18,7 @@ import (
 type EnquiryStore struct {
 	*store.Core
 	// An enquiry can be from someone already here, or become someone new.
-	Prospecting *prospecting.ProspectingStore
+	CRM *prospecting.CRMStore
 }
 
 func (s *EnquiryStore) EnquiryByID(org, id int64) (*store.Enquiry, error) {
@@ -288,7 +288,7 @@ func (s *EnquiryStore) ConverseEnquiry(o *store.Org, id int64, actor string) (*s
 			if err != nil {
 				return nil, err
 			}
-			added, err := s.Prospecting.QuickAddPerson(o, prospecting.QuickAdd{Name: senderName(e), Company: company, Email: e.Email}, actor)
+			added, err := s.CRM.QuickAddPerson(o, prospecting.QuickAdd{Name: senderName(e), Company: company, Email: e.Email}, actor)
 			if err != nil {
 				return nil, err
 			}
@@ -301,20 +301,20 @@ func (s *EnquiryStore) ConverseEnquiry(o *store.Org, id int64, actor string) (*s
 		}
 	}
 	// Someone put on the never-contact list since they were matched stays off the board.
-	if err := s.Prospecting.Allowed(o, store.Deref(c.Email), store.Deref(c.Linkedin)); err != nil {
+	if err := s.CRM.Allowed(o, store.Deref(c.Email), store.Deref(c.Linkedin)); err != nil {
 		return nil, err
 	}
 	if c.Declined != nil {
 		return nil, say.New("they are marked as not interested, which keeps them off the board")
 	}
 	if c.Replied == nil {
-		if err := s.Prospecting.Mark(o.ID, c.ID, "replied", store.Today(), actor); err != nil {
+		if err := s.CRM.Mark(o.ID, c.ID, "replied", store.Today(), actor); err != nil {
 			return nil, err
 		}
 	}
 	if store.Deref(c.CallNotes) == "" && e.Message != "" {
 		// What they asked, on the card. It is their own text, shown as text like the rest.
-		if err := s.Prospecting.Update(o.ID, c.ID, "call_notes", "Wrote in: "+store.Clip(e.Message, 500), actor); err != nil {
+		if err := s.CRM.Update(o.ID, c.ID, "call_notes", "Wrote in: "+store.Clip(e.Message, 500), actor); err != nil {
 			return nil, err
 		}
 	}

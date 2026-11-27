@@ -64,3 +64,5 @@ var pageIn = paging.PageIn
 var pipeline = prospecting.Pipeline
 var suggestable = prospecting.Suggestable
 var vendors = prospecting.Vendors
+
+type crmStore = prospecting.CRMStore

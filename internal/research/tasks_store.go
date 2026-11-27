@@ -29,6 +29,7 @@ type ResearchStore struct {
 	// What agents add are companies and people, an organisation's settings say who is
 	// left out, and an address is only kept where its domain takes mail.
 	Prospecting *prospecting.ProspectingStore
+	CRM         *prospecting.CRMStore
 	Identity    *identity.IdentityStore
 	Outreach    *marketing.OutreachStore
 }
@@ -785,7 +786,7 @@ func (s *ResearchStore) AgentNote(org int64, who store.Actor, in NoteIn) (*store
 	n := store.TaskNote{OrgID: org, TaskID: in.Task, Actor: who.Name, KeyID: who.KeyID, Kind: in.Kind, Text: text}
 	var company *int64
 	if strings.TrimSpace(in.Company) != "" {
-		c, err := s.Prospecting.CompanyRef(org, in.Company)
+		c, err := s.CRM.CompanyRef(org, in.Company)
 		if err != nil {
 			return nil, err
 		}
@@ -1293,7 +1294,7 @@ func (s *ResearchStore) AgentAddRole(org int64, who store.Actor, in AddRoleIn) (
 	if err := in.check(true); err != nil {
 		return nil, err
 	}
-	c, err := s.Prospecting.CompanyRef(org, in.Company)
+	c, err := s.CRM.CompanyRef(org, in.Company)
 	if err != nil {
 		return nil, err
 	}
@@ -1422,7 +1423,7 @@ func (s *ResearchStore) AgentAddFact(org int64, who store.Actor, in AddFactIn) (
 	if err := checkFact(in.FactIn); err != nil {
 		return nil, err
 	}
-	c, err := s.Prospecting.CompanyRef(org, in.Company)
+	c, err := s.CRM.CompanyRef(org, in.Company)
 	if err != nil {
 		return nil, err
 	}
@@ -1467,14 +1468,14 @@ func (s *ResearchStore) AgentAddContact(o *store.Org, who store.Actor, in prospe
 	if in.Linkedin != "" && !prospecting.HttpURL.MatchString(strings.TrimSpace(in.Linkedin)) {
 		return nil, say.New("linkedin must be an https link")
 	}
-	if err := s.Prospecting.Allowed(o, in.Email, in.Linkedin); err != nil {
+	if err := s.CRM.Allowed(o, in.Email, in.Linkedin); err != nil {
 		s.Prospecting.Withheld(o.ID, who, WithheldNeverContact)
 		return nil, err
 	}
 	if err := s.Outreach.CheckMailDomains(in.Email); err != nil {
 		return nil, err
 	}
-	c, err := s.Prospecting.CompanyRef(o.ID, in.Company)
+	c, err := s.CRM.CompanyRef(o.ID, in.Company)
 	if err != nil {
 		return nil, err
 	}
@@ -1608,7 +1609,7 @@ func (s *ResearchStore) AgentSearch(org int64, who store.Actor, q string, page p
 	}
 	size, more := page.Size(), false
 	var companies []store.Company
-	cond, args := s.Prospecting.CompanyMatch(q)
+	cond, args := s.CRM.CompanyMatch(q)
 	if err := s.InOrg(org).Where("id > ?", at[0]).Where(cond, args...).Order("id").Limit(size + 1).Find(&companies).Error; err != nil {
 		return nil, "", err
 	}
@@ -1629,7 +1630,7 @@ func (s *ResearchStore) AgentSearch(org int64, who store.Actor, q string, page p
 		hits = append(hits, SearchHit{Kind: "company", ID: c.ID, Name: c.Name, Stage: c.Stage, LastAgent: last[c.ID]})
 	}
 	var people []store.Contact
-	cond, args = s.Prospecting.ContactMatch(q, true)
+	cond, args = s.CRM.ContactMatch(q, true)
 	if err := s.InOrg(org).Where("id > ? and key not like 'org:%'", at[1]).Where(cond, args...).Order("id").Limit(size + 1).Find(&people).Error; err != nil {
 		return nil, "", err
 	}
@@ -1655,15 +1656,15 @@ func (s *ResearchStore) AgentCompany(org int64, who store.Actor, ref string, pag
 	if err != nil {
 		return nil, err
 	}
-	c, err := s.Prospecting.CompanyRef(org, ref)
+	c, err := s.CRM.CompanyRef(org, ref)
 	if err != nil {
 		return nil, err
 	}
-	facts, err := s.Prospecting.Facts(org, c.ID)
+	facts, err := s.CRM.Facts(org, c.ID)
 	if err != nil {
 		return nil, err
 	}
-	people, err := s.Prospecting.People(org, c.ID)
+	people, err := s.CRM.People(org, c.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -1744,7 +1745,7 @@ func (s *ResearchStore) AgentDue(o *store.Org, page paging.Page) (*DueOut, error
 	}
 	items := []DueItem{}
 	for _, step := range []string{"linkedin", "accepted", "email", "followup", "call"} {
-		rows, err := s.Prospecting.Due(o.ID, step, time.Now(), o.Settings)
+		rows, err := s.CRM.Due(o.ID, step, time.Now(), o.Settings)
 		if err != nil {
 			return nil, err
 		}
@@ -1817,7 +1818,7 @@ func (s *ResearchStore) AgentMark(org int64, who store.Actor, in MarkIn) error {
 	if date == "" {
 		date = store.Today()
 	}
-	return s.Prospecting.MarkAs(org, in.ContactID, in.Step, date, who, strings.TrimSpace(in.Note))
+	return s.CRM.MarkAs(org, in.ContactID, in.Step, date, who, strings.TrimSpace(in.Note))
 }
 
 // AgentMarks is, per contact and step, the agent behind the latest mark, so a

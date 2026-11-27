@@ -90,7 +90,7 @@ func (s *ProspectingStore) KeepFind(org int64, who store.Actor, contact int64, f
 }
 
 // Erased says so if an address or a profile belongs to someone erased on request.
-func (s *ProspectingStore) Erased(org int64, email, link string) error {
+func (s *CRMStore) Erased(org int64, email, link string) error {
 	return ErasedIn(s.DB, org, "", "", email, link)
 }
 
@@ -135,7 +135,7 @@ func (s *ProspectingStore) lookupsOf(org int64, people []int64) (map[int64][]Loo
 
 // LogEnrich records a lookup that kept nothing, so the same one isn't paid for again soon.
 func (s *ProspectingStore) LogEnrich(org int64, who store.Actor, contact int64, field, value string) error {
-	c, err := s.ContactByID(org, contact)
+	c, err := s.CRM.ContactByID(org, contact)
 	if err != nil {
 		return err
 	}
