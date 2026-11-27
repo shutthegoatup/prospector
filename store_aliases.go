@@ -114,3 +114,16 @@ var lookupVersion = store.LookupVersion
 var mac = store.Mac
 var sealed = store.Sealed
 var sealedVersion = store.SealedVersion
+
+type notFound = store.NotFound
+
+var displayName = store.DisplayName
+var hold = store.Hold
+var holdOrg = store.HoldOrg
+var logged = store.Logged
+var missing = store.Missing
+var noSuch = store.NoSuch
+var nonEmpty = store.NonEmpty
+var randomToken = store.RandomToken
+var str = store.Str
+var today = store.Today

@@ -113,19 +113,6 @@ func connect(dsn string) (*Store, error) {
 	return newStore(&core{DB: db}), nil
 }
 
-// holdOrg and hold make a transaction wait its turn on one row, so a rule that is
-// checked by reading and then kept by writing ("add it unless it is already here")
-// holds when two callers arrive together. Taken before the first read; an organisation
-// before anything in it.
-func holdOrg(tx *gorm.DB, org int64) error {
-	return tx.Exec("update orgs set id = id where id = ?", org).Error
-}
-
-func hold(tx *gorm.DB, model any, org, id int64) error {
-	// UpdateColumn, so holding a company doesn't count as changing it.
-	return tx.Model(model).Where("org_id = ? and id = ?", org, id).UpdateColumn("id", gorm.Expr("id")).Error
-}
-
 // oneNameWhateverItsCapitals backs ensureCompany's look-up with an index. Companies
 // that already differ only in capitals keep it from being built, which costs the
 // check its backing and nothing else, so the server still starts.
@@ -134,25 +121,4 @@ func (s *Store) oneNameWhateverItsCapitals() {
 	if err != nil {
 		log.Printf("companies in one organisation share a name but for its capitals, so nothing but the look-up keeps another out: %v", err)
 	}
-}
-
-// logged is for a query whose caller has nowhere to send an error: a count or a list
-// on its way to a page. The page then shows nothing, and the log says why.
-func logged(res *gorm.DB) error {
-	if res.Error != nil {
-		log.Printf("database: %v", res.Error)
-	}
-	return res.Error
-}
-
-func today() string { return time.Now().Format("2006-01-02") }
-
-func str(v string) *string { return &v }
-
-// nonEmpty is Python's nullif(v, ”).
-func nonEmpty(v string) *string {
-	if v == "" {
-		return nil
-	}
-	return &v
 }

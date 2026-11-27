@@ -79,7 +79,6 @@ type Card struct {
 }
 
 var (
-	nameCut     = regexp.MustCompile(`[,;(]`)
 	altSplit    = regexp.MustCompile(`(?i);|\s+·\s+|\bbackups?:?\s*|\bor\s+`)
 	altPart     = regexp.MustCompile(`^([^,(]+?)(?:\s*\(([^)]*)\))?\s*(?:,\s*(.*))?$`)
 	altPrefix   = regexp.MustCompile(`(?i)^(AC route|Backup \d|or)\s+`)
@@ -93,14 +92,6 @@ var (
 	urlInAbout  = regexp.MustCompile(`;?\s*https?:\S+`)
 	notTel      = regexp.MustCompile(`[^+\d]`)
 )
-
-func displayName(c Contact) string {
-	n := deref(c.Person)
-	if n == "" {
-		n = deref(c.First)
-	}
-	return strings.TrimSpace(nameCut.Split(n, 2)[0])
-}
 
 // alternates splits the research's backups ("Ada Lovelace, CMO; Grace Hopper, Head of Digital") into choices.
 func alternates(person string) []Person {
