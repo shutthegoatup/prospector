@@ -14,7 +14,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/glebarez/sqlite"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"gorm.io/gorm"
 )
 
 func mustOrg(t *testing.T, s *Store, slug string) *Org {
@@ -89,17 +91,26 @@ func TestSnapshotRoundTrip(t *testing.T) {
 	}
 }
 
+func TestOnlyPostgresIsOpened(t *testing.T) {
+	t.Parallel()
+	for _, dsn := range []string{"", "prospector.sqlite", "mysql://localhost/prospector"} {
+		if _, err := Open(dsn); err == nil || !strings.Contains(err.Error(), "postgres://") {
+			t.Errorf("opening %q: %v", dsn, err)
+		}
+	}
+}
+
 func TestImportLegacy(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "outreach.sqlite")
-	old, err := Open(path)
+	// The legacy tracker's own database, which is SQLite.
+	old, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	old.db.Exec("drop table contacts")
-	old.db.Exec(snapshotSchema)
-	old.db.Exec("alter table contacts add column accepted text")
-	old.db.Exec("insert into contacts (id, key, file, maker, person, first, linkedin_added, accepted) values (7, 'Ada Lovelace', 'x.md', 'Analytical Engines (UK)', 'Ada Lovelace, Countess', 'Ada', '2026-11-20', '2026-11-22')")
+	old.Exec(snapshotSchema)
+	old.Exec("alter table contacts add column accepted text")
+	old.Exec("insert into contacts (id, key, file, maker, person, first, linkedin_added, accepted) values (7, 'Ada Lovelace', 'x.md', 'Analytical Engines (UK)', 'Ada Lovelace, Countess', 'Ada', '2026-11-20', '2026-11-22')")
 	s := tempStore(t)
 	o := mustOrg(t, s, "acme")
 	n, err := s.ImportLegacy(o.ID, path)

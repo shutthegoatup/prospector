@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 
-	sqlite "github.com/glebarez/go-sqlite"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"gorm.io/gorm"
@@ -53,12 +52,11 @@ func missing(err error, format string, args ...any) error {
 // says what the caller got wrong.
 func ours(err error) bool {
 	var pg *pgconn.PgError
-	var lite *sqlite.Error
 	var network net.Error
 	if errors.As(err, &pg) || unstorable(err) {
 		return !unstorable(err)
 	}
-	return errors.As(err, &lite) || errors.As(err, &network) ||
+	return errors.As(err, &network) ||
 		errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
 		errors.Is(err, sql.ErrConnDone) || errors.Is(err, sql.ErrTxDone) || errors.Is(err, driver.ErrBadConn) ||
 		errors.Is(err, gorm.ErrInvalidTransaction) || errors.Is(err, gorm.ErrInvalidDB)
@@ -76,12 +74,7 @@ func unstorable(err error) bool {
 // rules, a unique index among them, and not a character it won't store.
 func breaksRule(err error) bool {
 	var pg *pgconn.PgError
-	var lite *sqlite.Error
-	if errors.As(err, &pg) {
-		return strings.HasPrefix(pg.Code, "23")
-	}
-	const sqliteConstraint = 19
-	return errors.As(err, &lite) && lite.Code()&0xff == sqliteConstraint
+	return errors.As(err, &pg) && strings.HasPrefix(pg.Code, "23")
 }
 
 const (
@@ -93,10 +86,9 @@ const (
 // fromDatabase is an error in the database's or its driver's own words.
 func fromDatabase(err error) bool {
 	var pg *pgconn.PgError
-	var lite *sqlite.Error
 	// A failure to connect names the database's user and host.
 	var dial *pgconn.ConnectError
-	if errors.As(err, &pg) || errors.As(err, &lite) || errors.As(err, &dial) {
+	if errors.As(err, &pg) || errors.As(err, &dial) {
 		return true
 	}
 	// database/sql keeps some of its errors to itself, such as a pool that has closed.

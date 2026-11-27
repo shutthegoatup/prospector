@@ -238,8 +238,6 @@ type ExportRecord struct {
 func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 	out := &OrgExport{ExportedAt: time.Now().UTC(), Members: []ExportMember{}, Keys: []ExportKey{}, History: []ExportRecord{}}
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		// Written before anything is read: SQLite refuses a write that follows reads in
-		// a transaction if anyone else wrote meanwhile, and this one reads for a while.
 		if err := s.log(tx, org, 0, nil, actor, "export:org", nil); err != nil {
 			return err
 		}

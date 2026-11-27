@@ -173,7 +173,7 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 		"FinishIfDone": func(s *Store) error { return s.SkipMail(first.ID, queued.ID, "skipped") },
 	}
 	try := func(name string, call func(s *Store, org int64) any, org int64) (got any, changed bool) {
-		on := &Store{db: s.db.Begin(), keys: s.keys, fts: s.fts}
+		on := &Store{db: s.db.Begin(), keys: s.keys}
 		defer on.db.Rollback()
 		if ready[name] != nil {
 			if err := ready[name](on); err != nil {

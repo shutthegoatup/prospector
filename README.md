@@ -4,7 +4,7 @@
 
 People and agents research companies, keeping a source link for every fact. People then work one daily queue across LinkedIn, email and phone, from first touch to deal. Agents research and draft over MCP; only people send.
 
-One binary, one database (SQLite or Postgres), several organisations per login.
+One binary, one Postgres database, several organisations per login.
 
 [![CI](https://github.com/shutthegoatup/prospector/actions/workflows/ci.yml/badge.svg)](https://github.com/shutthegoatup/prospector/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/shutthegoatup/prospector)](https://github.com/shutthegoatup/prospector/releases/latest)
@@ -105,6 +105,7 @@ For now an agreement is a draft: sending it for signature comes later, with what
 
 ```sh
 # download a release, or build from a clone (see Develop)
+export DATABASE_URL=postgres://user:password@localhost/prospector
 prospector org add acme "Acme"
 prospector user add you@example.com "Your Name"          # asks for a password
 prospector member add acme you@example.com owner
@@ -113,7 +114,7 @@ prospector serve                                          # http://127.0.0.1:876
 
 | Variable | Meaning |
 |---|---|
-| `DATABASE_URL` | A `postgres://` URL or a SQLite file path (default `prospector.sqlite`) |
+| `DATABASE_URL` | The Postgres database, as a `postgres://` URL. Required |
 | `PORT` | Listen on `:PORT` instead of `127.0.0.1:8766` |
 | `PROSPECTOR_URL` | The address people reach it at, e.g. `https://prospector.example.com`. With an `https://` address the session cookie is always marked Secure, and links shown in the app use this address. Set it if a proxy in front changes the `Host` header |
 | `SMTP_ADDR`, `MAIL_FROM` | The mail server the app's own mail leaves through, e.g. `smtp.example.com:587` and `Prospector <prospector@example.com>`. Set both or neither; see [Mail](#mail) |
@@ -145,7 +146,7 @@ Search uses a trigram index. On Postgres that needs the `pg_trgm` extension, whi
   - its limits: the rate limit on API requests, the slowing of wrong passwords, the hourly limit on enquiries, and how many of Prospector's own agents run at once are counted per server, so two servers allow twice as many;
   - an agent's MCP session, which lives on the server that opened it, so a load balancer has to keep sending `/o/<slug>/mcp` for one client to the same server.
 
-  A restart forgets both, as it does with one server. A SQLite file is for one server.
+  A restart forgets both, as it does with one server.
 
 There's a Dockerfile for container hosting.
 

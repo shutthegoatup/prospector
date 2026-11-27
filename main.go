@@ -35,8 +35,7 @@
 // SMTP_ADDR, SMTP_USERNAME, SMTP_PASSWORD and MAIL_FROM name the mail server that
 // password resets and invitations leave through; without them there are neither.
 //
-// DATABASE_URL picks the database: a postgres:// URL or a SQLite path
-// (default prospector.sqlite in the current directory).
+// DATABASE_URL is the Postgres database, as a postgres:// URL. There is no default.
 package main
 
 import (
@@ -59,12 +58,7 @@ import (
 // version is set at release time by -ldflags "-X main.version=…".
 var version = "dev"
 
-func defaultDSN() string {
-	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
-		return dsn
-	}
-	return "prospector.sqlite"
-}
+func defaultDSN() string { return os.Getenv("DATABASE_URL") }
 
 func arg(args []string, i int, fallback string) string {
 	if len(args) > i {

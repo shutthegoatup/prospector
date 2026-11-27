@@ -468,7 +468,7 @@ func (s *Store) Runs(org int64, before time.Time, limit int) (runs []Run, titles
 	if !before.IsZero() {
 		// A run the page before showed began before it, and its start is here too: it is
 		// left out, by how soon after it that agent did something on the page before.
-		// Read as rows, one an agent: SQLite answers min() of a time as text.
+		// Read as rows, one an agent.
 		cut := map[string]time.Time{}
 		for _, r := range runs {
 			key := fmt.Sprintf("%d\x00%s", r.KeyID, r.Actor)

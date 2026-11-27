@@ -1,12 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"strings"
 	"time"
 
-	"github.com/glebarez/sqlite"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -257,8 +257,6 @@ type Store struct {
 	// keys seal what is stored but mustn't be readable from the database alone; nil
 	// when the server was given none.
 	keys *keyring
-	// fts is whether SQLite has its search tables; Postgres searches through an index of its own.
-	fts bool
 	// dns says whether a domain takes mail; nil asks nothing, so tests never reach the network.
 	dns mailDNS
 }
@@ -267,7 +265,7 @@ var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
 	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &EnquiryMessage{}, &Suppression{}, &UnsubscribeLink{}, &Campaign{}, &CampaignRecipient{}, &Agreement{}, &AgreementFile{}, &AgreementRecipient{}, &AgreementField{}, &AgreementEvent{}, &SealKey{}, &Suggestion{},
 	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}, &Agent{}, &AgentRun{}, &Deal{}, &Subscription{}, &Onboarding{}, &OnboardingStep{}, &CustomerGrant{}, &CustomerLink{}, &CustomerSession{}, &MailDomain{}, &Enricher{}, &EnrichUsage{}, &Offering{}, &Verdict{}, &Role{}, &BounceHook{}}
 
-// Open takes a postgres:// URL or a SQLite file path, and brings its schema up to date.
+// Open takes a postgres:// URL and brings its schema up to date.
 func Open(dsn string) (*Store, error) {
 	s, err := connect(dsn)
 	if err != nil {
@@ -281,16 +279,10 @@ func Open(dsn string) (*Store, error) {
 
 // connect opens a database without touching its schema.
 func connect(dsn string) (*Store, error) {
-	var dialector gorm.Dialector
-	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
-		dialector = postgres.Open(dsn)
-	} else {
-		// A transaction takes the write lock as it begins and waits for it. One that began
-		// by reading would be refused outright, however long it was willing to wait, if
-		// someone else had written by the time it wrote.
-		dialector = sqlite.Open(dsn + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_txlock=immediate")
+	if !strings.HasPrefix(dsn, "postgres://") && !strings.HasPrefix(dsn, "postgresql://") {
+		return nil, errors.New("set DATABASE_URL to a postgres:// URL")
 	}
-	db, err := gorm.Open(dialector, &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		return nil, err
 	}
@@ -322,10 +314,7 @@ func (s *Store) migrate() error {
 func oneGoingRunPerAgent(db *gorm.DB) error {
 	const name = "idx_agent_runs_one_going"
 	var def string
-	lookup := "select coalesce(sql, '') from sqlite_master where type = 'index' and name = ?"
-	if db.Dialector.Name() == "postgres" { //nolint:staticcheck // the dialect's name, not the database's
-		lookup = "select indexdef from pg_indexes where indexname = ? and tablename = 'agent_runs' and schemaname = current_schema()"
-	}
+	lookup := "select indexdef from pg_indexes where indexname = ? and tablename = 'agent_runs' and schemaname = current_schema()"
 	if err := db.Raw(lookup, name).Scan(&def).Error; err != nil {
 		return err
 	}
@@ -342,8 +331,6 @@ func oneGoingRunPerAgent(db *gorm.DB) error {
 		return nil
 	})
 }
-
-func (s *Store) postgres() bool { return s.db.Dialector.Name() == "postgres" } //nolint:staticcheck // the dialect's name
 
 // in scopes a query to one organisation. Not every query uses it, so what holds the
 // store's exported methods to their organisation is TestNoMethodReachesIntoAnotherOrganisation.
@@ -366,8 +353,7 @@ func (s *Store) Users() (int64, error) {
 // holdOrg and hold make a transaction wait its turn on one row, so a rule that is
 // checked by reading and then kept by writing ("add it unless it is already here")
 // holds when two callers arrive together. Taken before the first read; an organisation
-// before anything in it. On SQLite a write that opens the transaction also keeps it
-// from being refused for writing after someone else has.
+// before anything in it.
 func holdOrg(tx *gorm.DB, org int64) error {
 	return tx.Exec("update orgs set id = id where id = ?", org).Error
 }

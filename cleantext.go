@@ -8,9 +8,8 @@ import (
 	"strings"
 )
 
-// Postgres won't keep a NUL in text, nor bytes that aren't UTF-8; SQLite keeps both. No
-// one means to send either, so they are taken out of what arrives before anything reads
-// it, and the two databases hold the same text.
+// Postgres won't keep a NUL in text, nor bytes that aren't UTF-8. No one means to send
+// either, so they are taken out of what arrives before anything reads it.
 
 func cleanText(s string) string {
 	if strings.IndexByte(s, 0) < 0 && isUTF8(s) {

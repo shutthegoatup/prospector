@@ -321,12 +321,10 @@ func (s *Store) replaceContacts(org int64, rows []Contact, absent []string) (int
 		if err := tx.CreateInBatches(rows, 100).Error; err != nil {
 			return fmt.Errorf("restore (another organisation may already use these ids): %w", err)
 		}
-		if s.postgres() {
-			// Only ever forwards: winding back would hand a dropped person's id, and the
-			// history still filed under it, to whoever is added next.
-			if err := tx.Exec("select setval(pg_get_serial_sequence('contacts', 'id'), greatest((select coalesce(max(id), 1) from contacts), nextval(pg_get_serial_sequence('contacts', 'id'))))").Error; err != nil {
-				return err
-			}
+		// Only ever forwards: winding back would hand a dropped person's id, and the
+		// history still filed under it, to whoever is added next.
+		if err := tx.Exec("select setval(pg_get_serial_sequence('contacts', 'id'), greatest((select coalesce(max(id), 1) from contacts), nextval(pg_get_serial_sequence('contacts', 'id'))))").Error; err != nil {
+			return err
 		}
 		if err := follow(tx, org, before, rows); err != nil {
 			return err

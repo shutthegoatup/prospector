@@ -7,7 +7,7 @@ This repository is public. Keep real prospect data, hostnames and credentials ou
 Several sessions may be working on this machine at once. These are the commands that can collide:
 
 - **`prospector serve`** listens on `127.0.0.1:8766`, or `:$PORT` when `PORT` is set. Check the port is free first, pass an explicit address (`prospector serve 127.0.0.1:<port>`), and stop the server when done.
-- **`DATABASE_URL`** defaults to `prospector.sqlite` in the current directory. For a throwaway run, point it at a file outside the checkout.
+- **`DATABASE_URL`** is required, a `postgres://` URL; the app runs on Postgres only. For a throwaway run, point it at a database of your own on your own Postgres (see the tests below), never at 5432.
 - **The tests run on Postgres.** `go test ./...` needs `PROSPECTOR_TEST_PG` to point at a server it may create databases on; without it the run stops and prints a `docker run` for a throwaway one. Port 5432 on this machine is another project's: start your own on a spare loopback port, with `-c fsync=off -c synchronous_commit=off -c full_page_writes=off`, which more than halves the run. Each run makes databases named `prospector_test_<random>…` from the database the URL names and drops them when it ends, so runs from several sessions can share one server; it never touches that database's own tables.
 
 Tests call `t.Parallel()` and get a database from `tempStore(t)` (one migrated template, copied once per parallel slot and emptied between tests) or, to change the schema, `freshDatabase(t)`. A test that sets the environment or swaps a package variable stays serial.
