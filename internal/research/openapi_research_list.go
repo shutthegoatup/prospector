@@ -135,3 +135,7 @@ func researchOut(set store.OrgSettings, r prospecting.ResearchRow) api.ResearchC
 	}
 	return c
 }
+
+func PendingOut(d prospecting.PendingDetail) api.PendingDetail {
+	return api.PendingDetail{Id: d.ID, Field: d.Field, Value: d.Value, Current: d.Current, SourceUrl: d.SourceURL, By: d.By, At: d.At, EmailStatus: d.EmailStatus, Vendor: d.Vendor}
+}

@@ -67,3 +67,5 @@ func LinkCompanies(tx *gorm.DB, org int64, rows []CompanyRow) error {
 	}
 	return nil
 }
+
+type CompanyRow map[string]string

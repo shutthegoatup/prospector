@@ -35,3 +35,68 @@ type AgreementFile struct {
 	OrgID       int64  `gorm:"index;not null"`
 	Data        []byte `gorm:"not null;default:''"`
 }
+
+// SealKey is the key an organisation's agreements are sealed with: made the first time
+// one is needed, its private half sealed under the server's secret key, its certificate
+// in every PDF it seals.
+type SealKey struct {
+	OrgID     int64     `gorm:"primaryKey;autoIncrement:false"`
+	Cert      []byte    `gorm:"not null"`
+	Key       string    `gorm:"not null;default:''"`
+	CreatedAt time.Time `gorm:"not null"`
+}
+
+// AgreementEvent is one thing that happened to an agreement once it went out: sent, a
+// link opened, a code entered, signed, sealed. Rows are only ever added. Each carries
+// the hash of the one before it, so a row changed or taken out afterwards shows. The
+// certificate in a sealed PDF is drawn from these.
+type AgreementEvent struct {
+	ID          int64     `gorm:"primaryKey" json:"id"`
+	OrgID       int64     `gorm:"index;not null" json:"-"`
+	AgreementID int64     `gorm:"uniqueIndex:idx_agreement_event_chain,priority:1;not null" json:"agreement_id"`
+	Round       int       `gorm:"not null;default:1" json:"round"`
+	At          time.Time `gorm:"not null" json:"at"`
+	Kind        string    `gorm:"not null;default:''" json:"kind"`
+	Actor       string    `gorm:"not null;default:''" json:"actor"`
+	RecipientID *int64    `json:"recipient_id"`
+	Detail      string    `gorm:"not null;default:''" json:"detail"`
+	IP          string    `gorm:"not null;default:''" json:"ip"`
+	UserAgent   string    `gorm:"not null;default:''" json:"user_agent"`
+	// Prev is the hash of the event before it on the same agreement, "" for the first.
+	// One agreement can't have two events after the same one, so two writers racing to
+	// add the next can't fork the chain: one of them is refused.
+	Prev string `gorm:"uniqueIndex:idx_agreement_event_chain,priority:2;not null;default:''" json:"prev"`
+	Hash string `gorm:"not null;default:''" json:"hash"`
+}
+
+// AgreementRecipient is someone an agreement goes to: a signer, in Position order when
+// the agreement is signed in order, or someone who gets a copy once it is signed. They
+// are a person at the company or a member of the organisation, never a bare address.
+type AgreementRecipient struct {
+	ID          int64     `gorm:"primaryKey" json:"id"`
+	OrgID       int64     `gorm:"index:idx_agreement_recipients,priority:1;not null" json:"-"`
+	AgreementID int64     `gorm:"index:idx_agreement_recipients,priority:2;not null" json:"agreement_id"`
+	Position    int       `gorm:"not null;default:0" json:"position"`
+	Role        string    `gorm:"not null;default:'signer'" json:"role"`
+	ContactID   *int64    `gorm:"index" json:"contact_id"`
+	UserID      *int64    `gorm:"index" json:"member_id"`
+	CreatedBy   string    `gorm:"not null;default:''" json:"created_by"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// AgreementField is a place on a page that one signer fills in. X, Y, W and H are
+// fractions of the page as it is shown, rotation applied, from its top left, so they
+// don't depend on the units or size the PDF uses.
+type AgreementField struct {
+	ID          int64   `gorm:"primaryKey" json:"id"`
+	OrgID       int64   `gorm:"index:idx_agreement_fields,priority:1;not null" json:"-"`
+	AgreementID int64   `gorm:"index:idx_agreement_fields,priority:2;not null" json:"agreement_id"`
+	Round       int     `gorm:"not null;default:1" json:"round"`
+	RecipientID int64   `gorm:"index;not null" json:"recipient_id"`
+	Page        int     `gorm:"not null;default:1" json:"page"`
+	Kind        string  `gorm:"not null;default:'signature'" json:"kind"`
+	X           float64 `gorm:"not null;default:0" json:"x"`
+	Y           float64 `gorm:"not null;default:0" json:"y"`
+	W           float64 `gorm:"not null;default:0" json:"w"`
+	H           float64 `gorm:"not null;default:0" json:"h"`
+}

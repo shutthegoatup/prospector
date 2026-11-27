@@ -129,3 +129,59 @@ func UniqueKey(tx *gorm.DB, org int64, key string) string {
 		try = fmt.Sprintf("%s (%d)", key, i)
 	}
 }
+
+// JudgedByRoles says whether a company's verdict for an offering follows its roles there,
+// so a person can't set it by hand.
+func JudgedByRoles(tx *gorm.DB, org int64, o *store.Offering, company int64) (bool, error) {
+	if !o.HasRoles {
+		return false, nil
+	}
+	var n int64
+	err := tx.Model(&store.Role{}).Where("org_id = ? and offering_id = ? and company_id = ?", org, o.ID, company).Count(&n).Error
+	return n > 0, err
+}
+
+const CompanyReview = "review"
+
+const CompanyQualified = "qualified"
+
+const CompanyRejected = "rejected"
+
+var Editable = map[string]bool{"phone": true, "email": true, "linkedin": true, "sources": true,
+	"call_notes": true, "tz": true, "person": true, "send_to": true, "message": true, "note": true,
+	"body": true, "followup": true, "subject": true,
+	"stage": true, "next_step": true, "next_date": true, "lost_reason": true, "title": true}
+
+// loggedValue are the fields whose new value goes into the history: where a conversation
+// stands and when it is due. The rest are a person's details or free text about them,
+// which their own row already holds, so the history keeps only that they changed.
+var loggedValue = map[string]bool{"stage": true, "next_date": true}
+
+// stringFields are the newer non-pointer columns, which store "" rather than NULL.
+var stringFields = map[string]bool{"stage": true, "next_step": true, "lost_reason": true, "title": true}
+
+var Marks = map[string]string{"linkedin": "linkedin_added", "email": "email_sent", "followup": "followup_sent",
+	"call": "called", "replied": "replied", "declined": "declined", "hold": "hold", "accepted": "accepted"}
+
+const openContacts = "hold is null and replied is null and declined is null and status <> 'suggested' and key not like 'org:%'"
+
+// A rejected company's people leave the queues without being marked, so qualifying
+// it again brings them back as they were. Rejected is for the offering each person is
+// reached for: the company's own stage for the organisation's, a verdict for another.
+const companyNotRejected = "(company_id is null" +
+	" or (offering_id = 0 and not exists (select 1 from companies c where c.id = contacts.company_id" +
+	" and c.org_id = contacts.org_id and c.stage = '" + CompanyRejected + "'))" +
+	" or (offering_id <> 0 and not exists (select 1 from verdicts v where v.org_id = contacts.org_id" +
+	" and v.offering_id = contacts.offering_id and v.company_id = contacts.company_id and v.stage = '" + CompanyRejected + "')))"
+
+// MarkDate compares days as text, in the zone today() uses: parsing the day as UTC
+// midnight would call today "the future" for the first hours of it east of UTC.
+func MarkDate(date string, now time.Time) error {
+	if _, err := time.Parse("2006-01-02", date); err != nil {
+		return say.New("date is YYYY-MM-DD")
+	}
+	if date > now.Format("2006-01-02") {
+		return say.New("date is in the future")
+	}
+	return nil
+}

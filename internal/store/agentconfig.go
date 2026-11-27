@@ -84,3 +84,7 @@ func (c Agent) ToolsKey(key string) string {
 func (c Agent) Searches() bool {
 	return c.SearchURL != "" || slices.ContainsFunc(c.AllowedTools(), func(t string) bool { return strings.Contains(t, "search") })
 }
+
+const KindOpenAI = "openai"
+
+const KindAnthropic = "anthropic"

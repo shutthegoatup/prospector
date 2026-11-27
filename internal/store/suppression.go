@@ -47,3 +47,11 @@ func BareAddress(address string) (string, error) {
 }
 
 var ErrNeverContact = say.New("on the never-contact list")
+
+// BounceHook is the secret Postmark signs its webhook in with, kept as its hash.
+// Postmark doesn't sign what it posts, so the secret is all that says a bounce is real.
+type BounceHook struct {
+	OrgID      int64 `gorm:"primaryKey;autoIncrement:false"`
+	SecretHash string
+	CreatedAt  time.Time
+}
