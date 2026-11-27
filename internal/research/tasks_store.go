@@ -1488,7 +1488,7 @@ func (s *ResearchStore) AgentAddContact(o *store.Org, who store.Actor, in prospe
 	if in.Title != "" {
 		person += ", " + strings.TrimSpace(in.Title)
 	}
-	first := prospecting.FirstField(in.Name)
+	first := store.FirstField(in.Name)
 	var out AddContactOut
 	err = s.DB.Transaction(func(tx *gorm.DB) error {
 		// The organisation too: a contact's key is one of a kind across it.

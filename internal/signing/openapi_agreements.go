@@ -10,7 +10,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 
-	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
@@ -26,7 +26,7 @@ func (s SigningAPI) ListAgreements(ctx context.Context, in api.ListAgreementsReq
 	if err != nil {
 		return nil, err
 	}
-	page, next, err := prospecting.ListPage(all, in.Params.Limit, in.Params.Cursor)
+	page, next, err := paging.ListPage(all, in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (s SigningAPI) ListAgreementRecipients(ctx context.Context, in api.ListAgre
 	if err != nil {
 		return nil, err
 	}
-	page, next, err := prospecting.ListPage(all, in.Params.Limit, in.Params.Cursor)
+	page, next, err := paging.ListPage(all, in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func (s SigningAPI) ListAgreementFields(ctx context.Context, in api.ListAgreemen
 	if err != nil {
 		return nil, err
 	}
-	page, next, err := prospecting.ListPage(all, in.Params.Limit, in.Params.Cursor)
+	page, next, err := paging.ListPage(all, in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
