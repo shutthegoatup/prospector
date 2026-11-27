@@ -2,6 +2,7 @@ package mailer
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"crypto/tls"
 	"net"
@@ -49,13 +50,17 @@ func TestMailFromEnv(t *testing.T) {
 type fakeSMTP struct {
 	addr string
 	// tls, when set, is offered as STARTTLS.
-	tls   *tls.Config
-	mu    sync.Mutex
-	from  string
-	to    []string
-	auth  string
-	data  string
-	verbs []string
+	tls *tls.Config
+	// rcptReply, when set, answers the recipient; dropAtRcpt drops the line there
+	// instead, and hangUp drops it after taking a message, with no goodbye.
+	rcptReply          string
+	dropAtRcpt, hangUp bool
+	mu                 sync.Mutex
+	from               string
+	to                 []string
+	auth               string
+	data               string
+	verbs              []string
 	// secured is whether the message arrived after STARTTLS.
 	secured bool
 }
@@ -114,7 +119,11 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 			say("250 ok")
 		case "RCPT":
 			f.to = append(f.to, line)
-			say("250 ok")
+			if f.dropAtRcpt {
+				f.mu.Unlock()
+				return
+			}
+			say(cmp.Or(f.rcptReply, "250 ok"))
 		case "DATA":
 			say("354 go on")
 			var b strings.Builder
@@ -127,6 +136,10 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 			}
 			f.data, f.secured = b.String(), secured
 			say("250 queued")
+			if f.hangUp {
+				f.mu.Unlock()
+				return
+			}
 		case "QUIT":
 			say("221 bye")
 			f.mu.Unlock()
