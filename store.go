@@ -259,6 +259,7 @@ var Marks = map[string]string{"linkedin": "linkedin_added", "email": "email_sent
 // reaches every area.
 type Store struct {
 	*core
+	agentStore
 	ssoStore
 	suppressionStore
 	customerStore
@@ -278,7 +279,7 @@ type core struct {
 }
 
 func newStore(c *core) *Store {
-	return &Store{core: c, ssoStore: ssoStore{c}, suppressionStore: suppressionStore{c}, customerStore: customerStore{c}, dealStore: dealStore{c}, subscriptionStore: subscriptionStore{c}, onboardingStore: onboardingStore{c}}
+	return &Store{core: c, agentStore: agentStore{c}, ssoStore: ssoStore{c}, suppressionStore: suppressionStore{c}, customerStore: customerStore{c}, dealStore: dealStore{c}, subscriptionStore: subscriptionStore{c}, onboardingStore: onboardingStore{c}}
 }
 
 // through is the same store working through db, such as a transaction.
