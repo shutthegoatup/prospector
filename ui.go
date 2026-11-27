@@ -95,7 +95,7 @@ func (a *App) todayElsewhere(org int64, now time.Time, d *TodayData) error {
 	}
 	for _, list := range others {
 		for _, o := range list {
-			if o.needsNextStep(now.Format("2006-01-02")) {
+			if o.NeedsNextStep(now.Format("2006-01-02")) {
 				d.Deals++
 			}
 		}

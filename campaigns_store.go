@@ -41,7 +41,7 @@ func (s *outreachStore) AddCampaign(org int64, in CampaignIn, actor string) (*Ca
 		}
 		*f.into = v
 	}
-	if err := c.fits(); err != nil {
+	if err := c.Fits(); err != nil {
 		return nil, err
 	}
 	return &c, s.db.Create(&c).Error
@@ -76,7 +76,7 @@ func (s *outreachStore) ChangeCampaign(org, id int64, changes []Change, actor st
 		if after.Kind == KindService && c.Kind != KindService && updates["audience"] == nil {
 			after.Audience, updates["audience"] = AudienceCustomers, AudienceCustomers
 		}
-		if err := after.fits(); err != nil {
+		if err := after.Fits(); err != nil {
 			return err
 		}
 		// Held to the draft it was read as: one sent in the meantime is left as it went.

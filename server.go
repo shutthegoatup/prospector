@@ -152,7 +152,7 @@ func (q *Req) Voice() Voice {
 	if caller == "" {
 		caller = q.User.Name
 	}
-	return Voice{Caller: caller, Org: q.Org.Name, Pitch: q.Org.Settings.withDefaults().Pitch, Signature: q.Member.Signature}
+	return Voice{Caller: caller, Org: q.Org.Name, Pitch: q.Org.Settings.WithDefaults().Pitch, Signature: q.Member.Signature}
 }
 
 func (q *Req) Owner() bool { return q.Member != nil && q.Member.Role == "owner" }
@@ -542,7 +542,7 @@ func (a *App) frontIntake(r *http.Request) (intake, origin string) {
 	}
 	origin = browserOrigin(a.baseURL(r))
 	org, err := a.s.OrgBySlug(a.frontOrg)
-	if err != nil || !org.Settings.takesEnquiriesFrom(origin) {
+	if err != nil || !org.Settings.TakesEnquiriesFrom(origin) {
 		return "", ""
 	}
 	return "/o/" + org.Slug + "/intake", origin

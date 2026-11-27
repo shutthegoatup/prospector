@@ -24,7 +24,7 @@ func TestASnapshotCarriesEveryContactColumn(t *testing.T) {
 			t.Errorf("contacts.%s is in no snapshot, so a restore would empty it: add it to laterColumns", f.DBName)
 		}
 	}
-	if len(laterColumns) != len((&Contact{}).later()) {
+	if len(laterColumns) != len((&Contact{}).Later()) {
 		t.Fatal("laterColumns and Contact.later() have drifted apart")
 	}
 }
@@ -70,7 +70,7 @@ func TestRestoreBringsBackEveryColumn(t *testing.T) {
 	suggested, _ := suggestedAndWorked(t, s, o)
 	before := contactsOf(t, s, o.ID)
 	for _, c := range before {
-		for i, f := range c.later() {
+		for i, f := range c.Later() {
 			// Between them the two hold something in every column: only one still waiting has a status.
 			if (c.ID == suggested) == (laterColumns[i] == "status") && deref(laterValue(f)) == "" {
 				t.Fatalf("the test leaves %s empty for contact %d, so it wouldn't notice it lost", laterColumns[i], c.ID)
@@ -114,8 +114,8 @@ func TestAnOlderSnapshotLeavesLaterColumnsAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, c := range contactsOf(t, s, o.ID) {
-		for j, f := range c.later() {
-			if got, want := deref(laterValue(f)), deref(laterValue(before[i].later()[j])); got != want {
+		for j, f := range c.Later() {
+			if got, want := deref(laterValue(f)), deref(laterValue(before[i].Later()[j])); got != want {
 				t.Errorf("%s: %s was %q and is now %q", c.Key, laterColumns[j], want, got)
 			}
 		}

@@ -35,16 +35,6 @@ const certificateLayout = 1
 // documentSigning is the extended key usage for signing documents (RFC 9336).
 var documentSigning = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 36}
 
-// SealKey is the key an organisation's agreements are sealed with: made the first time
-// one is needed, its private half sealed under the server's secret key, its certificate
-// in every PDF it seals.
-type SealKey struct {
-	OrgID     int64     `gorm:"primaryKey;autoIncrement:false"`
-	Cert      []byte    `gorm:"not null"`
-	Key       string    `gorm:"not null;default:''"`
-	CreatedAt time.Time `gorm:"not null"`
-}
-
 // Stamp is what one field shows on the sealed document: where, as fractions of the page
 // as shown from its top left, and what the signer gave.
 type Stamp struct {

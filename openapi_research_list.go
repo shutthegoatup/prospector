@@ -110,7 +110,7 @@ func researchOut(set OrgSettings, r ResearchRow) api.ResearchCompany {
 		person := api.ResearchPerson{Id: p.ID, Name: displayName(p), Title: p.Title, Status: p.Status, HasEmail: deref(p.Email) != "", HasPhone: deref(p.Phone) != "",
 			EmailStatus: p.EmailStatus, Linkedin: deref(p.Linkedin), SourceUrl: firstLine(deref(p.Sources)),
 			Pending: []api.PendingDetail{}, Lookups: []api.Lookup{},
-			Unlookable: set.unlookable(p, strings.ToLower(strings.TrimSpace(r.Domain)))}
+			Unlookable: set.Unlookable(p, strings.ToLower(strings.TrimSpace(r.Domain)))}
 		for _, d := range r.Pending[p.ID] {
 			person.Pending = append(person.Pending, pendingOut(d))
 		}

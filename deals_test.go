@@ -303,7 +303,7 @@ func TestAnotherDealWithSomeoneInConversation(t *testing.T) {
 	if at := board["proposal"]; len(at) != 1 || at[0].ID != renewal.ID || at[0].Value() != "£9,500" || at[0].NextStep != "Send renewal terms" || displayName(at[0].With) != "Hannah Pryce" {
 		t.Errorf("the renewal on the board: %+v", board)
 	}
-	if at := board["replied"]; len(at) != 1 || at[0].ID != expansion.ID || !at[0].needsNextStep("2026-11-25") {
+	if at := board["replied"]; len(at) != 1 || at[0].ID != expansion.ID || !at[0].NeedsNextStep("2026-11-25") {
 		t.Errorf("the expansion on the board: %+v", board)
 	}
 	var said []Event

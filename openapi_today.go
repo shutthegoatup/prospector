@@ -12,7 +12,7 @@ import (
 // keep the placeholder and its emails go unsigned.
 func voiceOf(q *Req) Voice {
 	if q.Member == nil || q.User == nil {
-		return Voice{Org: q.Org.Name, Pitch: q.Org.Settings.withDefaults().Pitch}
+		return Voice{Org: q.Org.Name, Pitch: q.Org.Settings.WithDefaults().Pitch}
 	}
 	return q.Voice()
 }
