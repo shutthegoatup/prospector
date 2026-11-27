@@ -36,7 +36,8 @@ func TestOnlyTheStoreTouchesTheDatabase(t *testing.T) {
 				continue
 			}
 			ast.Inspect(fn.Body, func(n ast.Node) bool {
-				if sel, ok := n.(*ast.SelectorExpr); ok && sel.Sel.Name == "db" {
+				// in is the store's own query, scoped to an organisation but still a query.
+				if sel, ok := n.(*ast.SelectorExpr); ok && (sel.Sel.Name == "db" || sel.Sel.Name == "in") {
 					t.Errorf("%s: %s reaches the database itself: give the store a method for it", fset.Position(sel.Pos()), fn.Name.Name)
 				}
 				return true

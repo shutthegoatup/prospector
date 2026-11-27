@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"slices"
 	"strings"
@@ -386,9 +385,7 @@ func (s *Store) lookups(org int64, people []int64) (map[int64][]Lookup, error) {
 }
 
 func (a *App) logEnrich(org int64, who Actor, c Contact, field, value string) {
-	if err := a.s.LogEnrich(org, who, c.ID, field, value); err != nil {
-		log.Printf("database: %v", err)
-	}
+	noted(a.s.LogEnrich(org, who, c.ID, field, value))
 }
 
 // LogEnrich records a lookup that kept nothing, so the same one isn't paid for again soon.

@@ -197,6 +197,13 @@ func (s *Store) newCustomerLink(tx *gorm.DB, g CustomerGrant) (string, error) {
 	return token, tx.Create(&CustomerLink{OrgID: g.OrgID, GrantID: g.ID, TokenHash: hashToken(token), ExpiresAt: time.Now().Add(customerLinkLife)}).Error
 }
 
+// Mailable is the people at these companies who could be sent a link: known, with an address.
+func (s *Store) Mailable(org int64, companies []int64) ([]Contact, error) {
+	var people []Contact
+	return people, s.in(org).Where("company_id in ? and status <> ? and key not like ?", companies, ContactSuggested, "org:%").
+		Where("coalesce(email, '') <> ''").Order("id").Find(&people).Error
+}
+
 // FreshCustomerLink makes another link for someone already let in.
 func (s *Store) FreshCustomerLink(org, grant int64) (token string, err error) {
 	return token, s.db.Transaction(func(tx *gorm.DB) error {
@@ -514,9 +521,8 @@ func (a *App) customerControls(org int64, rows []OnboardingRow) error {
 	for _, r := range rows {
 		companies = append(companies, r.CompanyID)
 	}
-	var people []Contact
-	if err := a.s.in(org).Where("company_id in ? and status <> ? and key not like ?", companies, ContactSuggested, "org:%").
-		Where("coalesce(email, \x27\x27) <> \x27\x27").Order("id").Find(&people).Error; err != nil {
+	people, err := a.s.Mailable(org, companies)
+	if err != nil {
 		return err
 	}
 	mailOn := a.customerMailOn(org)

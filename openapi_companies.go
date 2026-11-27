@@ -188,12 +188,8 @@ func (s apiServer) ListCompanyNotes(ctx context.Context, in api.ListCompanyNotes
 	if err != nil {
 		return nil, err
 	}
-	var total int64
-	if err := s.a.s.in(org).Model(&TaskNote{}).Where("company_id = ?", in.Id).Count(&total).Error; err != nil {
-		return nil, err
-	}
-	var notes []TaskNote
-	if err := s.a.s.in(org).Where("company_id = ?", in.Id).Order("id desc").Limit(page.size()).Offset(int(at[0])).Find(&notes).Error; err != nil {
+	notes, total, err := s.a.s.CompanyNotes(org, in.Id, int(at[0]), page.size())
+	if err != nil {
 		return nil, err
 	}
 	next := ""

@@ -202,7 +202,7 @@ func (a *App) startRun(org, task, agent int64, by string, replacing int64) (*Age
 		Owner: a.runOwner(), LeaseUntil: now.Add(runLease).UnixMilli(), StartedAt: now})
 	if err != nil {
 		// Another start of this agent won the race to this task.
-		if going, _ := a.s.RunsOn(org, task, cfg.ID); going > 0 {
+		if going, err := a.s.RunsOn(org, task, cfg.ID); noted(err) && going > 0 {
 			return nil, already
 		}
 		return nil, err
@@ -263,9 +263,7 @@ func (a *App) launch(run AgentRun) {
 		if status == "" {
 			return
 		}
-		if err := a.s.EndRun(run.OrgID, run, status, reason, time.Now()); err != nil {
-			log.Printf("database: %v", err)
-		}
+		noted(a.s.EndRun(run.OrgID, run, status, reason, time.Now()))
 	}()
 }
 
@@ -283,9 +281,7 @@ func (a *App) keepRunsGoing(ctx context.Context, every time.Duration) {
 
 func (a *App) resumeLapsed(now time.Time) {
 	lapsed, err := a.s.LapsedRuns(now)
-	if err != nil {
-		log.Printf("database: %v", err)
-	}
+	noted(err)
 	for _, run := range lapsed {
 		a.runs.mu.Lock()
 		_, mine := a.runs.cancel[run.ID]
@@ -296,9 +292,7 @@ func (a *App) resumeLapsed(now time.Time) {
 			continue
 		}
 		if run.StopAsked {
-			if err := a.s.StopLapsedRun(run.OrgID, run.ID, run.LeaseUntil, now); err != nil {
-				log.Printf("database: %v", err)
-			}
+			noted(a.s.StopLapsedRun(run.OrgID, run.ID, run.LeaseUntil, now))
 			continue
 		}
 		if busy >= maxRunning {
@@ -393,7 +387,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 			if goOn, err := a.hold(ctx, run, RunWorking, nil); err != nil || !goOn {
 				return a.ended(ctx, run, err)
 			}
-			if revoked, _ := a.s.KeyRevoked(run.OrgID, bk.ID); revoked {
+			if revoked, err := a.s.KeyRevoked(run.OrgID, bk.ID); noted(err) && revoked {
 				return RunStopped, "its key was revoked on the Agents page"
 			}
 			reply, err := chat.next(ctx)
@@ -508,10 +502,8 @@ func toolsPassing(err error) bool {
 // server is going away, nobody's if another server took it over, else failed.
 func (a *App) ended(ctx context.Context, run *AgentRun, err error) (string, string) {
 	var now AgentRun
-	if got, err := a.s.RunByID(run.OrgID, run.ID); err == nil {
+	if got, err := a.s.RunByID(run.OrgID, run.ID); noted(err) {
 		now = *got
-	} else {
-		log.Printf("database: %v", err)
 	}
 	switch {
 	case now.Owner != run.Owner:
@@ -552,7 +544,7 @@ func (a *App) handOver(run *AgentRun, c *Agent, bk *APIKey, waited time.Duration
 		return "", false
 	}
 	why := fmt.Sprintf("its endpoint stayed limited or away for over %d minutes", c.FallbackMinutes)
-	if going, _ := a.s.RunsOn(run.OrgID, run.TaskID, next.ID); going > 0 {
+	if going, err := a.s.RunsOn(run.OrgID, run.TaskID, next.ID); noted(err) && going > 0 {
 		return fmt.Sprintf("left the task to %s, already working it: %s", next.Name, why), true
 	}
 	// The request this run holds goes with the task, or the fallback would find
@@ -704,9 +696,7 @@ func sources(name string, args map[string]any) []string {
 
 func (t *turnState) requestDone() bool {
 	done, err := t.app.s.RequestDone(t.run.OrgID, t.run.RequestID)
-	if err != nil {
-		log.Printf("database: %v", err)
-	}
+	noted(err)
 	return done
 }
 

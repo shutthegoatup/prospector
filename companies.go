@@ -88,6 +88,21 @@ func bareDomain(v string) string {
 	return strings.TrimPrefix(v, "www.")
 }
 
+func (s *Store) CompanyCount(org int64) (int64, error) {
+	var n int64
+	return n, s.in(org).Model(&Company{}).Count(&n).Error
+}
+
+// CompanyNotes is one page of the notes left on a company, newest first, and how many there are.
+func (s *Store) CompanyNotes(org, company int64, offset, limit int) ([]TaskNote, int64, error) {
+	var total int64
+	if err := s.in(org).Model(&TaskNote{}).Where("company_id = ?", company).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var notes []TaskNote
+	return notes, total, s.in(org).Where("company_id = ?", company).Order("id desc").Limit(limit).Offset(offset).Find(&notes).Error
+}
+
 func (s *Store) CompanyByID(org, id int64) (*Company, error) {
 	var c Company
 	return &c, s.in(org).First(&c, id).Error

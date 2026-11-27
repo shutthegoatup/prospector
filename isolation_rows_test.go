@@ -48,7 +48,8 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 	}
 	queued := CampaignRecipient{OrgID: first.ID, CampaignID: campaign.ID, Address: "ann@alpha.example", Status: MailQueued}
 	sent := CampaignRecipient{OrgID: first.ID, CampaignID: campaign.ID, Address: "bob@alpha.example", Status: MailSent, SentAt: &now}
-	for _, row := range []any{&claim, &queued, &sent} {
+	note := TaskNote{OrgID: first.ID, TaskID: task.ID, CompanyID: 7, Actor: "scout", Kind: "skipped", Text: "not for us"}
+	for _, row := range []any{&claim, &queued, &sent, &note} {
 		if err := s.db.Create(row).Error; err != nil {
 			t.Fatal(err)
 		}
@@ -91,6 +92,12 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 		{"StopLapsedRun", changes, func(s *Store, org int64) any { return s.StopLapsedRun(org, run.ID, lease, now) }},
 		{"DropKeyClaims", changes, func(s *Store, org int64) any { return s.DropKeyClaims(org, task.ID, key.ID) }},
 		{"VerifySSODomain", changes, func(s *Store, org int64) any { return s.VerifySSODomain(org, domain.ID, now) }},
+		{"RemoveSSODomain", changes, func(s *Store, org int64) any { return s.RemoveSSODomain(org, domain.Domain) }},
+		{"CompanyNotes", int64(0), func(s *Store, org int64) any {
+			_, total, err := s.CompanyNotes(org, note.CompanyID, 0, 10)
+			return answer(total, err)
+		}},
+		{"AgentNameTaken", false, func(s *Store, org int64) any { return answer(s.AgentNameTaken(org, agent.Name, 0)) }},
 		{"SkipMail", changes, func(s *Store, org int64) any { return s.SkipMail(org, queued.ID, "skipped") }},
 		{"ClaimMail", false, func(s *Store, org int64) any { return answer(s.ClaimMail(org, queued.ID, queued.Address)) }},
 		{"SettleMail", changes, func(s *Store, org int64) any { return s.SettleMail(org, sent.ID, MailUnknown, "unknown") }},

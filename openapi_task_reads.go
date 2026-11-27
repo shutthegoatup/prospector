@@ -39,11 +39,8 @@ func (s apiServer) ListTasks(ctx context.Context, in api.ListTasksRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	var open, all int64
-	if err := s.a.s.in(q.Org.ID).Model(&Task{}).Where("closed_at is null").Count(&open).Error; err != nil {
-		return nil, err
-	}
-	if err := s.a.s.in(q.Org.ID).Model(&Task{}).Count(&all).Error; err != nil {
+	open, all, err := s.a.s.TaskCounts(q.Org.ID)
+	if err != nil {
 		return nil, err
 	}
 	out := api.ListTasks200JSONResponse{Headers: api.ListTasks200ResponseHeaders{Link: nextLink(ctx, next)}}
