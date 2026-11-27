@@ -16,3 +16,7 @@ type customerStore = onboarding.CustomerStore
 type onboardingStore = onboarding.OnboardingStore
 
 var errNoCustomer = onboarding.ErrNoCustomer
+
+type onboardingAPI = onboarding.OnboardingAPI
+
+var errNoCustomerMail = onboarding.ErrNoCustomerMail

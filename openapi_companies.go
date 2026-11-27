@@ -91,7 +91,7 @@ func (s apiServer) GetCompanyOverview(ctx context.Context, in api.GetCompanyOver
 	if err != nil {
 		return nil, err
 	}
-	onboardings, err := s.onboardings(org, c.ID)
+	onboardings, err := s.Onboardings(org, c.ID)
 	if err != nil {
 		return nil, err
 	}

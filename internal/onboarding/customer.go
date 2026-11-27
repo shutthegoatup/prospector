@@ -84,4 +84,6 @@ type CustomerInvite struct {
 
 // CustomerActor is who a step says finished it when the customer marked it themselves.
 // A fixed word, not their name: the person is on the history entry, which erasure removes.
-const CustomerActor = "customer"
+const CustomerActor = store.CustomerActor
+
+var ErrNoCustomerMail = say.New("mail isn't set up, so the link can't be sent: an owner sets a mail server in Settings, and the server needs PROSPECTOR_URL")
