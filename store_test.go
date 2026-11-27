@@ -351,7 +351,7 @@ func TestAPIKeys(t *testing.T) {
 	s, o, srv, _ := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	readOnly, _, _ := s.CreateKey(o.ID, "reader", []string{"read"}, "test")
-	writer, _, _ := s.CreateKey(o.ID, "bot", []string{"read", "research:write"}, "test")
+	writer, writerKey, _ := s.CreateKey(o.ID, "bot", []string{"read", "research:write"}, "test")
 	betaKey, _, _ := s.CreateKey(other.ID, "beta-bot", []string{"read", "research:write"}, "test")
 	api := srv.URL + "/o/alpha/api/v1/"
 	keyed := func(key string) *http.Client {
@@ -376,9 +376,7 @@ func TestAPIKeys(t *testing.T) {
 	if code, body := call(t, keyed(readOnly), "GET", api+"search?q=fjord", "", nil); code != http.StatusOK || !strings.Contains(body, "Fjordline") {
 		t.Fatalf("search: %d %s", code, body)
 	}
-	var keys []APIKey
-	s.in(o.ID).Find(&keys)
-	if err := s.RevokeKey(o.ID, keys[1].ID); err != nil {
+	if err := s.RevokeKey(o.ID, writerKey.ID); err != nil {
 		t.Fatal(err)
 	}
 	if code, _ := call(t, keyed(writer), "GET", api+"due", "", nil); code != http.StatusUnauthorized {
