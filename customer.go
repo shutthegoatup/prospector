@@ -33,38 +33,6 @@ const (
 	customerCookie = "customer"
 )
 
-// CustomerGrant lets one contact see one onboarding.
-type CustomerGrant struct {
-	ID           int64      `gorm:"primaryKey" json:"id"`
-	OrgID        int64      `gorm:"uniqueIndex:idx_customer_grant,priority:1;not null" json:"-"`
-	OnboardingID int64      `gorm:"uniqueIndex:idx_customer_grant,priority:2;not null" json:"onboarding_id"`
-	ContactID    int64      `gorm:"uniqueIndex:idx_customer_grant,priority:3;index;not null" json:"contact_id"`
-	InvitedBy    string     `gorm:"not null;default:''" json:"invited_by"`
-	CreatedAt    time.Time  `json:"created_at"`
-	RevokedAt    *time.Time `json:"revoked_at"`
-}
-
-// CustomerLink is a mailed link, stored as its hash. It opens the page once.
-type CustomerLink struct {
-	ID        int64  `gorm:"primaryKey"`
-	OrgID     int64  `gorm:"index;not null"`
-	GrantID   int64  `gorm:"index;not null"`
-	TokenHash string `gorm:"uniqueIndex;not null"`
-	ExpiresAt time.Time
-	UsedAt    *time.Time
-	CreatedAt time.Time
-}
-
-// CustomerSession is one browser the page was opened in, stored as its cookie's hash.
-type CustomerSession struct {
-	ID        int64  `gorm:"primaryKey"`
-	OrgID     int64  `gorm:"index;not null"`
-	GrantID   int64  `gorm:"index;not null"`
-	TokenHash string `gorm:"uniqueIndex;not null"`
-	ExpiresAt time.Time
-	CreatedAt time.Time
-}
-
 var errNoCustomer = errors.New("that link doesn't open anything: it may have been withdrawn")
 
 // CustomerAccess is a grant with everything it stands on. It exists only while all of
@@ -93,11 +61,7 @@ func invitable(o *Org, ob Onboarding, c Contact) error {
 	if _, err := mail.ParseAddress(strings.TrimSpace(deref(c.Email))); err != nil {
 		return errors.New("they have no single email address to send the link to")
 	}
-	return o.Settings.listed(deref(c.Email), deref(c.Linkedin))
-}
-
-func (l CustomerLink) opens() bool {
-	return l.UsedAt == nil && l.ExpiresAt.After(time.Now())
+	return o.Settings.Listed(deref(c.Email), deref(c.Linkedin))
 }
 
 var errLinkTooSoon = errors.New("a link was sent a moment ago: it can take a minute to arrive")
@@ -215,7 +179,7 @@ func (a *App) customerLinkPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	state := "again"
-	if acc.Link.opens() {
+	if acc.Link.Opens() {
 		state = "open"
 	}
 	a.customerRender(w, r, http.StatusOK, CustomerView{State: state, Token: token, Org: acc.Org.Name})

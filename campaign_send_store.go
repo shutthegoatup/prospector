@@ -131,7 +131,7 @@ func (s *outreachStore) SendCampaign(o *Org, id int64, actor string) (*Campaign,
 		if err := tx.Where("org_id = ? and id = ?", o.ID, id).First(&c).Error; err != nil {
 			return err
 		}
-		if err := c.fits(); err != nil {
+		if err := c.Fits(); err != nil {
 			return err
 		}
 		w, err := s.audienceWork(o)

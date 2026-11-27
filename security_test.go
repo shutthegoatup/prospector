@@ -647,7 +647,7 @@ func TestNeverContactEntries(t *testing.T) {
 		{"other.example, larkmoor.example", email, "", true},
 		{"", email, profile, false},
 	} {
-		got := OrgSettings{NeverContact: c.entry}.listed(c.email, c.link) != nil
+		got := OrgSettings{NeverContact: c.entry}.Listed(c.email, c.link) != nil
 		if got != c.listed {
 			t.Errorf("entry %q against %q %q: listed = %v, want %v", c.entry, c.email, c.link, got, c.listed)
 		}

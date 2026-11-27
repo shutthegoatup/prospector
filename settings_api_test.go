@@ -61,7 +61,7 @@ func TestSettingsChangeThroughTheAPIOnlyWhatIsSent(t *testing.T) {
 		t.Fatalf("changing only the enquiry sites: %d %s", code, body)
 	}
 	saved := must(s.OrgBySlug("alpha"))
-	if !saved.Settings.takesEnquiriesFrom("https://www.alpha.example") || saved.Settings.NeverContact != "rival.example" {
+	if !saved.Settings.TakesEnquiriesFrom("https://www.alpha.example") || saved.Settings.NeverContact != "rival.example" {
 		t.Fatalf("what was left out should stay as it was: %+v", saved.Settings)
 	}
 	if activity, _ := s.AgentActivity(o.ID, 1); len(activity) != 1 || activity[0].Actor != "robot" || activity[0].Action != "settings:change" || activity[0].Value != "enquiry_sites" {

@@ -15,7 +15,7 @@ func TestOnboardingStepsAreReadALineEach(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []StepPlan{{"Name a project lead", StepTheirs, 2}, {"Send your product files", StepTheirs, 7}, {"Kick-off call", StepOurs, 10}, {"Go live", StepOurs, -1}}
+	want := []StepPlan{{Name: "Name a project lead", Who: StepTheirs, Days: 2}, {Name: "Send your product files", Who: StepTheirs, Days: 7}, {Name: "Kick-off call", Who: StepOurs, Days: 10}, {Name: "Go live", Who: StepOurs, Days: -1}}
 	if len(plan) != len(want) {
 		t.Fatalf("read %d steps, want %d: %+v", len(plan), len(want), plan)
 	}
@@ -26,7 +26,7 @@ func TestOnboardingStepsAreReadALineEach(t *testing.T) {
 	}
 	// A colon in a step's own name isn't who does it, and a number in it isn't its days.
 	odd, err := OrgSettings{OnboardingSteps: "Call them: agree 3 sites\nTHEM : Sign, 0 day"}.Onboarding()
-	if err != nil || len(odd) != 2 || odd[0] != (StepPlan{"Call them: agree 3 sites", StepOurs, -1}) || odd[1] != (StepPlan{"Sign", StepTheirs, 0}) {
+	if err != nil || len(odd) != 2 || odd[0] != (StepPlan{Name: "Call them: agree 3 sites", Who: StepOurs, Days: -1}) || odd[1] != (StepPlan{Name: "Sign", Who: StepTheirs, Days: 0}) {
 		t.Errorf("odd lines read as %+v (%v)", odd, err)
 	}
 	for why, text := range map[string]string{"no name": "them:, 3 days", "three years": "Go live, 1000 days", "too many": strings.Repeat("Step\n", 41)} {

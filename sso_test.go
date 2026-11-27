@@ -948,15 +948,15 @@ func TestGoogleWorkspaceMustHoldTheAddress(t *testing.T) {
 func TestSingleSignOnIsAskedAgainAfterADay(t *testing.T) {
 	t.Parallel()
 	sess := &Session{Limited: true}
-	sess.prove(3, time.Now().Add(-proofLife-time.Minute))
-	sess.prove(7, time.Now().Add(-time.Hour))
+	sess.Prove(3, time.Now().Add(-proofLife-time.Minute))
+	sess.Prove(7, time.Now().Add(-time.Hour))
 	if sess.Proves(3) || sess.Opens(3) {
 		t.Fatal("going through the provider more than a day ago still counts")
 	}
 	if !sess.Proves(7) || !sess.Opens(7) {
 		t.Fatal("going through the provider an hour ago doesn't count")
 	}
-	sess.prove(3, time.Now())
+	sess.Prove(3, time.Now())
 	if !sess.Proves(3) || !sess.Proves(7) {
 		t.Fatalf("going through it again: %q", sess.SSOOrgs)
 	}

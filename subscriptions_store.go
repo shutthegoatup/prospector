@@ -55,7 +55,7 @@ func (s *subscriptionStore) AddSubscription(org int64, in SubscriptionIn, actor 
 		if err := tx.First(&o, org).Error; err != nil {
 			return err
 		}
-		sub = Subscription{OrgID: org, CompanyID: c.ID, Name: in.Name, Amount: amount, Currency: o.Settings.withDefaults().Currency,
+		sub = Subscription{OrgID: org, CompanyID: c.ID, Name: in.Name, Amount: amount, Currency: o.Settings.WithDefaults().Currency,
 			Per: in.Per, Start: in.Start, TermMonths: in.TermMonths, Then: in.Then, NoticeDays: in.NoticeDays}
 		if err := tx.Create(&sub).Error; err != nil {
 			return err
@@ -113,7 +113,7 @@ func (s *subscriptionStore) changeSubscription(tx *gorm.DB, org, id int64, field
 				if err := tx.First(&o, org).Error; err != nil {
 					return err
 				}
-				updates["currency"] = o.Settings.withDefaults().Currency
+				updates["currency"] = o.Settings.WithDefaults().Currency
 			}
 		case "per":
 			if value != PerMonth && value != PerYear {
@@ -294,7 +294,7 @@ func (s *subscriptionStore) StartRenewal(org, subscription, contact int64, actor
 			if err := tx.First(&o, org).Error; err != nil {
 				return err
 			}
-			currency = o.Settings.withDefaults().Currency
+			currency = o.Settings.WithDefaults().Currency
 		}
 		closes := st.TermEnd
 		if st.Ends != "" {

@@ -147,7 +147,7 @@ func (s *identityStore) FrontFormOff(base string) string {
 		return fmt.Sprintf("PROSPECTOR_URL isn't set, so the form shows only at an address the %q organisation lists, and it %s; %s",
 			frontOrgSlug, listed, fix)
 	}
-	if !o.Settings.takesEnquiriesFrom(browserOrigin(base)) {
+	if !o.Settings.TakesEnquiriesFrom(browserOrigin(base)) {
 		return fmt.Sprintf("the %q organisation %s, not %s; %s", frontOrgSlug, listed, browserOrigin(base), fix)
 	}
 	return ""
@@ -301,14 +301,14 @@ func (s *identityStore) NewSession(user, ssoOrg int64) (string, error) {
 	sess := &Session{TokenHash: s.keys.lookup(sessions, token), UserID: user, ExpiresAt: time.Now().Add(sessionLife)}
 	if ssoOrg != 0 {
 		sess.Limited = true
-		sess.prove(ssoOrg, time.Now())
+		sess.Prove(ssoOrg, time.Now())
 	}
 	return token, s.db.Create(sess).Error
 }
 
 // AddProof records that a session already open has now been through org's own sign-in too.
 func (s *identityStore) AddProof(sess *Session, org int64) error {
-	sess.prove(org, time.Now())
+	sess.Prove(org, time.Now())
 	return s.db.Model(sess).Update("sso_orgs", sess.SSOOrgs).Error
 }
 

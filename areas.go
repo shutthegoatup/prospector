@@ -1,14 +1,12 @@
 package main
 
 import (
-	"slices"
 	"strings"
 )
 
 const (
 	areaSales   = "sales"
 	areaSupport = "support"
-	areaAny     = "any"
 )
 
 // Areas split a team's work. Everyone reads everything; changing something takes
@@ -43,16 +41,6 @@ var opArea = map[string]string{
 	"AddOffering": "", "ChangeOffering": "", "RemoveOffering": "",
 	"AddMember": "", "ChangeMember": "", "RemoveMember": "", "GetMailServer": "", "SaveMailServer": "", "TestMailServer": "", "MakeBounceHook": "", "DropBounceHook": "",
 	"GetSSO": "", "SaveSSO": "", "ListSSODomains": "", "AddSSODomain": "", "RemoveSSODomain": "", "VerifySSODomain": "", "ExportOrg": "",
-}
-
-func (m *Membership) Works(area string) bool {
-	if m == nil {
-		return false
-	}
-	if area == areaAny {
-		return m.Role == "owner" || strings.TrimSpace(m.Areas) != ""
-	}
-	return area == "" || m.Role == "owner" || slices.Contains(strings.Fields(m.Areas), area)
 }
 
 // landing is the page someone starts on: Today is outreach, so someone who works only

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -116,39 +115,6 @@ type Member struct {
 
 var errWrongLogin = errors.New("wrong email or password")
 
-// proofLife is how long going through an organisation's provider counts for. After it
-// the provider is asked again, so somebody it has since turned away is out within a day.
-const proofLife = 24 * time.Hour
-
-// proofs reads SSOOrgs: each organisation with when its proof runs out, as ",3:1795600000,".
-func (sess *Session) proofs() map[int64]int64 {
-	out := map[int64]int64{}
-	for _, part := range strings.Split(sess.SSOOrgs, ",") {
-		org, until, ok := strings.Cut(part, ":")
-		o, err1 := strconv.ParseInt(org, 10, 64)
-		u, err2 := strconv.ParseInt(until, 10, 64)
-		if ok && err1 == nil && err2 == nil {
-			out[o] = u
-		}
-	}
-	return out
-}
-
-func (sess *Session) prove(org int64, now time.Time) {
-	proofs := sess.proofs()
-	proofs[org] = now.Add(proofLife).Unix()
-	sess.SSOOrgs = ","
-	for o, until := range proofs {
-		if until > now.Unix() {
-			sess.SSOOrgs += fmt.Sprintf("%d:%d,", o, until)
-		}
-	}
-}
-
-func (sess *Session) Proves(org int64) bool { return sess.proofs()[org] > time.Now().Unix() }
-
-func (sess *Session) Opens(org int64) bool { return !sess.Limited || sess.Proves(org) }
-
 // Scopes an API key can carry. None can change members or keys or reach another org; only enquiries:reply, customers:invite and campaigns:send send mail, and only import skips review.
 var Scopes = []struct{ Name, What string }{
 	{"read", "search companies and people, read what's due and the tasks people wrote, read deals, subscriptions, onboardings and enquiries with what was said in answering them, and read the organisation's settings, its never-contact list and agent guidance included, and what it sells with where each company stands for each"},
@@ -183,15 +149,6 @@ var Scopes = []struct{ Name, What string }{
 func validScope(s string) bool {
 	for _, sc := range Scopes {
 		if sc.Name == s {
-			return true
-		}
-	}
-	return false
-}
-
-func (k *APIKey) Has(scope string) bool {
-	for _, s := range strings.Split(k.Scopes, " ") {
-		if s == scope {
 			return true
 		}
 	}

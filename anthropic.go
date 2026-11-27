@@ -19,10 +19,6 @@ import (
 
 // An agent reaches its model one of two ways: any OpenAI-compatible endpoint, or
 // Anthropic's own API through its SDK.
-const (
-	kindOpenAI    = "openai"
-	kindAnthropic = "anthropic"
-)
 
 var AgentKinds = []struct{ Key, Label string }{
 	{kindOpenAI, "OpenAI-compatible"},

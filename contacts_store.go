@@ -22,7 +22,7 @@ func (s *prospectingStore) ContactByID(org, id int64) (*Contact, error) {
 // People on the never-contact list are left out here rather than marked, so the list
 // and the queue can't drift apart: listing someone hides them, unlisting brings them back.
 func (s *prospectingStore) Due(org int64, step string, now time.Time, set OrgSettings) ([]Contact, error) {
-	set = set.withDefaults()
+	set = set.WithDefaults()
 	var rows []Contact
 	q := s.in(org).Model(&Contact{}).Where(companyNotRejected)
 	switch step {
@@ -50,7 +50,7 @@ func (s *prospectingStore) Due(org int64, step string, now time.Time, set OrgSet
 	}
 	due := rows[:0]
 	for _, c := range rows {
-		if set.listed(deref(c.Email), deref(c.Linkedin)) == nil {
+		if set.Listed(deref(c.Email), deref(c.Linkedin)) == nil {
 			due = append(due, c)
 		}
 	}
@@ -74,7 +74,7 @@ func (s *prospectingStore) mark(org, id int64, step, date string, who Actor, not
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
 			return missing(err, "no contact %d", id)
 		}
-		if err := c.canMark(); err != nil {
+		if err := c.CanMark(); err != nil {
 			return err
 		}
 		updates := map[string]any{column: date}
@@ -128,7 +128,7 @@ func (s *prospectingStore) set(tx *gorm.DB, org, id int64, field, value, actor s
 		return missing(err, "no contact %d", id)
 	}
 	if field == "stage" {
-		if err := c.canEnterStage(value); err != nil {
+		if err := c.CanEnterStage(value); err != nil {
 			return err
 		}
 	}

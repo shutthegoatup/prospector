@@ -492,7 +492,7 @@ func (s *researchStore) taskViews(tx *gorm.DB, org int64, tasks []Task, now time
 		for _, id := range slices.Sorted(maps.Keys(companySince)) {
 			if c, here := companies[id]; here {
 				v.Companies = append(v.Companies, TaskCompany{ID: c.ID, Name: c.Name, Stage: c.Stage, Since: companySince[id], Held: heldAs[id]})
-				if o.Settings.coversCompany(c.Domain) {
+				if o.Settings.CoversCompany(c.Domain) {
 					v.Companies[len(v.Companies)-1].Held = heldNeverContact
 				}
 			}
@@ -868,7 +868,7 @@ func (s *researchStore) offeringOf(org, id int64) (*Offering, error) {
 }
 
 func (s *researchStore) AddOffering(org int64, o Offering, actor string) (*Offering, error) {
-	if err := o.check(); err != nil {
+	if err := o.Check(); err != nil {
 		return nil, err
 	}
 	o.ID, o.OrgID, o.UpdatedBy = 0, org, actor
@@ -900,7 +900,7 @@ func (s *researchStore) ChangeOffering(org, id int64, change func(*Offering), ac
 		}
 		had := o.HasRoles
 		change(o)
-		if err := o.check(); err != nil {
+		if err := o.Check(); err != nil {
 			return err
 		}
 		if had && !o.HasRoles {

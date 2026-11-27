@@ -455,7 +455,7 @@ func (s *prospectingStore) PickContactFor(org int64, o *Org, id int64, offeringI
 			}
 			c.OfferingID = *offeringID
 		}
-		template := o.Settings.withDefaults().NoteTemplate
+		template := o.Settings.WithDefaults().NoteTemplate
 		var offering *Offering
 		if c.OfferingID != 0 {
 			var err error
@@ -704,7 +704,7 @@ func (s *prospectingStore) QuickAddPerson(o *Org, in QuickAdd, actor string) (*C
 		first := firstField(in.Name)
 		note := strings.TrimSpace(in.Note)
 		if note == "" {
-			note = fill(o.Settings.withDefaults().NoteTemplate, first, maker, o.Name)
+			note = fill(o.Settings.WithDefaults().NoteTemplate, first, maker, o.Name)
 		}
 		person := in.Name
 		if in.Title != "" {
@@ -733,7 +733,7 @@ func (s *prospectingStore) QuickAddPerson(o *Org, in QuickAdd, actor string) (*C
 
 // Allowed applies the org's never-contact list to an email address or link.
 func (s *prospectingStore) Allowed(o *Org, email, link string) error {
-	return o.Settings.listed(email, link)
+	return o.Settings.Listed(email, link)
 }
 
 // NeverContactCovers names the people the list is keeping out of the outreach queues:
@@ -746,7 +746,7 @@ func (s *prospectingStore) NeverContactCovers(o *Org) []string {
 	_ = logged(s.in(o.ID).Where(openContacts).Where(companyNotRejected).Order("id").Find(&people))
 	var names []string
 	for _, p := range people {
-		if o.Settings.listed(deref(p.Email), deref(p.Linkedin)) != nil {
+		if o.Settings.Listed(deref(p.Email), deref(p.Linkedin)) != nil {
 			names = append(names, displayName(p))
 		}
 	}

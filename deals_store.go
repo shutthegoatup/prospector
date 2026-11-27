@@ -44,7 +44,7 @@ func (s *dealStore) setDeal(tx *gorm.DB, org, contact int64, field, value, actor
 	}
 	// A deal already valued keeps its currency: the setting changing mustn't turn
 	// pounds into euros the next time someone corrects the figure.
-	currency := o.Settings.withDefaults().Currency
+	currency := o.Settings.WithDefaults().Currency
 	if d.Amount != 0 && d.Currency != "" {
 		currency = d.Currency
 	}
@@ -130,7 +130,7 @@ func (s *dealStore) StartDeal(org, contact int64, kind, actor string) (*Deal, er
 			Select("coalesce(max(seq), 0)").Scan(&last).Error; err != nil {
 			return err
 		}
-		d = Deal{OrgID: org, ContactID: contact, Seq: last + 1, Kind: kind, Stage: Stages[0].Key, Currency: o.Settings.withDefaults().Currency}
+		d = Deal{OrgID: org, ContactID: contact, Seq: last + 1, Kind: kind, Stage: Stages[0].Key, Currency: o.Settings.WithDefaults().Currency}
 		if err := tx.Create(&d).Error; err != nil {
 			return err
 		}
@@ -197,7 +197,7 @@ func (s *dealStore) changeDeal(tx *gorm.DB, org, id int64, field, value, actor s
 			if err := tx.First(&o, org).Error; err != nil {
 				return err
 			}
-			currency = o.Settings.withDefaults().Currency
+			currency = o.Settings.WithDefaults().Currency
 		}
 		updates, logged, err := dealChange(tx, org, d, currency, field, value)
 		if err != nil {
