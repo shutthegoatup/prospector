@@ -8,6 +8,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/say"
@@ -288,7 +289,7 @@ func (s *EnquiryStore) ConverseEnquiry(o *store.Org, id int64, actor string) (*s
 			if err != nil {
 				return nil, err
 			}
-			added, err := s.CRM.QuickAddPerson(o, prospecting.QuickAdd{Name: senderName(e), Company: company, Email: e.Email}, actor)
+			added, err := s.CRM.QuickAddPerson(o, crm.QuickAdd{Name: senderName(e), Company: company, Email: e.Email}, actor)
 			if err != nil {
 				return nil, err
 			}

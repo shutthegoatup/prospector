@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -16,7 +16,7 @@ import (
 func configuratorFacts(url, platform, builtBy string) []FactIn {
 	url, platform, builtBy = strings.TrimSpace(url), strings.TrimSpace(platform), strings.TrimSpace(builtBy)
 	source := ""
-	if prospecting.HttpURL.MatchString(url) {
+	if crm.HttpURL.MatchString(url) {
 		source = url
 	}
 	var out []FactIn

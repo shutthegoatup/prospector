@@ -89,11 +89,6 @@ func (s *ProspectingStore) KeepFind(org int64, who store.Actor, contact int64, f
 	})
 }
 
-// Erased says so if an address or a profile belongs to someone erased on request.
-func (s *CRMStore) Erased(org int64, email, link string) error {
-	return ErasedIn(s.DB, org, "", "", email, link)
-}
-
 // AskedLately is when a vendor was last asked for this field of this person, if it
 // was recently enough that asking again would only spend a lookup.
 func (s *ProspectingStore) AskedLately(org, contact int64, field, kind string) *time.Time {

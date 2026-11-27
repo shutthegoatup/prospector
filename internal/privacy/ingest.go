@@ -5,6 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/store"
@@ -26,7 +27,7 @@ func CompetitorHold(r CompanyRow) *string {
 func LinkCompanies(tx *gorm.DB, org int64, rows []CompanyRow) error {
 	byStem := map[string]int64{}
 	for _, r := range rows {
-		c, created, err := prospecting.EnsureCompany(tx, org, store.Company{Name: r["name"], Country: r["country"], Segment: r["segment"],
+		c, created, err := crm.EnsureCompany(tx, org, store.Company{Name: r["name"], Country: r["country"], Segment: r["segment"],
 			Fit: r["priority"], Stage: prospecting.CompanyQualified,
 			Why: r["fit_reason"], Domain: store.DomainOf(r["website"]), FoundBy: "import", Hold: CompetitorHold(r)})
 		if err != nil {
@@ -53,7 +54,7 @@ func LinkCompanies(tx *gorm.DB, org int64, rows []CompanyRow) error {
 			if store.CompanyName(maker) == "" {
 				continue
 			}
-			c, _, err := prospecting.EnsureCompany(tx, org, store.Company{Name: store.CompanyName(maker), Stage: prospecting.CompanyQualified, FoundBy: "import"})
+			c, _, err := crm.EnsureCompany(tx, org, store.Company{Name: store.CompanyName(maker), Stage: prospecting.CompanyQualified, FoundBy: "import"})
 			if err != nil {
 				return err
 			}

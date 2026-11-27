@@ -13,6 +13,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/paging"
@@ -62,7 +63,7 @@ func (s *ResearchStore) CreateTaskWanting(org, offering int64, want int, title, 
 	t := store.Task{OrgID: org, Title: title, CreatedBy: by, OfferingID: offering, Want: want}
 	return &t, s.DB.Transaction(func(tx *gorm.DB) error {
 		if offering != 0 {
-			if _, err := prospecting.HeldOffering(tx, org, offering); err != nil {
+			if _, err := crm.HeldOffering(tx, org, offering); err != nil {
 				return err
 			}
 		}
@@ -198,7 +199,7 @@ func (s *ResearchStore) SetTaskClosed(org, task int64, closed bool, by string) e
 			return nil
 		}
 		if !closed && t.OfferingID != 0 {
-			if _, err := prospecting.HeldOffering(tx, org, t.OfferingID); err != nil {
+			if _, err := crm.HeldOffering(tx, org, t.OfferingID); err != nil {
 				var gone store.NotFound
 				if errors.As(err, &gone) {
 					return store.Conflict{Text: say.New("the offering this task was finding companies for has been removed: start a new task instead")}
@@ -901,7 +902,7 @@ func (s *ResearchStore) ChangeOffering(org, id int64, change func(*store.Offerin
 			return err
 		}
 		var err error
-		if o, err = prospecting.HeldOffering(tx, org, id); err != nil {
+		if o, err = crm.HeldOffering(tx, org, id); err != nil {
 			return err
 		}
 		had := o.HasRoles
@@ -943,7 +944,7 @@ func (s *ResearchStore) RemoveOffering(org, id int64, actor string) error {
 		if err := tx.Model(&store.Company{}).Where("org_id = ? and found_for = ?", org, id).Update("found_for", 0).Error; err != nil {
 			return err
 		}
-		o, err := prospecting.HeldOffering(tx, org, id)
+		o, err := crm.HeldOffering(tx, org, id)
 		if err != nil {
 			return err
 		}
@@ -983,7 +984,7 @@ func (s *ResearchStore) JudgeCompany(org, offering, company int64, stage, fit, r
 		return say.Errorf("unknown stage %q", stage)
 	}
 	return s.DB.Transaction(func(tx *gorm.DB) error {
-		o, err := prospecting.HeldOffering(tx, org, offering)
+		o, err := crm.HeldOffering(tx, org, offering)
 		if err != nil {
 			return err
 		}
@@ -994,7 +995,7 @@ func (s *ResearchStore) JudgeCompany(org, offering, company int64, stage, fit, r
 		if n == 0 {
 			return store.NoSuch("no company %d", company)
 		}
-		if byRoles, err := prospecting.JudgedByRoles(tx, org, o, company); err != nil || byRoles {
+		if byRoles, err := crm.JudgedByRoles(tx, org, o, company); err != nil || byRoles {
 			if byRoles {
 				return store.Conflict{Text: say.Errorf("this company has roles for %s, and where it stands follows them: pursue or junk its roles", o.Name)}
 			}
@@ -1106,7 +1107,7 @@ func (s *ResearchStore) addRole(tx *gorm.DB, org int64, o *store.Offering, compa
 		}
 		return had, true, err
 	}
-	if _, err := prospecting.PutUpForReview(tx, org, o.ID, company, who.Name); err != nil {
+	if _, err := crm.PutUpForReview(tx, org, o.ID, company, who.Name); err != nil {
 		return nil, false, err
 	}
 	var v store.Verdict
@@ -1226,7 +1227,7 @@ func (s *ResearchStore) JudgeRole(org, id int64, stage, reason, actor string) (*
 		if err := store.Hold(tx, &store.Company{}, org, r.CompanyID); err != nil {
 			return err
 		}
-		o, err := prospecting.HeldOffering(tx, org, r.OfferingID)
+		o, err := crm.HeldOffering(tx, org, r.OfferingID)
 		if err != nil {
 			return err
 		}
@@ -1340,7 +1341,7 @@ func (s *ResearchStore) AgentAddCompany(org int64, who store.Actor, in AddCompan
 	if err != nil {
 		return nil, err
 	}
-	if in.ConfiguratorURL != "" && !prospecting.HttpURL.MatchString(strings.TrimSpace(in.ConfiguratorURL)) {
+	if in.ConfiguratorURL != "" && !crm.HttpURL.MatchString(strings.TrimSpace(in.ConfiguratorURL)) {
 		return nil, say.New("configurator_url must be an http(s) link")
 	}
 	for _, f := range in.Facts {
@@ -1365,7 +1366,7 @@ func (s *ResearchStore) AgentAddCompany(org int64, who store.Actor, in AddCompan
 		}
 		created := false
 		if c == nil {
-			c, created, err = prospecting.EnsureCompany(tx, org, store.Company{Name: in.Name, Domain: domain, Country: in.Country,
+			c, created, err = crm.EnsureCompany(tx, org, store.Company{Name: in.Name, Domain: domain, Country: in.Country,
 				Segment: in.Segment, Fit: in.Fit, Why: in.Why, FoundBy: who.Name, Stage: prospecting.CompanyReview, FoundFor: who.Offering})
 			if err != nil {
 				return err
@@ -1376,10 +1377,10 @@ func (s *ResearchStore) AgentAddCompany(org int64, who store.Actor, in AddCompan
 			return err
 		}
 		if who.Offering != 0 {
-			if out.Stage, err = prospecting.PutUpForReview(tx, org, who.Offering, c.ID, who.Name); err != nil {
+			if out.Stage, err = crm.PutUpForReview(tx, org, who.Offering, c.ID, who.Name); err != nil {
 				return err
 			}
-		} else if err := prospecting.FoundForOwn(tx, org, c.ID); err != nil {
+		} else if err := crm.FoundForOwn(tx, org, c.ID); err != nil {
 			return err
 		}
 		if !created {
@@ -1459,13 +1460,13 @@ func (s *ResearchStore) AgentAddContact(o *store.Org, who store.Actor, in prospe
 	if strings.TrimSpace(in.Name) == "" {
 		return nil, say.New("name is required")
 	}
-	if !prospecting.HttpURL.MatchString(strings.TrimSpace(in.SourceURL)) {
+	if !crm.HttpURL.MatchString(strings.TrimSpace(in.SourceURL)) {
 		return nil, say.New("source_url is required and must start with http")
 	}
 	if in.EmailStatus != "" && in.EmailStatus != "verified" && in.EmailStatus != "guess" {
 		return nil, say.New("email_status is verified, guess or empty")
 	}
-	if in.Linkedin != "" && !prospecting.HttpURL.MatchString(strings.TrimSpace(in.Linkedin)) {
+	if in.Linkedin != "" && !crm.HttpURL.MatchString(strings.TrimSpace(in.Linkedin)) {
 		return nil, say.New("linkedin must be an https link")
 	}
 	if err := s.CRM.Allowed(o, in.Email, in.Linkedin); err != nil {
@@ -1479,7 +1480,7 @@ func (s *ResearchStore) AgentAddContact(o *store.Org, who store.Actor, in prospe
 	if err != nil {
 		return nil, err
 	}
-	if err := prospecting.ErasedIn(s.DB, o.ID, in.Name, c.Name, in.Email, in.Linkedin); err != nil {
+	if err := crm.ErasedIn(s.DB, o.ID, in.Name, c.Name, in.Email, in.Linkedin); err != nil {
 		if errors.Is(err, store.ErrErased) {
 			s.Prospecting.Withheld(o.ID, who, WithheldErased)
 		}
@@ -1517,7 +1518,7 @@ func (s *ResearchStore) AgentAddContact(o *store.Org, who store.Actor, in prospe
 			out = AddContactOut{ID: p.ID, Status: p.Status, Existed: true, Suggested: waiting}
 			return s.matched(tx, o.ID, who, p.ID, &c.ID)
 		}
-		contact := store.Contact{OrgID: o.ID, Key: prospecting.UniqueKey(tx, o.ID, store.PersonKey(in.Name)), File: "added by " + who.Name,
+		contact := store.Contact{OrgID: o.ID, Key: crm.UniqueKey(tx, o.ID, store.PersonKey(in.Name)), File: "added by " + who.Name,
 			Person: &person, First: &first, Maker: &c.Name, CompanyID: &c.ID, Title: strings.TrimSpace(in.Title),
 			Email: store.NonEmpty(strings.TrimSpace(in.Email)), EmailStatus: in.EmailStatus, Linkedin: store.NonEmpty(strings.TrimSpace(in.Linkedin)),
 			Phone: store.NonEmpty(strings.TrimSpace(in.Phone)), Sources: store.Str(strings.TrimSpace(in.SourceURL)), Status: store.ContactSuggested, OfferingID: who.Offering}
