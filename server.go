@@ -121,20 +121,6 @@ func fail(w http.ResponseWriter, r *http.Request, err error, code int) {
 	http.Error(w, text.In(languageOf(r)), code)
 }
 
-func decode(w http.ResponseWriter, r *http.Request, v any) bool {
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<20)).Decode(v); err != nil {
-		if hasKey(r) {
-			writeProblem(w, r, http.StatusBadRequest, say.Errorf("bad request body: %s", err.Error()))
-		} else {
-			fail(w, r, fmt.Errorf("bad request body: %w", err), http.StatusBadRequest)
-		}
-		return false
-	}
-	// The answer's clock starts once the body is in, so a slow upload doesn't use it up.
-	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(answerLimit))
-	return true
-}
-
 func (a *App) secure(r *http.Request) bool {
 	return strings.HasPrefix(a.base, "https://") || r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 }
