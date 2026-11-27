@@ -387,15 +387,6 @@ func joinNonEmpty(sep string, parts ...string) string {
 	return strings.Join(out, sep)
 }
 
-func firstLine(s string) string { return strings.SplitN(s, "\n", 2)[0] }
-
-func prefixed(prefix, s string) string {
-	if s == "" {
-		return ""
-	}
-	return prefix + s
-}
-
 // safeHref lets only web links through, so a stored javascript: link (from an agent
 // or a teammate) can never run when clicked.
 func safeHref(u string) string {

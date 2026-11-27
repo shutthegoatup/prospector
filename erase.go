@@ -141,18 +141,3 @@ func forgetEvents(matching *gorm.DB) error {
 	}
 	return nil
 }
-
-// keptValue is what an event may still say once its person is gone: a stage, or the
-// day of a mark. Everything else held their details or free text about them.
-func keptValue(e Event) *string {
-	v := deref(e.Value)
-	switch {
-	case e.Action == "set:stage" && validStage(v):
-		return &v
-	case strings.HasPrefix(e.Action, "mark:") && len(v) >= 10:
-		if _, err := time.Parse("2006-01-02", v[:10]); err == nil {
-			return str(v[:10])
-		}
-	}
-	return nil
-}

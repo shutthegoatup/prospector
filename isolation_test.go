@@ -370,7 +370,9 @@ var saysNothingBack = map[string]bool{
 	"AddMember": true, "RemoveMember": true, "SetRole": true, "SetAreas": true, "SaveVoice": true, "SaveOrg": true, "ChangeSettings": true, "RevokeKey": true, "SetKeyScopes": true, "DeleteOrgMail": true,
 	// A webhook secret is new random words, and the others say yes or no of the caller's own.
 	"NewBounceHook": true, "DropBounceHook": true, "HasBounceHook": true,
-	"Mark": true, "MarkAs": true, "Withheld": true, "Update": true,
+	"Mark": true, "MarkAs": true, "Claim": true, "Withheld": true, "Update": true,
+	// Needs a task read for it; TestAnotherOrganisationCantClaimThroughATaskItWasHanded tries it.
+	"ClaimNext": true,
 	// A key and certificate of its own, made on first use; seal_test.go checks another organisation gets its own.
 	"SealKey": true, "SealDocument": true,
 
