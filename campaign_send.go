@@ -208,7 +208,7 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *mailer.Serve
 			log.Printf("campaign %d: checking a mail: %v", c.ID, why)
 			return false
 		}
-		return skip(because)
+		return skip(because.Error())
 	}
 	foot := c.Body + "\n\n-- \n" + o.Name + "\n" + strings.TrimSpace(o.Settings.PostalAddress) + "\n\n"
 	var token, unsubscribe, body string

@@ -47,15 +47,8 @@
     {
       "files": [
         "src/components/app/site.tsx",
-        "src/components/app/subscription.tsx",
         "src/pages/Agents.tsx",
-        "src/pages/Campaigns.tsx",
-        "src/pages/Conversations.tsx",
-        "src/pages/Enquiries.tsx",
-        "src/pages/Onboarding.tsx",
-        "src/pages/Prepare.tsx",
         "src/pages/Settings.tsx",
-        "src/pages/Subscriptions.tsx",
         "src/pages/Tasks.tsx",
         "src/pages/Task.tsx",
         "src/site/ApiReference.tsx",

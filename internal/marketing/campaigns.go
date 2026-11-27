@@ -92,8 +92,8 @@ type Recipient struct {
 	Name      string `json:"name"`
 	Company   string `json:"company"`
 	Address   string `json:"address"`
-	// LeftOut is empty for someone it goes to, and otherwise says why it doesn't.
-	LeftOut string `json:"left_out"`
+	// LeftOut is nil for someone it goes to, and otherwise says why it doesn't.
+	LeftOut *say.Text `json:"left_out"`
 }
 
 // audienceWork is what every campaign's audience is checked against, read once for a
@@ -106,18 +106,18 @@ type audienceWork struct {
 
 // LeftOutBecause says why someone is left out, for the reasons there are. Any other
 // error is a failure to check, and is not passed off as a reason.
-func LeftOutBecause(err error) (string, bool) {
+func LeftOutBecause(err error) (*say.Text, bool) {
 	switch {
 	case errors.Is(err, ErrSuppressed):
-		return "on the list not to be mailed", true
+		return say.New("on the list not to be mailed"), true
 	case errors.Is(err, ErrBounced):
-		return "mail to them bounced", true
+		return say.New("mail to them bounced"), true
 	case errors.Is(err, ErrComplained):
-		return "marked a mail as spam", true
+		return say.New("marked a mail as spam"), true
 	case errors.Is(err, store.ErrErased):
-		return "erased on request", true
+		return say.New("erased on request"), true
 	case errors.Is(err, store.ErrNeverContact):
-		return "on the never-contact list", true
+		return say.New("on the never-contact list"), true
 	}
-	return "", false
+	return nil, false
 }

@@ -40,10 +40,15 @@ export function clock(at: string) {
   return intl.formatTime(at, { hour: "2-digit", minute: "2-digit" });
 }
 
+// today is the reader's calendar date, as YYYY-MM-DD.
+export function today(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // onDay is a calendar date (YYYY-MM-DD), the same day wherever the reader is, with its
-// year unless that is the year of today (also YYYY-MM-DD).
-export function onDay(date: string, today?: string) {
-  const year = today && date.slice(0, 4) === today.slice(0, 4) ? undefined : "numeric";
+// year unless that is the year of now (YYYY-MM-DD, usually today).
+export function onDay(date: string, now?: string) {
+  const year = now && date.slice(0, 4) === now.slice(0, 4) ? undefined : "numeric";
   return intl.formatDate(date, { day: "numeric", month: "short", year, timeZone: "UTC" });
 }
 

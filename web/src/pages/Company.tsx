@@ -4,12 +4,12 @@ import { defineMessage, defineMessages, type MessageDescriptor, useIntl } from "
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, Meta, Pill, type Tone, usePageTitle, useRefresh } from "@/components/app";
-import { standingText, SubscriptionUpdate, termText, thens } from "@/components/app/subscription";
+import { standingText, SubscriptionUpdate, termText, thenLabel, thens } from "@/components/app/subscription";
 import { Placeholders, Text } from "@/components/app/skeleton";
-import { actor, stamp } from "@/lib/format";
+import { actor, stamp, today } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Pager, StageTag, usePages } from "@/pages/Companies";
-import { OnboardingCard, today } from "@/pages/Onboarding";
+import { OnboardingCard } from "@/pages/Onboarding";
 import { safeHref } from "@/lib/links";
 import { useOfferings } from "@/lib/offerings";
 import { useSession } from "@/session";
@@ -853,8 +853,8 @@ function Subscriptions({ c }: { c: Overview }) {
               <Eyebrow>{say(m.thenLabel)}</Eyebrow>
               <select name="then" className={select}>
                 {thens.map((t) => (
-                  <option key={t.key} value={t.key}>
-                    {t.label}
+                  <option key={t} value={t}>
+                    {thenLabel(t)}
                   </option>
                 ))}
               </select>

@@ -9,6 +9,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -170,7 +171,7 @@ func (s apiServer) ListAgentActivity(ctx context.Context, in api.ListAgentActivi
 	out.Body.Items, out.Body.NextCursor, out.Body.Total = []api.AgentEvent{}, next, total
 	for _, e := range events {
 		out.Body.Items = append(out.Body.Items, api.AgentEvent{At: e.At, Actor: e.Actor, Action: e.Action, Value: e.Value,
-			Text: historyText(HistoryItem{Action: e.Action, Value: e.Value})})
+			Text: historyText(HistoryItem{Action: e.Action, Value: e.Value}).In(request.LanguageFrom(ctx))})
 	}
 	return out, nil
 }

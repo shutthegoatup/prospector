@@ -183,13 +183,13 @@ func (s *OutreachStore) audience(o *store.Org, c store.Campaign, w *audienceWork
 		addr, err := store.BareAddress(store.Deref(p.Email))
 		switch {
 		case strings.TrimSpace(store.Deref(p.Email)) == "":
-			r.LeftOut = "no email address"
+			r.LeftOut = say.New("no email address")
 		case err != nil:
-			r.Address, r.LeftOut = store.Deref(p.Email), "not one email address"
+			r.Address, r.LeftOut = store.Deref(p.Email), say.New("not one email address")
 		default:
 			r.Address = addr
 			if first, twice := seen[addr]; twice {
-				r.LeftOut = "same address as " + first
+				r.LeftOut = say.Errorf("same address as %s", first)
 			} else if why := w.gate.WhyFor(c.Kind, addr, store.Deref(p.Linkedin)); why != nil {
 				because, known := LeftOutBecause(why)
 				if !known {
@@ -197,14 +197,14 @@ func (s *OutreachStore) audience(o *store.Org, c store.Campaign, w *audienceWork
 				}
 				r.LeftOut = because
 			} else if w.noMail[MailDomainOf(addr)] {
-				r.LeftOut = "its domain takes no mail"
+				r.LeftOut = say.New("its domain takes no mail")
 			} else {
 				seen[addr] = r.Name
 			}
 		}
 		out = append(out, r)
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].LeftOut == "" && out[j].LeftOut != "" })
+	sort.SliceStable(out, func(i, j int) bool { return out[i].LeftOut == nil && out[j].LeftOut != nil })
 	return out, nil
 }
 

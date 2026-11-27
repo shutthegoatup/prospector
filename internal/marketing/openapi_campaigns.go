@@ -125,7 +125,7 @@ func (s MarketingAPI) ListCampaigns(ctx context.Context, in api.ListCampaignsReq
 	}
 	out.Body.Items, out.Body.NextCursor = items, next
 	if err := s.App.Sendable(request.ReqFrom(ctx).Org); err != nil {
-		out.Body.NotReady = err.Error()
+		out.Body.NotReady = say.ErrorIn(err, request.LanguageFrom(ctx))
 	}
 	return out, nil
 }
@@ -189,14 +189,19 @@ func (s MarketingAPI) ListCampaignAudience(ctx context.Context, in api.ListCampa
 	out := api.ListCampaignAudience200JSONResponse{Headers: api.ListCampaignAudience200ResponseHeaders{Link: request.NextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor = []api.Recipient{}, next
 	for _, p := range people {
-		if p.LeftOut == "" {
+		if p.LeftOut == nil {
 			out.Body.Going++
 		} else {
 			out.Body.LeftOut++
 		}
 	}
+	lang := request.LanguageFrom(ctx)
 	for _, p := range page {
-		out.Body.Items = append(out.Body.Items, api.Recipient{ContactId: p.ContactID, Name: p.Name, Company: p.Company, Address: p.Address, LeftOut: p.LeftOut})
+		leftOut := ""
+		if p.LeftOut != nil {
+			leftOut = p.LeftOut.In(lang)
+		}
+		out.Body.Items = append(out.Body.Items, api.Recipient{ContactId: p.ContactID, Name: p.Name, Company: p.Company, Address: p.Address, LeftOut: leftOut})
 	}
 	return out, nil
 }

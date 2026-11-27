@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"net/http"
+
+	"github.com/shutthegoatup/prospector/internal/request"
 )
 
-type requestKey struct{}
+type requestKey = request.RequestKey
 
 // listURL hands each operation the address it was asked at, so a page of a list can
 // name the next one in its Link header, and the request, for an answer that names

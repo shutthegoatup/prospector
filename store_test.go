@@ -509,8 +509,8 @@ func TestAgentMarks(t *testing.T) {
 			h = append(h, it)
 		}
 	}
-	if len(h) != 1 || h[0].Actor != "agent:bot" || historyText(h[0]) != "marked not interested · Hannah Pryce: Allan says no" {
-		t.Fatalf("decline history: %+v %q", h, historyText(h[0]))
+	if len(h) != 1 || h[0].Actor != "agent:bot" || historyText(h[0]).Error() != "marked not interested · Hannah Pryce: Allan says no" {
+		t.Fatalf("decline history: %+v %q", h, historyText(h[0]).Error())
 	}
 }
 

@@ -1,4 +1,4 @@
-import { defineMessage, useIntl } from "react-intl";
+import { defineMessage, defineMessages, FormattedMessage, useIntl } from "react-intl";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect } from "react";
 import type { components } from "@/api";
@@ -6,25 +6,101 @@ import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, PageHead, Pill, type Tone, useRefresh, Whose } from "@/components/app";
 import { Bar, Loading, Placeholders } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
+import { intl } from "@/i18n";
+import { onDay } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/session";
 
 type Card = components["schemas"]["DealCard"];
 type DealChange = components["schemas"]["DealChange"];
 
-const stages = [
-  { key: "replied", label: "Replied" },
-  { key: "meeting", label: "Meeting" },
-  { key: "proposal", label: "Proposal" },
-  { key: "won", label: "Won" },
-  { key: "lost", label: "Lost" },
-];
+const m = defineMessages({
+  title: { defaultMessage: "Conversations", id: "WPvnJ8", description: "Title of the page of deals with everyone who replied" },
+  intro: {
+    defaultMessage:
+      "Everyone who replied, until it's won or lost. Each needs a next step with a date; ones without, or due today, also show on Today. Give one a value and each stage shows what it is worth. A renewal or an expansion with someone already here is a deal of its own, started from their card.",
+    id: "JM2kvo",
+    description: "Under the conversations page's title, saying what the board is. Today is the name of another page",
+  },
+  whose: {
+    defaultMessage: "Deals are sales work, so here you read it.",
+    id: "H7f6JZ",
+    description: "On the conversations page, to someone not in sales: why they can read the deals but not change them",
+  },
+  board: {
+    defaultMessage: "Deals by stage",
+    id: "cbitp9",
+    description: "What a screen reader calls the board of deals, which scrolls sideways",
+  },
+  none: { defaultMessage: "None", id: "QAbkpp", description: "In a column of the deals board with no deals at that stage" },
+  onboarding: { defaultMessage: "Onboarding under way", id: "LgfOmL", description: "Link on a won deal's card when the company's onboarding has begun" },
+  onboarded: { defaultMessage: "Onboarded", id: "jkBdoO", description: "Link on a won deal's card when the company's onboarding is done" },
+  startOnboarding: { defaultMessage: "Start onboarding", id: "LMExaj", description: "Button on a won deal's card to begin onboarding the company" },
+  value: { defaultMessage: "Value", id: "2SyN4n", description: "Label of the field for what a deal is worth" },
+  valueHint: { defaultMessage: "e.g. 14,000", id: "xfzi4R", description: "Placeholder of the field for what a deal is worth: an example amount" },
+  close: { defaultMessage: "Expected to close", id: "TVTRQS", description: "Label of the field for the date a deal is expected to close" },
+  kind: { defaultMessage: "Kind", id: "/jQEvP", description: "Label of the choice of a deal's kind: new business, renewal or expansion" },
+  owner: { defaultMessage: "Owner", id: "zJ6dfh", description: "Label of the choice of the member who owns a deal" },
+  nobody: { defaultMessage: "Nobody yet", id: "KetojS", description: "The owner choice for a deal nobody owns" },
+  stage: { defaultMessage: "Stage", id: "bryZPN", description: "Label of the choice of a deal's stage" },
+  update: { defaultMessage: "Update", id: "JF4NIn", description: "Opens the fields to change a deal, under its card" },
+  nextStep: { defaultMessage: "Next step", id: "NbvPnY", description: "Label of the field for the next thing to do on a deal" },
+  recapHint: { defaultMessage: "e.g. send recap", id: "w6pRqA", description: "Placeholder of a deal's next step field: an example step" },
+  renewalHint: {
+    defaultMessage: "e.g. send renewal terms",
+    id: "ttK/9z",
+    description: "Placeholder of a renewal or expansion's next step field: an example step",
+  },
+  by: { defaultMessage: "By", id: "ufF1TC", description: "Label of the field for the date the next step is due" },
+  whyLost: { defaultMessage: "Why lost", id: "Obnnbe", description: "Label of the field for why a deal was lost" },
+  another: { defaultMessage: "Another deal", id: "+m0YFB", description: "Small heading on someone's card before the choice to start another deal with them" },
+  kindOfDeal: { defaultMessage: "Kind of deal", id: "dXt4Ta", description: "What a screen reader calls the choice of what kind of deal to start" },
+  start: { defaultMessage: "Start", id: "bWjJSC", description: "Button to start another deal with someone, of the kind chosen" },
+  remove: { defaultMessage: "Remove this deal", id: "PS/xSv", description: "Button on a renewal or expansion's card to remove it" },
+  noNext: { defaultMessage: "No next step yet", id: "Htu8Hi", description: "On a deal's card when it has no next step" },
+});
 
-const kinds = [
-  { key: "new", label: "New business" },
-  { key: "renewal", label: "Renewal" },
-  { key: "expansion", label: "Expansion" },
-];
+const v = {
+  stage: defineMessage<{ stage: string }>({
+    defaultMessage: "{stage, select, replied {Replied} meeting {Meeting} proposal {Proposal} won {Won} lost {Lost} other {{stage}}}",
+    id: "M2H8VT",
+    description: "A stage of a deal, as a column heading of the deals board and a choice: replied, meeting, proposal, won or lost",
+  }),
+  kind: defineMessage<{ kind: string }>({
+    defaultMessage: "{kind, select, new {New business} renewal {Renewal} expansion {Expansion} other {{kind}}}",
+    id: "Y86spi",
+    description: "The kind of a deal: new business, a renewal or an expansion",
+  }),
+  closes: defineMessage<{ date: string }>({
+    defaultMessage: "closes {date}",
+    id: "V5m+z7",
+    description: "On a deal's card: when it is expected to close. {date} is a day, such as 5 Mar",
+  }),
+  overdue: defineMessage<{ step: string; date: string }>({
+    defaultMessage: "{step} · overdue since {date}",
+    id: "xA8Bif",
+    description: "On a deal's card: its next step, past the day it was due. {step} is what the member wrote; {date} is a day, such as 5 Mar",
+  }),
+  due: defineMessage<{ step: string; date: string }>({
+    defaultMessage: "{step} · {date}",
+    id: "32xeoG",
+    description: "On a deal's card: its next step and the day it is due. {step} is what the member wrote; {date} is a day, such as 5 Mar",
+  }),
+  left: defineMessage<{ name: string }>({
+    defaultMessage: "{name} (left)",
+    id: "F6XpbN",
+    description: "The owner choice for a deal whose owner is no longer a member. {name} is theirs",
+  }),
+};
+
+const stages = ["replied", "meeting", "proposal", "won", "lost"];
+const kinds = ["new", "renewal", "expansion"];
+const dot = " · ";
+const plus = " + ";
+const space = " ";
+
+const muted = (chunks: ReactNode[]) => <span className="text-muted-foreground">{chunks}</span>;
+const bold = (chunks: ReactNode[]) => <b>{chunks}</b>;
 
 const select = "h-8 rounded-lg border border-input bg-muted px-2 text-sm";
 const signs: Record<string, string> = { GBP: "£", EUR: "€", USD: "$" };
@@ -34,12 +110,10 @@ function today() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// money writes an amount in hundredths as the server does: "£14,000", "CHF 999.50".
+// money writes an amount in hundredths in the reader's numbers: "£14,000", "CHF 999.50".
 function money(amount: number, currency: string) {
-  let whole = Math.trunc(amount / 100).toString();
-  for (let i = whole.length - 3; i > 0; i -= 3) whole = whole.slice(0, i) + "," + whole.slice(i);
-  const cents = amount % 100;
-  if (cents !== 0) whole += "." + String(cents).padStart(2, "0");
+  const cents = amount % 100 !== 0 ? 2 : 0;
+  const whole = intl.formatNumber(amount / 100, { minimumFractionDigits: cents, maximumFractionDigits: cents });
   return currency in signs ? signs[currency] + whole : `${currency} ${whole}`.trim();
 }
 
@@ -51,16 +125,18 @@ function worth(cards: Card[]) {
       .map(([currency, sum]) => money(sum, currency))
       // oxlint-disable-next-line unicorn/no-array-sort -- the array map just made, which nothing else holds; toSorted needs ES2023
       .sort()
-      .join(" + ")
+      .join(plus)
   );
 }
 
-function kindLabel(kind: string) {
-  return kinds.find((k) => k.key === kind)?.label ?? kind;
-}
-
-function dealMeta(c: Card, withKind: boolean) {
-  return [withKind && c.kind !== "new" ? kindLabel(c.kind) : "", c.close_date && "closes " + c.close_date, c.owner].filter(Boolean).join(" · ");
+function dealMeta(c: Card, withKind: boolean, day: string) {
+  return [
+    withKind && c.kind !== "new" ? intl.formatMessage(v.kind, { kind: c.kind }) : "",
+    c.close_date && intl.formatMessage(v.closes, { date: onDay(c.close_date, day) }),
+    c.owner,
+  ]
+    .filter(Boolean)
+    .join(dot);
 }
 
 function needsNextStep(c: Card, day: string) {
@@ -76,9 +152,9 @@ function edge(c: Card, day: string) {
 
 function nextText(c: Card, day: string): [string, Tone] {
   if (c.stage === "won" || c.stage === "lost") return ["", ""];
-  if (c.next_step === "") return ["No next step yet", "warn"];
-  if (c.next_date && c.next_date < day) return [`${c.next_step} · overdue since ${c.next_date}`, "stop"];
-  if (c.next_date) return [`${c.next_step} · ${c.next_date}`, "agent"];
+  if (c.next_step === "") return [intl.formatMessage(m.noNext), "warn"];
+  if (c.next_date && c.next_date < day) return [intl.formatMessage(v.overdue, { step: c.next_step, date: onDay(c.next_date, day) }), "stop"];
+  if (c.next_date) return [intl.formatMessage(v.due, { step: c.next_step, date: onDay(c.next_date, day) }), "agent"];
   return [c.next_step, "agent"];
 }
 
@@ -99,44 +175,36 @@ function useBoard() {
   return { cards: pages.flatMap((p) => p.items), planned: pages[0]?.onboarding_steps ?? 0, loading: !board.data && !board.error, error: board.error };
 }
 
-const board = defineMessage({
-  defaultMessage: "Deals by stage",
-  id: "cbitp9",
-  description: "What a screen reader calls the board of deals, which scrolls sideways",
-});
-
 export function ConversationsPage() {
-  const intl = useIntl();
+  const say = useIntl().formatMessage;
   const { org, sales } = useSession();
   const { cards, planned, loading, error } = useBoard();
   const members = $api.useQuery("get", "/o/{org}/api/v1/members", { params: { path: { org }, query: { limit: 200 } } });
-  const names = (members.data?.items ?? []).map((m) => m.name);
+  const names = (members.data?.items ?? []).map((member) => member.name);
   const day = today();
   return (
     <>
-      <PageHead title="Conversations" />
-      <p className="mb-5 max-w-[70ch] text-sm text-muted-foreground">
-        Everyone who replied, until it's won or lost. Each needs a next step with a date; ones without, or due today, also show on Today. Give one a value and
-        each stage shows what it is worth. A renewal or an expansion with someone already here is a deal of its own, started from their card.
-      </p>
-      <Whose area="sales" said="Deals are sales work, so here you read it." can={sales} />
+      <PageHead title={say(m.title)} />
+      <p className="mb-5 max-w-[70ch] text-sm text-muted-foreground">{say(m.intro)}</p>
+      <Whose area="sales" said={say(m.whose)} can={sales} />
       <Failed errors={[error, members.error]} />
-      <div className="overflow-x-auto pb-4" role="region" aria-label={intl.formatMessage(board)} tabIndex={0}>
+      <div className="overflow-x-auto pb-4" role="region" aria-label={say(m.board)} tabIndex={0}>
         <Loading busy={loading} className="flex min-w-max gap-4">
           {stages.map((st) => {
-            const here = cards.filter((c) => c.stage === st.key);
+            const here = cards.filter((c) => c.stage === st);
             const sum = worth(here);
+            const name = say(v.stage, { stage: st });
             return (
-              <section key={st.key} className="flex w-[280px] flex-col gap-2.5" aria-label={st.label}>
+              <section key={st} className="flex w-[280px] flex-col gap-2.5" aria-label={name}>
                 <div className="flex items-baseline justify-between border-b-2 border-border px-1 pb-1.5">
-                  <h2 className="font-heading text-base font-semibold">{st.label}</h2>
+                  <h2 className="font-heading text-base font-semibold">{name}</h2>
                   <span className="font-mono text-xs text-muted-foreground">
                     {loading ? (
                       <Bar w="2ch" />
                     ) : (
                       <>
-                        {here.length}
-                        {sum && " · " + sum}
+                        {intl.formatNumber(here.length)}
+                        {sum && dot + sum}
                       </>
                     )}
                   </span>
@@ -149,7 +217,7 @@ export function ConversationsPage() {
                   </Placeholders>
                 )}
                 {!loading && here.length === 0 && (
-                  <p className="rounded-xl border border-dashed border-border p-3.5 font-mono text-xs text-muted-foreground">None</p>
+                  <p className="rounded-xl border border-dashed border-border p-3.5 font-mono text-xs text-muted-foreground">{say(m.none)}</p>
                 )}
                 {here.map((c) =>
                   c.seq === 0 ? (
@@ -172,7 +240,7 @@ function CompanyLink({ c }: { c: Card }) {
   if (!c.company_id) return null;
   return (
     <Link to="/o/$org/companies/$id" params={{ org, id: c.company_id }} className="font-mono text-xs text-muted-foreground hover:text-mark">
-      {" · " + c.company}
+      {dot + c.company}
     </Link>
   );
 }
@@ -203,6 +271,7 @@ function Next({ c, day }: { c: Card; day: string }) {
 
 // WonNext offers to start onboarding the company a won deal is with, or says it has begun.
 function WonNext({ c, planned, day }: { c: Card; planned: number; day: string }) {
+  const say = useIntl().formatMessage;
   const { org, sales, support } = useSession();
   const refresh = useRefresh();
   const start = $api.useMutation("post", "/o/{org}/api/v1/onboardings", { onSuccess: refresh });
@@ -210,7 +279,7 @@ function WonNext({ c, planned, day }: { c: Card; planned: number; day: string })
   if (c.onboarding) {
     return (
       <Link to="/o/$org/companies/$id" params={{ org, id: c.company_id }} className="font-mono text-xs text-mark underline">
-        {c.onboarding === "running" ? "Onboarding under way" : "Onboarded"}
+        {say(c.onboarding === "running" ? m.onboarding : m.onboarded)}
       </Link>
     );
   }
@@ -222,7 +291,7 @@ function WonNext({ c, planned, day }: { c: Card; planned: number; day: string })
         disabled={start.isPending}
         onClick={() => start.mutate({ params: { path: { org } }, body: { company: c.company_id, start: day } })}
       >
-        Start onboarding
+        {say(m.startOnboarding)}
       </ActionButton>
       <Failed errors={[start.error]} />
     </div>
@@ -265,31 +334,28 @@ function Choice({ value, save, children, label }: { value: string; save: (v: str
 
 // DealFields are a deal's value, close date, kind and owner.
 function DealFields({ c, members, save }: { c: Card; members: string[]; save: (change: DealChange) => void }) {
+  const say = useIntl().formatMessage;
   const left = c.owner !== "" && !members.includes(c.owner);
   return (
     <>
-      <Field label="Value">
-        <Text value={c.value} placeholder="e.g. 14,000" save={(amount) => save({ amount })} />
+      <Field label={say(m.value)}>
+        <Text value={c.value} placeholder={say(m.valueHint)} save={(amount) => save({ amount })} />
       </Field>
-      <Field label="Expected to close">
+      <Field label={say(m.close)}>
         <Text type="date" value={c.close_date} save={(close_date) => save({ close_date })} />
       </Field>
-      <Field label="Kind" row>
+      <Field label={say(m.kind)} row>
         <Choice value={c.kind || "new"} save={(kind) => save({ kind })}>
-          {kinds.map((k) => (
-            <option key={k.key} value={k.key}>
-              {k.label}
-            </option>
-          ))}
+          <KindOptions />
         </Choice>
       </Field>
-      <Field label="Owner" row>
+      <Field label={say(m.owner)} row>
         <Choice value={c.owner} save={(owner) => save({ owner })}>
-          <option value="">Nobody yet</option>
-          {left && <option value={c.owner}>{c.owner + " (left)"}</option>}
-          {members.map((m) => (
-            <option key={m} value={m}>
-              {m}
+          <option value="">{say(m.nobody)}</option>
+          {left && <option value={c.owner}>{say(v.left, { name: c.owner })}</option>}
+          {members.map((member) => (
+            <option key={member} value={member}>
+              {member}
             </option>
           ))}
         </Choice>
@@ -298,13 +364,23 @@ function DealFields({ c, members, save }: { c: Card; members: string[]; save: (c
   );
 }
 
+function KindOptions() {
+  const say = useIntl().formatMessage;
+  return kinds.map((k) => (
+    <option key={k} value={k}>
+      {say(v.kind, { kind: k })}
+    </option>
+  ));
+}
+
 function StageChoice({ value, save }: { value: string; save: (v: string) => void }) {
+  const say = useIntl().formatMessage;
   return (
-    <Field label="Stage" row>
+    <Field label={say(m.stage)} row>
       <Choice value={value} save={save}>
         {stages.map((s) => (
-          <option key={s.key} value={s.key}>
-            {s.label}
+          <option key={s} value={s}>
+            {say(v.stage, { stage: s })}
           </option>
         ))}
       </Choice>
@@ -316,6 +392,7 @@ type CardProps = { c: Card; members: string[]; planned: number; day: string };
 
 // DealCard is someone in conversation, or their card's outline while the board loads.
 function DealCard({ c, members = [], planned = 0, day = "" }: Partial<CardProps>) {
+  const say = useIntl().formatMessage;
   const { org, sales } = useSession();
   const refresh = useRefresh();
   const contact = $api.useMutation("patch", "/o/{org}/api/v1/contacts/{id}", { onSuccess: refresh });
@@ -329,7 +406,7 @@ function DealCard({ c, members = [], planned = 0, day = "" }: Partial<CardProps>
             <Bar w="10ch" />
           </b>
           <span className="font-mono text-xs">
-            {" "}
+            {space}
             <Bar w="12ch" />
           </span>
         </div>
@@ -350,23 +427,23 @@ function DealCard({ c, members = [], planned = 0, day = "" }: Partial<CardProps>
         <CompanyLink c={c} />
       </div>
       {c.call_notes && <p className="line-clamp-3 text-[13px] text-muted-foreground">{c.call_notes}</p>}
-      <Value c={c} meta={dealMeta(c, true)} />
+      <Value c={c} meta={dealMeta(c, true, day)} />
       <Next c={c} day={day} />
       <WonNext c={c} planned={planned} day={day} />
       {sales && (
         <details className="text-sm">
-          <summary className="cursor-pointer font-mono text-xs text-muted-foreground">Update</summary>
+          <summary className="cursor-pointer font-mono text-xs text-muted-foreground">{say(m.update)}</summary>
           <div className="mt-2 flex flex-col gap-2">
             <StageChoice value={c.stage || "replied"} save={(stage) => person({ stage })} />
-            <Field label="Next step">
-              <Text value={c.next_step} placeholder="e.g. send recap" save={(next_step) => person({ next_step })} />
+            <Field label={say(m.nextStep)}>
+              <Text value={c.next_step} placeholder={say(m.recapHint)} save={(next_step) => person({ next_step })} />
             </Field>
-            <Field label="By">
+            <Field label={say(m.by)}>
               <Text type="date" value={c.next_date} save={(next_date) => person({ next_date })} />
             </Field>
             <DealFields c={c} members={members} save={(body) => deal.mutate({ params: { path }, body })} />
             {c.stage === "lost" && (
-              <Field label="Why lost">
+              <Field label={say(m.whyLost)}>
                 <Text value={c.lost_reason} save={(lost_reason) => person({ lost_reason })} />
               </Field>
             )}
@@ -378,16 +455,12 @@ function DealCard({ c, members = [], planned = 0, day = "" }: Partial<CardProps>
                 another.mutate({ params: { path: { org } }, body: { contact: c.contact_id, kind } });
               }}
             >
-              <Eyebrow>Another deal</Eyebrow>
-              <select name="kind" aria-label="Kind of deal" defaultValue="renewal" className={select}>
-                {kinds.map((k) => (
-                  <option key={k.key} value={k.key}>
-                    {k.label}
-                  </option>
-                ))}
+              <Eyebrow>{say(m.another)}</Eyebrow>
+              <select name="kind" aria-label={say(m.kindOfDeal)} defaultValue="renewal" className={select}>
+                <KindOptions />
               </select>
               <ActionButton quiet size="sm" type="submit" disabled={another.isPending}>
-                Start
+                {say(m.start)}
               </ActionButton>
             </form>
           </div>
@@ -400,6 +473,7 @@ function DealCard({ c, members = [], planned = 0, day = "" }: Partial<CardProps>
 
 // OtherDealCard is a renewal, an expansion or a further deal with someone in conversation.
 function OtherDealCard({ c, members, planned, day }: CardProps) {
+  const say = useIntl().formatMessage;
   const { org, sales } = useSession();
   const refresh = useRefresh();
   const change = $api.useMutation("patch", "/o/{org}/api/v1/deals/{id}", { onSuccess: refresh });
@@ -409,33 +483,37 @@ function OtherDealCard({ c, members, planned, day }: CardProps) {
   return (
     <article className={cn("flex flex-col gap-2.5 rounded-xl border bg-card p-3.5 text-sm", edge(c, day))}>
       <div>
-        <b>{kindLabel(c.kind)}</b>
-        <span className="text-muted-foreground">{" with " + c.person}</span>
+        <FormattedMessage
+          defaultMessage="<b>{kind}</b><muted> with {person}</muted>"
+          id="4KnQ8O"
+          description="Heading of a renewal or expansion's card. {kind} is the kind of deal, such as Renewal; {person} is who it is with"
+          values={{ kind: say(v.kind, { kind: c.kind }), person: c.person, b: bold, muted }}
+        />
         <CompanyLink c={c} />
       </div>
-      <Value c={c} meta={dealMeta(c, false)} />
+      <Value c={c} meta={dealMeta(c, false, day)} />
       <Next c={c} day={day} />
       <WonNext c={c} planned={planned} day={day} />
       {sales && (
         <details className="text-sm">
-          <summary className="cursor-pointer font-mono text-xs text-muted-foreground">Update</summary>
+          <summary className="cursor-pointer font-mono text-xs text-muted-foreground">{say(m.update)}</summary>
           <div className="mt-2 flex flex-col gap-2">
             <StageChoice value={c.stage} save={(stage) => save({ stage })} />
-            <Field label="Next step">
-              <Text value={c.next_step} placeholder="e.g. send renewal terms" save={(next_step) => save({ next_step })} />
+            <Field label={say(m.nextStep)}>
+              <Text value={c.next_step} placeholder={say(m.renewalHint)} save={(next_step) => save({ next_step })} />
             </Field>
-            <Field label="By">
+            <Field label={say(m.by)}>
               <Text type="date" value={c.next_date} save={(next_date) => save({ next_date })} />
             </Field>
             <DealFields c={c} members={members} save={save} />
             {c.stage === "lost" && (
-              <Field label="Why lost">
+              <Field label={say(m.whyLost)}>
                 <Text value={c.lost_reason} save={(lost_reason) => save({ lost_reason })} />
               </Field>
             )}
             <div className="flex items-center gap-2 border-t border-border pt-2">
               <ActionButton quiet size="sm" disabled={remove.isPending} onClick={() => remove.mutate({ params: { path } })}>
-                Remove this deal
+                {say(m.remove)}
               </ActionButton>
             </div>
           </div>
