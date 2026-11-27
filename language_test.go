@@ -74,6 +74,43 @@ func TestAMembersOwnLanguageOutranksTheirBrowsers(t *testing.T) {
 	if got, _ := inLanguage(t, client, page, "de"); got != "de" {
 		t.Errorf("left to the browser again: %s", got)
 	}
+
+	// A browser asking for nothing Prospector has gets the organisation's language.
+	if got, _ := inLanguage(t, client, page, "ja"); got != locales.Source {
+		t.Errorf("before the organisation has one: %s", got)
+	}
+	if code, body := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/settings", "application/json", map[string]string{"customer_language": "en-XA"}); code != http.StatusOK {
+		t.Fatalf("setting the organisation's language: %d %s", code, body)
+	}
+	if got, _ := inLanguage(t, client, page, "ja"); got != "en-XA" {
+		t.Errorf("a browser asking for nothing Prospector has: %s", got)
+	}
+	if got, body := inLanguage(t, client, srv.URL+"/o/alpha/api/v1/companies/9999999/overview", "ja"); got != "en-XA" || !strings.Contains(body, `"detail":"[`) {
+		t.Errorf("the server's own words, likewise: %s %s", got, body)
+	}
+	if got, _ := inLanguage(t, client, page, "de"); got != "de" {
+		t.Errorf("the browser still comes before the organisation: %s", got)
+	}
+}
+
+// The link's owner is who reads it, so their own language comes before the asker's.
+func TestAResetIsMailedInItsOwnersLanguage(t *testing.T) {
+	translatedInto(t, "de", "en-XA")
+	_, srv, ada, box := mailSite(t, nil)
+	if code, _ := call(t, ada, "PATCH", srv.URL+"/o/alpha/api/v1/me", "application/json", map[string]string{"language": "en-XA"}); code != http.StatusOK {
+		t.Fatalf("choosing a language: %d", code)
+	}
+	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/password-resets", strings.NewReader(`{"email": "ada@example.com"}`))
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Accept-Language", "de")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil || res.StatusCode != http.StatusAccepted {
+		t.Fatalf("asking for a link: %v %v", res, err)
+	}
+	res.Body.Close()
+	if m := box.take(t, 1)[0]; !strings.HasPrefix(m.Subject, "[") {
+		t.Errorf("not in the owner's language: %q", m.Subject)
+	}
 }
 
 func TestAnOrganisationSpeaksToItsOutsidersInItsLanguage(t *testing.T) {
@@ -122,6 +159,17 @@ func TestAnOrganisationSpeaksToItsOutsidersInItsLanguage(t *testing.T) {
 	token := must(s.UnsubscribeLink(o.ID, "sven@nordkap.example"))
 	if got, _ := inLanguage(t, outsider, srv.URL+"/u/"+token, "ja"); got != "en-XA" {
 		t.Errorf("an unsubscribe page: %s", got)
+	}
+	req, _ := http.NewRequest("POST", srv.URL+"/u/"+token, nil)
+	req.Header.Set("Accept-Language", "ja")
+	res, err := outsider.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if !strings.Contains(string(b), `<html lang="en-XA">`) || !strings.Contains(string(b), "done&quot;:true") {
+		t.Errorf("unsubscribed: %d %.300s", res.StatusCode, b)
 	}
 	if got, _ := inLanguage(t, outsider, srv.URL+"/u/never-made", "ja"); got != locales.Source {
 		t.Errorf("an unsubscribe link that was never made: %s", got)

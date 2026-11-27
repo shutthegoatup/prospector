@@ -141,9 +141,7 @@ func (a *App) customerOpen(w http.ResponseWriter, r *http.Request) {
 // was ever real, nor to reach any address but the invited one.
 func (a *App) customerAgain(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
-	lang := ""
 	if acc, err := a.s.CustomerByToken("link", token); err == nil && a.customerMailOn(acc.Org.ID) {
-		lang = acc.Org.Settings.CustomerLanguage
 		if fresh, err := a.s.FreshCustomerLink(acc.Org.ID, acc.Grant.ID); err == nil {
 			org, to := acc.Org, deref(acc.Contact.Email)
 			a.background(func() {
@@ -157,7 +155,8 @@ func (a *App) customerAgain(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
-	a.customerRender(w, r, http.StatusOK, CustomerView{State: "sent", Lang: lang})
+	// Not in the organisation's language: that would tell a real link from a made-up one.
+	a.customerRender(w, r, http.StatusOK, CustomerView{State: "sent"})
 }
 
 func (a *App) customerSession(r *http.Request) (*CustomerAccess, string) {

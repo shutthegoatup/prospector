@@ -5410,8 +5410,10 @@ components:
       description: |
         What went wrong, as RFC 9457 lays it out. Its `title` and `detail` are in the
         language the request is answered in, which `Content-Language` names: the one chosen
-        with `?lang=` on a page (kept in the `lang` cookie), else the best of
-        `Accept-Language` that Prospector has been translated into, else British English.
+        with `?lang=` on a page (kept in the `lang` cookie), else the signed-in member's own
+        (`language` in /me), else the best of `Accept-Language` that Prospector has been
+        translated into, else, for a signed-in member, the organisation's
+        `customer_language`, else British English.
         Act on `type` and `status`, which don't change with it.
       required: [type, title, status]
       additionalProperties: false

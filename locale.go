@@ -79,9 +79,10 @@ const langCookie = "lang"
 // languageOf is the language to answer r in.
 func languageOf(r *http.Request) string { return languageFor(r, "") }
 
-// languageFor is the language to answer r in when an organisation's outsiders are
-// spoken to in fallback: one picked with ?lang=, then the signed-in member's own, then
-// the best of their browser's.
+// languageFor is the language to answer r in: one picked with ?lang=, then the
+// signed-in member's own, then the best of their browser's, then fallback, which is
+// what an organisation speaks to its outsiders and, unless another is given, to its
+// members.
 func languageFor(r *http.Request, fallback string) string {
 	picked := ""
 	if c, err := r.Cookie(langCookie); err == nil {
@@ -91,8 +92,14 @@ func languageFor(r *http.Request, fallback string) string {
 }
 
 func spoken(r *http.Request, picked, fallback string) string {
-	if q, ok := r.Context().Value(reqKey{}).(*Req); ok && q.User != nil && picked == "" {
-		picked = q.User.Language
+	// Only a person has a language; a key's caller is answered by its own browser, if any.
+	if q, ok := r.Context().Value(reqKey{}).(*Req); ok && q.User != nil {
+		if !locales.offers(picked) {
+			picked = q.User.Language
+		}
+		if fallback == "" && q.Org != nil {
+			fallback = q.Org.Settings.CustomerLanguage
+		}
 	}
 	return locales.choose(picked, r.Header.Get("Accept-Language"), fallback)
 }

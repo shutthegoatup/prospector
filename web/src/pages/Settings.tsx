@@ -33,11 +33,10 @@ const areas = [
   { name: "support", what: "enquiries and their replies, subscriptions and onboarding" },
 ] as const;
 
+const languageName = (code: string) => new Intl.DisplayNames([code], { type: "language" }).of(code) ?? code;
+
 // The languages a person can choose, each named in itself.
-const languages = [locales.source, ...locales.translated].map((code) => ({
-  code,
-  name: new Intl.DisplayNames([code], { type: "language" }).of(code) ?? code,
-}));
+const languages = [locales.source, ...locales.translated].map((code) => ({ code, name: languageName(code) }));
 
 const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -187,7 +186,8 @@ function Language({ me }: { me: Me }) {
       <Section title="Your language" hint="For you in every organisation: the app, mail sent to you, and the server's messages.">
         <Row label="Language">
           <select name="language" defaultValue={me.language} className={cn(select, "w-full")}>
-            <option value="">Your browser's</option>
+            {/* With none chosen, the page is in what the browser's languages came to. */}
+            <option value="">{me.language ? "Your browser's" : `Your browser's (${languageName(document.documentElement.lang)})`}</option>
             {languages.map((l) => (
               <option key={l.code} value={l.code} lang={l.code}>
                 {l.name}
