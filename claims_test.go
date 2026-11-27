@@ -22,12 +22,12 @@ func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders with a configurator.", "Ada Lovelace"))
 	now := time.Now()
 
-	first := must(s.agentTask(o.ID, scout, task.ID, now))
+	first := must(s.AgentTaskAt(o.ID, scout, task.ID, now))
 	brief := first.Requests[0].ID
 	if first.Claimed != brief || !first.Requests[0].Yours || first.Status != TaskWorking {
 		t.Fatalf("the first agent should be kept the brief: %+v", first)
 	}
-	got := must(s.agentTask(o.ID, second, task.ID, now.Add(time.Minute)))
+	got := must(s.AgentTaskAt(o.ID, second, task.ID, now.Add(time.Minute)))
 	if got.Claimed != 0 || got.Requests[0].HeldBy != "agent:scout" || got.Requests[0].Yours || got.Requests[0].Until == nil {
 		t.Fatalf("the second agent should see the brief is the first's: %+v", got)
 	}
@@ -38,18 +38,18 @@ func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
 	if _, err := s.AskTask(o.ID, task.ID, "Find ten more in Italy.", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	got = must(s.agentTask(o.ID, second, task.ID, now.Add(2*time.Minute)))
+	got = must(s.AgentTaskAt(o.ID, second, task.ID, now.Add(2*time.Minute)))
 	more := got.Requests[1].ID
 	if got.Claimed != more || !got.Requests[1].Yours || got.Requests[0].HeldBy != "agent:scout" {
 		t.Fatalf("the second agent should take the new request: %+v", got)
 	}
-	if again := must(s.agentTask(o.ID, scout, task.ID, now.Add(3*time.Minute))); again.Claimed != brief {
+	if again := must(s.AgentTaskAt(o.ID, scout, task.ID, now.Add(3*time.Minute))); again.Claimed != brief {
 		t.Fatalf("the first agent reading the task again should keep what it had, got %d", again.Claimed)
 	}
 
 	// A key under a name another key had is a different agent.
 	renamed := Actor{Name: "agent:scout", KeyID: 9}
-	if got := must(s.agentTask(o.ID, renamed, task.ID, now.Add(4*time.Minute))); got.Claimed != 0 || got.Requests[0].Yours {
+	if got := must(s.AgentTaskAt(o.ID, renamed, task.ID, now.Add(4*time.Minute))); got.Claimed != 0 || got.Requests[0].Yours {
 		t.Fatalf("a new key took an old key's claim because they share a name: %+v", got)
 	}
 
@@ -61,7 +61,7 @@ func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
 	if _, err := s.AskTask(o.ID, task.ID, "And Spain.", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if got := must(s.agentTask(o.ID, reader, task.ID, now.Add(5*time.Minute))); got.Claimed != 0 || got.Requests[2].HeldBy != "" {
+	if got := must(s.AgentTaskAt(o.ID, reader, task.ID, now.Add(5*time.Minute))); got.Claimed != 0 || got.Requests[2].HeldBy != "" {
 		t.Fatalf("a read-only key was kept a request: %+v", got.Requests[2])
 	}
 	var claims []RequestClaim
@@ -78,7 +78,7 @@ func TestAClaimLapsesUnlessTheHolderKeepsAdding(t *testing.T) {
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
 	start := time.Now()
-	brief := must(s.agentTask(o.ID, scout, task.ID, start)).Claimed
+	brief := must(s.AgentTaskAt(o.ID, scout, task.ID, start)).Claimed
 
 	expires := func() time.Time {
 		var c RequestClaim
@@ -104,11 +104,11 @@ func TestAClaimLapsesUnlessTheHolderKeepsAdding(t *testing.T) {
 
 	// Once it has lapsed the request is free for whoever picks the task up next.
 	later := time.Now().Add(claimFor + time.Minute)
-	got := must(s.agentTask(o.ID, second, task.ID, later))
+	got := must(s.AgentTaskAt(o.ID, second, task.ID, later))
 	if got.Claimed != brief || !got.Requests[0].Yours {
 		t.Fatalf("a lapsed claim should pass to the next agent: %+v", got)
 	}
-	if mine := must(s.agentTask(o.ID, scout, task.ID, later)); mine.Claimed != 0 || mine.Requests[0].HeldBy != "agent:second" {
+	if mine := must(s.AgentTaskAt(o.ID, scout, task.ID, later)); mine.Claimed != 0 || mine.Requests[0].HeldBy != "agent:second" {
 		t.Fatalf("the agent that let it lapse should see it taken: %+v", mine)
 	}
 	if v := must(s.Task(o.ID, task.ID, later.Add(claimFor+runGap))); v.Status != TaskWaiting || v.Requests[0].HeldBy != "" {
@@ -131,7 +131,7 @@ func TestOnlyOneOfManyAgentsWinsARequest(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			won[i], errs[i] = s.claim(o.ID, task.ID, request, Actor{Name: "agent:" + strings.Repeat("x", i+1), KeyID: int64(i + 1)}, now)
+			won[i], errs[i] = s.Claim(o.ID, task.ID, request, Actor{Name: "agent:" + strings.Repeat("x", i+1), KeyID: int64(i + 1)}, now)
 		}()
 	}
 	wg.Wait()
@@ -213,7 +213,7 @@ func TestAClaimIsntTakenOnAFinishedRequestOrShownOnAClosedTask(t *testing.T) {
 	if err := s.SetRequestDone(o.ID, request, true, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if got := must(s.claimNext(stale, scout, now)); got != 0 {
+	if got := must(s.ClaimNext(o.ID, stale, scout, now)); got != 0 {
 		t.Fatalf("a finished request was claimed: %d", got)
 	}
 	var n int64
@@ -225,13 +225,13 @@ func TestAClaimIsntTakenOnAFinishedRequestOrShownOnAClosedTask(t *testing.T) {
 	if err := s.SetRequestDone(o.ID, request, false, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	must(s.agentTask(o.ID, scout, task.ID, now))
+	must(s.AgentTaskAt(o.ID, scout, task.ID, now))
 	held := must(s.Task(o.ID, task.ID, now))
 	later := now.Add(claimFor + time.Minute)
-	if won := must(s.claim(o.ID, task.ID, request, second, later)); !won {
+	if won := must(s.Claim(o.ID, task.ID, request, second, later)); !won {
 		t.Fatal("a lapsed claim should pass to another agent")
 	}
-	if got := must(s.claimNext(held, scout, later)); got != 0 {
+	if got := must(s.ClaimNext(o.ID, held, scout, later)); got != 0 {
 		t.Fatalf("an agent was told it kept a request another had taken: %d", got)
 	}
 
@@ -240,5 +240,25 @@ func TestAClaimIsntTakenOnAFinishedRequestOrShownOnAClosedTask(t *testing.T) {
 	}
 	if v := must(s.Task(o.ID, task.ID, later)); v.Requests[0].HeldBy != "" {
 		t.Fatalf("a closed task still shows an agent on a request: %+v", v.Requests[0])
+	}
+}
+
+func TestAnotherOrganisationCantClaimThroughATaskItWasHanded(t *testing.T) {
+	t.Parallel()
+	s := tempStore(t)
+	o, other := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
+	scout := Actor{Name: "agent:scout", KeyID: 1}
+	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
+	now := time.Now()
+	v := must(s.Task(o.ID, task.ID, now))
+	if got := must(s.ClaimNext(other.ID, v, scout, now)); got != 0 {
+		t.Fatalf("another organisation claimed request %d of this one's task", got)
+	}
+	var n int64
+	if s.DB.Model(&RequestClaim{}).Count(&n); n != 0 {
+		t.Fatalf("%d claims made by another organisation", n)
+	}
+	if got := must(s.ClaimNext(o.ID, v, scout, now)); got != v.Requests[0].ID {
+		t.Fatalf("the task's own organisation should claim its request, got %d", got)
 	}
 }

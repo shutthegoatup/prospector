@@ -84,14 +84,11 @@ type Verdict = store.Verdict
 var Stages = store.Stages
 var addMonths = store.AddMonths
 var assetKey = store.AssetKey
-var bareDomain = store.BareDomain
 var deref = store.Deref
 var domainOf = store.DomainOf
 var enquiryOrigins = store.EnquiryOrigins
 var formatMoney = store.FormatMoney
-var linkedinPath = store.LinkedinPath
 var mustDay = store.MustDay
-var validStage = store.ValidStage
 
 const sealing = store.Sealing
 
@@ -115,8 +112,6 @@ var sealedVersion = store.SealedVersion
 type notFound = store.NotFound
 
 var displayName = store.DisplayName
-var hold = store.Hold
-var holdOrg = store.HoldOrg
 var logged = store.Logged
 var missing = store.Missing
 var noSuch = store.NoSuch
@@ -139,6 +134,5 @@ var companyName = store.CompanyName
 var emailRe = store.EmailRe
 var errErased = store.ErrErased
 var identifiers = store.Identifiers
-var openTask = store.OpenTask
 var personKey = store.PersonKey
 var unusableHash = store.UnusableHash
