@@ -56,8 +56,6 @@ func (v Voice) signed() string {
 	return "\n\n" + v.Signature
 }
 
-type Person struct{ Name, Title string }
-
 type Badge struct{ Text, State string }
 
 type Local struct{ Text, State, Why string }
@@ -79,9 +77,6 @@ type Card struct {
 }
 
 var (
-	altSplit    = regexp.MustCompile(`(?i);|\s+·\s+|\bbackups?:?\s*|\bor\s+`)
-	altPart     = regexp.MustCompile(`^([^,(]+?)(?:\s*\(([^)]*)\))?\s*(?:,\s*(.*))?$`)
-	altPrefix   = regexp.MustCompile(`(?i)^(AC route|Backup \d|or)\s+`)
 	switchboard = regexp.MustCompile(`(?i)switchboard|head office|main line|main office|HQ`)
 	pressLine   = regexp.MustCompile(`(?i)\bpress\b`)
 	directLine  = regexp.MustCompile(`(?i)direct`)
@@ -92,45 +87,6 @@ var (
 	urlInAbout  = regexp.MustCompile(`;?\s*https?:\S+`)
 	notTel      = regexp.MustCompile(`[^+\d]`)
 )
-
-// alternates splits the research's backups ("Ada Lovelace, CMO; Grace Hopper, Head of Digital") into choices.
-func alternates(person string) []Person {
-	var parts []string
-	last := 0
-	for _, m := range altSplit.FindAllStringIndex(person, -1) {
-		sep := strings.ToLower(strings.TrimSpace(person[m[0]:m[1]]))
-		if sep == "or" {
-			if r, _ := utf8.DecodeRuneInString(person[m[1]:]); !unicode.IsLetter(r) {
-				continue
-			}
-		}
-		parts = append(parts, person[last:m[0]])
-		last = m[1]
-	}
-	parts = append(parts, person[last:])
-	var out []Person
-	for _, s := range parts {
-		s = strings.TrimSpace(s)
-		if s == "" {
-			continue
-		}
-		p := Person{Name: s}
-		if m := altPart.FindStringSubmatch(s); m != nil {
-			p.Name = m[1]
-			p.Title = m[3]
-			if p.Title == "" {
-				p.Title = m[2]
-			}
-		}
-		p.Name = strings.TrimSpace(altPrefix.ReplaceAllString(p.Name, ""))
-		p.Title = strings.TrimSpace(p.Title)
-		r, _ := utf8.DecodeRuneInString(p.Name)
-		if unicode.IsUpper(r) && len(strings.Split(p.Name, " ")) <= 4 {
-			out = append(out, p)
-		}
-	}
-	return out
-}
 
 func titleOf(people []Person, name string) string {
 	for _, p := range people {

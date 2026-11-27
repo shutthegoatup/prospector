@@ -15,5 +15,4 @@ type OnboardingRow = customers.OnboardingRow
 type customerStore = customers.CustomerStore
 type onboardingStore = customers.OnboardingStore
 
-var dropCustomerGrants = customers.DropCustomerGrants
 var errNoCustomer = customers.ErrNoCustomer

@@ -373,6 +373,8 @@ var saysNothingBack = map[string]bool{
 	"Mark": true, "MarkAs": true, "Claim": true, "Withheld": true, "Update": true,
 	// Needs a task read for it; TestAnotherOrganisationCantClaimThroughATaskItWasHanded tries it.
 	"ClaimNext": true,
+	// Answers with how many contacts it put in place.
+	"ReplaceContacts": true,
 	// A key and certificate of its own, made on first use; seal_test.go checks another organisation gets its own.
 	"SealKey": true, "SealDocument": true,
 

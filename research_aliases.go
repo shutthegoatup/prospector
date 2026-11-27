@@ -51,10 +51,8 @@ type TaskView = research.TaskView
 type VerdictRow = research.VerdictRow
 type researchStore = research.ResearchStore
 
-var addConfiguratorFacts = research.AddConfiguratorFacts
 var contactStage = research.ContactStage
 var firstLine = research.FirstLine
-var keptValue = research.KeptValue
 var lookForList = research.LookForList
 var normalURL = research.NormalURL
 var runsOf = research.RunsOf

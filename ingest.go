@@ -133,10 +133,6 @@ func seedSentLog(tx *gorm.DB, org int64, entries []SentLogEntry) error {
 	return nil
 }
 
-func companyStem(maker string) string {
-	return strings.Trim(strings.ToLower(firstField(maker)), "(")
-}
-
 func knownMakers(tx *gorm.DB, org int64) (string, error) {
 	var people []Contact
 	if err := tx.Where("org_id = ? and key not like 'org:%'", org).Find(&people).Error; err != nil {
@@ -147,13 +143,6 @@ func knownMakers(tx *gorm.DB, org int64) (string, error) {
 		makers = append(makers, strings.ToLower(deref(p.Maker)))
 	}
 	return strings.Join(makers, " | "), nil
-}
-
-func competitorHold(r CompanyRow) *string {
-	if strings.Contains(r["fit_reason"], "COMPETITOR") && !strings.Contains(r["fit_reason"], "PARTNER") {
-		return str("competitor")
-	}
-	return nil
 }
 
 // importCompanies keeps the Python tracker's "org:" placeholder contacts so the
@@ -214,52 +203,6 @@ func importCompanies(tx *gorm.DB, org int64, companies []CompanyRow) error {
 			if err := tx.Delete(&o).Error; err != nil {
 				return err
 			}
-		}
-	}
-	return nil
-}
-
-// linkCompanies gives every prospects.csv row and every contact's maker a company,
-// and points each contact at it.
-func linkCompanies(tx *gorm.DB, org int64, rows []CompanyRow) error {
-	byStem := map[string]int64{}
-	for _, r := range rows {
-		c, created, err := ensureCompany(tx, org, Company{Name: r["name"], Country: r["country"], Segment: r["segment"],
-			Fit: r["priority"], Stage: CompanyQualified,
-			Why: r["fit_reason"], Domain: domainOf(r["website"]), FoundBy: "import", Hold: competitorHold(r)})
-		if err != nil {
-			return err
-		}
-		if _, err := addConfiguratorFacts(tx, org, c.ID, r["configurator_url"], "", r["configurator_built_by"], "import"); err != nil {
-			return err
-		}
-		if !created {
-			if err := tx.Model(c).Updates(map[string]any{"fit": r["priority"], "segment": r["segment"], "why": r["fit_reason"]}).Error; err != nil {
-				return err
-			}
-		}
-		byStem[companyStem(r["name"])] = c.ID
-	}
-	var people []Contact
-	if err := tx.Where("org_id = ? and company_id is null", org).Find(&people).Error; err != nil {
-		return err
-	}
-	for _, p := range people {
-		maker := deref(p.Maker)
-		id, ok := byStem[companyStem(maker)]
-		if !ok {
-			if companyName(maker) == "" {
-				continue
-			}
-			c, _, err := ensureCompany(tx, org, Company{Name: companyName(maker), Stage: CompanyQualified, FoundBy: "import"})
-			if err != nil {
-				return err
-			}
-			id = c.ID
-			byStem[companyStem(maker)] = id
-		}
-		if err := tx.Model(&p).Update("company_id", id).Error; err != nil {
-			return err
 		}
 	}
 	return nil

@@ -15,6 +15,4 @@ type EnquiryIn = enquiries.EnquiryIn
 type enquiriesAround = enquiries.EnquiriesAround
 type enquiryStore = enquiries.EnquiryStore
 
-var enquiryIDs = enquiries.EnquiryIDs
 var errEnquiryEmail = enquiries.ErrEnquiryEmail
-var inThread = enquiries.InThread

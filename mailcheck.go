@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/nyaruka/phonenumbers/v2"
-	"gorm.io/gorm"
 )
 
 // A domain that takes mail rarely stops; one that doesn't may be set up next week.
@@ -32,21 +31,6 @@ func (a *App) keepCheckingMail(ctx context.Context, every time.Duration) {
 		case <-time.After(every):
 		}
 	}
-}
-
-// forgetMailDomains drops what is kept about the domains of an erased person's
-// addresses: a domain can be their own name. It is asked about again if anyone else uses it.
-func forgetMailDomains(tx *gorm.DB, emails []string) error {
-	var domains []string
-	for _, e := range emails {
-		if d := mailDomainOf(e); d != "" {
-			domains = append(domains, d)
-		}
-	}
-	if len(domains) == 0 {
-		return nil
-	}
-	return tx.Where("domain in ?", domains).Delete(&MailDomain{}).Error
 }
 
 // roleBoxes are local parts that reach whoever reads a shared inbox, not one person.

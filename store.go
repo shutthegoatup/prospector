@@ -11,17 +11,13 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-var Columns = []string{"id", "key", "file", "section", "fit", "maker", "person", "first",
-	"linkedin", "email", "note", "subject", "body", "followup", "flags",
-	"linkedin_added", "email_sent", "followup_sent", "replied", "declined", "hold",
-	"sources", "phone", "called", "call_notes", "tz", "send_to", "accepted", "message"}
-
 // Store is every area's queries, each area a type of its own embedded here so its
 // methods are the store's. They share one core, so a key or resolver set on the store
 // reaches every area.
 type Store struct {
 	*core
 	researchStore
+	privacyStore
 	outreachStore
 	agreementStore
 	enquiryStore
@@ -39,7 +35,7 @@ type Store struct {
 func newStore(c *core) *Store {
 	s := &Store{core: c, identityStore: identityStore{Core: c}, agentStore: agentStore{Core: c}, ssoStore: ssoStore{Core: c},
 		suppressionStore: suppressionStore{Core: c}, customerStore: customerStore{Core: c}, dealStore: dealStore{Core: c},
-		subscriptionStore: subscriptionStore{Core: c}, onboardingStore: onboardingStore{Core: c}}
+		subscriptionStore: subscriptionStore{Core: c}, onboardingStore: onboardingStore{Core: c}, privacyStore: privacyStore{Core: c}}
 	// An area that needs another's queries holds that area, not the whole store.
 	s.prospectingStore = prospectingStore{Core: c, Identity: &s.identityStore, Sales: &s.dealStore}
 	s.enquiryStore = enquiryStore{Core: c, Prospecting: &s.prospectingStore}
