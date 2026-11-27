@@ -83,3 +83,5 @@ func (c Contact) CanMark() error {
 	}
 	return nil
 }
+
+const InConversation = "replied is not null and declined is null and status <> 'suggested'"

@@ -2,7 +2,7 @@ package main
 
 import "github.com/shutthegoatup/prospector/internal/store"
 
-// The models and what they need live in internal/store; these keep their names here.
+// What moved to internal/store keeps its name here.
 
 const AudienceCustomers = store.AudienceCustomers
 const ContactSuggested = store.ContactSuggested
@@ -92,7 +92,6 @@ var enquiryOrigins = store.EnquiryOrigins
 var formatMoney = store.FormatMoney
 var linkedinPath = store.LinkedinPath
 var mustDay = store.MustDay
-var parseDay = store.ParseDay
 var validStage = store.ValidStage
 
 const sealing = store.Sealing
@@ -127,3 +126,10 @@ var nonEmpty = store.NonEmpty
 var randomToken = store.RandomToken
 var str = store.Str
 var today = store.Today
+
+const inConversation = store.InConversation
+
+type Change = store.Change
+type conflict = store.Conflict
+
+var parseMoney = store.ParseMoney

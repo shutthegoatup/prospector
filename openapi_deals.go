@@ -89,7 +89,7 @@ func dealChanges(b *api.DealChange) []Change {
 	}{{"kind", b.Kind}, {"amount", b.Amount}, {"close_date", b.CloseDate}, {"owner", b.Owner}, {"stage", b.Stage},
 		{"next_step", b.NextStep}, {"next_date", b.NextDate}, {"lost_reason", b.LostReason}} {
 		if set.value != nil {
-			out = append(out, Change{set.field, *set.value})
+			out = append(out, Change{Field: set.field, Value: *set.value})
 		}
 	}
 	return out
@@ -219,7 +219,7 @@ func (s apiServer) ChangeEnquiry(ctx context.Context, in api.ChangeEnquiryReques
 			value *string
 		}{{"state", b.State}, {"owner", b.Owner}, {"note", b.Note}} {
 			if set.value != nil {
-				changes = append(changes, Change{set.field, *set.value})
+				changes = append(changes, Change{Field: set.field, Value: *set.value})
 			}
 		}
 	}

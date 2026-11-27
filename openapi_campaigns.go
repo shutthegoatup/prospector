@@ -146,7 +146,7 @@ func (s apiServer) ChangeCampaign(ctx context.Context, in api.ChangeCampaignRequ
 			value *string
 		}{{"name", b.Name}, {"kind", b.Kind}, {"audience", b.Audience}, {"subject", b.Subject}, {"body", b.Body}} {
 			if set.value != nil {
-				changes = append(changes, Change{set.field, *set.value})
+				changes = append(changes, Change{Field: set.field, Value: *set.value})
 			}
 		}
 	}
