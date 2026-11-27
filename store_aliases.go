@@ -125,7 +125,6 @@ var randomToken = store.RandomToken
 var str = store.Str
 var today = store.Today
 
-
 type Change = store.Change
 type conflict = store.Conflict
 
