@@ -254,13 +254,31 @@ var stringFields = map[string]bool{"stage": true, "next_step": true, "lost_reaso
 var Marks = map[string]string{"linkedin": "linkedin_added", "email": "email_sent", "followup": "followup_sent",
 	"call": "called", "replied": "replied", "declined": "declined", "hold": "hold", "accepted": "accepted"}
 
+// Store is every area's queries, each area a type of its own embedded here so its
+// methods are the store's. They share one core, so a key or resolver set on the store
+// reaches every area.
 type Store struct {
+	*core
+	onboardingStore
+}
+
+// core is what every area's queries need: the database and the means to keep secrets.
+type core struct {
 	db *gorm.DB
 	// keys seal what is stored but mustn't be readable from the database alone; nil
 	// when the server was given none.
 	keys *keyring
 	// dns says whether a domain takes mail; nil asks nothing, so tests never reach the network.
 	dns mailDNS
+}
+
+func newStore(c *core) *Store {
+	return &Store{core: c, onboardingStore: onboardingStore{c}}
+}
+
+// through is the same store working through db, such as a transaction.
+func (s *Store) through(db *gorm.DB) *Store {
+	return newStore(&core{db: db, keys: s.keys, dns: s.dns})
 }
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
@@ -288,12 +306,12 @@ func connect(dsn string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Store{db: db}, nil
+	return newStore(&core{db: db}), nil
 }
 
 // in scopes a query to one organisation. Not every query uses it, so what holds the
 // store's exported methods to their organisation is TestNoMethodReachesIntoAnotherOrganisation.
-func (s *Store) in(org int64) *gorm.DB { return s.db.Where("org_id = ?", org) }
+func (s *core) in(org int64) *gorm.DB { return s.db.Where("org_id = ?", org) }
 
 func (s *Store) ContactByID(org, id int64) (*Contact, error) {
 	var c Contact
@@ -399,11 +417,11 @@ func (s *Store) Due(org int64, step string, now time.Time, set OrgSettings) ([]C
 	return due, nil
 }
 
-func (s *Store) log(tx *gorm.DB, org, contact int64, company *int64, actor, action string, value *string) error {
+func (s *core) log(tx *gorm.DB, org, contact int64, company *int64, actor, action string, value *string) error {
 	return s.logAs(tx, org, contact, company, Actor{Name: actor}, action, value)
 }
 
-func (s *Store) logAs(tx *gorm.DB, org, contact int64, company *int64, who Actor, action string, value *string) error {
+func (s *core) logAs(tx *gorm.DB, org, contact int64, company *int64, who Actor, action string, value *string) error {
 	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: who.Name, KeyID: who.KeyID, TaskID: who.Task, Action: action, Value: value, At: time.Now()}).Error
 }
 

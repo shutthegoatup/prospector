@@ -170,7 +170,7 @@ func everyWay(s *Store, undo bool, m reflect.Method, org *Org, do func(said stri
 			in := &intruder{org: org, word: word, spoken: slices.Clone(spoken), yes: yes}
 			on := s
 			if undo {
-				on = &Store{db: s.db.Begin(), keys: s.keys}
+				on = s.through(s.db.Begin())
 			}
 			said, fell := in.call(on, m)
 			if undo {
