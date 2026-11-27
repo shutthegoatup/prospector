@@ -2,12 +2,18 @@ import { expect, test as setup } from "@playwright/test";
 import createClient from "openapi-fetch";
 
 import type { paths } from "../src/api";
-import { base, member, org } from "./world.ts";
+import { base, member, org, reader } from "./world.ts";
 
 function ok<T>({ data, error, response }: { data?: T; error?: unknown; response: Response }): T {
   expect(error, `${response.url} answered ${response.status}: ${JSON.stringify(error)}`).toBeUndefined();
   return data as T;
 }
+
+setup("a member who only reads", async ({ request }) => {
+  const signedIn = await request.post("/api/v1/session", { data: { email: reader.email, password: reader.password } });
+  expect(signedIn.status()).toBe(200);
+  await request.storageState({ path: "a11y/.reader.json" });
+});
 
 // Signs in, then gives the organisation something on every page, through the API as the
 // app itself would.

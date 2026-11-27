@@ -46,7 +46,7 @@ export function OnboardingPage() {
         The steps between a signature and a live customer. Each onboarding is a copy of your steps, made the day it starts, so changing them in Settings later
         leaves the ones running as they are. Start one from a company's page. Ones running late come first.
       </p>
-      <Whose area="support" work="Onboarding is" can={support} />
+      <Whose area="support" said="Onboarding is support work, so here you read it." can={support} />
       <Failed errors={[list.error, settings.error]} />
       {!loading && settings.data && planned === 0 && (
         <Empty title="No steps written yet" hint="An owner writes the steps under Settings, one a line. Then start an onboarding from a company's page." />

@@ -150,7 +150,7 @@ export function TodayPage() {
       <PageHead title="Today">
         <span className="font-mono text-xs text-muted-foreground">{clock(now)}</span>
       </PageHead>
-      <Whose area="sales" work="Outreach is" can={sales} />
+      <Whose area="sales" said="Outreach is sales work, so here you read it." can={sales} />
       <div className="flex flex-wrap items-start gap-8">
         <section className="flex min-w-0 flex-[999_1_560px] flex-col gap-4">
           <p className="text-sm text-muted-foreground">

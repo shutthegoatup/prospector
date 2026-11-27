@@ -46,9 +46,6 @@
   "overrides": [
     {
       "files": [
-        "src/components/app/index.tsx",
-        "src/components/app/layout.tsx",
-        "src/components/app/more.tsx",
         "src/components/app/site.tsx",
         "src/components/app/subscription.tsx",
         "src/pages/Add.tsx",
@@ -61,9 +58,7 @@
         "src/pages/Onboarding.tsx",
         "src/pages/Prepare.tsx",
         "src/pages/Research.tsx",
-        "src/pages/Served.tsx",
         "src/pages/Settings.tsx",
-        "src/pages/SignIn.tsx",
         "src/pages/Subscriptions.tsx",
         "src/pages/Tasks.tsx",
         "src/pages/Task.tsx",

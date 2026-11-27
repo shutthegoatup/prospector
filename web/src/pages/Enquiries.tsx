@@ -104,7 +104,7 @@ export function EnquiriesPage() {
         give it an owner, and say when you're waiting on them or it's closed. Reply from here and it is emailed to them; their answer comes to your own mailbox,
         and you record it here.
       </p>
-      <Whose area="support" work="Answering enquiries is" can={support} />
+      <Whose area="support" said="Answering enquiries is support work, so here you read it." can={support} />
       {/* Only "All" is sure to be there, so it holds the row's place until the counts come. */}
       {!counts && (
         <div className="mb-5 flex flex-wrap gap-2">

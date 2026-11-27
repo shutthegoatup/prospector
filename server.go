@@ -114,9 +114,11 @@ func writeJSON(w http.ResponseWriter, v any) {
 	}
 }
 
-func fail(w http.ResponseWriter, err error, code int) {
+// fail answers a browser with what went wrong, in its language, as text that
+// problemPage makes a page of.
+func fail(w http.ResponseWriter, r *http.Request, err error, code int) {
 	code, text := telling("a browser's request", err, code)
-	http.Error(w, text.Error(), code)
+	http.Error(w, text.In(languageOf(r)), code)
 }
 
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
@@ -124,7 +126,7 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 		if hasKey(r) {
 			writeProblem(w, r, http.StatusBadRequest, say.Errorf("bad request body: %s", err.Error()))
 		} else {
-			fail(w, fmt.Errorf("bad request body: %w", err), http.StatusBadRequest)
+			fail(w, r, fmt.Errorf("bad request body: %w", err), http.StatusBadRequest)
 		}
 		return false
 	}
@@ -385,7 +387,7 @@ func (a *App) signInRoutes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("GET /reset/{token}", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := a.s.PasswordTokenUser(r.PathValue("token")); err != nil {
-			fail(w, errBadLink, http.StatusGone)
+			fail(w, r, errBadLink, http.StatusGone)
 			return
 		}
 		a.shell(w, r)

@@ -80,7 +80,7 @@ func (p *problemPage) finish() {
 		return
 	}
 	p.Header().Del("Content-Length")
-	title, message := problemText(p.code, p.text.String())
+	title, message := problemText(languageOf(p.r), p.code, p.text.String())
 	writeShell(p.ResponseWriter, languageOf(p.r), p.code, problemShown{"problem", p.code, title, message, "/"}, title+": "+message+"\n")
 }
 
@@ -93,7 +93,9 @@ type problemShown struct {
 	Back string `json:"back"`
 }
 
-func problemText(code int, text string) (title, message string) {
+// problemText is the title and message of the page for a browser's request answered
+// with code and text, in lang: the text is the handler's, already in it.
+func problemText(lang string, code int, text string) (title, message string) {
 	message = strings.TrimSpace(text)
 	if first, size := utf8.DecodeRuneInString(message); size > 0 {
 		message = string(unicode.ToUpper(first)) + message[size:]
@@ -103,16 +105,16 @@ func problemText(code int, text string) (title, message string) {
 	}
 	switch {
 	case code == http.StatusNotFound:
-		return "Nothing here", "That page doesn't exist, or it belongs to an organisation you're not in."
+		return say.New("Nothing here").In(lang), say.New("That page doesn't exist, or it belongs to an organisation you're not in.").In(lang)
 	case code == http.StatusForbidden:
-		return "Not allowed", message
+		return say.New("Not allowed").In(lang), message
 	case code == http.StatusUnauthorized:
-		return "Signed out", message
+		return say.New("Signed out").In(lang), message
 	case code == http.StatusTooManyRequests:
-		return "Slow down", message
+		return say.New("Slow down").In(lang), message
 	case code >= 500:
 		// The text may carry internals, so it stays in the plain-text response only.
-		return "Something went wrong", "The server couldn't finish that. Try again in a moment."
+		return say.New("Something went wrong").In(lang), say.New("The server couldn't finish that. Try again in a moment.").In(lang)
 	}
-	return "That didn't work", message
+	return say.New("That didn't work").In(lang), message
 }

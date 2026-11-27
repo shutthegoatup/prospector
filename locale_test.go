@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func TestTheAppSpeaksTheBestOfTheBrowsersLanguagesItHas(t *testing.T) {
@@ -111,5 +112,25 @@ func TestAProblemIsInTheLanguageThePagesAre(t *testing.T) {
 	res, body = problem()
 	if !strings.Contains(body, `"detail":"[ñö çöɱþáñý 9999999]"`) || res.Header.Get("Content-Language") != "en-XA" {
 		t.Errorf("picked: %s %s", res.Header.Get("Content-Language"), body)
+	}
+}
+
+// A page the server makes of a browser's failed request is in the reader's language too:
+// its title and what the handler said.
+func TestAProblemPageIsInTheReadersLanguage(t *testing.T) {
+	t.Parallel()
+	_, _, srv, _ := signedIn(t)
+	req, _ := http.NewRequest("GET", srv.URL+"/reset/not-a-token", nil)
+	req.Header.Set("Accept", "text/html")
+	req.AddCookie(&http.Cookie{Name: langCookie, Value: "en-XA"})
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	page := served(t, string(b))
+	if res.StatusCode != http.StatusGone || page.Title != say.New("That didn't work").In("en-XA") || page.Message != "[ţĥîš ļîñķ ĥáš éẋþîŕéð öŕ ĥáš ƀééñ ûšéð: ášķ ƒöŕ á ñéŵ öñé]." {
+		t.Errorf("a link that has gone: %d %q %q", res.StatusCode, page.Title, page.Message)
 	}
 }

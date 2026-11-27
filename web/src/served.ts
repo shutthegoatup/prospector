@@ -46,10 +46,11 @@ export function parseServed(raw: string | undefined): Served | undefined {
   }
 }
 
-// stepMeta is the note beside a customer's step: when it was done, or when it is due.
-export function stepMeta(st: CustomerStep, day: string | undefined): string {
-  if (st.done_on) return `done ${st.done_on}`;
-  if (st.due && day && st.due < day) return `was due ${st.due}`;
-  if (st.due) return `due ${st.due}`;
-  return "";
+// stepMeta is what the note beside a customer's step says: when it was done, or when it
+// is or was due, the page's day being today.
+export function stepMeta(st: CustomerStep, day: string | undefined): { said: "done" | "late" | "due"; on: string } | undefined {
+  if (st.done_on) return { said: "done", on: st.done_on };
+  if (st.due && day && st.due < day) return { said: "late", on: st.due };
+  if (st.due) return { said: "due", on: st.due };
+  return undefined;
 }

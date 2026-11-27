@@ -31,7 +31,7 @@ export function SubscriptionsPage() {
         What each customer is on, and until when. The one that needs someone soonest comes first: a day to cancel by, a renewal or an end. Record one from a
         company's page. Prospector notes what was agreed and when it's due; it takes no payment and sends no invoice.
       </p>
-      <Whose area="support" work="Subscriptions are" can={support} />
+      <Whose area="support" said="Subscriptions are support work, so here you read it." can={support} />
       <Failed errors={[list.error]} />
       {list.data && list.data.items.length === 0 && <Empty title="No subscriptions yet" hint="Open a company and record what they are on." />}
       {!list.data && !list.error && (

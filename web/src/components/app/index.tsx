@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { type ComponentProps, type CSSProperties, type ReactNode, useEffect } from "react";
 import { createLink, useParams } from "@tanstack/react-router";
-import { defineMessage, useIntl } from "react-intl";
+import { defineMessage, defineMessages, FormattedMessage, useIntl } from "react-intl";
 import { $api } from "@/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { Text } from "./skeleton";
+
+// stop is the coral full stop after a page's title: a mark of Prospector's, the same in
+// every language.
+export const stop = ".";
 
 export type Tone = "ok" | "warn" | "stop" | "agent" | "";
 
@@ -104,23 +108,41 @@ export function useRefresh() {
   return () => client.invalidateQueries();
 }
 
+const m = defineMessages({
+  failed: {
+    defaultMessage: "That didn't work. Reload and try again.",
+    id: "B71vd+",
+    description: "Shown when a change failed and the server said nothing about why",
+  },
+});
+
+const v = {
+  whose: defineMessage<{ area: string }>({
+    defaultMessage: "An owner can add {area, select, sales {sales} other {support}} to you on the Team list in Settings.",
+    id: "TUP8Mp",
+    description: "After saying a page is work the member doesn't do: how they could be given it. {area} is the area of work, sales or support",
+  }),
+};
+
 // Failed says why a change didn't happen, in the server's words.
 export function Failed({ errors }: { errors: ({ detail?: string } | null | undefined)[] }) {
+  const intl = useIntl();
   const error = errors.find(Boolean);
   if (!error) return null;
   return (
     <p className="w-full text-sm text-[var(--stop)]" role="alert">
-      {error.detail ?? "That didn't work. Reload and try again."}
+      {error.detail ?? intl.formatMessage(m.failed)}
     </p>
   );
 }
 
-// Whose tells a member who reads a page, but whose work it isn't, why and how to change that.
-export function Whose({ area, work, can }: { area: "sales" | "support"; work: string; can: boolean }) {
+// Whose tells a member who reads a page, but whose work it isn't, why (said, a whole
+// sentence of the page's own) and how to change that.
+export function Whose({ area, said, can }: { area: "sales" | "support"; said: string; can: boolean }) {
   if (can) return null;
   return (
     <p className="mb-5 max-w-[70ch] border-t border-dashed border-border pt-2 font-mono text-xs text-mark">
-      {work} {area} work, so here you read it. An owner can add {area} to you on the Team list in Settings.
+      {said} <FormattedMessage {...v.whose} values={{ area }} />
     </p>
   );
 }
@@ -166,7 +188,7 @@ export function PageHead({ title, children }: { title: string; children?: ReactN
     <header className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
       <h1 className="font-heading text-4xl font-bold tracking-tight">
         {title}
-        <span className="text-coral">.</span>
+        <span className="text-coral">{stop}</span>
       </h1>
       {children}
     </header>
