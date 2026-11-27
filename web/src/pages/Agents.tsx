@@ -167,7 +167,7 @@ function TallyChip({ rail, n, text }: { rail?: Rail; n?: number; text: string })
   if (n === 0) return null;
   return (
     <span className="rounded-full border-[1.5px] border-ink bg-card px-2.5 py-0.5">
-      <i className={cn("mr-1.5 inline-block size-2 rounded-full", rail ? fill[rail] : "animate-pulse bg-accent")} />
+      <i className={cn("mr-1.5 inline-block size-2 rounded-full", rail ? fill[rail] : "motion-safe:animate-pulse bg-accent")} />
       {n === undefined ? <Bar w="7ch" /> : `${n} ${text}`}
     </span>
   );

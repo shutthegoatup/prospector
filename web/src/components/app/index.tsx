@@ -1,8 +1,10 @@
 // Prospector's own pieces, built on shadcn/ui. components/ui stays as the shadcn CLI
 // writes it, so it can be updated; the look Prospector adds lives here.
 import { useQueryClient } from "@tanstack/react-query";
-import type { ComponentProps, CSSProperties, ReactNode } from "react";
-import { createLink } from "@tanstack/react-router";
+import { type ComponentProps, type CSSProperties, type ReactNode, useEffect } from "react";
+import { createLink, useParams } from "@tanstack/react-router";
+import { defineMessage, useIntl } from "react-intl";
+import { $api } from "@/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -133,8 +135,33 @@ export function Empty({ title, hint }: { title: string; hint?: string }) {
   );
 }
 
+const titles = {
+  page: defineMessage<{ page: string; org: string }>({
+    defaultMessage: "{page} · {org} · Prospector",
+    id: "vFbjH0",
+    description: "The browser tab's title: the page, then the organisation it is in",
+  }),
+  org: defineMessage<{ org: string }>({
+    defaultMessage: "{org} · Prospector",
+    id: "97VVE5",
+    description: "The browser tab's title while the page's own name is still loading",
+  }),
+};
+
+// usePageTitle names the browser tab after the page and its organisation (WCAG 2.4.2);
+// until the page knows its name, the organisation's alone.
+export function usePageTitle(page: string | undefined) {
+  const intl = useIntl();
+  const { org } = useParams({ from: "/o/$org" });
+  const name = $api.useQuery("get", "/o/{org}/api/v1/nav", { params: { path: { org } } }).data?.org.name;
+  useEffect(() => {
+    if (name) document.title = page ? intl.formatMessage(titles.page, { page, org: name }) : intl.formatMessage(titles.org, { org: name });
+  }, [intl, page, name]);
+}
+
 // PageHead is a page's title, with the coral full stop, and anything beside it.
-export function PageHead({ title, children }: { title: ReactNode; children?: ReactNode }) {
+export function PageHead({ title, children }: { title: string; children?: ReactNode }) {
+  usePageTitle(title);
   return (
     <header className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
       <h1 className="font-heading text-4xl font-bold tracking-tight">

@@ -122,7 +122,9 @@ function Code({ dark, children }: { dark?: boolean; children: string }) {
     <pre
       className={cn(
         "overflow-x-auto rounded-[10px] border px-4 py-3.5 font-mono text-[13px] leading-[1.6] [&_code]:bg-transparent! [&_code]:p-0! [&_code]:text-[length:inherit]!",
-        dark ? "sticky top-5 border-sidebar bg-sidebar break-all whitespace-pre-wrap text-[#f4ecdc]" : "my-2.5 mb-3.5 border-border bg-card whitespace-pre",
+        dark
+          ? "sticky top-5 border-sidebar bg-sidebar break-all whitespace-pre-wrap text-[#f4ecdc]"
+          : "my-2.5 mb-3.5 border-border bg-card whitespace-pre-wrap wrap-anywhere",
       )}
     >
       <code>{children}</code>
@@ -318,7 +320,7 @@ export function ApiReference({ doc }: { doc: Doc }) {
                                 <Badge
                                   className={cn(
                                     "rounded px-[7px] py-px font-mono text-xs font-semibold",
-                                    r.bad ? "bg-chart-3/15 text-[#b8401f]" : "bg-chart-2/20 text-[#1d7a52]",
+                                    r.bad ? "bg-chart-3/15 text-[#b8401f]" : "bg-chart-2/20 text-[#1a6e4a]",
                                   )}
                                 >
                                   {r.code}

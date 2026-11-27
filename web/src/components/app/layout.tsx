@@ -1,5 +1,7 @@
+import { useIsFetching } from "@tanstack/react-query";
 import { Link, Outlet, useLocation, useMatch, useNavigate, useParams } from "@tanstack/react-router";
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { defineMessages, useIntl } from "react-intl";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { cn } from "@/lib/utils";
@@ -8,6 +10,22 @@ import { SessionContext } from "@/session";
 import { Bar, Text } from "./skeleton";
 
 type Nav = components["schemas"]["Nav"];
+
+const m = defineMessages({
+  skip: { defaultMessage: "Skip to content", id: "f/j3Ps", description: "A link, first for the keyboard, past the sidebar to the page" },
+  sidebar: { defaultMessage: "Sidebar", id: "Vk7CpX", description: "What a screen reader calls the sidebar of every page in an organisation" },
+  loading: { defaultMessage: "Loading…", id: "1nOXrK", description: "Read out by a screen reader while a page's data is on its way" },
+  unreadable: {
+    defaultMessage: "This organisation couldn't be opened",
+    id: "7UEJYq",
+    description: "Heading of the page shown when an organisation fails to load",
+  },
+  unreadableHint: {
+    defaultMessage: "Reload to try again.",
+    id: "1w6LoO",
+    description: "Under the heading when an organisation fails to load and the server gave no reason",
+  },
+});
 type Area = "sales" | "support";
 
 // The templ app's own button, as the server-rendered pages draw it, so the sidebar looks
@@ -52,10 +70,17 @@ export function AppLayout() {
   const nav = $api.useQuery("get", "/o/{org}/api/v1/nav", { params: { path: { org } } }, { refetchInterval: 60_000 });
   const popup = useMatch({ from: "/o/$org/add", shouldThrow: false })?.search.popup;
   const n = nav.data;
+  const intl = useIntl();
 
+  // Moving to another page puts the keyboard and the screen reader at its start, as a
+  // page load would; a change of filter on the same page leaves focus where it is.
+  const pathname = useLocation({ select: (l) => l.pathname });
+  const shown = useRef(pathname);
   useEffect(() => {
-    if (n) document.title = popup ? `Add to ${n.org.name}` : `${n.org.name} · Prospector`;
-  }, [n, popup]);
+    if (pathname === shown.current) return;
+    shown.current = pathname;
+    document.getElementById("content")?.focus({ preventScroll: true });
+  }, [pathname]);
   useEffect(() => {
     // A session that ended while the page was open: sign in again and come back here.
     // A body that isn't JSON reaches here as a string.
@@ -70,14 +95,26 @@ export function AppLayout() {
   }, [nav.error]);
 
   if (nav.error && !n)
-    return <p className="p-8 text-sm text-[var(--stop)]">{nav.error.detail ?? "This organisation couldn't be read. Reload to try again."}</p>;
+    return (
+      <main id="content" className="panel mx-auto mt-16 max-w-sm p-7">
+        <h1 className="font-heading text-2xl font-bold">
+          {intl.formatMessage(m.unreadable)}
+          <span className="text-coral">.</span>
+        </h1>
+        <p className="text-sm text-[var(--stop)]" role="alert">
+          {nav.error.detail ?? intl.formatMessage(m.unreadableHint)}
+        </p>
+      </main>
+    );
   // Until the organisation has been read, the sidebar draws its outline and the page waits
   // beside it, so nothing already drawn moves when it comes.
   if (!n) {
     return popup ? null : (
       <div className="flex min-h-svh flex-wrap">
+        <SkipLink />
+        <Busy />
         <Sidebar org={org} />
-        <main id="content" aria-busy className="relative min-w-0 flex-[999_1_640px] px-4 pb-16 pt-7 sm:px-8 lg:px-12" />
+        <main id="content" tabIndex={-1} aria-busy className="relative min-w-0 flex-[999_1_640px] px-4 pb-16 pt-7 outline-none sm:px-8 lg:px-12" />
       </div>
     );
   }
@@ -86,6 +123,7 @@ export function AppLayout() {
     return (
       <SessionContext.Provider value={session}>
         <div className="min-h-svh px-5 py-5">
+          <Busy />
           <Outlet />
         </div>
       </SessionContext.Provider>
@@ -94,8 +132,15 @@ export function AppLayout() {
   return (
     <SessionContext.Provider value={session}>
       <div className="flex min-h-svh flex-wrap">
+        <SkipLink />
+        <Busy />
         <Sidebar org={org} n={n} />
-        <main id="content" className="relative min-w-0 flex-[999_1_640px] px-4 pb-16 pt-7 sm:px-8 lg:px-12" style={{ "--org": n.org.color } as CSSProperties}>
+        <main
+          id="content"
+          tabIndex={-1}
+          className="relative min-w-0 flex-[999_1_640px] px-4 pb-16 pt-7 outline-none sm:px-8 lg:px-12"
+          style={{ "--org": n.org.color } as CSSProperties}
+        >
           <Outlet />
         </main>
       </div>
@@ -103,7 +148,30 @@ export function AppLayout() {
   );
 }
 
+// SkipLink is the first thing the keyboard reaches, past the sidebar to the page (WCAG 2.4.1).
+function SkipLink() {
+  const intl = useIntl();
+  return (
+    <a href="#content" className={cn(button, primary, "absolute left-3 top-3 z-50 -translate-y-20 focus:translate-y-0")}>
+      {intl.formatMessage(m.skip)}
+    </a>
+  );
+}
+
+// Busy tells a screen reader that a page's data is on its way, which its placeholders,
+// hidden from it, can't. Refreshing what is already shown says nothing.
+function Busy() {
+  const intl = useIntl();
+  const loading = useIsFetching({ predicate: (q) => q.state.data === undefined }) > 0;
+  return (
+    <p role="status" className="sr-only">
+      {loading ? intl.formatMessage(m.loading) : ""}
+    </p>
+  );
+}
+
 function Sidebar({ org, n }: { org: string; n?: Nav }) {
+  const intl = useIntl();
   const signOut = $api.useMutation("delete", "/api/v1/session", { onSuccess: () => window.location.assign("/login") });
   const page = useLocation({ select: (l) => l.pathname.split("/")[3] ?? "" });
   const active = under[page] ?? page;
@@ -125,14 +193,17 @@ function Sidebar({ org, n }: { org: string; n?: Nav }) {
   ];
 
   return (
-    <aside className="flex max-w-full flex-[1_1_240px] flex-col gap-4 night bg-background px-3.5 py-5 text-foreground md:sticky md:top-0 md:h-svh md:max-w-[260px]">
+    <aside
+      aria-label={intl.formatMessage(m.sidebar)}
+      className="flex max-w-full flex-[1_1_240px] flex-col gap-4 night bg-background px-3.5 py-5 text-foreground md:sticky md:top-0 md:h-svh md:max-w-[260px]"
+    >
       <a href="/" className="flex items-center gap-2.5 px-1.5 font-heading text-lg font-bold tracking-tight">
         <img src="/assets/img/mark.svg" width="26" height="26" alt="" />
         Prospector.
       </a>
       {n ? <OrgSwitcher n={n} /> : <OrgOutline />}
       {!n ? (
-        <span aria-hidden className="h-8 w-full animate-pulse rounded-lg bg-accent" />
+        <span aria-hidden className="h-8 w-full motion-safe:animate-pulse rounded-lg bg-accent" />
       ) : (
         n.sales && (
           <Link to="/o/$org/add" params={{ org }} className={cn(button, primary, "w-full")}>
@@ -186,7 +257,7 @@ function Sidebar({ org, n }: { org: string; n?: Nav }) {
 function OrgOutline() {
   return (
     <div aria-hidden className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2">
-      <span className="size-7 shrink-0 animate-pulse rounded-md bg-accent" />
+      <span className="size-7 shrink-0 motion-safe:animate-pulse rounded-md bg-accent" />
       <span className="flex min-w-0 flex-1 flex-col leading-tight">
         <Bar w="10ch" className="text-sm" />
         <span className="font-mono text-xs text-muted-foreground">organisation</span>

@@ -76,7 +76,6 @@ export function PreparePage() {
     });
   };
 
-  if (agreement.error) return <Failed errors={[agreement.error]} />;
   const head = (
     <>
       <Link to="/o/$org/companies/$id" params={{ org, id: a?.company_id ?? 0 }} disabled={!a} className="font-mono text-xs text-mark">
@@ -90,6 +89,13 @@ export function PreparePage() {
       <Whose area="sales" work="Preparing agreements is" can={sales} />
     </>
   );
+  if (agreement.error)
+    return (
+      <>
+        {head}
+        <Failed errors={[agreement.error]} />
+      </>
+    );
   // What follows depends on the agreement, so it appears below rather than pushing the head down.
   if (!a) return <Loading busy>{head}</Loading>;
   const known = recipients.data !== undefined || Boolean(recipients.error);
@@ -274,7 +280,7 @@ function SignerRow({
     <div className="flex flex-col gap-1.5 rounded-lg border border-border p-2 text-sm">
       <label className="flex items-center gap-2">
         {edit && <input type="radio" name="placing" checked={placing ?? false} disabled={!s} onChange={onPlace} />}
-        <span className={cn("shrink-0 rounded-sm", !s && "animate-pulse bg-accent")} style={{ width: 10, height: 10, background: s?.colour }} />
+        <span className={cn("shrink-0 rounded-sm", !s && "motion-safe:animate-pulse bg-accent")} style={{ width: 10, height: 10, background: s?.colour }} />
         <b>{s ? `${n} · ${s.name}` : <Bar w="12ch" />}</b>
       </label>
       <Meta>

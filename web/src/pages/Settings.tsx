@@ -153,10 +153,16 @@ function Voice({ me, error }: { me?: Me; error?: { detail?: string } | null }) {
         {!me && error ? null : (
           <>
             <Row label="Caller name">
-              <Input name="caller_name" defaultValue={me?.caller_name} placeholder={me?.name} disabled={!me} className={cn(field, !me && "animate-pulse")} />
+              <Input
+                name="caller_name"
+                defaultValue={me?.caller_name}
+                placeholder={me?.name}
+                disabled={!me}
+                className={cn(field, !me && "motion-safe:animate-pulse")}
+              />
             </Row>
             <Row label="Signature">
-              <Textarea name="signature" rows={4} defaultValue={me?.signature} disabled={!me} className={cn(area, !me && "animate-pulse")} />
+              <Textarea name="signature" rows={4} defaultValue={me?.signature} disabled={!me} className={cn(area, !me && "motion-safe:animate-pulse")} />
             </Row>
             <div className="flex items-center gap-3">
               <ActionButton type="submit" size="sm" disabled={!me || save.isPending}>
@@ -259,8 +265,8 @@ function neverContactHint(covered: string[], total: number) {
 function Organisation({ settings: set, failed }: { settings?: Settings; failed: boolean }) {
   const { org, owner } = useSession();
   const loading = !set && !failed;
-  const box = cn(field, loading && "animate-pulse");
-  const areaBox = cn(area, loading && "animate-pulse");
+  const box = cn(field, loading && "motion-safe:animate-pulse");
+  const areaBox = cn(area, loading && "motion-safe:animate-pulse");
   const refresh = useRefresh();
   const covers = $api.useQuery("get", "/o/{org}/api/v1/never-contact/covers", { params: { path: { org }, query: { limit: 8 } } });
   const save = $api.useMutation("patch", "/o/{org}/api/v1/settings", { onSuccess: refresh });
@@ -301,7 +307,7 @@ function Organisation({ settings: set, failed }: { settings?: Settings; failed: 
               name="color"
               type="color"
               defaultValue={set?.color}
-              className={cn("h-10 w-20 rounded-lg border border-input bg-muted p-1", loading && "animate-pulse")}
+              className={cn("h-10 w-20 rounded-lg border border-input bg-muted p-1", loading && "motion-safe:animate-pulse")}
             />
           </Row>
           <Row label="Language for customers">
@@ -435,7 +441,7 @@ function OutgoingMail({ orgName }: { orgName: string }) {
   const test = $api.useMutation("post", "/o/{org}/api/v1/mail-server/test");
   const m = mail.data;
   const loading = !m && !mail.error;
-  const box = cn(field, loading && "animate-pulse");
+  const box = cn(field, loading && "motion-safe:animate-pulse");
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);

@@ -1,3 +1,4 @@
+import { defineMessage, useIntl } from "react-intl";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect } from "react";
 import type { components } from "@/api";
@@ -98,7 +99,14 @@ function useBoard() {
   return { cards: pages.flatMap((p) => p.items), planned: pages[0]?.onboarding_steps ?? 0, loading: !board.data && !board.error, error: board.error };
 }
 
+const board = defineMessage({
+  defaultMessage: "Deals by stage",
+  id: "cbitp9",
+  description: "What a screen reader calls the board of deals, which scrolls sideways",
+});
+
 export function ConversationsPage() {
+  const intl = useIntl();
   const { org, sales } = useSession();
   const { cards, planned, loading, error } = useBoard();
   const members = $api.useQuery("get", "/o/{org}/api/v1/members", { params: { path: { org }, query: { limit: 200 } } });
@@ -113,7 +121,7 @@ export function ConversationsPage() {
       </p>
       <Whose area="sales" work="Deals are" can={sales} />
       <Failed errors={[error, members.error]} />
-      <div className="overflow-x-auto pb-4">
+      <div className="overflow-x-auto pb-4" role="region" aria-label={intl.formatMessage(board)} tabIndex={0}>
         <Loading busy={loading} className="flex min-w-max gap-4">
           {stages.map((st) => {
             const here = cards.filter((c) => c.stage === st.key);
