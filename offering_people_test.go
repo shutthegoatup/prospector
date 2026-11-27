@@ -121,7 +121,7 @@ func TestPickingForAnOfferingLeavesTheCompanysOwnStage(t *testing.T) {
 func scriptText(lines []Line) string {
 	var b strings.Builder
 	for _, l := range lines {
-		b.WriteString(l.Say + "\n")
+		b.WriteString(l.Say.Error() + "\n")
 	}
 	return b.String()
 }

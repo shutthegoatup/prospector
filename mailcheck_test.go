@@ -144,7 +144,7 @@ func TestTheDaysCardWarnsOfADetailThatCantBeRight(t *testing.T) {
 	texts := func(c Contact, noMail map[string]bool) string {
 		var out []string
 		for _, b := range badges(c, "Hannah", now, noMail) {
-			out = append(out, b.Text)
+			out = append(out, b.Text.Error())
 		}
 		return strings.Join(out, " | ")
 	}

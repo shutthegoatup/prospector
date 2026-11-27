@@ -9,6 +9,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // Steps are Today's filters, in the order the chips show.
@@ -21,11 +23,23 @@ var Steps = []struct{ Key, Label, Card string }{
 	{"next", "Next steps", "Next step"},
 }
 
-type Badge struct{ Text, State string }
+// Badge, Local and Line are words for the member, in their language where Today is sent.
+type Badge struct {
+	Text  say.Sayer
+	State string
+}
 
-type Local struct{ Text, State, Why string }
+type Local struct {
+	Text  say.Sayer
+	State string
+}
 
-type Line struct{ Cue, Say string }
+type Line struct{ Cue, Say say.Sayer }
+
+var weekdays = map[string]*say.Text{
+	"Mon": say.New("Mon"), "Tue": say.New("Tue"), "Wed": say.New("Wed"), "Thu": say.New("Thu"),
+	"Fri": say.New("Fri"), "Sat": say.New("Sat"), "Sun": say.New("Sun"),
+}
 
 type Card struct {
 	Contact
@@ -105,55 +119,54 @@ func localTime(tz string, now time.Time) *Local {
 	if lunchLate[tz] {
 		ls, le = 12*60+30, 14*60+30
 	}
-	l := &Local{State: "ok", Why: "good time to call"}
+	state, why := "ok", say.New("good time to call")
 	switch {
 	case day == "Sat" || day == "Sun":
-		l.State, l.Why = "stop", "weekend"
+		state, why = "stop", say.New("weekend")
 	case mins < 9*60 || mins >= 17*60+30:
-		l.State, l.Why = "stop", "outside office hours"
+		state, why = "stop", say.New("outside office hours")
 	case mins >= ls && mins < le:
-		l.State, l.Why = "warn", "lunchtime"
+		state, why = "warn", say.New("lunchtime")
 	case day == "Fri" && mins >= 15*60:
-		l.State, l.Why = "warn", "Friday afternoon"
+		state, why = "warn", say.New("Friday afternoon")
 	case mins < 9*60+30:
-		l.State, l.Why = "warn", "just started the day"
+		state, why = "warn", say.New("just started the day")
 	}
-	city := tz[strings.LastIndex(tz, "/")+1:]
-	l.Text = fmt.Sprintf("%s %s in %s", day, t.Format("15:04"), strings.Replace(city, "_", " ", 1))
-	return l
+	city := strings.Replace(tz[strings.LastIndex(tz, "/")+1:], "_", " ", 1)
+	return &Local{Text: say.Errorf("%s %s in %s: %s", weekdays[day], t.Format("15:04"), city, why), State: state}
 }
 
 func badges(c Contact, name string, now time.Time, noMail map[string]bool) []Badge {
 	var b []Badge
 	phone := deref(c.Phone)
 	if l := localTime(deref(c.Tz), now); l != nil {
-		b = append(b, Badge{l.Text + ": " + l.Why, l.State})
+		b = append(b, Badge{l.Text, l.State})
 	} else {
-		b = append(b, Badge{"Time zone unknown: set it below", "warn"})
+		b = append(b, Badge{say.New("Time zone unknown: set it below"), "warn"})
 	}
 	if strings.HasPrefix(strings.TrimSpace(phone), "+44") {
-		b = append(b, Badge{"UK: check CTPS before calling", "warn"})
+		b = append(b, Badge{say.New("UK: check CTPS before calling"), "warn"})
 	}
 	if switchboard.MatchString(phone) {
-		b = append(b, Badge{"Switchboard: ask for " + name, ""})
+		b = append(b, Badge{say.Errorf("Switchboard: ask for %s", name), ""})
 	}
 	if pressLine.MatchString(phone) && !directLine.MatchString(phone) {
-		b = append(b, Badge{"Press line: ask who to speak to, don't pitch", "warn"})
+		b = append(b, Badge{say.New("Press line: ask who to speak to, don't pitch"), "warn"})
 	}
 	if strings.Contains(deref(c.Flags), "INFERRED") {
-		b = append(b, Badge{"Email may be a guess: verify", "warn"})
+		b = append(b, Badge{say.New("Email may be a guess: verify"), "warn"})
 	}
 	if dead := deadAddress(deref(c.Email), noMail); dead != "" {
-		b = append(b, Badge{dead[strings.IndexByte(dead, '@')+1:] + " takes no mail: find another address", "warn"})
+		b = append(b, Badge{say.Errorf("%s takes no mail: find another address", dead[strings.IndexByte(dead, '@')+1:]), "warn"})
 	}
 	if role := roleAddress(deref(c.Email)); role != "" && !strings.HasPrefix(c.Key, "org:") {
-		b = append(b, Badge{role + " is a shared inbox: ask for " + name + "'s own", ""})
+		b = append(b, Badge{say.Errorf("%s is a shared inbox: ask for %s's own", role, name), ""})
 	}
 	if phoneLooksWrong(phone) {
-		b = append(b, Badge{"Phone number isn't one any country uses: check it", "warn"})
+		b = append(b, Badge{say.New("Phone number isn't one any country uses: check it"), "warn"})
 	}
 	if deref(c.Email) == "" {
-		b = append(b, Badge{"No email on file", ""})
+		b = append(b, Badge{say.New("No email on file"), ""})
 	}
 	return b
 }
@@ -168,22 +181,28 @@ func callScript(c Contact, name string, v Voice) []Line {
 		}
 	}
 	first := deref(c.First)
-	from := v.CallerFull() + " from " + v.Org
 	var lines []Line
 	if switchboard.MatchString(deref(c.Phone)) || pressLine.MatchString(deref(c.Phone)) {
-		lines = append(lines, Line{"If someone else answers", "Hi, could I speak to " + name + ", please? It's " + from + "."})
+		lines = append(lines, Line{say.New("If someone else answers"),
+			say.Errorf("Hi, could I speak to %s, please? It's %s from %s.", name, v.CallerFull(), v.Org)})
 	}
-	why := said
+	// What the connection note said is the member's own words.
+	var why say.Sayer = say.New(said)
 	if c.LinkedinAdded != nil {
-		why = strings.TrimSpace("I added you on LinkedIn the other day. " + said)
+		why = say.New("I added you on LinkedIn the other day.")
+		if said != "" {
+			why = say.Errorf("I added you on LinkedIn the other day. %s", said)
+		}
 	}
 	return append(lines,
-		Line{"When they pick up", "Hi " + first + ", it's " + v.CallerFirst() + " from " + v.Org + ". Have you got a couple of minutes?"},
-		Line{"Why you're calling", why},
-		Line{"What you do", fill(v.PitchFor(c.OfferingID), first, maker, v.Org)},
-		Line{"Ask", "Who looks after that at " + maker + "? Is that you?"},
-		Line{"If they're interested", "Would 20 minutes next week be worth it?"},
-		Line{"Voicemail", "Hi " + first + ", it's " + from + ". I sent you a note on LinkedIn. I'll drop you a short email so you've got my details. Thanks, bye."},
+		Line{say.New("When they pick up"), say.Errorf("Hi %s, it's %s from %s. Have you got a couple of minutes?", first, v.CallerFirst(), v.Org)},
+		Line{say.New("Why you're calling"), why},
+		// The pitch is the organisation's own.
+		Line{say.New("What you do"), say.New(fill(v.PitchFor(c.OfferingID), first, maker, v.Org))},
+		Line{say.New("Ask"), say.Errorf("Who looks after that at %s? Is that you?", maker)},
+		Line{say.New("If they're interested"), say.New("Would 20 minutes next week be worth it?")},
+		Line{say.New("Voicemail"), say.Errorf("Hi %s, it's %s from %s. I sent you a note on LinkedIn. I'll drop you a short email so you've got my details. Thanks, bye.",
+			first, v.CallerFull(), v.Org)},
 	)
 }
 
@@ -331,11 +350,11 @@ func profileHref(c Contact) string {
 	return "https://www.linkedin.com/search/results/people/?keywords=" + strings.ReplaceAll(url.QueryEscape(words), "+", "%20")
 }
 
-func openLabel(c Contact) string {
+func openLabel(c Contact) *say.Text {
 	if safeHref(deref(c.Linkedin)) == "#" {
-		return "Search + copy"
+		return say.New("Search + copy")
 	}
-	return "Open + copy"
+	return say.New("Open + copy")
 }
 
 func plural(n int, word string) string {
@@ -353,12 +372,12 @@ func plural(n int, word string) string {
 	return fmt.Sprintf("%d %s", n, word)
 }
 
-func actorLabel(actor string) string {
+func actorLabel(actor string) say.Sayer {
 	if actor == customerActor {
-		return "the customer"
+		return say.New("the customer")
 	}
 	if a, ok := strings.CutPrefix(actor, "agent:"); ok {
-		return "agent · " + a
+		return say.Errorf("agent · %s", a)
 	}
-	return actor
+	return say.New(actor)
 }

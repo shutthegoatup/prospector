@@ -29,6 +29,9 @@ type Text struct {
 
 func New(text string) *Text { return &Text{format: text, literal: true} }
 
+// Nothing is no words, for a part of a sentence that isn't there this time.
+var Nothing = &Text{literal: true}
+
 // Errorf is fmt.Errorf without %w: what a person reads doesn't wrap another error.
 func Errorf(format string, args ...any) *Text { return &Text{format: format, args: args} }
 

@@ -1,3 +1,4 @@
+import { defineMessages } from "react-intl";
 import { intl } from "@/i18n";
 import type { components } from "@/api";
 
@@ -25,8 +26,20 @@ export function vendorName(kind: string) {
   return vendorNames[kind as VendorKind] ?? kind;
 }
 
-// The details a vendor can find, as a person would say them.
-export const detailNames: Record<string, string> = { email: "email", phone: "mobile", linkedin: "LinkedIn profile" };
+const details = defineMessages({
+  email: { defaultMessage: "email", id: "aPrUFD", description: "A detail a vendor can find about a person: their email address, in the middle of a sentence" },
+  phone: { defaultMessage: "mobile", id: "Cga/Te", description: "A detail a vendor can find about a person: their mobile number, in the middle of a sentence" },
+  linkedin: {
+    defaultMessage: "LinkedIn profile",
+    id: "8UaEj7",
+    description: "A detail a vendor can find about a person: their LinkedIn profile, in the middle of a sentence",
+  },
+});
+
+// detailName is one of the details a vendor can find, as a person would say it.
+export function detailName(field: string) {
+  return field in details ? intl.formatMessage(details[field as keyof typeof details]) : field;
+}
 
 // month is the calendar month vendors' lookups are counted in, which is UTC's.
 export function month(at = new Date()) {

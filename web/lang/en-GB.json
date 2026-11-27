@@ -1,7 +1,27 @@
 {
+  "+650eH": {
+    "defaultMessage": "Outreach is sales work, so here you read it.",
+    "description": "On the Today page, to a member without sales work: why they can read it but not act"
+  },
   "+6aIWQ": {
     "defaultMessage": "You can read this page, not change it",
     "description": "Tooltip on the 'view' tag beside a page the member only reads"
+  },
+  "+BZXGt": {
+    "defaultMessage": "Older →",
+    "description": "Button to the next page of the research page's list"
+  },
+  "+PizFY": {
+    "defaultMessage": "{count}{n, plural, one {thing due} other {things due}}, best first: next steps, calls where it's office hours, messages, emails, follow-ups, then LinkedIn adds.",
+    "description": "Top of the Today page. {count} is the number of things due, drawn with its own space after it; {n} is the same number"
+  },
+  "+auOns": {
+    "defaultMessage": "Look up {detail}",
+    "description": "Button to ask an enrichment vendor for a person's detail. {detail} is the detail, such as email"
+  },
+  "+g0jsI": {
+    "defaultMessage": "They land in Today under LinkedIn adds, with your note ready: <o>o</o> opens the profile and copies the note, <a>a</a> marks them added.",
+    "description": "What happens after adding someone. <o>o</o> and <a>a</a> are the keyboard keys that do it, shown in bold"
   },
   "+m6MKx": {
     "defaultMessage": "Back to Prospector",
@@ -11,6 +31,38 @@
     "defaultMessage": "This page is open for {email} in this browser.",
     "description": "At the foot of a customer's onboarding page"
   },
+  "/lC2L6": {
+    "defaultMessage": "Touches",
+    "description": "Small heading over how many times the company's people have been contacted"
+  },
+  "/rdoJK": {
+    "defaultMessage": "Showing the first {shown} of {total}. Clear some, or filter by step above.",
+    "description": "Under the Today page's list when only some of what is due is shown"
+  },
+  "/xCPC3": {
+    "defaultMessage": "{n} left out",
+    "description": "After how many companies a search found: how many it came to that were already here"
+  },
+  "0+Wiez": {
+    "defaultMessage": "Next steps",
+    "description": "Filter on the Today page: conversations needing a next step"
+  },
+  "00b7Sq": {
+    "defaultMessage": "Connect an agent",
+    "description": "Button on the research page to the page for setting up agents"
+  },
+  "06TjCf": {
+    "defaultMessage": "From your steps",
+    "description": "Over the button that starts an onboarding from the organisation's own steps"
+  },
+  "0BmVcB": {
+    "defaultMessage": "Move renewals and other deals on",
+    "description": "In the Do now panel, beside a count of further deals with no next step or one that is due"
+  },
+  "0Fcu5u": {
+    "defaultMessage": "Left out",
+    "description": "What a screen reader calls the panel of companies a search came to that were already here"
+  },
   "0GmQoe": {
     "defaultMessage": "{role, select, owner {owner} other {member}}",
     "description": "Someone's role in an organisation, in the list of their organisations"
@@ -19,9 +71,33 @@
     "defaultMessage": "This page opens from a link in an email. If yours has stopped working, open it again and ask for a new one, or ask whoever is setting you up.",
     "description": "On /c opened without a link: how to get to a customer's page"
   },
+  "0LnApv": {
+    "defaultMessage": "Add to {org}",
+    "description": "Heading of the bookmarklet's window, and the button that adds the person. {org} is the organisation's name"
+  },
+  "0Mqlku": {
+    "defaultMessage": "Agents check each of these, from Settings › What you sell › {offering}, and record what they find as a fact with its source. <link>Change them</link>",
+    "description": "Under the search box, below what agents check at every company, for another offering. Settings › What you sell › {offering} is a place in Settings; {offering} is its name"
+  },
+  "0QRSAG": {
+    "defaultMessage": "Leave empty to use your template: {template}",
+    "description": "Placeholder of the empty connection note: the organisation's template follows"
+  },
+  "0Yl05V": {
+    "defaultMessage": "suggested",
+    "description": "A person's stage: suggested by an agent, not yet accepted"
+  },
+  "0jL+c4": {
+    "defaultMessage": "People",
+    "description": "Small heading over the people at a company"
+  },
   "0o1xO4": {
     "defaultMessage": "Use your organisation's single sign-on",
     "description": "Button to sign in through an organisation's own provider"
+  },
+  "12dWYp": {
+    "defaultMessage": "Research is sales work, so here you read it.",
+    "description": "On the research page, to a member who doesn't do sales: why they can only read it"
   },
   "1FV3pz": {
     "defaultMessage": "That didn't go through. Check your connection and try again.",
@@ -31,9 +107,25 @@
     "defaultMessage": "No organisation here uses single sign-on for that address. Sign in with your password instead.",
     "description": "When no organisation's single sign-on covers the email address given"
   },
+  "1MET8Y": {
+    "defaultMessage": "Last 7 days",
+    "description": "Heading of the Today page's panel of counts for the past week"
+  },
   "1OUt4r": {
     "defaultMessage": "Stop marketing mail from this sender to the address this link was sent to.",
     "description": "What the unsubscribe button does"
+  },
+  "1ScrsB": {
+    "defaultMessage": "hold",
+    "description": "A person's stage: contact is on hold"
+  },
+  "1UVqh/": {
+    "defaultMessage": "Junked",
+    "description": "Filter on the research page: companies binned for another offering, in place of Rejected"
+  },
+  "1VB59v": {
+    "defaultMessage": "Nothing named yet",
+    "description": "When the organisation has named nothing to look for in a company"
   },
   "1nOXrK": {
     "defaultMessage": "Loading…",
@@ -43,45 +135,241 @@
     "defaultMessage": "Reload to try again.",
     "description": "Under the heading when an organisation fails to load and the server gave no reason"
   },
+  "22ESKg": {
+    "defaultMessage": "Every request, note and run",
+    "description": "Link to a search's own page"
+  },
+  "2CydC5": {
+    "defaultMessage": "Add someone with + Add person, or let an agent suggest people.",
+    "description": "On the research page when no qualified company lacks a contact. + Add person is the button of that name"
+  },
+  "2FVp9+": {
+    "defaultMessage": "{who}, {when}",
+    "description": "Beside a company's verdict for an offering. {who} is who decided, {when} the date and time"
+  },
   "2OK37z": {
     "defaultMessage": "There's no such page here.",
     "description": "Under the 'Not found' heading"
+  },
+  "2ZkiXy": {
+    "defaultMessage": "Agreements",
+    "description": "Small heading over a company's agreements"
+  },
+  "2qC45m": {
+    "defaultMessage": "Send LinkedIn messages",
+    "description": "In the Do now panel, beside a count of LinkedIn messages to send"
+  },
+  "2zl7VT": {
+    "defaultMessage": "Nothing recorded. Once they are a customer, record what they are on.",
+    "description": "When a company has no subscriptions, to someone who can record one"
+  },
+  "3+5BFJ": {
+    "defaultMessage": "Put back",
+    "description": "Button to undo ruling a company out for the organisation's own offering"
+  },
+  "31wBYy": {
+    "defaultMessage": "Rejected",
+    "description": "Filter on the research page: companies rejected for the organisation's own offering"
+  },
+  "3hSmdD": {
+    "defaultMessage": "Search companies, people, notes",
+    "description": "Placeholder of the search box on the companies page"
+  },
+  "3iAFDY": {
+    "defaultMessage": "seen on their site",
+    "description": "How a criterion was checked: an agent saw it on the company's site"
+  },
+  "3kx7Ri": {
+    "defaultMessage": "To review",
+    "description": "A company's verdict for an offering: still to be looked at"
+  },
+  "4MZWhE": {
+    "defaultMessage": "That didn't work. Reload and try again.",
+    "description": "When adding a person failed and the server said nothing about why"
+  },
+  "4S4kkc": {
+    "defaultMessage": "a year",
+    "description": "Choice of the period a subscription's price is for"
+  },
+  "4SUazY": {
+    "defaultMessage": "+ add",
+    "description": "Link to add a person at this company"
+  },
+  "4T465k": {
+    "defaultMessage": "No agent of {prospector}'s own is ready, so this waits for one of yours. <link>Set one up</link>",
+    "description": "Beside the search box when no built-in agent is ready. {prospector} is the product's name; the link goes to the agents page"
+  },
+  "4dHiRC": {
+    "defaultMessage": "LinkedIn adds",
+    "description": "Filter on the Today page: people to add on LinkedIn"
+  },
+  "4qzFVJ": {
+    "defaultMessage": "Put back",
+    "description": "Button to put a rejected company back up for review"
+  },
+  "54Xc1m": {
+    "defaultMessage": "Every search, closed ones too",
+    "description": "Link from the research page to the list of every search"
+  },
+  "594pUG": {
+    "defaultMessage": "An email, phone or profile an agent finds for someone already here waits for you to accept it.",
+    "description": "On the research page when no found detail waits to be accepted"
+  },
+  "5E4w2C": {
+    "defaultMessage": "met",
+    "description": "A company's criterion is met"
+  },
+  "5JeqPz": {
+    "defaultMessage": "Junk",
+    "description": "Button to rule a company out for one offering"
+  },
+  "5YGxNE": {
+    "defaultMessage": "History",
+    "description": "Small heading over what has happened with the company"
+  },
+  "5aDLnG": {
+    "defaultMessage": "Junk",
+    "description": "Button to bin a company for another offering; nothing is sent to anyone"
+  },
+  "5c9azL": {
+    "defaultMessage": "Won",
+    "description": "A conversation's stage: won"
+  },
+  "5jhLCi": {
+    "defaultMessage": "Not being onboarded.",
+    "description": "When a company has no onboarding"
+  },
+  "5nZjIa": {
+    "defaultMessage": "within 30 days",
+    "description": "Tag on a subscription whose next change is within 30 days"
   },
   "5yMmkS": {
     "defaultMessage": "Today",
     "description": "Sidebar: the page of what to do today"
   },
+  "6/S/4s": {
+    "defaultMessage": "Email",
+    "description": "Top of a card on the Today page: an email to send"
+  },
   "659pta": {
     "defaultMessage": "Sign in with a password instead",
     "description": "Link from single sign-on back to signing in with a password"
+  },
+  "6Dz4/z": {
+    "defaultMessage": "That company isn't here.",
+    "description": "Heading of a company's page when there is no such company"
+  },
+  "6K2Fti": {
+    "defaultMessage": "“{reason}” {who}, {when}",
+    "description": "Beside a company's verdict for an offering. {reason} is why, {who} who decided, {when} the date and time"
+  },
+  "6LtUo/": {
+    "defaultMessage": "Reload to try again.",
+    "description": "Under the heading of a company's page that failed to load"
   },
   "6SUmKL": {
     "defaultMessage": "Not found",
     "description": "Heading of the page for an address that doesn't exist"
   },
+  "6UuOrU": {
+    "defaultMessage": "{who} · {when}",
+    "description": "Under an agent's note. {who} is the agent that left it, {when} the date and time"
+  },
+  "6YRzhQ": {
+    "defaultMessage": "proposal",
+    "description": "A person's stage: a proposal is with them"
+  },
   "6efxNd": {
     "defaultMessage": "The company you're prospecting for. You can add more later and switch between them.",
     "description": "What an organisation is, on the page to start a first one"
+  },
+  "74idfF": {
+    "defaultMessage": "in place of {current}",
+    "description": "Under a suggested detail: the one the person holds now, which it would replace"
   },
   "7QmOpI": {
     "defaultMessage": "Single sign-on",
     "description": "Title of the page to sign in through an organisation's own provider"
   },
+  "7RJwhX": {
+    "defaultMessage": "Start an agreement",
+    "description": "Line that opens the form to start an agreement"
+  },
   "7UEJYq": {
     "defaultMessage": "This organisation couldn't be opened",
     "description": "Heading of the page shown when an organisation fails to load"
+  },
+  "7fXu3t": {
+    "defaultMessage": "Flags",
+    "description": "Heading of what the research flagged to look at"
+  },
+  "7v4UCq": {
+    "defaultMessage": "Page {n} of {pages}",
+    "description": "Between the buttons of a long list: which page this is"
+  },
+  "8+qEML": {
+    "defaultMessage": "Every qualified company has a contact",
+    "description": "Heading on the research page when no qualified company lacks a contact"
   },
   "83KaBa": {
     "defaultMessage": "Create",
     "description": "Button to create the first organisation"
   },
+  "8Ijl1I": {
+    "defaultMessage": "suggested",
+    "description": "A person an agent suggested, for a member who can't pick them"
+  },
+  "8UaEj7": {
+    "defaultMessage": "LinkedIn profile",
+    "description": "A detail a vendor can find about a person: their LinkedIn profile, in the middle of a sentence"
+  },
+  "8a6W7E": {
+    "defaultMessage": "Keys: {o} open profile and copy the note · {a} added · {s} skip",
+    "description": "Keyboard shortcuts on the LinkedIn adds. {o}, {a} and {s} are the keys themselves, which stay the same"
+  },
   "8ideLH": {
     "defaultMessage": "view",
     "description": "Small tag beside a page the member can read but not change"
   },
+  "8inZFI": {
+    "defaultMessage": "Start an onboarding",
+    "description": "Line that opens the form to start an onboarding"
+  },
   "97VVE5": {
     "defaultMessage": "{org} · Prospector",
     "description": "The browser tab's title while the page's own name is still loading"
+  },
+  "9EV7uU": {
+    "defaultMessage": "Calls",
+    "description": "Filter on the Today page: calls to make"
+  },
+  "9MCyQA": {
+    "defaultMessage": "Move onboarding steps on",
+    "description": "In the Do now panel, beside a count of customers' onboarding steps waiting"
+  },
+  "9VnAyh": {
+    "defaultMessage": "Find about {count} companies",
+    "description": "Beside the search box. {count} is a field for how many companies to find"
+  },
+  "9aNa1O": {
+    "defaultMessage": "source ↗",
+    "description": "Link to the web page a fact or suggestion came from"
+  },
+  "9viMdO": {
+    "defaultMessage": "{first}, {second}",
+    "description": "Two notes under a suggested detail, such as 'a guess' and 'in place of …'"
+  },
+  "ADTSld": {
+    "defaultMessage": "· {title}",
+    "description": "After a person's name: their job title"
+  },
+  "AJlMQH": {
+    "defaultMessage": "No one yet.",
+    "description": "When no one at a company has been added"
+  },
+  "ALXPUa": {
+    "defaultMessage": "Qualify",
+    "description": "Button to mark a company as worth pursuing"
   },
   "Ak+wss": {
     "defaultMessage": "Main",
@@ -91,13 +379,29 @@
     "defaultMessage": "{org} set up a page for you",
     "description": "Heading when a customer opens the link to their onboarding page. {org} is who is setting them up"
   },
+  "B1gCLF": {
+    "defaultMessage": "People an agent tried to add and was refused. They can't be included, and who they were isn't kept, so one person tried twice counts twice.",
+    "description": "In the panel of what a search left out, under the people refused"
+  },
   "B71vd+": {
     "defaultMessage": "That didn't work. Reload and try again.",
     "description": "Shown when a change failed and the server said nothing about why"
   },
+  "BQ+Tmb": {
+    "defaultMessage": "Then",
+    "description": "Label of what happens when a subscription's term ends"
+  },
   "BlhaQR": {
     "defaultMessage": "Subscriptions",
     "description": "Sidebar: the page of customers' subscriptions"
+  },
+  "BsG9Is": {
+    "defaultMessage": "Undo",
+    "description": "Button to undo ruling a company out for one offering"
+  },
+  "C7e7R8": {
+    "defaultMessage": "Add someone from LinkedIn, or check Research for companies waiting on you.",
+    "description": "Hint when the Today page has nothing to do; Research is the name of a page"
   },
   "CYJzap": {
     "defaultMessage": "A link opens the page once, in one browser. We can send a fresh one to the address this one was sent to.",
@@ -107,29 +411,237 @@
     "defaultMessage": "← First",
     "description": "Button back to the first page of a list"
   },
+  "Cga/Te": {
+    "defaultMessage": "mobile",
+    "description": "A detail a vendor can find about a person: their mobile number, in the middle of a sentence"
+  },
+  "CjdkS3": {
+    "defaultMessage": "Dismiss",
+    "description": "Button to turn down a suggested detail for a person"
+  },
+  "DGGnaQ": {
+    "defaultMessage": "Accept",
+    "description": "Button to accept a suggested detail for a person"
+  },
+  "DM8OQs": {
+    "defaultMessage": "Stage",
+    "description": "What a screen reader calls the filter by where a company stands"
+  },
+  "DMQIfb": {
+    "defaultMessage": "active",
+    "description": "A subscription's status: running"
+  },
+  "DMp1f1": {
+    "defaultMessage": "Called",
+    "description": "Button marking a call made"
+  },
+  "DN9gF+": {
+    "defaultMessage": "unchecked",
+    "description": "No agent has checked a company's criterion"
+  },
+  "DXkbGZ": {
+    "defaultMessage": "Filter by step",
+    "description": "What a screen reader calls the row of filters by step on the Today page"
+  },
+  "E9oEyL": {
+    "defaultMessage": "Send follow-ups",
+    "description": "In the Do now panel, beside a count of follow-ups to send"
+  },
+  "EIULF9": {
+    "defaultMessage": "Added",
+    "description": "Button marking someone added on LinkedIn"
+  },
+  "Eccjcs": {
+    "defaultMessage": "For",
+    "description": "Label of the period a subscription's price is for"
+  },
+  "Eiyhbl": {
+    "defaultMessage": "found by {vendor}",
+    "description": "Which enrichment vendor found a person's detail. {vendor} is its name"
+  },
+  "EkP4JJ": {
+    "defaultMessage": "Agents' notes, unchecked",
+    "description": "Small heading over notes AI agents left about the company, which no one has checked"
+  },
+  "En6Qg4": {
+    "defaultMessage": "e.g. 14,000",
+    "description": "Example in the field for a subscription's price"
+  },
+  "F2Pytr": {
+    "defaultMessage": "Twenty more, in Scotland this time.",
+    "description": "Example in the box for asking a search for more"
+  },
+  "FZDrq9": {
+    "defaultMessage": "Call",
+    "description": "Top of a card on the Today page: a call to make"
+  },
+  "Fj4Bnp": {
+    "defaultMessage": "+ Add person",
+    "description": "Button on the research page to add a person by hand"
+  },
+  "Fnd5y4": {
+    "defaultMessage": "Delete this note?",
+    "description": "Asked before deleting an agent's note"
+  },
+  "GAdsC7": {
+    "defaultMessage": "Drag this to your bookmarks bar. On someone's LinkedIn profile, click it: this form opens filled in with their name, role and company.",
+    "description": "How to use the bookmarklet"
+  },
+  "GSfBhn": {
+    "defaultMessage": "All segments",
+    "description": "The segment filter's choice of every segment"
+  },
+  "GaTn8A": {
+    "defaultMessage": "{brand} keeps the PDF as uploaded, with its SHA-256, and doesn't read what it says. It is not for deeds, or anything that must be witnessed or notarised. You can set out who signs it and where; sending it for signature comes later.",
+    "description": "Under the form to start an agreement. {brand} is the product's name, Prospector"
+  },
+  "GhomIh": {
+    "defaultMessage": "The company couldn't be read.",
+    "description": "Heading of a company's page when it failed to load"
+  },
+  "GkKZVw": {
+    "defaultMessage": "Starts",
+    "description": "Label of the date an onboarding or subscription starts"
+  },
+  "Gtr29S": {
+    "defaultMessage": "Nothing due right now.",
+    "description": "In the Do now panel when there is nothing to do"
+  },
+  "Guehlt": {
+    "defaultMessage": "Download",
+    "description": "Link to download an agreement's PDF"
+  },
+  "H46vQV": {
+    "defaultMessage": "{facts, plural, one {# other fact} other {# other facts}} · {people, plural, one {# person} other {# people}}",
+    "description": "Summary of a company's card that opens to show its facts and people"
+  },
+  "HPuNNE": {
+    "defaultMessage": "It reads only the profile's title and headline, when you click. Nothing runs on LinkedIn by itself.",
+    "description": "What the bookmarklet reads"
+  },
   "HTJdgK": {
     "defaultMessage": "Unsubscribe",
     "description": "Title of the page an unsubscribe link opens, and its button"
+  },
+  "HVKPd7": {
+    "defaultMessage": "Accept",
+    "description": "Button to accept a detail found for a person"
+  },
+  "HYsRxB": {
+    "defaultMessage": "Email",
+    "description": "Label of a person's email address"
   },
   "HkI9B7": {
     "defaultMessage": "You won't get these again",
     "description": "Heading after unsubscribing"
   },
+  "Ho/O7f": {
+    "defaultMessage": "Nothing recorded.",
+    "description": "When a company has no subscriptions"
+  },
+  "Hpunxd": {
+    "defaultMessage": "replies",
+    "description": "Under a count in the Last 7 days panel: replies received"
+  },
   "HriBfZ": {
     "defaultMessage": "{org} asks its people to sign in through its own provider.",
     "description": "When an organisation sent someone to its single sign-on. {org} is its name"
+  },
+  "I6brYQ": {
+    "defaultMessage": "Nothing here",
+    "description": "Heading on the research page when no company was rejected"
+  },
+  "ILygsp": {
+    "defaultMessage": "None.",
+    "description": "When there are no agents' notes"
+  },
+  "IgLv+t": {
+    "defaultMessage": "To review",
+    "description": "Filter on the research page: companies waiting to be qualified or rejected"
   },
   "IlooCq": {
     "defaultMessage": "Older →",
     "description": "Button on to the next page of a list, of older things"
   },
+  "JGEzpW": {
+    "defaultMessage": "Filter",
+    "description": "Button applying the companies page's search and filters"
+  },
+  "JJI9qp": {
+    "defaultMessage": "Company",
+    "description": "Label of the field for a person's company"
+  },
+  "JLb18k": {
+    "defaultMessage": "e.g. the Leith site",
+    "description": "Example in the field naming what an onboarding is for"
+  },
   "JODtyS": {
     "defaultMessage": "Companies",
     "description": "Sidebar: the page listing every company"
   },
+  "JPpPnr": {
+    "defaultMessage": "That didn't work.",
+    "description": "When starting a search failed with nothing from the server to say why"
+  },
+  "JTms4T": {
+    "defaultMessage": "Connection note",
+    "description": "Label of the field for the note sent with a LinkedIn connection request"
+  },
+  "JX+D3g": {
+    "defaultMessage": "Ask for more",
+    "description": "Label of the box for asking a search for more"
+  },
+  "JZP4gH": {
+    "defaultMessage": "Next",
+    "description": "Kind of an agent's note: what to do next"
+  },
+  "Jbmq9x": {
+    "defaultMessage": "Companies",
+    "description": "Title of the page listing every company"
+  },
+  "JjxF8R": {
+    "defaultMessage": "Agents' notes",
+    "description": "Heading of the notes agents left on a search"
+  },
+  "JnJ6Mx": {
+    "defaultMessage": "Later",
+    "description": "Heading of the Today page's panel of calls to make once it is office hours"
+  },
+  "JqNSxB": {
+    "defaultMessage": "{vendor} checked it: valid",
+    "description": "An enrichment vendor checked the email address it found. {vendor} is its name"
+  },
+  "K2NMhm": {
+    "defaultMessage": "suggested {field, select, linkedin {{linkedin} profile} phone {phone number} other {{field}}}",
+    "description": "Over a detail suggested for a person. {field} is which detail, such as email; {linkedin} is the name LinkedIn"
+  },
+  "KoActI": {
+    "defaultMessage": "Reject",
+    "description": "Button to reject a company"
+  },
+  "KoD14D": {
+    "defaultMessage": "From “{title}”",
+    "description": "On the research page when only one search's companies are shown. {title} is the search's title"
+  },
+  "Kxpprw": {
+    "defaultMessage": "Record",
+    "description": "Button to record a subscription"
+  },
+  "KzAALb": {
+    "defaultMessage": "{n, plural, one {# call} other {# calls}} outside office hours right now",
+    "description": "In the Later panel: calls to make once it is office hours where the person is"
+  },
+  "L6iW3x": {
+    "defaultMessage": "No search open.",
+    "description": "On the research page when no search is open"
+  },
   "LTWfbQ": {
     "defaultMessage": "Check your email",
     "description": "Heading after asking for a fresh link"
+  },
+  "LmNULy": {
+    "defaultMessage": "· drafted by {who}",
+    "description": "After the step on a card, when someone wrote the text. {who} is a member or an agent"
   },
   "Ls0JRD": {
     "defaultMessage": "There is nothing for you to do at the moment.",
@@ -139,13 +651,65 @@
     "defaultMessage": "Choose a password",
     "description": "Title of the page a reset link opens"
   },
+  "MEtZ08": {
+    "defaultMessage": "Upload the PDF",
+    "description": "Label of the file field to upload an agreement's PDF"
+  },
+  "MNh7Fx": {
+    "defaultMessage": "Copied ✓",
+    "description": "A copy button's label once it has copied the text"
+  },
+  "MQ49SY": {
+    "defaultMessage": "Days' notice",
+    "description": "Label of how many days' notice a subscription needs"
+  },
+  "MZV8ni": {
+    "defaultMessage": "ended",
+    "description": "A subscription's status: over"
+  },
   "MclTMJ": {
     "defaultMessage": "Sign in",
     "description": "Title of the sign-in page, and its button"
   },
+  "MkdeMg": {
+    "defaultMessage": "Message",
+    "description": "What a screen reader calls the box with a LinkedIn message to edit"
+  },
+  "My4lQ/": {
+    "defaultMessage": "Left out · {n}",
+    "description": "Heading of the panel of what a search left out. {n} is how many"
+  },
+  "N9IPcM": {
+    "defaultMessage": "Review for this",
+    "description": "Button to put a company up for review for one offering"
+  },
+  "NCrA9f": {
+    "defaultMessage": "Found by",
+    "description": "Heading of who found a company"
+  },
+  "NHrASo": {
+    "defaultMessage": "researched",
+    "description": "Under a count in the Last 7 days panel: companies researched"
+  },
   "NJgV5V": {
     "defaultMessage": "just now",
     "description": "Less than a minute ago"
+  },
+  "NLrJ+d": {
+    "defaultMessage": "{stage, select, research {research} outreach {outreach} replied {replied} meeting {meeting} proposal {proposal} won {won} lost {lost} rejected {rejected} other {{stage}}}",
+    "description": "Where a company stands in the pipeline: research, outreach, replied, meeting, proposal, won, lost or rejected. Shown in small capitals"
+  },
+  "Njrfrv": {
+    "defaultMessage": "Name what you look for",
+    "description": "Link to settings, for an owner, when nothing is named to look for in a company"
+  },
+  "O3c/qR": {
+    "defaultMessage": "Faster: from LinkedIn itself",
+    "description": "Heading of the panel about the bookmarklet"
+  },
+  "O3zy1f": {
+    "defaultMessage": "{per, select, year {{figure} a year} month {{figure} a month} other {{figure} a {per}}}",
+    "description": "A subscription's price. {figure} is the amount with its currency, {per} the period (year or month)"
   },
   "OLWuEw": {
     "defaultMessage": "This link isn't one we sent. Use the link in the mail itself.",
@@ -155,13 +719,69 @@
     "defaultMessage": "Send me a new link",
     "description": "Button to mail a customer a fresh link"
   },
+  "OPFGR7": {
+    "defaultMessage": "Run {agent}",
+    "description": "Button to set an agent going on a search. {agent} is its name"
+  },
   "OR1PS+": {
     "defaultMessage": "Your onboarding",
     "description": "Browser tab title of a customer's onboarding page, when the organisation isn't known"
   },
+  "OVGwgM": {
+    "defaultMessage": "Role",
+    "description": "Label of the field for a person's job title"
+  },
+  "OYVII4": {
+    "defaultMessage": "{name} unchecked",
+    "description": "Tag for something the organisation looks for that no one has checked yet. {name} is what it is"
+  },
+  "OnlYXy": {
+    "defaultMessage": "An owner writes the onboarding steps under Settings; then one can be started here.",
+    "description": "When the organisation has no onboarding steps yet"
+  },
+  "OsvY74": {
+    "defaultMessage": "Emails",
+    "description": "Filter on the Today page: emails to send"
+  },
+  "PYDd6K": {
+    "defaultMessage": "Meeting",
+    "description": "A conversation's stage: a meeting is booked or held"
+  },
+  "PaLl0s": {
+    "defaultMessage": "No agent has checked this yet.",
+    "description": "Beside a criterion no agent has checked"
+  },
+  "PdSfEa": {
+    "defaultMessage": "looked",
+    "description": "How a criterion was checked: an agent looked and found nothing"
+  },
+  "PiieMg": {
+    "defaultMessage": "Rejected",
+    "description": "A company's verdict for the organisation's own offering: ruled out"
+  },
+  "Pk0UKs": {
+    "defaultMessage": "replied",
+    "description": "A person's stage: they replied"
+  },
+  "PkuvpQ": {
+    "defaultMessage": "Any stage",
+    "description": "The stage filter's choice of every stage"
+  },
+  "PoLBvs": {
+    "defaultMessage": "Contacts whose email is a pattern guess show up here.",
+    "description": "On the research page when no contact's email is a guess"
+  },
+  "PtEfl7": {
+    "defaultMessage": "Months committed",
+    "description": "Label of how many months a subscription commits to"
+  },
   "PuNA1u": {
     "defaultMessage": "Choose your own password",
     "description": "Title of the page a new member sees first, to replace the password they were given"
+  },
+  "Q0Em+a": {
+    "defaultMessage": "By",
+    "description": "Label of the date the next step is due by"
   },
   "Q5ZL9W": {
     "defaultMessage": "Your first organisation",
@@ -175,17 +795,93 @@
     "defaultMessage": "Sign out",
     "description": "Button to sign out"
   },
+  "QYg3/2": {
+    "defaultMessage": "{n} / {max} chars",
+    "description": "Beside a LinkedIn connection note: how many characters it has of the most LinkedIn allows"
+  },
+  "QfMDej": {
+    "defaultMessage": "What they're on",
+    "description": "Label of the field naming a subscription"
+  },
   "Qjc+uX": {
     "defaultMessage": "Continue to {org}",
     "description": "Button to an organisation's own sign-in. {org} is its name"
+  },
+  "QwNVvH": {
+    "defaultMessage": "Fit {grade}",
+    "description": "Choice of the grade to qualify a company at. {grade} is A, B or C"
+  },
+  "RHnee5": {
+    "defaultMessage": "Agents check each of these, from Settings › What you look for, and record what they find as a fact with its source. <link>Change them</link>",
+    "description": "Under the search box, below what agents check at every company. Settings › What you look for is a place in Settings"
+  },
+  "RMzu66": {
+    "defaultMessage": "← Companies",
+    "description": "Link from a company's page back to the list of companies"
+  },
+  "RtYccE": {
+    "defaultMessage": "Erase {whom, select, row {everyone on this row ({several})} other {{name}}}? Their details, drafts and notes are deleted for good, along with agents' notes about this company and its tasks, and they can't be added again. Facts about the company, and the briefs and requests on tasks, that mention them aren't found for you, and nor are your own lead files: take them out there too.",
+    "description": "Asked before erasing a person. {whom} is row when the row stands for several people, {several} the names it stands for, {name} the person's name otherwise"
+  },
+  "S3a3KE": {
+    "defaultMessage": "LinkedIn profile",
+    "description": "Label of the field for a person's LinkedIn profile address"
+  },
+  "S7V2h5": {
+    "defaultMessage": "why it fits",
+    "description": "Beside an agent's reason a company fits"
+  },
+  "SNTPLC": {
+    "defaultMessage": "Next step",
+    "description": "Top of a card on the Today page: a conversation needing a next step"
+  },
+  "SO6qGo": {
+    "defaultMessage": "Export",
+    "description": "Button to download everything held about a person"
+  },
+  "SUlfGp": {
+    "defaultMessage": "a month",
+    "description": "Choice of the period a subscription's price is for"
+  },
+  "SaS5to": {
+    "defaultMessage": "Name",
+    "description": "Label of the field for a person's name"
+  },
+  "SiTJ6W": {
+    "defaultMessage": "Pick",
+    "description": "Button to pick a suggested person as the company's contact"
+  },
+  "SmcTbd": {
+    "defaultMessage": "Dismiss",
+    "description": "Button to dismiss a detail found for a person"
+  },
+  "T5fiHW": {
+    "defaultMessage": "Facts",
+    "description": "Small heading over what research found about the company"
   },
   "T5oLiE": {
     "defaultMessage": "If that link was yours, a new one is on its way to the address it was sent to. It can take a minute, and only one is sent every few minutes.",
     "description": "After asking for a fresh link; it says the same whether or not the link was real"
   },
+  "T6AkIy": {
+    "defaultMessage": "LinkedIn add",
+    "description": "Top of a card on the Today page: someone to add on LinkedIn"
+  },
   "T6kmYe": {
     "defaultMessage": "Organisation name",
     "description": "Placeholder and label of the field naming a new organisation"
+  },
+  "T7yEjP": {
+    "defaultMessage": "Add on LinkedIn",
+    "description": "In the Do now panel, beside a count of people to add on LinkedIn"
+  },
+  "TOtIK2": {
+    "defaultMessage": "now {current}",
+    "description": "What a person's detail is now, beside a new one found for it"
+  },
+  "TTEOSE": {
+    "defaultMessage": "Existing customer",
+    "description": "Why a company a search came to was left out: it is a customer"
   },
   "TUP8Mp": {
     "defaultMessage": "An owner can add {area, select, sales {sales} other {support}} to you on the Team list in Settings.",
@@ -195,41 +891,177 @@
     "defaultMessage": "Password saved. Sign in with it.",
     "description": "On the sign-in page after choosing a new password from a reset link"
   },
+  "Tjl3hP": {
+    "defaultMessage": "Research",
+    "description": "Title and heading of the research page"
+  },
+  "ToaiqE": {
+    "defaultMessage": "Show these",
+    "description": "Button to show only one search's companies on the research page"
+  },
   "UAooGb": {
     "defaultMessage": "Or",
     "description": "Small heading above the other ways to sign in"
+  },
+  "UJC7aR": {
+    "defaultMessage": "Prepare for signing",
+    "description": "Button to set out who signs an agreement and where"
+  },
+  "URkHiD": {
+    "defaultMessage": "a guess",
+    "description": "Under a suggested email address that was worked out rather than checked"
+  },
+  "UaJIIV": {
+    "defaultMessage": "not met",
+    "description": "A company's criterion is not met"
   },
   "UkToXa": {
     "defaultMessage": "Continue",
     "description": "Button to save a new member's own password and go on"
   },
+  "UkanjM": {
+    "defaultMessage": "Junked",
+    "description": "A company's verdict for an offering: ruled out"
+  },
   "UxaOfn": {
     "defaultMessage": "Password you were given",
     "description": "Label of the field for the password a new member was given"
+  },
+  "V8IBGd": {
+    "defaultMessage": "People",
+    "description": "Heading of the people found at a company"
+  },
+  "VBs1xl": {
+    "defaultMessage": "Sources to check before sending",
+    "description": "Heading of the pages the research drew on"
+  },
+  "VMAH42": {
+    "defaultMessage": "with",
+    "description": "Before the agents a search is sent to, as in: Find about 20 companies with Claude"
   },
   "Vk7CpX": {
     "defaultMessage": "Sidebar",
     "description": "What a screen reader calls the sidebar of every page in an organisation"
   },
+  "VwX+MR": {
+    "defaultMessage": "Agents look for what you write. Settings › What you look for adds what they check at every company. <link>Change them</link>",
+    "description": "Under the search box, with nothing set to check. Settings › What you look for is a place in Settings"
+  },
+  "Vx2kvl": {
+    "defaultMessage": "Note",
+    "description": "What a screen reader calls the box with a LinkedIn connection note to edit"
+  },
+  "W5kGDV": {
+    "defaultMessage": "{state, select, stopping {stopping} waiting {waiting for its endpoint} running {running} finished {finished} stopped {stopped} failed {failed} other {{state}}}",
+    "description": "Where an agent's run on a search is. {state} is one of stopping, waiting, running, finished, stopped, failed"
+  },
+  "WDiXzK": {
+    "defaultMessage": "Email (optional)",
+    "description": "Label of the field for a person's email address"
+  },
+  "WIXyfe": {
+    "defaultMessage": "Review researched companies",
+    "description": "In the Do now panel, beside a count of researched companies to review"
+  },
+  "WQEfWF": {
+    "defaultMessage": "Needs verifying",
+    "description": "Filter on the research page: contacts whose email is a guess"
+  },
+  "WWGyJJ": {
+    "defaultMessage": "Erase",
+    "description": "Button to delete a person and what is held about them for good"
+  },
   "WfNo1q": {
     "defaultMessage": "Other ways to sign in",
     "description": "What a screen reader calls the list of other ways to sign in"
+  },
+  "WfYycz": {
+    "defaultMessage": "{found, plural, one {# new company found} other {# new companies found}}",
+    "description": "How many new companies a search has found"
   },
   "Wfckmw": {
     "defaultMessage": "If that address has an account, a link is on its way. It lasts an hour.",
     "description": "After asking for a reset link; it says the same whether or not the address has an account"
   },
+  "WnjdPv": {
+    "defaultMessage": "No details to check",
+    "description": "Heading on the research page when no found detail waits to be accepted"
+  },
+  "WqroO0": {
+    "defaultMessage": "Notes",
+    "description": "Label of the field for notes from a call"
+  },
+  "Wwk3F6": {
+    "defaultMessage": "Look at subscriptions coming due",
+    "description": "In the Do now panel, beside a count of subscriptions coming due"
+  },
   "X/x+KX": {
     "defaultMessage": "Enquiries",
     "description": "Sidebar: the page of enquiries from the website"
+  },
+  "X6CYIK": {
+    "defaultMessage": "· flags",
+    "description": "After Details on a card when the research flagged something"
+  },
+  "X7D4CM": {
+    "defaultMessage": "declined",
+    "description": "A person's stage: they said no"
+  },
+  "XUzj4e": {
+    "defaultMessage": "{vendor} ({left} of {limit} left)",
+    "description": "A vendor a lookup would go to. {vendor} is its name; {left} the lookups left this month of {limit}"
+  },
+  "XbHScK": {
+    "defaultMessage": "Follow-up",
+    "description": "Top of a card on the Today page: a follow-up to send"
   },
   "Xm3zph": {
     "defaultMessage": "{done} of {total, plural, one {# of your steps is} other {# of your steps are}} done. Mark each one when you have done it.",
     "description": "How many of a customer's own onboarding steps are done"
   },
+  "XxgWDg": {
+    "defaultMessage": "Send to",
+    "description": "Label of the choice of whom at a company to send to"
+  },
+  "Y/oI8e": {
+    "defaultMessage": "That search isn't here.",
+    "description": "When the search being shown on the research page can't be found"
+  },
+  "Y0fsY5": {
+    "defaultMessage": "Show every search",
+    "description": "Link or button to stop showing only one search's companies on the research page"
+  },
+  "Y1XZJo": {
+    "defaultMessage": "Next step",
+    "description": "Label of the field for the next step in a conversation"
+  },
+  "YhpmCA": {
+    "defaultMessage": "No companies match",
+    "description": "When no company matches the companies page's filters"
+  },
   "YnwcFA": {
     "defaultMessage": "Not done yet",
     "description": "Button for a customer to take back marking a step done"
+  },
+  "Z1lVj5": {
+    "defaultMessage": "Answer enquiries",
+    "description": "In the Do now panel, beside a count of unanswered enquiries"
+  },
+  "ZQ5Y/A": {
+    "defaultMessage": "No date",
+    "description": "In place of a next step's date when it has none"
+  },
+  "a/lXfh": {
+    "defaultMessage": "Qualified already",
+    "description": "Why a company a search came to was left out: it was qualified already"
+  },
+  "a1XYeP": {
+    "defaultMessage": "None yet.",
+    "description": "When no one at a company has been found"
+  },
+  "aPrUFD": {
+    "defaultMessage": "email",
+    "description": "A detail a vendor can find about a person: their email address, in the middle of a sentence"
   },
   "aSiD4J": {
     "defaultMessage": "Pages",
@@ -239,13 +1071,25 @@
     "defaultMessage": "Agents & API",
     "description": "Sidebar: the page of AI agents and API keys"
   },
+  "awkoz5": {
+    "defaultMessage": "No emails to verify",
+    "description": "Heading on the research page when no contact's email is a guess"
+  },
   "b7VNor": {
     "defaultMessage": "Marketing mail from this sender won't go to the address this link was sent to. Mail about something you already have with them, such as a change to your contract, can still reach you.",
     "description": "After unsubscribing: what stops, and what can still come"
   },
+  "bOriAy": {
+    "defaultMessage": "Nothing due here",
+    "description": "Title when the Today page has nothing to do under the filter chosen"
+  },
   "bTlt3J": {
     "defaultMessage": "Close it here",
     "description": "Button to close a customer's onboarding page in this browser"
+  },
+  "blZ73x": {
+    "defaultMessage": "Replied",
+    "description": "A conversation's stage: they replied"
   },
   "bqXVSi": {
     "defaultMessage": "current",
@@ -259,6 +1103,22 @@
     "defaultMessage": "Email me a link",
     "description": "Button to send a password reset link"
   },
+  "c//kQy": {
+    "defaultMessage": "ending",
+    "description": "A subscription's status: ends when its term does"
+  },
+  "cEBHnw": {
+    "defaultMessage": "{status, select, draft {draft} other {{status}}} · by {who}",
+    "description": "Beside an agreement's name. {status} is where it stands (draft), {who} who started it"
+  },
+  "cL1i3L": {
+    "defaultMessage": "Skipped",
+    "description": "Kind of an agent's note: something it chose not to do"
+  },
+  "cS1f1R": {
+    "defaultMessage": "lost",
+    "description": "A person's stage: the deal is lost"
+  },
   "cVVVDW": {
     "defaultMessage": "New password",
     "description": "Label of the field for a new password"
@@ -266,6 +1126,30 @@
   "cbitp9": {
     "defaultMessage": "Deals by stage",
     "description": "What a screen reader calls the board of deals, which scrolls sideways"
+  },
+  "chI4zo": {
+    "defaultMessage": "Not looked at",
+    "description": "A company with no verdict yet for an offering"
+  },
+  "cpHquh": {
+    "defaultMessage": "Skip",
+    "description": "Button putting off adding someone on LinkedIn"
+  },
+  "crEQSv": {
+    "defaultMessage": "e.g. Standard plan, 2 sites",
+    "description": "Example in the field naming a subscription"
+  },
+  "cuZbNR": {
+    "defaultMessage": "Facts",
+    "description": "Heading of the facts found about a company"
+  },
+  "cvX7jy": {
+    "defaultMessage": "Record a subscription",
+    "description": "Line that opens the form to record a subscription"
+  },
+  "d2Cw+R": {
+    "defaultMessage": "Add someone",
+    "description": "Link to add a person at a company"
   },
   "d68oa4": {
     "defaultMessage": "That didn't go through. Check your connection and try again.",
@@ -279,9 +1163,45 @@
     "defaultMessage": "agent · {name}",
     "description": "Who did something, when it was one of the organisation's AI agents"
   },
+  "dbFG9c": {
+    "defaultMessage": "Details to check",
+    "description": "Filter on the research page: details found for people, waiting to be accepted"
+  },
+  "deNoGE": {
+    "defaultMessage": "{outcome, select, not_kept {{vendor} found one that can't be kept: {detail} on {on} · it can be asked again from {again}} other {{vendor} found no {detail} on {on} · it can be asked again from {again}}}",
+    "description": "An enrichment vendor's lookup that found nothing to keep. {outcome} is not_kept when what it found may not be kept, otherwise it found nothing; {vendor} is its name; {detail} the detail, such as email; {on} and {again} are days"
+  },
+  "deTA2z": {
+    "defaultMessage": "Details · {n, plural, one {# source} other {# sources}}",
+    "description": "Opens a card's contact details and the pages its research drew on"
+  },
+  "djs9DB": {
+    "defaultMessage": "{found} of about {want} found",
+    "description": "How far a search has got. {found} is the new companies found; {want} how many were asked for"
+  },
   "do7vTs": {
     "defaultMessage": "The one you signed in with was shown to whoever added you. Choose one only you know, 10 characters or more.",
     "description": "Why a new member must choose their own password"
+  },
+  "doI3QL": {
+    "defaultMessage": "e.g. Annual service agreement 2027",
+    "description": "Example in the field naming a new agreement"
+  },
+  "dplTOl": {
+    "defaultMessage": "Needs a contact",
+    "description": "Filter on the research page: qualified companies with nobody picked to contact"
+  },
+  "dr8gK1": {
+    "defaultMessage": "Nothing recorded yet.",
+    "description": "When a company has no history"
+  },
+  "e9fTe/": {
+    "defaultMessage": "meetings",
+    "description": "Under a count in the Last 7 days panel: meetings booked"
+  },
+  "eD55lX": {
+    "defaultMessage": "{n} more on the search's own page",
+    "description": "Link to a search's own page, for the companies it left out that aren't listed here"
   },
   "eRNQKX": {
     "defaultMessage": "Forgot your password?",
@@ -291,9 +1211,65 @@
     "defaultMessage": "We'll email you a link to choose a new one.",
     "description": "On the page to ask for a password reset link"
   },
+  "epZJG2": {
+    "defaultMessage": "Never contact, kept on file",
+    "description": "Why a company a search came to was left out: it is on the never-contact list"
+  },
+  "eu9lWY": {
+    "defaultMessage": "About how many companies",
+    "description": "What a screen reader calls the field for how many companies a search should find"
+  },
   "f/j3Ps": {
     "defaultMessage": "Skip to content",
     "description": "A link, first for the keyboard, past the sidebar to the page"
+  },
+  "fAYYkN": {
+    "defaultMessage": "touches",
+    "description": "Under a count in the Last 7 days panel: notes, messages, emails and calls made"
+  },
+  "fGmy+l": {
+    "defaultMessage": "Find",
+    "description": "Button to start a search"
+  },
+  "fh5d6n": {
+    "defaultMessage": "Onboarding",
+    "description": "Small heading over a company's onboardings"
+  },
+  "fsVQKi": {
+    "defaultMessage": "must",
+    "description": "Beside a criterion a company has to meet"
+  },
+  "fzP2kj": {
+    "defaultMessage": "Say who you're looking for and an agent goes to find them. What agents, jobs and imports find waits here: nothing reaches outreach until someone qualifies it and picks a contact. Every fact keeps the link it came from.",
+    "description": "Paragraph under the research page's heading saying what the page is for"
+  },
+  "gA7E5s": {
+    "defaultMessage": "Adding people is sales work. An owner can add sales to you on the Team list in Settings.",
+    "description": "On the add person page, for a member who doesn't do sales"
+  },
+  "gCBhX9": {
+    "defaultMessage": "Subscriptions",
+    "description": "Small heading over a company's subscriptions"
+  },
+  "gGeerE": {
+    "defaultMessage": "When it's right",
+    "description": "Over the button that records a subscription"
+  },
+  "gHQcsa": {
+    "defaultMessage": "Stop {agent}",
+    "description": "Button to stop an agent's run on a search. {agent} is its name"
+  },
+  "gMzis5": {
+    "defaultMessage": "Today",
+    "description": "Title of the page listing the day's outreach"
+  },
+  "gQL8tA": {
+    "defaultMessage": "Fit",
+    "description": "Tooltip on a company's fit score"
+  },
+  "gU6T/w": {
+    "defaultMessage": "None yet. Start one, then upload the contract as a PDF.",
+    "description": "When a company has no agreements"
   },
   "ggJSEV": {
     "defaultMessage": "{page} · Prospector",
@@ -303,6 +1279,10 @@
     "defaultMessage": "Back to sign in",
     "description": "Link back to the sign-in page"
   },
+  "gmXCeT": {
+    "defaultMessage": "Accepted instead",
+    "description": "Button on an email due: the person accepted the LinkedIn connection instead, so a LinkedIn message goes next"
+  },
   "gsLlgl": {
     "defaultMessage": "Getting you set up",
     "description": "Heading of a customer's onboarding page"
@@ -311,13 +1291,33 @@
     "defaultMessage": "Onboarding",
     "description": "Sidebar: the page of new customers being set up"
   },
+  "h8NJyf": {
+    "defaultMessage": "Segment",
+    "description": "What a screen reader calls the filter by market segment"
+  },
+  "h9vXAR": {
+    "defaultMessage": "Proposal",
+    "description": "A conversation's stage: a proposal is out"
+  },
   "h9yCRK": {
     "defaultMessage": "Research",
     "description": "Sidebar: the page of companies and people to look into"
   },
+  "hD6tPx": {
+    "defaultMessage": "Where it stands",
+    "description": "Small heading over a company's verdict for each offering"
+  },
   "hMigST": {
     "defaultMessage": "{org} · your onboarding",
     "description": "Browser tab title of a customer's onboarding page. {org} is who is setting them up"
+  },
+  "heKwYR": {
+    "defaultMessage": "Price",
+    "description": "Label of a subscription's price"
+  },
+  "i28Gr1": {
+    "defaultMessage": "Companies your agents and discovery jobs add will wait here.",
+    "description": "On the research page when nothing is waiting to be reviewed"
   },
   "iCmTO/": {
     "defaultMessage": "Settings",
@@ -327,41 +1327,257 @@
     "defaultMessage": "That didn't work. Try again.",
     "description": "When creating an organisation failed and the server said nothing about why"
   },
+  "iT6cv9": {
+    "defaultMessage": "Filter",
+    "description": "What a screen reader calls the research page's row of filters"
+  },
   "iTA1+m": {
     "defaultMessage": "Work email",
     "description": "Label of the email field on the single sign-on page"
+  },
+  "j8PtH5": {
+    "defaultMessage": "Not interested",
+    "description": "Button marking that the person called was not interested"
+  },
+  "j9HJpA": {
+    "defaultMessage": "{day} · {time}",
+    "description": "Beside the Today page's title: the day, such as Fri 27 Nov, and the time"
+  },
+  "jI0/xf": {
+    "defaultMessage": "won",
+    "description": "A person's stage: the deal is won"
+  },
+  "jSsJTy": {
+    "defaultMessage": "Rejected before",
+    "description": "Why a company a search came to was left out: it was rejected before"
+  },
+  "jVc7oA": {
+    "defaultMessage": "Searches",
+    "description": "Heading of the research page's list of open searches, and what a screen reader calls it"
   },
   "jtASEY": {
     "defaultMessage": "Nothing to show here",
     "description": "Heading of /c opened without a link"
   },
+  "jy0OnA": {
+    "defaultMessage": "Start",
+    "description": "Button to start an onboarding or an agreement"
+  },
+  "k4kThJ": {
+    "defaultMessage": "← First",
+    "description": "Button back to the start of the research page's list"
+  },
+  "k4na53": {
+    "defaultMessage": "Your own",
+    "description": "In the research page's row of offerings: the organisation's own, when its name hasn't loaded"
+  },
+  "kJ/AVh": {
+    "defaultMessage": "Stage",
+    "description": "Label of where a conversation stands"
+  },
+  "km4QGa": {
+    "defaultMessage": "Ask",
+    "description": "Button to send a request for more to a search"
+  },
+  "lXKsMn": {
+    "defaultMessage": "Delete",
+    "description": "Button to delete an agent's note"
+  },
+  "lXwsoK": {
+    "defaultMessage": "Erased on request",
+    "description": "In the panel of what a search left out: people refused as erased at their request"
+  },
   "la6HzQ": {
     "defaultMessage": "Password",
     "description": "Label of the password field"
+  },
+  "ldGibd": {
+    "defaultMessage": "notice given",
+    "description": "A subscription's status: the customer gave notice"
+  },
+  "lfp5kR": {
+    "defaultMessage": "Found by",
+    "description": "Small heading over who found the company"
   },
   "lhN4WM": {
     "defaultMessage": "It shows the steps that are yours while they set you up. Opening it here keeps it open in this browser for 30 days. The link works once.",
     "description": "What a customer's onboarding page is, before they open it"
   },
+  "loW2RH": {
+    "defaultMessage": "Message",
+    "description": "Top of a card on the Today page: a LinkedIn message to send"
+  },
+  "lp7maQ": {
+    "defaultMessage": "Review again",
+    "description": "Button to put a company rejected before back up for review"
+  },
+  "mAMWFh": {
+    "defaultMessage": "Remove the draft {name} and its document?",
+    "description": "Asked before removing a draft agreement. {name} is the agreement's name"
+  },
+  "mEwBdB": {
+    "defaultMessage": "Open conversation",
+    "description": "Why a company a search came to was left out: a conversation with it is open"
+  },
+  "mfLMho": {
+    "defaultMessage": "Set next steps",
+    "description": "In the Do now panel, beside a count of conversations needing a next step"
+  },
+  "mjBZXe": {
+    "defaultMessage": "Who signs it",
+    "description": "Link to see who signs an agreement"
+  },
+  "mp4wvV": {
+    "defaultMessage": "Qualify",
+    "description": "Button to qualify a company"
+  },
+  "msXQvr": {
+    "defaultMessage": "email verified",
+    "description": "A person's email address has been checked"
+  },
   "n0QYBT": {
     "defaultMessage": "Add",
     "description": "Button to create the new organisation named beside it"
+  },
+  "n8d2rY": {
+    "defaultMessage": "{agent} · {state}",
+    "description": "An agent running on a search. {agent} is its name; {state} where its run is, such as running"
+  },
+  "nOfqx2": {
+    "defaultMessage": "not found",
+    "description": "An agent looked for a company's criterion and didn't find it"
+  },
+  "nXFGEy": {
+    "defaultMessage": "Qualified",
+    "description": "A company's verdict for an offering: worth pursuing"
+  },
+  "nYBbXx": {
+    "defaultMessage": "<b>{agent}</b> · {state}",
+    "description": "An agent's run on a search. {agent} is its name; {state} where its run is, such as finished"
+  },
+  "np+FZ1": {
+    "defaultMessage": "Who are you looking for?",
+    "description": "Label of the box where a search is described"
+  },
+  "nzC5dc": {
+    "defaultMessage": "Send emails",
+    "description": "In the Do now panel, beside a count of emails to send"
+  },
+  "nzO1rC": {
+    "defaultMessage": "not contacted",
+    "description": "A person's stage: no one has contacted them yet"
+  },
+  "oDszhZ": {
+    "defaultMessage": "inferred",
+    "description": "How a criterion was checked: an agent inferred it"
+  },
+  "oyGplP": {
+    "defaultMessage": "Your own",
+    "description": "Name of the organisation's own offering, when its name hasn't loaded"
+  },
+  "p3QEcq": {
+    "defaultMessage": "Nothing to review",
+    "description": "Heading on the research page when nothing is waiting to be reviewed"
+  },
+  "p98CtA": {
+    "defaultMessage": "← Previous",
+    "description": "Button back to the previous page of a list"
+  },
+  "pArKFD": {
+    "defaultMessage": "Replied",
+    "description": "Button marking that the person replied"
+  },
+  "pHTf+E": {
+    "defaultMessage": "in outreach",
+    "description": "A person's stage: being contacted"
+  },
+  "pKfcaJ": {
+    "defaultMessage": "{n, plural, one {# person} other {# people}}",
+    "description": "How many people are known at a company, in its row on the companies page"
+  },
+  "pZxxbI": {
+    "defaultMessage": "Looking for",
+    "description": "Small heading over what the organisation looks for in a company, and whether this one has it"
   },
   "plpp7+": {
     "defaultMessage": "Campaigns",
     "description": "Sidebar: the page of mail campaigns"
   },
+  "q+kFC6": {
+    "defaultMessage": "Dead end",
+    "description": "Kind of an agent's note: something it tried that led nowhere"
+  },
+  "qCBlOC": {
+    "defaultMessage": "Head of Marketing",
+    "description": "Example job title shown in the empty role field"
+  },
   "qzUXSB": {
     "defaultMessage": "+ Add person",
     "description": "Sidebar button to add a person to prospect"
+  },
+  "rJg0SS": {
+    "defaultMessage": "Then",
+    "description": "Small heading: what happens after adding someone with the bookmarklet"
+  },
+  "rK4VHZ": {
+    "defaultMessage": "I've already sent the connection request",
+    "description": "Checkbox: the LinkedIn request has been sent already"
+  },
+  "rKDuXV": {
+    "defaultMessage": "Add person",
+    "description": "Title of the page to add a person by hand"
+  },
+  "rKb9Yi": {
+    "defaultMessage": "{kind, select, skipped {skipped} dead_end {dead end} next {next} other {{other}}}",
+    "description": "What kind of note an agent left on a search. {other} is the kind as the server names it, for one not listed"
   },
   "rW3MyB": {
     "defaultMessage": "Mark done",
     "description": "Button for a customer to mark one of their steps done"
   },
+  "ra3/v2": {
+    "defaultMessage": "Never contact",
+    "description": "In the panel of what a search left out: people refused as on the never-contact list"
+  },
+  "rtXs/J": {
+    "defaultMessage": "refused {n}×",
+    "description": "How many times an agent was refused adding people of this kind"
+  },
+  "s1zF84": {
+    "defaultMessage": "For, if they have several",
+    "description": "Label of the field naming which of a customer's sites or teams an onboarding is for"
+  },
+  "s2mEtH": {
+    "defaultMessage": "Fit",
+    "description": "Heading of how well a company fits, and what a screen reader calls the grade to qualify it at"
+  },
+  "sAXDZu": {
+    "defaultMessage": "Company",
+    "description": "What a screen reader calls a company's page while it loads"
+  },
+  "scH4Dg": {
+    "defaultMessage": "{n, plural, one {# company} other {# companies}}",
+    "description": "How many companies match, beside the companies page's title"
+  },
+  "se8WBZ": {
+    "defaultMessage": "no {name}",
+    "description": "Tag for something the organisation looks for that the company lacks. {name} is what it is"
+  },
+  "sgwP9f": {
+    "defaultMessage": "Do now",
+    "description": "Heading of the Today page's panel of things to do now, each with a count"
+  },
   "slbFYd": {
     "defaultMessage": "{said, select, done {done {on}} late {was due {on}} other {due {on}}}",
     "description": "Beside a customer's step: when it was done, or when it was or is due. {on} is a date"
+  },
+  "ssENcA": {
+    "defaultMessage": "search {n}",
+    "description": "Stands for a search's title while it loads. {n} is its number"
+  },
+  "t3TOt+": {
+    "defaultMessage": "Asked.",
+    "description": "After a request for more was sent to a search"
   },
   "tIzXly": {
     "defaultMessage": "Save password",
@@ -371,6 +1587,10 @@
     "defaultMessage": "This link has been used or has run out",
     "description": "Heading when a customer's link no longer opens their page"
   },
+  "tXCGGp": {
+    "defaultMessage": "All",
+    "description": "Filter on the Today page showing every step"
+  },
   "taHntT": {
     "defaultMessage": "New organisation",
     "description": "Label and placeholder of the box to name a new organisation"
@@ -379,32 +1599,168 @@
     "defaultMessage": "Email",
     "description": "Label of the email address field"
   },
+  "tnYITz": {
+    "defaultMessage": "fit {grade}",
+    "description": "In the line under a company's name: how well it fits. {grade} is a letter grade, such as A"
+  },
   "u+8kmh": {
     "defaultMessage": "Find my organisation",
     "description": "Button to look up which organisation's single sign-on covers an address"
+  },
+  "uFqR/b": {
+    "defaultMessage": "asks {vendors} in {month}",
+    "description": "Under the buttons to look up a person's details: who they ask. {vendors} are vendors joined with or; {month} the month"
+  },
+  "uHTjF9": {
+    "defaultMessage": "Time zone",
+    "description": "Label of a person's time zone"
+  },
+  "uNYUoZ": {
+    "defaultMessage": "Remove",
+    "description": "Button to remove a draft agreement"
+  },
+  "ui6JIn": {
+    "defaultMessage": "Sent",
+    "description": "Button marking a message, email or follow-up sent"
+  },
+  "usAvp4": {
+    "defaultMessage": "{vendor} couldn't confirm it: a guess",
+    "description": "An enrichment vendor couldn't confirm the email address it found. {vendor} is its name"
+  },
+  "ut+JNH": {
+    "defaultMessage": "Best fit first: no must missed, then most met, then fewest left unknown.",
+    "description": "On the research page: the order the companies of a search are listed in. A must is a criterion a company has to meet"
+  },
+  "uzH+V4": {
+    "defaultMessage": "Next →",
+    "description": "Button on to the next page of a list"
+  },
+  "v8v3AO": {
+    "defaultMessage": "Already here when this search came to them, or on a domain the never-contact list covers: kept, never up for review.",
+    "description": "In the panel of companies a search left out: why they were"
+  },
+  "vDbQhP": {
+    "defaultMessage": "Lost",
+    "description": "A conversation's stage: lost"
   },
   "vFbjH0": {
     "defaultMessage": "{page} · {org} · Prospector",
     "description": "The browser tab's title: the page, then the organisation it is in"
   },
+  "vHcjmH": {
+    "defaultMessage": "Selling",
+    "description": "Label of the research page's row of offerings to pick whose queue is shown, and what a screen reader calls it"
+  },
   "vRiRx4": {
     "defaultMessage": "Conversations",
     "description": "Sidebar: the page of deals under way"
+  },
+  "vcAVds": {
+    "defaultMessage": "Name of the agreement",
+    "description": "What a screen reader calls the field naming a new agreement"
+  },
+  "vq2NQX": {
+    "defaultMessage": "source ↗",
+    "description": "Link to the page a fact came from"
+  },
+  "vuSEJ7": {
+    "defaultMessage": "{n} to review",
+    "description": "After how many companies a search found: how many of them wait for review"
   },
   "w4EZ+4": {
     "defaultMessage": "the customer",
     "description": "Who did something, when it was the customer themselves"
   },
+  "wBVcnU": {
+    "defaultMessage": "meeting",
+    "description": "A person's stage: a meeting is arranged"
+  },
+  "waRVnL": {
+    "defaultMessage": "Messages",
+    "description": "Filter on the Today page: LinkedIn messages to send"
+  },
   "whdKVO": {
     "defaultMessage": "member · {work, select, none {reads only} sales {sales} support {support} other {sales, support}}",
     "description": "Under a member's name in the sidebar: their role and the areas of work they do. {work} is which areas"
+  },
+  "wlw5/B": {
+    "defaultMessage": "Interested",
+    "description": "Button marking that the person called was interested"
+  },
+  "ws4nzJ": {
+    "defaultMessage": "Agents look for what you write. Settings › What you sell adds what they check at every company. <link>Change them</link>",
+    "description": "Under the search box, with nothing set to check, for another offering. Settings › What you sell is a place in Settings"
+  },
+  "xGB6d2": {
+    "defaultMessage": "Replace the PDF",
+    "description": "Label of the file field to replace an agreement's PDF"
+  },
+  "xOHwOr": {
+    "defaultMessage": "Search",
+    "description": "What a screen reader calls the search box on the companies page"
+  },
+  "xOiRvD": {
+    "defaultMessage": "Clear the filters, or add companies through Research or an agent.",
+    "description": "Under 'No companies match'"
+  },
+  "xUQKbh": {
+    "defaultMessage": "email is a guess",
+    "description": "A person's email address was worked out from the company's pattern"
+  },
+  "xfJnWy": {
+    "defaultMessage": "Phone",
+    "description": "Label of a person's phone number"
   },
   "xkqhRH": {
     "defaultMessage": "Open my steps",
     "description": "Button to open a customer's onboarding page from their link"
   },
+  "xmDFHI": {
+    "defaultMessage": "Make calls now",
+    "description": "In the Do now panel, beside a count of calls where it is office hours"
+  },
+  "y4K/LS": {
+    "defaultMessage": "Call script",
+    "description": "Opens what to say on a call"
+  },
+  "y6Xtb8": {
+    "defaultMessage": "scheduled",
+    "description": "A subscription's status: not started yet"
+  },
+  "yAIlAK": {
+    "defaultMessage": "The queue couldn't be read. Reload to try again.",
+    "description": "When the research page's list of companies failed to load"
+  },
+  "yJOtz6": {
+    "defaultMessage": "Follow-ups",
+    "description": "Filter on the Today page: follow-ups to send"
+  },
   "yxe9Ac": {
     "defaultMessage": "Continue with {provider}",
     "description": "Button to sign in through a provider. {provider} is its name, such as Google"
+  },
+  "z5Md+V": {
+    "defaultMessage": "No document yet",
+    "description": "When an agreement has no PDF uploaded"
+  },
+  "z6/sFR": {
+    "defaultMessage": "Who are you looking for, for {offering}?",
+    "description": "Label of the box where a search is described. {offering} is the name of what the search is for"
+  },
+  "zL5xPp": {
+    "defaultMessage": "{name} · {kb} KB · SHA-256 {hash}…",
+    "description": "An agreement's PDF. {name} is its file name, {kb} its size in kilobytes, {hash} the start of its SHA-256 fingerprint"
+  },
+  "zLXyuu": {
+    "defaultMessage": "{name} not found",
+    "description": "Tag for something the organisation looks for that research couldn't find out. {name} is what it is"
+  },
+  "zaqdVr": {
+    "defaultMessage": "Copy",
+    "description": "Button copying an email or follow-up, signed, to paste elsewhere"
+  },
+  "zba2Hc": {
+    "defaultMessage": "Heads of procurement at UK kitchen makers with their own showrooms. About twenty, with the page that shows each one's role.",
+    "description": "Example in the box where a search is described"
   }
 }

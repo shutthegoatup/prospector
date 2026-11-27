@@ -32,7 +32,7 @@ func (a *App) todayVoice(q *Req) (Voice, error) {
 	return voice, nil
 }
 
-func cardMeta(c Card) string {
+func cardMeta(c Card) say.Sayer {
 	switch c.Step {
 	case "call":
 		return callMeta(c)
@@ -43,13 +43,14 @@ func cardMeta(c Card) string {
 	case "email", "followup":
 		return emailMeta(c)
 	}
-	return ""
+	return say.Nothing
 }
 
-func dueCardOut(c Card) api.DueCard {
+// dueCardOut is a card as the API sends it, its words in lang.
+func dueCardOut(c Card, lang string) api.DueCard {
 	out := api.DueCard{Id: c.ID, Step: api.DueCardStep(c.Step), Name: c.Name, Title: c.Title, Company: deref(c.Maker), Fit: deref(c.Fit),
 		DraftBy: c.DraftBy, Held: c.Held, State: api.DueCardState(c.State), Next: c.Next, People: []api.DuePerson{}, Badges: []api.DueBadge{},
-		Meta: cardMeta(c), Text: c.Text, Copy: c.Copy, OpenUrl: profileHref(c.Contact), OpenLabel: openLabel(c.Contact),
+		Meta: cardMeta(c).In(lang), Text: c.Text, Copy: c.Copy, OpenUrl: profileHref(c.Contact), OpenLabel: openLabel(c.Contact).In(lang),
 		Number: c.Number, Tel: c.Tel, About: c.About, Script: []api.ScriptLine{}, Email: deref(c.Email), Phone: deref(c.Phone),
 		Linkedin: deref(c.Linkedin), Tz: deref(c.Tz), CallNotes: deref(c.CallNotes), Flags: deref(c.Flags), Sources: nonNil(c.SourceList),
 		Stage: c.Stage, NextStep: c.NextStep, NextDate: deref(c.NextDate)}
@@ -60,10 +61,10 @@ func dueCardOut(c Card) api.DueCard {
 		out.People = append(out.People, api.DuePerson{Name: p.Name, Title: p.Title})
 	}
 	for _, b := range c.Badges {
-		out.Badges = append(out.Badges, api.DueBadge{Text: b.Text, State: api.DueBadgeState(b.State)})
+		out.Badges = append(out.Badges, api.DueBadge{Text: b.Text.In(lang), State: api.DueBadgeState(b.State)})
 	}
 	for _, l := range c.Script {
-		out.Script = append(out.Script, api.ScriptLine{Cue: l.Cue, Say: l.Say})
+		out.Script = append(out.Script, api.ScriptLine{Cue: l.Cue.In(lang), Say: l.Say.In(lang)})
 	}
 	return out
 }
@@ -104,7 +105,7 @@ func (s apiServer) ListToday(ctx context.Context, in api.ListTodayRequestObject)
 	out.Body.Counts, out.Body.Total, out.Body.Shown, out.Body.LaterCalls = counts, len(cards), len(shown), later
 	for _, c := range page {
 		c.AgentMarks = marks[c.ID]
-		out.Body.Items = append(out.Body.Items, dueCardOut(c))
+		out.Body.Items = append(out.Body.Items, dueCardOut(c, languageOf(requestFrom(ctx))))
 	}
 	return out, nil
 }
@@ -125,48 +126,54 @@ func (s apiServer) MarkOutcome(ctx context.Context, in api.MarkOutcomeRequestObj
 	}
 	return api.MarkOutcome200JSONResponse{Ok: true}, nil
 }
-func nextMeta(c Contact) string {
-	st := c.Stage
-	if st == "" {
-		st = "replied"
-	}
-	s := "In conversation · " + st + " · replied " + deref(c.Replied)
-	if c.NextStep == "" {
-		return s + " · no next step yet"
-	}
-	return s + " · due " + deref(c.NextDate)
+
+// dealStages are a deal's stages as the status line names them.
+var dealStages = map[string]*say.Text{
+	"replied": say.New("replied"), "meeting": say.New("meeting"), "proposal": say.New("proposal"), "won": say.New("won"), "lost": say.New("lost"),
 }
 
-func callMeta(c Card) string {
-	s := "Not on LinkedIn yet"
+func nextMeta(c Contact) say.Sayer {
+	var st say.Sayer = dealStages["replied"]
+	if s, ok := dealStages[c.Stage]; ok {
+		st = s
+	} else if c.Stage != "" {
+		st = say.New(c.Stage)
+	}
+	if c.NextStep == "" {
+		return say.Errorf("In conversation · %s · replied %s · no next step yet", st, deref(c.Replied))
+	}
+	return say.Errorf("In conversation · %s · replied %s · due %s", st, deref(c.Replied), deref(c.NextDate))
+}
+
+func callMeta(c Card) say.Sayer {
+	var s say.Sayer = say.New("Not on LinkedIn yet")
 	if c.LinkedinAdded != nil {
-		s = "Added on LinkedIn " + *c.LinkedinAdded + markedBy(c, "linkedin")
+		s = say.Errorf("Added on LinkedIn %s%s", *c.LinkedinAdded, markedBy(c, "linkedin"))
 	}
 	if c.EmailSent != nil {
-		s += " · emailed " + *c.EmailSent + markedBy(c, "email")
+		s = say.Errorf("%s · emailed %s%s", s, *c.EmailSent, markedBy(c, "email"))
 	}
 	return s
 }
 
-func markedBy(c Card, step string) string {
+// markedBy is who marked a step done, when it wasn't a member, in brackets after it.
+func markedBy(c Card, step string) say.Sayer {
 	if a := c.AgentMarks[step]; a != "" {
-		return " (" + actorLabel(a) + ")"
+		return say.Errorf(" (%s)", actorLabel(a))
 	}
-	return ""
+	return say.Nothing
 }
 
-func acceptedMeta(c Card) string {
-	s := "Accepted " + deref(c.Accepted) + markedBy(c, "accepted") + " · LinkedIn message"
+func acceptedMeta(c Card) say.Sayer {
 	if deref(c.Message) == "" {
-		s += " (none written yet, so this is the email; edit it down)"
+		return say.Errorf("Accepted %s%s · LinkedIn message (none written yet, so this is the email; edit it down)", deref(c.Accepted), markedBy(c, "accepted"))
 	}
-	return s
+	return say.Errorf("Accepted %s%s · LinkedIn message", deref(c.Accepted), markedBy(c, "accepted"))
 }
 
-func emailMeta(c Card) string {
-	s := "added " + deref(c.LinkedinAdded) + markedBy(c, "linkedin")
+func emailMeta(c Card) say.Sayer {
 	if c.Step == "email" {
-		s = "Subject: " + deref(c.Subject) + " · " + s
+		return say.Errorf("Subject: %s · added %s%s", deref(c.Subject), deref(c.LinkedinAdded), markedBy(c, "linkedin"))
 	}
-	return s
+	return say.Errorf("added %s%s", deref(c.LinkedinAdded), markedBy(c, "linkedin"))
 }
