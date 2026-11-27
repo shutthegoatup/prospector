@@ -88,7 +88,7 @@ export function CampaignsPage() {
             </div>
           )}
           {notReady && <p className="mb-5 max-w-[70ch] rounded-lg border border-border bg-muted px-3 py-2 text-sm">Not yet ready to send: {notReady}.</p>}
-          <Whose area="sales" work="Campaigns are" can={sales} />
+          <Whose area="sales" said="Campaigns are sales work, so here you read it." can={sales} />
           {sales && (
             <form
               className="mb-5 flex flex-wrap items-center gap-2"

@@ -1,4 +1,5 @@
 import { useEffect, type ComponentProps, type ReactNode } from "react";
+import { defineMessage, useIntl } from "react-intl";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -6,15 +7,22 @@ const backdrop = "front-backdrop min-h-svh font-sans antialiased";
 
 // SignedOutPage is the card the sign-in pages sit in, on the front page's backdrop
 // rather than the app's.
+const tab = defineMessage<{ page: string }>({
+  defaultMessage: "{page} · Prospector",
+  id: "ggJSEV",
+  description: "The browser tab's title on a page outside any organisation, such as signing in",
+});
+
 export function SignedOutPage({ title, children, framed = true }: { title: string; children: ReactNode; framed?: boolean }) {
+  const intl = useIntl();
   useEffect(() => {
-    document.title = `${title} · Prospector`;
+    document.title = intl.formatMessage(tab, { page: title });
     const was = document.body.className;
     document.body.className = backdrop;
     return () => {
       document.body.className = was;
     };
-  }, [title]);
+  }, [intl, title]);
   return (
     <div className="grid min-h-svh place-items-center px-4">
       <main className={cn("flex w-full max-w-sm flex-col gap-4", framed && "panel panel-lift p-7")}>{children}</main>

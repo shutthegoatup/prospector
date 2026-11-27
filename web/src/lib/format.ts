@@ -40,6 +40,11 @@ export function clock(at: string) {
   return intl.formatTime(at, { hour: "2-digit", minute: "2-digit" });
 }
 
+// onDay is a calendar date (YYYY-MM-DD), the same day wherever the reader is.
+export function onDay(date: string) {
+  return intl.formatDate(date, { day: "numeric", month: "short", timeZone: "UTC" });
+}
+
 // ago is how long since: past a day, the date.
 export function ago(at: string, now = Date.now()) {
   const ms = now - new Date(at).getTime();

@@ -1231,7 +1231,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	if res.StatusCode != http.StatusMethodNotAllowed || res.Header.Get("Allow") == "" {
 		t.Fatalf("a method the route doesn't take: %d, Allow %q", res.StatusCode, res.Header.Get("Allow"))
 	}
-	if _, message := problemText(http.StatusUnauthorized, "an API key is needed: Authorization: Bearer pk_…"); strings.HasSuffix(message, "….") {
+	if _, message := problemText(locales.Source, http.StatusUnauthorized, "an API key is needed: Authorization: Bearer pk_…"); strings.HasSuffix(message, "….") {
 		t.Fatalf("a full stop was added after an ellipsis: %q", message)
 	}
 
@@ -1250,7 +1250,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	if code, ctype, body := get(client, "GET", "/o/alpha/today", browser); code != http.StatusOK || !strings.HasPrefix(ctype, "text/html") || styled(body) {
 		t.Fatalf("a working page: %d %s", code, ctype)
 	}
-	if title, message := problemText(http.StatusInternalServerError, "pq: relation \"contacts\" does not exist"); title != "Something went wrong" || strings.Contains(message, "contacts") {
+	if title, message := problemText(locales.Source, http.StatusInternalServerError, "pq: relation \"contacts\" does not exist"); title != "Something went wrong" || strings.Contains(message, "contacts") {
 		t.Fatalf("a server fault shows %q %q", title, message)
 	}
 }

@@ -119,7 +119,7 @@ export function ConversationsPage() {
         Everyone who replied, until it's won or lost. Each needs a next step with a date; ones without, or due today, also show on Today. Give one a value and
         each stage shows what it is worth. A renewal or an expansion with someone already here is a deal of its own, started from their card.
       </p>
-      <Whose area="sales" work="Deals are" can={sales} />
+      <Whose area="sales" said="Deals are sales work, so here you read it." can={sales} />
       <Failed errors={[error, members.error]} />
       <div className="overflow-x-auto pb-4" role="region" aria-label={intl.formatMessage(board)} tabIndex={0}>
         <Loading busy={loading} className="flex min-w-max gap-4">

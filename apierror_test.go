@@ -95,7 +95,7 @@ func TestNoRawDatabaseErrorsGoOut(t *testing.T) {
 		"what another server said":             {errors.New("the mail server refused the password"), 502, 502, "the mail server refused the password"},
 	} {
 		page := httptest.NewRecorder()
-		fail(page, c.err, c.given)
+		fail(page, httptest.NewRequest("GET", "/", nil), c.err, c.given)
 		body := strings.TrimSpace(page.Body.String())
 		if page.Code != c.code || body != c.text || raw.MatchString(body) {
 			t.Errorf("%s, to a page: %d %q, want %d %q", name, page.Code, body, c.code, c.text)

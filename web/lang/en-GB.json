@@ -1,4 +1,40 @@
 {
+  "+6aIWQ": {
+    "defaultMessage": "You can read this page, not change it",
+    "description": "Tooltip on the 'view' tag beside a page the member only reads"
+  },
+  "+m6MKx": {
+    "defaultMessage": "Back to Prospector",
+    "description": "Button on an error page, back to the app"
+  },
+  "/SrQDl": {
+    "defaultMessage": "This page is open for {email} in this browser.",
+    "description": "At the foot of a customer's onboarding page"
+  },
+  "0GmQoe": {
+    "defaultMessage": "{role, select, owner {owner} other {member}}",
+    "description": "Someone's role in an organisation, in the list of their organisations"
+  },
+  "0HxoFB": {
+    "defaultMessage": "This page opens from a link in an email. If yours has stopped working, open it again and ask for a new one, or ask whoever is setting you up.",
+    "description": "On /c opened without a link: how to get to a customer's page"
+  },
+  "0o1xO4": {
+    "defaultMessage": "Use your organisation's single sign-on",
+    "description": "Button to sign in through an organisation's own provider"
+  },
+  "1FV3pz": {
+    "defaultMessage": "That didn't go through. Check your connection and try again.",
+    "description": "When signing in, or the like, failed with nothing from the server to say why"
+  },
+  "1M9Rh5": {
+    "defaultMessage": "No organisation here uses single sign-on for that address. Sign in with your password instead.",
+    "description": "When no organisation's single sign-on covers the email address given"
+  },
+  "1OUt4r": {
+    "defaultMessage": "Stop marketing mail from this sender to the address this link was sent to.",
+    "description": "What the unsubscribe button does"
+  },
   "1nOXrK": {
     "defaultMessage": "Loading…",
     "description": "Read out by a screen reader while a page's data is on its way"
@@ -7,40 +43,368 @@
     "defaultMessage": "Reload to try again.",
     "description": "Under the heading when an organisation fails to load and the server gave no reason"
   },
+  "2OK37z": {
+    "defaultMessage": "There's no such page here.",
+    "description": "Under the 'Not found' heading"
+  },
+  "5yMmkS": {
+    "defaultMessage": "Today",
+    "description": "Sidebar: the page of what to do today"
+  },
+  "659pta": {
+    "defaultMessage": "Sign in with a password instead",
+    "description": "Link from single sign-on back to signing in with a password"
+  },
+  "6SUmKL": {
+    "defaultMessage": "Not found",
+    "description": "Heading of the page for an address that doesn't exist"
+  },
+  "6efxNd": {
+    "defaultMessage": "The company you're prospecting for. You can add more later and switch between them.",
+    "description": "What an organisation is, on the page to start a first one"
+  },
+  "7QmOpI": {
+    "defaultMessage": "Single sign-on",
+    "description": "Title of the page to sign in through an organisation's own provider"
+  },
   "7UEJYq": {
     "defaultMessage": "This organisation couldn't be opened",
     "description": "Heading of the page shown when an organisation fails to load"
+  },
+  "83KaBa": {
+    "defaultMessage": "Create",
+    "description": "Button to create the first organisation"
+  },
+  "8ideLH": {
+    "defaultMessage": "view",
+    "description": "Small tag beside a page the member can read but not change"
   },
   "97VVE5": {
     "defaultMessage": "{org} · Prospector",
     "description": "The browser tab's title while the page's own name is still loading"
   },
+  "Ak+wss": {
+    "defaultMessage": "Main",
+    "description": "What a screen reader calls the sidebar's list of pages"
+  },
+  "B/Gqh6": {
+    "defaultMessage": "{org} set up a page for you",
+    "description": "Heading when a customer opens the link to their onboarding page. {org} is who is setting them up"
+  },
+  "B71vd+": {
+    "defaultMessage": "That didn't work. Reload and try again.",
+    "description": "Shown when a change failed and the server said nothing about why"
+  },
+  "BlhaQR": {
+    "defaultMessage": "Subscriptions",
+    "description": "Sidebar: the page of customers' subscriptions"
+  },
+  "CYJzap": {
+    "defaultMessage": "A link opens the page once, in one browser. We can send a fresh one to the address this one was sent to.",
+    "description": "Why a customer's link stopped working, and what can be done"
+  },
+  "CgAAU4": {
+    "defaultMessage": "← First",
+    "description": "Button back to the first page of a list"
+  },
+  "HTJdgK": {
+    "defaultMessage": "Unsubscribe",
+    "description": "Title of the page an unsubscribe link opens, and its button"
+  },
+  "HkI9B7": {
+    "defaultMessage": "You won't get these again",
+    "description": "Heading after unsubscribing"
+  },
+  "HriBfZ": {
+    "defaultMessage": "{org} asks its people to sign in through its own provider.",
+    "description": "When an organisation sent someone to its single sign-on. {org} is its name"
+  },
+  "IlooCq": {
+    "defaultMessage": "Older →",
+    "description": "Button on to the next page of a list, of older things"
+  },
+  "JODtyS": {
+    "defaultMessage": "Companies",
+    "description": "Sidebar: the page listing every company"
+  },
+  "LTWfbQ": {
+    "defaultMessage": "Check your email",
+    "description": "Heading after asking for a fresh link"
+  },
+  "Ls0JRD": {
+    "defaultMessage": "There is nothing for you to do at the moment.",
+    "description": "On a customer's onboarding page with no steps of theirs"
+  },
+  "M6xWaL": {
+    "defaultMessage": "Choose a password",
+    "description": "Title of the page a reset link opens"
+  },
+  "MclTMJ": {
+    "defaultMessage": "Sign in",
+    "description": "Title of the sign-in page, and its button"
+  },
   "NJgV5V": {
     "defaultMessage": "just now",
     "description": "Less than a minute ago"
+  },
+  "OLWuEw": {
+    "defaultMessage": "This link isn't one we sent. Use the link in the mail itself.",
+    "description": "On an unsubscribe page whose link is malformed"
+  },
+  "OP+zjF": {
+    "defaultMessage": "Send me a new link",
+    "description": "Button to mail a customer a fresh link"
+  },
+  "OR1PS+": {
+    "defaultMessage": "Your onboarding",
+    "description": "Browser tab title of a customer's onboarding page, when the organisation isn't known"
+  },
+  "PuNA1u": {
+    "defaultMessage": "Choose your own password",
+    "description": "Title of the page a new member sees first, to replace the password they were given"
+  },
+  "Q5ZL9W": {
+    "defaultMessage": "Your first organisation",
+    "description": "Title of the page to start a first organisation"
+  },
+  "Q937/W": {
+    "defaultMessage": "Reset your password",
+    "description": "Title of the page to ask for a password reset link"
+  },
+  "QOH77B": {
+    "defaultMessage": "Sign out",
+    "description": "Button to sign out"
+  },
+  "Qjc+uX": {
+    "defaultMessage": "Continue to {org}",
+    "description": "Button to an organisation's own sign-in. {org} is its name"
+  },
+  "T5oLiE": {
+    "defaultMessage": "If that link was yours, a new one is on its way to the address it was sent to. It can take a minute, and only one is sent every few minutes.",
+    "description": "After asking for a fresh link; it says the same whether or not the link was real"
+  },
+  "T6kmYe": {
+    "defaultMessage": "Organisation name",
+    "description": "Placeholder and label of the field naming a new organisation"
+  },
+  "TUP8Mp": {
+    "defaultMessage": "An owner can add {area, select, sales {sales} other {support}} to you on the Team list in Settings.",
+    "description": "After saying a page is work the member doesn't do: how they could be given it. {area} is the area of work, sales or support"
+  },
+  "TfEvtW": {
+    "defaultMessage": "Password saved. Sign in with it.",
+    "description": "On the sign-in page after choosing a new password from a reset link"
+  },
+  "UAooGb": {
+    "defaultMessage": "Or",
+    "description": "Small heading above the other ways to sign in"
+  },
+  "UkToXa": {
+    "defaultMessage": "Continue",
+    "description": "Button to save a new member's own password and go on"
+  },
+  "UxaOfn": {
+    "defaultMessage": "Password you were given",
+    "description": "Label of the field for the password a new member was given"
   },
   "Vk7CpX": {
     "defaultMessage": "Sidebar",
     "description": "What a screen reader calls the sidebar of every page in an organisation"
   },
+  "WfNo1q": {
+    "defaultMessage": "Other ways to sign in",
+    "description": "What a screen reader calls the list of other ways to sign in"
+  },
+  "Wfckmw": {
+    "defaultMessage": "If that address has an account, a link is on its way. It lasts an hour.",
+    "description": "After asking for a reset link; it says the same whether or not the address has an account"
+  },
+  "X/x+KX": {
+    "defaultMessage": "Enquiries",
+    "description": "Sidebar: the page of enquiries from the website"
+  },
+  "Xm3zph": {
+    "defaultMessage": "{done} of {total, plural, one {# of your steps is} other {# of your steps are}} done. Mark each one when you have done it.",
+    "description": "How many of a customer's own onboarding steps are done"
+  },
+  "YnwcFA": {
+    "defaultMessage": "Not done yet",
+    "description": "Button for a customer to take back marking a step done"
+  },
+  "aSiD4J": {
+    "defaultMessage": "Pages",
+    "description": "What a screen reader calls the links between pages of a long list"
+  },
+  "auv4T1": {
+    "defaultMessage": "Agents & API",
+    "description": "Sidebar: the page of AI agents and API keys"
+  },
+  "b7VNor": {
+    "defaultMessage": "Marketing mail from this sender won't go to the address this link was sent to. Mail about something you already have with them, such as a change to your contract, can still reach you.",
+    "description": "After unsubscribing: what stops, and what can still come"
+  },
+  "bTlt3J": {
+    "defaultMessage": "Close it here",
+    "description": "Button to close a customer's onboarding page in this browser"
+  },
+  "bqXVSi": {
+    "defaultMessage": "current",
+    "description": "What a screen reader says for the tick beside the organisation now open"
+  },
+  "bujAVD": {
+    "defaultMessage": "organisation",
+    "description": "Under the organisation's name in the switcher at the top of the sidebar"
+  },
+  "bxJXBH": {
+    "defaultMessage": "Email me a link",
+    "description": "Button to send a password reset link"
+  },
+  "cVVVDW": {
+    "defaultMessage": "New password",
+    "description": "Label of the field for a new password"
+  },
   "cbitp9": {
     "defaultMessage": "Deals by stage",
     "description": "What a screen reader calls the board of deals, which scrolls sideways"
+  },
+  "d68oa4": {
+    "defaultMessage": "That didn't go through. Check your connection and try again.",
+    "description": "When creating an organisation failed with nothing from the server to say why"
+  },
+  "dK/U8c": {
+    "defaultMessage": "For {email}. 10 characters or more.",
+    "description": "On the page a reset link opens: whose password it is, and how long it must be"
   },
   "dMepNA": {
     "defaultMessage": "agent · {name}",
     "description": "Who did something, when it was one of the organisation's AI agents"
   },
+  "do7vTs": {
+    "defaultMessage": "The one you signed in with was shown to whoever added you. Choose one only you know, 10 characters or more.",
+    "description": "Why a new member must choose their own password"
+  },
+  "eRNQKX": {
+    "defaultMessage": "Forgot your password?",
+    "description": "Link from the sign-in page to reset a password"
+  },
+  "eeJYXA": {
+    "defaultMessage": "We'll email you a link to choose a new one.",
+    "description": "On the page to ask for a password reset link"
+  },
   "f/j3Ps": {
     "defaultMessage": "Skip to content",
     "description": "A link, first for the keyboard, past the sidebar to the page"
+  },
+  "ggJSEV": {
+    "defaultMessage": "{page} · Prospector",
+    "description": "The browser tab's title on a page outside any organisation, such as signing in"
+  },
+  "gh0Ao+": {
+    "defaultMessage": "Back to sign in",
+    "description": "Link back to the sign-in page"
+  },
+  "gsLlgl": {
+    "defaultMessage": "Getting you set up",
+    "description": "Heading of a customer's onboarding page"
+  },
+  "h3ZwsO": {
+    "defaultMessage": "Onboarding",
+    "description": "Sidebar: the page of new customers being set up"
+  },
+  "h9yCRK": {
+    "defaultMessage": "Research",
+    "description": "Sidebar: the page of companies and people to look into"
+  },
+  "hMigST": {
+    "defaultMessage": "{org} · your onboarding",
+    "description": "Browser tab title of a customer's onboarding page. {org} is who is setting them up"
+  },
+  "iCmTO/": {
+    "defaultMessage": "Settings",
+    "description": "Sidebar: the organisation's settings page"
+  },
+  "iI+i6h": {
+    "defaultMessage": "That didn't work. Try again.",
+    "description": "When creating an organisation failed and the server said nothing about why"
+  },
+  "iTA1+m": {
+    "defaultMessage": "Work email",
+    "description": "Label of the email field on the single sign-on page"
+  },
+  "jtASEY": {
+    "defaultMessage": "Nothing to show here",
+    "description": "Heading of /c opened without a link"
+  },
+  "la6HzQ": {
+    "defaultMessage": "Password",
+    "description": "Label of the password field"
+  },
+  "lhN4WM": {
+    "defaultMessage": "It shows the steps that are yours while they set you up. Opening it here keeps it open in this browser for 30 days. The link works once.",
+    "description": "What a customer's onboarding page is, before they open it"
+  },
+  "n0QYBT": {
+    "defaultMessage": "Add",
+    "description": "Button to create the new organisation named beside it"
+  },
+  "plpp7+": {
+    "defaultMessage": "Campaigns",
+    "description": "Sidebar: the page of mail campaigns"
+  },
+  "qzUXSB": {
+    "defaultMessage": "+ Add person",
+    "description": "Sidebar button to add a person to prospect"
+  },
+  "rW3MyB": {
+    "defaultMessage": "Mark done",
+    "description": "Button for a customer to mark one of their steps done"
+  },
+  "slbFYd": {
+    "defaultMessage": "{said, select, done {done {on}} late {was due {on}} other {due {on}}}",
+    "description": "Beside a customer's step: when it was done, or when it was or is due. {on} is a date"
+  },
+  "tIzXly": {
+    "defaultMessage": "Save password",
+    "description": "Button to save a new password"
+  },
+  "tNR2Cj": {
+    "defaultMessage": "This link has been used or has run out",
+    "description": "Heading when a customer's link no longer opens their page"
+  },
+  "taHntT": {
+    "defaultMessage": "New organisation",
+    "description": "Label and placeholder of the box to name a new organisation"
+  },
+  "tm5UAO": {
+    "defaultMessage": "Email",
+    "description": "Label of the email address field"
+  },
+  "u+8kmh": {
+    "defaultMessage": "Find my organisation",
+    "description": "Button to look up which organisation's single sign-on covers an address"
   },
   "vFbjH0": {
     "defaultMessage": "{page} · {org} · Prospector",
     "description": "The browser tab's title: the page, then the organisation it is in"
   },
+  "vRiRx4": {
+    "defaultMessage": "Conversations",
+    "description": "Sidebar: the page of deals under way"
+  },
   "w4EZ+4": {
     "defaultMessage": "the customer",
     "description": "Who did something, when it was the customer themselves"
+  },
+  "whdKVO": {
+    "defaultMessage": "member · {work, select, none {reads only} sales {sales} support {support} other {sales, support}}",
+    "description": "Under a member's name in the sidebar: their role and the areas of work they do. {work} is which areas"
+  },
+  "xkqhRH": {
+    "defaultMessage": "Open my steps",
+    "description": "Button to open a customer's onboarding page from their link"
+  },
+  "yxe9Ac": {
+    "defaultMessage": "Continue with {provider}",
+    "description": "Button to sign in through a provider. {provider} is its name, such as Google"
   }
 }

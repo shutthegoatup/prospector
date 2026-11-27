@@ -21,8 +21,8 @@ test("anything else routes as usual", () => {
 
 test("a step says when it was done or is due", () => {
   const st = { id: 1, name: "Send files", due: "2026-11-20", done_on: null, mine: false };
-  assert.equal(stepMeta(st, "2026-11-26"), "was due 2026-11-20");
-  assert.equal(stepMeta(st, "2026-11-01"), "due 2026-11-20");
-  assert.equal(stepMeta({ ...st, done_on: "2026-11-21" }, "2026-11-26"), "done 2026-11-21");
-  assert.equal(stepMeta({ ...st, due: null }, "2026-11-26"), "");
+  assert.deepEqual(stepMeta(st, "2026-11-26"), { said: "late", on: "2026-11-20" });
+  assert.deepEqual(stepMeta(st, "2026-11-01"), { said: "due", on: "2026-11-20" });
+  assert.deepEqual(stepMeta({ ...st, done_on: "2026-11-21" }, "2026-11-26"), { said: "done", on: "2026-11-21" });
+  assert.equal(stepMeta({ ...st, due: null }, "2026-11-26"), undefined);
 });

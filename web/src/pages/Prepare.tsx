@@ -86,7 +86,7 @@ export function PreparePage() {
           <Text value={a && `${a.name} · ${a.file_name} · ${a.page_count} pages`} w="32ch" />
         </Meta>
       </PageHead>
-      <Whose area="sales" work="Preparing agreements is" can={sales} />
+      <Whose area="sales" said="Preparing agreements is sales work, so here you read it." can={sales} />
     </>
   );
   if (agreement.error)

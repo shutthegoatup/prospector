@@ -76,7 +76,7 @@ func writeShell(w http.ResponseWriter, lang string, code int, page any, fallback
 func (a *App) shell(w http.ResponseWriter, r *http.Request) {
 	b, err := shellIn(a.pickLanguage(w, r))
 	if err != nil {
-		fail(w, err, http.StatusInternalServerError)
+		fail(w, r, err, http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("content-type", "text/html; charset=utf-8")
