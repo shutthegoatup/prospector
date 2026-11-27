@@ -6,8 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	"gorm.io/gorm"
-
 	"github.com/shutthegoatup/prospector/api"
 )
 
@@ -50,15 +48,11 @@ func (s apiServer) ChangeContact(ctx context.Context, in api.ChangeContactReques
 		}
 		return strings.Compare(a, b)
 	})
-	err = s.a.s.db.Transaction(func(tx *gorm.DB) error {
-		for _, f := range fields {
-			if err := s.a.s.set(tx, q.Org.ID, in.Id, f, *changes[f], q.Actor()); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if err != nil {
+	ordered := make([]Change, len(fields))
+	for i, f := range fields {
+		ordered[i] = Change{Field: f, Value: *changes[f]}
+	}
+	if err := s.a.s.ChangeContactFields(q.Org.ID, in.Id, ordered, q.Actor()); err != nil {
 		return nil, err
 	}
 	return api.ChangeContact204Response{}, nil

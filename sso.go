@@ -125,6 +125,50 @@ func (s *Store) SaveSSO(c *SSOConnection, actor string) error {
 	})
 }
 
+// RequiresSSO is one read, as most organisations require nothing.
+func (s *Store) RequiresSSO(org int64) (bool, error) {
+	var c SSOConnection
+	err := s.in(org).Limit(1).Find(&c).Error
+	return c.Required, err
+}
+
+func (s *Store) AddSSODomain(org int64, domain string) (*SSODomain, error) {
+	var n int64
+	if err := s.in(org).Model(&SSODomain{}).Count(&n).Error; err != nil {
+		return nil, err
+	}
+	if n >= maxSSODomains {
+		return nil, fmt.Errorf("an organisation can have %d domains", maxSSODomains)
+	}
+	d := &SSODomain{OrgID: org, Domain: domain, Token: randomToken(20)}
+	if err := s.db.Create(d).Error; err != nil {
+		if breaksRule(err) {
+			err = conflict(domain + " is already listed")
+		}
+		return nil, err
+	}
+	return d, nil
+}
+
+func (s *Store) SSODomain(org int64, domain string) (*SSODomain, error) {
+	var d SSODomain
+	if err := s.in(org).Where("domain = ?", domain).First(&d).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		return nil, errors.New("that domain isn't listed")
+	}
+	return &d, nil
+}
+
+func (s *Store) VerifySSODomain(org, id int64, at time.Time) error {
+	return s.in(org).Model(&SSODomain{}).Where("id = ?", id).Update("verified_at", &at).Error
+}
+
+func (s *Store) RemoveSSODomain(org int64, domain string) error {
+	return s.in(org).Where("domain = ?", domain).Delete(&SSODomain{}).Error
+}
+
 // SSOOrgsFor is the organisations whose own sign-in speaks for an email domain.
 func (s *Store) SSOOrgsFor(domain string) ([]Org, error) {
 	var out []Org
@@ -515,9 +559,7 @@ func (a *App) ssoRequired(org *Org, u *User, m *Membership, sess *Session) bool 
 	if m.Role == "owner" || sess.Proves(org.ID) {
 		return false
 	}
-	// Most organisations require nothing, which one read of the connection settles.
-	var c SSOConnection
-	if err := a.s.db.Where("org_id = ?", org.ID).Limit(1).Find(&c).Error; err != nil || !c.Required {
+	if required, err := a.s.RequiresSSO(org.ID); err != nil || !required {
 		return false
 	}
 	sso, err := a.s.SSO(org.ID)
@@ -611,19 +653,7 @@ func (a *App) addSSODomain(org int64, raw string) (*SSODomain, error) {
 	if !domainRe.MatchString(domain) {
 		return nil, fmt.Errorf("a domain looks like example.com, not %q", raw)
 	}
-	var n int64
-	_ = logged(a.s.in(org).Model(&SSODomain{}).Count(&n))
-	if n >= maxSSODomains {
-		return nil, fmt.Errorf("an organisation can have %d domains", maxSSODomains)
-	}
-	d := &SSODomain{OrgID: org, Domain: domain, Token: randomToken(20)}
-	if err := a.s.db.Create(d).Error; err != nil {
-		if breaksRule(err) {
-			err = conflict(domain + " is already listed")
-		}
-		return nil, err
-	}
-	return d, nil
+	return a.s.AddSSODomain(org, domain)
 }
 
 func (a *App) removeSSODomain(org int64, domain string) error {
@@ -640,7 +670,7 @@ func (a *App) removeSSODomain(org int64, domain string) error {
 	if others == 0 && (sso.Required || sso.AutoJoin) {
 		return errors.New("that is the last verified domain: stop requiring single sign-on and letting people join first")
 	}
-	return a.s.in(org).Where("domain = ?", domain).Delete(&SSODomain{}).Error
+	return a.s.RemoveSSODomain(org, domain)
 }
 
 func (a *App) lookupTXT(ctx context.Context, name string) ([]string, error) {
@@ -653,22 +683,19 @@ func (a *App) lookupTXT(ctx context.Context, name string) ([]string, error) {
 }
 
 func (a *App) verifySSODomain(ctx context.Context, org int64, domain string) (*SSODomain, error) {
-	var d SSODomain
-	if err := a.s.in(org).Where("domain = ?", domain).First(&d).Error; err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
-		return nil, errors.New("that domain isn't listed")
+	d, err := a.s.SSODomain(org, domain)
+	if err != nil {
+		return nil, err
 	}
 	records, _ := a.lookupTXT(ctx, d.Record())
 	for _, record := range records {
 		if strings.TrimSpace(record) == d.Token {
 			now := time.Now()
-			if err := a.s.db.Model(&d).Update("verified_at", &now).Error; err != nil {
+			if err := a.s.VerifySSODomain(org, d.ID, now); err != nil {
 				return nil, err
 			}
 			d.VerifiedAt = &now
-			return &d, nil
+			return d, nil
 		}
 	}
 	return nil, fmt.Errorf("no TXT record at %s holds the value yet: DNS changes can take a while to show", d.Record())

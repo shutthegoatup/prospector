@@ -438,11 +438,9 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	if err != nil {
 		return nil, fmt.Errorf("search: %w", err)
 	}
-	var taken int64
-	if err := a.s.db.Model(&Agent{}).Where("org_id = ? and name = ? and id <> ?", org, name, c.ID).Count(&taken).Error; err != nil {
+	if taken, err := a.s.AgentNameTaken(org, name, c.ID); err != nil {
 		return nil, err
-	}
-	if taken > 0 {
+	} else if taken {
 		return nil, conflict(fmt.Sprintf("there is already an agent called %q", name))
 	}
 	renamed := c.ID != 0 && c.Name != name
@@ -561,7 +559,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	}
 	if renamed && c.KeyID != 0 {
 		// Its key carries its name into the record; MCP servers built for it hold the old one.
-		if err := a.s.db.Model(&APIKey{}).Where("id = ?", c.KeyID).Update("name", builtinKeyName(c.Name)).Error; err != nil {
+		if err := a.s.RenameKey(org, c.KeyID, builtinKeyName(c.Name)); err != nil {
 			return nil, err
 		}
 		a.mu.Lock()
@@ -595,8 +593,8 @@ func (a *App) deleteAgent(org, id int64) error {
 	if err != nil {
 		return err
 	}
-	var going []AgentRun
-	if err := a.s.db.Where("org_id = ? and agent_id = ? and status in ?", org, c.ID, []string{RunWorking, RunWaiting}).Find(&going).Error; err != nil {
+	going, err := a.s.AgentRunsGoing(org, c.ID)
+	if err != nil {
 		return err
 	}
 	for _, run := range going {
@@ -604,17 +602,43 @@ func (a *App) deleteAgent(org, id int64) error {
 			log.Printf("agent %d: run %d not asked to stop: %v", c.ID, run.ID, err)
 		}
 	}
+	return a.s.DeleteAgent(org, c.ID)
+}
+
+func (s *Store) AgentNameTaken(org int64, name string, except int64) (bool, error) {
+	var taken int64
+	err := s.in(org).Model(&Agent{}).Where("name = ? and id <> ?", name, except).Count(&taken).Error
+	return taken > 0, err
+}
+
+func (s *Store) RenameKey(org, id int64, name string) error {
+	return s.in(org).Model(&APIKey{}).Where("id = ?", id).Update("name", name).Error
+}
+
+// AgentRunsGoing is what an agent is working or waiting on.
+func (s *Store) AgentRunsGoing(org, agent int64) ([]AgentRun, error) {
+	var going []AgentRun
+	return going, s.in(org).Where("agent_id = ? and status in ?", agent, []string{RunWorking, RunWaiting}).Find(&going).Error
+}
+
+// DeleteAgent revokes its key and forgets its settings, and any agent falling back to it
+// falls back to nothing.
+func (s *Store) DeleteAgent(org, id int64) error {
 	now := time.Now()
-	return a.s.db.Transaction(func(tx *gorm.DB) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var c Agent
+		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
+			return missing(err, "no agent %d in this organisation", id)
+		}
 		if c.KeyID != 0 {
-			if err := tx.Model(&APIKey{}).Where("id = ? and revoked_at is null", c.KeyID).Update("revoked_at", &now).Error; err != nil {
+			if err := tx.Model(&APIKey{}).Where("org_id = ? and id = ? and revoked_at is null", org, c.KeyID).Update("revoked_at", &now).Error; err != nil {
 				return err
 			}
 		}
 		if err := tx.Model(&Agent{}).Where("org_id = ? and fallback_id = ?", org, c.ID).Update("fallback_id", 0).Error; err != nil {
 			return err
 		}
-		return tx.Delete(c).Error
+		return tx.Delete(&c).Error
 	})
 }
 

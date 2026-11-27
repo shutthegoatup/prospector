@@ -146,6 +146,14 @@ func (s *Store) StartOnboarding(org int64, in OnboardingIn, actor string) (*Onbo
 	return &ob, nil
 }
 
+func (s *Store) OnboardingStepByID(org, id int64) (*OnboardingStep, error) {
+	var st OnboardingStep
+	if err := s.in(org).Where("id = ?", id).First(&st).Error; err != nil {
+		return nil, missing(err, "no onboarding step %d", id)
+	}
+	return &st, nil
+}
+
 // SetOnboardingStep marks a step done or not, or moves the day it is due. The steps
 // are the organisation's own wording, so the history names the one that was done.
 func (s *Store) SetOnboardingStep(org, id int64, field, value, actor string) error {

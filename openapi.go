@@ -271,7 +271,7 @@ func (s apiServer) DeleteAgent(ctx context.Context, in api.DeleteAgentRequestObj
 
 func (s apiServer) ListRuns(ctx context.Context, in api.ListRunsRequestObject) (api.ListRunsResponseObject, error) {
 	org := reqFrom(ctx).Org.ID
-	if err := s.a.s.db.Where("org_id = ? and id = ?", org, in.Task).First(&Task{}).Error; err != nil {
+	if _, err := s.a.s.TaskByID(org, in.Task); err != nil {
 		return nil, err
 	}
 	runs, err := s.a.s.AgentRuns(org, in.Task, 0)

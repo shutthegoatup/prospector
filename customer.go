@@ -197,6 +197,25 @@ func (s *Store) newCustomerLink(tx *gorm.DB, g CustomerGrant) (string, error) {
 	return token, tx.Create(&CustomerLink{OrgID: g.OrgID, GrantID: g.ID, TokenHash: hashToken(token), ExpiresAt: time.Now().Add(customerLinkLife)}).Error
 }
 
+// Mailable is the people at these companies who could be sent a link: known, with an address.
+func (s *Store) Mailable(org int64, companies []int64) ([]Contact, error) {
+	var people []Contact
+	return people, s.in(org).Where("company_id in ? and status <> ? and key not like ?", companies, ContactSuggested, "org:%").
+		Where("coalesce(email, '') <> ''").Order("id").Find(&people).Error
+}
+
+// FreshCustomerLink makes another link for someone already let in.
+func (s *Store) FreshCustomerLink(org, grant int64) (token string, err error) {
+	return token, s.db.Transaction(func(tx *gorm.DB) error {
+		var g CustomerGrant
+		if err := tx.Where("org_id = ? and id = ?", org, grant).First(&g).Error; err != nil {
+			return missing(err, "no customer %d in this organisation", grant)
+		}
+		token, err = s.newCustomerLink(tx, g)
+		return err
+	})
+}
+
 // InviteCustomer lets a contact at the onboarding's company see their steps, and
 // returns the link to mail them. Inviting someone again makes a fresh link, and brings
 // back access that was withdrawn.
@@ -434,13 +453,7 @@ func (a *App) customerOpen(w http.ResponseWriter, r *http.Request) {
 func (a *App) customerAgain(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 	if acc, err := a.s.CustomerByToken("link", token); err == nil && a.customerMailOn(acc.Org.ID) {
-		var fresh string
-		err := a.s.db.Transaction(func(tx *gorm.DB) error {
-			var err error
-			fresh, err = a.s.newCustomerLink(tx, acc.Grant)
-			return err
-		})
-		if err == nil {
+		if fresh, err := a.s.FreshCustomerLink(acc.Org.ID, acc.Grant.ID); err == nil {
 			org, to := acc.Org, deref(acc.Contact.Email)
 			a.background(func() {
 				ctx, cancel := context.WithTimeout(context.Background(), sendLimit)
@@ -508,9 +521,8 @@ func (a *App) customerControls(org int64, rows []OnboardingRow) error {
 	for _, r := range rows {
 		companies = append(companies, r.CompanyID)
 	}
-	var people []Contact
-	if err := a.s.in(org).Where("company_id in ? and status <> ? and key not like ?", companies, ContactSuggested, "org:%").
-		Where("coalesce(email, \x27\x27) <> \x27\x27").Order("id").Find(&people).Error; err != nil {
+	people, err := a.s.Mailable(org, companies)
+	if err != nil {
 		return err
 	}
 	mailOn := a.customerMailOn(org)

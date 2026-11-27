@@ -201,6 +201,8 @@ func (s *Store) askTask(org, task int64, text, by string) (*TaskRequest, error) 
 }
 
 // taskRow and requestRow are one task, or one request, of the organisation's.
+func (s *Store) TaskByID(org, id int64) (*Task, error) { return s.taskRow(org, id) }
+
 func (s *Store) taskRow(org, id int64) (*Task, error) {
 	var t Task
 	if err := s.db.Where("org_id = ? and id = ?", org, id).First(&t).Error; err != nil {
@@ -800,6 +802,14 @@ func (s *Store) taskViews(tx *gorm.DB, org int64, tasks []Task, now time.Time) (
 		v.Status = taskStatus(t, v.Open(), v.Last, now)
 	}
 	return out, nil
+}
+
+// TaskCounts is how many of an organisation's tasks are open, and how many it has.
+func (s *Store) TaskCounts(org int64) (open, all int64, err error) {
+	if err := s.in(org).Model(&Task{}).Where("closed_at is null").Count(&open).Error; err != nil {
+		return 0, 0, err
+	}
+	return open, all, s.in(org).Model(&Task{}).Count(&all).Error
 }
 
 func (s *Store) Task(org, id int64, now time.Time) (*TaskView, error) {

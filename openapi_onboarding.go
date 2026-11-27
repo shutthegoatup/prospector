@@ -111,11 +111,11 @@ func (s apiServer) ChangeOnboardingStep(ctx context.Context, in api.ChangeOnboar
 			return nil, err
 		}
 	}
-	var st OnboardingStep
-	if err := s.a.s.in(q.Org.ID).Where("id = ?", in.Id).First(&st).Error; err != nil {
-		return nil, missing(err, "no onboarding step %d", in.Id)
+	st, err := s.a.s.OnboardingStepByID(q.Org.ID, in.Id)
+	if err != nil {
+		return nil, err
 	}
-	return api.ChangeOnboardingStep200JSONResponse(stepOut(st)), nil
+	return api.ChangeOnboardingStep200JSONResponse(stepOut(*st)), nil
 }
 
 func (s apiServer) InviteCustomer(ctx context.Context, in api.InviteCustomerRequestObject) (api.InviteCustomerResponseObject, error) {

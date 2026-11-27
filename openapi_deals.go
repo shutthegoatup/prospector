@@ -165,15 +165,15 @@ func (s apiServer) ChangeOwnDeal(ctx context.Context, in api.ChangeOwnDealReques
 	}
 	// Read back by itself, not off the board: someone who replied and then declined has
 	// a deal that the board no longer shows.
-	var c Contact
-	if err := s.a.s.in(q.Org.ID).Where("id = ?", in.Id).First(&c).Error; err != nil {
-		return nil, missing(err, "no contact %d", in.Id)
-	}
-	var d Deal
-	if err := s.a.s.in(q.Org.ID).Where("contact_id = ? and seq = 0", in.Id).Limit(1).Find(&d).Error; err != nil {
+	c, err := s.a.s.ContactByID(q.Org.ID, in.Id)
+	if err != nil {
 		return nil, err
 	}
-	return api.ChangeOwnDeal200JSONResponse(dealOut(d, c, true)), nil
+	d, err := s.a.s.OwnDeal(q.Org.ID, in.Id)
+	if err != nil {
+		return nil, err
+	}
+	return api.ChangeOwnDeal200JSONResponse(dealOut(*d, *c, true)), nil
 }
 
 func enquiryOut(e Enquiry, around enquiriesAround) api.Enquiry {
@@ -230,15 +230,15 @@ func (s apiServer) ChangeEnquiry(ctx context.Context, in api.ChangeEnquiryReques
 	if err := s.a.s.SetEnquiryFields(q.Org.ID, in.Id, changes, q.Actor()); err != nil {
 		return nil, err
 	}
-	var e Enquiry
-	if err := s.a.s.in(q.Org.ID).Where("id = ?", in.Id).First(&e).Error; err != nil {
-		return nil, missing(err, "no enquiry %d", in.Id)
-	}
-	around, err := s.a.s.aroundEnquiries(q.Org.ID, []Enquiry{e})
+	e, err := s.a.s.EnquiryByID(q.Org.ID, in.Id)
 	if err != nil {
 		return nil, err
 	}
-	return api.ChangeEnquiry200JSONResponse(enquiryOut(e, around)), nil
+	around, err := s.a.s.aroundEnquiries(q.Org.ID, []Enquiry{*e})
+	if err != nil {
+		return nil, err
+	}
+	return api.ChangeEnquiry200JSONResponse(enquiryOut(*e, around)), nil
 }
 
 func (s apiServer) DeleteEnquiry(ctx context.Context, in api.DeleteEnquiryRequestObject) (api.DeleteEnquiryResponseObject, error) {

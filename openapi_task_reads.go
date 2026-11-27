@@ -39,11 +39,8 @@ func (s apiServer) ListTasks(ctx context.Context, in api.ListTasksRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	var open, all int64
-	if err := s.a.s.in(q.Org.ID).Model(&Task{}).Where("closed_at is null").Count(&open).Error; err != nil {
-		return nil, err
-	}
-	if err := s.a.s.in(q.Org.ID).Model(&Task{}).Count(&all).Error; err != nil {
+	open, all, err := s.a.s.TaskCounts(q.Org.ID)
+	if err != nil {
 		return nil, err
 	}
 	out := api.ListTasks200JSONResponse{Headers: api.ListTasks200ResponseHeaders{Link: nextLink(ctx, next)}}
@@ -161,22 +158,17 @@ func (s apiServer) DeleteNote(ctx context.Context, in api.DeleteNoteRequestObjec
 
 func (s apiServer) ListLeftOut(ctx context.Context, in api.ListLeftOutRequestObject) (api.ListLeftOutResponseObject, error) {
 	q := reqFrom(ctx)
-	t, err := s.a.s.taskRow(q.Org.ID, in.Id)
+	v, err := s.a.s.Task(q.Org.ID, in.Id, time.Now())
 	if err != nil {
 		return nil, err
 	}
-	views, err := s.a.s.taskViews(s.a.s.db, q.Org.ID, []Task{*t}, time.Now())
-	if err != nil {
-		return nil, err
-	}
-	v := views[0]
 	left := v.LeftOut()
 	page, next, err := listPage(left, int(in.Params.Limit), string(in.Params.Cursor))
 	if err != nil {
 		return nil, err
 	}
 	out := api.ListLeftOut200JSONResponse{Headers: api.ListLeftOut200ResponseHeaders{Link: nextLink(ctx, next)}}
-	out.Body.NextCursor, out.Body.Offering = next, t.OfferingID
+	out.Body.NextCursor, out.Body.Offering = next, v.OfferingID
 	out.Body.NeverContact, out.Body.Erased = v.Withheld[withheldNeverContact], v.Withheld[withheldErased]
 	for _, c := range left {
 		switch c.Held {
