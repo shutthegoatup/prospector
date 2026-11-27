@@ -82,7 +82,7 @@ func TestAServedPageStaysInItsAttribute(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()
 	odd := `"></div><script>alert(1)</script><div a="&amp;`
-	writeShell(w, http.StatusTeapot, problemShown{"problem", 418, odd, "it's <b>odd</b> & \"quoted\"", "/"}, "fallback")
+	writeShell(w, httptest.NewRequest("GET", "/", nil), http.StatusTeapot, problemShown{"problem", 418, odd, "it's <b>odd</b> & \"quoted\"", "/"}, "fallback")
 	body := w.Body.String()
 	if w.Code != http.StatusTeapot || !strings.HasPrefix(w.Header().Get("Content-Type"), "text/html") {
 		t.Fatalf("%d %s", w.Code, w.Header().Get("Content-Type"))

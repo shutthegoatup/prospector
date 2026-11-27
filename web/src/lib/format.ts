@@ -1,26 +1,35 @@
-// How pages write people, times and counts, as the server-rendered pages do.
+import { defineMessage, defineMessages } from "react-intl";
+import { intl } from "@/i18n";
+
+// How pages write people, times and counts, in the language the app speaks.
+
+const m = defineMessages({
+  customer: { id: "w4EZ+4", defaultMessage: "the customer", description: "Who did something, when it was the customer themselves" },
+  justNow: { id: "NJgV5V", defaultMessage: "just now", description: "Less than a minute ago" },
+});
+
+const agent = defineMessage<{ name: string }>({
+  id: "dMepNA",
+  defaultMessage: "agent · {name}",
+  description: "Who did something, when it was one of the organisation's AI agents",
+});
 
 export function actor(by: string) {
-  if (by === "customer") return "the customer";
-  return by.startsWith("agent:") ? "agent · " + by.slice(6) : by;
+  if (by === "customer") return intl.formatMessage(m.customer);
+  return by.startsWith("agent:") ? intl.formatMessage(agent, { name: by.slice(6) }) : by;
 }
 
 export function day(at: string) {
-  return new Date(at).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return intl.formatDate(at, { day: "numeric", month: "short" });
 }
 
 export function stamp(at: string) {
-  const d = new Date(at);
-  return day(at) + " " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return intl.formatDate(at, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-// dated is a moment with its year, as "2 Jan 2006 15:04".
+// dated is a moment with its year.
 export function dated(at: string) {
-  const d = new Date(at);
-  const hm = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} ${hm}`;
+  return intl.formatDate(at, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 export function plural(n: number, one: string, many = one + "s") {
@@ -28,14 +37,14 @@ export function plural(n: number, one: string, many = one + "s") {
 }
 
 export function clock(at: string) {
-  return new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return intl.formatTime(at, { hour: "2-digit", minute: "2-digit" });
 }
 
-// ago is how long since, as the server's pages say it: past a day, the date.
+// ago is how long since: past a day, the date.
 export function ago(at: string, now = Date.now()) {
   const ms = now - new Date(at).getTime();
-  if (ms < 60_000) return "just now";
-  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)} min ago`;
-  if (ms < 86_400_000) return plural(Math.floor(ms / 3_600_000), "hour") + " ago";
-  return new Date(at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  if (ms < 60_000) return intl.formatMessage(m.justNow);
+  if (ms < 3_600_000) return intl.formatRelativeTime(-Math.floor(ms / 60_000), "minute", { style: "short" });
+  if (ms < 86_400_000) return intl.formatRelativeTime(-Math.floor(ms / 3_600_000), "hour");
+  return intl.formatDate(at, { day: "numeric", month: "short", year: "numeric" });
 }
