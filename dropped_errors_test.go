@@ -67,7 +67,7 @@ func TestAFailedQueryIsntTakenForNothingThere(t *testing.T) {
 	if _, err := firstOf(s.History(o.ID, co.ID, 1)); err == nil {
 		t.Error("a company's history came back as if complete when its people couldn't be read")
 	}
-	srv := apiServer{a: &App{s: s}}
+	srv := newAPIServer(&App{s: s})
 	ctx := context.WithValue(context.Background(), reqKey{}, &Req{Org: o, User: &User{}, Member: &Membership{}})
 	if _, err := srv.GetCompanyOverview(ctx, api.GetCompanyOverviewRequestObject{Id: co.ID}); err == nil {
 		t.Error("a company's overview with its people unreadable came back instead of failing")

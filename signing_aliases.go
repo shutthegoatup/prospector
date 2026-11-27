@@ -27,3 +27,7 @@ var eventHash = signing.EventHash
 var fileName = signing.FileName
 var fillIn = signing.FillIn
 var readForSealing = signing.ReadForSealing
+
+type signingAPI = signing.SigningAPI
+
+var agreementOut = signing.AgreementOut
