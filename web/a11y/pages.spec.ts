@@ -2,7 +2,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
-import type { Served } from "../src/served.ts";
+import { serve, served } from "./served.ts";
 import { org } from "./world.ts";
 
 // WCAG 2.2 A and AA, and axe's best practices (landmarks, headings, unique regions).
@@ -130,31 +130,10 @@ test.describe("signed out", () => {
     await accessible(tab);
   });
 
-  // The pages the server decides, drawn from what it puts in the shell's data-page: each
-  // state it can send, in the shell it sends them in.
-  const steps = [
-    { id: 1, name: "Kick-off call", due: "2026-12-01", done_on: null, mine: false },
-    { id: 2, name: "Send the welcome pack", due: null, done_on: "2026-11-20", mine: true },
-  ];
-  const served: [string, Served][] = [
-    ["a customer's steps", { page: "customer", state: "steps", token: "t", org: org.name, email: "ada@brookvale.example", day: "2026-11-27", steps }],
-    ["a customer asking for a link", { page: "customer", state: "open", steps: [] }],
-    ["a customer whose link has gone", { page: "customer", state: "again", steps: [] }],
-    ["a customer sent a link", { page: "customer", state: "sent", email: "ada@brookvale.example", steps: [] }],
-    ["a customer with nothing to do", { page: "customer", state: "none", org: org.name, steps: [] }],
-    ["unsubscribing", { page: "unsubscribe", token: "t", done: false }],
-    ["unsubscribed", { page: "unsubscribe", token: "t", done: true }],
-    ["starting a first organisation", { page: "start" }],
-  ];
+  // The pages the server decides, in the shell it sends them in.
   for (const [name, payload] of served) {
     test(name, async ({ page: tab }) => {
-      await tab.route("**/c", async (route) => {
-        const shell = await (await route.fetch()).text();
-        const attribute = JSON.stringify(payload).replaceAll("&", "&amp;").replaceAll('"', "&quot;");
-        await route.fulfill({ contentType: "text/html", body: shell.replace(/data-page="[^"]*"/, `data-page="${attribute}"`) });
-      });
-      await tab.goto("/c");
-      await tab.waitForLoadState("networkidle");
+      await serve(tab, payload);
       if (payload.page === "customer" && payload.state === "steps") await expect(tab.getByText("Kick-off call")).toBeVisible();
       await accessible(tab);
     });

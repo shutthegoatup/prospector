@@ -16,11 +16,12 @@ test("the organisation that asked is offered alone", () => {
 });
 
 test("every failure says something", () => {
-  assert.equal(failure(undefined), undefined);
-  assert.equal(failure(null), undefined);
-  assert.equal(failure({ detail: "wrong email or password" }), "wrong email or password");
-  assert.equal(failure("this request came from another site\n"), "this request came from another site");
+  const otherwise = "it didn't go through";
+  assert.equal(failure(undefined, otherwise), undefined);
+  assert.equal(failure(null, otherwise), undefined);
+  assert.equal(failure({ detail: "wrong email or password" }, otherwise), "wrong email or password");
+  assert.equal(failure("this request came from another site\n", otherwise), "this request came from another site");
   for (const e of [new TypeError("Failed to fetch"), {}, "", { detail: "" }]) {
-    assert.match(failure(e) ?? "", /didn't go through/, JSON.stringify(e));
+    assert.equal(failure(e, otherwise), otherwise, JSON.stringify(e));
   }
 });

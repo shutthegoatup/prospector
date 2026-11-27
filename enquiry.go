@@ -98,7 +98,7 @@ func (a *App) intake(w http.ResponseWriter, r *http.Request) {
 	}
 	var in EnquiryIn
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, enquiryBodyLimit)).Decode(&in); err != nil {
-		fail(w, say.New("the enquiry couldn't be read"), http.StatusBadRequest)
+		fail(w, r, say.New("the enquiry couldn't be read"), http.StatusBadRequest)
 		return
 	}
 	in.Site = r.Header.Get("Origin")
@@ -114,7 +114,7 @@ func (a *App) intake(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, errEnquiryEmail) {
 			code = http.StatusBadRequest
 		}
-		fail(w, err, code)
+		fail(w, r, err, code)
 		return
 	}
 	writeJSON(w, ok{true})

@@ -11,10 +11,10 @@ export function offered<T extends { slug: string }>(found: T[] | undefined, aske
 }
 
 // failure is what to say when a call failed: an API problem's detail, the plain text a
-// same-site check answers with, or, when nothing came back that says, that it didn't work.
-export function failure(error: unknown): string | undefined {
+// same-site check answers with, or, when nothing came back that says, otherwise.
+export function failure(error: unknown, otherwise: string): string | undefined {
   if (error === null || error === undefined) return undefined;
   if (typeof error === "string" && error.trim() !== "") return error.trim();
   if (typeof error === "object" && "detail" in error && typeof error.detail === "string" && error.detail !== "") return error.detail;
-  return "That didn't go through. Check your connection and try again.";
+  return otherwise;
 }

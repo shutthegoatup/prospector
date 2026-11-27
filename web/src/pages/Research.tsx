@@ -132,7 +132,7 @@ export function ResearchPage() {
         qualifies it and picks a contact. Every fact keeps the link it came from.
       </p>
 
-      <Whose area="sales" work="Research is" can={sales} />
+      <Whose area="sales" said="Research is sales work, so here you read it." can={sales} />
       {!above && <Loading busy>{null}</Loading>}
       {above && (
         <>

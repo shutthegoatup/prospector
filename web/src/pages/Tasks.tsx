@@ -66,7 +66,7 @@ export function TasksPage() {
         Write what you want found. An agent picks it up, and what it finds waits in Research for you. Anyone can ask for more later, and a different agent can
         carry on from what is already here.
       </p>
-      <Whose area="sales" work="Tasks for agents are" can={sales} />
+      <Whose area="sales" said="Tasks for agents are sales work, so here you read it." can={sales} />
       <div className="flex flex-wrap items-start gap-8">
         <div className="flex min-w-0 flex-[999_1_480px] flex-col gap-3">
           <div className="flex flex-wrap gap-2">
