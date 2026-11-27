@@ -10,7 +10,7 @@ import (
 )
 
 // EnquiryThread is what has been said in answering one enquiry, oldest first.
-func (s *Store) EnquiryThread(org, enquiry int64) ([]EnquiryMessage, error) {
+func (s *enquiryStore) EnquiryThread(org, enquiry int64) ([]EnquiryMessage, error) {
 	if err := s.in(org).Where("id = ?", enquiry).First(&Enquiry{}).Error; err != nil {
 		return nil, missing(err, "no enquiry %d", enquiry)
 	}
@@ -21,7 +21,7 @@ func (s *Store) EnquiryThread(org, enquiry int64) ([]EnquiryMessage, error) {
 	return threads[enquiry], err
 }
 
-func (s *Store) EnquiryThreads(org int64, enquiries []int64) (map[int64][]EnquiryMessage, error) {
+func (s *enquiryStore) EnquiryThreads(org int64, enquiries []int64) (map[int64][]EnquiryMessage, error) {
 	out := map[int64][]EnquiryMessage{}
 	if len(enquiries) == 0 {
 		return out, nil
@@ -38,7 +38,7 @@ func (s *Store) EnquiryThreads(org int64, enquiries []int64) (map[int64][]Enquir
 
 // StartReply keeps a reply before it is sent, so two presses of the button are one
 // reply. It is not in the thread until settleReply says it went.
-func (s *Store) StartReply(o *Org, enquiry int64, text, actor string) (*EnquiryMessage, string, error) {
+func (s *enquiryStore) StartReply(o *Org, enquiry int64, text, actor string) (*EnquiryMessage, string, error) {
 	text, err := threadText(text)
 	if err != nil {
 		return nil, "", err
@@ -94,7 +94,7 @@ func (s *Store) StartReply(o *Org, enquiry int64, text, actor string) (*EnquiryM
 // SettleReply records how sending went. A reply that went joins the thread, and the
 // enquiry waits on them, with an owner if it had none. One that didn't is forgotten,
 // and the enquiry stays as it was.
-func (s *Store) SettleReply(org int64, m *EnquiryMessage, sent bool, actor string) error {
+func (s *enquiryStore) SettleReply(org int64, m *EnquiryMessage, sent bool, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		if !sent {
 			return tx.Where("org_id = ? and id = ? and sent_at is null", org, m.ID).Delete(&EnquiryMessage{}).Error
@@ -122,7 +122,7 @@ func (s *Store) SettleReply(org int64, m *EnquiryMessage, sent bool, actor strin
 
 // logEnquiry puts a turn in the history of whoever wrote in, when they are held here.
 // It says that it happened, not what was said: the words are in the thread.
-func (s *Store) logEnquiry(tx *gorm.DB, e Enquiry, actor, action string) error {
+func (s *enquiryStore) logEnquiry(tx *gorm.DB, e Enquiry, actor, action string) error {
 	if e.ContactID == nil && e.CompanyID == nil {
 		return nil
 	}
@@ -135,7 +135,7 @@ func (s *Store) logEnquiry(tx *gorm.DB, e Enquiry, actor, action string) error {
 
 // HearEnquiry records what they said back, pasted in by whoever read it. Nothing is
 // sent. The enquiry is ours to answer again.
-func (s *Store) HearEnquiry(org, enquiry int64, text, actor string) (*EnquiryMessage, error) {
+func (s *enquiryStore) HearEnquiry(org, enquiry int64, text, actor string) (*EnquiryMessage, error) {
 	text, err := threadText(text)
 	if err != nil {
 		return nil, err

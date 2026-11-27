@@ -92,16 +92,6 @@ func recordAgreementEvent(tx *gorm.DB, e AgreementEvent) (*AgreementEvent, error
 	return &e, nil
 }
 
-// AgreementEvents are an agreement's events in the order they happened, checked against
-// their hashes.
-func (s *Store) AgreementEvents(org, id int64) ([]AgreementEvent, error) {
-	out := []AgreementEvent{}
-	if err := s.in(org).Where("agreement_id = ?", id).Order("id").Find(&out).Error; err != nil {
-		return nil, err
-	}
-	return out, checkChain(out)
-}
-
 // checkChain is whether events, in order, each follow the one before and say what their
 // hash says they did.
 func checkChain(events []AgreementEvent) error {

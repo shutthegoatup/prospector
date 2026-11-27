@@ -1,18 +1,12 @@
 package main
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"path"
 	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
-
-	"gorm.io/gorm"
 )
 
 // Agreement is a contract a company is to sign: the document as it will be sent, frozen
@@ -91,151 +85,4 @@ func fileName(name string) string {
 		name += ".pdf"
 	}
 	return name
-}
-
-func (s *Store) AddAgreement(org, company int64, name, actor string) (*Agreement, error) {
-	name, err := agreementName(name)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.in(org).Where("id = ?", company).First(&Company{}).Error; err != nil {
-		return nil, missing(err, "no company %d", company)
-	}
-	a := Agreement{OrgID: org, CompanyID: company, Name: name, Status: AgreementDraft, Round: 1, InOrder: true, CreatedBy: actor, UpdatedBy: actor}
-	return &a, s.db.Create(&a).Error
-}
-
-func (s *Store) Agreement(org, id int64) (*Agreement, error) {
-	var a Agreement
-	if err := s.in(org).Where("id = ?", id).First(&a).Error; err != nil {
-		return nil, missing(err, "no agreement %d", id)
-	}
-	return &a, nil
-}
-
-// Agreements are an organisation's, or one company's when company isn't 0, newest first.
-func (s *Store) Agreements(org, company int64) ([]Agreement, error) {
-	q := s.in(org)
-	if company != 0 {
-		q = q.Where("company_id = ?", company)
-	}
-	out := []Agreement{}
-	return out, q.Order("id desc").Find(&out).Error
-}
-
-// ChangeAgreement renames a draft, or says whether its signers sign in order.
-func (s *Store) ChangeAgreement(org, id int64, name *string, inOrder *bool, actor string) (*Agreement, error) {
-	change := map[string]any{"updated_by": actor}
-	if name != nil {
-		n, err := agreementName(*name)
-		if err != nil {
-			return nil, err
-		}
-		change["name"] = n
-	}
-	if inOrder != nil {
-		change["in_order"] = *inOrder
-	}
-	res := s.in(org).Model(&Agreement{}).Where("id = ? and status = ?", id, AgreementDraft).Updates(change)
-	if res.Error != nil {
-		return nil, res.Error
-	}
-	a, err := s.Agreement(org, id)
-	if err != nil {
-		return nil, err
-	}
-	if res.RowsAffected == 0 {
-		return nil, errNotDraft
-	}
-	return a, nil
-}
-
-func (s *Store) RemoveAgreement(org, id int64) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		res := tx.Where("org_id = ? and id = ? and status = ?", org, id, AgreementDraft).Delete(&Agreement{})
-		if res.Error != nil {
-			return res.Error
-		}
-		if res.RowsAffected == 0 {
-			if err := tx.Where("org_id = ? and id = ?", org, id).First(&Agreement{}).Error; err != nil {
-				return missing(err, "no agreement %d", id)
-			}
-			return errors.New("only a draft agreement can be removed; one that was sent is kept")
-		}
-		for _, part := range []any{&AgreementFile{}, &AgreementRecipient{}, &AgreementField{}, &AgreementEvent{}} {
-			if err := tx.Where("org_id = ? and agreement_id = ?", org, id).Delete(part).Error; err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
-// PutAgreementFile keeps a draft's document, replacing any before it. It has to be a
-// PDF Prospector can later fill in and seal, so what is signed is what was seen, and it
-// is hashed as it arrives. Fields on pages the new one doesn't have go.
-func (s *Store) PutAgreementFile(org, id int64, name string, data []byte, actor string) (*Agreement, error) {
-	if len(data) > agreementFileLimit {
-		return nil, fmt.Errorf("a document is %d MB at most", agreementFileLimit>>20)
-	}
-	if !bytes.HasPrefix(data, []byte("%PDF-")) {
-		return nil, errors.New("that isn't a PDF: save the agreement as a PDF first")
-	}
-	pages, err := pdfPages(data)
-	if err != nil {
-		return nil, err
-	}
-	sum := sha256.Sum256(data)
-	var a Agreement
-	err = s.db.Transaction(func(tx *gorm.DB) error {
-		res := tx.Model(&Agreement{}).Where("org_id = ? and id = ? and status = ?", org, id, AgreementDraft).
-			Updates(map[string]any{"file_name": fileName(name), "file_size": int64(len(data)), "file_hash": hex.EncodeToString(sum[:]), "page_count": pages, "updated_by": actor})
-		if res.Error != nil {
-			return res.Error
-		}
-		if res.RowsAffected == 0 {
-			if err := tx.Where("org_id = ? and id = ?", org, id).First(&a).Error; err != nil {
-				return missing(err, "no agreement %d", id)
-			}
-			return errNotDraft
-		}
-		if err := tx.Where("org_id = ? and agreement_id = ?", org, id).Delete(&AgreementFile{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Create(&AgreementFile{AgreementID: id, OrgID: org, Data: data}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("org_id = ? and agreement_id = ? and page > ?", org, id, pages).Delete(&AgreementField{}).Error; err != nil {
-			return err
-		}
-		return tx.Where("org_id = ? and id = ?", org, id).First(&a).Error
-	})
-	return &a, err
-}
-
-// AgreementFile is a document's bytes, checked against the hash it was kept with.
-func (s *Store) AgreementDocument(org, id int64) (*Agreement, []byte, error) {
-	if _, err := s.Agreement(org, id); err != nil {
-		return nil, nil, err
-	}
-	// The record and its file in one statement, so a replacement committing between two
-	// reads can't pass for tampering.
-	var both struct {
-		Agreement
-		Data []byte
-	}
-	read := s.db.Model(&Agreement{}).Select("agreements.*, agreement_files.data as data").
-		Joins("join agreement_files on agreement_files.agreement_id = agreements.id and agreement_files.org_id = agreements.org_id").
-		Where("agreements.org_id = ? and agreements.id = ?", org, id).Limit(1).Scan(&both)
-	if read.Error != nil {
-		return nil, nil, read.Error
-	}
-	if read.RowsAffected == 0 {
-		return nil, nil, noSuch("agreement %d has no document yet", id)
-	}
-	a, f := &both.Agreement, AgreementFile{Data: both.Data}
-	if sum := sha256.Sum256(f.Data); hex.EncodeToString(sum[:]) != a.FileHash {
-		return nil, nil, fmt.Errorf("agreement %d: %w", id, errTampered)
-	}
-	return a, f.Data, nil
 }
