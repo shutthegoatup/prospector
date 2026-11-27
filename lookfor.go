@@ -2,55 +2,12 @@ package main
 
 import (
 	"cmp"
-	"fmt"
 	"strings"
 
 	"gorm.io/gorm"
 )
 
 // What a company's facts say of one thing the organisation looks for.
-const (
-	assetMet       = "met"
-	assetNotMet    = "not_met"
-	assetNotFound  = "not_found"
-	assetUnchecked = "unchecked"
-)
-
-type AssetFound struct {
-	Asset
-	// State is met, not_met, not_found, or unchecked when no fact speaks to it; Fact is
-	// the latest that does.
-	State string
-	Fact  *Fact
-	Has   bool
-}
-
-// assetsFound says, for each of the organisation's assets, what the latest fact about
-// it shows. The facts come oldest first.
-func assetsFound(set OrgSettings, facts []Fact) []AssetFound {
-	assets, _ := set.Assets()
-	latest := map[string]*Fact{}
-	for i := range facts {
-		latest[assetKey(facts[i].Field)] = &facts[i]
-	}
-	out := make([]AssetFound, len(assets))
-	for i, a := range assets {
-		found := AssetFound{Asset: a, State: assetUnchecked, Fact: latest[a.Field]}
-		if f := found.Fact; f != nil {
-			switch f.Answer {
-			case answerNo:
-				found.State = assetNotMet
-			case answerUnknown:
-				found.State = assetNotFound
-			default:
-				found.State = assetMet
-			}
-		}
-		found.Has = found.State == assetMet
-		out[i] = found
-	}
-	return out
-}
 
 // otherFacts are the facts not already shown as the answer to something the
 // organisation looks for, older answers among them.
@@ -68,56 +25,6 @@ func otherFacts(set OrgSettings, facts []Fact) []Fact {
 		}
 	}
 	return out
-}
-
-// Fit is how well a company matches what the organisation looks for.
-type Fit struct {
-	Of, Met, NotFound, Unchecked int
-	// MustsMissed are the musts it doesn't have, or that no fact shows yet.
-	MustsMissed int
-}
-
-func fitOf(found []AssetFound) Fit {
-	f := Fit{Of: len(found)}
-	for _, a := range found {
-		switch a.State {
-		case assetMet:
-			f.Met++
-		case assetNotFound:
-			f.NotFound++
-		case assetUnchecked:
-			f.Unchecked++
-		}
-		if a.Must && a.State != assetMet {
-			f.MustsMissed++
-		}
-	}
-	return f
-}
-
-// better orders fits best first: no must missed, then most met, then fewest left unknown.
-func (f Fit) better(g Fit) bool {
-	if f.MustsMissed != g.MustsMissed {
-		return f.MustsMissed < g.MustsMissed
-	}
-	if f.Met != g.Met {
-		return f.Met > g.Met
-	}
-	return f.NotFound+f.Unchecked < g.NotFound+g.Unchecked
-}
-
-func (f Fit) Text() string {
-	s := fmt.Sprintf("%d of %d", f.Met, f.Of)
-	if f.NotFound > 0 {
-		s += fmt.Sprintf(" · %d not found", f.NotFound)
-	}
-	if f.Unchecked > 0 {
-		s += fmt.Sprintf(" · %d unchecked", f.Unchecked)
-	}
-	if f.MustsMissed > 0 {
-		s += " · misses a must"
-	}
-	return s
 }
 
 // configuratorFacts are the configurator_url, platform and built_by a company could

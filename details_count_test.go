@@ -18,8 +18,8 @@ func TestTheDetailsCountIsTheDetailsList(t *testing.T) {
 	}
 	agrees := func(want int) {
 		t.Helper()
-		rows := must(s.detailsToCheck(o.ID, 0, 0))
-		if n := must(s.detailsCount(o.ID, 0, 0)); n != len(rows) || n != want || s.ResearchCounts(o.ID)["details"] != want {
+		rows := must(s.DetailsToCheck(o.ID, 0, 0))
+		if n := must(s.DetailsCount(o.ID, 0, 0)); n != len(rows) || n != want || s.ResearchCounts(o.ID)["details"] != want {
 			t.Fatalf("%d companies listed, %d counted, %d in the counts; want %d", len(rows), n, s.ResearchCounts(o.ID)["details"], want)
 		}
 	}

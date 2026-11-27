@@ -231,7 +231,7 @@ func (s *researchStore) TaskNotesPage(org, task int64, page int) ([]NoteView, Pa
 	}
 	pg := pageOf(page, taskNotesPageSize, int(total))
 	var notes []TaskNote
-	if err := theirs().Order("id desc").Limit(pg.Size).Offset(pg.offset()).Find(&notes).Error; err != nil {
+	if err := theirs().Order("id desc").Limit(pg.Size).Offset(pg.Offset()).Find(&notes).Error; err != nil {
 		return nil, Page{}, err
 	}
 	out, err := s.noteViews(org, notes)
@@ -294,7 +294,7 @@ func (s *researchStore) CompanyNotesPage(org, company int64, page int) ([]TaskNo
 	}
 	pg := pageOf(page, companyNotesPageSize, int(total))
 	var notes []TaskNote
-	return notes, pg, theirs().Order("id desc").Limit(pg.Size).Offset(pg.offset()).Find(&notes).Error
+	return notes, pg, theirs().Order("id desc").Limit(pg.Size).Offset(pg.Offset()).Find(&notes).Error
 }
 
 // Runs is a page of the organisation's agent work, newest first: the limit runs that
@@ -578,7 +578,7 @@ func (s *researchStore) Tasks(org int64, closed bool, page int, now time.Time) (
 	}
 	pg := pageOf(page, taskPageSize, int(total))
 	var tasks []Task
-	if err := matching().Order("closed_at is not null, id desc").Limit(pg.Size).Offset(pg.offset()).Find(&tasks).Error; err != nil {
+	if err := matching().Order("closed_at is not null, id desc").Limit(pg.Size).Offset(pg.Offset()).Find(&tasks).Error; err != nil {
 		return nil, Page{}, err
 	}
 	out, err := s.taskViews(s.DB, org, tasks, now)
@@ -780,7 +780,7 @@ func (s *researchStore) AgentNote(org int64, who Actor, in NoteIn) (*TaskNote, e
 	n := TaskNote{OrgID: org, TaskID: in.Task, Actor: who.Name, KeyID: who.KeyID, Kind: in.Kind, Text: text}
 	var company *int64
 	if strings.TrimSpace(in.Company) != "" {
-		c, err := s.prospecting.companyRef(org, in.Company)
+		c, err := s.prospecting.CompanyRef(org, in.Company)
 		if err != nil {
 			return nil, err
 		}
@@ -1289,7 +1289,7 @@ func (s *researchStore) AgentAddRole(org int64, who Actor, in AddRoleIn) (*AddRo
 	if err := in.check(true); err != nil {
 		return nil, err
 	}
-	c, err := s.prospecting.companyRef(org, in.Company)
+	c, err := s.prospecting.CompanyRef(org, in.Company)
 	if err != nil {
 		return nil, err
 	}
@@ -1315,7 +1315,7 @@ func (s *researchStore) AgentAddRole(org int64, who Actor, in AddRoleIn) (*AddRo
 		if !had {
 			return nil
 		}
-		if err := s.prospecting.heldWhenFound(tx, org, who, c, stages[c.ID]); err != nil {
+		if err := s.prospecting.HeldWhenFound(tx, org, who, c, stages[c.ID]); err != nil {
 			return err
 		}
 		return s.matched(tx, org, who, 0, &c.ID)
@@ -1378,7 +1378,7 @@ func (s *researchStore) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (
 			return err
 		}
 		if !created {
-			if err := s.prospecting.heldWhenFound(tx, org, who, c, out.Stage); err != nil {
+			if err := s.prospecting.HeldWhenFound(tx, org, who, c, out.Stage); err != nil {
 				return err
 			}
 		}
@@ -1418,7 +1418,7 @@ func (s *researchStore) AgentAddFact(org int64, who Actor, in AddFactIn) (*AddFa
 	if err := checkFact(in.FactIn); err != nil {
 		return nil, err
 	}
-	c, err := s.prospecting.companyRef(org, in.Company)
+	c, err := s.prospecting.CompanyRef(org, in.Company)
 	if err != nil {
 		return nil, err
 	}
@@ -1430,7 +1430,7 @@ func (s *researchStore) AgentAddFact(org int64, who Actor, in AddFactIn) (*AddFa
 		if err := forOffering(tx, org, who, c.ID); err != nil {
 			return err
 		}
-		if err := s.prospecting.heldWhenReached(tx, org, who, c); err != nil {
+		if err := s.prospecting.HeldWhenReached(tx, org, who, c); err != nil {
 			return err
 		}
 		f, had, err := addFact(tx, org, c.ID, in.FactIn, who.Name)
@@ -1464,19 +1464,19 @@ func (s *researchStore) AgentAddContact(o *Org, who Actor, in AddContactIn) (*Ad
 		return nil, errors.New("linkedin must be an https link")
 	}
 	if err := s.prospecting.Allowed(o, in.Email, in.Linkedin); err != nil {
-		s.prospecting.withheld(o.ID, who, withheldNeverContact)
+		s.prospecting.Withheld(o.ID, who, withheldNeverContact)
 		return nil, err
 	}
 	if err := s.outreach.checkMailDomains(in.Email); err != nil {
 		return nil, err
 	}
-	c, err := s.prospecting.companyRef(o.ID, in.Company)
+	c, err := s.prospecting.CompanyRef(o.ID, in.Company)
 	if err != nil {
 		return nil, err
 	}
 	if err := erased(s.DB, o.ID, in.Name, c.Name, in.Email, in.Linkedin); err != nil {
 		if errors.Is(err, errErased) {
-			s.prospecting.withheld(o.ID, who, withheldErased)
+			s.prospecting.Withheld(o.ID, who, withheldErased)
 		}
 		return nil, err
 	}
@@ -1497,7 +1497,7 @@ func (s *researchStore) AgentAddContact(o *Org, who Actor, in AddContactIn) (*Ad
 		if err := forOffering(tx, o.ID, who, c.ID); err != nil {
 			return err
 		}
-		if err := s.prospecting.heldWhenReached(tx, o.ID, who, c); err != nil {
+		if err := s.prospecting.HeldWhenReached(tx, o.ID, who, c); err != nil {
 			return err
 		}
 		var people []Contact
@@ -1505,7 +1505,7 @@ func (s *researchStore) AgentAddContact(o *Org, who Actor, in AddContactIn) (*Ad
 			return err
 		}
 		if p := samePerson(people, in); p != nil {
-			waiting, err := s.prospecting.suggestDetails(tx, who, *p, in)
+			waiting, err := s.prospecting.SuggestDetails(tx, who, *p, in)
 			if err != nil {
 				return err
 			}
@@ -1604,7 +1604,7 @@ func (s *researchStore) AgentSearch(org int64, who Actor, q string, page paging.
 	}
 	size, more := page.Size(), false
 	var companies []Company
-	cond, args := s.prospecting.companyMatch(q)
+	cond, args := s.prospecting.CompanyMatch(q)
 	if err := s.InOrg(org).Where("id > ?", at[0]).Where(cond, args...).Order("id").Limit(size + 1).Find(&companies).Error; err != nil {
 		return nil, "", err
 	}
@@ -1625,7 +1625,7 @@ func (s *researchStore) AgentSearch(org int64, who Actor, q string, page paging.
 		hits = append(hits, SearchHit{Kind: "company", ID: c.ID, Name: c.Name, Stage: c.Stage, LastAgent: last[c.ID]})
 	}
 	var people []Contact
-	cond, args = s.prospecting.contactMatch(q, true)
+	cond, args = s.prospecting.ContactMatch(q, true)
 	if err := s.InOrg(org).Where("id > ? and key not like 'org:%'", at[1]).Where(cond, args...).Order("id").Limit(size + 1).Find(&people).Error; err != nil {
 		return nil, "", err
 	}
@@ -1651,7 +1651,7 @@ func (s *researchStore) AgentCompany(org int64, who Actor, ref string, page pagi
 	if err != nil {
 		return nil, err
 	}
-	c, err := s.prospecting.companyRef(org, ref)
+	c, err := s.prospecting.CompanyRef(org, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -1813,7 +1813,7 @@ func (s *researchStore) AgentMark(org int64, who Actor, in MarkIn) error {
 	if date == "" {
 		date = today()
 	}
-	return s.prospecting.mark(org, in.ContactID, in.Step, date, who, strings.TrimSpace(in.Note))
+	return s.prospecting.MarkAs(org, in.ContactID, in.Step, date, who, strings.TrimSpace(in.Note))
 }
 
 // AgentMarks is, per contact and step, the agent behind the latest mark, so a

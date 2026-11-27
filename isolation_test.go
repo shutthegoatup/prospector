@@ -39,6 +39,8 @@ var acrossOrganisations = map[string]bool{
 	// The server's own sweeps, over every organisation; what they find is then handled
 	// by methods that take its organisation.
 	"LapsedRuns": true, "CampaignsSending": true, "FreeStaleMail": true, "Users": true,
+	// The search indexes, built at start-up for everyone's rows.
+	"IndexSearch": true,
 }
 
 // theirs marks what the first organisation holds, so it shows if it turns up elsewhere.
@@ -368,7 +370,10 @@ var saysNothingBack = map[string]bool{
 	"AddMember": true, "RemoveMember": true, "SetRole": true, "SetAreas": true, "SaveVoice": true, "SaveOrg": true, "ChangeSettings": true, "RevokeKey": true, "SetKeyScopes": true, "DeleteOrgMail": true,
 	// A webhook secret is new random words, and the others say yes or no of the caller's own.
 	"NewBounceHook": true, "DropBounceHook": true, "HasBounceHook": true,
-	"Mark": true, "Update": true, "SetCompanyStage": true, "PickContact": true, "PickContactFor": true, "ToReview": true, "DecideSuggestion": true,
+	"Mark": true, "MarkAs": true, "Withheld": true, "Update": true,
+	// Only listed with suggestions waiting; TestTheDetailsCountIsTheDetailsList tries both.
+	"DetailsToCheck": true, "DetailsCount": true,
+	"SetCompanyStage": true, "PickContact": true, "PickContactFor": true, "ToReview": true, "DecideSuggestion": true,
 	"AgentDraft": true, "AgentMark": true, "AgentFinish": true, "AgentAddFact": true, "AgentAddContact": true,
 	"AskTask": true, "SetRequestDone": true, "SetTaskClosed": true, "DeleteNote": true, "DeleteEnquiry": true,
 	"StartDeal": true, "ChangeDeal": true, "RemoveDeal": true, "JudgeCompany": true, "RemoveOffering": true,

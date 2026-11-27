@@ -83,6 +83,10 @@ var withinTheStore = map[string]bool{
 	"Gate":                true, // outreach and research ask suppression who may be mailed
 	"Marketable":          true,
 	"MintUnsubscribeLink": true, // a campaign's mail carries a link made in its own transaction
+	// Research holds back a company it finds, and suggests details, inside its own work.
+	"HeldWhenFound": true, "HeldWhenReached": true, "SuggestDetails": true,
+	// The search's query text, which agents' searches build on.
+	"CompanyMatch": true, "ContactMatch": true,
 }
 
 // TestNoStoreMethodHandsOutTheDatabase keeps the rule above from being got round: a

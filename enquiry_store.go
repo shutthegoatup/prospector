@@ -164,7 +164,7 @@ func (s *enquiryStore) Enquiries(org int64, f EnquiryFilter, page int) ([]Enquir
 	}
 	pg := pageOf(page, enquiryPageSize, int(total))
 	var rows []Enquiry
-	err := s.enquiriesMatching(org, f).Order("created_at desc, id desc").Limit(pg.Size).Offset(pg.offset()).Find(&rows).Error
+	err := s.enquiriesMatching(org, f).Order("created_at desc, id desc").Limit(pg.Size).Offset(pg.Offset()).Find(&rows).Error
 	return rows, pg, err
 }
 

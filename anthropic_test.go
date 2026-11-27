@@ -151,7 +151,7 @@ func TestAClaudeAgentWorksATaskThroughAnthropicsAPI(t *testing.T) {
 	if got.Status != RunFinished || got.Turns != 3 || got.Added != 1 || got.TokensIn != 3*1300 || got.TokensOut != 3*40 {
 		t.Fatalf("a run with Claude: %+v", got)
 	}
-	if facts := must(r.s.Facts(r.o.ID, must(r.s.companyRef(r.o.ID, "Larkmoor Yachts")).ID)); len(facts) != 1 {
+	if facts := must(r.s.Facts(r.o.ID, must(r.s.CompanyRef(r.o.ID, "Larkmoor Yachts")).ID)); len(facts) != 1 {
 		t.Fatalf("only the fact from a page Claude was shown should be stored: %+v", facts)
 	}
 	tools.mu.Lock()

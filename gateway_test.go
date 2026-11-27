@@ -221,7 +221,7 @@ func TestTheAgentWorksThroughAGatewaysFederatedTools(t *testing.T) {
 	if !slices.Contains(calls, "fetch_fetch") {
 		t.Fatalf("the gateway wasn't asked to fetch the page: %v", calls)
 	}
-	c := must(r.s.companyRef(r.o.ID, "Larkmoor Yachts"))
+	c := must(r.s.CompanyRef(r.o.ID, "Larkmoor Yachts"))
 	facts := must(r.s.Facts(r.o.ID, c.ID))
 	if len(facts) != 1 || facts[0].Field != "founded" || facts[0].SourceURL != about {
 		t.Fatalf("the page it read should count as shown, and nothing else from that call: %+v", facts)
