@@ -9,7 +9,10 @@ import (
 	"gorm.io/gorm"
 )
 
-func (s *Store) SSO(org int64) (*SSO, error) {
+// ssoStore is the single sign-on area's queries: an organisation's own identity provider and its domains.
+type ssoStore struct{ *core }
+
+func (s *ssoStore) SSO(org int64) (*SSO, error) {
 	c := &SSO{}
 	if err := s.db.Where("org_id = ?", org).Limit(1).Find(&c.SSOConnection).Error; err != nil {
 		return nil, err
@@ -19,7 +22,7 @@ func (s *Store) SSO(org int64) (*SSO, error) {
 }
 
 // SaveSSO keeps the connection; an empty issuer turns the organisation's sign-in off.
-func (s *Store) SaveSSO(c *SSOConnection, actor string) error {
+func (s *ssoStore) SaveSSO(c *SSOConnection, actor string) error {
 	// Sealed here, whoever is saving, so nothing a key could seal is written in clear.
 	if c.ClientSecret != "" && !sealed(c.ClientSecret) && s.keys != nil {
 		stored, err := s.keys.seal(c.ClientSecret)
@@ -45,13 +48,13 @@ func (s *Store) SaveSSO(c *SSOConnection, actor string) error {
 }
 
 // RequiresSSO is one read, as most organisations require nothing.
-func (s *Store) RequiresSSO(org int64) (bool, error) {
+func (s *ssoStore) RequiresSSO(org int64) (bool, error) {
 	var c SSOConnection
 	err := s.in(org).Limit(1).Find(&c).Error
 	return c.Required, err
 }
 
-func (s *Store) AddSSODomain(org int64, domain string) (*SSODomain, error) {
+func (s *ssoStore) AddSSODomain(org int64, domain string) (*SSODomain, error) {
 	var n int64
 	if err := s.in(org).Model(&SSODomain{}).Count(&n).Error; err != nil {
 		return nil, err
@@ -69,7 +72,7 @@ func (s *Store) AddSSODomain(org int64, domain string) (*SSODomain, error) {
 	return d, nil
 }
 
-func (s *Store) SSODomain(org int64, domain string) (*SSODomain, error) {
+func (s *ssoStore) SSODomain(org int64, domain string) (*SSODomain, error) {
 	var d SSODomain
 	if err := s.in(org).Where("domain = ?", domain).First(&d).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -80,16 +83,16 @@ func (s *Store) SSODomain(org int64, domain string) (*SSODomain, error) {
 	return &d, nil
 }
 
-func (s *Store) VerifySSODomain(org, id int64, at time.Time) error {
+func (s *ssoStore) VerifySSODomain(org, id int64, at time.Time) error {
 	return s.in(org).Model(&SSODomain{}).Where("id = ?", id).Update("verified_at", &at).Error
 }
 
-func (s *Store) RemoveSSODomain(org int64, domain string) error {
+func (s *ssoStore) RemoveSSODomain(org int64, domain string) error {
 	return s.in(org).Where("domain = ?", domain).Delete(&SSODomain{}).Error
 }
 
 // SSOOrgsFor is the organisations whose own sign-in speaks for an email domain.
-func (s *Store) SSOOrgsFor(domain string) ([]Org, error) {
+func (s *ssoStore) SSOOrgsFor(domain string) ([]Org, error) {
 	var out []Org
 	if domain == "" {
 		return nil, nil
@@ -102,7 +105,7 @@ func (s *Store) SSOOrgsFor(domain string) ([]Org, error) {
 }
 
 // SocialUser is the account a social sign-in belongs to. It never makes one.
-func (s *Store) SocialUser(who *outsider) (*User, error) {
+func (s *ssoStore) SocialUser(who *outsider) (*User, error) {
 	var u *User
 	err := s.db.Transaction(func(tx *gorm.DB) (err error) {
 		if u, err = resolve(tx, who, who.Email, who.Vouched, nil); err != nil {
@@ -115,7 +118,7 @@ func (s *Store) SocialUser(who *outsider) (*User, error) {
 
 // SSOUser is the member an organisation's own sign-in has let in, made a member on
 // the way if the organisation lets people join. Nobody becomes an owner like this.
-func (s *Store) SSOUser(org *Org, c *SSO, who *outsider, email string) (*User, error) {
+func (s *ssoStore) SSOUser(org *Org, c *SSO, who *outsider, email string) (*User, error) {
 	var u *User
 	err := s.db.Transaction(func(tx *gorm.DB) (err error) {
 		var create func() (*User, error)

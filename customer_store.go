@@ -6,7 +6,10 @@ import (
 	"gorm.io/gorm"
 )
 
-func (s *Store) customerAccess(grant int64) (*CustomerAccess, error) {
+// customerStore is the customers area's queries: who outside the organisation may see their onboarding, and their links and sessions.
+type customerStore struct{ *core }
+
+func (s *customerStore) customerAccess(grant int64) (*CustomerAccess, error) {
 	var a CustomerAccess
 	if err := s.db.Where("id = ? and revoked_at is null", grant).First(&a.Grant).Error; err != nil {
 		return nil, errNoCustomer
@@ -32,7 +35,7 @@ func (s *Store) customerAccess(grant int64) (*CustomerAccess, error) {
 // CustomerByToken is the one look-up that starts from a secret and not an organisation:
 // kind "link" finds by a mailed link, whatever its state, and "session" by a browser's
 // cookie that hasn't expired. Either answers the same when nothing matches.
-func (s *Store) CustomerByToken(kind, token string) (*CustomerAccess, error) {
+func (s *customerStore) CustomerByToken(kind, token string) (*CustomerAccess, error) {
 	if token == "" {
 		return nil, errNoCustomer
 	}
@@ -60,7 +63,7 @@ func (s *Store) CustomerByToken(kind, token string) (*CustomerAccess, error) {
 
 // RedeemCustomerLink spends a link and opens a session for the browser that sent it.
 // The link is spent inside the transaction, so two requests can't both use it.
-func (s *Store) RedeemCustomerLink(org int64, a *CustomerAccess, token string) (string, error) {
+func (s *customerStore) RedeemCustomerLink(org int64, a *CustomerAccess, token string) (string, error) {
 	session := randomToken(32)
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		now := time.Now()
@@ -79,12 +82,12 @@ func (s *Store) RedeemCustomerLink(org int64, a *CustomerAccess, token string) (
 	return session, err
 }
 
-func (s *Store) EndCustomerSession(token string) error {
+func (s *customerStore) EndCustomerSession(token string) error {
 	return s.db.Where("token_hash = ?", hashToken(token)).Delete(&CustomerSession{}).Error
 }
 
 // newCustomerLink makes a link for a grant, unless one was made inside customerLinkGap.
-func (s *Store) newCustomerLink(tx *gorm.DB, g CustomerGrant) (string, error) {
+func (s *customerStore) newCustomerLink(tx *gorm.DB, g CustomerGrant) (string, error) {
 	// Held, so a burst of requests for one person is counted one at a time.
 	if err := hold(tx, &CustomerGrant{}, g.OrgID, g.ID); err != nil {
 		return "", err
@@ -104,14 +107,14 @@ func (s *Store) newCustomerLink(tx *gorm.DB, g CustomerGrant) (string, error) {
 }
 
 // Mailable is the people at these companies who could be sent a link: known, with an address.
-func (s *Store) Mailable(org int64, companies []int64) ([]Contact, error) {
+func (s *customerStore) Mailable(org int64, companies []int64) ([]Contact, error) {
 	var people []Contact
 	return people, s.in(org).Where("company_id in ? and status <> ? and key not like ?", companies, ContactSuggested, "org:%").
 		Where("coalesce(email, '') <> ''").Order("id").Find(&people).Error
 }
 
 // FreshCustomerLink makes another link for someone already let in.
-func (s *Store) FreshCustomerLink(org, grant int64) (token string, err error) {
+func (s *customerStore) FreshCustomerLink(org, grant int64) (token string, err error) {
 	return token, s.db.Transaction(func(tx *gorm.DB) error {
 		var g CustomerGrant
 		if err := tx.Where("org_id = ? and id = ?", org, grant).First(&g).Error; err != nil {
@@ -125,7 +128,7 @@ func (s *Store) FreshCustomerLink(org, grant int64) (token string, err error) {
 // InviteCustomer lets a contact at the onboarding's company see their steps, and
 // returns the link to mail them. Inviting someone again makes a fresh link, and brings
 // back access that was withdrawn.
-func (s *Store) InviteCustomer(o *Org, onboarding, contact int64, actor string) (string, *Contact, error) {
+func (s *customerStore) InviteCustomer(o *Org, onboarding, contact int64, actor string) (string, *Contact, error) {
 	var token string
 	var c Contact
 	err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -161,7 +164,7 @@ func (s *Store) InviteCustomer(o *Org, onboarding, contact int64, actor string) 
 }
 
 // RevokeCustomer withdraws someone's access at once, in every browser.
-func (s *Store) RevokeCustomer(org, grant int64, actor string) error {
+func (s *customerStore) RevokeCustomer(org, grant int64, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		var g CustomerGrant
 		if err := tx.Where("org_id = ? and id = ?", org, grant).First(&g).Error; err != nil {
@@ -180,7 +183,7 @@ func (s *Store) RevokeCustomer(org, grant int64, actor string) error {
 
 // CustomerInvites are the people let see each of an organisation's onboardings, by
 // onboarding, with those whose access was withdrawn.
-func (s *Store) CustomerInvites(org int64) (map[int64][]CustomerInvite, error) {
+func (s *customerStore) CustomerInvites(org int64) (map[int64][]CustomerInvite, error) {
 	var grants []CustomerGrant
 	if err := s.in(org).Order("id").Find(&grants).Error; err != nil {
 		return nil, err
@@ -207,19 +210,19 @@ func (s *Store) CustomerInvites(org int64) (map[int64][]CustomerInvite, error) {
 
 // CustomerSteps are the steps of an onboarding that are the customer's to do. The
 // organisation's own steps were written for its own eyes and are never read for this page.
-func (s *Store) CustomerSteps(org int64, a *CustomerAccess) ([]OnboardingStep, error) {
+func (s *customerStore) CustomerSteps(org int64, a *CustomerAccess) ([]OnboardingStep, error) {
 	var steps []OnboardingStep
 	return steps, s.in(org).Where("onboarding_id = ? and who = ?", a.Onboarding.ID, StepTheirs).Order("seq").Find(&steps).Error
 }
 
-func (s *Store) DropCustomerLink(token string) {
+func (s *customerStore) DropCustomerLink(token string) {
 	_ = logged(s.db.Where("token_hash = ?", hashToken(token)).Delete(&CustomerLink{}))
 }
 
 // CustomerSetStep marks one of the customer's own steps done, or takes back a mark they
 // made. A step a member marked stays as the member left it, and so does a step that
 // isn't theirs or belongs to another onboarding.
-func (s *Store) CustomerSetStep(org int64, a *CustomerAccess, step int64, done bool) error {
+func (s *customerStore) CustomerSetStep(org int64, a *CustomerAccess, step int64, done bool) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		// Held and read again inside, so access withdrawn or a person erased a moment ago marks nothing.
 		if err := hold(tx, &CustomerGrant{}, org, a.Grant.ID); err != nil {
