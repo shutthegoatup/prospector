@@ -25,8 +25,8 @@ import (
 
 const (
 	RunFinished = "finished"
-	RunStopped  = "stopped"
-	RunFailed   = "failed"
+
+	RunFailed = "failed"
 )
 
 var (
@@ -41,7 +41,6 @@ var (
 const (
 	completionLimit = 5 * time.Minute
 	maxToolResult   = 12_000
-	builtinPrefix   = "builtin"
 )
 
 // The tools of Prospector's own the agent is given: research only, nothing that
@@ -85,10 +84,6 @@ func runCap(setting string) int {
 	}
 	return 8
 }
-
-// builtinKeyName is an agent's name as its key carries it into the record, marked so
-// it isn't taken for a key someone made for an agent of their own.
-func builtinKeyName(agent string) string { return agent + " (built in)" }
 
 // StartRun sets the organisation's agent going on a task.
 func (a *App) StartRun(org, task, agent int64, by string) (*AgentRun, error) {

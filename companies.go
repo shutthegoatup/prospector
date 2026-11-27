@@ -12,14 +12,8 @@ import (
 )
 
 var (
-	countryInName = regexp.MustCompile(`\s*\(.*\)\s*$`)
-	httpURL       = regexp.MustCompile(`^https?://\S+$`)
+	httpURL = regexp.MustCompile(`^https?://\S+$`)
 )
-
-// companyName strips the "(UK, group)" tags the drafts put after maker names.
-func companyName(maker string) string {
-	return strings.TrimSpace(countryInName.ReplaceAllString(maker, ""))
-}
 
 // ensureCompany finds a company by name (case-insensitive) or creates it.
 func ensureCompany(tx *gorm.DB, org int64, c Company) (*Company, bool, error) {

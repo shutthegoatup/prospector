@@ -44,7 +44,7 @@ func (s *outreachStore) BounceHookOrg(slug, secret string) (*Org, bool) {
 // arrived, which stays sent.
 func (s *outreachStore) MailFailed(org int64, addr, reason, said string) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
-		if _, err := s.suppression.suppress(tx, org, addr, reason, bounceBy); err != nil {
+		if _, err := s.suppression.SuppressIn(tx, org, addr, reason, bounceBy); err != nil {
 			return err
 		}
 		if reason != SuppressBounced {

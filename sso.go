@@ -14,69 +14,9 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
-	"gorm.io/gorm"
-)
-
-const (
-	maxSSODomains = 20
 )
 
 var googleIssuer = "https://accounts.google.com"
-
-var (
-	errNoAccount = errors.New("there's no account here for that address: ask whoever runs your organisation to add you")
-	errUnvouched = errors.New("the provider didn't confirm that address is yours, so it can't be matched to an account here")
-	errElsewhere = errors.New("that sign-in is linked to an account whose address isn't at this organisation's domains")
-	errNotMember = errors.New("you aren't a member of that organisation: ask one of its owners to add you")
-)
-
-func unusableHash() string { return "!" + randomToken(32) }
-
-// resolve finds whose sign-in a provider's answer is. A link made before wins; an
-// address makes a new one only when byEmail says the provider may speak for it.
-func resolve(tx *gorm.DB, who *outsider, email string, byEmail bool, create func() (*User, error)) (*User, error) {
-	var u User
-	var id Identity
-	err := tx.Where("provider = ? and subject = ?", who.Issuer, who.Subject).First(&id).Error
-	if err == nil {
-		return &u, tx.First(&u, id.UserID).Error
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-	if !byEmail || email == "" {
-		return nil, errUnvouched
-	}
-	found := &u
-	if err := tx.Where("email = ?", email).First(&u).Error; errors.Is(err, gorm.ErrRecordNotFound) {
-		if create == nil {
-			return nil, errNoAccount
-		}
-		if found, err = create(); err != nil {
-			return nil, err
-		}
-	} else if err != nil {
-		return nil, err
-	}
-	return found, tx.Create(&Identity{UserID: found.ID, Provider: who.Issuer, Subject: who.Subject}).Error
-}
-
-// claim ends a first password its inviter saw, once the account's owner has arrived
-// another way: they can't be asked to change a password they were never told.
-func claim(tx *gorm.DB, u *User) error {
-	if !u.MustChangePassword {
-		return nil
-	}
-	u.PasswordHash, u.MustChangePassword = unusableHash(), false
-	if err := tx.Model(u).Select("password_hash", "must_change_password").Updates(u).Error; err != nil {
-		return err
-	}
-	// An emailed invitation could still set a password; it ends with the first password.
-	if err := tx.Where("user_id = ?", u.ID).Delete(&PasswordToken{}).Error; err != nil {
-		return err
-	}
-	return tx.Where("user_id = ?", u.ID).Delete(&Session{}).Error
-}
 
 // socialWay is a sign-in the whole deployment offers, registered once by whoever runs it.
 type socialWay struct {

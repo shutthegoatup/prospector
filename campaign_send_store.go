@@ -23,10 +23,10 @@ func (s *outreachStore) CampaignsSending() ([]Campaign, error) {
 	return going, s.DB.Where("status = ?", CampaignSending).Order("id").Find(&going).Error
 }
 
-func (s *outreachStore) MailGate(o *Org) (*mailGate, error) { return s.suppression.gate(s.DB, o) }
+func (s *outreachStore) MailGate(o *Org) (*mailGate, error) { return s.suppression.Gate(s.DB, o) }
 
 func (s *outreachStore) UnsubscribeLink(org int64, address string) (string, error) {
-	return s.suppression.unsubscribeLink(s.DB, org, address)
+	return s.suppression.MintUnsubscribeLink(s.DB, org, address)
 }
 
 // MailSentSince counts the campaign mails an organisation has sent since a time.

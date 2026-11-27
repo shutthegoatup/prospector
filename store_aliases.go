@@ -133,3 +133,17 @@ type Change = store.Change
 type conflict = store.Conflict
 
 var parseMoney = store.ParseMoney
+
+const builtinPrefix = store.BuiltinPrefix
+
+var bareAddress = store.BareAddress
+var breaksRule = store.BreaksRule
+var builtinKeyName = store.BuiltinKeyName
+var companyName = store.CompanyName
+var emailRe = store.EmailRe
+var errErased = store.ErrErased
+var errNeverContact = store.ErrNeverContact
+var identifiers = store.Identifiers
+var openTask = store.OpenTask
+var personKey = store.PersonKey
+var unusableHash = store.UnusableHash

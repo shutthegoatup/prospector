@@ -198,16 +198,6 @@ func (b *looseBool) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// outsider is who a provider says has signed in.
-type outsider struct {
-	Issuer, Subject    string
-	Email, Name        string
-	Username, HostedBy string
-	// Vouched is the provider saying the address is this person's own. Disowned is
-	// it saying outright that it isn't known to be.
-	Vouched, Disowned bool
-}
-
 type outsiderClaims struct {
 	Email    string     `json:"email"`
 	Verified *looseBool `json:"email_verified"`
