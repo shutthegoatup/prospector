@@ -196,38 +196,6 @@ func TestADealFollowsItsPersonThroughARestore(t *testing.T) {
 	}
 }
 
-// A database written before deals existed has replied contacts and no deals table.
-func TestADatabaseFromBeforeDealsOpens(t *testing.T) {
-	t.Parallel()
-	dsn := freshDatabase(t)
-	old := must(Open(dsn))
-	if err := old.db.Migrator().DropTable(models...); err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.AutoMigrate(models...); err != nil {
-		t.Fatal(err)
-	}
-	o := mustOrg(t, old, "alpha")
-	c := repliedPerson(t, old, o, "Hannah Pryce")
-	if err := old.db.Migrator().DropTable(&Deal{}); err != nil {
-		t.Fatal(err)
-	}
-
-	s := must(Open(dsn))
-	if board := must(s.Conversations(o.ID)); len(board["replied"]) != 1 {
-		t.Fatalf("the board after the upgrade: %+v", board)
-	}
-	if deals := must(s.Deals(o.ID)); len(deals) != 0 {
-		t.Fatalf("deals nobody made: %+v", deals)
-	}
-	if err := s.Update(o.ID, c.ID, "deal_amount", "9,500", "Ada Lovelace"); err != nil {
-		t.Fatal(err)
-	}
-	if d := must(s.Deals(o.ID))[c.ID]; d.Amount != 950000 || d.Kind != DealNew {
-		t.Errorf("the first deal after the upgrade: %+v", d)
-	}
-}
-
 func TestTheBoardShowsWhatAStageIsWorth(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
@@ -290,76 +258,6 @@ func boardCards(t *testing.T, c *http.Client, base string) []api.DealCard {
 		t.Fatalf("the board: %d %s", code, body)
 	}
 	return out.Items
-}
-
-// dealV1 is the deals table as the first release with deals made it: one per contact.
-type dealV1 struct {
-	ID        int64  `gorm:"primaryKey"`
-	OrgID     int64  `gorm:"uniqueIndex:idx_deal_contact;not null"`
-	ContactID int64  `gorm:"uniqueIndex:idx_deal_contact;not null"`
-	Kind      string `gorm:"not null;default:'new'"`
-	Amount    int64  `gorm:"not null;default:0"`
-	Currency  string `gorm:"not null;default:''"`
-	CloseDate *string
-	Owner     string `gorm:"not null;default:''"`
-	UpdatedAt time.Time
-}
-
-func (dealV1) TableName() string { return "deals" }
-
-// A database from the first release with deals has rows without a seq, and an index
-// that allows each contact one deal.
-func TestDealsFromTheFirstReleaseBecomeTheConversationsOwn(t *testing.T) {
-	t.Parallel()
-	dsn := freshDatabase(t)
-	old := must(Open(dsn))
-	if err := old.db.Migrator().DropTable(models...); err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.AutoMigrate(models...); err != nil {
-		t.Fatal(err)
-	}
-	o := mustOrg(t, old, "alpha")
-	valued, fresh := repliedPerson(t, old, o, "Hannah Pryce"), repliedPerson(t, old, o, "Tom Ellery")
-	if err := old.db.Migrator().DropTable(&Deal{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.AutoMigrate(&dealV1{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.Create(&dealV1{OrgID: o.ID, ContactID: valued.ID, Kind: DealNew, Amount: 1400000, Currency: "GBP"}).Error; err != nil {
-		t.Fatal(err)
-	}
-
-	s := must(Open(dsn))
-	if !s.db.Migrator().HasIndex(&Deal{}, "idx_deal_seq") {
-		t.Error("the upgrade didn't add the index that tells a contact's deals apart")
-	}
-	for _, c := range []*Contact{valued, fresh} {
-		if err := s.Update(o.ID, c.ID, "deal_close_date", "2026-12-12", "Ada Lovelace"); err != nil {
-			t.Fatalf("setting a deal after the upgrade: %v", err)
-		}
-	}
-	deals := must(s.Deals(o.ID))
-	if d := deals[valued.ID]; len(deals) != 2 || d.Amount != 1400000 || d.Seq != 0 || deref(d.CloseDate) != "2026-12-12" {
-		t.Errorf("the deals after the upgrade: %+v", deals)
-	}
-
-	// The index that held a contact to one deal is gone, so a renewal can be started.
-	if s.db.Migrator().HasIndex(&Deal{}, "idx_deal_contact") {
-		t.Error("the upgrade left the index that allows each contact one deal")
-	}
-	renewal, err := s.StartDeal(o.ID, valued.ID, "renewal", "Ada Lovelace")
-	if err != nil || renewal.Seq != 1 {
-		t.Fatalf("starting a renewal after the upgrade: %+v %v", renewal, err)
-	}
-	if d := must(s.Deals(o.ID))[valued.ID]; d.Amount != 1400000 || d.Seq != 0 {
-		t.Errorf("the conversation's own deal, once it has a renewal beside it: %+v", d)
-	}
-	// Opening it again finds nothing to drop.
-	if _, err := Open(dsn); err != nil {
-		t.Errorf("opening the upgraded database a second time: %v", err)
-	}
 }
 
 func TestAnotherDealWithSomeoneInConversation(t *testing.T) {

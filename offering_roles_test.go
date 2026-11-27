@@ -196,22 +196,6 @@ func TestRolesAreKeptOnlyForAnOfferingThatHasThem(t *testing.T) {
 	}
 }
 
-func TestOfferingsFromBeforeRolesHaveNone(t *testing.T) {
-	t.Parallel()
-	s := tempStore(t)
-	o := mustOrg(t, s, "alpha")
-	must(s.AddOffering(o.ID, Offering{Name: "Interim CTO"}, "Ada"))
-	if err := s.db.Migrator().DropColumn(&Offering{}, "has_roles"); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.db.AutoMigrate(&Offering{}); err != nil {
-		t.Fatalf("adding the column to a table with rows: %v", err)
-	}
-	if got := must(s.Offerings(o.ID)); len(got) != 1 || got[0].HasRoles {
-		t.Fatalf("an offering from before roles: %+v", got)
-	}
-}
-
 func TestARoleAnAgentAddsMustCiteAPageItWasShown(t *testing.T) {
 	t.Parallel()
 	got := sources("add_role", map[string]any{"title": "Platform engineer", "source_url": "https://northwind.example/jobs/2"})

@@ -216,31 +216,3 @@ func addConfiguratorFacts(tx *gorm.DB, org, company int64, url, platform, builtB
 	o.Settings.LookFor = "configurator: a product configurator or builder on their site"
 	return added, tx.Model(&o).Select("settings").Updates(&o).Error
 }
-
-// moveAssetColumns turns what companies hold in the old configurator columns into
-// facts, credited to whoever found the company, then empties the columns so the next
-// start finds nothing to move. They are kept so an earlier release still starts.
-func moveAssetColumns(db *gorm.DB) error {
-	for _, col := range []string{"configurator_url", "platform", "built_by"} {
-		if !db.Migrator().HasColumn(&Company{}, col) {
-			return nil
-		}
-	}
-	const held = "coalesce(configurator_url, '') <> '' or coalesce(platform, '') <> '' or coalesce(built_by, '') <> ''"
-	return db.Transaction(func(tx *gorm.DB) error {
-		var rows []struct {
-			ID, OrgID                                   int64
-			FoundBy, ConfiguratorURL, Platform, BuiltBy string
-		}
-		if err := tx.Raw(`select id, org_id, coalesce(found_by, '') as found_by, coalesce(configurator_url, '') as configurator_url,
-			coalesce(platform, '') as platform, coalesce(built_by, '') as built_by from companies where ` + held).Scan(&rows).Error; err != nil {
-			return err
-		}
-		for _, r := range rows {
-			if _, err := addConfiguratorFacts(tx, r.OrgID, r.ID, r.ConfiguratorURL, r.Platform, r.BuiltBy, cmp.Or(r.FoundBy, "import")); err != nil {
-				return err
-			}
-		}
-		return tx.Exec(`update companies set configurator_url = '', platform = '', built_by = '' where ` + held).Error
-	})
-}

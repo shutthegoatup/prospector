@@ -231,35 +231,6 @@ func TestOnboardingIsWorkedFromItsPages(t *testing.T) {
 	}
 }
 
-// A database written before onboarding existed has companies and neither table.
-func TestADatabaseFromBeforeOnboardingOpens(t *testing.T) {
-	t.Parallel()
-	dsn := freshDatabase(t)
-	old := must(Open(dsn))
-	if err := old.db.Migrator().DropTable(models...); err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.AutoMigrate(models...); err != nil {
-		t.Fatal(err)
-	}
-	o := mustOrg(t, old, "alpha")
-	person := repliedPerson(t, old, o, "Hannah Pryce")
-	if err := old.db.Migrator().DropTable(&Onboarding{}, &OnboardingStep{}); err != nil {
-		t.Fatal(err)
-	}
-	s := must(Open(dsn))
-	if rows := must(s.Onboardings(o.ID, 0, "2026-01-01")); len(rows) != 0 {
-		t.Fatalf("onboardings nobody started: %+v", rows)
-	}
-	o.Settings.OnboardingSteps = fourSteps
-	if err := s.SaveOrg(o); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.StartOnboarding(o.ID, OnboardingIn{Company: *person.CompanyID, Start: "2026-01-01"}, "Ada Lovelace"); err != nil {
-		t.Errorf("the first onboarding after the upgrade: %v", err)
-	}
-}
-
 func TestAWonDealOffersOnboarding(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)

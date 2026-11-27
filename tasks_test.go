@@ -226,33 +226,6 @@ func TestErasingAPersonTakesTheNotesAroundThem(t *testing.T) {
 	}
 }
 
-func TestExistingHistorySurvivesTheTaskColumn(t *testing.T) {
-	t.Parallel()
-	s := tempStore(t)
-	o := mustOrg(t, s, "alpha")
-	scout := Actor{Name: "agent:scout", KeyID: 4}
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
-	// A database from before tasks, with history already in it.
-	if err := s.db.Migrator().DropColumn(&Event{}, "task_id"); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.db.Migrator().DropTable(&Task{}, &TaskRequest{}, &TaskNote{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.db.AutoMigrate(models...); err != nil {
-		t.Fatalf("adding tasks to a database with rows: %v", err)
-	}
-	var old Event
-	if err := s.in(o.ID).First(&old).Error; err != nil || old.Action != "add:company" || old.KeyID != 4 || old.TaskID != 0 {
-		t.Fatalf("an existing event after the upgrade: %+v %v", old, err)
-	}
-	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts", Task: task.ID}))
-	if got := must(s.AgentTask(o.ID, scout, task.ID, PageIn{})); len(got.Companies) != 1 {
-		t.Fatalf("a company from before the upgrade should join a task: %+v", got.Companies)
-	}
-}
-
 func TestRunsSplitOnAQuietHalfHour(t *testing.T) {
 	t.Parallel()
 	at := time.Date(2026, 11, 24, 9, 0, 0, 0, time.UTC)

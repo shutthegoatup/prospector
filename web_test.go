@@ -245,21 +245,3 @@ func TestAToolServersWebSearchIsntTakenOver(t *testing.T) {
 		t.Fatalf("the gateway's web_search: %q %v", got, err)
 	}
 }
-
-func TestAgentsTableGainsSearchWithRowsInIt(t *testing.T) {
-	t.Parallel()
-	s := tempStore(t)
-	o := mustOrg(t, s, "alpha")
-	if err := s.db.Create(&Agent{OrgID: o.ID, Name: "Gateway", Kind: kindOpenAI, Models: "[]", Tools: "[]", Allowed: "[]"}).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := s.db.Migrator().DropColumn(&Agent{}, "search_url"); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.db.AutoMigrate(models...); err != nil {
-		t.Fatalf("adding search to a table with rows: %v", err)
-	}
-	if got := must(s.AgentNamed(o.ID, "Gateway")); got.SearchURL != "" {
-		t.Fatalf("an agent from before search should have none: %+v", got)
-	}
-}

@@ -150,41 +150,6 @@ func TestEnquiriesAreAnsweredFromTheirPage(t *testing.T) {
 	}
 }
 
-// A database from before enquiries were tracked has them without a state, owner or note.
-func TestEnquiriesFromBeforeTheyWereTrackedStayAsTheyWere(t *testing.T) {
-	t.Parallel()
-	dsn := freshDatabase(t)
-	old := must(Open(dsn))
-	if err := old.db.Migrator().DropTable(models...); err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.AutoMigrate(models...); err != nil {
-		t.Fatal(err)
-	}
-	o := mustOrg(t, old, "alpha")
-	sent := must(old.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "support", Email: "hannah@larkmoor.example", Message: "From last year"}))
-	for _, column := range []string{"state", "owner", "note"} {
-		if err := old.db.Migrator().DropColumn(&Enquiry{}, column); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	s := must(Open(dsn))
-	rows := must(firstOf(s.Enquiries(o.ID, EnquiryFilter{}, 1)))
-	if len(rows) != 1 || rows[0].ID != sent.ID || rows[0].State != "" || rows[0].Owner != "" || rows[0].Message != "From last year" {
-		t.Fatalf("the enquiry after the upgrade: %+v", rows)
-	}
-	if n := s.EnquiryCounts(o.ID)["state:"+EnquiryOpen]; n != 0 {
-		t.Errorf("%d enquiries from before the upgrade are asking to be answered", n)
-	}
-	if err := s.SetEnquiry(o.ID, sent.ID, "state", EnquiryOpen, "Ada Lovelace"); err != nil {
-		t.Errorf("taking up an old enquiry: %v", err)
-	}
-	if next := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Email: "sven@nordkap.example", Message: "New"})); next.State != EnquiryOpen {
-		t.Errorf("the first enquiry after the upgrade starts as %q", next.State)
-	}
-}
-
 func TestAnEnquiryBecomesAConversation(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)

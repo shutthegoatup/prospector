@@ -200,31 +200,3 @@ func TestAgentsLeaveAPersonsWordsAlone(t *testing.T) {
 		t.Fatalf("the message after accepting is still to write: %v", err)
 	}
 }
-
-func TestExistingHistorySurvivesTheKeyColumn(t *testing.T) {
-	t.Parallel()
-	s := tempStore(t)
-	o := mustOrg(t, s, "alpha")
-	if _, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:scout", KeyID: 4}, AddCompanyIn{Name: "Larkmoor Yachts"}); err != nil {
-		t.Fatal(err)
-	}
-	// A database from before the column existed, with history already in it.
-	if err := s.db.Migrator().DropColumn(&Event{}, "key_id"); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.db.AutoMigrate(&Event{}); err != nil {
-		t.Fatalf("adding the column to a table with rows: %v", err)
-	}
-	var old Event
-	if err := s.in(o.ID).First(&old).Error; err != nil || old.User != "agent:scout" || old.Action != "add:company" || old.KeyID != 0 {
-		t.Fatalf("an existing event after the upgrade: %+v %v", old, err)
-	}
-	if _, err := s.AgentAddFact(o.ID, Actor{Name: "agent:scout", KeyID: 4}, AddFactIn{Company: "Larkmoor Yachts",
-		FactIn: FactIn{Field: "press", Value: "Boat of the year", SourceURL: "https://larkmoor.example/news"}}); err != nil {
-		t.Fatal(err)
-	}
-	var latest Event
-	if s.in(o.ID).Order("id desc").First(&latest); latest.KeyID != 4 {
-		t.Fatalf("a new event after the upgrade: %+v", latest)
-	}
-}

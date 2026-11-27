@@ -945,40 +945,6 @@ func TestGoogleWorkspaceMustHoldTheAddress(t *testing.T) {
 	}
 }
 
-func TestSessionsSurviveTheSingleSignOnColumns(t *testing.T) {
-	t.Parallel()
-	s := tempStore(t)
-	if _, err := s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery"); err != nil {
-		t.Fatal(err)
-	}
-	token, _, err := s.Login("ada@example.com", "correct horse battery")
-	if err != nil {
-		t.Fatal(err)
-	}
-	// A database from before the columns existed, with somebody signed in.
-	for _, column := range []string{"sso_orgs", "limited"} {
-		if err := s.db.Migrator().DropColumn(&Session{}, column); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := s.db.AutoMigrate(&Session{}); err != nil {
-		t.Fatalf("adding the columns to a table with rows: %v", err)
-	}
-	sess, u, err := s.SessionFor(token)
-	if err != nil || u.Email != "ada@example.com" || sess.Limited || sess.SSOOrgs != "" || !sess.Opens(7) || sess.Proves(7) {
-		t.Fatalf("a session from before the upgrade: %+v %v", sess, err)
-	}
-	if err := s.AddProof(sess, 7); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.AddProof(sess, 71); err != nil {
-		t.Fatal(err)
-	}
-	if sess, _, _ = s.SessionFor(token); !sess.Proves(7) || !sess.Proves(71) || sess.Proves(1) || sess.Limited {
-		t.Fatalf("proofs added to a session: %+v", sess)
-	}
-}
-
 func TestSingleSignOnIsAskedAgainAfterADay(t *testing.T) {
 	t.Parallel()
 	sess := &Session{Limited: true}

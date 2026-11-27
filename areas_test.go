@@ -180,19 +180,3 @@ func memberAreas(e *OrgExport) []string {
 	}
 	return out
 }
-
-func TestMembershipsGainAreasWithRowsInThem(t *testing.T) {
-	t.Parallel()
-	s := tempStore(t)
-	o := mustOrg(t, s, "alpha")
-	grace := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
-	if err := s.db.Migrator().DropColumn(&Membership{}, "areas"); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.db.AutoMigrate(models...); err != nil {
-		t.Fatalf("adding areas to a table with rows: %v", err)
-	}
-	if m := must(s.Membership(o.ID, grace.ID)); m.Areas != "sales support" {
-		t.Fatalf("someone on a team before areas works on %q, want every area", m.Areas)
-	}
-}

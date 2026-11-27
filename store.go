@@ -289,49 +289,6 @@ func connect(dsn string) (*Store, error) {
 	return &Store{db: db}, nil
 }
 
-func (s *Store) migrate() error {
-	if err := s.db.AutoMigrate(models...); err != nil {
-		return err
-	}
-	if err := moveAssetColumns(s.db); err != nil {
-		return err
-	}
-	if err := allowSeveralDeals(s.db); err != nil {
-		return err
-	}
-	s.oneNameWhateverItsCapitals()
-	s.indexSearch()
-	if err := migrateAgentConfigs(s.db); err != nil {
-		return err
-	}
-	return oneGoingRunPerAgent(s.db)
-}
-
-// oneGoingRunPerAgent has the database hold that an agent works a task once at a time,
-// however two starts interleave; several agents can share a task. It keeps the name of
-// the earlier rule, one run per task, because an earlier release creates that name only
-// if nothing has it: so going back to one still starts, whatever runs are going.
-func oneGoingRunPerAgent(db *gorm.DB) error {
-	const name = "idx_agent_runs_one_going"
-	var def string
-	lookup := "select indexdef from pg_indexes where indexname = ? and tablename = 'agent_runs' and schemaname = current_schema()"
-	if err := db.Raw(lookup, name).Scan(&def).Error; err != nil {
-		return err
-	}
-	if strings.Contains(def, "agent_id") {
-		return nil
-	}
-	return db.Transaction(func(tx *gorm.DB) error {
-		for _, stmt := range []string{"drop index if exists " + name,
-			"create unique index " + name + " on agent_runs (task_id, agent_id) where status in ('running', 'waiting')"} {
-			if err := tx.Exec(stmt).Error; err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
 // in scopes a query to one organisation. Not every query uses it, so what holds the
 // store's exported methods to their organisation is TestNoMethodReachesIntoAnotherOrganisation.
 func (s *Store) in(org int64) *gorm.DB { return s.db.Where("org_id = ?", org) }

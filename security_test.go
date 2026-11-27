@@ -913,28 +913,6 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 	}
 }
 
-func TestExistingAccountsSurviveTheNewColumn(t *testing.T) {
-	t.Parallel()
-	s := tempStore(t)
-	if _, err := s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery"); err != nil {
-		t.Fatal(err)
-	}
-	// A database from before the column existed, with an account already in it.
-	if err := s.db.Migrator().DropColumn(&User{}, "must_change_password"); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.db.AutoMigrate(&User{}); err != nil {
-		t.Fatalf("adding the column to a table with rows: %v", err)
-	}
-	u, err := s.UserByEmail("ada@example.com")
-	if err != nil || u.MustChangePassword {
-		t.Fatalf("an existing account after the upgrade: %+v %v", u, err)
-	}
-	if _, _, err := s.Login("ada@example.com", "correct horse battery"); err != nil {
-		t.Fatalf("an existing account can't sign in after the upgrade: %v", err)
-	}
-}
-
 func TestOtherSitesCantPost(t *testing.T) {
 	t.Parallel()
 	s, _, srv, client := signedIn(t)

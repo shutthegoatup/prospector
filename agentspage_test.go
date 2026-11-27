@@ -156,28 +156,3 @@ func TestAnAgentWithThinkingOffAsksItsModelNotToThink(t *testing.T) {
 		t.Fatal("thinking off was kept for an Anthropic agent, which ignores it")
 	}
 }
-
-// A database from before thinking could be turned off has agents, and they keep thinking.
-func TestAgentsFromBeforeThinkingOffStillThink(t *testing.T) {
-	t.Parallel()
-	dsn := freshDatabase(t)
-	old := must(Open(dsn))
-	if err := old.db.Migrator().DropTable(models...); err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.AutoMigrate(models...); err != nil {
-		t.Fatal(err)
-	}
-	o := mustOrg(t, old, "alpha")
-	if err := old.db.Create(&Agent{OrgID: o.ID, Name: "Gateway", BaseURL: "https://llm.example/v1", Model: "router/auto"}).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.Migrator().DropColumn(&Agent{}, "thinking_off"); err != nil {
-		t.Fatal(err)
-	}
-
-	s := must(Open(dsn))
-	if c := must(s.AgentNamed(o.ID, "Gateway")); c.ThinkingOff {
-		t.Fatalf("an agent from before should still think: %+v", c)
-	}
-}

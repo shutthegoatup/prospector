@@ -93,9 +93,10 @@ func withDatabases(run func() int) int {
 	}
 	// Emptied by deleting, which is far quicker than truncating tables this small, with
 	// foreign keys unchecked so the order doesn't matter, and ids counting from 1 again.
+	// Which migrations ran stays, as it would in a real database.
 	err = s.db.Raw(`select 'set session_replication_role = replica; '
-		|| (select string_agg('delete from ' || quote_ident(tablename), '; ') from pg_tables where schemaname = current_schema())
-		|| coalesce('; ' || (select string_agg('alter sequence ' || quote_ident(sequencename) || ' restart', '; ') from pg_sequences where schemaname = current_schema()), '')`).
+		|| (select string_agg('delete from ' || quote_ident(tablename), '; ') from pg_tables where schemaname = current_schema() and tablename <> 'goose_db_version')
+		|| coalesce('; ' || (select string_agg('alter sequence ' || quote_ident(sequencename) || ' restart', '; ') from pg_sequences where schemaname = current_schema() and sequencename <> 'goose_db_version_id_seq'), '')`).
 		Scan(&testDB.empty).Error
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

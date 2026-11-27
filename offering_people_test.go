@@ -125,24 +125,3 @@ func scriptText(lines []Line) string {
 	}
 	return b.String()
 }
-
-func TestExistingPeopleAreReachedForTheOrganisationsOwnOffering(t *testing.T) {
-	t.Parallel()
-	s := tempStore(t)
-	o := mustOrg(t, s, "alpha")
-	old := must(s.QuickAddPerson(o, QuickAdd{Name: "Cleo Marsh", Company: "Larkmoor"}, "Ada"))
-	// A database from before the column existed, with people already in it.
-	if err := s.db.Migrator().DropColumn(&Contact{}, "offering_id"); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.db.AutoMigrate(&Contact{}); err != nil {
-		t.Fatalf("adding the column to a table with rows: %v", err)
-	}
-	var got Contact
-	if err := s.in(o.ID).Where("id = ?", old.ID).First(&got).Error; err != nil || got.OfferingID != 0 {
-		t.Fatalf("an existing person after the upgrade: %+v %v", got.OfferingID, err)
-	}
-	if !dueNames(t, s, o)["Cleo"] {
-		t.Fatal("an existing person should still be in the queue")
-	}
-}

@@ -164,35 +164,3 @@ func TestASearchRanksItsCompaniesByFit(t *testing.T) {
 		t.Errorf("the whole queue should stay newest first: %s (ranked %v)", got, all.Ranked)
 	}
 }
-
-// A database from before answers has facts, and each still says the company has it.
-func TestFactsFromBeforeAnswersStillCount(t *testing.T) {
-	t.Parallel()
-	dsn := freshDatabase(t)
-	old := must(Open(dsn))
-	if err := old.db.Migrator().DropTable(models...); err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.AutoMigrate(models...); err != nil {
-		t.Fatal(err)
-	}
-	o := mustOrg(t, old, "alpha")
-	co := Company{OrgID: o.ID, Name: "Tidewater Skiffs", Stage: CompanyReview}
-	if err := old.db.Create(&co).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.Create(&Fact{OrgID: o.ID, CompanyID: co.ID, Field: "configurator", Value: "A hull picker", SourceURL: "https://tidewater.example"}).Error; err != nil {
-		t.Fatal(err)
-	}
-	for _, column := range []string{"answer", "inferred"} {
-		if err := old.db.Migrator().DropColumn(&Fact{}, column); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	s := must(Open(dsn))
-	found := assetsFound(OrgSettings{LookFor: criteriaLookFor}, must(s.Facts(o.ID, co.ID)))
-	if found[0].State != assetMet || found[0].Fact.Inferred {
-		t.Fatalf("an older fact should still count as the company having it: %+v", found[0])
-	}
-}

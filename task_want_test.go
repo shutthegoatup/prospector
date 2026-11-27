@@ -59,26 +59,3 @@ func TestASearchAsksForAboutSoManyCompanies(t *testing.T) {
 		t.Errorf("an agent is given a number nobody asked for: %s", out)
 	}
 }
-
-// A database from before searches asked for a number has tasks, and they ask for none.
-func TestTasksFromBeforeANumberAskForNone(t *testing.T) {
-	t.Parallel()
-	dsn := freshDatabase(t)
-	old := must(Open(dsn))
-	if err := old.db.Migrator().DropTable(models...); err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.AutoMigrate(models...); err != nil {
-		t.Fatal(err)
-	}
-	o := mustOrg(t, old, "alpha")
-	task := must(old.CreateTask(o.ID, "", "Yacht builders.", "Ada Lovelace"))
-	if err := old.db.Migrator().DropColumn(&Task{}, "want"); err != nil {
-		t.Fatal(err)
-	}
-
-	s := must(Open(dsn))
-	if got := must(s.TaskByID(o.ID, task.ID)); got.Want != 0 {
-		t.Fatalf("a task from before should ask for no number: %+v", got)
-	}
-}
