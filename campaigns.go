@@ -251,11 +251,11 @@ func (s *Store) audienceWork(o *Org) (*audienceWork, error) {
 	if err != nil {
 		return nil, err
 	}
-	customers, err := s.customerCompanies(o.ID)
+	customers, err := s.CustomerCompanies(o.ID)
 	if err != nil {
 		return nil, err
 	}
-	return &audienceWork{gate: g, customers: customers, noMail: s.noMailDomains()}, nil
+	return &audienceWork{gate: g, customers: customers, noMail: s.NoMailDomains()}, nil
 }
 
 func (s *Store) audience(o *Org, c Campaign, w *audienceWork) ([]Recipient, error) {
@@ -336,8 +336,8 @@ func leftOutBecause(err error) (string, bool) {
 	return "", false
 }
 
-// customerCompanies are those with a subscription running today: started, not ended.
-func (s *Store) customerCompanies(org int64) ([]int64, error) {
+// CustomerCompanies are those with a subscription running today: started, not ended.
+func (s *Store) CustomerCompanies(org int64) ([]int64, error) {
 	subs, err := s.Subscriptions(org, 0, today())
 	if err != nil {
 		return nil, err

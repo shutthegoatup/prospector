@@ -287,8 +287,8 @@ func (s *Store) Roles(org, company int64, offering *int64) ([]Role, error) {
 	return out, q.Order("offering_id, id").Find(&out).Error
 }
 
-// rolesAt are the roles for an offering at each of these companies.
-func (s *Store) rolesAt(org, offering int64, companies []int64) (map[int64][]Role, error) {
+// RolesAt are the roles for an offering at each of these companies.
+func (s *Store) RolesAt(org, offering int64, companies []int64) (map[int64][]Role, error) {
 	out := map[int64][]Role{}
 	if offering == 0 || len(companies) == 0 {
 		return out, nil
@@ -319,7 +319,7 @@ type AddRoleOut struct {
 // AgentAddRole adds a role an agent found for its task's offering. One junked before is
 // refused with why, so it isn't brought back.
 func (s *Store) AgentAddRole(org int64, who Actor, in AddRoleIn) (*AddRoleOut, error) {
-	who, err := s.onTask(org, who, in.Task)
+	who, err := s.OnTask(org, who, in.Task)
 	if err != nil {
 		return nil, err
 	}

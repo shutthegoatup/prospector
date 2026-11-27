@@ -79,13 +79,13 @@ func (s *Store) InviteToken(user int64) (string, error) {
 	if recent > 0 {
 		return "", errTooSoon
 	}
-	if err := s.dropInvites(user); err != nil {
+	if err := s.DropInvites(user); err != nil {
 		return "", err
 	}
 	return s.newPasswordToken(user, true)
 }
 
-func (s *Store) dropInvites(user int64) error {
+func (s *Store) DropInvites(user int64) error {
 	return s.db.Where("user_id = ? and invite = ?", user, true).Delete(&PasswordToken{}).Error
 }
 
@@ -231,7 +231,7 @@ func (a *App) invite(ctx context.Context, q *Req, u *User, created bool) (bool, 
 			"Then sign in with " + u.Email + ".\n"})
 	if err != nil {
 		// Nothing was sent, so the wait before another try doesn't apply.
-		if err := a.s.dropInvites(u.ID); err != nil {
+		if err := a.s.DropInvites(u.ID); err != nil {
 			log.Printf("user %d: unsent invite not dropped: %v", u.ID, err)
 		}
 	}

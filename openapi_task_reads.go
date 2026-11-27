@@ -35,7 +35,7 @@ func (s apiServer) ListTasks(ctx context.Context, in api.ListTasksRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	tasks, next, err := s.a.s.taskBriefsFor(q.Org.ID, worker(q), in.Params.Closed, in.Params.Offering, page)
+	tasks, next, err := s.a.s.TaskBriefsFor(q.Org.ID, worker(q), in.Params.Closed, in.Params.Offering, page)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (s apiServer) FinishRequest(ctx context.Context, in api.FinishRequestReques
 
 func (s apiServer) GetTaskPrompt(ctx context.Context, in api.GetTaskPromptRequestObject) (api.GetTaskPromptResponseObject, error) {
 	q := reqFrom(ctx)
-	t, err := s.a.s.taskRow(q.Org.ID, in.Id)
+	t, err := s.a.s.TaskByID(q.Org.ID, in.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func (s apiServer) GetTaskPrompt(ctx context.Context, in api.GetTaskPromptReques
 
 func (s apiServer) ListTaskNotes(ctx context.Context, in api.ListTaskNotesRequestObject) (api.ListTaskNotesResponseObject, error) {
 	q := reqFrom(ctx)
-	if _, err := s.a.s.taskRow(q.Org.ID, in.Id); err != nil {
+	if _, err := s.a.s.TaskByID(q.Org.ID, in.Id); err != nil {
 		return nil, err
 	}
 	page, err := pageIn(in.Params.Limit, in.Params.Cursor)

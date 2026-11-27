@@ -183,7 +183,7 @@ func TestASealedAgreementIsFilledInCertifiedAndShowsAnyChange(t *testing.T) {
 		Signers: []CertificateSigner{{Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Via: "typed name · email code", Typed: "Hannah Pryce", IP: "203.0.113.24", Browser: "Firefox on macOS", SignedAt: when}},
 		Events:  []CertificateEvent{{At: when, Text: "Signed by Hannah Pryce as \"Hannah Pryce\""}}, Consent: signingConsent}
 	stamps := []Stamp{{Page: 3, X: 0.1, Y: 0.7, W: 0.3, H: 0.06, Kind: "signature", Value: "Hannah Pryce"}, {Page: 2, X: 0.1, Y: 0.1, W: 0.03, H: 0.022, Kind: "tick", Value: "✓"}}
-	out := must(s.seal(o, doc, stamps, c))
+	out := must(s.sealDocument(o, doc, stamps, c))
 
 	pages, err := api.PageCount(context.Background(), bytes.NewReader(out.PDF), model.NewDefaultConfiguration())
 	if err != nil || pages != 4 {
@@ -215,7 +215,7 @@ func TestASealedAgreementIsFilledInCertifiedAndShowsAnyChange(t *testing.T) {
 		c2, st2 := c, slices.Clone(stamps)
 		c2.Signers = slices.Clone(c.Signers)
 		change(&c2, st2)
-		if _, err := s.seal(o, doc, st2, c2); err == nil || !strings.Contains(err.Error(), "can't show") {
+		if _, err := s.sealDocument(o, doc, st2, c2); err == nil || !strings.Contains(err.Error(), "can't show") {
 			t.Errorf("%s the fonts can't draw: %v", what, err)
 		}
 	}

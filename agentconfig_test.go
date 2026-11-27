@@ -127,7 +127,7 @@ func TestAnOwnerSetsUpTheAgent(t *testing.T) {
 	save := func(body map[string]any) (int, string) {
 		t.Helper()
 		body["name"] = "Prospector"
-		if c, err := s.agentNamed(o.ID, "Prospector"); err == nil {
+		if c, err := s.AgentNamed(o.ID, "Prospector"); err == nil {
 			body["id"] = c.ID
 		}
 		return saveAgentAt(t, ada, srv.URL, body)
@@ -137,7 +137,7 @@ func TestAnOwnerSetsUpTheAgent(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, "Pick a model") {
 		t.Fatalf("saving without a model: %d %s", code, body)
 	}
-	c := must(s.agentNamed(o.ID, "Prospector"))
+	c := must(s.AgentNamed(o.ID, "Prospector"))
 	if c.BaseURL != fake.srv.URL+"/v1" || strings.Contains(c.APIKey, agentTestKey) || !sealed(c.APIKey) {
 		t.Fatalf("the endpoint or its key wasn't kept as it should be: %+v", c)
 	}
@@ -157,7 +157,7 @@ func TestAnOwnerSetsUpTheAgent(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, `"message":"Prospector saved."`) {
 		t.Fatalf("saving the model and a tool: %d %s", code, body)
 	}
-	c = must(s.agentNamed(o.ID, "Prospector"))
+	c = must(s.AgentNamed(o.ID, "Prospector"))
 	if !c.Ready() || c.Model != "router/auto" || strings.Join(c.AllowedTools(), " ") != "fetch_fetch" {
 		t.Fatalf("only a tool on offer can be allowed: %+v %v", c, c.AllowedTools())
 	}
@@ -235,8 +235,8 @@ func TestAnOrganisationHasSeveralAgents(t *testing.T) {
 	}
 
 	// Renaming carries the new name into its key, which is what its work is recorded under.
-	claude := must(s.agentNamed(o.ID, "Claude"))
-	key := must(s.agentKey(claude))
+	claude := must(s.AgentNamed(o.ID, "Claude"))
+	key := must(s.AgentKey(o.ID, claude))
 	if code, body := add(map[string]any{"id": claude.ID, "name": "Claude Opus", "model": "router/auto"}); code != http.StatusOK {
 		t.Fatalf("renaming: %d %s", code, body)
 	}
@@ -256,7 +256,7 @@ func TestAnOrganisationHasSeveralAgents(t *testing.T) {
 	if code, _ := call(t, ada, "DELETE", fmt.Sprintf("%s/o/alpha/api/v1/agents/%d", srv.URL, theirs.ID), "", nil); code != http.StatusNotFound {
 		t.Fatal("an owner deleted another organisation's agent")
 	}
-	if must(s.agentNamed(beta.ID, "Theirs")).Name != "Theirs" {
+	if must(s.AgentNamed(beta.ID, "Theirs")).Name != "Theirs" {
 		t.Fatal("the other organisation's agent changed")
 	}
 
@@ -291,7 +291,7 @@ func TestAToolServerElsewhereIsntSentTheKey(t *testing.T) {
 	if _, toolAuth := other.auths(); len(toolAuth) == 0 || slicesContainsPrefix(toolAuth, "Bearer") {
 		t.Fatalf("a tool server on another address was sent the endpoint's key: %v", toolAuth)
 	}
-	if len(must(s.agentNamed(must(s.OrgBySlug("alpha")).ID, "Prospector")).ToolList()) != 2 {
+	if len(must(s.AgentNamed(must(s.OrgBySlug("alpha")).ID, "Prospector")).ToolList()) != 2 {
 		t.Fatal("its tools should still be listed")
 	}
 }
@@ -315,7 +315,7 @@ func TestAnEndpointAtItsLimitStillSaves(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, "answered 429") || !strings.Contains(body, "until") {
 		t.Fatalf("a check refused for its limit should be reported, and the settings kept: %d %s", code, body)
 	}
-	if c := must(s.agentNamed(must(s.OrgBySlug("alpha")).ID, "Prospector")); !c.Ready() {
+	if c := must(s.AgentNamed(must(s.OrgBySlug("alpha")).ID, "Prospector")); !c.Ready() {
 		t.Fatalf("the settings weren't kept: %+v", c)
 	}
 	if listed := listedAgents(t, ada, srv.URL); len(listed) != 1 || !strings.Contains(listed[0].State.Todo, "Last check: Models: the endpoint answered 429") {
@@ -374,7 +374,7 @@ func TestAnAgentKeyMovesToANewSecretKey(t *testing.T) {
 	if moved, err := s.Reseal(); err != nil || moved != 1 {
 		t.Fatalf("resealing: %d %v", moved, err)
 	}
-	c := must(s.agentNamed(o.ID, "Prospector"))
+	c := must(s.AgentNamed(o.ID, "Prospector"))
 	if key, err := s.keys.open(c.APIKey); err != nil || key != agentTestKey || sealedVersion(c.APIKey) != 2 {
 		t.Fatalf("the agent's key didn't move to the new secret key: %v", err)
 	}
@@ -414,7 +414,7 @@ func TestTheOneAgentFromBeforeCarriesOnAsOneOfSeveral(t *testing.T) {
 	if err := migrateAgentConfigs(s.db); err != nil {
 		t.Fatal(err)
 	}
-	moved := must(s.agentNamed(r.o.ID, "Prospector"))
+	moved := must(s.AgentNamed(r.o.ID, "Prospector"))
 	if moved.KeyID != old.ID || moved.APIKey != sealedKey || moved.Model != "router/auto" || !moved.Allows(searchTool) {
 		t.Fatalf("the agent should move with its key, settings and record: %+v", moved)
 	}
@@ -491,7 +491,7 @@ func TestGoingBackAReleaseAndForwardAgainStillStarts(t *testing.T) {
 	if err := migrateAgentConfigs(s.db); err != nil {
 		t.Fatalf("going forward again would fail to start: %v", err)
 	}
-	if got := must(s.agentNamed(r.o.ID, "Prospector")); got.Model != "qwen/qwen-small" || len(must(s.Agents(r.o.ID))) != 2 {
+	if got := must(s.AgentNamed(r.o.ID, "Prospector")); got.Model != "qwen/qwen-small" || len(must(s.Agents(r.o.ID))) != 2 {
 		t.Fatalf("the settings entered on the earlier release should be the agent's: %+v", got)
 	}
 }
@@ -503,7 +503,7 @@ func TestAMovedAgentNeverTakesAKeyAnotherAgentHolds(t *testing.T) {
 	s := r.s
 	// Prospector, moved and given its key, then renamed Claude.
 	claude := must(s.AgentByID(r.o.ID, r.agent))
-	key := must(s.agentKey(claude))
+	key := must(s.AgentKey(r.o.ID, claude))
 	if _, err := r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{ID: claude.ID, Name: "Claude", BaseURL: fake.srv.URL + "/v1",
 		APIKey: agentTestKey, Model: "router/auto"}, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
@@ -522,7 +522,7 @@ func TestAMovedAgentNeverTakesAKeyAnotherAgentHolds(t *testing.T) {
 	if err := migrateAgentConfigs(s.db); err != nil {
 		t.Fatal(err)
 	}
-	moved := must(s.agentNamed(r.o.ID, "Prospector"))
+	moved := must(s.AgentNamed(r.o.ID, "Prospector"))
 	if moved.KeyID == key.ID {
 		t.Fatal("the agent entered again was given the key Claude holds, so their records and claims would be one")
 	}
@@ -531,7 +531,7 @@ func TestAMovedAgentNeverTakesAKeyAnotherAgentHolds(t *testing.T) {
 	if claudesKey.Name != "Claude (built in)" {
 		t.Fatalf("Claude's key was renamed: %q", claudesKey.Name)
 	}
-	if own := must(s.agentKey(moved)); own.ID == key.ID || own.Name != "Prospector (built in)" {
+	if own := must(s.AgentKey(r.o.ID, moved)); own.ID == key.ID || own.Name != "Prospector (built in)" {
 		t.Fatalf("its first run should make it a key of its own: %+v", own)
 	}
 }
@@ -541,12 +541,12 @@ func TestAnAgentDeletedWhileSavingStaysDeleted(t *testing.T) {
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	c := must(r.s.AgentByID(r.o.ID, r.agent))
-	key := must(r.s.agentKey(c))
+	key := must(r.s.AgentKey(r.o.ID, c))
 	if err := r.a.deleteAgent(r.o.ID, c.ID); err != nil {
 		t.Fatal(err)
 	}
 	c.Model = "something else"
-	if err := r.s.writeAgent(c); err == nil || !strings.Contains(err.Error(), "deleted meanwhile") {
+	if err := r.s.SaveAgentRow(r.o.ID, c); err == nil || !strings.Contains(err.Error(), "deleted meanwhile") {
 		t.Fatalf("saving a deleted agent: %v", err)
 	}
 	if _, err := r.s.AgentByID(r.o.ID, c.ID); err == nil {
@@ -555,9 +555,9 @@ func TestAnAgentDeletedWhileSavingStaysDeleted(t *testing.T) {
 	// A key made by a first run while its settings were being checked isn't written over.
 	fresh := must(r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{Name: "Gateway", BaseURL: fake.srv.URL + "/v1", APIKey: agentTestKey, Model: "router/auto"}, "Ada Lovelace"))
 	stale := *fresh
-	made := must(r.s.agentKey(fresh))
+	made := must(r.s.AgentKey(r.o.ID, fresh))
 	stale.Model = "qwen/qwen-small"
-	if err := r.s.writeAgent(&stale); err != nil {
+	if err := r.s.SaveAgentRow(r.o.ID, &stale); err != nil {
 		t.Fatal(err)
 	}
 	if got := must(r.s.AgentByID(r.o.ID, fresh.ID)); got.KeyID != made.ID || got.Model != "qwen/qwen-small" || key.ID == made.ID {

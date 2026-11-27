@@ -129,7 +129,7 @@ func latestFact(tx *gorm.DB, org, company int64, field string) (*Fact, error) {
 }
 
 func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddCompanyOut, error) {
-	who, err := s.onTask(org, who, in.Task)
+	who, err := s.OnTask(org, who, in.Task)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +220,7 @@ type AddFactOut struct {
 }
 
 func (s *Store) AgentAddFact(org int64, who Actor, in AddFactIn) (*AddFactOut, error) {
-	who, err := s.onTask(org, who, in.Task)
+	who, err := s.OnTask(org, who, in.Task)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +290,7 @@ func samePerson(people []Contact, in AddContactIn) *Contact {
 }
 
 func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContactOut, error) {
-	who, err := s.onTask(o.ID, who, in.Task)
+	who, err := s.OnTask(o.ID, who, in.Task)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +306,7 @@ func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContact
 	if in.Linkedin != "" && !httpURL.MatchString(strings.TrimSpace(in.Linkedin)) {
 		return nil, errors.New("linkedin must be an https link")
 	}
-	if err := s.allowed(o, in.Email, in.Linkedin); err != nil {
+	if err := s.Allowed(o, in.Email, in.Linkedin); err != nil {
 		s.withheld(o.ID, who, withheldNeverContact)
 		return nil, err
 	}
@@ -407,7 +407,7 @@ func editedBy(tx *gorm.DB, org, contact int64, field, kind string) (string, erro
 }
 
 func (s *Store) AgentDraft(org int64, who Actor, in DraftIn) error {
-	who, err := s.onTask(org, who, in.Task)
+	who, err := s.OnTask(org, who, in.Task)
 	if err != nil {
 		return err
 	}

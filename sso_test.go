@@ -659,7 +659,7 @@ func TestRequiredSingleSignOn(t *testing.T) {
 		t.Fatalf("a password after `sso off`: %d", code)
 	}
 	sso, _ := s.SSO(alpha.ID)
-	if spec, err := s.spec(sso); err != nil || !sso.On() || spec.Secret != "secret" {
+	if spec, err := s.keys.idpSpec(sso); err != nil || !sso.On() || spec.Secret != "secret" {
 		t.Fatal("`sso off` lost the connection itself")
 	}
 }
@@ -828,7 +828,7 @@ func TestSingleSignOnSettings(t *testing.T) {
 		t.Fatalf("saving without the secret: %d %s", code, body)
 	}
 	sso, _ = s.SSO(alpha.ID)
-	if spec, err := s.spec(sso); err != nil || spec.Secret != "s3cret-value" || sso.Required {
+	if spec, err := s.keys.idpSpec(sso); err != nil || spec.Secret != "s3cret-value" || sso.Required {
 		t.Fatalf("after saving again: %+v %v", sso.SSOConnection, err)
 	}
 	// The database holds it sealed: a compact JWE naming the key's version and nothing else.

@@ -46,7 +46,7 @@ func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
 	if err := s.SetCompanyStage(o.ID, larkmoor.ID, CompanyRejected, "", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AskTask(o.ID, task.ID, "Find some in Switzerland too.", "Grace Hopper"); err != nil {
+	if _, err := s.AskTask(o.ID, task.ID, "Find some in Switzerland too.", "Grace Hopper"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -120,7 +120,7 @@ func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
 	if _, err := s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Brandtech", Task: task.ID}); err == nil {
 		t.Fatal("work was accepted for a closed task")
 	}
-	if err := s.AskTask(o.ID, task.ID, "One more", "Ada Lovelace"); err == nil {
+	if _, err := s.AskTask(o.ID, task.ID, "One more", "Ada Lovelace"); err == nil {
 		t.Fatal("a request was added to a closed task")
 	}
 }
@@ -143,7 +143,7 @@ func TestTasksStayInTheirOrganisation(t *testing.T) {
 	if _, err := s.AgentNote(b.ID, scout, NoteIn{Task: task.ID, Kind: "next", Text: "Try the trade register."}); err == nil {
 		t.Fatal("a note was left on another organisation's task")
 	}
-	if err := s.AskTask(b.ID, task.ID, "More", "Grace Hopper"); err == nil {
+	if _, err := s.AskTask(b.ID, task.ID, "More", "Grace Hopper"); err == nil {
 		t.Fatal("a request was added to another organisation's task")
 	}
 	request := must(s.AgentTask(a.ID, scout, task.ID, PageIn{})).Open[0].ID

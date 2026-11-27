@@ -30,8 +30,8 @@ func TestTheSpecsTaskReadsSayEverythingTheStoreDoes(t *testing.T) {
 	must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Title: "Head of Marketing",
 		SourceURL: "https://larkmoor.example/team", Task: task.ID}))
 	must(s.AgentNote(o.ID, scout, NoteIn{Task: task.ID, Company: "Larkmoor Yachts", Kind: "next", Text: "Look at their dealer list."}))
-	must(s.askTask(o.ID, task.ID, "Now some in Dorset.", "Ada Lovelace"))
-	finished := must(s.askTask(o.ID, task.ID, "And one in Kent.", "Ada Lovelace"))
+	must(s.AskTask(o.ID, task.ID, "Now some in Dorset.", "Ada Lovelace"))
+	finished := must(s.AskTask(o.ID, task.ID, "And one in Kent.", "Ada Lovelace"))
 	if err := s.SetRequestDone(o.ID, finished.ID, true, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
@@ -84,8 +84,8 @@ func TestPeopleInSalesLeaveNotesAndFinishRequests(t *testing.T) {
 	grace := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
 	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders with a configurator.", "Ada Lovelace"))
-	first := must(s.askTask(o.ID, task.ID, "Now some in Dorset.", "Ada Lovelace"))
-	second := must(s.askTask(o.ID, task.ID, "And one in Kent.", "Ada Lovelace"))
+	first := must(s.AskTask(o.ID, task.ID, "Now some in Dorset.", "Ada Lovelace"))
+	second := must(s.AskTask(o.ID, task.ID, "And one in Kent.", "Ada Lovelace"))
 	base := srv.URL + "/o/alpha/api/v1/"
 	note := map[string]any{"task": task.ID, "kind": "next", "text": "Look at their dealer list."}
 	finish := func(id int64) map[string]any { return map[string]any{"request": id} }
@@ -111,7 +111,7 @@ func TestPeopleInSalesLeaveNotesAndFinishRequests(t *testing.T) {
 	if code, out := call(t, asGrace, "POST", base+"requests/finish", "application/json", finish(first.ID)); code != http.StatusOK || !strings.Contains(out, `"ok":true`) {
 		t.Fatalf("a person in sales finishing a request: %d %s", code, out)
 	}
-	if r := must(s.requestRow(o.ID, first.ID)); r.DoneAt == nil || r.DoneBy != "Grace Hopper" {
+	if r := must(s.RequestByID(o.ID, first.ID)); r.DoneAt == nil || r.DoneBy != "Grace Hopper" {
 		t.Fatalf("the request should be done, by Grace: %+v", r)
 	}
 

@@ -520,9 +520,9 @@ type Sealed struct {
 	Hash string
 }
 
-// seal fills an agreement's document in, adds its certificate and seals the whole with
+// sealDocument fills an agreement's document in, adds its certificate and seals the whole with
 // the organisation's key, then checks the seal holds before handing it back.
-func (s *Store) seal(o *Org, doc []byte, stamps []Stamp, c Certificate) (*Sealed, error) {
+func (s *Store) sealDocument(o *Org, doc []byte, stamps []Stamp, c Certificate) (*Sealed, error) {
 	// Text the fonts can't draw would seal as empty space, so it stops the seal instead.
 	for _, text := range c.texts(stamps) {
 		if err := drawable(text); err != nil {
@@ -603,7 +603,7 @@ func (s *Store) TrySeal(o *Org, id int64) error {
 	for _, f := range fields {
 		stamps = append(stamps, Stamp{Page: f.Page, X: f.X, Y: f.Y, W: f.W, H: f.H, Kind: f.Kind, Value: standIn(f.Kind, names[f.RecipientID])})
 	}
-	_, err = s.seal(o, doc, stamps, c)
+	_, err = s.sealDocument(o, doc, stamps, c)
 	return err
 }
 

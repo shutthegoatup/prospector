@@ -84,9 +84,9 @@ func (c *SSO) Proves(email string) bool {
 	return false
 }
 
-// spec opens the connection's client secret, which the database holds sealed.
-func (s *Store) spec(c *SSO) (idpSpec, error) {
-	secret, err := s.keys.open(c.ClientSecret)
+// idpSpec opens the connection's client secret, which the database holds sealed.
+func (k *keyring) idpSpec(c *SSO) (idpSpec, error) {
+	secret, err := k.open(c.ClientSecret)
 	return idpSpec{Issuer: c.Issuer, ClientID: c.ClientID, Secret: secret}, err
 }
 
@@ -397,7 +397,7 @@ func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 		a.signInProblem(w, r, query.Get("next"), http.StatusBadRequest, "That organisation has no single sign-on for that address.")
 		return
 	}
-	spec, err := a.s.spec(sso)
+	spec, err := a.s.keys.idpSpec(sso)
 	if err != nil {
 		log.Printf("single sign-on for %s: %v", org.Slug, err)
 		a.signInProblem(w, r, query.Get("next"), http.StatusServiceUnavailable, unopenable(org))
@@ -486,7 +486,7 @@ func (a *App) finishSSO(w http.ResponseWriter, r *http.Request, att attempt, ref
 		refuse(errors.Join(err, errors.New("the organisation's single sign-on is off")))
 		return
 	}
-	spec, err := a.s.spec(sso)
+	spec, err := a.s.keys.idpSpec(sso)
 	if err != nil {
 		log.Printf("single sign-on for %s: %v", org.Slug, err)
 		a.signInProblem(w, r, att.Next, http.StatusServiceUnavailable, unopenable(org))
@@ -727,7 +727,7 @@ func agentCommand(s *Store, rest []string) error {
 		}
 		// The name says which: an agent already called that is changed, else one is made.
 		if name, err := agentName(in.Name); err == nil {
-			if c, err := s.agentNamed(o.ID, name); err == nil {
+			if c, err := s.AgentNamed(o.ID, name); err == nil {
 				in.ID, in.Fallback, in.FallbackMinutes, in.SearchURL, in.ThinkingOff = c.ID, c.FallbackID, c.FallbackMinutes, c.SearchURL, c.ThinkingOff
 			}
 		}

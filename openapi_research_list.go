@@ -21,7 +21,7 @@ func (s apiServer) ListResearch(ctx context.Context, in api.ListResearchRequestO
 	}
 	offering := in.Params.Offering
 	if in.Params.Task != 0 {
-		t, err := s.a.s.taskRow(q.Org.ID, in.Params.Task)
+		t, err := s.a.s.TaskByID(q.Org.ID, in.Params.Task)
 		if err != nil {
 			return nil, missing(err, "there's no task %d here", in.Params.Task)
 		}
@@ -44,24 +44,24 @@ func (s apiServer) ListResearch(ctx context.Context, in api.ListResearchRequestO
 		}
 		set.LookFor = o.LookFor
 	}
-	rows, ranked, next, err := s.a.s.researchList(q.Org.ID, offering, set, filter, in.Params.Task, page)
+	rows, ranked, next, err := s.a.s.ResearchList(q.Org.ID, offering, set, filter, in.Params.Task, page)
 	if err != nil {
 		return nil, err
 	}
 	if offering != 0 {
-		if err := s.a.s.withVerdicts(q.Org.ID, offering, rows); err != nil {
+		if err := s.a.s.WithVerdicts(q.Org.ID, offering, rows); err != nil {
 			return nil, err
 		}
 	}
 	out := api.ListResearch200JSONResponse{Headers: api.ListResearch200ResponseHeaders{Link: nextLink(ctx, next)}}
 	out.Body.Items, out.Body.Ranked, out.Body.NextCursor = []api.ResearchCompany{}, ranked, next
 	out.Body.OfferingId = offering
-	out.Body.Counts = s.a.s.researchCountsFor(q.Org.ID, offering, in.Params.Task)
+	out.Body.Counts = s.a.s.ResearchCountsFor(q.Org.ID, offering, in.Params.Task)
 	ids := make([]int64, len(rows))
 	for i, r := range rows {
 		ids[i] = r.ID
 	}
-	roles, err := s.a.s.rolesAt(q.Org.ID, offering, ids)
+	roles, err := s.a.s.RolesAt(q.Org.ID, offering, ids)
 	if err != nil {
 		return nil, err
 	}

@@ -12,7 +12,7 @@ func TestAWaitingAgentHandsItsTaskToItsFallback(t *testing.T) {
 	r, claude, gateway := claudeSetup(t)
 	ctx := context.Background()
 	claudeID := r.agent
-	first := must(r.s.agentNamed(r.o.ID, "Prospector"))
+	first := must(r.s.AgentNamed(r.o.ID, "Prospector"))
 	in := AgentSettingsIn{ID: first.ID, Name: first.Name, BaseURL: first.BaseURL, Model: first.Model, ToolsURL: first.ToolsURL,
 		Tools: first.AllowedTools(), Fallback: claudeID}
 	if got := must(r.a.saveAgent(ctx, r.o.ID, in, "Ada Lovelace")); got.FallbackID != claudeID || got.FallbackMinutes != 15 {
@@ -93,7 +93,7 @@ func TestExistingAgentsSurviveTheFallbackColumns(t *testing.T) {
 	if err := s.db.AutoMigrate(models...); err != nil {
 		t.Fatalf("adding the fallback to a table with rows: %v", err)
 	}
-	got := must(s.agentNamed(o.ID, "Gateway"))
+	got := must(s.AgentNamed(o.ID, "Gateway"))
 	if got.FallbackID != 0 || got.FallbackMinutes != 15 {
 		t.Fatalf("an agent from before fallbacks should have none, waiting 15 minutes if given one: %+v", got)
 	}
@@ -103,7 +103,7 @@ func TestAFallbackIsAnotherOfTheOrganisationsAgents(t *testing.T) {
 	t.Parallel()
 	r, _, _ := claudeSetup(t)
 	c := must(r.s.AgentByID(r.o.ID, r.agent))
-	first := must(r.s.agentNamed(r.o.ID, "Prospector"))
+	first := must(r.s.AgentNamed(r.o.ID, "Prospector"))
 	must(r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{ID: first.ID, Name: first.Name, BaseURL: first.BaseURL, Model: first.Model,
 		ToolsURL: first.ToolsURL, Tools: first.AllowedTools(), Fallback: c.ID}, "Ada Lovelace"))
 	base := AgentSettingsIn{ID: c.ID, Name: c.Name, BaseURL: c.BaseURL, Model: c.Model, ToolsURL: c.ToolsURL, Tools: []string{searchTool}}

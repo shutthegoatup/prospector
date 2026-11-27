@@ -14,7 +14,7 @@ import (
 
 // TestOnlyTheStoreTouchesTheDatabase keeps every query on an exported method of the
 // store, where TestNoMethodReachesIntoAnotherOrganisation tries it as another organisation.
-// A query made anywhere else is never tried.
+// A query made anywhere else, or through an unexported method, is never tried.
 func TestOnlyTheStoreTouchesTheDatabase(t *testing.T) {
 	t.Parallel()
 	files, err := filepath.Glob("*.go")
@@ -22,6 +22,10 @@ func TestOnlyTheStoreTouchesTheDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	fset := token.NewFileSet()
+	var parsed []*ast.File
+	// The store's unexported methods, and every other type's, by name: the check below
+	// goes by name alone, so a name both use would fail the other type's calls.
+	private, others := map[string]bool{"db": true, "in": true}, map[string]bool{}
 	for _, name := range files {
 		if strings.HasSuffix(name, "_test.go") {
 			continue
@@ -30,15 +34,32 @@ func TestOnlyTheStoreTouchesTheDatabase(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		parsed = append(parsed, f)
+		for _, decl := range f.Decls {
+			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Recv != nil {
+				if !onStore(fn) {
+					others[fn.Name.Name] = true
+				} else if !fn.Name.IsExported() {
+					private[fn.Name.Name] = true
+				}
+			}
+		}
+	}
+	for name := range private {
+		if others[name] {
+			t.Errorf("Store.%s shares its name with another type's method, whose calls this test can't tell from the store's: rename one", name)
+		}
+	}
+	for _, f := range parsed {
 		for _, decl := range f.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Body == nil || onStore(fn) {
+			// Open makes the store, so it migrates it.
+			if !ok || fn.Body == nil || onStore(fn) || fn.Recv == nil && fn.Name.Name == "Open" {
 				continue
 			}
 			ast.Inspect(fn.Body, func(n ast.Node) bool {
-				// in is the store's own query, scoped to an organisation but still a query.
-				if sel, ok := n.(*ast.SelectorExpr); ok && (sel.Sel.Name == "db" || sel.Sel.Name == "in") {
-					t.Errorf("%s: %s reaches the database itself: give the store a method for it", fset.Position(sel.Pos()), fn.Name.Name)
+				if sel, ok := n.(*ast.SelectorExpr); ok && private[sel.Sel.Name] {
+					t.Errorf("%s: %s reaches the database past the store's exported methods (.%s): give the store one", fset.Position(sel.Pos()), fn.Name.Name, sel.Sel.Name)
 				}
 				return true
 			})

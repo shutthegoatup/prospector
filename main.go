@@ -219,11 +219,11 @@ func run(args []string) error {
 		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
 			return err
 		}
-		s.resealAtStart()
+		s.ResealAtStart()
 		// Not a reason to stay down: the page is served without its form meanwhile.
 		if err := s.EnsureFrontOrg(base); err != nil {
 			fmt.Fprintf(os.Stderr, "the front page has no contact form: %v\n", err)
-		} else if why := s.frontFormOff(base); why != "" {
+		} else if why := s.FrontFormOff(base); why != "" {
 			fmt.Fprintf(os.Stderr, "the front page has no contact form: %s\n", why)
 		}
 		if os.Getenv("PROSPECTOR_FRONT_ORG") != "" {

@@ -18,7 +18,7 @@ func (s apiServer) ListCompanies(ctx context.Context, in api.ListCompaniesReques
 	if err != nil {
 		return nil, err
 	}
-	rows, total, next, err := s.a.s.companiesList(q.Org.ID, p.Q, p.Segment, string(p.Stage), page)
+	rows, total, next, err := s.a.s.CompaniesList(q.Org.ID, p.Q, p.Segment, string(p.Stage), page)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +32,7 @@ func (s apiServer) ListCompanies(ctx context.Context, in api.ListCompaniesReques
 }
 
 func (s apiServer) ListSegments(ctx context.Context, in api.ListSegmentsRequestObject) (api.ListSegmentsResponseObject, error) {
-	all, err := s.a.s.segments(reqFrom(ctx).Org.ID)
+	all, err := s.a.s.Segments(reqFrom(ctx).Org.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -155,11 +155,11 @@ func (s apiServer) ListCompanyHistory(ctx context.Context, in api.ListCompanyHis
 	if err != nil {
 		return nil, err
 	}
-	total, err := s.a.s.historyCount(org, in.Id)
+	total, err := s.a.s.HistoryCount(org, in.Id)
 	if err != nil {
 		return nil, err
 	}
-	items, err := s.a.s.historyAt(org, in.Id, int(at[0]), page.size())
+	items, err := s.a.s.HistoryAt(org, in.Id, int(at[0]), page.size())
 	if err != nil {
 		return nil, err
 	}

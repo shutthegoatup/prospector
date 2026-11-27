@@ -42,7 +42,7 @@ func (s apiServer) ChangeTask(ctx context.Context, in api.ChangeTaskRequestObjec
 	if err := s.a.s.SetTaskClosed(q.Org.ID, in.Id, in.Body.Closed, q.Actor()); err != nil {
 		return nil, err
 	}
-	t, err := s.a.s.taskRow(q.Org.ID, in.Id)
+	t, err := s.a.s.TaskByID(q.Org.ID, in.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (s apiServer) ChangeTask(ctx context.Context, in api.ChangeTaskRequestObjec
 
 func (s apiServer) AskTask(ctx context.Context, in api.AskTaskRequestObject) (api.AskTaskResponseObject, error) {
 	q := reqFrom(ctx)
-	r, err := s.a.s.askTask(q.Org.ID, in.Id, in.Body.Text, q.Actor())
+	r, err := s.a.s.AskTask(q.Org.ID, in.Id, in.Body.Text, q.Actor())
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (s apiServer) ChangeTaskRequest(ctx context.Context, in api.ChangeTaskReque
 	if err := s.a.s.SetRequestDone(q.Org.ID, in.Id, in.Body.Done, q.Actor()); err != nil {
 		return nil, err
 	}
-	r, err := s.a.s.requestRow(q.Org.ID, in.Id)
+	r, err := s.a.s.RequestByID(q.Org.ID, in.Id)
 	if err != nil {
 		return nil, err
 	}

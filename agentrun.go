@@ -18,6 +18,8 @@ import (
 	"sync"
 	"time"
 
+	"gorm.io/gorm"
+
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -122,26 +124,36 @@ func runCap(setting string) int {
 // it isn't taken for a key someone made for an agent of their own.
 func builtinKeyName(agent string) string { return agent + " (built in)" }
 
-// agentKey is the agent as an API key that no request can present: its hash is
+// AgentKey is the agent as an API key that no request can present: its hash is
 // nothing a secret could be looked up as. One revoked is replaced, so a deleted
 // agent's runs stop while a new one called the same starts clean.
-func (s *Store) agentKey(c *Agent) (*APIKey, error) {
+func (s *Store) AgentKey(org int64, c *Agent) (*APIKey, error) {
 	var k APIKey
 	if c.KeyID != 0 {
-		if err := s.db.Where("org_id = ? and id = ?", c.OrgID, c.KeyID).Limit(1).Find(&k).Error; err != nil {
+		if err := s.in(org).Where("id = ?", c.KeyID).Limit(1).Find(&k).Error; err != nil {
 			return nil, err
 		}
 		if k.ID != 0 && k.RevokedAt == nil {
 			return &k, nil
 		}
 	}
-	k = APIKey{OrgID: c.OrgID, Name: builtinKeyName(c.Name), Prefix: builtinPrefix, Hash: "builtin:" + randomToken(24),
+	k = APIKey{OrgID: org, Name: builtinKeyName(c.Name), Prefix: builtinPrefix, Hash: "builtin:" + randomToken(24),
 		Scopes: "read research:write", CreatedBy: "prospector"}
-	if err := s.db.Create(&k).Error; err != nil {
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&k).Error; err != nil {
+			return err
+		}
+		res := tx.Model(&Agent{}).Where("org_id = ? and id = ?", org, c.ID).Update("key_id", k.ID)
+		if res.Error == nil && res.RowsAffected == 0 {
+			return fmt.Errorf("no agent %d in this organisation", c.ID)
+		}
+		return res.Error
+	})
+	if err != nil {
 		return nil, err
 	}
 	c.KeyID = k.ID
-	return &k, s.db.Model(&Agent{}).Where("id = ?", c.ID).Update("key_id", k.ID).Error
+	return &k, nil
 }
 
 // AgentRuns are a task's runs, newest first: every one going, however old, so each
@@ -332,7 +344,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 	if err != nil {
 		return RunFailed, "the endpoint's key can't be read: an owner enters it again on the Agents page"
 	}
-	bk, err := a.s.agentKey(cfg)
+	bk, err := a.s.AgentKey(run.OrgID, cfg)
 	if err != nil {
 		return RunFailed, "the agent's key couldn't be made"
 	}

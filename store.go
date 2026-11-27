@@ -546,7 +546,7 @@ func (s *Store) set(tx *gorm.DB, org, id int64, field, value, actor string) erro
 		if field == "linkedin" {
 			email, link = "", value
 		}
-		if err := s.allowed(&o, email, link); err != nil {
+		if err := s.Allowed(&o, email, link); err != nil {
 			return err
 		}
 		if err := erased(tx, org, "", "", email, link); err != nil {

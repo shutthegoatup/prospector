@@ -221,7 +221,7 @@ func TestTheServerSaysWhyTheFrontPageHasNoForm(t *testing.T) {
 		s := tempStore(t)
 		o := mustOrg(t, s, frontOrgSlug)
 		takeEnquiriesFrom(t, s, o, c.sites)
-		why := s.frontFormOff(c.base)
+		why := s.FrontFormOff(c.base)
 		if c.want == "" && why != "" || c.want != "" && (!strings.Contains(why, c.want) || !strings.Contains(why, "member add prospector")) {
 			t.Errorf("%s: %q", name, why)
 		}

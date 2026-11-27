@@ -54,6 +54,35 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	ann := person(t, s, first, "Ann Alpha", "Alpha Works", "ann@alpha.example", false)
+	company := Company{ID: *ann.CompanyID}
+	if err := s.db.Model(&company).Update("stage", CompanyReview).Error; err != nil {
+		t.Fatal(err)
+	}
+	enquiry := Enquiry{OrgID: first.ID, Name: "Ann Alpha", Email: "ann@alpha.example", CompanyID: ann.CompanyID, ContactID: &ann.ID}
+	if err := s.db.Create(&enquiry).Error; err != nil {
+		t.Fatal(err)
+	}
+	reply := EnquiryMessage{OrgID: first.ID, EnquiryID: enquiry.ID, Ours: true, Text: "Thanks", By: "Owner One", CreatedAt: now}
+	onboarding := Onboarding{OrgID: first.ID, CompanyID: company.ID, Name: "Setup"}
+	subscription := Subscription{OrgID: first.ID, CompanyID: company.ID, Name: "Licence", Start: "2020-01-01"}
+	for _, row := range []any{&reply, &onboarding, &subscription} {
+		if err := s.db.Create(row).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	step := OnboardingStep{OrgID: first.ID, OnboardingID: onboarding.ID, Seq: 1, Name: "Send files", Who: StepTheirs}
+	grant := CustomerGrant{OrgID: first.ID, OnboardingID: onboarding.ID, ContactID: ann.ID}
+	for _, row := range []any{&step, &grant} {
+		if err := s.db.Create(row).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	link := randomToken(16)
+	if err := s.db.Create(&CustomerLink{OrgID: first.ID, GrantID: grant.ID, TokenHash: hashToken(link), ExpiresAt: now.Add(time.Hour)}).Error; err != nil {
+		t.Fatal(err)
+	}
+	customer := &CustomerAccess{Grant: grant, Org: *first, Onboarding: onboarding, Contact: *ann}
 
 	answer := func(v any, err error) any {
 		if err != nil {
@@ -104,6 +133,40 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 		{"CampaignWent", changes, func(s *Store, org int64) any { return s.CampaignWent(org, campaign.ID) }},
 		{"PauseCampaign", changes, func(s *Store, org int64) any { return s.PauseCampaign(org, campaign.ID, "paused") }},
 		{"FinishIfDone", changes, func(s *Store, org int64) any { return s.FinishIfDone(org, campaign.ID) }},
+		{"AgentNamed", false, func(s *Store, org int64) any { return answer(s.AgentNamed(org, agent.Name)) != nil }},
+		{"AgentKey", changes, func(s *Store, org int64) any {
+			return answer(s.AgentKey(org, &Agent{ID: agent.ID, OrgID: first.ID, Name: agent.Name}))
+		}},
+		{"SaveAgentRow", changes, func(s *Store, org int64) any {
+			return s.SaveAgentRow(org, &Agent{ID: agent.ID, OrgID: first.ID, Name: "renamed"})
+		}},
+		{"OnTask", false, func(s *Store, org int64) any {
+			_, err := s.OnTask(org, Actor{Name: "scout"}, task.ID)
+			return err == nil
+		}},
+		{"TaskBriefsFor", 0, func(s *Store, org int64) any {
+			briefs, _, err := s.TaskBriefsFor(org, Actor{}, false, nil, PageIn{})
+			return len(must(briefs, err))
+		}},
+		{"ResearchList", 0, func(s *Store, org int64) any {
+			rows, _, _, err := s.ResearchList(org, 0, first.Settings, "review", 0, PageIn{})
+			return len(must(rows, err))
+		}},
+		{"HistoryCount", 0, func(s *Store, org int64) any { return answer(s.HistoryCount(org, company.ID)) }},
+		{"CustomerCompanies", 0, func(s *Store, org int64) any { return len(must(s.CustomerCompanies(org))) }},
+		{"AroundEnquiries", 0, func(s *Store, org int64) any {
+			around := must(s.AroundEnquiries(org, []Enquiry{enquiry}))
+			return len(around.Companies) + len(around.Threads)
+		}},
+		{"StartReply", changes, func(s *Store, org int64) any {
+			_, _, err := s.StartReply(&Org{ID: org, Name: "x"}, enquiry.ID, "Another word", "Owner One")
+			return err
+		}},
+		{"SettleReply", changes, func(s *Store, org int64) any { return s.SettleReply(org, &reply, true, "Owner One") }},
+		{"MailFailed", changes, func(s *Store, org int64) any { return s.MailFailed(org, sent.Address, SuppressBounced, "gone") }},
+		{"CustomerSteps", 0, func(s *Store, org int64) any { return len(must(s.CustomerSteps(org, customer))) }},
+		{"CustomerSetStep", changes, func(s *Store, org int64) any { return s.CustomerSetStep(org, customer, step.ID, true) }},
+		{"RedeemCustomerLink", changes, func(s *Store, org int64) any { return answer(s.RedeemCustomerLink(org, customer, link)) }},
 	}
 	ready := map[string]func(s *Store) error{
 		// Only a campaign with nothing left to send can be finished.

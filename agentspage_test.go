@@ -39,7 +39,7 @@ func TestTheAgentsPageSaysWhichAgentsAreReady(t *testing.T) {
 	if code, body := saveAgentAt(t, ada, srv.URL, settings("Local", map[string]any{"thinking_off": true})); code != http.StatusOK {
 		t.Fatalf("adding Local: %d %s", code, body)
 	}
-	local := must(s.agentNamed(o.ID, "Local"))
+	local := must(s.AgentNamed(o.ID, "Local"))
 	if !local.ThinkingOff {
 		t.Fatal("thinking off wasn't kept")
 	}
@@ -177,7 +177,7 @@ func TestAgentsFromBeforeThinkingOffStillThink(t *testing.T) {
 	}
 
 	s := must(Open(dsn))
-	if c := must(s.agentNamed(o.ID, "Gateway")); c.ThinkingOff {
+	if c := must(s.AgentNamed(o.ID, "Gateway")); c.ThinkingOff {
 		t.Fatalf("an agent from before should still think: %+v", c)
 	}
 }

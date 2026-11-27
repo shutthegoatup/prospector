@@ -102,9 +102,9 @@ func answerable(o *Org, e Enquiry) (string, error) {
 	return to.Address, nil
 }
 
-// startReply keeps a reply before it is sent, so two presses of the button are one
+// StartReply keeps a reply before it is sent, so two presses of the button are one
 // reply. It is not in the thread until settleReply says it went.
-func (s *Store) startReply(o *Org, enquiry int64, text, actor string) (*EnquiryMessage, string, error) {
+func (s *Store) StartReply(o *Org, enquiry int64, text, actor string) (*EnquiryMessage, string, error) {
 	text, err := threadText(text)
 	if err != nil {
 		return nil, "", err
@@ -157,10 +157,10 @@ func (s *Store) startReply(o *Org, enquiry int64, text, actor string) (*EnquiryM
 	return m, to, err
 }
 
-// settleReply records how sending went. A reply that went joins the thread, and the
+// SettleReply records how sending went. A reply that went joins the thread, and the
 // enquiry waits on them, with an owner if it had none. One that didn't is forgotten,
 // and the enquiry stays as it was.
-func (s *Store) settleReply(org int64, m *EnquiryMessage, sent bool, actor string) error {
+func (s *Store) SettleReply(org int64, m *EnquiryMessage, sent bool, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		if !sent {
 			return tx.Where("org_id = ? and id = ? and sent_at is null", org, m.ID).Delete(&EnquiryMessage{}).Error
@@ -241,14 +241,14 @@ func (a *App) replyEnquiry(ctx context.Context, o *Org, enquiry int64, text, act
 	if via == nil {
 		return nil, errNoReplyMail
 	}
-	m, to, err := a.s.startReply(o, enquiry, text, actor)
+	m, to, err := a.s.StartReply(o, enquiry, text, actor)
 	if err != nil {
 		return nil, err
 	}
 	sendCtx, cancel := context.WithTimeout(ctx, sendLimit)
 	defer cancel()
 	sendErr := a.deliver(sendCtx, *via, Message{To: to, ReplyTo: answers, Subject: "Your message to " + o.Name, Body: m.Text + "\n"})
-	if err := a.s.settleReply(o.ID, m, sendErr == nil, actor); err != nil {
+	if err := a.s.SettleReply(o.ID, m, sendErr == nil, actor); err != nil {
 		return nil, err
 	}
 	if sendErr != nil {
