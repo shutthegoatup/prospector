@@ -61,7 +61,9 @@ func orgRoutes(t *testing.T) (gets, posts []string) {
 			continue
 		}
 		path = strings.Replace(pathParam.ReplaceAllString(path, "{id}"), "/o/{id}/", "/o/{org}/", 1)
-		if item.Get != nil {
+		// Operations for keys alone aren't a page's or a form's; another organisation's key
+		// is refused before them (TestAnAgentsReadsAnswerAsTheyAlwaysHave).
+		if item.Get != nil && sessionAllowed(item.Get) {
 			gets = append(gets, path)
 		}
 		for method, op := range map[string]*openapi3.Operation{"POST": item.Post, "PUT": item.Put, "PATCH": item.Patch, "DELETE": item.Delete} {

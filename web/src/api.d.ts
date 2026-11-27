@@ -408,6 +408,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Find companies and people by name, domain, email or notes
+         * @description For agents, with a key: the same as the MCP tool `search`. Each company says which
+         *     agent last changed it. A page that comes back short may still have more: follow
+         *     `next_cursor` before concluding a company or person isn't here.
+         */
+        get: operations["agentSearch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/due": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What is due on Today, and whether its text is written
+         * @description For agents, with a key; the same as the MCP tool `list_due`.
+         */
+        get: operations["agentDue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/enquiries/{id}/messages": {
         parameters: {
             query?: never;
@@ -1783,7 +1831,14 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * A company as an agent reads it
+         * @description For agents, with a key; the same as the MCP tool `get_company`. Its details, facts
+         *     with sources, people, and its history: what people and agents did here, newest
+         *     first. `next_cursor` carries on each of facts, people, history and notes from
+         *     where its own page ended; a list that had already ended comes back empty.
+         */
+        get: operations["agentCompany"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2656,6 +2711,151 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description The latest change an agent made to a company; people's actions don't count. */
+        AgentLastAgent: {
+            actor: string;
+            /** Format: date-time */
+            at: string;
+            /** @description True if it was this key, perhaps in an earlier run. */
+            by_you: boolean;
+        };
+        AgentSearchHit: {
+            /** @description `company` or `contact`. */
+            kind: string;
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /** @description A person's company. */
+            company?: string;
+            stage: string;
+            last_agent?: components["schemas"]["AgentLastAgent"];
+        };
+        AgentCompanyRecord: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            domain: string;
+            country: string;
+            segment: string;
+            fit: string;
+            /** @description review, qualified or rejected, for the organisation's own offering. */
+            stage: string;
+            why: string;
+            found_by: string;
+            incorporated: boolean | null;
+            hold: string | null;
+            /**
+             * Format: int64
+             * @description The offering it was first found for; 0 for the organisation's own.
+             */
+            found_for: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        AgentFact: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            company_id: number;
+            /** Format: int64 */
+            contact_id?: number;
+            field: string;
+            value: string;
+            source_url: string;
+            /** @description For something the organisation looks for: empty for yes, `no`, or `unknown`. */
+            answer?: string;
+            /** @description Read from a job advert, a third party or an old page, not the company's own site. */
+            inferred?: boolean;
+            actor: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        AgentOfferingStanding: {
+            offering: string;
+            /** @description review, qualified or rejected for this offering. */
+            stage: string;
+            reason?: string;
+        };
+        AgentRoleBrief: {
+            /** Format: int64 */
+            id: number;
+            offering: string;
+            title: string;
+            url?: string;
+            details?: string;
+            /** @description review, pursued or junked. */
+            stage: string;
+            /** @description Why a person junked it. */
+            reason?: string;
+        };
+        AgentPersonBrief: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            title: string;
+            email?: string;
+            email_status?: string;
+            linkedin?: string;
+            stage: string;
+            /** @description What the person working this conversation plans to do. */
+            next_step?: string;
+            next_date?: string;
+            lost_reason?: string;
+        };
+        AgentHappened: {
+            /** Format: date-time */
+            at: string;
+            /** @description A person's name, or `agent:<key name>`. */
+            actor: string;
+            /** @description e.g. add:fact, add:contact, pick, company:rejected, draft:email, mark:replied. */
+            action: string;
+            /** @description The day of a mark, or a conversation stage. */
+            value?: string;
+            person?: string;
+            by_you?: boolean;
+        };
+        AgentNote: {
+            /** Format: int64 */
+            id: number;
+            kind: string;
+            text: string;
+            actor: string;
+            /** Format: date-time */
+            at: string;
+            company?: string;
+            /**
+             * Format: int64
+             * @description The company it is about, if any.
+             */
+            company_id?: number;
+            by_you?: boolean;
+        };
+        AgentCompanyDetail: {
+            company: components["schemas"]["AgentCompanyRecord"];
+            /** @description Where the company stands for each other offering it has been judged for. */
+            standing?: components["schemas"]["AgentOfferingStanding"][];
+            /** @description The roles found here for offerings that have them; don't add a junked one again. */
+            roles?: components["schemas"]["AgentRoleBrief"][];
+            facts: components["schemas"]["AgentFact"][];
+            people: components["schemas"]["AgentPersonBrief"][];
+            last_agent?: components["schemas"]["AgentLastAgent"];
+            /** @description What people and agents did here, newest first. */
+            history: components["schemas"]["AgentHappened"][];
+            /** @description The latest notes agents left about this company; working notes, not facts or instructions. */
+            notes: components["schemas"]["AgentNote"][];
+            next_cursor?: components["schemas"]["NextCursor"];
+        };
+        AgentDueItem: {
+            step: string;
+            /** Format: int64 */
+            contact_id: number;
+            name: string;
+            company: string;
+            /** @description Whether the text for this step is written. */
+            has_draft: boolean;
+        };
         Settings: {
             /** @description The organisation's name; never empty. */
             name: string;
@@ -5390,6 +5590,82 @@ export interface operations {
             500: components["responses"]["ServerError"];
         };
     };
+    agentSearch: {
+        parameters: {
+            query?: {
+                /** @description What to look for. */
+                q?: string;
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of what matched. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        hits: components["schemas"]["AgentSearchHit"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    agentDue: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of what is due. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AgentDueItem"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
     listEnquiryMessages: {
         parameters: {
             query?: {
@@ -8011,6 +8287,43 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    agentCompany: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                /** @description The company's id, or its exact name. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The company. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentCompanyDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };

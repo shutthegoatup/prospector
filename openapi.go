@@ -54,11 +54,14 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 	if err != nil {
 		log.Fatalf("the API spec: %v", err)
 	}
-	scopes, account := map[string][]string{}, map[string]bool{}
+	scopes, account, keysOnly := map[string][]string{}, map[string]bool{}, map[string]bool{}
 	for path, item := range spec.Paths.Map() {
 		for method, op := range item.Operations() {
 			if s := opScopes(op); len(s) > 0 {
 				scopes[op.OperationID] = s
+				if !sessionAllowed(op) {
+					keysOnly[method+" "+path] = true
+				}
 			}
 			if slices.Contains(op.Tags, "account") {
 				account[method+" "+path] = true
@@ -86,7 +89,7 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 	}
 	api.HandlerWithOptions(strict, api.StdHTTPServerOptions{
 		BaseRouter:  router,
-		Middlewares: []api.MiddlewareFunc{a.apiCaller(account), noEmptyLink},
+		Middlewares: []api.MiddlewareFunc{a.apiCaller(account, keysOnly), noEmptyLink},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeProblem(w, r, http.StatusBadRequest, say.New(err.Error()))
 		},
@@ -98,18 +101,19 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 var watchAPI func(*http.ServeMux) api.ServeMux
 
 // apiCaller works out who is asking: a key, or a signed-in member of the organisation.
-// The account operations, named by route, are asked by whoever is there.
-func (a *App) apiCaller(account map[string]bool) api.MiddlewareFunc {
-	return func(next http.Handler) http.Handler { return a.caller(account, next) }
+// The account operations, named by route, are asked by whoever is there; those whose
+// security names only a key are for keys alone.
+func (a *App) apiCaller(account, keysOnly map[string]bool) api.MiddlewareFunc {
+	return func(next http.Handler) http.Handler { return a.caller(account, keysOnly, next) }
 }
 
-func (a *App) caller(account map[string]bool, next http.Handler) http.Handler {
+func (a *App) caller(account, keysOnly map[string]bool, next http.Handler) http.Handler {
 	member := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if hasKey(r) && r.PathValue("org") == "" {
 			writeProblem(w, r, http.StatusForbidden, say.New("a key belongs to one organisation and can't start another: sign in to do that"))
 			return
 		}
-		if hasKey(r) {
+		if hasKey(r) || keysOnly[r.Pattern] {
 			a.agent("", next.ServeHTTP)(w, r)
 			return
 		}
@@ -167,6 +171,19 @@ func opScopes(op *openapi3.Operation) []string {
 		}
 	}
 	return out
+}
+
+// sessionAllowed is whether a person signed in may make op, besides a key.
+func sessionAllowed(op *openapi3.Operation) bool {
+	if op.Security == nil {
+		return true
+	}
+	for _, req := range *op.Security {
+		if _, ok := req["session"]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func ownersOnly(scope string) bool {

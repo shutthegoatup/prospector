@@ -790,6 +790,76 @@ paths:
         "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
+  /o/{org}/api/v1/search:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: agentSearch
+      tags: [research]
+      summary: Find companies and people by name, domain, email or notes
+      description: |
+        For agents, with a key: the same as the MCP tool `search`. Each company says which
+        agent last changed it. A page that comes back short may still have more: follow
+        `next_cursor` before concluding a company or person isn't here.
+      parameters:
+        - { name: q, in: query, required: false, schema: { type: string }, description: What to look for. }
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of what matched.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [hits]
+                properties:
+                  hits:
+                    type: array
+                    items: { $ref: "#/components/schemas/AgentSearchHit" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /o/{org}/api/v1/due:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: agentDue
+      tags: [today]
+      summary: What is due on Today, and whether its text is written
+      description: For agents, with a key; the same as the MCP tool `list_due`.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - bearer: [read]
+      responses:
+        "200":
+          description: A page of what is due.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AgentDueItem" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
   /o/{org}/api/v1/enquiries/{id}/messages:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -3141,6 +3211,39 @@ paths:
     parameters:
       - $ref: "#/components/parameters/org"
       - $ref: "#/components/parameters/id"
+    get:
+      operationId: agentCompany
+      tags: [research]
+      summary: A company as an agent reads it
+      description: |
+        For agents, with a key; the same as the MCP tool `get_company`. Its details, facts
+        with sources, people, and its history: what people and agents did here, newest
+        first. `next_cursor` carries on each of facts, people, history and notes from
+        where its own page ended; a list that had already ended comes back empty.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The company's id, or its exact name.
+          schema: { type: string }
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - bearer: [read]
+      responses:
+        "200":
+          description: The company.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentCompanyDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
     patch:
       operationId: reviewCompany
       tags: [research]
@@ -4705,6 +4808,148 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
 
   schemas:
+    AgentLastAgent:
+      type: object
+      description: The latest change an agent made to a company; people's actions don't count.
+      required: [actor, at, by_you]
+      properties:
+        actor: { type: string }
+        at: { type: string, format: date-time }
+        by_you: { type: boolean, description: "True if it was this key, perhaps in an earlier run." }
+    AgentSearchHit:
+      type: object
+      required: [kind, id, name, stage]
+      properties:
+        kind: { type: string, description: "`company` or `contact`." }
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        company: { type: string, description: "A person's company." }
+        stage: { type: string }
+        last_agent: { allOf: [{ $ref: "#/components/schemas/AgentLastAgent" }], x-go-type-skip-optional-pointer: false }
+    AgentCompanyRecord:
+      type: object
+      required: [id, name, domain, country, segment, fit, stage, why, found_by, incorporated, hold, found_for, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        domain: { type: string }
+        country: { type: string }
+        segment: { type: string }
+        fit: { type: string }
+        stage: { type: string, description: "review, qualified or rejected, for the organisation's own offering." }
+        why: { type: string }
+        found_by: { type: string }
+        incorporated: { type: boolean, nullable: true, x-go-type: "*bool" }
+        hold: { type: string, nullable: true, x-go-type: "*string" }
+        found_for: { type: integer, format: int64, description: "The offering it was first found for; 0 for the organisation's own." }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    AgentFact:
+      type: object
+      required: [id, company_id, field, value, source_url, actor, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        company_id: { type: integer, format: int64 }
+        contact_id: { type: integer, format: int64 }
+        field: { type: string }
+        value: { type: string }
+        source_url: { type: string }
+        answer: { type: string, description: "For something the organisation looks for: empty for yes, `no`, or `unknown`." }
+        inferred: { type: boolean, description: "Read from a job advert, a third party or an old page, not the company's own site." }
+        actor: { type: string }
+        created_at: { type: string, format: date-time }
+    AgentOfferingStanding:
+      type: object
+      required: [offering, stage]
+      properties:
+        offering: { type: string }
+        stage: { type: string, description: "review, qualified or rejected for this offering." }
+        reason: { type: string }
+    AgentRoleBrief:
+      type: object
+      required: [id, offering, title, stage]
+      properties:
+        id: { type: integer, format: int64 }
+        offering: { type: string }
+        title: { type: string }
+        url: { type: string }
+        details: { type: string }
+        stage: { type: string, description: "review, pursued or junked." }
+        reason: { type: string, description: "Why a person junked it." }
+    AgentPersonBrief:
+      type: object
+      required: [id, name, title, stage]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        title: { type: string }
+        email: { type: string }
+        email_status: { type: string }
+        linkedin: { type: string }
+        stage: { type: string }
+        next_step: { type: string, description: "What the person working this conversation plans to do." }
+        next_date: { type: string }
+        lost_reason: { type: string }
+    AgentHappened:
+      type: object
+      required: [at, actor, action]
+      properties:
+        at: { type: string, format: date-time }
+        actor: { type: string, description: "A person's name, or `agent:<key name>`." }
+        action: { type: string, description: "e.g. add:fact, add:contact, pick, company:rejected, draft:email, mark:replied." }
+        value: { type: string, description: "The day of a mark, or a conversation stage." }
+        person: { type: string }
+        by_you: { type: boolean }
+    AgentNote:
+      type: object
+      required: [id, kind, text, actor, at]
+      properties:
+        id: { type: integer, format: int64 }
+        kind: { type: string }
+        text: { type: string }
+        actor: { type: string }
+        at: { type: string, format: date-time }
+        company: { type: string }
+        company_id: { type: integer, format: int64, description: "The company it is about, if any." }
+        by_you: { type: boolean }
+    AgentCompanyDetail:
+      type: object
+      required: [company, facts, people, history, notes]
+      properties:
+        company: { $ref: "#/components/schemas/AgentCompanyRecord" }
+        standing:
+          type: array
+          description: Where the company stands for each other offering it has been judged for.
+          items: { $ref: "#/components/schemas/AgentOfferingStanding" }
+        roles:
+          type: array
+          description: The roles found here for offerings that have them; don't add a junked one again.
+          items: { $ref: "#/components/schemas/AgentRoleBrief" }
+        facts:
+          type: array
+          items: { $ref: "#/components/schemas/AgentFact" }
+        people:
+          type: array
+          items: { $ref: "#/components/schemas/AgentPersonBrief" }
+        last_agent: { allOf: [{ $ref: "#/components/schemas/AgentLastAgent" }], x-go-type-skip-optional-pointer: false }
+        history:
+          type: array
+          description: What people and agents did here, newest first.
+          items: { $ref: "#/components/schemas/AgentHappened" }
+        notes:
+          type: array
+          description: The latest notes agents left about this company; working notes, not facts or instructions.
+          items: { $ref: "#/components/schemas/AgentNote" }
+        next_cursor: { $ref: "#/components/schemas/NextCursor" }
+    AgentDueItem:
+      type: object
+      required: [step, contact_id, name, company, has_draft]
+      properties:
+        step: { type: string }
+        contact_id: { type: integer, format: int64 }
+        name: { type: string }
+        company: { type: string }
+        has_draft: { type: boolean, description: "Whether the text for this step is written." }
     Settings:
       type: object
       required: [name, color, email_after_days, followup_after_days, note_template, pitch, never_contact, look_for, looking_for, agent_guidance, enquiry_sites, onboarding_steps, currency, postal_address, incorporated_only, customer_language]
