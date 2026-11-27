@@ -9,19 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"gorm.io/gorm"
-
 	"github.com/shutthegoatup/prospector/internal/mailer"
 )
 
 const (
-	MailQueued    = "queued"
-	MailSending   = "sending"
-	MailSent      = "sent"
-	MailFailed    = "failed"
-	MailUnknown   = "unknown"
-	MailSkipped   = "skipped"
-	MailCancelled = "cancelled"
 
 	// sendEach is how many of one campaign's mails go in one round, and sendEvery how
 	// often a round runs: about ninety a minute, a pace a mail server takes kindly.
@@ -107,9 +98,6 @@ func (a *App) sendRound(ctx context.Context, now time.Time) {
 		a.sendSome(ctx, c, now)
 	}
 }
-
-// stored is whether a query went through, logging it when it didn't.
-func stored(res *gorm.DB) bool { return logged(res) == nil }
 
 // noted is stored for what the store answers with.
 func noted(err error) bool {

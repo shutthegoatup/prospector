@@ -31,7 +31,7 @@ var acrossOrganisations = map[string]bool{
 	// A webhook names its organisation by slug, and proves it with the secret.
 	"BounceHookOrg": true,
 	// Whether a domain takes mail is the same for everyone who writes to it.
-	"TakesMail": true, "NoMailDomains": true, "CheckSomeMail": true,
+	"TakesMail": true, "NoMailDomains": true, "CheckSomeMail": true, "CheckMailDomains": true,
 	// What the server does as it starts.
 	"ResealAtStart": true, "FrontFormOff": true,
 	// These take a row that already names its organisation, which their callers read with it.

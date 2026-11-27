@@ -1467,7 +1467,7 @@ func (s *researchStore) AgentAddContact(o *Org, who Actor, in AddContactIn) (*Ad
 		s.prospecting.Withheld(o.ID, who, withheldNeverContact)
 		return nil, err
 	}
-	if err := s.outreach.checkMailDomains(in.Email); err != nil {
+	if err := s.outreach.CheckMailDomains(in.Email); err != nil {
 		return nil, err
 	}
 	c, err := s.prospecting.CompanyRef(o.ID, in.Company)

@@ -44,7 +44,7 @@ func newStore(c *core) *Store {
 	s.prospectingStore = prospectingStore{Core: c, Identity: &s.identityStore, Sales: &s.dealStore}
 	s.enquiryStore = enquiryStore{Core: c, Prospecting: &s.prospectingStore}
 	s.agreementStore = agreementStore{Core: c, Prospecting: &s.prospectingStore, Identity: &s.identityStore}
-	s.outreachStore = outreachStore{core: c, identity: &s.identityStore, suppression: &s.suppressionStore, subscriptions: &s.subscriptionStore}
+	s.outreachStore = outreachStore{Core: c, Identity: &s.identityStore, Suppression: &s.suppressionStore, Billing: &s.subscriptionStore}
 	s.researchStore = researchStore{core: c, prospecting: &s.prospectingStore, identity: &s.identityStore, outreach: &s.outreachStore}
 	return s
 }
