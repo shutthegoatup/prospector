@@ -120,8 +120,9 @@ type Req struct {
 	Member  *Membership
 	Orgs    []OrgMembership
 	Key     *APIKey
-	// due is worked out once a request, for the page and the navigation both.
-	due map[string][]Contact
+	// due and convs are worked out once a request, for the page and the navigation both.
+	due   map[string][]Contact
+	convs map[string][]Contact
 }
 
 type reqKey struct{}

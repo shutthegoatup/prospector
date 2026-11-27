@@ -363,11 +363,18 @@ func (s *identityStore) KeyFor(secret string) (*APIKey, error) {
 		return nil, err
 	}
 	now := time.Now()
-	set := map[string]any{"last_used_at": now}
+	set := map[string]any{}
+	// Not every call: a key busy all day would make every read a write, and the minute
+	// is as near as its last use is ever shown.
+	if k.LastUsedAt == nil || now.Sub(*k.LastUsedAt) >= time.Minute {
+		set["last_used_at"] = now
+	}
 	if s.keys.lookupBehind(k.Hash) {
 		set["hash"] = s.keys.lookup(apiKeys, secret)
 	}
-	_ = logged(s.db.Model(&k).Updates(set))
+	if len(set) > 0 {
+		_ = logged(s.db.Model(&k).Updates(set))
+	}
 	return &k, nil
 }
 
