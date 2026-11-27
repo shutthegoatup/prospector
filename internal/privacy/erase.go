@@ -7,9 +7,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/shutthegoatup/prospector/internal/customers"
 	"github.com/shutthegoatup/prospector/internal/identity"
-	"github.com/shutthegoatup/prospector/internal/outreach"
+	"github.com/shutthegoatup/prospector/internal/marketing"
+	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/say"
@@ -50,7 +50,7 @@ func (s *PrivacyStore) ErasePerson(org, id int64, actor string) error {
 			return err
 		}
 		// Their page closes in every browser, and the record that they could open it goes.
-		if err := customers.DropCustomerGrants(tx, org, tx.Where("org_id = ? and contact_id = ?", org, id), false); err != nil {
+		if err := onboarding.DropCustomerGrants(tx, org, tx.Where("org_id = ? and contact_id = ?", org, id), false); err != nil {
 			return err
 		}
 		if err := identity.DropRecipients(tx, tx.Where("org_id = ? and contact_id = ?", org, id)); err != nil {
@@ -95,8 +95,8 @@ func (s *PrivacyStore) ErasePerson(org, id int64, actor string) error {
 		}
 		// One still waiting is not sent at all.
 		if err := recipients.Updates(map[string]any{"contact_id": nil, "address": gorm.Expr("'erased:' || id"), "name": "",
-			"status": gorm.Expr("case when status = ? then ? else status end", outreach.MailQueued, outreach.MailSkipped),
-			"reason": gorm.Expr("case when status = ? then ? else reason end", outreach.MailQueued, "erased on request")}).Error; err != nil {
+			"status": gorm.Expr("case when status = ? then ? else status end", marketing.MailQueued, marketing.MailSkipped),
+			"reason": gorm.Expr("case when status = ? then ? else reason end", marketing.MailQueued, "erased on request")}).Error; err != nil {
 			return err
 		}
 		// After their mail is taken: a send claims its mail only once its unsubscribe link
