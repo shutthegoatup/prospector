@@ -16,6 +16,7 @@ require (
 	github.com/oapi-codegen/runtime v1.9.1
 	github.com/pdfcpu/pdfcpu v0.16.4
 	github.com/pressly/goose/v3 v3.30.2
+	github.com/wneessen/go-mail v0.8.2
 	golang.org/x/crypto v0.59.0
 	golang.org/x/image v0.48.0
 	golang.org/x/net v0.63.0

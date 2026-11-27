@@ -2,8 +2,10 @@ package mailer
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"crypto/tls"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	gomail "github.com/wneessen/go-mail"
 )
 
 func TestMailFromEnv(t *testing.T) {
@@ -49,13 +53,17 @@ func TestMailFromEnv(t *testing.T) {
 type fakeSMTP struct {
 	addr string
 	// tls, when set, is offered as STARTTLS.
-	tls   *tls.Config
-	mu    sync.Mutex
-	from  string
-	to    []string
-	auth  string
-	data  string
-	verbs []string
+	tls *tls.Config
+	// rcptReply and dataReply, when set, answer the recipient and the end of the
+	// message; hangUp, when set, drops the line after taking a message, with no goodbye.
+	rcptReply, dataReply string
+	hangUp               bool
+	mu                   sync.Mutex
+	from                 string
+	to                   []string
+	auth                 string
+	data                 string
+	verbs                []string
 	// secured is whether the message arrived after STARTTLS.
 	secured bool
 }
@@ -114,7 +122,7 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 			say("250 ok")
 		case "RCPT":
 			f.to = append(f.to, line)
-			say("250 ok")
+			say(cmp.Or(f.rcptReply, "250 ok"))
 		case "DATA":
 			say("354 go on")
 			var b strings.Builder
@@ -126,7 +134,13 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 				b.WriteString(l)
 			}
 			f.data, f.secured = b.String(), secured
-			say("250 queued")
+			say(cmp.Or(f.dataReply, "250 queued"))
+			if f.hangUp {
+				f.mu.Unlock()
+				return
+			}
+		case "NOOP", "RSET":
+			say("250 ok")
 		case "QUIT":
 			say("221 bye")
 			f.mu.Unlock()
@@ -155,13 +169,21 @@ func TestSMTPSend(t *testing.T) {
 		t.Errorf("envelope: %q %q, auth %q", f.from, f.to, f.auth)
 	}
 	head, body, _ := strings.Cut(f.data, "\r\n\r\n")
-	if strings.Contains(head, "\r\nBcc:") || !strings.Contains(head, "Subject: =?utf-8?q?") {
+	// A charset's name, and an encoded word's, are the same whatever their case.
+	folded := strings.ToLower(head)
+	if strings.Contains(head, "\r\nBcc:") || !strings.Contains(folded, "subject: =?utf-8?q?") {
 		t.Errorf("a line break in the subject made a header:\n%s", head)
 	}
-	for _, want := range []string{`From: "Prospector" <site@prospector.example>`, `To: "Grace Hopper" <grace@example.com>`, "Date: ", "Message-ID: <", "charset=utf-8"} {
+	for _, want := range []string{`From: "Prospector" <site@prospector.example>`, `To: "Grace Hopper" <grace@example.com>`, "Date: ", "Message-ID: <"} {
 		if !strings.Contains(head, want) {
 			t.Errorf("headers lack %q:\n%s", want, head)
 		}
+	}
+	if !strings.Contains(folded, "charset=utf-8") {
+		t.Errorf("no charset:\n%s", head)
+	}
+	if strings.Contains(folded, "user-agent:") || strings.Contains(folded, "x-mailer:") {
+		t.Errorf("the message names the software that sent it:\n%s", head)
 	}
 	if !strings.Contains(body, "reset/abc=3Ddef") {
 		t.Errorf("body: %q", body)
@@ -181,15 +203,13 @@ func TestSMTPNeedsTLS(t *testing.T) {
 	t.Parallel()
 	from, to := &mail.Address{Address: "site@prospector.example"}, &mail.Address{Address: "grace@example.com"}
 	via := Server{Host: "example.com", Port: 587, Username: "user", Password: "pass", From: from.Address}
-	dial := func(f *fakeSMTP) net.Conn {
-		t.Helper()
-		conn, err := net.Dial("tcp", f.addr)
-		if err != nil {
-			t.Fatal(err)
+	// Whatever host and port the client is told, it reaches the fake server.
+	dial := func(f *fakeSMTP) gomail.DialContextFunc {
+		return func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "tcp", f.addr)
 		}
-		t.Cleanup(func() { conn.Close() })
-		return conn
 	}
+	ctx := context.Background()
 	said := func(f *fakeSMTP) string {
 		f.mu.Lock()
 		defer f.mu.Unlock()
@@ -198,8 +218,8 @@ func TestSMTPNeedsTLS(t *testing.T) {
 
 	// A server that offers no TLS is told nothing: no password, no message.
 	plain := newFakeSMTP(t, nil)
-	err := submit(dial(plain), via, from, to, Message{Subject: "x", Body: "y"}, &tls.Config{ServerName: via.Host}, true)
-	if err == nil || !strings.Contains(err.Error(), "doesn't offer TLS") {
+	err := submit(ctx, dial(plain), via, from, to, Message{Subject: "x", Body: "y"}, &tls.Config{ServerName: via.Host}, true)
+	if !errors.Is(err, ErrUnsent) {
 		t.Fatalf("sending without TLS: %v", err)
 	}
 	if got := said(plain); strings.Contains(got, "AUTH") || strings.Contains(got, "MAIL") {
@@ -213,7 +233,7 @@ func TestSMTPNeedsTLS(t *testing.T) {
 	offer := &tls.Config{Certificates: web.TLS.Certificates}
 
 	secure := newFakeSMTP(t, offer)
-	if err := submit(dial(secure), via, from, to, Message{Subject: "x", Body: "y"}, &tls.Config{ServerName: via.Host, RootCAs: roots}, true); err != nil {
+	if err := submit(ctx, dial(secure), via, from, to, Message{Subject: "x", Body: "y"}, &tls.Config{ServerName: via.Host, RootCAs: roots}, true); err != nil {
 		t.Fatalf("sending over STARTTLS: %v", err)
 	}
 	secure.mu.Lock()
@@ -228,7 +248,7 @@ func TestSMTPNeedsTLS(t *testing.T) {
 		"another server's name":    {ServerName: "smtp.other.example", RootCAs: roots},
 	} {
 		f := newFakeSMTP(t, offer)
-		if err := submit(dial(f), via, from, to, Message{Subject: "x", Body: "y"}, trust, true); err == nil {
+		if err := submit(ctx, dial(f), via, from, to, Message{Subject: "x", Body: "y"}, trust, true); err == nil {
 			t.Errorf("%s was accepted", name)
 		}
 		if got := said(f); strings.Contains(got, "AUTH") || strings.Contains(got, "MAIL") {
@@ -239,7 +259,7 @@ func TestSMTPNeedsTLS(t *testing.T) {
 	// A relay on this machine usually offers TLS under a certificate of its own making.
 	local, relay := via, newFakeSMTP(t, offer)
 	local.Username = ""
-	if err := submit(dial(relay), local, from, to, Message{Subject: "x", Body: "y"}, &tls.Config{ServerName: via.Host}, false); err != nil {
+	if err := submit(ctx, dial(relay), local, from, to, Message{Subject: "x", Body: "y"}, &tls.Config{ServerName: via.Host}, false); err != nil {
 		t.Fatalf("a local relay with a self-signed certificate: %v", err)
 	}
 	if got := said(relay); strings.Contains(got, "STARTTLS") || !strings.Contains(got, "DATA") {

@@ -7,16 +7,14 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"mime"
-	"mime/quotedprintable"
 	"net"
 	"net/mail"
-	"net/smtp"
-	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	gomail "github.com/wneessen/go-mail"
 )
 
 // Server is an SMTP submission service and the address mail leaves from. Every
@@ -100,10 +98,9 @@ var (
 
 func unsent(err error) error { return fmt.Errorf("%w: %w", ErrUnsent, err) }
 
-// Send never sends a password or a message in the clear, except to this machine:
-// net/smtp's own SendMail only uses TLS when offered, and waits forever. A failure
-// before the message is handed over wraps ErrUnsent, or ErrRefusedRecipient; any other
-// leaves it unknown whether the mail went.
+// Send never sends a password or a message in the clear, except to this machine, and
+// waits no longer than SendLimit. A failure before the message is handed over wraps
+// ErrUnsent, or ErrRefusedRecipient; any other leaves it unknown whether the mail went.
 func Send(ctx context.Context, via Server, m Message) error {
 	if err := via.Check(); err != nil {
 		return unsent(err)
@@ -115,93 +112,119 @@ func Send(ctx context.Context, via Server, m Message) error {
 	}
 	ctx, cancel := context.WithTimeout(ctx, SendLimit)
 	defer cancel()
-	addr := net.JoinHostPort(via.Host, strconv.Itoa(via.Port))
-	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", addr)
-	if err != nil {
-		return unsent(fmt.Errorf("reach %s: %w", addr, err))
-	}
-	defer conn.Close()
-	deadline, _ := ctx.Deadline()
-	_ = conn.SetDeadline(deadline)
 	secure := &tls.Config{ServerName: via.Host, MinVersion: tls.VersionTLS12}
-	return submit(conn, via, from, to, m, secure, !Loopback(via.Host))
+	return submit(ctx, (&net.Dialer{}).DialContext, via, from, to, m, secure, !Loopback(via.Host))
 }
 
-// submit holds the conversation with a server already reached. Port 465 is TLS from
-// the first byte; any other port must offer STARTTLS when needTLS.
-func submit(conn net.Conn, via Server, from, to *mail.Address, m Message, secure *tls.Config, needTLS bool) error {
+// submit holds the conversation through dial. Port 465 is TLS from the first byte; any
+// other port must offer STARTTLS when needTLS. A server on this machine is spoken to in
+// the clear even when it offers TLS: its certificate is usually self-signed, and nothing
+// leaves the machine.
+func submit(ctx context.Context, dial gomail.DialContextFunc, via Server, from, to *mail.Address, m Message, secure *tls.Config, needTLS bool) error {
 	addr := net.JoinHostPort(via.Host, strconv.Itoa(via.Port))
-	if via.Port == 465 {
-		conn = tls.Client(conn, secure)
-	}
-	c, err := smtp.NewClient(conn, via.Host)
-	if err != nil {
-		return unsent(fmt.Errorf("%s: %w", addr, err))
-	}
-	defer c.Close()
-	// A server on this machine is spoken to in the clear even when it offers TLS: its
-	// certificate is usually self-signed, and nothing leaves the machine.
-	if via.Port != 465 && needTLS {
-		if ok, _ := c.Extension("STARTTLS"); !ok {
-			return unsent(fmt.Errorf("%s doesn't offer TLS, so nothing was sent", addr))
-		}
-		if err := c.StartTLS(secure); err != nil {
-			return unsent(fmt.Errorf("%s: %w", addr, err))
-		}
-	}
-	if via.Username != "" {
-		if err := c.Auth(smtp.PlainAuth("", via.Username, via.Password, via.Host)); err != nil {
-			return unsent(fmt.Errorf("%s refused the username and password: %w", addr, err))
-		}
-	}
-	if err := c.Mail(from.Address); err != nil {
-		return unsent(fmt.Errorf("%s refused mail from %s: %w", addr, from.Address, err))
-	}
-	if err := c.Rcpt(to.Address); err != nil {
-		// A 4xx is "not now" (a rate limit, greylisting): it can be tried again. Only a
-		// 5xx is the address refused for good.
-		var reply *textproto.Error
-		if errors.As(err, &reply) && reply.Code >= 400 && reply.Code < 500 {
-			return unsent(fmt.Errorf("%s put off mail to %s: %w", addr, to.Address, err))
-		}
-		return fmt.Errorf("%w: %s refused mail to %s: %w", ErrRefusedRecipient, addr, to.Address, err)
-	}
-	// Refused before any of the message is written, it didn't go.
-	w, err := c.Data()
+	msg, err := compose(from, to, m, time.Now())
 	if err != nil {
 		return unsent(err)
 	}
-	if _, err := w.Write(Compose(from, to, m, time.Now())); err != nil {
-		return err
+	// Greeted as localhost, as net/smtp did, rather than with this machine's own name.
+	opts := []gomail.Option{gomail.WithPort(via.Port), gomail.WithTLSConfig(secure), gomail.WithDialContextFunc(dial),
+		gomail.WithTimeout(SendLimit), gomail.WithHELO("localhost")}
+	switch {
+	case via.Port == 465:
+		opts = append(opts, gomail.WithSSL())
+	case needTLS:
+		opts = append(opts, gomail.WithTLSPolicy(gomail.TLSMandatory))
+	default:
+		opts = append(opts, gomail.WithTLSPolicy(gomail.NoTLS))
 	}
-	if err := w.Close(); err != nil {
-		return err
+	if via.Username != "" {
+		// The strongest of the mechanisms the server lists, over TLS. Only a server on
+		// this machine, spoken to in the clear, is given a plain password without it.
+		auth := gomail.SMTPAuthAutoDiscover
+		if via.Port != 465 && !needTLS {
+			auth = gomail.SMTPAuthPlainNoEnc
+		}
+		opts = append(opts, gomail.WithSMTPAuth(auth), gomail.WithUsername(via.Username), gomail.WithPassword(via.Password))
+	}
+	c, err := gomail.NewClient(via.Host, opts...)
+	if err != nil {
+		return unsent(err)
+	}
+	// Reaching the server, securing the line and signing in all come before anything of
+	// the message is sent.
+	if err := c.DialWithContext(ctx); err != nil {
+		return unsent(fmt.Errorf("%s: %w", addr, err))
 	}
 	// The server took the message when the data closed. A goodbye that fails after that
 	// isn't a failed send, and calling it one would have the same mail sent twice.
-	c.Quit()
-	return nil
+	defer func() { _ = c.Close() }()
+	return settled(addr, to, c.Send(msg))
 }
 
-func Compose(from, to *mail.Address, m Message, now time.Time) []byte {
-	var b bytes.Buffer
-	_, domain, _ := strings.Cut(from.Address, "@")
-	subject := strings.Join(strings.Fields(m.Subject), " ")
-	fmt.Fprintf(&b, "From: %s\r\nTo: %s\r\nSubject: %s\r\n", from.String(), to.String(), mime.QEncoding.Encode("utf-8", subject))
+// settled says what a failed send means: refused before the message was handed over,
+// it didn't go; a 5xx to the address is the address refused for good, a 4xx only "not
+// now" (a rate limit, greylisting). Anything after the data began is unknown.
+func settled(addr string, to *mail.Address, err error) error {
+	var failed *gomail.SendError
+	if err == nil || !errors.As(err, &failed) {
+		return err
+	}
+	switch failed.Reason {
+	case gomail.ErrSMTPReset:
+		// Only asked once the server has taken the message, to ready the line for
+		// another: it went.
+		return nil
+	case gomail.ErrSMTPRcptTo:
+		if failed.IsTemp() {
+			return unsent(fmt.Errorf("%s put off mail to %s: %w", addr, to.Address, err))
+		}
+		return fmt.Errorf("%w: %s refused mail to %s: %w", ErrRefusedRecipient, addr, to.Address, err)
+	case gomail.ErrGetSender, gomail.ErrGetRcpts, gomail.ErrSMTPMailFrom, gomail.ErrSMTPData, gomail.ErrNoUnencoded, gomail.ErrConnCheck:
+		return unsent(fmt.Errorf("%s: %w", addr, err))
+	}
+	return err
+}
+
+func compose(from, to *mail.Address, m Message, now time.Time) (*gomail.Msg, error) {
+	// No User-Agent or X-Mailer: what software sends it is nobody's business.
+	msg := gomail.NewMsg(gomail.WithCharset(gomail.CharsetUTF8), gomail.WithEncoding(gomail.EncodingQP), gomail.WithNoDefaultUserAgent())
+	if err := msg.From(from.String()); err != nil {
+		return nil, err
+	}
+	if err := msg.To(to.String()); err != nil {
+		return nil, err
+	}
+	msg.Subject(strings.Join(strings.Fields(m.Subject), " "))
 	// Parsed and written back out, so nothing in it can start a header of its own.
 	if answer, err := mail.ParseAddress(m.ReplyTo); err == nil {
-		fmt.Fprintf(&b, "Reply-To: %s\r\n", (&mail.Address{Address: answer.Address}).String())
+		if err := msg.ReplyTo(answer.Address); err != nil {
+			return nil, err
+		}
 	}
 	// RFC 8058 one-click: only over HTTPS, and only a link we made, never one with room
 	// in it to start a header of its own.
 	if u, err := url.Parse(m.Unsubscribe); err == nil && u.Scheme == "https" && printableASCII(m.Unsubscribe) && !strings.ContainsAny(m.Unsubscribe, "<> ,") {
-		fmt.Fprintf(&b, "List-Unsubscribe: <%s>\r\nList-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n", m.Unsubscribe)
+		if err := msg.SetListUnsubscribeOneClick(m.Unsubscribe); err != nil {
+			return nil, err
+		}
 	}
-	fmt.Fprintf(&b, "Date: %s\r\nMessage-ID: <%s@%s>\r\n", now.Format(time.RFC1123Z), rand.Text(), domain)
-	b.WriteString("MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n")
-	body := quotedprintable.NewWriter(&b)
-	body.Write([]byte(strings.ReplaceAll(strings.ReplaceAll(m.Body, "\r\n", "\n"), "\n", "\r\n")))
-	body.Close()
+	_, domain, _ := strings.Cut(from.Address, "@")
+	msg.SetMessageIDWithValue(rand.Text() + "@" + domain)
+	msg.SetDateWithValue(now)
+	msg.SetBodyString(gomail.TypeTextPlain, m.Body)
+	return msg, nil
+}
+
+// Compose is the message as it goes over the wire, for reading it back.
+func Compose(from, to *mail.Address, m Message, now time.Time) []byte {
+	msg, err := compose(from, to, m, now)
+	if err != nil {
+		return nil
+	}
+	var b bytes.Buffer
+	if _, err := msg.WriteTo(&b); err != nil {
+		return nil
+	}
 	return b.Bytes()
 }
 
