@@ -58,47 +58,6 @@ func (o *Offering) check() error {
 	return err
 }
 
-func (s *Store) Offerings(org int64) ([]Offering, error) {
-	var out []Offering
-	return out, s.in(org).Order("lower(name), id").Find(&out).Error
-}
-
-func (s *Store) Offering(org, id int64) (*Offering, error) {
-	var o Offering
-	if err := s.in(org).Where("id = ?", id).First(&o).Error; err != nil {
-		return nil, missing(err, "no offering %d", id)
-	}
-	return &o, nil
-}
-
-// offeringOf is the offering with this id, or nil for the organisation's own.
-func (s *Store) offeringOf(org, id int64) (*Offering, error) {
-	if id == 0 {
-		return nil, nil
-	}
-	return s.Offering(org, id)
-}
-
-func (s *Store) AddOffering(org int64, o Offering, actor string) (*Offering, error) {
-	if err := o.check(); err != nil {
-		return nil, err
-	}
-	o.ID, o.OrgID, o.UpdatedBy = 0, org, actor
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := holdOrg(tx, org); err != nil {
-			return err
-		}
-		if err := nameFree(tx, org, 0, o.Name); err != nil {
-			return err
-		}
-		if err := tx.Create(&o).Error; err != nil {
-			return err
-		}
-		return s.log(tx, org, 0, nil, actor, "offering:added", &o.Name)
-	})
-	return &o, err
-}
-
 // heldOffering reads an offering with its row held, so it can't be removed or changed
 // under the caller before the transaction ends.
 func heldOffering(tx *gorm.DB, org, id int64) (*Offering, error) {
@@ -112,43 +71,6 @@ func heldOffering(tx *gorm.DB, org, id int64) (*Offering, error) {
 	return &o, nil
 }
 
-// ChangeOffering applies change to the offering as it is now, and saves it.
-func (s *Store) ChangeOffering(org, id int64, change func(*Offering), actor string) (*Offering, error) {
-	var o *Offering
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := holdOrg(tx, org); err != nil {
-			return err
-		}
-		var err error
-		if o, err = heldOffering(tx, org, id); err != nil {
-			return err
-		}
-		had := o.HasRoles
-		change(o)
-		if err := o.check(); err != nil {
-			return err
-		}
-		if had && !o.HasRoles {
-			var n int64
-			if err := tx.Model(&Role{}).Where("org_id = ? and offering_id = ?", org, o.ID).Count(&n).Error; err != nil {
-				return err
-			}
-			if n > 0 {
-				return conflict(fmt.Sprintf("%s has %d roles, so it keeps them", o.Name, n))
-			}
-		}
-		if err := nameFree(tx, org, o.ID, o.Name); err != nil {
-			return err
-		}
-		o.UpdatedBy = actor
-		if err := tx.Model(o).Select("name", "look_for", "pitch", "note_template", "has_roles", "updated_by", "updated_at").Updates(o).Error; err != nil {
-			return err
-		}
-		return s.log(tx, org, 0, nil, actor, "offering:changed", &o.Name)
-	})
-	return o, err
-}
-
 func nameFree(tx *gorm.DB, org, id int64, name string) error {
 	var n int64
 	if err := tx.Model(&Offering{}).Where("org_id = ? and id <> ? and lower(name) = ?", org, id, strings.ToLower(name)).Count(&n).Error; err != nil {
@@ -158,96 +80,6 @@ func nameFree(tx *gorm.DB, org, id int64, name string) error {
 		return conflict(fmt.Sprintf("there is already an offering called %q", name))
 	}
 	return nil
-}
-
-// RemoveOffering deletes an offering with every verdict and role kept for it; the history keeps
-// what was decided. People being reached for it are then reached for the organisation's
-// own, and companies found only for it come up in the organisation's own review.
-func (s *Store) RemoveOffering(org, id int64, actor string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		// Companies are held before the offering, as everywhere; holding the organisation
-		// keeps any more from being found for it meanwhile.
-		if err := holdOrg(tx, org); err != nil {
-			return err
-		}
-		if err := tx.Model(&Company{}).Where("org_id = ? and found_for = ?", org, id).Update("found_for", 0).Error; err != nil {
-			return err
-		}
-		o, err := heldOffering(tx, org, id)
-		if err != nil {
-			return err
-		}
-		var open int64
-		if err := tx.Model(&Task{}).Where("org_id = ? and offering_id = ? and closed_at is null", org, id).Count(&open).Error; err != nil {
-			return err
-		}
-		if open > 0 {
-			return conflict(fmt.Sprintf("%d open tasks are finding companies for %s: close them first", open, o.Name))
-		}
-		if err := tx.Where("org_id = ? and offering_id = ?", org, id).Delete(&Verdict{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("org_id = ? and offering_id = ?", org, id).Delete(&Role{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&Contact{}).Where("org_id = ? and offering_id = ?", org, id).Update("offering_id", 0).Error; err != nil {
-			return err
-		}
-		if err := tx.Delete(o).Error; err != nil {
-			return err
-		}
-		return s.log(tx, org, 0, nil, actor, "offering:removed", &o.Name)
-	})
-}
-
-// JudgeCompany says where a company stands for an offering; offering 0 is the
-// organisation's own, whose verdict is the company's stage.
-func (s *Store) JudgeCompany(org, offering, company int64, stage, fit, reason, actor string) error {
-	if offering == 0 {
-		if strings.TrimSpace(reason) != "" {
-			return errors.New("a reason is kept with a verdict for an offering; for the organisation's own, say why in fit")
-		}
-		return s.SetCompanyStage(org, company, stage, fit, actor)
-	}
-	if stage != CompanyQualified && stage != CompanyRejected && stage != CompanyReview {
-		return fmt.Errorf("unknown stage %q", stage)
-	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		o, err := heldOffering(tx, org, offering)
-		if err != nil {
-			return err
-		}
-		var n int64
-		if err := tx.Model(&Company{}).Where("org_id = ? and id = ?", org, company).Count(&n).Error; err != nil {
-			return err
-		}
-		if n == 0 {
-			return noSuch("no company %d", company)
-		}
-		if byRoles, err := judgedByRoles(tx, org, o, company); err != nil || byRoles {
-			if byRoles {
-				return conflict(fmt.Sprintf("this company has roles for %s, and where it stands follows them: pursue or junk its roles", o.Name))
-			}
-			return err
-		}
-		v := Verdict{OrgID: org, OfferingID: offering, CompanyID: company, Stage: stage, Fit: fit,
-			Reason: strings.TrimSpace(reason), By: actor, UpdatedAt: time.Now()}
-		update := []string{"stage", "reason", "decided_by", "updated_at"}
-		if fit != "" {
-			update = append(update, "fit")
-		}
-		if err := tx.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "org_id"}, {Name: "offering_id"}, {Name: "company_id"}},
-			DoUpdates: clause.AssignmentColumns(update),
-		}).Create(&v).Error; err != nil {
-			return err
-		}
-		said := o.Name
-		if v.Reason != "" {
-			said += ": " + v.Reason
-		}
-		return s.log(tx, org, 0, &company, actor, "verdict:"+stage, &said)
-	})
 }
 
 // putUpForReview brings a company found for an offering into that offering's review,
@@ -317,83 +149,7 @@ func offeringStages(tx *gorm.DB, org, offering int64, companies []int64) (map[in
 	return out, nil
 }
 
-// ToReview is how many companies wait for review, counting each offering's queue.
-func (s *Store) ToReview(org int64) int {
-	var n int64
-	_ = logged(s.in(org).Model(&Verdict{}).Where("stage = ?", CompanyReview).Count(&n))
-	return s.ResearchCount(org, "review") + int(n)
-}
-
-// WithVerdicts shows Research rows as they stand for an offering: its stage, and its
-// grade where a person gave one.
-func (s *Store) WithVerdicts(org, offering int64, rows []ResearchRow) error {
-	ids := make([]int64, len(rows))
-	for i, r := range rows {
-		ids[i] = r.ID
-	}
-	var verdicts []Verdict
-	if err := s.in(org).Where("offering_id = ? and company_id in ?", offering, ids).Find(&verdicts).Error; err != nil {
-		return err
-	}
-	by := map[int64]Verdict{}
-	for _, v := range verdicts {
-		by[v.CompanyID] = v
-	}
-	for i := range rows {
-		v, ok := by[rows[i].ID]
-		rows[i].Stage = CompanyReview
-		if ok {
-			rows[i].Stage = v.Stage
-		}
-		if v.Fit != "" {
-			rows[i].Fit = v.Fit
-		}
-	}
-	return nil
-}
-
-func (s *Store) standing(org, company int64) ([]OfferingStanding, error) {
-	var out []OfferingStanding
-	return out, s.db.Model(&Verdict{}).Select("offerings.name as offering, verdicts.stage, verdicts.reason").
-		Joins("join offerings on offerings.id = verdicts.offering_id and offerings.org_id = verdicts.org_id").
-		Where("verdicts.org_id = ? and verdicts.company_id = ?", org, company).Order("lower(offerings.name)").Scan(&out).Error
-}
-
 type VerdictRow struct {
 	Verdict
 	Company string
-}
-
-func (s *Store) verdictRows(org int64) *gorm.DB {
-	return s.db.Model(&Verdict{}).Select("verdicts.*, companies.name as company").
-		Joins("join companies on companies.id = verdicts.company_id and companies.org_id = verdicts.org_id").
-		Joins("join offerings on offerings.id = verdicts.offering_id and offerings.org_id = verdicts.org_id").
-		Where("verdicts.org_id = ?", org)
-}
-
-// Verdicts are where a company stands for each offering it has been judged for.
-func (s *Store) Verdicts(org, company int64) ([]VerdictRow, error) {
-	var n int64
-	if err := s.in(org).Model(&Company{}).Where("id = ?", company).Count(&n).Error; err != nil {
-		return nil, err
-	}
-	if n == 0 {
-		return nil, noSuch("no company %d", company)
-	}
-	var out []VerdictRow
-	return out, s.verdictRows(org).Where("verdicts.company_id = ?", company).Order("verdicts.offering_id").Scan(&out).Error
-}
-
-// Judged lists an offering's verdicts at one stage, or at every stage when stage is
-// empty, latest first; a company ruled out by mistake is found here and put back.
-func (s *Store) Judged(org, offering int64, stage string) ([]VerdictRow, error) {
-	if _, err := s.Offering(org, offering); err != nil {
-		return nil, err
-	}
-	q := s.verdictRows(org).Where("verdicts.offering_id = ?", offering)
-	if stage != "" {
-		q = q.Where("verdicts.stage = ?", stage)
-	}
-	var out []VerdictRow
-	return out, q.Order("verdicts.updated_at desc, verdicts.id desc").Scan(&out).Error
 }
