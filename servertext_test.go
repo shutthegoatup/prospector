@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -147,8 +148,8 @@ func verbs(format string) []string {
 // translation may leave a format out, which then reads in English, but has none the
 // source lacks, and fills the same verbs.
 func TestTheServersWordsAreCatalogued(t *testing.T) {
-	if say.Source != locales.Source {
-		t.Fatalf("the server is written in %s and the app in %s", say.Source, locales.Source)
+	if say.Source != request.Locales.Source {
+		t.Fatalf("the server is written in %s and the app in %s", say.Source, request.Locales.Source)
 	}
 	formats := serverFormats(t)
 	source := say.Catalogue(say.Source)
@@ -188,8 +189,8 @@ func TestTheServersWordsAreCatalogued(t *testing.T) {
 		}
 	}
 	for _, lang := range say.Languages() {
-		if !slices.Contains(locales.Translated, lang) && lang != say.Source {
-			t.Errorf("internal/say/lang/%s.json is for a language web/locales.json doesn't list as translated", lang)
+		if !slices.Contains(request.Locales.Translated, lang) && lang != say.Source {
+			t.Errorf("internal/say/lang/%s.json is for a language web/request.Locales.json doesn't list as translated", lang)
 		}
 		for f, m := range say.Catalogue(lang) {
 			if _, ok := source[f]; !ok {

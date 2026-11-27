@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"github.com/shutthegoatup/prospector/internal/request"
 )
 
 // appPages are the pages the React app (web/src/router.tsx) draws. Each is served the
@@ -43,7 +45,7 @@ func shellIn(lang string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return bytes.Replace(b, []byte(`<html lang="`+locales.Source+`">`), []byte(`<html lang="`+lang+`">`), 1), nil
+	return bytes.Replace(b, []byte(`<html lang="`+request.Locales.Source+`">`), []byte(`<html lang="`+lang+`">`), 1), nil
 }
 
 // writeShell answers with the app's shell carrying page: what the server already decided

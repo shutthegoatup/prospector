@@ -16,18 +16,18 @@ type Nav struct {
 
 // conversations are the organisation's, read once a request.
 func (a *App) conversations(q *Req) map[string][]Contact {
-	if q.convs == nil {
-		q.convs, _ = a.s.Conversations(q.Org.ID)
+	if q.OpenConversations == nil {
+		q.OpenConversations, _ = a.s.Conversations(q.Org.ID)
 	}
-	return q.convs
+	return q.OpenConversations
 }
 
 func (a *App) dueByStep(q *Req, now time.Time) map[string][]Contact {
-	if q.due != nil {
-		return q.due
+	if q.DueByStep != nil {
+		return q.DueByStep
 	}
 	out := map[string][]Contact{}
-	q.due = out
+	q.DueByStep = out
 	for _, s := range Steps {
 		if s.Key == "next" {
 			continue

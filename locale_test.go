@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/request"
 )
 
 func TestTheAppSpeaksTheBestOfTheBrowsersLanguagesItHas(t *testing.T) {
@@ -28,7 +30,7 @@ func TestTheAppSpeaksTheBestOfTheBrowsersLanguagesItHas(t *testing.T) {
 		{"pt", "de", "fr", "pt"},
 		{"", "ja", "xx", "en-GB"},
 	} {
-		if got := set.choose(c.chosen, c.accept, c.fallback); got != c.want {
+		if got := set.Choose(c.chosen, c.accept, c.fallback); got != c.want {
 			t.Errorf("chosen %q, Accept-Language %q, fallback %q: %s, want %s", c.chosen, c.accept, c.fallback, got, c.want)
 		}
 	}
@@ -46,7 +48,7 @@ func TestTheShellSaysWhichLanguageToDrawIn(t *testing.T) {
 		}
 		return rest[:strings.IndexByte(rest, '"')]
 	}
-	if got := lang("/o/alpha/today"); got != locales.Source {
+	if got := lang("/o/alpha/today"); got != request.Locales.Source {
 		t.Errorf("before any is picked: %s", got)
 	}
 	if got := lang("/o/alpha/today?lang=en-XA"); got != "en-XA" {
@@ -59,10 +61,10 @@ func TestTheShellSaysWhichLanguageToDrawIn(t *testing.T) {
 	if got := lang("/c"); got != "en-XA" {
 		t.Errorf("a customer's page: %s", got)
 	}
-	if got := lang(`/o/alpha/today?lang="><script>`); got != locales.Source {
+	if got := lang(`/o/alpha/today?lang="><script>`); got != request.Locales.Source {
 		t.Errorf("one it doesn't have: %s", got)
 	}
-	if got := lang("/o/alpha/today"); got != locales.Source {
+	if got := lang("/o/alpha/today"); got != request.Locales.Source {
 		t.Errorf("after an unknown one forgets the pick: %s", got)
 	}
 }
@@ -71,14 +73,14 @@ func TestALanguageIsPickedOnlyByName(t *testing.T) {
 	t.Parallel()
 	_, _, srv, _ := signedIn(t)
 	req, _ := http.NewRequest("GET", srv.URL+"/login", nil)
-	req.Header.Set("Accept-Language", strings.Join(locales.Pseudo, ","))
+	req.Header.Set("Accept-Language", strings.Join(request.Locales.Pseudo, ","))
 	res, err := noRedirects().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	b, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	if body := string(b); res.StatusCode != http.StatusOK || !strings.Contains(body, `<html lang="`+locales.Source+`">`) {
+	if body := string(b); res.StatusCode != http.StatusOK || !strings.Contains(body, `<html lang="`+request.Locales.Source+`">`) {
 		t.Errorf("a browser asking for a pseudo-locale gets it: %d %s", res.StatusCode, body)
 	}
 	if len(res.Cookies()) != 0 {
@@ -99,7 +101,7 @@ func TestAProblemIsInTheLanguageThePagesAre(t *testing.T) {
 		return res, body
 	}
 	res, body := problem()
-	if !strings.Contains(body, `"detail":"no company 9999999"`) || res.Header.Get("Content-Language") != locales.Source {
+	if !strings.Contains(body, `"detail":"no company 9999999"`) || res.Header.Get("Content-Language") != request.Locales.Source {
 		t.Errorf("before any is picked: %s %s", res.Header.Get("Content-Language"), body)
 	}
 	if vary := res.Header.Values("Vary"); !strings.Contains(strings.Join(vary, ","), "Accept-Language") || !strings.Contains(strings.Join(vary, ","), "Cookie") {

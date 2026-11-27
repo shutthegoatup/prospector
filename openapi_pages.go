@@ -3,10 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
-	"net/url"
 )
-
-type listURLKey struct{}
 
 type requestKey struct{}
 
@@ -18,17 +15,6 @@ func listURL(f func(ctx context.Context, w http.ResponseWriter, r *http.Request,
 		ctx = context.WithValue(ctx, requestKey{}, r)
 		return f(context.WithValue(ctx, listURLKey{}, r.URL), w, r, in)
 	}
-}
-
-// nextLink is the Link header for the page after this one: empty when this one is the last.
-func nextLink(ctx context.Context, next string) string {
-	at, _ := ctx.Value(listURLKey{}).(*url.URL)
-	if next == "" || at == nil {
-		return ""
-	}
-	q := at.Query()
-	q.Set("cursor", next)
-	return "<" + at.Path + "?" + q.Encode() + `>; rel="next"`
 }
 
 // noEmptyLink drops the Link header the generated code writes on every page, the last

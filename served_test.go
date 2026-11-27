@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/request"
 )
 
 // shown is what a page the server decided hands the app, read back from its shell.
@@ -82,7 +84,7 @@ func TestAServedPageStaysInItsAttribute(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()
 	odd := `"></div><script>alert(1)</script><div a="&amp;`
-	writeShell(w, locales.Source, http.StatusTeapot, problemShown{"problem", 418, odd, "it's <b>odd</b> & \"quoted\"", "/"}, "fallback")
+	writeShell(w, request.Locales.Source, http.StatusTeapot, problemShown{"problem", 418, odd, "it's <b>odd</b> & \"quoted\"", "/"}, "fallback")
 	body := w.Body.String()
 	if w.Code != http.StatusTeapot || !strings.HasPrefix(w.Header().Get("Content-Type"), "text/html") {
 		t.Fatalf("%d %s", w.Code, w.Header().Get("Content-Type"))

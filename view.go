@@ -21,41 +21,6 @@ var Steps = []struct{ Key, Label, Card string }{
 	{"next", "Next steps", "Next step"},
 }
 
-// Voice is who is calling and signing, from the org's settings and the member's own.
-type Voice struct {
-	Caller, Org, Pitch, Signature string
-	// Pitches are the offerings' own pitch lines, by offering, where one was written.
-	Pitches map[int64]string
-}
-
-func (v Voice) pitchFor(offering int64) string {
-	if p := v.Pitches[offering]; p != "" {
-		return p
-	}
-	return v.Pitch
-}
-
-func (v Voice) callerFirst() string {
-	if f := firstField(v.Caller); f != "" {
-		return f
-	}
-	return "[YOUR NAME]"
-}
-
-func (v Voice) callerFull() string {
-	if v.Caller != "" {
-		return v.Caller
-	}
-	return "[YOUR NAME]"
-}
-
-func (v Voice) signed() string {
-	if v.Signature == "" {
-		return ""
-	}
-	return "\n\n" + v.Signature
-}
-
 type Badge struct{ Text, State string }
 
 type Local struct{ Text, State, Why string }
@@ -203,7 +168,7 @@ func callScript(c Contact, name string, v Voice) []Line {
 		}
 	}
 	first := deref(c.First)
-	from := v.callerFull() + " from " + v.Org
+	from := v.CallerFull() + " from " + v.Org
 	var lines []Line
 	if switchboard.MatchString(deref(c.Phone)) || pressLine.MatchString(deref(c.Phone)) {
 		lines = append(lines, Line{"If someone else answers", "Hi, could I speak to " + name + ", please? It's " + from + "."})
@@ -213,9 +178,9 @@ func callScript(c Contact, name string, v Voice) []Line {
 		why = strings.TrimSpace("I added you on LinkedIn the other day. " + said)
 	}
 	return append(lines,
-		Line{"When they pick up", "Hi " + first + ", it's " + v.callerFirst() + " from " + v.Org + ". Have you got a couple of minutes?"},
+		Line{"When they pick up", "Hi " + first + ", it's " + v.CallerFirst() + " from " + v.Org + ". Have you got a couple of minutes?"},
 		Line{"Why you're calling", why},
-		Line{"What you do", fill(v.pitchFor(c.OfferingID), first, maker, v.Org)},
+		Line{"What you do", fill(v.PitchFor(c.OfferingID), first, maker, v.Org)},
 		Line{"Ask", "Who looks after that at " + maker + "? Is that you?"},
 		Line{"If they're interested", "Would 20 minutes next week be worth it?"},
 		Line{"Voicemail", "Hi " + first + ", it's " + from + ". I sent you a note on LinkedIn. I'll drop you a short email so you've got my details. Thanks, bye."},
@@ -283,7 +248,7 @@ func MakeCard(step string, raw Contact, v Voice, now time.Time, noMail map[strin
 	}
 	card.Copy = card.Text
 	if step == "email" || step == "followup" {
-		card.Copy += v.signed()
+		card.Copy += v.Signed()
 	}
 	return card
 }

@@ -105,52 +105,7 @@ func streaming(next http.Handler) http.HandlerFunc {
 	}
 }
 
-// Req is who is asking and in which organisation: a signed-in member, or an API key.
-type Req struct {
-	User    *User
-	Session *Session
-	Org     *Org
-	Member  *Membership
-	Orgs    []OrgMembership
-	Key     *APIKey
-	// due and convs are worked out once a request, for the page and the navigation both.
-	due   map[string][]Contact
-	convs map[string][]Contact
-}
-
-type reqKey struct{}
-
 func reqOf(r *http.Request) *Req { return r.Context().Value(reqKey{}).(*Req) }
-
-// Actor is the name recorded against what this request does. A person is their full
-// name, so two with the same first name stay distinct in the history, or their email
-// when the name is missing or would read as an agent, the CLI or an import.
-func (q *Req) Actor() string {
-	if q.Key != nil {
-		return "agent:" + q.Key.Name
-	}
-	name := strings.TrimSpace(q.User.Name)
-	if name == "" || strings.HasPrefix(name, "agent:") || name == "cli" || name == "import" || name == customerActor {
-		return q.User.Email
-	}
-	return name
-}
-
-func (q *Req) Agent() Actor {
-	return Actor{Name: q.Actor(), KeyID: q.Key.ID, ReadOnly: !q.Key.Has("research:write")}
-}
-
-func (q *Req) Voice() Voice {
-	caller := q.Member.CallerName
-	if caller == "" {
-		caller = q.User.Name
-	}
-	return Voice{Caller: caller, Org: q.Org.Name, Pitch: q.Org.Settings.WithDefaults().Pitch, Signature: q.Member.Signature}
-}
-
-func (q *Req) Owner() bool { return q.Member != nil && q.Member.Role == "owner" }
-
-func (q *Req) Base() string { return "/o/" + q.Org.Slug + "/" }
 
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("content-type", "application/json")

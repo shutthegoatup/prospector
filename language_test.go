@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/request"
 )
 
 // translatedInto swaps in languages to choose from, as Prospector has none translated yet. en-XA
@@ -12,9 +14,9 @@ import (
 // serial.
 func translatedInto(t *testing.T, translated ...string) {
 	t.Helper()
-	was := locales
-	locales = localeSet{Source: was.Source, Translated: translated}
-	t.Cleanup(func() { locales = was })
+	was := request.Locales
+	request.Locales = localeSet{Source: was.Source, Translated: translated}
+	t.Cleanup(func() { request.Locales = was })
 }
 
 // inLanguage is the language a page or a Problem came back in, for a browser asking for
@@ -76,7 +78,7 @@ func TestAMembersOwnLanguageOutranksTheirBrowsers(t *testing.T) {
 	}
 
 	// A browser asking for nothing Prospector has gets the organisation's language.
-	if got, _ := inLanguage(t, client, page, "ja"); got != locales.Source {
+	if got, _ := inLanguage(t, client, page, "ja"); got != request.Locales.Source {
 		t.Errorf("before the organisation has one: %s", got)
 	}
 	if code, body := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/settings", "application/json", map[string]string{"customer_language": "en-XA"}); code != http.StatusOK {
@@ -171,7 +173,7 @@ func TestAnOrganisationSpeaksToItsOutsidersInItsLanguage(t *testing.T) {
 	if !strings.Contains(string(b), `<html lang="en-XA">`) || !strings.Contains(string(b), "done&quot;:true") {
 		t.Errorf("unsubscribed: %d %.300s", res.StatusCode, b)
 	}
-	if got, _ := inLanguage(t, outsider, srv.URL+"/u/never-made", "ja"); got != locales.Source {
+	if got, _ := inLanguage(t, outsider, srv.URL+"/u/never-made", "ja"); got != request.Locales.Source {
 		t.Errorf("an unsubscribe link that was never made: %s", got)
 	}
 }

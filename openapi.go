@@ -151,8 +151,6 @@ func ownersOnly(scope string) bool {
 	return false
 }
 
-func reqFrom(ctx context.Context) *Req { return ctx.Value(reqKey{}).(*Req) }
-
 // agentOut is an agent with its card worked out as the Agents page shows it; all is
 // every agent of the organisation, the ones it could fall back to among them.
 func agentOut(c Agent, all []Agent) api.Agent {
