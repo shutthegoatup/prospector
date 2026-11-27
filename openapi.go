@@ -26,11 +26,13 @@ type apiServer struct {
 	marketingAPI
 	crmAPI
 	privacyAPI
+	researchAPI
 }
 
 // newAPIServer hands each product's operations the part of the store they use.
 func newAPIServer(a *App) apiServer {
 	return apiServer{a: a,
+		researchAPI:   researchAPI{Research: &a.s.researchStore, Finding: &a.s.prospectingStore, Records: &a.s.crmStore, Runs: a},
 		privacyAPI:    privacyAPI{Store: &a.s.privacyStore},
 		crmAPI:        crmAPI{Records: &a.s.crmStore},
 		signingAPI:    signingAPI{Store: &a.s.agreementStore},
@@ -194,12 +196,6 @@ func agentOut(c Agent, all []Agent) api.Agent {
 func (s apiServer) oneAgentOut(org int64, c Agent) (api.Agent, error) {
 	all, err := s.a.s.Agents(org)
 	return agentOut(c, all), err
-}
-
-func runOut(r AgentRun) api.Run {
-	return api.Run{Id: r.ID, Task: r.TaskID, Agent: r.AgentID, AgentName: r.AgentName, Request: r.RequestID, StartedBy: r.StartedBy, Model: r.Model,
-		Status: api.RunStatus(r.Status), StopAsked: r.StopAsked, StartedAt: r.StartedAt, EndedAt: r.EndedAt, WaitUntil: r.WaitUntil, Turns: r.Turns,
-		Episodes: r.Episodes, ToolCalls: r.ToolCalls, Added: r.Added, Resumes: r.Resumes, TokensIn: r.TokensIn, TokensOut: r.TokensOut, StopReason: r.StopReason}
 }
 
 func nonNil(s []string) []string {

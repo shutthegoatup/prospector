@@ -73,10 +73,6 @@ func (s apiServer) GetCompanyOverview(ctx context.Context, in api.GetCompanyOver
 	return api.GetCompanyOverview200JSONResponse(out), nil
 }
 
-func pendingOut(d PendingDetail) api.PendingDetail {
-	return api.PendingDetail{Id: d.ID, Field: d.Field, Value: d.Value, Current: d.Current, SourceUrl: d.SourceURL, By: d.By, At: d.At, EmailStatus: d.EmailStatus, Vendor: d.Vendor}
-}
-
 func factOut(f Fact) api.ResearchFact {
 	return api.ResearchFact{Id: f.ID, Field: f.Field, Value: f.Value, SourceUrl: f.SourceURL, Answer: factAnswerOut(f.Answer), Inferred: f.Inferred, By: f.Actor, At: f.CreatedAt}
 }

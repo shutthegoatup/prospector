@@ -50,3 +50,6 @@ func WriteTyped(w http.ResponseWriter, r *http.Request, status int, kind api.Pro
 		log.Print(err)
 	}
 }
+
+// Refused is an error about something the caller may not do, whatever it sends.
+type Refused struct{ *say.Text }

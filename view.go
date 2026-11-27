@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/url"
 	"regexp"
 	"sort"
@@ -355,21 +354,6 @@ func openLabel(c Contact) *say.Text {
 		return say.New("Search + copy")
 	}
 	return say.New("Open + copy")
-}
-
-func plural(n int, word string) string {
-	if n == 1 {
-		return "1 " + word
-	}
-	switch {
-	case word == "person":
-		word = "people"
-	case strings.HasSuffix(word, "y") && !strings.ContainsAny(word[len(word)-2:len(word)-1], "aeiou"):
-		word = word[:len(word)-1] + "ies"
-	default:
-		word += "s"
-	}
-	return fmt.Sprintf("%d %s", n, word)
 }
 
 func actorLabel(actor string) say.Sayer {

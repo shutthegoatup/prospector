@@ -77,12 +77,6 @@ func (s apiServer) ChangeSettings(ctx context.Context, in api.ChangeSettingsRequ
 	return api.ChangeSettings200JSONResponse(settingsOut(o)), nil
 }
 
-func put(to, v *string) {
-	if v != nil {
-		*to = *v
-	}
-}
-
 func putInt(to *int, v *int32) {
 	if v != nil {
 		*to = int(*v)

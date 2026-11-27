@@ -12,10 +12,8 @@ const TaskDone = research.TaskDone
 const TaskWaiting = research.TaskWaiting
 const TaskWorking = research.TaskWorking
 const agentNotes = research.AgentNotes
-const answerYes = research.AnswerYes
 const claimFor = research.ClaimFor
 const companyNotesPageSize = research.CompanyNotesPageSize
-const heldNeverContact = research.HeldNeverContact
 const maxBrief = research.MaxBrief
 const maxNote = research.MaxNote
 const runGap = research.RunGap
@@ -52,7 +50,18 @@ type VerdictRow = research.VerdictRow
 type researchStore = research.ResearchStore
 
 var contactStage = research.ContactStage
-var firstLine = research.FirstLine
 var lookForList = research.LookForList
 var normalURL = research.NormalURL
 var runsOf = research.RunsOf
+
+const lookupNone = research.LookupNone
+const lookupNotKept = research.LookupNotKept
+
+type researchAPI = research.ResearchAPI
+
+var factAnswerOut = research.FactAnswerOut
+var lookingFor = research.LookingFor
+var otherFacts = research.OtherFacts
+var pendingOut = research.PendingOut
+var runOut = research.RunOut
+var taskPrompt = research.TaskPrompt
