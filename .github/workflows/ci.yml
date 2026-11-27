@@ -89,6 +89,13 @@ jobs:
         run: |
           psql "$PROSPECTOR_TEST_PG" -c "alter system set fsync = off" -c "alter system set synchronous_commit = off" \
             -c "alter system set full_page_writes = off" -c "select pg_reload_conf()"
+      - name: Diagnose the build (temporary)
+        run: |
+          nproc
+          du -sh "$(go env GOCACHE)" || true
+          time go build -v -o /dev/null . 2>&1 | tail -3
+          go build -v -o /dev/null . 2>&1 | wc -l
+          time go test -vet=off -c -o /dev/null .
       # go vet is the lint job's (golangci's govet); run again here it is most of the build.
       - name: Test
         run: |
