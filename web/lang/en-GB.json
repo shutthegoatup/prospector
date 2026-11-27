@@ -1,11 +1,43 @@
 {
+  "1nOXrK": {
+    "defaultMessage": "Loading…",
+    "description": "Read out by a screen reader while a page's data is on its way"
+  },
+  "1w6LoO": {
+    "defaultMessage": "Reload to try again.",
+    "description": "Under the heading when an organisation fails to load and the server gave no reason"
+  },
+  "7UEJYq": {
+    "defaultMessage": "This organisation couldn't be opened",
+    "description": "Heading of the page shown when an organisation fails to load"
+  },
+  "97VVE5": {
+    "defaultMessage": "{org} · Prospector",
+    "description": "The browser tab's title while the page's own name is still loading"
+  },
   "NJgV5V": {
     "defaultMessage": "just now",
     "description": "Less than a minute ago"
   },
+  "Vk7CpX": {
+    "defaultMessage": "Sidebar",
+    "description": "What a screen reader calls the sidebar of every page in an organisation"
+  },
+  "cbitp9": {
+    "defaultMessage": "Deals by stage",
+    "description": "What a screen reader calls the board of deals, which scrolls sideways"
+  },
   "dMepNA": {
     "defaultMessage": "agent · {name}",
     "description": "Who did something, when it was one of the organisation's AI agents"
+  },
+  "f/j3Ps": {
+    "defaultMessage": "Skip to content",
+    "description": "A link, first for the keyboard, past the sidebar to the page"
+  },
+  "vFbjH0": {
+    "defaultMessage": "{page} · {org} · Prospector",
+    "description": "The browser tab's title: the page, then the organisation it is in"
   },
   "w4EZ+4": {
     "defaultMessage": "the customer",

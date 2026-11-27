@@ -3,8 +3,8 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
-import { ActionButton, Eyebrow, Failed, FilterChip, Meta, Meter, Pill, Section, type Tone, useRefresh, Whose } from "@/components/app";
-import { Bar, Placeholders, placeholders, Text } from "@/components/app/skeleton";
+import { ActionButton, Eyebrow, Failed, FilterChip, Meta, Meter, Pill, Section, type Tone, usePageTitle, useRefresh, Whose } from "@/components/app";
+import { Bar, Loading, Placeholders, placeholders, Text } from "@/components/app/skeleton";
 import { actor, day, stamp } from "@/lib/format";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -105,6 +105,7 @@ export function ResearchPage() {
   const cardsReady = research.data && !enrichersQuery.isPending;
   const ranked = settled ? settled.ranked && settled.items.length > 0 : !research.error && !!task && filter === "review";
 
+  usePageTitle("Research");
   return (
     <>
       <header className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
@@ -132,6 +133,7 @@ export function ResearchPage() {
       </p>
 
       <Whose area="sales" work="Research is" can={sales} />
+      {!above && <Loading busy>{null}</Loading>}
       {above && (
         <>
           {sales && (
@@ -216,7 +218,11 @@ export function ResearchPage() {
                   <p className="text-sm text-muted-foreground">{empty[filter][1]}</p>
                 </div>
               )}
-              {research.error && <p className="text-sm text-[var(--stop)]">The queue couldn't be read. Reload to try again.</p>}
+              {research.error && (
+                <p className="text-sm text-[var(--stop)]" role="alert">
+                  The queue couldn't be read. Reload to try again.
+                </p>
+              )}
               {!cardsReady && !research.error && (
                 <Placeholders className="flex flex-col gap-3">
                   {Array.from({ length: placeholders }, (_, i) => (

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 export function Bar({ w, className }: { w: string; className?: string }) {
   return (
     <span aria-hidden className={cn("inline-block h-[1lh] max-w-full py-[0.25lh] align-top", className)} style={{ width: w }}>
-      <span className="block h-full animate-pulse rounded-md bg-accent" />
+      <span className="block h-full motion-safe:animate-pulse rounded-md bg-accent" />
     </span>
   );
 }

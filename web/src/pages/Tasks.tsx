@@ -25,7 +25,7 @@ const statuses: Record<string, [string, Tone]> = {
 export function TaskStatus({ status }: { status?: string }) {
   if (status === undefined) {
     return (
-      <span aria-hidden className="inline-flex animate-pulse rounded-full bg-accent">
+      <span aria-hidden className="inline-flex motion-safe:animate-pulse rounded-full bg-accent">
         <span className="invisible inline-flex">
           <Pill>Waiting for an agent</Pill>
         </span>
@@ -72,7 +72,11 @@ export function TasksPage() {
             <FilterChip to="/o/$org/tasks" params={{ org }} label="Open" count={tasks.data?.open} on={!closed} />
             <FilterChip to="/o/$org/tasks" params={{ org }} search={{ closed: true }} label="With closed" count={tasks.data?.all} on={closed} />
           </div>
-          {tasks.error && <p className="text-sm text-[var(--stop)]">The tasks couldn't be read. Reload to try again.</p>}
+          {tasks.error && (
+            <p className="text-sm text-[var(--stop)]" role="alert">
+              The tasks couldn't be read. Reload to try again.
+            </p>
+          )}
           {tasks.data && tasks.data.items.length === 0 && (
             <Empty title="No tasks yet" hint="Write a brief and hand it to your agent with the prompt on its page." />
           )}

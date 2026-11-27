@@ -3,7 +3,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
-import { ActionButton, Empty, Eyebrow, Failed, Meta, Pill, Section, useRefresh } from "@/components/app";
+import { ActionButton, Empty, Eyebrow, Failed, Meta, Pill, Section, usePageTitle, useRefresh } from "@/components/app";
 import { Pager, Quote } from "@/components/app/more";
 import { Loading, Placeholders, placeholders, Text } from "@/components/app/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -99,7 +99,15 @@ export function TaskPage() {
   const prompt = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}/prompt", { params: { path: { org, id } } });
   const side = !runs.isPending && !agents.isPending && !prompt.isPending;
 
-  if (task.error) return <Empty title="No such task" hint="It may be in another organisation, or the link is wrong." />;
+  usePageTitle(task.data?.title);
+  if (task.error?.status === 404) return <Empty title="No such task" hint="It may be in another organisation, or the link is wrong." />;
+  if (task.error)
+    return (
+      <div role="alert">
+        <h1 className="font-heading text-4xl font-bold tracking-tight">The task couldn't be read.</h1>
+        <p className="text-sm text-[var(--stop)]">Reload to try again.</p>
+      </div>
+    );
   const t = task.data;
 
   // While the task loads, only what every task's page starts with: the rest depends on

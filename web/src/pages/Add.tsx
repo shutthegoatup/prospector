@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
-import { ActionButton, Eyebrow, Failed, PageHead } from "@/components/app";
+import { ActionButton, Eyebrow, Failed, PageHead, usePageTitle } from "@/components/app";
 import { Loading, Text } from "@/components/app/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ export function AddPage() {
   ) : (
     <p className="font-mono text-xs text-mark">Adding people is sales work. An owner can add sales to you on the Team list in Settings.</p>
   );
+  usePageTitle("Add person");
   if (popup) {
     return (
       <Loading busy={!ready && !failed}>
@@ -65,7 +66,7 @@ function OrgMark({ name, color }: { name?: string; color?: string }) {
     <span
       className={cn(
         "grid size-7 shrink-0 place-items-center rounded-md font-heading text-sm font-bold text-[#111]",
-        name === undefined && "animate-pulse bg-accent",
+        name === undefined && "motion-safe:animate-pulse bg-accent",
       )}
       style={color === undefined ? undefined : { background: color }}
     >
@@ -109,7 +110,7 @@ function AddForm({ draft, settings, popup }: { draft?: Draft; settings?: Setting
   });
   const set = (key: keyof typeof blank) => (e: { target: { value: string } }) => setValues({ ...values, [key]: e.target.value });
   const loading = !draft || !settings;
-  const box = cn(field, loading && "animate-pulse");
+  const box = cn(field, loading && "motion-safe:animate-pulse");
 
   return (
     <form
@@ -162,7 +163,7 @@ function AddForm({ draft, settings, popup }: { draft?: Draft; settings?: Setting
           onChange={set("note")}
           placeholder={settings && "Leave empty to use your template:\n\n" + settings.note_template}
           disabled={loading}
-          className={cn("rounded-lg border-input bg-muted px-3 py-2 text-sm leading-relaxed", loading && "animate-pulse")}
+          className={cn("rounded-lg border-input bg-muted px-3 py-2 text-sm leading-relaxed", loading && "motion-safe:animate-pulse")}
         />
       </Field>
       <label className="flex items-center gap-2.5 text-sm">

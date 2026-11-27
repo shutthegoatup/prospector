@@ -25,7 +25,7 @@ export function StageTag({ stage }: { stage?: string }) {
       aria-hidden={stage === undefined || undefined}
       className={cn(
         "whitespace-nowrap rounded-md px-2 py-0.5 font-mono text-[11px] uppercase tracking-wide",
-        stage === undefined && "animate-pulse bg-accent text-transparent",
+        stage === undefined && "motion-safe:animate-pulse bg-accent text-transparent",
         stage !== undefined && (answered ? "bg-[color-mix(in_oklab,var(--primary)_14%,transparent)] text-mark" : "bg-secondary text-muted-foreground"),
       )}
     >

@@ -126,7 +126,11 @@ export function EnquiriesPage() {
           {counts.spam > 0 && <FilterChip {...here} search={{ spam: true }} label="Spam" count={counts.spam} on={spam} />}
         </div>
       )}
-      {list.error && <p className="text-sm text-[var(--stop)]">The enquiries couldn't be read. Reload to try again.</p>}
+      {list.error && (
+        <p className="text-sm text-[var(--stop)]" role="alert">
+          The enquiries couldn't be read. Reload to try again.
+        </p>
+      )}
       {list.data && list.data.items.length === 0 && (
         <Empty title="Nothing yet" hint="Enquiries appear here once a site listed in Settings posts one, or a key with the enquiries:write scope does." />
       )}

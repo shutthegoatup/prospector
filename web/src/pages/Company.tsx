@@ -2,7 +2,7 @@ import { type FormEvent, type ReactNode } from "react";
 import { Link, useParams } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
-import { ActionButton, Eyebrow, Failed, Meta, Pill, type Tone, useRefresh } from "@/components/app";
+import { ActionButton, Eyebrow, Failed, Meta, Pill, type Tone, usePageTitle, useRefresh } from "@/components/app";
 import { standingText, SubscriptionUpdate, termText, thens } from "@/components/app/subscription";
 import { Placeholders, Text } from "@/components/app/skeleton";
 import { actor, stamp } from "@/lib/format";
@@ -65,7 +65,7 @@ export function CompanyPage() {
     return (
       <>
         {back}
-        <p className="mt-3 text-sm">That company isn't here.</p>
+        <h1 className="mt-3 font-heading text-3xl font-bold tracking-tight">That company isn't here.</h1>
       </>
     );
   }
@@ -74,9 +74,10 @@ export function CompanyPage() {
     return (
       <>
         {back}
-        <p className="mt-3 text-sm text-[var(--stop)]" role="alert">
-          The company couldn't be read. Reload to try again.
-        </p>
+        <div role="alert">
+          <h1 className="mt-3 font-heading text-3xl font-bold tracking-tight">The company couldn't be read.</h1>
+          <p className="text-sm text-[var(--stop)]">Reload to try again.</p>
+        </div>
       </>
     );
   }
@@ -87,6 +88,8 @@ export function CompanyPage() {
     return (
       <>
         {back}
+        {/* The outline's heading is hidden with the rest of it, so the page is named here meanwhile. */}
+        <h1 className="sr-only">Company</h1>
         <Placeholders className="mt-3 flex flex-col gap-5 panel p-6">
           <Head />
         </Placeholders>
@@ -178,6 +181,7 @@ export function CompanyPage() {
 // Head is the company's name and where it stands, or their outline while the page loads.
 function Head({ c }: { c?: Overview }) {
   const { org, sales } = useSession();
+  usePageTitle(c?.name);
   const refresh = useRefresh();
   const review = $api.useMutation("patch", "/o/{org}/api/v1/companies/{id}", { onSuccess: refresh });
   return (

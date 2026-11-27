@@ -507,7 +507,7 @@ function TodayCard({ c, index, focused = false, onMarked }: { c?: DueCard; index
               {!c ? (
                 <Bar w="24ch" />
               ) : c.company_id ? (
-                <Link className="text-foreground/90 hover:text-mark" to="/o/$org/companies/$id" params={{ org, id: c.company_id }}>
+                <Link className="text-foreground/90 underline underline-offset-2 hover:text-mark" to="/o/$org/companies/$id" params={{ org, id: c.company_id }}>
                   {c.company}
                 </Link>
               ) : (
