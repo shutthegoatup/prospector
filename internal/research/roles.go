@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
@@ -41,7 +41,7 @@ func (in *RoleIn) check(needSource bool) error {
 		return say.Errorf("a role's title is %d characters at most", roleTitleMax)
 	case utf8.RuneCountInString(in.Details) > roleDetailsMax:
 		return say.Errorf("a role's details are %d characters at most", roleDetailsMax)
-	case in.SourceURL != "" && !prospecting.HttpURL.MatchString(in.SourceURL):
+	case in.SourceURL != "" && !crm.HttpURL.MatchString(in.SourceURL):
 		return say.New("source_url must be an http(s) link")
 	case needSource && in.SourceURL == "":
 		return say.New("a role needs the source_url of the posting or page that shows it")
@@ -55,7 +55,7 @@ func rolesOffering(tx *gorm.DB, org, id int64) (*store.Offering, error) {
 	if id == 0 {
 		return nil, store.Conflict{Text: say.New("roles are kept for an offering that has them; the organisation's own doesn't")}
 	}
-	o, err := prospecting.HeldOffering(tx, org, id)
+	o, err := crm.HeldOffering(tx, org, id)
 	if err != nil {
 		return nil, err
 	}

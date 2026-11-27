@@ -13,9 +13,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/onboarding"
-	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
@@ -270,7 +270,7 @@ func (s *PrivacyStore) ReplaceContacts(org int64, rows []store.Contact, absent [
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		kept := rows[:0]
 		for _, r := range rows {
-			err := prospecting.ErasedIn(tx, org, store.DisplayName(r), store.Deref(r.Maker), store.Deref(r.Email), store.Deref(r.Linkedin))
+			err := crm.ErasedIn(tx, org, store.DisplayName(r), store.Deref(r.Maker), store.Deref(r.Email), store.Deref(r.Linkedin))
 			if errors.Is(err, store.ErrErased) {
 				continue
 			}

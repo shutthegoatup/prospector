@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
@@ -58,7 +58,7 @@ func (s *EnquiryStore) StartReply(o *store.Org, enquiry int64, text, actor strin
 		if to, err = answerable(o, e); err != nil {
 			return err
 		}
-		if err := prospecting.ErasedIn(tx, o.ID, "", "", to, ""); err != nil {
+		if err := crm.ErasedIn(tx, o.ID, "", "", to, ""); err != nil {
 			return say.New("that address belongs to someone who was erased on request, so nothing is sent to it")
 		}
 		// Replies in a row with no answer between: a card pressed again and again, or a

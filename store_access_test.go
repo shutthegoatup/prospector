@@ -130,6 +130,7 @@ func handedATransaction(fn *ast.FuncDecl) bool {
 var withinTheStore = map[string]bool{
 	"InOrg": true, "Log": true, "LogAs": true,
 	"SetDeal":             true, // prospecting writes a contact's deal through it
+	"SetContactField":     true, // accepting a suggestion writes the contact in its own transaction
 	"SuppressIn":          true, // a bounce, and an agent's address, suppress within their own work
 	"Gate":                true, // outreach and research ask suppression who may be mailed
 	"Marketable":          true,

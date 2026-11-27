@@ -5,7 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
@@ -27,9 +27,9 @@ func nameFree(tx *gorm.DB, org, id int64, name string) error {
 // own review, if it was found for another offering.
 func forOffering(tx *gorm.DB, org int64, who store.Actor, company int64) error {
 	if who.Offering == 0 {
-		return prospecting.FoundForOwn(tx, org, company)
+		return crm.FoundForOwn(tx, org, company)
 	}
-	_, err := prospecting.PutUpForReview(tx, org, who.Offering, company, who.Name)
+	_, err := crm.PutUpForReview(tx, org, who.Offering, company, who.Name)
 	return err
 }
 

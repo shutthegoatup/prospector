@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
@@ -69,7 +70,7 @@ func checkFact(f FactIn) error {
 	if answer == prospecting.AnswerUnknown && strings.TrimSpace(f.SourceURL) == "" {
 		return nil
 	}
-	if !prospecting.HttpURL.MatchString(strings.TrimSpace(f.SourceURL)) {
+	if !crm.HttpURL.MatchString(strings.TrimSpace(f.SourceURL)) {
 		return say.Errorf("fact %q needs a source_url starting with http", f.Field)
 	}
 	return nil

@@ -34,7 +34,7 @@ func newAPIServer(a *App) apiServer {
 		onboardingAPI: onboardingAPI{Steps: &a.s.onboardingStore, Customers: &a.s.customerStore, App: a},
 		marketingAPI:  marketingAPI{Campaigns: &a.s.outreachStore, Suppression: &a.s.suppressionStore, App: a},
 		salesAPI: salesAPI{Pipeline: &a.s.dealStore, Subscriptions: &a.s.subscriptionStore,
-			People: &a.s.prospectingStore, Onboarding: &a.s.onboardingStore},
+			People: &a.s.crmStore, Onboarding: &a.s.onboardingStore},
 	}
 }
 
