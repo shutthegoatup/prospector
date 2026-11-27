@@ -1,18 +1,14 @@
 package main
 
 import (
-	"cmp"
 	"errors"
 	"fmt"
-	"slices"
-	"sort"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/internal/paging"
-	"github.com/shutthegoatup/prospector/internal/tz"
 )
 
 // Agent operations: the REST API and the MCP server both call these, with the
@@ -130,86 +126,6 @@ func latestFact(tx *gorm.DB, org, company int64, field string) (*Fact, error) {
 	return nil, nil
 }
 
-func (s *Store) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (*AddCompanyOut, error) {
-	who, err := s.OnTask(org, who, in.Task)
-	if err != nil {
-		return nil, err
-	}
-	if in.ConfiguratorURL != "" && !httpURL.MatchString(strings.TrimSpace(in.ConfiguratorURL)) {
-		return nil, errors.New("configurator_url must be an http(s) link")
-	}
-	for _, f := range in.Facts {
-		if err := checkFact(f); err != nil {
-			return nil, err
-		}
-	}
-	var out AddCompanyOut
-	err = s.db.Transaction(func(tx *gorm.DB) error {
-		if err := holdOrg(tx, org); err != nil {
-			return err
-		}
-		domain := bareDomain(in.Domain)
-		var c *Company
-		var named int64
-		err := tx.Model(&Company{}).Where("org_id = ? and lower(name) = ?", org, strings.ToLower(strings.TrimSpace(in.Name))).Count(&named).Error
-		if err == nil && named == 0 {
-			c, err = companyAt(tx, org, domain)
-		}
-		if err != nil {
-			return err
-		}
-		created := false
-		if c == nil {
-			c, created, err = ensureCompany(tx, org, Company{Name: in.Name, Domain: domain, Country: in.Country,
-				Segment: in.Segment, Fit: in.Fit, Why: in.Why, FoundBy: who.Name, Stage: CompanyReview, FoundFor: who.Offering})
-			if err != nil {
-				return err
-			}
-		}
-		out = AddCompanyOut{ID: c.ID, Name: c.Name, Existed: !created, Stage: c.Stage}
-		if err := hold(tx, &Company{}, org, c.ID); err != nil {
-			return err
-		}
-		if who.Offering != 0 {
-			if out.Stage, err = putUpForReview(tx, org, who.Offering, c.ID, who.Name); err != nil {
-				return err
-			}
-		} else if err := foundForOwn(tx, org, c.ID); err != nil {
-			return err
-		}
-		if !created {
-			if err := s.heldWhenFound(tx, org, who, c, out.Stage); err != nil {
-				return err
-			}
-		}
-		added := 0
-		for _, f := range in.Facts {
-			_, had, err := addFact(tx, org, c.ID, f, who.Name)
-			if err != nil {
-				return err
-			}
-			if !had {
-				added++
-			}
-		}
-		// Older clients' fields become facts; with no configurator link they cite nothing, as they did as columns.
-		older, err := addConfiguratorFacts(tx, org, c.ID, in.ConfiguratorURL, in.Platform, in.BuiltBy, who.Name)
-		if err != nil {
-			return err
-		}
-		added += older
-		if !created && added == 0 {
-			return s.matched(tx, org, who, 0, &c.ID)
-		}
-		action := "add:company"
-		if !created {
-			action = "add:facts"
-		}
-		return s.logAs(tx, org, 0, &c.ID, who, action, str(fmt.Sprintf("%s, %d facts", c.Name, added)))
-	})
-	return &out, err
-}
-
 type AddFactIn struct {
 	Company string `json:"company" jsonschema:"company id or exact name"`
 	FactIn
@@ -219,42 +135,6 @@ type AddFactIn struct {
 type AddFactOut struct {
 	Fact
 	Existed bool `json:"existed" jsonschema:"true if the company already had this fact from this page; nothing was added"`
-}
-
-func (s *Store) AgentAddFact(org int64, who Actor, in AddFactIn) (*AddFactOut, error) {
-	who, err := s.OnTask(org, who, in.Task)
-	if err != nil {
-		return nil, err
-	}
-	if err := checkFact(in.FactIn); err != nil {
-		return nil, err
-	}
-	c, err := s.companyRef(org, in.Company)
-	if err != nil {
-		return nil, err
-	}
-	var out AddFactOut
-	err = s.db.Transaction(func(tx *gorm.DB) error {
-		if err := hold(tx, &Company{}, org, c.ID); err != nil {
-			return err
-		}
-		if err := forOffering(tx, org, who, c.ID); err != nil {
-			return err
-		}
-		if err := s.heldWhenReached(tx, org, who, c); err != nil {
-			return err
-		}
-		f, had, err := addFact(tx, org, c.ID, in.FactIn, who.Name)
-		if err != nil {
-			return err
-		}
-		out = AddFactOut{Fact: *f, Existed: had}
-		if had {
-			return s.matched(tx, org, who, 0, &c.ID)
-		}
-		return s.logAs(tx, org, 0, &c.ID, who, "add:fact", str(f.Field))
-	})
-	return &out, err
 }
 
 type AddContactIn struct {
@@ -289,86 +169,6 @@ func samePerson(people []Contact, in AddContactIn) *Contact {
 		}
 	}
 	return nil
-}
-
-func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContactOut, error) {
-	who, err := s.OnTask(o.ID, who, in.Task)
-	if err != nil {
-		return nil, err
-	}
-	if strings.TrimSpace(in.Name) == "" {
-		return nil, errors.New("name is required")
-	}
-	if !httpURL.MatchString(strings.TrimSpace(in.SourceURL)) {
-		return nil, errors.New("source_url is required and must start with http")
-	}
-	if in.EmailStatus != "" && in.EmailStatus != "verified" && in.EmailStatus != "guess" {
-		return nil, errors.New("email_status is verified, guess or empty")
-	}
-	if in.Linkedin != "" && !httpURL.MatchString(strings.TrimSpace(in.Linkedin)) {
-		return nil, errors.New("linkedin must be an https link")
-	}
-	if err := s.Allowed(o, in.Email, in.Linkedin); err != nil {
-		s.withheld(o.ID, who, withheldNeverContact)
-		return nil, err
-	}
-	if err := s.checkMailDomains(in.Email); err != nil {
-		return nil, err
-	}
-	c, err := s.companyRef(o.ID, in.Company)
-	if err != nil {
-		return nil, err
-	}
-	if err := erased(s.db, o.ID, in.Name, c.Name, in.Email, in.Linkedin); err != nil {
-		if errors.Is(err, errErased) {
-			s.withheld(o.ID, who, withheldErased)
-		}
-		return nil, err
-	}
-	person := strings.TrimSpace(in.Name)
-	if in.Title != "" {
-		person += ", " + strings.TrimSpace(in.Title)
-	}
-	first := firstField(in.Name)
-	var out AddContactOut
-	err = s.db.Transaction(func(tx *gorm.DB) error {
-		// The organisation too: a contact's key is one of a kind across it.
-		if err := holdOrg(tx, o.ID); err != nil {
-			return err
-		}
-		if err := hold(tx, &Company{}, o.ID, c.ID); err != nil {
-			return err
-		}
-		if err := forOffering(tx, o.ID, who, c.ID); err != nil {
-			return err
-		}
-		if err := s.heldWhenReached(tx, o.ID, who, c); err != nil {
-			return err
-		}
-		var people []Contact
-		if err := tx.Where("org_id = ? and company_id = ? and key not like 'org:%'", o.ID, c.ID).Order("id").Find(&people).Error; err != nil {
-			return err
-		}
-		if p := samePerson(people, in); p != nil {
-			waiting, err := s.suggestDetails(tx, who, *p, in)
-			if err != nil {
-				return err
-			}
-			out = AddContactOut{ID: p.ID, Status: p.Status, Existed: true, Suggested: waiting}
-			return s.matched(tx, o.ID, who, p.ID, &c.ID)
-		}
-		contact := Contact{OrgID: o.ID, Key: uniqueKey(tx, o.ID, personKey(in.Name)), File: "added by " + who.Name,
-			Person: &person, First: &first, Maker: &c.Name, CompanyID: &c.ID, Title: strings.TrimSpace(in.Title),
-			Email: nonEmpty(strings.TrimSpace(in.Email)), EmailStatus: in.EmailStatus, Linkedin: nonEmpty(strings.TrimSpace(in.Linkedin)),
-			Phone: nonEmpty(strings.TrimSpace(in.Phone)), Sources: str(strings.TrimSpace(in.SourceURL)), Status: ContactSuggested, OfferingID: who.Offering}
-		contact.Tz = tz.Guess(in.Phone, "("+c.Country+")")
-		if err := tx.Create(&contact).Error; err != nil {
-			return err
-		}
-		out = AddContactOut{ID: contact.ID, Status: contact.Status}
-		return s.logAs(tx, o.ID, contact.ID, &c.ID, who, "add:contact", nil)
-	})
-	return &out, err
 }
 
 type DraftIn struct {
@@ -408,54 +208,6 @@ func editedBy(tx *gorm.DB, org, contact int64, field, kind string) (string, erro
 	return last.User, err
 }
 
-func (s *Store) AgentDraft(org int64, who Actor, in DraftIn) error {
-	who, err := s.OnTask(org, who, in.Task)
-	if err != nil {
-		return err
-	}
-	field, ok := draftFields[in.Kind]
-	if !ok {
-		return fmt.Errorf("kind is note, message, email or followup, not %q", in.Kind)
-	}
-	if strings.TrimSpace(in.Text) == "" {
-		return errors.New("text is empty")
-	}
-	if in.Kind == "note" && len([]rune(in.Text)) > 300 {
-		return errors.New("LinkedIn notes are 300 characters at most")
-	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		// A person's edit made meanwhile is then either seen below or lands on top of this.
-		if err := hold(tx, &Contact{}, org, in.ContactID); err != nil {
-			return err
-		}
-		var c Contact
-		if err := tx.Where("org_id = ? and id = ?", org, in.ContactID).First(&c).Error; err != nil {
-			return missing(err, "no contact %d", in.ContactID)
-		}
-		if day := draftSent(c, in.Kind); day != "" {
-			return fmt.Errorf("that went out on %s, so its text stays as sent", day)
-		}
-		current := map[string]*string{"note": c.Note, "message": c.Message, "body": c.Body, "followup": c.Followup}[field]
-		if deref(current) != "" {
-			person, err := editedBy(tx, org, c.ID, field, in.Kind)
-			if err != nil {
-				return err
-			}
-			if person != "" {
-				return fmt.Errorf("%s edited this text, so it is theirs to change", person)
-			}
-		}
-		updates := map[string]any{field: strings.TrimSpace(in.Text), "draft_by": who.Name}
-		if in.Kind == "email" && in.Subject != "" {
-			updates["subject"] = in.Subject
-		}
-		if err := tx.Model(&c).Updates(updates).Error; err != nil {
-			return err
-		}
-		return s.logAs(tx, org, c.ID, c.CompanyID, who, "draft:"+in.Kind, nil)
-	})
-}
-
 type SearchIn struct {
 	Query string `json:"query" jsonschema:"words in a company, person, email or notes"`
 	paging.Page
@@ -483,74 +235,6 @@ func (who Actor) did(e Event) bool {
 		return e.KeyID == who.KeyID
 	}
 	return e.User == who.Name
-}
-
-func (s *Store) lastAgents(org int64, who Actor, companies []int64) (map[int64]*LastAgent, error) {
-	out := map[int64]*LastAgent{}
-	if len(companies) == 0 {
-		return out, nil
-	}
-	latest := s.db.Model(&Event{}).Select("max(id)").
-		Where(`org_id = ? and company_id in ? and "user" like 'agent:%'`, org, companies).Group("company_id")
-	var events []Event
-	if err := s.in(org).Where("id in (?)", latest).Find(&events).Error; err != nil {
-		return nil, err
-	}
-	for _, e := range events {
-		out[*e.CompanyID] = &LastAgent{Actor: e.User, At: e.At, ByYou: who.did(e)}
-	}
-	return out, nil
-}
-
-// AgentSearch lists a page of matching companies and a page of matching people, each
-// in the order they were added. The cursor holds the last of each kind listed.
-func (s *Store) AgentSearch(org int64, who Actor, q string, page paging.Page) (hits []SearchHit, next string, err error) {
-	q = strings.ToLower(strings.TrimSpace(q))
-	if len(q) < 2 {
-		return nil, "", errors.New("search for at least two characters")
-	}
-	at, err := page.At(2)
-	if err != nil {
-		return nil, "", err
-	}
-	size, more := page.Size(), false
-	var companies []Company
-	cond, args := s.companyMatch(q)
-	if err := s.in(org).Where("id > ?", at[0]).Where(cond, args...).Order("id").Limit(size + 1).Find(&companies).Error; err != nil {
-		return nil, "", err
-	}
-	if at[0] = paging.RanOut; len(companies) > size {
-		companies, more = companies[:size], true
-		at[0] = companies[size-1].ID
-	}
-	ids := make([]int64, len(companies))
-	for i, c := range companies {
-		ids[i] = c.ID
-	}
-	last, err := s.lastAgents(org, who, ids)
-	if err != nil {
-		return nil, "", err
-	}
-	hits = []SearchHit{}
-	for _, c := range companies {
-		hits = append(hits, SearchHit{Kind: "company", ID: c.ID, Name: c.Name, Stage: c.Stage, LastAgent: last[c.ID]})
-	}
-	var people []Contact
-	cond, args = s.contactMatch(q, true)
-	if err := s.in(org).Where("id > ? and key not like 'org:%'", at[1]).Where(cond, args...).Order("id").Limit(size + 1).Find(&people).Error; err != nil {
-		return nil, "", err
-	}
-	if at[1] = paging.RanOut; len(people) > size {
-		people, more = people[:size], true
-		at[1] = people[size-1].ID
-	}
-	for _, p := range people {
-		hits = append(hits, SearchHit{Kind: "contact", ID: p.ID, Name: displayName(p), Company: deref(p.Maker), Stage: contactStage(p)})
-	}
-	if more {
-		next = paging.Cursor(at...)
-	}
-	return hits, next, nil
 }
 
 // SearchOut is what a search answers with.
@@ -622,94 +306,6 @@ type Happened struct {
 
 const agentHistory = 20
 
-// AgentCompany is a company with a page of each list it has: its facts and people,
-// oldest first, and its history and notes, newest first. The cursor holds where each
-// of the four was left. With no limit asked for, the history and the notes come in
-// their own shorter pages: the latest is what an agent starting on a company needs.
-func (s *Store) AgentCompany(org int64, who Actor, ref string, page paging.Page) (*CompanyDetail, error) {
-	at, err := page.At(4)
-	if err != nil {
-		return nil, err
-	}
-	c, err := s.companyRef(org, ref)
-	if err != nil {
-		return nil, err
-	}
-	facts, err := s.Facts(org, c.ID)
-	if err != nil {
-		return nil, err
-	}
-	people, err := s.People(org, c.ID)
-	if err != nil {
-		return nil, err
-	}
-	slices.SortFunc(people, func(a, b Contact) int { return cmp.Compare(a.ID, b.ID) })
-	names := map[int64]string{}
-	for _, p := range people {
-		names[p.ID] = displayName(p)
-	}
-	size, historySize, notesSize := page.Size(), page.Size(), page.Size()
-	// Only the first answer is the short one: carrying on from it reads full pages, so
-	// the rest takes a few calls and not one for every three notes.
-	if page.Limit <= 0 && page.Cursor == "" {
-		historySize, notesSize = agentHistory, agentNotes
-	}
-	out := &CompanyDetail{Company: *c, People: []PersonBrief{}, History: []Happened{}, Notes: []NoteOut{}}
-	if out.Standing, err = s.standing(org, c.ID); err != nil {
-		return nil, err
-	}
-	if out.Roles, err = s.roleBriefs(org, c.ID); err != nil {
-		return nil, err
-	}
-	out.Facts, at[0] = paging.AfterID(facts, func(f Fact) int64 { return f.ID }, at[0], size)
-	if out.Facts == nil {
-		out.Facts = []Fact{}
-	}
-	people, at[1] = paging.AfterID(people, func(p Contact) int64 { return p.ID }, at[1], size)
-	for _, p := range people {
-		out.People = append(out.People, PersonBrief{ID: p.ID, Name: displayName(p), Title: p.Title, Email: deref(p.Email),
-			EmailStatus: p.EmailStatus, Linkedin: deref(p.Linkedin), Stage: contactStage(p),
-			NextStep: p.NextStep, NextDate: deref(p.NextDate), LostReason: p.LostReason})
-	}
-	last, err := s.lastAgents(org, who, []int64{c.ID})
-	if err != nil {
-		return nil, err
-	}
-	out.LastAgent = last[c.ID]
-
-	// Newest first, and only as many as a page and one more are read.
-	before := func(id int64) *gorm.DB {
-		q := s.in(org).Where("company_id = ?", c.ID).Order("id desc")
-		if id > 0 {
-			q = q.Where("id < ?", id)
-		}
-		return q
-	}
-	var events []Event
-	if err := before(at[2]).Limit(historySize + 1).Find(&events).Error; err != nil {
-		return nil, err
-	}
-	events, at[2] = paging.BeforeID(events, func(e Event) int64 { return e.ID }, 0, historySize)
-	for _, e := range events {
-		// Only what erasure would keep: an event's value can hold a note or someone's details.
-		out.History = append(out.History, Happened{At: e.At, Actor: e.User, Action: e.Action, Value: deref(keptValue(e)),
-			Person: names[e.ContactID], ByYou: who.did(e)})
-	}
-	var notes []TaskNote
-	if err := before(at[3]).Limit(notesSize + 1).Find(&notes).Error; err != nil {
-		return nil, err
-	}
-	notes, at[3] = paging.BeforeID(notes, func(n TaskNote) int64 { return n.ID }, 0, notesSize)
-	for _, n := range notes {
-		out.Notes = append(out.Notes, NoteOut{ID: n.ID, Kind: n.Kind, Text: n.Text, Actor: n.Actor, At: n.CreatedAt,
-			ByYou: who.did(Event{User: n.Actor, KeyID: n.KeyID})})
-	}
-	if at[0] != paging.RanOut || at[1] != paging.RanOut || at[2] != paging.NoneBefore || at[3] != paging.NoneBefore {
-		out.NextCursor = paging.Cursor(at...)
-	}
-	return out, nil
-}
-
 type DueItem struct {
 	Step      string `json:"step"`
 	ContactID int64  `json:"contact_id"`
@@ -722,34 +318,6 @@ type DueItem struct {
 type DueOut struct {
 	Items      []DueItem `json:"items"`
 	NextCursor string    `json:"next_cursor,omitempty" jsonschema:"set when more is due than is listed: pass it as cursor for the rest"`
-}
-
-// AgentDue lists a page of what is due, step by step in the order Today works them.
-// The queues are worked out whole each time, so the cursor is how far down them the
-// last page ended: someone marked in between moves the rest up by one.
-func (s *Store) AgentDue(o *Org, page paging.Page) (*DueOut, error) {
-	at, err := page.At(1)
-	if err != nil {
-		return nil, err
-	}
-	items := []DueItem{}
-	for _, step := range []string{"linkedin", "accepted", "email", "followup", "call"} {
-		rows, err := s.Due(o.ID, step, time.Now(), o.Settings)
-		if err != nil {
-			return nil, err
-		}
-		for _, c := range rows {
-			text := map[string]string{"linkedin": deref(c.Note), "accepted": deref(c.Message), "email": deref(c.Body), "followup": deref(c.Followup), "call": "x"}[step]
-			items = append(items, DueItem{Step: step, ContactID: c.ID, Name: displayName(c), Company: deref(c.Maker), HasDraft: text != ""})
-		}
-	}
-	from := min(int(at[0]), len(items))
-	to := min(from+page.Size(), len(items))
-	out := &DueOut{Items: items[from:to]}
-	if to < len(items) {
-		out.NextCursor = paging.Cursor(int64(to))
-	}
-	return out, nil
 }
 
 // agentInstructions describes each task rather than naming a model: the client
@@ -824,90 +392,9 @@ type AgentScore struct {
 	Contacts, Picked, Replied      int
 }
 
-// AgentScores is each agent's record: how many of its companies people qualified
-// or rejected, and how many of its contacts were picked and later replied.
-func (s *Store) AgentScores(org int64) []AgentScore {
-	by := map[string]*AgentScore{}
-	get := func(actor string) *AgentScore {
-		name := strings.TrimPrefix(actor, "agent:")
-		if by[name] == nil {
-			by[name] = &AgentScore{Agent: name}
-		}
-		return by[name]
-	}
-	var companies []struct {
-		FoundBy, Stage string
-		N              int
-	}
-	_ = logged(s.db.Raw(`select found_by, stage, count(*) as n from companies
-		where org_id = ? and found_by like 'agent:%' group by found_by, stage`, org).Scan(&companies))
-	for _, r := range companies {
-		a := get(r.FoundBy)
-		a.Companies += r.N
-		switch r.Stage {
-		case CompanyQualified:
-			a.Qualified += r.N
-		case CompanyRejected:
-			a.Rejected += r.N
-		}
-	}
-	var contacts []struct {
-		Actor                     string
-		Contacts, Picked, Replied int
-	}
-	_ = logged(s.db.Raw(`select e."user" as actor, count(*) as contacts,
-		sum(case when exists (select 1 from events p where p.org_id = e.org_id and p.contact_id = e.contact_id and p.action = 'pick') then 1 else 0 end) as picked,
-		sum(case when c.replied is not null then 1 else 0 end) as replied
-		from events e join contacts c on c.id = e.contact_id
-		where e.org_id = ? and e.action = 'add:contact' and e."user" like 'agent:%' group by e."user"`, org).Scan(&contacts))
-	for _, r := range contacts {
-		a := get(r.Actor)
-		a.Contacts, a.Picked, a.Replied = r.Contacts, r.Picked, r.Replied
-	}
-	out := make([]AgentScore, 0, len(by))
-	for _, a := range by {
-		out = append(out, *a)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Agent < out[j].Agent })
-	return out
-}
-
 type MarkIn struct {
 	ContactID int64  `json:"contact_id"`
 	Step      string `json:"step" jsonschema:"linkedin (request sent), accepted, email, followup, call, replied, declined or hold"`
 	Date      string `json:"date,omitempty" jsonschema:"YYYY-MM-DD it happened; today if empty"`
 	Note      string `json:"note,omitempty" jsonschema:"how you know, e.g. 'Allan said he replied rudely'"`
-}
-
-// AgentMark records an outcome for a contact already in outreach. Suggested
-// contacts haven't been picked by a person yet, so nothing has happened to them.
-func (s *Store) AgentMark(org int64, who Actor, in MarkIn) error {
-	date := strings.TrimSpace(in.Date)
-	if date == "" {
-		date = today()
-	}
-	return s.mark(org, in.ContactID, in.Step, date, who, strings.TrimSpace(in.Note))
-}
-
-// AgentMarks is, per contact and step, the agent behind the latest mark, so a
-// person re-marking a step takes it back.
-func (s *Store) AgentMarks(org int64, ids []int64) map[int64]map[string]string {
-	out := map[int64]map[string]string{}
-	if len(ids) == 0 {
-		return out
-	}
-	var events []Event
-	_ = logged(s.in(org).Where("contact_id in ? and action like 'mark:%'", ids).Order("at, id").Find(&events))
-	for _, e := range events {
-		step := strings.TrimPrefix(e.Action, "mark:")
-		if out[e.ContactID] == nil {
-			out[e.ContactID] = map[string]string{}
-		}
-		if strings.HasPrefix(e.User, "agent:") {
-			out[e.ContactID][step] = e.User
-		} else {
-			delete(out[e.ContactID], step)
-		}
-	}
-	return out
 }

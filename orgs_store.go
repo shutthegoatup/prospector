@@ -465,3 +465,23 @@ func (s *identityStore) Users() (int64, error) {
 	var n int64
 	return n, s.db.Model(&User{}).Count(&n).Error
 }
+
+// SetAreas says what someone works on. None leaves them reading only.
+func (s *identityStore) SetAreas(org, user int64, areas []string) error {
+	for _, ar := range areas {
+		if ar != areaSales && ar != areaSupport {
+			return fmt.Errorf("unknown area %q", ar)
+		}
+	}
+	var keep []string
+	for _, ar := range Areas {
+		if slices.Contains(areas, ar.Name) {
+			keep = append(keep, ar.Name)
+		}
+	}
+	res := s.db.Model(&Membership{}).Where("org_id = ? and user_id = ?", org, user).Update("areas", strings.Join(keep, " "))
+	if res.Error == nil && res.RowsAffected == 0 {
+		return errors.New("that person isn't in this organisation")
+	}
+	return res.Error
+}
