@@ -23,11 +23,11 @@ var acrossOrganisations = map[string]bool{
 	"ResetToken": true, "InviteToken": true, "PasswordTokenUser": true, "RedeemPasswordToken": true,
 	"CreateOrg": true, "CreateOrgWithOwner": true, "EnsureFrontOrg": true, "OrgByID": true, "OrgBySlug": true, "OrgsFor": true,
 	"KeyFor": true, "Reseal": true, "SSOOrgsFor": true, "SocialUser": true, "SSOUser": true,
-	"KnownDevice": true, "DropInvites": true,
+	"KnownDevice": true, "DropInvites": true, "SetLanguage": true,
 	// Finds a customer by the secret in their link or cookie, which is all they have.
 	"CustomerByToken": true, "EndCustomerSession": true, "DropCustomerLink": true,
 	// An unsubscribe link names its organisation itself; whoever holds it has no session.
-	"UnsubscribeByToken": true, "DropUnsubscribeLink": true,
+	"UnsubscribeByToken": true, "DropUnsubscribeLink": true, "UnsubscribeLinkOrg": true,
 	// A webhook names its organisation by slug, and proves it with the secret.
 	"BounceHookOrg": true,
 	// Whether a domain takes mail is the same for everyone who writes to it.

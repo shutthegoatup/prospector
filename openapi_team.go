@@ -33,7 +33,7 @@ func someone(ctx context.Context) (*Req, error) {
 
 func meOut(u *User, m *Membership) api.Me {
 	return api.Me{UserId: u.ID, Name: u.Name, Email: u.Email, Role: api.MeRole(m.Role), HasPassword: u.HasPassword(),
-		CallerName: m.CallerName, Signature: m.Signature}
+		CallerName: m.CallerName, Signature: m.Signature, Language: u.Language}
 }
 
 func (s apiServer) GetMe(ctx context.Context, _ api.GetMeRequestObject) (api.GetMeResponseObject, error) {
@@ -52,14 +52,25 @@ func (s apiServer) ChangeMe(ctx context.Context, in api.ChangeMeRequestObject) (
 	if in.Body == nil {
 		return nil, say.New("send what changes, such as {\"signature\": \"Ada\"}")
 	}
-	m := *q.Member
-	put(&m.CallerName, in.Body.CallerName)
-	put(&m.Signature, in.Body.Signature)
-	if err := s.a.s.SaveVoice(q.Org.ID, q.User.ID, m.CallerName, m.Signature); err != nil {
-		return nil, err
+	m, u := *q.Member, *q.User
+	if lang := in.Body.Language; lang != nil && *lang != u.Language {
+		if *lang != "" && !speaks(*lang) {
+			return nil, say.Errorf("Prospector isn't translated into %q", *lang)
+		}
+		if err := s.a.s.SetLanguage(u.ID, *lang); err != nil {
+			return nil, err
+		}
+		u.Language = *lang
 	}
-	m.CallerName, m.Signature = strings.TrimSpace(m.CallerName), strings.TrimSpace(m.Signature)
-	return api.ChangeMe200JSONResponse(meOut(q.User, &m)), nil
+	if in.Body.CallerName != nil || in.Body.Signature != nil {
+		put(&m.CallerName, in.Body.CallerName)
+		put(&m.Signature, in.Body.Signature)
+		if err := s.a.s.SaveVoice(q.Org.ID, q.User.ID, m.CallerName, m.Signature); err != nil {
+			return nil, err
+		}
+		m.CallerName, m.Signature = strings.TrimSpace(m.CallerName), strings.TrimSpace(m.Signature)
+	}
+	return api.ChangeMe200JSONResponse(meOut(&u, &m)), nil
 }
 
 // passwordChangedResponse carries the device cookie the new password vouches for.

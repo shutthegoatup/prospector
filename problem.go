@@ -81,7 +81,7 @@ func (p *problemPage) finish() {
 	}
 	p.Header().Del("Content-Length")
 	title, message := problemText(p.code, p.text.String())
-	writeShell(p.ResponseWriter, p.r, p.code, problemShown{"problem", p.code, title, message, "/"}, title+": "+message+"\n")
+	writeShell(p.ResponseWriter, languageOf(p.r), p.code, problemShown{"problem", p.code, title, message, "/"}, title+": "+message+"\n")
 }
 
 type problemShown struct {

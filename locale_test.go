@@ -10,20 +10,26 @@ import (
 func TestTheAppSpeaksTheBestOfTheBrowsersLanguagesItHas(t *testing.T) {
 	t.Parallel()
 	set := localeSet{Source: "en-GB", Translated: []string{"de", "fr", "pt"}, Pseudo: []string{"en-XA"}}
-	for _, c := range []struct{ chosen, accept, want string }{
-		{"", "", "en-GB"},
-		{"", "de-CH,de;q=0.9,en;q=0.5", "de"},
-		{"", "pt-BR", "pt"},
-		{"", "ja,ko;q=0.8", "en-GB"},
-		{"", "en-US,fr;q=0.5", "en-GB"},
-		{"", "en-XA", "en-GB"},
-		{"", "not a header;;", "en-GB"},
-		{"fr", "de", "fr"},
-		{"en-XA", "de", "en-XA"},
-		{"xx", "de", "de"},
+	for _, c := range []struct{ chosen, accept, fallback, want string }{
+		{"", "", "", "en-GB"},
+		{"", "de-CH,de;q=0.9,en;q=0.5", "", "de"},
+		{"", "pt-BR", "", "pt"},
+		{"", "ja,ko;q=0.8", "", "en-GB"},
+		{"", "en-US,fr;q=0.5", "", "en-GB"},
+		{"", "en-XA", "", "en-GB"},
+		{"", "not a header;;", "", "en-GB"},
+		{"fr", "de", "", "fr"},
+		{"en-XA", "de", "", "en-XA"},
+		{"xx", "de", "", "de"},
+		// An organisation's language stands in only where the browser asks for none it has.
+		{"", "ja,ko;q=0.8", "fr", "fr"},
+		{"", "", "fr", "fr"},
+		{"", "de", "fr", "de"},
+		{"pt", "de", "fr", "pt"},
+		{"", "ja", "xx", "en-GB"},
 	} {
-		if got := set.choose(c.chosen, c.accept); got != c.want {
-			t.Errorf("chosen %q, Accept-Language %q: %s, want %s", c.chosen, c.accept, got, c.want)
+		if got := set.choose(c.chosen, c.accept, c.fallback); got != c.want {
+			t.Errorf("chosen %q, Accept-Language %q, fallback %q: %s, want %s", c.chosen, c.accept, c.fallback, got, c.want)
 		}
 	}
 }

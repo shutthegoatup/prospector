@@ -2302,9 +2302,9 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Change your voice in this organisation
-         * @description Your caller name, used in call scripts, and your signature, added to copied emails.
-         *     Send only what changes. A signed-in member only: an API key is no one, so it is refused.
+         * Change your voice in this organisation, or your language
+         * @description Your caller name, used in call scripts, and your signature, added to copied emails;
+         *     and your language, which is yours in every organisation. Send only what changes. A signed-in member only: an API key is no one, so it is refused.
          */
         patch: operations["changeMe"];
         trace?: never;
@@ -2693,6 +2693,8 @@ export interface components {
             postal_address: string;
             /** @description Email only incorporated companies. */
             incorporated_only: boolean;
+            /** @description The language, as a BCP 47 tag, of customers' and unsubscribe pages, mail to customers and to new members, and of a member who hasn't chosen one when their browser asks for none Prospector has. */
+            customer_language: string;
         };
         SettingsChange: {
             /** @description The organisation's name; never empty. */
@@ -2729,6 +2731,8 @@ export interface components {
             postal_address?: string | null;
             /** @description Email only incorporated companies. */
             incorporated_only?: boolean | null;
+            /** @description One Prospector has been translated into. */
+            customer_language?: string | null;
         };
         Offering: {
             /** Format: int64 */
@@ -4301,6 +4305,8 @@ export interface components {
             caller_name: string;
             /** @description Added to copied emails. */
             signature: string;
+            /** @description The language you chose, as a BCP 47 tag such as `de`, in every organisation: pages, mail to you and the server's messages. Empty is none, and then your browser's languages decide. */
+            language: string;
         };
         OrgSummary: {
             /** Format: int64 */
@@ -4360,6 +4366,8 @@ export interface components {
         MeChange: {
             caller_name?: string | null;
             signature?: string | null;
+            /** @description One Prospector has been translated into, or empty to let your browser decide. */
+            language?: string | null;
         };
         Member: {
             /** Format: int64 */

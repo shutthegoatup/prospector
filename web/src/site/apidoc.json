@@ -15901,10 +15901,10 @@
      "method": "PATCH",
      "tone": "is-violet",
      "path": "/o/{org}/api/v1/me",
-     "summary": "Change your voice in this organisation",
+     "summary": "Change your voice in this organisation, or your language",
      "about": [
       {
-       "text": "Your caller name, used in call scripts, and your signature, added to copied emails. Send only what changes. A signed-in member only: an API key is no one, so it is refused."
+       "text": "Your caller name, used in call scripts, and your signature, added to copied emails; and your language, which is yours in every organisation. Send only what changes. A signed-in member only: an API key is no one, so it is refused."
       }
      ],
      "scope": "read",
@@ -15921,6 +15921,17 @@
          "name": "string?"
         },
         "about": []
+       },
+       {
+        "name": "language",
+        "type": {
+         "name": "string?"
+        },
+        "about": [
+         {
+          "text": "One Prospector has been translated into, or empty to let your browser decide."
+         }
+        ]
        },
        {
         "name": "signature",
@@ -16004,7 +16015,7 @@
        }
       }
      ],
-     "curl": "curl -X PATCH https://prospector.invalid/o/your-org/api/v1/me \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"caller_name\": \"…\", \"signature\": \"…\"}'"
+     "curl": "curl -X PATCH https://prospector.invalid/o/your-org/api/v1/me \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"caller_name\": \"…\", \"language\": \"…\", \"signature\": \"…\"}'"
     },
     {
      "anchor": "op-changeMyPassword",
@@ -16910,6 +16921,17 @@
         ]
        },
        {
+        "name": "customer_language",
+        "type": {
+         "name": "string?"
+        },
+        "about": [
+         {
+          "text": "One Prospector has been translated into."
+         }
+        ]
+       },
+       {
         "name": "email_after_days",
         "type": {
          "name": "int32?"
@@ -17147,7 +17169,7 @@
        }
       }
      ],
-     "curl": "curl -X PATCH https://prospector.invalid/o/your-org/api/v1/settings \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"agent_guidance\": \"…\", \"color\": \"…\", \"currency\": \"…\", \"email_after_days\": \"…\"}'"
+     "curl": "curl -X PATCH https://prospector.invalid/o/your-org/api/v1/settings \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"agent_guidance\": \"…\", \"color\": \"…\", \"currency\": \"…\", \"customer_language\": \"…\"}'"
     },
     {
      "anchor": "op-getSSO",
@@ -22664,6 +22686,25 @@
      "required": true
     },
     {
+     "name": "language",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The language you chose, as a BCP 47 tag such as "
+      },
+      {
+       "text": "de",
+       "code": true
+      },
+      {
+       "text": ", in every organisation: pages, mail to you and the server's messages. Empty is none, and then your browser's languages decide."
+      }
+     ],
+     "required": true
+    },
+    {
      "name": "name",
      "type": {
       "name": "string"
@@ -22713,6 +22754,17 @@
       "name": "string?"
      },
      "about": []
+    },
+    {
+     "name": "language",
+     "type": {
+      "name": "string?"
+     },
+     "about": [
+      {
+       "text": "One Prospector has been translated into, or empty to let your browser decide."
+      }
+     ]
     },
     {
      "name": "signature",
@@ -25524,6 +25576,18 @@
      "required": true
     },
     {
+     "name": "customer_language",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The language, as a BCP 47 tag, of customers' and unsubscribe pages, mail to customers and to new members, and of a member who hasn't chosen one when their browser asks for none Prospector has."
+      }
+     ],
+     "required": true
+    },
+    {
      "name": "email_after_days",
      "type": {
       "name": "int32"
@@ -25766,6 +25830,17 @@
      "about": [
       {
        "text": "The three-letter code deals are valued in."
+      }
+     ]
+    },
+    {
+     "name": "customer_language",
+     "type": {
+      "name": "string?"
+     },
+     "about": [
+      {
+       "text": "One Prospector has been translated into."
       }
      ]
     },

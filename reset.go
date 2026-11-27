@@ -59,12 +59,15 @@ func (a *App) mailFor(org int64) (*mailer.Server, error) {
 	return via, nil
 }
 
-// sendReset mails a link to choose a new password, in the language of whoever asked for
-// it, who is most likely the one who reads it.
+// sendReset mails a link to choose a new password, in the language its owner chose, or
+// else in that of whoever asked for it, who is most likely the one who reads it.
 func (a *App) sendReset(email, lang string) {
 	u, err := a.s.UserByEmail(email)
 	if err != nil {
 		return
+	}
+	if u.Language != "" {
+		lang = u.Language
 	}
 	token, err := a.s.ResetToken(u.ID)
 	if err != nil {
@@ -103,11 +106,15 @@ func (a *App) invite(ctx context.Context, q *Req, u *User, created bool) (bool, 
 	if err != nil {
 		return false, err
 	}
-	// The new member hasn't chosen a language, and the one who added them may read another.
-	err = a.deliver(ctx, *via, mailer.Message{To: u.Email, Subject: say.Errorf("%s added you to %s on Prospector", q.Actor(), q.Org.Name).Error(),
+	// Not the language of whoever added them, who may read another.
+	lang := u.Language
+	if lang == "" {
+		lang = q.Org.Settings.WithDefaults().CustomerLanguage
+	}
+	err = a.deliver(ctx, *via, mailer.Message{To: u.Email, Subject: say.Errorf("%s added you to %s on Prospector", q.Actor(), q.Org.Name).In(lang),
 		Body: say.Errorf("%s added you to %s on Prospector, at %s.\n\n"+
 			"Choose your password here, within 7 days:\n%s\n\n"+
-			"Then sign in with %s.\n", q.Actor(), q.Org.Name, a.base, a.base+"/reset/"+token, u.Email).Error()})
+			"Then sign in with %s.\n", q.Actor(), q.Org.Name, a.base, a.base+"/reset/"+token, u.Email).In(lang)})
 	if err != nil {
 		// Nothing was sent, so the wait before another try doesn't apply.
 		if err := a.s.DropInvites(u.ID); err != nil {

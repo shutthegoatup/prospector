@@ -17,7 +17,7 @@ func settingsOut(o *Org) api.Settings {
 	return api.Settings{Name: o.Name, Color: o.Color, EmailAfterDays: int32(set.EmailAfterDays), FollowupAfterDays: int32(set.FollowupAfterDays),
 		NoteTemplate: set.NoteTemplate, Pitch: set.Pitch, NeverContact: set.NeverContact, LookFor: set.LookFor, AgentGuidance: set.AgentGuidance,
 		EnquirySites: set.EnquirySites, OnboardingSteps: set.OnboardingSteps, Currency: set.Currency, PostalAddress: set.PostalAddress,
-		IncorporatedOnly: set.IncorporatedOnly, LookingFor: lookingFor(o.Settings)}
+		IncorporatedOnly: set.IncorporatedOnly, LookingFor: lookingFor(o.Settings), CustomerLanguage: set.CustomerLanguage}
 }
 
 func (s apiServer) GetSettings(ctx context.Context, _ api.GetSettingsRequestObject) (api.GetSettingsResponseObject, error) {
@@ -54,6 +54,7 @@ func (s apiServer) ChangeSettings(ctx context.Context, in api.ChangeSettingsRequ
 	put(&set.OnboardingSteps, c.OnboardingSteps)
 	put(&set.Currency, c.Currency)
 	put(&set.PostalAddress, c.PostalAddress)
+	put(&set.CustomerLanguage, c.CustomerLanguage)
 	if c.IncorporatedOnly != nil {
 		set.IncorporatedOnly = *c.IncorporatedOnly
 	}
@@ -122,6 +123,9 @@ func checkOrg(o *Org) error {
 	}
 	if _, err := set.Onboarding(); err != nil {
 		return err
+	}
+	if set.CustomerLanguage != "" && !speaks(set.CustomerLanguage) {
+		return say.Errorf("Prospector isn't translated into %q", set.CustomerLanguage)
 	}
 	if utf8.RuneCountInString(set.PostalAddress) > 300 {
 		return say.New("a postal address is 300 characters at most")
