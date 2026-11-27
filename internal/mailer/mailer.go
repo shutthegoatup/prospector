@@ -158,13 +158,14 @@ func submit(conn net.Conn, via Server, from, to *mail.Address, m Message, secure
 		return unsent(fmt.Errorf("%s refused mail from %s: %w", addr, from.Address, err))
 	}
 	if err := c.Rcpt(to.Address); err != nil {
-		// A 4xx is "not now" (a rate limit, greylisting): it can be tried again. Only a
-		// 5xx is the address refused for good.
+		// Only a 5xx is the address refused for good. A 4xx is "not now" (a rate limit,
+		// greylisting), and a line that dropped or timed out said nothing of the address:
+		// either way nothing went, and it can be tried again.
 		var reply *textproto.Error
-		if errors.As(err, &reply) && reply.Code >= 400 && reply.Code < 500 {
-			return unsent(fmt.Errorf("%s put off mail to %s: %w", addr, to.Address, err))
+		if errors.As(err, &reply) && reply.Code >= 500 {
+			return fmt.Errorf("%w: %s refused mail to %s: %w", ErrRefusedRecipient, addr, to.Address, err)
 		}
-		return fmt.Errorf("%w: %s refused mail to %s: %w", ErrRefusedRecipient, addr, to.Address, err)
+		return unsent(fmt.Errorf("%s didn't take mail to %s: %w", addr, to.Address, err))
 	}
 	// Refused before any of the message is written, it didn't go.
 	w, err := c.Data()
