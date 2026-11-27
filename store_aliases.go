@@ -85,7 +85,6 @@ var Stages = store.Stages
 var addMonths = store.AddMonths
 var assetKey = store.AssetKey
 var bareDomain = store.BareDomain
-var clip = store.Clip
 var deref = store.Deref
 var domainOf = store.DomainOf
 var enquiryOrigins = store.EnquiryOrigins
@@ -126,7 +125,6 @@ var randomToken = store.RandomToken
 var str = store.Str
 var today = store.Today
 
-const inConversation = store.InConversation
 
 type Change = store.Change
 type conflict = store.Conflict
