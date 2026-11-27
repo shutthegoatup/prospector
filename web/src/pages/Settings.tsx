@@ -71,12 +71,13 @@ function Tick({ name, checked, children }: { name: string; checked: boolean; chi
   );
 }
 
+const answered = (q: { data?: unknown; error?: unknown }) => q.data !== undefined || Boolean(q.error);
+
 export function SettingsPage() {
   const { org } = useSession();
   const settings = $api.useQuery("get", "/o/{org}/api/v1/settings", { params: { path: { org } } });
   const me = $api.useQuery("get", "/o/{org}/api/v1/me", { params: { path: { org } } });
   const name = settings.data?.name ?? "";
-  const answered = (q: { data?: unknown; error?: unknown }) => q.data !== undefined || Boolean(q.error);
   // Each section holds back the ones under it until its own shape is known: Password's
   // depends on you, and What you sell's hint on the organisation's name.
   return (

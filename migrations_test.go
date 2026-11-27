@@ -81,9 +81,10 @@ func TestADatabaseFromBeforeGooseIsOnlyRecorded(t *testing.T) {
 	if err := s.migrate(); err != nil {
 		t.Fatal(err)
 	}
-	var version int64
-	if err := s.db.Raw("select max(version_id) from goose_db_version").Scan(&version).Error; err != nil || version != 1 {
-		t.Fatalf("recorded at version %d: %v", version, err)
+	// The baseline is recorded as run; the migrations after it run as on any database.
+	var baselines int64
+	if err := s.db.Raw("select count(*) from goose_db_version where version_id = 1").Scan(&baselines).Error; err != nil || baselines != 1 {
+		t.Fatalf("the baseline recorded %d times: %v", baselines, err)
 	}
 	if got := must(s.OrgBySlug("alpha")); got.ID != o.ID {
 		t.Fatalf("the organisation was lost: %+v", got)
