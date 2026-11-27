@@ -12,7 +12,14 @@ import (
 	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
-func (s *Store) EnquiryByID(org, id int64) (*Enquiry, error) {
+// enquiryStore is the enquiries area's queries: what people sent in through the website or a key, and the threads of replies.
+type enquiryStore struct {
+	*core
+	// An enquiry can be from someone already here, or become someone new.
+	prospecting *prospectingStore
+}
+
+func (s *enquiryStore) EnquiryByID(org, id int64) (*Enquiry, error) {
 	var e Enquiry
 	if err := s.in(org).Where("id = ?", id).First(&e).Error; err != nil {
 		return nil, missing(err, "no enquiry %d", id)
@@ -21,12 +28,12 @@ func (s *Store) EnquiryByID(org, id int64) (*Enquiry, error) {
 }
 
 // SetEnquiry changes where answering an enquiry stands, who has it, or our note on it.
-func (s *Store) SetEnquiry(org, id int64, field, value, actor string) error {
+func (s *enquiryStore) SetEnquiry(org, id int64, field, value, actor string) error {
 	return s.SetEnquiryFields(org, id, []Change{{field, value}}, actor)
 }
 
 // SetEnquiryFields makes several of those changes or none.
-func (s *Store) SetEnquiryFields(org, id int64, changes []Change, actor string) error {
+func (s *enquiryStore) SetEnquiryFields(org, id int64, changes []Change, actor string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		for _, c := range changes {
 			if err := s.setEnquiry(tx, org, id, c.Field, strings.TrimSpace(c.Value), actor); err != nil {
@@ -37,7 +44,7 @@ func (s *Store) SetEnquiryFields(org, id int64, changes []Change, actor string) 
 	})
 }
 
-func (s *Store) setEnquiry(tx *gorm.DB, org, id int64, field, value, actor string) error {
+func (s *enquiryStore) setEnquiry(tx *gorm.DB, org, id int64, field, value, actor string) error {
 	{
 		var e Enquiry
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&e).Error; err != nil {
@@ -85,7 +92,7 @@ func (s *Store) setEnquiry(tx *gorm.DB, org, id int64, field, value, actor strin
 
 // AddEnquiry stores one enquiry. The same thing sent again within a few minutes is
 // the same enquiry, so a form can retry until it hears back without making copies.
-func (s *Store) AddEnquiry(org int64, via string, in EnquiryIn) (*Enquiry, error) {
+func (s *enquiryStore) AddEnquiry(org int64, via string, in EnquiryIn) (*Enquiry, error) {
 	e := Enquiry{OrgID: org, Kind: enquiryKind(in.Kind), Name: clip(in.Name, 200), Email: strings.ToLower(clip(in.Email, 320)),
 		Company: clip(in.Company, 200), Phone: clip(in.Phone, 50), Message: clip(in.Message, 10000),
 		Site: clip(in.Site, 200), Page: clip(in.Page, 500), Via: via, Spam: strings.TrimSpace(in.Trap) != ""}
@@ -136,7 +143,7 @@ func (s *Store) AddEnquiry(org int64, via string, in EnquiryIn) (*Enquiry, error
 }
 
 // DeleteEnquiry removes one for good: spam, or a person asking for what they sent to go.
-func (s *Store) DeleteEnquiry(org, id int64) error {
+func (s *enquiryStore) DeleteEnquiry(org, id int64) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		res := tx.Where("org_id = ? and id = ?", org, id).Delete(&Enquiry{})
 		if res.Error == nil && res.RowsAffected == 0 {
@@ -150,7 +157,7 @@ func (s *Store) DeleteEnquiry(org, id int64) error {
 }
 
 // Enquiries lists one page of the enquiries a filter matches, newest first.
-func (s *Store) Enquiries(org int64, f EnquiryFilter, page int) ([]Enquiry, Page, error) {
+func (s *enquiryStore) Enquiries(org int64, f EnquiryFilter, page int) ([]Enquiry, Page, error) {
 	var total int64
 	if err := s.enquiriesMatching(org, f).Count(&total).Error; err != nil {
 		return nil, Page{}, err
@@ -161,7 +168,7 @@ func (s *Store) Enquiries(org int64, f EnquiryFilter, page int) ([]Enquiry, Page
 	return rows, pg, err
 }
 
-func (s *Store) enquiriesMatching(org int64, f EnquiryFilter) *gorm.DB {
+func (s *enquiryStore) enquiriesMatching(org int64, f EnquiryFilter) *gorm.DB {
 	q := s.in(org).Model(&Enquiry{}).Where("spam = ?", f.Spam)
 	if f.Kind != "" {
 		q = q.Where("kind = ?", f.Kind)
@@ -175,7 +182,7 @@ func (s *Store) enquiriesMatching(org int64, f EnquiryFilter) *gorm.DB {
 // EnquiriesBefore is a page of the enquiries a filter matches, newest first, after
 // the one a cursor names. The cursor is that enquiry's id, so one answered or marked
 // as spam while the list is walked, or one arriving, moves no other between pages.
-func (s *Store) EnquiriesBefore(org int64, f EnquiryFilter, page paging.Page) (rows []Enquiry, next string, err error) {
+func (s *enquiryStore) EnquiriesBefore(org int64, f EnquiryFilter, page paging.Page) (rows []Enquiry, next string, err error) {
 	at, err := page.At(1)
 	if err != nil {
 		return nil, "", err
@@ -196,7 +203,7 @@ func (s *Store) EnquiriesBefore(org int64, f EnquiryFilter, page paging.Page) (r
 
 // EnquiryCounts is how many enquiries there are of each kind, with spam under "spam"
 // and each state of answering under "state:" and its name.
-func (s *Store) EnquiryCounts(org int64) map[string]int {
+func (s *enquiryStore) EnquiryCounts(org int64) map[string]int {
 	var rows []struct {
 		Kind, State string
 		Spam        bool
@@ -218,7 +225,7 @@ func (s *Store) EnquiryCounts(org int64) map[string]int {
 	return out
 }
 
-func (s *Store) AroundEnquiries(org int64, rows []Enquiry) (enquiriesAround, error) {
+func (s *enquiryStore) AroundEnquiries(org int64, rows []Enquiry) (enquiriesAround, error) {
 	out := enquiriesAround{Companies: map[int64]string{}, Talking: map[int64]bool{}}
 	var ids, senders []int64
 	for _, e := range rows {
@@ -254,7 +261,7 @@ func (s *Store) AroundEnquiries(org int64, rows []Enquiry) (enquiriesAround, err
 // a reply to nothing we sent, but it is them talking to us, which is what the board is
 // for. Someone not held yet is added first, under the never-contact and erasure rules
 // that adding anyone by hand goes through.
-func (s *Store) ConverseEnquiry(o *Org, id int64, actor string) (*Contact, error) {
+func (s *enquiryStore) ConverseEnquiry(o *Org, id int64, actor string) (*Contact, error) {
 	var e Enquiry
 	if err := s.in(o.ID).Where("id = ?", id).First(&e).Error; err != nil {
 		return nil, missing(err, "no enquiry %d", id)
@@ -279,7 +286,7 @@ func (s *Store) ConverseEnquiry(o *Org, id int64, actor string) (*Contact, error
 			if err != nil {
 				return nil, err
 			}
-			added, err := s.QuickAddPerson(o, QuickAdd{Name: senderName(e), Company: company, Email: e.Email}, actor)
+			added, err := s.prospecting.QuickAddPerson(o, QuickAdd{Name: senderName(e), Company: company, Email: e.Email}, actor)
 			if err != nil {
 				return nil, err
 			}
@@ -292,20 +299,20 @@ func (s *Store) ConverseEnquiry(o *Org, id int64, actor string) (*Contact, error
 		}
 	}
 	// Someone put on the never-contact list since they were matched stays off the board.
-	if err := s.Allowed(o, deref(c.Email), deref(c.Linkedin)); err != nil {
+	if err := s.prospecting.Allowed(o, deref(c.Email), deref(c.Linkedin)); err != nil {
 		return nil, err
 	}
 	if c.Declined != nil {
 		return nil, errors.New("they are marked as not interested, which keeps them off the board")
 	}
 	if c.Replied == nil {
-		if err := s.Mark(o.ID, c.ID, "replied", today(), actor); err != nil {
+		if err := s.prospecting.Mark(o.ID, c.ID, "replied", today(), actor); err != nil {
 			return nil, err
 		}
 	}
 	if deref(c.CallNotes) == "" && e.Message != "" {
 		// What they asked, on the card. It is their own text, shown as text like the rest.
-		if err := s.Update(o.ID, c.ID, "call_notes", "Wrote in: "+clip(e.Message, 500), actor); err != nil {
+		if err := s.prospecting.Update(o.ID, c.ID, "call_notes", "Wrote in: "+clip(e.Message, 500), actor); err != nil {
 			return nil, err
 		}
 	}
@@ -316,7 +323,7 @@ func (s *Store) ConverseEnquiry(o *Org, id int64, actor string) (*Contact, error
 // address matched is used. The name they typed is used only when no company here has
 // it: a form can claim to be from anyone, and that claim mustn't attach a stranger to
 // a company already held. Otherwise they are added with none.
-func (s *Store) enquiryCompany(org int64, e Enquiry) (string, error) {
+func (s *enquiryStore) enquiryCompany(org int64, e Enquiry) (string, error) {
 	if e.CompanyID != nil {
 		var co Company
 		if err := s.in(org).Where("id = ?", *e.CompanyID).First(&co).Error; err != nil {

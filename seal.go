@@ -4,17 +4,11 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/sha256"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"embed"
 	"encoding/asn1"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 	"time"
 
@@ -25,8 +19,6 @@ import (
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 	"golang.org/x/image/font/sfnt"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // Sealing an agreement once everyone has signed: what each signer filled in is drawn onto
@@ -51,75 +43,6 @@ type SealKey struct {
 	Cert      []byte    `gorm:"not null"`
 	Key       string    `gorm:"not null;default:''"`
 	CreatedAt time.Time `gorm:"not null"`
-}
-
-// sealKey is the organisation's sealing key and certificate, made on first use.
-func (s *Store) sealKey(o *Org) (*ecdsa.PrivateKey, *x509.Certificate, error) {
-	var k SealKey
-	err := s.db.Where("org_id = ?", o.ID).First(&k).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if k, err = s.makeSealKey(o); err != nil {
-			return nil, nil, err
-		}
-	} else if err != nil {
-		return nil, nil, err
-	}
-	plain, err := s.keys.open(k.Key)
-	if err != nil {
-		return nil, nil, fmt.Errorf("the organisation's sealing key: %w", err)
-	}
-	key, err := x509.ParseECPrivateKey([]byte(plain))
-	if err != nil {
-		return nil, nil, fmt.Errorf("the organisation's sealing key: %w", err)
-	}
-	cert, err := x509.ParseCertificate(k.Cert)
-	if err != nil {
-		return nil, nil, fmt.Errorf("the organisation's sealing certificate: %w", err)
-	}
-	return key, cert, nil
-}
-
-// makeSealKey makes an organisation's key and its self-signed certificate. Two made at
-// once keep whichever was stored first.
-func (s *Store) makeSealKey(o *Org) (SealKey, error) {
-	if s.keys == nil {
-		return SealKey{}, fmt.Errorf("sealing agreements needs a secret key to keep its own under: %w", errNoKeys)
-	}
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return SealKey{}, err
-	}
-	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 127))
-	if err != nil {
-		return SealKey{}, err
-	}
-	now := time.Now().UTC()
-	tmpl := &x509.Certificate{
-		SerialNumber:          serial,
-		Subject:               pkix.Name{CommonName: o.Name + " (Prospector)", Organization: []string{o.Name}},
-		NotBefore:             now.Add(-time.Hour),
-		NotAfter:              now.AddDate(20, 0, 0),
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageContentCommitment,
-		UnknownExtKeyUsage:    []asn1.ObjectIdentifier{documentSigning},
-		BasicConstraintsValid: true,
-	}
-	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
-	if err != nil {
-		return SealKey{}, err
-	}
-	raw, err := x509.MarshalECPrivateKey(key)
-	if err != nil {
-		return SealKey{}, err
-	}
-	sealedKey, err := s.keys.seal(string(raw))
-	if err != nil {
-		return SealKey{}, err
-	}
-	k := SealKey{OrgID: o.ID, Cert: der, Key: sealedKey, CreatedAt: now}
-	if err := s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&k).Error; err != nil {
-		return SealKey{}, err
-	}
-	return k, s.db.Where("org_id = ?", o.ID).First(&k).Error
 }
 
 // Stamp is what one field shows on the sealed document: where, as fractions of the page
@@ -518,93 +441,6 @@ func byteRangeEnd(doc []byte) (int, bool) {
 type Sealed struct {
 	PDF  []byte
 	Hash string
-}
-
-// sealDocument fills an agreement's document in, adds its certificate and seals the whole with
-// the organisation's key, then checks the seal holds before handing it back.
-func (s *Store) sealDocument(o *Org, doc []byte, stamps []Stamp, c Certificate) (*Sealed, error) {
-	// Text the fonts can't draw would seal as empty space, so it stops the seal instead.
-	for _, text := range c.texts(stamps) {
-		if err := drawable(text); err != nil {
-			return nil, err
-		}
-	}
-	key, cert, err := s.sealKey(o)
-	if err != nil {
-		return nil, err
-	}
-	rc, err := readForSealing(doc)
-	if err != nil {
-		return nil, err
-	}
-	if err := fillIn(rc, stamps); err != nil {
-		return nil, err
-	}
-	page, err := drawCertificate(c)
-	if err != nil {
-		return nil, err
-	}
-	certificate, err := api.ReadAndValidate(context.Background(), bytes.NewReader(page), model.NewDefaultConfiguration())
-	if err != nil {
-		return nil, fmt.Errorf("reading the certificate back: %w", err)
-	}
-	rc.EnsureVersionForWriting()
-	if err := pdfcpu.MergeXRefTables(context.Background(), "certificate", certificate, rc, false, false); err != nil {
-		return nil, fmt.Errorf("adding the certificate: %w", err)
-	}
-	var whole bytes.Buffer
-	if err := api.WriteContext(context.Background(), rc, &whole); err != nil {
-		return nil, err
-	}
-	out, err := sealPDF(whole.Bytes(), key, cert, o.Name)
-	if err != nil {
-		return nil, err
-	}
-	if err := checkSeal(out, cert); err != nil {
-		return nil, err
-	}
-	sum := sha256.Sum256(out)
-	return &Sealed{PDF: out, Hash: hex.EncodeToString(sum[:])}, nil
-}
-
-// TrySeal goes through sealing a draft as it is set out, with stand-in values in every
-// field and a stand-in certificate, and keeps nothing. Sending runs it first, so a
-// document that can't be filled in and sealed is found before anyone signs it.
-func (s *Store) TrySeal(o *Org, id int64) error {
-	a, doc, err := s.AgreementDocument(o.ID, id)
-	if err != nil {
-		return err
-	}
-	fields, err := s.AgreementFields(o.ID, id)
-	if err != nil {
-		return err
-	}
-	parties, err := s.AgreementRecipients(o.ID, id)
-	if err != nil {
-		return err
-	}
-	pages, err := s.agreementPages(o.ID, a)
-	if err != nil {
-		return err
-	}
-	names := map[int64]string{}
-	c := Certificate{Org: o.Name, Agreement: a.Name, Ref: fmt.Sprintf("AGR-%04d", a.ID), Pages: pages, SentBy: a.CreatedBy, SentAt: time.Now(), CompletedAt: time.Now(),
-		Rounds: []CertificateRound{{N: a.Round, Hash: a.FileHash, Outcome: "signed by everyone"}}, Consent: signingConsent}
-	for _, r := range parties {
-		if err := drawable(r.Name); err != nil {
-			return err
-		}
-		names[r.ID] = r.Name
-		if r.Role == RecipientSigner {
-			c.Signers = append(c.Signers, CertificateSigner{Name: r.Name, Email: r.Email, Via: "typed name · email code", Typed: r.Name, IP: "203.0.113.1", Browser: "a browser", SignedAt: time.Now()})
-		}
-	}
-	stamps := make([]Stamp, 0, len(fields))
-	for _, f := range fields {
-		stamps = append(stamps, Stamp{Page: f.Page, X: f.X, Y: f.Y, W: f.W, H: f.H, Kind: f.Kind, Value: standIn(f.Kind, names[f.RecipientID])})
-	}
-	_, err = s.sealDocument(o, doc, stamps, c)
-	return err
 }
 
 // standIn is what a dry run puts in a field: the signer's own name where they would type
