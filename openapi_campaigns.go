@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"errors"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func campaignOut(c Campaign) api.Campaign {
@@ -128,7 +128,7 @@ func (s apiServer) ListCampaigns(ctx context.Context, in api.ListCampaignsReques
 
 func (s apiServer) CreateCampaign(ctx context.Context, in api.CreateCampaignRequestObject) (api.CreateCampaignResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send the campaign: {\"name\": …}")
+		return nil, say.New("send the campaign: {\"name\": …}")
 	}
 	q, b := reqFrom(ctx), in.Body
 	c, err := s.a.s.AddCampaign(q.Org.ID, CampaignIn{Name: b.Name, Kind: b.Kind, Audience: b.Audience, Subject: b.Subject, Body: b.Body}, q.Actor())
@@ -151,7 +151,7 @@ func (s apiServer) ChangeCampaign(ctx context.Context, in api.ChangeCampaignRequ
 		}
 	}
 	if len(changes) == 0 {
-		return nil, errors.New("send what to change: name, audience, subject or body")
+		return nil, say.New("send what to change: name, audience, subject or body")
 	}
 	q := reqFrom(ctx)
 	c, err := s.a.s.ChangeCampaign(q.Org.ID, in.Id, changes, q.Actor())

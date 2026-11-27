@@ -1,11 +1,12 @@
 package main
 
 import (
-	"errors"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func (s *identityStore) newPasswordToken(user int64, invite bool) (string, error) {
@@ -68,7 +69,7 @@ func (s *identityStore) RedeemPasswordToken(token, password string) error {
 		return err
 	}
 	if len(password) < 10 {
-		return errors.New("passwords need at least 10 characters")
+		return say.New("passwords need at least 10 characters")
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), passwordCost)
 	if err != nil {

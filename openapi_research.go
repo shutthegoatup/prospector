@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"errors"
 	"slices"
 	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func (s apiServer) AddPerson(ctx context.Context, in api.AddPersonRequestObject) (api.AddPersonResponseObject, error) {
@@ -36,7 +36,7 @@ func (s apiServer) ChangeContact(ctx context.Context, in api.ChangeContactReques
 		}
 	}
 	if len(fields) == 0 {
-		return nil, errors.New("send at least one field to change")
+		return nil, say.New("send at least one field to change")
 	}
 	// A time zone sent with a phone is the one wanted, not the phone's guess: it goes last.
 	slices.SortFunc(fields, func(a, b string) int {

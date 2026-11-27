@@ -21,6 +21,7 @@ import (
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/cleantext"
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // dummyHash keeps a wrong email as slow as a wrong password.
@@ -168,13 +169,13 @@ func writeJSON(w http.ResponseWriter, v any) {
 
 func fail(w http.ResponseWriter, err error, code int) {
 	code, text := telling("a browser's request", err, code)
-	http.Error(w, text, code)
+	http.Error(w, text.Error(), code)
 }
 
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<20)).Decode(v); err != nil {
 		if hasKey(r) {
-			writeProblem(w, http.StatusBadRequest, "bad request body: "+err.Error())
+			writeProblem(w, r, http.StatusBadRequest, say.Errorf("bad request body: %s", err.Error()))
 		} else {
 			fail(w, fmt.Errorf("bad request body: %w", err), http.StatusBadRequest)
 		}
@@ -232,18 +233,18 @@ func (a *App) sessionCookie(r *http.Request, token string) *http.Cookie {
 func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// A page is sent where it can go on; an API caller is told, with a type to act on.
-		refuse := func(status int, kind api.ProblemType, text, to string) {
+		refuse := func(status int, kind api.ProblemType, text *say.Text, to string) {
 			switch {
 			case forAPI(r):
-				writeTyped(w, status, kind, text)
+				writeTyped(w, r, status, kind, text)
 			case r.Method == http.MethodGet:
 				http.Redirect(w, r, to, http.StatusSeeOther)
 			default:
-				http.Error(w, text, status)
+				http.Error(w, text.Error(), status)
 			}
 		}
 		signedOut := func(kind api.ProblemType) {
-			refuse(http.StatusUnauthorized, kind, "signed out", "/login?next="+url.QueryEscape(r.URL.RequestURI()))
+			refuse(http.StatusUnauthorized, kind, say.New("signed out"), "/login?next="+url.QueryEscape(r.URL.RequestURI()))
 		}
 		sess, u := a.session(r)
 		if u == nil {
@@ -252,7 +253,7 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 		}
 		// Someone still on a password their inviter saw can only go and choose their own.
 		if u.MustChangePassword && r.URL.Path != "/password" {
-			refuse(http.StatusForbidden, api.ProblemTypeMustChangePassword, "choose your own password first", "/password")
+			refuse(http.StatusForbidden, api.ProblemTypeMustChangePassword, say.New("choose your own password first"), "/password")
 			return
 		}
 		q := &Req{User: u, Session: sess}
@@ -278,7 +279,7 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 			if a.ssoRequired(org, u, m, sess) {
-				refuse(http.StatusForbidden, api.ProblemTypeSsoRequired, org.Name+" requires its single sign-on: reload the page to go through it",
+				refuse(http.StatusForbidden, api.ProblemTypeSsoRequired, say.Errorf("%s requires its single sign-on: reload the page to go through it", org.Name),
 					ssoPageURL(org, u.Email, r.URL.RequestURI()))
 				return
 			}
@@ -296,21 +297,21 @@ func (a *App) agent(scope string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		secret, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if !ok {
-			challenge(w, http.StatusUnauthorized, "", "", "an API key is needed: Authorization: Bearer pk_…")
+			challenge(w, r, http.StatusUnauthorized, "", "", say.New("an API key is needed: Authorization: Bearer pk_…"))
 			return
 		}
 		k, err := a.s.KeyFor(strings.TrimSpace(secret))
 		if err != nil {
-			challenge(w, http.StatusUnauthorized, "invalid_token", "", "unknown or revoked API key")
+			challenge(w, r, http.StatusUnauthorized, "invalid_token", "", say.New("unknown or revoked API key"))
 			return
 		}
 		org, err := a.s.OrgBySlug(r.PathValue("org"))
 		if err != nil || org.ID != k.OrgID {
-			writeProblem(w, http.StatusForbidden, "this key belongs to another organisation")
+			writeProblem(w, r, http.StatusForbidden, say.New("this key belongs to another organisation"))
 			return
 		}
 		if scope != "" && !k.Has(scope) {
-			challenge(w, http.StatusForbidden, "insufficient_scope", scope, "this key lacks the "+scope+" scope")
+			challenge(w, r, http.StatusForbidden, "insufficient_scope", scope, say.Errorf("this key lacks the %s scope", scope))
 			return
 		}
 		if !a.limited(w, r, keyBucket(k), keyRate) {
@@ -619,7 +620,7 @@ func serve(a *App, addr string) error {
 		log.Print("no users yet: create one with `prospector user add <email> <name>`")
 	}
 	if a.base == "" && len(a.social) > 0 {
-		return errors.New("signing in with Google, Microsoft or LinkedIn needs PROSPECTOR_URL: it is where the provider sends people back")
+		return say.New("signing in with Google, Microsoft or LinkedIn needs PROSPECTOR_URL: it is where the provider sends people back")
 	}
 	if a.base == "" && !strings.HasPrefix(addr, "127.0.0.1:") && !strings.HasPrefix(addr, "localhost:") {
 		log.Print("PROSPECTOR_URL isn't set: the session cookie is marked Secure only when a proxy sends X-Forwarded-Proto: https")

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const (
@@ -71,7 +73,7 @@ const (
 	enquiryRepeat    = 10 * time.Minute
 )
 
-var errEnquiryEmail = errors.New("an email address is needed, so we can answer")
+var errEnquiryEmail = say.New("an email address is needed, so we can answer")
 
 type EnquiryFilter struct {
 	Kind string
@@ -164,7 +166,7 @@ func (a *App) intake(w http.ResponseWriter, r *http.Request) {
 	}
 	var in EnquiryIn
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, enquiryBodyLimit)).Decode(&in); err != nil {
-		fail(w, errors.New("the enquiry couldn't be read"), http.StatusBadRequest)
+		fail(w, say.New("the enquiry couldn't be read"), http.StatusBadRequest)
 		return
 	}
 	in.Site = r.Header.Get("Origin")

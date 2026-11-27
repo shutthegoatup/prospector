@@ -2,10 +2,9 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func offeringOut(o Offering) api.Offering {
@@ -37,7 +36,7 @@ func (s apiServer) ListOfferings(ctx context.Context, in api.ListOfferingsReques
 
 func (s apiServer) AddOffering(ctx context.Context, in api.AddOfferingRequestObject) (api.AddOfferingResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send the offering: {\"name\": …}")
+		return nil, say.New("send the offering: {\"name\": …}")
 	}
 	q, b := reqFrom(ctx), in.Body
 	o, err := s.a.s.AddOffering(q.Org.ID, Offering{Name: b.Name, LookFor: b.LookFor, Pitch: b.Pitch, NoteTemplate: b.NoteTemplate, HasRoles: b.HasRoles}, q.Actor())
@@ -49,7 +48,7 @@ func (s apiServer) AddOffering(ctx context.Context, in api.AddOfferingRequestObj
 
 func (s apiServer) ChangeOffering(ctx context.Context, in api.ChangeOfferingRequestObject) (api.ChangeOfferingResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send what changes, such as {\"name\": …}")
+		return nil, say.New("send what changes, such as {\"name\": …}")
 	}
 	q, c := reqFrom(ctx), in.Body
 	o, err := s.a.s.ChangeOffering(q.Org.ID, in.Id, func(o *Offering) {
@@ -79,7 +78,7 @@ func (s apiServer) ListVerdicts(ctx context.Context, in api.ListVerdictsRequestO
 	switch stage := string(in.Params.Stage); stage {
 	case "", CompanyReview, CompanyQualified, CompanyRejected:
 	default:
-		return nil, fmt.Errorf("stage is review, qualified or rejected, not %q", stage)
+		return nil, say.Errorf("stage is review, qualified or rejected, not %q", stage)
 	}
 	rows, err := s.a.s.Judged(reqFrom(ctx).Org.ID, in.Id, string(in.Params.Stage))
 	if err != nil {
@@ -138,7 +137,7 @@ func (s apiServer) ListCompanyRoles(ctx context.Context, in api.ListCompanyRoles
 
 func (s apiServer) AddRole(ctx context.Context, in api.AddRoleRequestObject) (api.AddRoleResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send the role: {\"offering\": …, \"title\": …}")
+		return nil, say.New("send the role: {\"offering\": …, \"title\": …}")
 	}
 	q, b := reqFrom(ctx), in.Body
 	r, err := s.a.s.AddRole(q.Org.ID, b.Offering, in.Id, RoleIn{Title: b.Title, SourceURL: b.SourceUrl, Details: b.Details}, q.Actor())
@@ -150,7 +149,7 @@ func (s apiServer) AddRole(ctx context.Context, in api.AddRoleRequestObject) (ap
 
 func (s apiServer) JudgeRole(ctx context.Context, in api.JudgeRoleRequestObject) (api.JudgeRoleResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send the stage: {\"stage\": \"pursued\"}")
+		return nil, say.New("send the stage: {\"stage\": \"pursued\"}")
 	}
 	q := reqFrom(ctx)
 	r, err := s.a.s.JudgeRole(q.Org.ID, in.Id, string(in.Body.Stage), in.Body.Reason, q.Actor())

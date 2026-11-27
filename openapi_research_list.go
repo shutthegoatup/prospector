@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func (s apiServer) ListResearch(ctx context.Context, in api.ListResearchRequestObject) (api.ListResearchResponseObject, error) {
@@ -26,7 +26,7 @@ func (s apiServer) ListResearch(ctx context.Context, in api.ListResearchRequestO
 			return nil, missing(err, "there's no task %d here", in.Params.Task)
 		}
 		if offering != 0 && offering != t.OfferingID {
-			return nil, fmt.Errorf("task %d finds companies for another offering", t.ID)
+			return nil, say.Errorf("task %d finds companies for another offering", t.ID)
 		}
 		offering = t.OfferingID
 		// A closed task can outlive its offering, whose finds are then the organisation's own.

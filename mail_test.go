@@ -16,6 +16,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const testSite = "https://prospector.example"
@@ -142,6 +143,25 @@ func TestMailIsOffUntilConfigured(t *testing.T) {
 		}
 		box.take(t, 0)
 	}
+}
+
+// The one who asks for a link is most likely the one who reads it.
+func TestAResetIsMailedInTheLanguageItWasAskedIn(t *testing.T) {
+	t.Parallel()
+	_, srv, _, box := mailSite(t, nil)
+	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/password-resets", strings.NewReader(`{"email": "ada@example.com"}`))
+	req.Header.Set("content-type", "application/json")
+	req.AddCookie(&http.Cookie{Name: langCookie, Value: "en-XA"})
+	res, err := http.DefaultClient.Do(req)
+	if err != nil || res.StatusCode != http.StatusAccepted {
+		t.Fatalf("asking for a link: %v %v", res, err)
+	}
+	res.Body.Close()
+	mail := box.take(t, 1)[0]
+	if want := say.New("Reset your Prospector password").In("en-XA"); mail.Subject != want || !strings.HasPrefix(mail.Body, "[Šöɱéöñé") {
+		t.Errorf("not in the language asked in: %q %q", mail.Subject, mail.Body)
+	}
+	linkIn(t, mail)
 }
 
 func TestPasswordReset(t *testing.T) {

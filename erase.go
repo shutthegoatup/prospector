@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -11,9 +10,11 @@ import (
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
-var errErased = errors.New("this person was erased on request and can't be added again")
+var errErased = say.New("this person was erased on request and can't be added again")
 
 var emailRe = regexp.MustCompile(`[^\s,;:<>()"']+@[^\s,;:<>()"']+`)
 
@@ -65,7 +66,7 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 			return missing(err, "no contact %d", id)
 		}
 		if strings.HasPrefix(c.Key, "org:") {
-			return errors.New("that row stands for a company, not a person")
+			return say.New("that row stands for a company, not a person")
 		}
 		// Agents' notes are free text that can't be searched for a name, so every note on a
 		// task their row was part of goes, as below does every note about their company.

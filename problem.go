@@ -6,6 +6,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // wantsPage is a person's browser opening a page or submitting a form, as opposed to
@@ -23,7 +25,7 @@ func forAPI(r *http.Request) bool {
 // browser is shown as a page.
 func refuseAs(w http.ResponseWriter, r *http.Request, status int, text string) {
 	if forAPI(r) {
-		writeProblem(w, status, text)
+		writeProblem(w, r, status, say.New(text))
 		return
 	}
 	http.Error(w, text, status)

@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func agreementOut(a Agreement) api.Agreement {
@@ -38,7 +38,7 @@ func (s apiServer) ListAgreements(ctx context.Context, in api.ListAgreementsRequ
 
 func (s apiServer) CreateAgreement(ctx context.Context, in api.CreateAgreementRequestObject) (api.CreateAgreementResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send the agreement: {\"company\": id, \"name\": …}")
+		return nil, say.New("send the agreement: {\"company\": id, \"name\": …}")
 	}
 	q := reqFrom(ctx)
 	a, err := s.a.s.AddAgreement(q.Org.ID, in.Body.Company, in.Body.Name, q.Actor())
@@ -73,7 +73,7 @@ func (s apiServer) GetAgreement(ctx context.Context, in api.GetAgreementRequestO
 
 func (s apiServer) ChangeAgreement(ctx context.Context, in api.ChangeAgreementRequestObject) (api.ChangeAgreementResponseObject, error) {
 	if in.Body == nil || (in.Body.Name == nil && in.Body.InOrder == nil) {
-		return nil, errors.New("send what changes: {\"name\": …} or {\"in_order\": true}")
+		return nil, say.New("send what changes: {\"name\": …} or {\"in_order\": true}")
 	}
 	q := reqFrom(ctx)
 	a, err := s.a.s.ChangeAgreement(q.Org.ID, in.Id, in.Body.Name, in.Body.InOrder, q.Actor())
@@ -121,7 +121,7 @@ func (s apiServer) ListAgreementRecipients(ctx context.Context, in api.ListAgree
 
 func (s apiServer) AddAgreementRecipient(ctx context.Context, in api.AddAgreementRecipientRequestObject) (api.AddAgreementRecipientResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send who: {\"role\": \"signer\", \"contact\": id} or {\"role\": \"copy\", \"member\": id}")
+		return nil, say.New("send who: {\"role\": \"signer\", \"contact\": id} or {\"role\": \"copy\", \"member\": id}")
 	}
 	q := reqFrom(ctx)
 	r, err := s.a.s.AddRecipient(q.Org, in.Id, string(in.Body.Role), in.Body.Contact, in.Body.Member, q.Actor())
@@ -134,7 +134,7 @@ func (s apiServer) AddAgreementRecipient(ctx context.Context, in api.AddAgreemen
 
 func (s apiServer) ChangeAgreementRecipient(ctx context.Context, in api.ChangeAgreementRecipientRequestObject) (api.ChangeAgreementRecipientResponseObject, error) {
 	if in.Body == nil || (in.Body.Role == nil && in.Body.Position == nil) {
-		return nil, errors.New("send what changes: {\"position\": 1} or {\"role\": \"copy\"}")
+		return nil, say.New("send what changes: {\"position\": 1} or {\"role\": \"copy\"}")
 	}
 	q := reqFrom(ctx)
 	var role *string
@@ -181,7 +181,7 @@ func (s apiServer) ListAgreementFields(ctx context.Context, in api.ListAgreement
 
 func (s apiServer) PutAgreementFields(ctx context.Context, in api.PutAgreementFieldsRequestObject) (api.PutAgreementFieldsResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send every field: {\"items\": [...]}")
+		return nil, say.New("send every field: {\"items\": [...]}")
 	}
 	fields := make([]AgreementField, 0, len(in.Body.Items))
 	for _, f := range in.Body.Items {
@@ -207,7 +207,7 @@ func (s apiServer) RemoveAgreement(ctx context.Context, in api.RemoveAgreementRe
 
 func (s apiServer) PutAgreementDocument(ctx context.Context, in api.PutAgreementDocumentRequestObject) (api.PutAgreementDocumentResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send the PDF as the body")
+		return nil, say.New("send the PDF as the body")
 	}
 	// One byte past the limit is enough to know it is too big, without reading the rest.
 	data, err := io.ReadAll(io.LimitReader(in.Body, agreementFileLimit+1))
@@ -242,11 +242,11 @@ func uploads(f api.StrictHandlerFunc, op string) api.StrictHandlerFunc {
 	}
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error) {
 		if kind, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); kind != "application/pdf" {
-			writeProblem(w, http.StatusUnsupportedMediaType, "send the document as application/pdf")
+			writeProblem(w, r, http.StatusUnsupportedMediaType, say.New("send the document as application/pdf"))
 			return nil, nil
 		}
 		if r.ContentLength > agreementFileLimit {
-			writeProblem(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("a document is %d MB at most", agreementFileLimit>>20))
+			writeProblem(w, r, http.StatusRequestEntityTooLarge, say.Errorf("a document is %d MB at most", agreementFileLimit>>20))
 			return nil, nil
 		}
 		out, err := f(ctx, w, r, in)

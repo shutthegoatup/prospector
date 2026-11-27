@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,6 +8,8 @@ import (
 	"strings"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const (
@@ -16,7 +17,7 @@ const (
 	SuppressAdded        = "added"
 )
 
-var errNotAnAddress = errors.New("that isn't one email address")
+var errNotAnAddress = say.New("that isn't one email address")
 
 func bareAddress(address string) (string, error) {
 	at, err := mail.ParseAddress(strings.TrimSpace(address))
@@ -31,8 +32,8 @@ func bareAddress(address string) (string, error) {
 var suppressRank = map[string]int{SuppressBounced: 0, SuppressAdded: 1, SuppressUnsubscribed: 2, SuppressComplained: 3}
 
 var (
-	errSuppressed   = errors.New("that address is on the list not to be mailed")
-	errNeverContact = errors.New("on the never-contact list")
+	errSuppressed   = say.New("that address is on the list not to be mailed")
+	errNeverContact = say.New("on the never-contact list")
 )
 
 // mailGate holds what keeps marketing mail from an organisation's addresses, read once,

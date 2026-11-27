@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -20,6 +19,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const (
@@ -95,7 +96,7 @@ func publicClient(allowPrivate bool) *http.Client {
 		dialer.Control = func(_, address string, _ syscall.RawConn) error {
 			ap, err := netip.ParseAddrPort(address)
 			if err != nil || !publicAddr(ap.Addr()) {
-				return fmt.Errorf("%s isn't a public address", address)
+				return say.Errorf("%s isn't a public address", address)
 			}
 			return nil
 		}
@@ -121,10 +122,10 @@ func endpointURL(raw string) (string, error) {
 	}
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-		return "", fmt.Errorf("%q isn't an address like https://llm.example.com/v1", raw)
+		return "", say.Errorf("%q isn't an address like https://llm.example.com/v1", raw)
 	}
 	if u.Scheme != "https" && !(u.Scheme == "http" && os.Getenv("PROSPECTOR_AGENT_ALLOW_PRIVATE") == "1") { //nolint:staticcheck // plain http only when allowed
-		return "", errors.New("the address must start with https://")
+		return "", say.New("the address must start with https://")
 	}
 	return raw, nil
 }
@@ -163,7 +164,7 @@ func (a *App) listModels(ctx context.Context, base, key string) ([]string, error
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(io.LimitReader(res.Body, maxListBytes)).Decode(&list); err != nil {
-		return nil, fmt.Errorf("%s/models didn't answer with a model list", base)
+		return nil, say.Errorf("%s/models didn't answer with a model list", base)
 	}
 	var out []string
 	for _, m := range list.Data {
@@ -234,10 +235,10 @@ const maxAgentName = 40
 func agentName(raw string) (string, error) {
 	name := strings.Join(strings.Fields(raw), " ")
 	if name == "" {
-		return "", errors.New("give the agent a name, such as the model it uses")
+		return "", say.New("give the agent a name, such as the model it uses")
 	}
 	if len([]rune(name)) > maxAgentName {
-		return "", fmt.Errorf("an agent's name is %d characters at most", maxAgentName)
+		return "", say.Errorf("an agent's name is %d characters at most", maxAgentName)
 	}
 	return name, nil
 }
@@ -261,7 +262,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 		kind = c.Kind
 	}
 	if !slices.ContainsFunc(AgentKinds, func(k struct{ Key, Label string }) bool { return k.Key == kind }) {
-		return nil, fmt.Errorf("an agent is OpenAI-compatible or Anthropic, not %q", kind)
+		return nil, say.Errorf("an agent is OpenAI-compatible or Anthropic, not %q", kind)
 	}
 	base, err := endpointURL(in.BaseURL)
 	if err != nil {
@@ -269,7 +270,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	}
 	// Anthropic's own address is the SDK's; another is for a proxy in front of it.
 	if base == "" && kind == kindOpenAI {
-		return nil, errors.New("enter the endpoint's address")
+		return nil, say.New("enter the endpoint's address")
 	}
 	tools, err := endpointURL(in.ToolsURL)
 	if err != nil {
@@ -282,7 +283,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	if taken, err := a.s.AgentNameTaken(org, name, c.ID); err != nil {
 		return nil, err
 	} else if taken {
-		return nil, conflict(fmt.Sprintf("there is already an agent called %q", name))
+		return nil, conflict{say.Errorf("there is already an agent called %q", name)}
 	}
 	renamed := c.ID != 0 && c.Name != name
 	c.Name = name
@@ -294,13 +295,13 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 		}
 	}
 	if key == "" {
-		return nil, errors.New("enter the endpoint's API key")
+		return nil, say.New("enter the endpoint's API key")
 	}
 	if len(key) > 4096 || strings.ContainsAny(key, " \r\n\t") {
-		return nil, errors.New("that doesn't look like an API key")
+		return nil, say.New("that doesn't look like an API key")
 	}
 	if a.s.Keyring == nil {
-		return nil, errors.New("this server has no secret key, so it can't keep an API key safely: ask whoever runs it to set PROSPECTOR_SECRET_KEYS")
+		return nil, say.New("this server has no secret key, so it can't keep an API key safely: ask whoever runs it to set PROSPECTOR_SECRET_KEYS")
 	}
 	sealedKey, err := a.s.Keyring.Seal(key)
 	if err != nil {
@@ -316,15 +317,15 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	if fallback != 0 {
 		next, err := a.s.AgentByID(org, fallback)
 		if err != nil {
-			return nil, errors.New("the fallback agent isn't one of this organisation's")
+			return nil, say.New("the fallback agent isn't one of this organisation's")
 		}
 		if next.ID == c.ID && c.ID != 0 {
-			return nil, errors.New("an agent can't be its own fallback")
+			return nil, say.New("an agent can't be its own fallback")
 		}
 		// Agents falling back to each other would hand a task round without ever waiting.
 		for id, seen := next.FallbackID, 0; id != 0 && c.ID != 0 && seen < 100; seen++ {
 			if id == c.ID {
-				return nil, fmt.Errorf("%s's fallbacks lead back to %s, which would hand a task round without waiting", next.Name, c.Name)
+				return nil, say.Errorf("%s's fallbacks lead back to %s, which would hand a task round without waiting", next.Name, c.Name)
 			}
 			later, err := a.s.AgentByID(org, id)
 			if err != nil {
@@ -337,14 +338,14 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	case in.FallbackMinutes == 0:
 		in.FallbackMinutes = 15
 	case in.FallbackMinutes < 1 || in.FallbackMinutes > 7*24*60:
-		return nil, errors.New("wait between a minute and a week before falling back")
+		return nil, say.New("wait between a minute and a week before falling back")
 	}
 	c.FallbackID, c.FallbackMinutes = fallback, in.FallbackMinutes
 	c.ThinkingOff = in.ThinkingOff && kind == kindOpenAI
 	c.Kind, c.BaseURL, c.APIKey, c.ToolsURL, c.SearchURL, c.UpdatedBy = kind, base, sealedKey, tools, search, by
 	c.Model = strings.TrimSpace(in.Model)
 	if len(c.Model) > 200 {
-		return nil, errors.New("that model name is too long")
+		return nil, say.New("that model name is too long")
 	}
 
 	var problems []string

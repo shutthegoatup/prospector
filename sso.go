@@ -15,6 +15,8 @@ import (
 
 	"golang.org/x/oauth2"
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const (
@@ -24,10 +26,10 @@ const (
 var googleIssuer = "https://accounts.google.com"
 
 var (
-	errNoAccount = errors.New("there's no account here for that address: ask whoever runs your organisation to add you")
-	errUnvouched = errors.New("the provider didn't confirm that address is yours, so it can't be matched to an account here")
-	errElsewhere = errors.New("that sign-in is linked to an account whose address isn't at this organisation's domains")
-	errNotMember = errors.New("you aren't a member of that organisation: ask one of its owners to add you")
+	errNoAccount = say.New("there's no account here for that address: ask whoever runs your organisation to add you")
+	errUnvouched = say.New("the provider didn't confirm that address is yours, so it can't be matched to an account here")
+	errElsewhere = say.New("that sign-in is linked to an account whose address isn't at this organisation's domains")
+	errNotMember = say.New("you aren't a member of that organisation: ask one of its owners to add you")
 )
 
 func unusableHash() string { return "!" + randomToken(32) }
@@ -102,7 +104,7 @@ func socialFromEnv(getenv func(string) string) ([]socialWay, error) {
 		name := "PROSPECTOR_" + strings.ToUpper(way.Key) + "_CLIENT_"
 		way.ClientID, way.Secret = getenv(name+"ID"), getenv(name+"SECRET")
 		if (way.ClientID == "") != (way.Secret == "") {
-			return nil, fmt.Errorf("%sID and %sSECRET go together: one is set without the other", name, name)
+			return nil, say.Errorf("%sID and %sSECRET go together: one is set without the other", name, name)
 		}
 		if way.ClientID != "" {
 			out = append(out, way)
@@ -255,8 +257,8 @@ func (a *App) loginCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 var (
-	errWrongDomain = errors.New("that address isn't at a domain this organisation has shown is its own")
-	errDisowned    = errors.New("the organisation's provider says that address hasn't been verified")
+	errWrongDomain = say.New("that address isn't at a domain this organisation has shown is its own")
+	errDisowned    = say.New("the organisation's provider says that address hasn't been verified")
 )
 
 func (a *App) finishSSO(w http.ResponseWriter, r *http.Request, att attempt, refuse func(error)) {
@@ -267,7 +269,7 @@ func (a *App) finishSSO(w http.ResponseWriter, r *http.Request, att attempt, ref
 	}
 	sso, err := a.s.SSO(org.ID)
 	if err != nil || !sso.On() {
-		refuse(errors.Join(err, errors.New("the organisation's single sign-on is off")))
+		refuse(errors.Join(err, say.New("the organisation's single sign-on is off")))
 		return
 	}
 	spec, err := a.s.Keyring.IdpSpec(sso)
@@ -333,7 +335,7 @@ func (a *App) finishSSO(w http.ResponseWriter, r *http.Request, att attempt, ref
 
 func sentence(err error) string {
 	_, text := telling("single sign-on", err, http.StatusBadRequest)
-	_, message := problemText(http.StatusBadRequest, text)
+	_, message := problemText(http.StatusBadRequest, text.Error())
 	return message
 }
 
@@ -356,11 +358,11 @@ var domainRe = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]
 func checkIssuer(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
-		return fmt.Errorf("an issuer looks like https://login.example.com, not %q", raw)
+		return say.Errorf("an issuer looks like https://login.example.com, not %q", raw)
 	}
 	if first, _, _ := strings.Cut(strings.TrimPrefix(u.Path, "/"), "/"); strings.EqualFold(u.Hostname(), "login.microsoftonline.com") &&
 		(first == "common" || first == "organizations" || first == "consumers") {
-		return errors.New("that is Microsoft's sign-in for every tenant, so it pins nobody to yours: use https://login.microsoftonline.com/<your tenant id>/v2.0")
+		return say.New("that is Microsoft's sign-in for every tenant, so it pins nobody to yours: use https://login.microsoftonline.com/<your tenant id>/v2.0")
 	}
 	return nil
 }
@@ -400,7 +402,7 @@ func (a *App) saveSSO(ctx context.Context, q *Req, in ssoIn) error {
 		c.ClientSecret = sso.ClientSecret
 		// But nobody is made to depend on a sign-in that can't work.
 		if _, oerr := a.s.Keyring.Open(c.ClientSecret); oerr != nil && ((c.Required && !sso.Required) || (c.AutoJoin && !sso.AutoJoin)) {
-			return errors.New("this server can't open the kept client secret, so single sign-on isn't working here: type the secret again before requiring it or letting people join")
+			return say.New("this server can't open the kept client secret, so single sign-on isn't working here: type the secret again before requiring it or letting people join")
 		}
 	}
 	verified := false
@@ -409,11 +411,11 @@ func (a *App) saveSSO(ctx context.Context, q *Req, in ssoIn) error {
 	}
 	switch {
 	case a.base == "":
-		err = errors.New("single sign-on needs PROSPECTOR_URL set to this app's address, so the provider knows where to send people back")
+		err = say.New("single sign-on needs PROSPECTOR_URL set to this app's address, so the provider knows where to send people back")
 	case c.ClientID == "" || c.ClientSecret == "":
-		err = errors.New("the provider's client ID and client secret are both needed, and the secret again when the issuer or client ID changes")
+		err = say.New("the provider's client ID and client secret are both needed, and the secret again when the issuer or client ID changes")
 	case (c.Required || c.AutoJoin) && !verified:
-		err = errors.New("verify a domain first: requiring single sign-on, or letting people join, applies to addresses at your verified domains")
+		err = say.New("verify a domain first: requiring single sign-on, or letting people join, applies to addresses at your verified domains")
 	default:
 		err = checkIssuer(c.Issuer)
 	}
@@ -435,7 +437,7 @@ func (a *App) saveSSO(ctx context.Context, q *Req, in ssoIn) error {
 func (a *App) addSSODomain(org int64, raw string) (*SSODomain, error) {
 	domain := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(raw)), "@")
 	if !domainRe.MatchString(domain) {
-		return nil, fmt.Errorf("a domain looks like example.com, not %q", raw)
+		return nil, say.Errorf("a domain looks like example.com, not %q", raw)
 	}
 	return a.s.AddSSODomain(org, domain)
 }
@@ -452,7 +454,7 @@ func (a *App) removeSSODomain(org int64, domain string) error {
 		}
 	}
 	if others == 0 && (sso.Required || sso.AutoJoin) {
-		return errors.New("that is the last verified domain: stop requiring single sign-on and letting people join first")
+		return say.New("that is the last verified domain: stop requiring single sign-on and letting people join first")
 	}
 	return a.s.RemoveSSODomain(org, domain)
 }
@@ -482,19 +484,19 @@ func (a *App) verifySSODomain(ctx context.Context, org int64, domain string) (*S
 			return d, nil
 		}
 	}
-	return nil, fmt.Errorf("no TXT record at %s holds the value yet: DNS changes can take a while to show", d.Record())
+	return nil, say.Errorf("no TXT record at %s holds the value yet: DNS changes can take a while to show", d.Record())
 }
 
 // agentCommand sets up an organisation's agents from the shell. A key comes from the
 // environment, so it never sits in shell history or a process listing.
 func agentCommand(s *Store, rest []string) error {
-	usage := fmt.Errorf("usage: prospector agent set <org> <name> <endpoint> <model> [<tools-url> [<tool>…]], or prospector agent show <org>")
+	usage := say.Errorf("usage: prospector agent set <org> <name> <endpoint> <model> [<tools-url> [<tool>…]], or prospector agent show <org>")
 	if len(rest) < 2 {
 		return usage
 	}
 	o, err := s.OrgBySlug(rest[1])
 	if err != nil {
-		return fmt.Errorf("no organisation %q", rest[1])
+		return say.Errorf("no organisation %q", rest[1])
 	}
 	switch rest[0] {
 	case "set":
@@ -523,7 +525,7 @@ func agentCommand(s *Store, rest []string) error {
 		case thinking == "off" || thinking == "on":
 			in.ThinkingOff = thinking == "off"
 		default:
-			return fmt.Errorf("PROSPECTOR_AGENT_THINKING is off or on, not %q", thinking)
+			return say.Errorf("PROSPECTOR_AGENT_THINKING is off or on, not %q", thinking)
 		}
 		c, err := (&App{s: s}).saveAgent(context.Background(), o.ID, in, "cli")
 		if err != nil {
@@ -556,11 +558,11 @@ func agentCommand(s *Store, rest []string) error {
 // ssoCommand is the way back in when a required provider has broken and no owner can sign in.
 func ssoCommand(s *Store, rest []string) error {
 	if arg(rest, 0, "") != "off" || len(rest) < 2 {
-		return fmt.Errorf("usage: prospector sso off <org>")
+		return say.Errorf("usage: prospector sso off <org>")
 	}
 	o, err := s.OrgBySlug(rest[1])
 	if err != nil {
-		return fmt.Errorf("no organisation %q", rest[1])
+		return say.Errorf("no organisation %q", rest[1])
 	}
 	sso, err := s.SSO(o.ID)
 	if err != nil {

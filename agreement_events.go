@@ -4,12 +4,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const (
@@ -30,7 +31,7 @@ const (
 	EventCopySent     = "copy_sent"
 )
 
-var errBrokenChain = errors.New("the agreement's record has been changed since it was written")
+var errBrokenChain = say.New("the agreement's record has been changed since it was written")
 
 // eventHash is the SHA-256 of everything an event says, the hash before it included.
 func eventHash(e AgreementEvent) string {

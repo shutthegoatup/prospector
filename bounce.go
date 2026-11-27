@@ -2,10 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"log"
 	"net/http"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const (
@@ -17,8 +18,8 @@ const (
 const bounceBy = "Postmark"
 
 var (
-	errBounced    = errors.New("mail to that address bounced: it doesn't exist or won't take mail")
-	errComplained = errors.New("they marked a mail as spam")
+	errBounced    = say.New("mail to that address bounced: it doesn't exist or won't take mail")
+	errComplained = say.New("they marked a mail as spam")
 )
 
 // postmarkBounce is the part of Postmark's bounce and spam complaint webhooks that is used.

@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 var runGoing = []string{RunWorking, RunWaiting}
@@ -130,7 +132,7 @@ func (s *agentStore) AgentKey(org int64, c *Agent) (*APIKey, error) {
 		}
 		res := tx.Model(&Agent{}).Where("org_id = ? and id = ?", org, c.ID).Update("key_id", k.ID)
 		if res.Error == nil && res.RowsAffected == 0 {
-			return fmt.Errorf("no agent %d in this organisation", c.ID)
+			return say.Errorf("no agent %d in this organisation", c.ID)
 		}
 		return res.Error
 	})

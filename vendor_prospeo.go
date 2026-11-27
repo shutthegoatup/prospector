@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // prospeo is Prospeo's Enrich Person: a name and a company's domain, or a LinkedIn
@@ -38,7 +39,7 @@ func (prospeo) Find(ctx context.Context, c *http.Client, base, key string, p enr
 		}
 	}
 	if data["linkedin_url"] == "" && data["company_website"] == "" && data["company_name"] == "" {
-		return vendorFind{}, errors.New("it needs the person's name and company, or their LinkedIn profile")
+		return vendorFind{}, say.New("it needs the person's name and company, or their LinkedIn profile")
 	}
 	ask := map[string]any{"data": data}
 	if field == "phone" {
@@ -75,7 +76,7 @@ func (prospeo) Find(ctx context.Context, c *http.Client, base, key string, p enr
 		} `json:"person"`
 	}
 	if err := json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&body); err != nil {
-		return vendorFind{}, fmt.Errorf("an answer that isn't JSON (%s)", res.Status)
+		return vendorFind{}, say.Errorf("an answer that isn't JSON (%s)", res.Status)
 	}
 	if body.Error || res.StatusCode != http.StatusOK {
 		if body.ErrorCode == "NO_MATCH" {

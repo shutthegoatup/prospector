@@ -9,6 +9,8 @@ import (
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 var (
@@ -25,7 +27,7 @@ func companyName(maker string) string {
 func ensureCompany(tx *gorm.DB, org int64, c Company) (*Company, bool, error) {
 	c.Name = strings.TrimSpace(c.Name)
 	if c.Name == "" {
-		return nil, false, errors.New("company name is required")
+		return nil, false, say.New("company name is required")
 	}
 	if err := holdOrg(tx, org); err != nil {
 		return nil, false, err

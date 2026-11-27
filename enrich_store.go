@@ -1,13 +1,14 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func (s *prospectingStore) Enrichers(org int64) ([]Enricher, error) {
@@ -20,10 +21,10 @@ func (s *prospectingStore) Enrichers(org int64) ([]Enricher, error) {
 func (s *prospectingStore) SaveEnricher(org int64, in EnricherIn, by string) (*Enricher, error) {
 	kind := strings.ToLower(strings.TrimSpace(in.Kind))
 	if vendors[kind] == nil {
-		return nil, fmt.Errorf("unknown vendor %q: one of %s", in.Kind, strings.Join(vendorKinds(), ", "))
+		return nil, say.Errorf("unknown vendor %q: one of %s", in.Kind, strings.Join(vendorKinds(), ", "))
 	}
 	if in.MonthlyLimit < 0 || in.MonthlyLimit > maxMonthlyLimit {
-		return nil, fmt.Errorf("monthly_limit is from 0 to %d", maxMonthlyLimit)
+		return nil, say.Errorf("monthly_limit is from 0 to %d", maxMonthlyLimit)
 	}
 	var e Enricher
 	if err := s.DB.Where("org_id = ? and kind = ?", org, kind).Limit(1).Find(&e).Error; err != nil {
@@ -31,7 +32,7 @@ func (s *prospectingStore) SaveEnricher(org int64, in EnricherIn, by string) (*E
 	}
 	key := strings.TrimSpace(in.APIKey)
 	if key == "" && e.APIKey == "" {
-		return nil, errors.New("api_key is needed: the vendor's key for your account")
+		return nil, say.New("api_key is needed: the vendor's key for your account")
 	}
 	if key != "" {
 		sealedKey, err := s.Keyring.Seal(key)

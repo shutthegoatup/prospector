@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // enrichPerson is what a vendor is told about someone: no more than it needs to find them.
@@ -78,7 +80,7 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 		}
 	}
 	if len(in.Fields) == 0 {
-		return nil, errors.New("fields is needed: which of email, phone and linkedin to look for")
+		return nil, say.New("fields is needed: which of email, phone and linkedin to look for")
 	}
 	found, err := s.ContactByID(o.ID, in.ContactID)
 	if err != nil {
@@ -86,7 +88,7 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 	}
 	c := *found
 	if strings.HasPrefix(c.Key, "org:") {
-		return nil, errors.New("that is a company's own row, not a person")
+		return nil, say.New("that is a company's own row, not a person")
 	}
 	co := &Company{}
 	if c.CompanyID != nil {
@@ -96,7 +98,7 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 	}
 	domain := strings.ToLower(strings.TrimSpace(co.Domain))
 	if why := o.Settings.Unlookable(c, domain); why != "" {
-		return nil, conflict(why)
+		return nil, conflict{say.New(why)}
 	}
 	person := enrichPerson{Name: displayName(c), Domain: domain, Company: co.Name, Linkedin: deref(c.Linkedin)}
 	enrichers, err := s.Enrichers(o.ID)
@@ -107,7 +109,7 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 	for _, field := range in.Fields {
 		field = strings.ToLower(strings.TrimSpace(field))
 		if !slices.Contains(suggestable, field) {
-			return nil, fmt.Errorf("unknown field %q: email, phone or linkedin", field)
+			return nil, say.Errorf("unknown field %q: email, phone or linkedin", field)
 		}
 		if detailOf(c, field) != "" {
 			out = append(out, EnrichAsked{Field: field, Outcome: "has"})

@@ -1,13 +1,14 @@
 package main
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const DealNew = "new"
@@ -28,12 +29,12 @@ func parseMoney(text string) (int64, error) {
 	s := strings.NewReplacer(",", "", " ", "", "£", "", "$", "", "€", "").Replace(text)
 	s = leadingCode.ReplaceAllString(s, "")
 	if !moneyRe.MatchString(s) || s == "." {
-		return 0, fmt.Errorf("%q isn't an amount", text)
+		return 0, say.Errorf("%q isn't an amount", text)
 	}
 	whole, frac, _ := strings.Cut(s, ".")
 	n, err := strconv.ParseInt("0"+whole+(frac + "00")[:2], 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("%q isn't an amount", text)
+		return 0, say.Errorf("%q isn't an amount", text)
 	}
 	return n, nil
 }
@@ -67,13 +68,13 @@ func dealChange(tx *gorm.DB, org int64, d Deal, currency, field, value string) (
 		}
 		if value != "" {
 			if _, err := time.Parse("2006-01-02", value); err != nil {
-				return nil, "", fmt.Errorf("%q isn't a date", value)
+				return nil, "", say.Errorf("%q isn't a date", value)
 			}
 		}
 		return map[string]any{field: nonEmpty(value)}, value, nil
 	case "kind":
 		if !kindOfDeal(value) {
-			return nil, "", fmt.Errorf("unknown kind of deal %q", value)
+			return nil, "", say.Errorf("unknown kind of deal %q", value)
 		}
 		return map[string]any{"kind": value}, value, nil
 	case "owner":
@@ -84,7 +85,7 @@ func dealChange(tx *gorm.DB, org int64, d Deal, currency, field, value string) (
 				return nil, "", err
 			}
 			if n == 0 {
-				return nil, "", fmt.Errorf("%q isn't a member of this organisation", value)
+				return nil, "", say.Errorf("%q isn't a member of this organisation", value)
 			}
 		}
 		return map[string]any{"owner": value}, value, nil
@@ -93,14 +94,14 @@ func dealChange(tx *gorm.DB, org int64, d Deal, currency, field, value string) (
 		switch field {
 		case "stage":
 			if !validStage(value) {
-				return nil, "", fmt.Errorf("unknown stage %q", value)
+				return nil, "", say.Errorf("unknown stage %q", value)
 			}
 			return map[string]any{"stage": value}, value, nil
 		case "next_step", "lost_reason":
 			return map[string]any{field: value}, "", nil
 		}
 	}
-	return nil, "", fmt.Errorf("a deal has no %q", field)
+	return nil, "", say.Errorf("a deal has no %q", field)
 }
 
 // OtherDeal is a deal after the conversation's own, with the person it is with.

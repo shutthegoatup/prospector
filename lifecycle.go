@@ -1,8 +1,9 @@
 package main
 
 import (
-	"errors"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const openContacts = "hold is null and replied is null and declined is null and status <> 'suggested' and key not like 'org:%'"
@@ -22,10 +23,10 @@ const inConversation = "replied is not null and declined is null and status <> '
 // midnight would call today "the future" for the first hours of it east of UTC.
 func markDate(date string, now time.Time) error {
 	if _, err := time.Parse("2006-01-02", date); err != nil {
-		return errors.New("date is YYYY-MM-DD")
+		return say.New("date is YYYY-MM-DD")
 	}
 	if date > now.Format("2006-01-02") {
-		return errors.New("date is in the future")
+		return say.New("date is in the future")
 	}
 	return nil
 }

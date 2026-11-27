@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func stepOut(st OnboardingStep) api.OnboardingStep {
@@ -61,7 +61,7 @@ func (s apiServer) ListOnboardings(ctx context.Context, in api.ListOnboardingsRe
 
 func (s apiServer) StartOnboarding(ctx context.Context, in api.StartOnboardingRequestObject) (api.StartOnboardingResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("say which company: {\"company\": id}")
+		return nil, say.New("say which company: {\"company\": id}")
 	}
 	q := reqFrom(ctx)
 	start := in.Body.Start
@@ -94,7 +94,7 @@ func (s apiServer) RemoveOnboarding(ctx context.Context, in api.RemoveOnboarding
 
 func (s apiServer) ChangeOnboardingStep(ctx context.Context, in api.ChangeOnboardingStepRequestObject) (api.ChangeOnboardingStepResponseObject, error) {
 	if in.Body == nil || (in.Body.Done == nil && in.Body.Due == nil) {
-		return nil, errors.New("send what to change: done, due, or both")
+		return nil, say.New("send what to change: done, due, or both")
 	}
 	q := reqFrom(ctx)
 	if in.Body.Due != nil {
@@ -120,7 +120,7 @@ func (s apiServer) ChangeOnboardingStep(ctx context.Context, in api.ChangeOnboar
 
 func (s apiServer) InviteCustomer(ctx context.Context, in api.InviteCustomerRequestObject) (api.InviteCustomerResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("say who to invite: {\"contact\": id}")
+		return nil, say.New("say who to invite: {\"contact\": id}")
 	}
 	q := reqFrom(ctx)
 	// Checked before anyone is let in: access with no way to send the link is no use.
@@ -135,7 +135,7 @@ func (s apiServer) InviteCustomer(ctx context.Context, in api.InviteCustomerRequ
 		// Nothing was sent, so the wait before another try doesn't apply.
 		s.a.s.DropCustomerLink(token)
 		log.Printf("a customer's link wasn't sent: %v", err)
-		return nil, notSent{errors.New("they were let in, but the mail server didn't take the link; invite them again to send another")}
+		return nil, notSent{say.New("they were let in, but the mail server didn't take the link; invite them again to send another")}
 	}
 	return api.InviteCustomer204Response{}, nil
 }

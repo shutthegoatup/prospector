@@ -13,6 +13,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // A customer's page shows someone outside the organisation the onboarding steps that
@@ -33,7 +34,7 @@ const (
 	customerCookie = "customer"
 )
 
-var errNoCustomer = errors.New("that link doesn't open anything: it may have been withdrawn")
+var errNoCustomer = say.New("that link doesn't open anything: it may have been withdrawn")
 
 // CustomerAccess is a grant with everything it stands on. It exists only while all of
 // them do: the grant not withdrawn, its onboarding and its contact still there.
@@ -52,19 +53,19 @@ type CustomerAccess struct {
 func invitable(o *Org, ob Onboarding, c Contact) error {
 	switch {
 	case strings.HasPrefix(c.Key, "org:"):
-		return errors.New("that row stands for a company, not a person")
+		return say.New("that row stands for a company, not a person")
 	case c.CompanyID == nil || *c.CompanyID != ob.CompanyID:
-		return errors.New("that person is not at the company being onboarded")
+		return say.New("that person is not at the company being onboarded")
 	case c.Status == ContactSuggested:
-		return errors.New("this contact is still a suggestion in Research; a person picks them first")
+		return say.New("this contact is still a suggestion in Research; a person picks them first")
 	}
 	if _, err := mail.ParseAddress(strings.TrimSpace(deref(c.Email))); err != nil {
-		return errors.New("they have no single email address to send the link to")
+		return say.New("they have no single email address to send the link to")
 	}
 	return o.Settings.Listed(deref(c.Email), deref(c.Linkedin))
 }
 
-var errLinkTooSoon = errors.New("a link was sent a moment ago: it can take a minute to arrive")
+var errLinkTooSoon = say.New("a link was sent a moment ago: it can take a minute to arrive")
 
 // dropCustomerGrants ends access for the grants a query matches: the links and the
 // browsers go with them. keep leaves the grant rows, withdrawn, as a record.
@@ -93,7 +94,7 @@ type CustomerInvite struct {
 	Name, Email string
 }
 
-var errNoCustomerMail = errors.New("mail isn't set up, so the link can't be sent: an owner sets a mail server in Settings, and the server needs PROSPECTOR_URL")
+var errNoCustomerMail = say.New("mail isn't set up, so the link can't be sent: an owner sets a mail server in Settings, and the server needs PROSPECTOR_URL")
 
 // customerMailOn is whether a link can be mailed for this organisation: it needs a mail
 // server, its own or the app's, and PROSPECTOR_URL, because a link is never built from
@@ -111,12 +112,13 @@ func (a *App) customerLinkMail(ctx context.Context, org *Org, to, token string) 
 	if via == nil || a.base == "" {
 		return errNoCustomerMail
 	}
-	return a.deliver(ctx, *via, mailer.Message{To: to, Subject: org.Name + ": your onboarding steps",
-		Body: org.Name + " has a page showing the steps that are yours while they set you up.\n\n" +
-			"Open it here:\n" + a.base + "/c/" + token + "\n\n" +
-			"The link works once, within 7 days, and opens the page in the browser you use it in. " +
-			"To open it somewhere else, use the link again and ask for a fresh one: it is sent to this address.\n\n" +
-			"If you weren't expecting this, ignore it: nothing happens unless the link is opened.\n"})
+	// A customer has no language of their own yet, and the organisation none to stand in.
+	return a.deliver(ctx, *via, mailer.Message{To: to, Subject: say.Errorf("%s: your onboarding steps", org.Name).Error(),
+		Body: say.Errorf("%[1]s has a page showing the steps that are yours while they set you up.\n\n"+
+			"Open it here:\n%[2]s\n\n"+
+			"The link works once, within 7 days, and opens the page in the browser you use it in. "+
+			"To open it somewhere else, use the link again and ask for a fresh one: it is sent to this address.\n\n"+
+			"If you weren't expecting this, ignore it: nothing happens unless the link is opened.\n", org.Name, a.base+"/c/"+token).Error()})
 }
 
 // customerHeaders are for every page an outsider opens: a link in the address mustn't

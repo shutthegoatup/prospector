@@ -2,18 +2,18 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func (s apiServer) ListCompanies(ctx context.Context, in api.ListCompaniesRequestObject) (api.ListCompaniesResponseObject, error) {
 	q, p := reqFrom(ctx), in.Params
 	if p.Stage != "" && !slices.Contains(pipelineStages, string(p.Stage)) {
-		return nil, fmt.Errorf("no stage %q: one of %v", p.Stage, pipelineStages)
+		return nil, say.Errorf("no stage %q: one of %v", p.Stage, pipelineStages)
 	}
 	page, err := pageIn(int(p.Limit), string(p.Cursor))
 	if err != nil {

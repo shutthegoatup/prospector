@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // ssoStore is the single sign-on area's queries: an organisation's own identity provider and its domains.
@@ -60,12 +62,12 @@ func (s *ssoStore) AddSSODomain(org int64, domain string) (*SSODomain, error) {
 		return nil, err
 	}
 	if n >= maxSSODomains {
-		return nil, fmt.Errorf("an organisation can have %d domains", maxSSODomains)
+		return nil, say.Errorf("an organisation can have %d domains", maxSSODomains)
 	}
 	d := &SSODomain{OrgID: org, Domain: domain, Token: randomToken(20)}
 	if err := s.DB.Create(d).Error; err != nil {
 		if breaksRule(err) {
-			err = conflict(domain + " is already listed")
+			err = conflict{say.Errorf("%s is already listed", domain)}
 		}
 		return nil, err
 	}
@@ -78,7 +80,7 @@ func (s *ssoStore) SSODomain(org int64, domain string) (*SSODomain, error) {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}
-		return nil, errors.New("that domain isn't listed")
+		return nil, say.New("that domain isn't listed")
 	}
 	return &d, nil
 }

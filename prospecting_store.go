@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"slices"
@@ -11,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // prospectingStore is the prospecting area's queries: companies and the people at them,
@@ -164,7 +164,7 @@ func (s *prospectingStore) researchQuery(org, offering int64, filter string, tas
 		latest := fmt.Sprintf("(select v.updated_at from verdicts v where v.org_id = companies.org_id and v.company_id = companies.id and v.offering_id = %d) desc, id desc", offering)
 		return staged(CompanyRejected), latest, nil
 	}
-	return nil, "", fmt.Errorf("unknown filter %q", filter)
+	return nil, "", say.Errorf("unknown filter %q", filter)
 }
 
 // researchRows fills in what is known about each company, in a query a table rather
@@ -407,7 +407,7 @@ func (s *prospectingStore) ResearchCountsFor(org, offering, task int64) map[stri
 
 func (s *prospectingStore) SetCompanyStage(org, id int64, stage, fit, actor string) error {
 	if stage != CompanyQualified && stage != CompanyRejected && stage != CompanyReview {
-		return fmt.Errorf("unknown stage %q", stage)
+		return say.Errorf("unknown stage %q", stage)
 	}
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		updates := map[string]any{"stage": stage, "found_for": 0}
@@ -451,7 +451,7 @@ func (s *prospectingStore) PickContactFor(org int64, o *Org, id int64, offeringI
 				return res.Error
 			}
 			if res.RowsAffected == 0 {
-				return conflict(fmt.Sprintf("%s is already being reached for another offering", displayName(c)))
+				return conflict{say.Errorf("%s is already being reached for another offering", displayName(c))}
 			}
 			c.OfferingID = *offeringID
 		}
@@ -676,10 +676,10 @@ func (s *prospectingStore) QuickAddPerson(o *Org, in QuickAdd, actor string) (*C
 	in.Name = strings.TrimSpace(in.Name)
 	in.Linkedin = strings.TrimSpace(in.Linkedin)
 	if in.Name == "" {
-		return nil, errors.New("a name is needed")
+		return nil, say.New("a name is needed")
 	}
 	if in.Linkedin != "" && !httpURL.MatchString(in.Linkedin) {
-		return nil, errors.New("the LinkedIn link should start with https://")
+		return nil, say.New("the LinkedIn link should start with https://")
 	}
 	if err := s.Allowed(o, in.Email, in.Linkedin); err != nil {
 		return nil, err
@@ -852,7 +852,7 @@ func (s *prospectingStore) Pending(org int64, people []Contact) (map[int64][]Pen
 // typed it, or dismisses it. Either way it is settled once.
 func (s *prospectingStore) DecideSuggestion(org, id int64, decision, actor string) error {
 	if decision != SuggestionAccepted && decision != SuggestionDismissed {
-		return fmt.Errorf("unknown decision %q", decision)
+		return say.Errorf("unknown decision %q", decision)
 	}
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var sg Suggestion
@@ -860,7 +860,7 @@ func (s *prospectingStore) DecideSuggestion(org, id int64, decision, actor strin
 			return missing(err, "no suggestion %d", id)
 		}
 		if sg.Decision != "" {
-			return conflict("that suggestion was already " + sg.Decision + " by " + sg.DecidedBy)
+			return conflict{say.Errorf("that suggestion was already %s by %s", sg.Decision, sg.DecidedBy)}
 		}
 		now := time.Now()
 		res := tx.Model(&Suggestion{}).Where("id = ? and decision = ''", sg.ID).
@@ -869,7 +869,7 @@ func (s *prospectingStore) DecideSuggestion(org, id int64, decision, actor strin
 			return res.Error
 		}
 		if res.RowsAffected == 0 {
-			return errors.New("someone else just settled that suggestion")
+			return say.New("someone else just settled that suggestion")
 		}
 		if decision == SuggestionDismissed {
 			// A restore can leave a suggestion behind without its person.

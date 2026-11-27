@@ -1,12 +1,12 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"sort"
 	"strings"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // onboardingStore is the onboarding area's queries: a customer's steps to going live.
@@ -33,7 +33,7 @@ func (s *onboardingStore) StartOnboarding(org int64, in OnboardingIn, actor stri
 			return err
 		}
 		if len(plan) == 0 {
-			return errors.New("write your onboarding steps in Settings first")
+			return say.New("write your onboarding steps in Settings first")
 		}
 		ob = Onboarding{OrgID: org, CompanyID: c.ID, Name: clip(strings.TrimSpace(in.Name), 200), Start: in.Start}
 		if err := tx.Create(&ob).Error; err != nil {
@@ -86,7 +86,7 @@ func (s *onboardingStore) SetOnboardingStep(org, id int64, field, value, actor s
 			case value == "":
 				updates["done_on"], updates["done_by"], updates["done_entry"], action = nil, "", 0, "onboard:undone"
 			case value != "yes":
-				return fmt.Errorf("a step is done (yes) or not (empty), not %q", value)
+				return say.Errorf("a step is done (yes) or not (empty), not %q", value)
 			case st.DoneOn != nil:
 				// Someone on a page that hadn't caught up: who did it, and when, stay as they were.
 				return nil
@@ -104,7 +104,7 @@ func (s *onboardingStore) SetOnboardingStep(org, id int64, field, value, actor s
 				logged = st.Name + ": no date"
 			}
 		default:
-			return fmt.Errorf("a step has no %q to set", field)
+			return say.Errorf("a step has no %q to set", field)
 		}
 		if err := tx.Model(&st).Updates(updates).Error; err != nil {
 			return err

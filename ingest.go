@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/tz"
 )
 
@@ -44,7 +45,7 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 		}
 	}
 	if len(blocked) > 0 {
-		return 0, fmt.Errorf("nothing imported: %s", strings.Join(blocked, "; "))
+		return 0, say.Errorf("nothing imported: %s", strings.Join(blocked, "; "))
 	}
 	var total int64
 	err = s.DB.Transaction(func(tx *gorm.DB) error {

@@ -221,7 +221,7 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 				t, err := a.s.Task(org.ID, id, time.Now())
 				if err != nil {
 					_, text := telling("prompt work_task", err, statusOf(err))
-					return nil, errors.New(text)
+					return nil, errors.New(text.Error())
 				}
 				return &mcp.GetPromptResult{Description: t.Title, Messages: []*mcp.PromptMessage{
 					{Role: "user", Content: &mcp.TextContent{Text: taskPrompt(org, t.Task)}}}}, nil

@@ -14,6 +14,12 @@ linters:
         - (*net/smtp.Client).Quit
         - (*mime/quotedprintable.Writer).Write
         - (*mime/quotedprintable.Writer).Close
+    govet:
+      settings:
+        printf:
+          # It keeps its format to translate, so vet can't see it reach fmt.
+          funcs:
+            - github.com/shutthegoatup/prospector/internal/say.Errorf
   exclusions:
     rules:
       # A test's dropped error shows up as the test failing.
