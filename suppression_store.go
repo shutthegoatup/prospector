@@ -10,9 +10,12 @@ import (
 	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
+// suppressionStore is the suppression area's queries: addresses no marketing mail goes to, and their unsubscribe links.
+type suppressionStore struct{ *core }
+
 // Suppress puts an address on the list. Asking twice changes nothing, and an address
 // someone unsubscribed stays theirs even if a member adds it too.
-func (s *Store) Suppress(org int64, address, actor string) (*Suppression, error) {
+func (s *suppressionStore) Suppress(org int64, address, actor string) (*Suppression, error) {
 	addr, err := bareAddress(address)
 	if err != nil {
 		return nil, err
@@ -20,7 +23,7 @@ func (s *Store) Suppress(org int64, address, actor string) (*Suppression, error)
 	return s.suppress(s.db, org, addr, SuppressAdded, actor)
 }
 
-func (s *Store) suppress(tx *gorm.DB, org int64, addr, reason, actor string) (*Suppression, error) {
+func (s *suppressionStore) suppress(tx *gorm.DB, org int64, addr, reason, actor string) (*Suppression, error) {
 	// A row a member is taking off at the same moment is put back, not lost: each round
 	// either finds the row and makes it stronger, or creates it.
 	for range 3 {
@@ -54,7 +57,7 @@ func (s *Store) suppress(tx *gorm.DB, org int64, addr, reason, actor string) (*S
 // Unsuppress takes off an address a member or key added, or one that bounced, as when
 // it was mended. One the person unsubscribed or complained about can't be taken off
 // from here: only they can ask again.
-func (s *Store) Unsuppress(org, id int64, actor string) error {
+func (s *suppressionStore) Unsuppress(org, id int64, actor string) error {
 	var row Suppression
 	if err := s.in(org).Where("id = ?", id).First(&row).Error; err != nil {
 		return missing(err, "no suppression %d", id)
@@ -71,7 +74,7 @@ func (s *Store) Unsuppress(org, id int64, actor string) error {
 }
 
 // Suppressions are the list, newest first, a page at a time.
-func (s *Store) Suppressions(org int64, page paging.Page) ([]Suppression, string, error) {
+func (s *suppressionStore) Suppressions(org int64, page paging.Page) ([]Suppression, string, error) {
 	at, err := page.At(1)
 	if err != nil {
 		return nil, "", err
@@ -98,7 +101,7 @@ func (s *Store) Suppressions(org int64, page paging.Page) ([]Suppression, string
 // is one address, not on the suppression list, not on the never-contact list (by the
 // address or the person's LinkedIn profile), and not someone erased on request. An
 // error that leftOutBecause doesn't know is a failure to check, not a reason.
-func (s *Store) marketable(tx *gorm.DB, o *Org, address, link string) error {
+func (s *suppressionStore) marketable(tx *gorm.DB, o *Org, address, link string) error {
 	g, err := s.gate(tx, o)
 	if err != nil {
 		return err
@@ -106,7 +109,7 @@ func (s *Store) marketable(tx *gorm.DB, o *Org, address, link string) error {
 	return g.why(address, link)
 }
 
-func (s *Store) gate(tx *gorm.DB, o *Org) (*mailGate, error) {
+func (s *suppressionStore) gate(tx *gorm.DB, o *Org) (*mailGate, error) {
 	g := &mailGate{o: o, suppressed: map[string]Suppression{}, erased: map[string]bool{}}
 	var listed []Suppression
 	var hashes []string
@@ -126,7 +129,7 @@ func (s *Store) gate(tx *gorm.DB, o *Org) (*mailGate, error) {
 }
 
 // unsubscribeLink makes the secret for one mail's unsubscribe link to an address.
-func (s *Store) unsubscribeLink(tx *gorm.DB, org int64, address string) (string, error) {
+func (s *suppressionStore) unsubscribeLink(tx *gorm.DB, org int64, address string) (string, error) {
 	addr, err := bareAddress(address)
 	if err != nil {
 		return "", err
@@ -138,7 +141,7 @@ func (s *Store) unsubscribeLink(tx *gorm.DB, org int64, address string) (string,
 // UnsubscribeByToken is the one look-up that starts from a secret and not an
 // organisation. It reports nothing back: a link that was never made and one that was
 // are answered alike.
-func (s *Store) UnsubscribeByToken(token string) error {
+func (s *suppressionStore) UnsubscribeByToken(token string) error {
 	if token == "" {
 		return nil
 	}
