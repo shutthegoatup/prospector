@@ -306,6 +306,7 @@ func (s *IdentityStore) NewSession(user, ssoOrg int64) (string, error) {
 		sess.Limited = true
 		sess.Prove(ssoOrg, time.Now())
 	}
+	_ = store.Logged(s.DB.Where("expires_at < ?", time.Now()).Delete(&store.Session{}))
 	return token, s.DB.Create(sess).Error
 }
 
