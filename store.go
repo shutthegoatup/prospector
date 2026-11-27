@@ -106,13 +106,13 @@ type APIKey struct {
 
 type Company struct {
 	ID           int64   `gorm:"primaryKey" json:"id"`
-	OrgID        int64   `gorm:"uniqueIndex:idx_org_company;not null" json:"-"`
+	OrgID        int64   `gorm:"uniqueIndex:idx_org_company;index:idx_companies_org_stage,priority:1;not null" json:"-"`
 	Name         string  `gorm:"uniqueIndex:idx_org_company;not null" json:"name"`
 	Domain       string  `json:"domain"`
 	Country      string  `json:"country"`
 	Segment      string  `json:"segment"`
 	Fit          string  `json:"fit"`
-	Stage        string  `gorm:"index" json:"stage"`
+	Stage        string  `gorm:"index;index:idx_companies_org_stage,priority:2" json:"stage"`
 	Why          string  `json:"why"`
 	FoundBy      string  `json:"found_by"`
 	Incorporated *bool   `json:"incorporated"`
@@ -208,9 +208,9 @@ var Columns = []string{"id", "key", "file", "section", "fit", "maker", "person",
 // older rows), "agent:<key name>" or "cli".
 type Event struct {
 	ID        int64  `gorm:"primaryKey"`
-	OrgID     int64  `gorm:"index"`
+	OrgID     int64  `gorm:"index;index:idx_events_company_at,priority:1;index:idx_events_org_at,priority:1"`
 	ContactID int64  `gorm:"index"`
-	CompanyID *int64 `gorm:"index"`
+	CompanyID *int64 `gorm:"index;index:idx_events_company_at,priority:2"`
 	User      string
 	// KeyID is the API key behind an agent's action, since key names can repeat; 0 for people.
 	KeyID int64 `gorm:"not null;default:0"`
@@ -218,7 +218,7 @@ type Event struct {
 	TaskID int64 `gorm:"index;not null;default:0"`
 	Action string
 	Value  *string
-	At     time.Time `gorm:"index"`
+	At     time.Time `gorm:"index;index:idx_events_company_at,priority:3;index:idx_events_org_at,priority:2"`
 }
 
 // Actor is who an operation is recorded against: a name ("agent:<key name>" for an
