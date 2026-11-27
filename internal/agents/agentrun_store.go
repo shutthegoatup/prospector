@@ -162,3 +162,5 @@ func (s *AgentStore) AgentRuns(org, task int64, limit int) ([]store.AgentRun, er
 	}
 	return append(out, ended...), nil
 }
+
+const RunStopped = "stopped"

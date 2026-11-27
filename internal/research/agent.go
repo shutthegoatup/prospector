@@ -2,6 +2,7 @@ package research
 
 import (
 	"errors"
+	"net/url"
 	"strings"
 	"time"
 
@@ -317,4 +318,69 @@ type MarkIn struct {
 	Step      string `json:"step" jsonschema:"linkedin (request sent), accepted, email, followup, call, replied, declined or hold"`
 	Date      string `json:"date,omitempty" jsonschema:"YYYY-MM-DD it happened; today if empty"`
 	Note      string `json:"note,omitempty" jsonschema:"how you know, e.g. 'Allan said he replied rudely'"`
+}
+
+func NormalURL(raw string) string {
+	raw = strings.TrimRight(raw, ".,;:!?*_`")
+	// A closing bracket belongs to the address only if it opened one, as in
+	// .../Acme_(company); otherwise it closes the sentence around it.
+	for strings.HasSuffix(raw, ")") && strings.Count(raw, ")") > strings.Count(raw, "(") {
+		raw = strings.TrimRight(strings.TrimSuffix(raw, ")"), ".,;:!?*_`")
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	u.Fragment, u.Host = "", strings.ToLower(u.Host)
+	return strings.TrimRight(u.String(), "/")
+}
+
+const LookupNone = "none found"
+
+const LookupNotKept = "found, not kept"
+
+const // HeldNeverContact is a company on a domain the never-contact list covers. It is read
+// from the list as it is now, so it isn't recorded.
+HeldNeverContact = "never_contact"
+
+const WithheldNeverContact = "never_contact"
+
+const WithheldErased = "erased"
+
+func FirstLine(s string) string { return strings.SplitN(s, "\n", 2)[0] }
+
+func prefixed(prefix, s string) string {
+	if s == "" {
+		return ""
+	}
+	return prefix + s
+}
+
+// KeptValue is what an event may still say once its person is gone: a stage, or the
+// day of a mark. Everything else held their details or free text about them.
+func KeptValue(e store.Event) *string {
+	v := store.Deref(e.Value)
+	switch {
+	case e.Action == "set:stage" && store.ValidStage(v):
+		return &v
+	case strings.HasPrefix(e.Action, "mark:") && len(v) >= 10:
+		if _, err := time.Parse("2006-01-02", v[:10]); err == nil {
+			return store.Str(v[:10])
+		}
+	}
+	return nil
+}
+
+// companyAt finds the company an agent means by its website when the name is new,
+// so one company found under two spellings stays one row. A site that several
+// companies share (a group's brands, a marketplace) identifies none of them.
+func companyAt(tx *gorm.DB, org int64, domain string) (*store.Company, error) {
+	if domain == "" {
+		return nil, nil
+	}
+	var found []store.Company
+	if err := tx.Where("org_id = ? and lower(domain) = ?", org, domain).Limit(2).Find(&found).Error; err != nil || len(found) != 1 {
+		return nil, err
+	}
+	return &found[0], nil
 }

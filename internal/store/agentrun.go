@@ -43,3 +43,10 @@ const BuiltinPrefix = "builtin"
 // BuiltinKeyName is an agent's name as its key carries it into the record, marked so
 // it isn't taken for a key someone made for an agent of their own.
 func BuiltinKeyName(agent string) string { return agent + " (built in)" }
+
+func (who Actor) Did(e Event) bool {
+	if e.KeyID != 0 && who.KeyID != 0 {
+		return e.KeyID == who.KeyID
+	}
+	return e.User == who.Name
+}

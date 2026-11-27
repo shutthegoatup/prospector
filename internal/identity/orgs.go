@@ -1,12 +1,18 @@
 package identity
 
 import (
+	"errors"
+	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
@@ -156,3 +162,78 @@ func checkScopes(scopes []string) error {
 }
 
 var errBuiltinKey = say.New("this key belongs to one of Prospector's own agents, which change on the agent itself")
+
+const AgreementDraft = "draft"
+
+// DropRecipients takes the recipients a query matches off their drafts, with their
+// fields, when the person or member they stand for goes.
+func DropRecipients(tx *gorm.DB, matching *gorm.DB) error {
+	var ids []int64
+	if err := matching.Model(&store.AgreementRecipient{}).Pluck("id", &ids).Error; err != nil || len(ids) == 0 {
+		return err
+	}
+	// On an agreement that has gone out, who it went to is part of its record: they are
+	// detached from the person or member, never taken off.
+	var kept []int64
+	if err := tx.Table("agreement_recipients").Select("agreement_recipients.id").
+		Joins("join agreements on agreements.id = agreement_recipients.agreement_id and agreements.org_id = agreement_recipients.org_id").
+		Where("agreement_recipients.id in ? and agreements.status <> ?", ids, AgreementDraft).Pluck("agreement_recipients.id", &kept).Error; err != nil {
+		return err
+	}
+	if len(kept) > 0 {
+		if err := tx.Model(&store.AgreementRecipient{}).Where("id in ?", kept).Updates(map[string]any{"contact_id": nil, "user_id": nil}).Error; err != nil {
+			return err
+		}
+	}
+	gone := slices.DeleteFunc(ids, func(id int64) bool { return slices.Contains(kept, id) })
+	if len(gone) == 0 {
+		return nil
+	}
+	if err := tx.Where("recipient_id in ?", gone).Delete(&store.AgreementField{}).Error; err != nil {
+		return err
+	}
+	return tx.Where("id in ?", gone).Delete(&store.AgreementRecipient{}).Error
+}
+
+// Unstorable is the database turning the data down: a row that breaks one of its rules,
+// such as a name already taken, or a character Postgres won't store (classes 22 and
+// 23). Trying again with the same request can't help.
+func Unstorable(err error) bool {
+	var pg *pgconn.PgError
+	return store.BreaksRule(err) || errors.As(err, &pg) && strings.HasPrefix(pg.Code, "22")
+}
+
+const // Sessions and apiKeys key what a session token and an API key are stored and found by.
+Sessions store.Purpose = "prospector: sessions"
+
+const ApiKeys store.Purpose = "prospector: API keys"
+
+// dummyHash keeps a wrong email as slow as a wrong password.
+// passwordCost is how hard a password hash is to compute; the tests lower it.
+var PasswordCost = bcrypt.DefaultCost
+
+var DummyHash, _ = bcrypt.GenerateFromPassword([]byte("unused"), PasswordCost)
+
+// BrowserOrigin is an address as a browser names it in Origin: lower case, and
+// without the port when it is the scheme's own.
+func BrowserOrigin(address string) string {
+	u, err := url.Parse(address)
+	if err != nil {
+		return address
+	}
+	host := u.Host
+	if (u.Scheme == "https" && u.Port() == "443") || (u.Scheme == "http" && u.Port() == "80") {
+		host = strings.TrimSuffix(host, ":"+u.Port())
+	}
+	return strings.ToLower(u.Scheme + "://" + host)
+}
+
+func DeviceMAC(u *store.User, nonce string) string {
+	return store.Mac([]byte(u.PasswordHash), "device\x00"+nonce)
+}
+
+// The guard counts under names that say what is being guessed at, so the sign-in
+// form, whatever is typed into it, can't reach the count for anything else.
+func SignInBucket(email string) string {
+	return "sign-in\x00" + strings.ToLower(strings.TrimSpace(email))
+}
