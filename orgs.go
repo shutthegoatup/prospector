@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"regexp"
@@ -21,14 +19,6 @@ var (
 	colorRe   = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 	orgColors = []string{"#56c5f4", "#f5c66b", "#7fe0a8", "#ff9a9a", "#c4a7ff"}
 )
-
-func randomToken(n int) string {
-	b := make([]byte, n)
-	if _, err := rand.Read(b); err != nil {
-		panic(err)
-	}
-	return base64.RawURLEncoding.EncodeToString(b)
-}
 
 func slugify(name string) string {
 	s := strings.Trim(notSlug.ReplaceAllString(strings.ToLower(name), "-"), "-")

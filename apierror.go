@@ -20,13 +20,6 @@ import (
 	"github.com/shutthegoatup/prospector/api"
 )
 
-// notFound is an error about something that isn't here, or isn't this organisation's.
-type notFound string
-
-func (e notFound) Error() string { return string(e) }
-
-func noSuch(format string, args ...any) error { return notFound(fmt.Sprintf(format, args...)) }
-
 // conflict is an error about something that can't be made because what is already here
 // has its place: asking again won't help until one of the two changes.
 type conflict string
@@ -37,15 +30,6 @@ func (e conflict) Error() string { return string(e) }
 type refused string
 
 func (e refused) Error() string { return string(e) }
-
-// missing is what a failed look-up means: nothing there, unless the look-up itself
-// failed, which mustn't read as the thing being gone.
-func missing(err error, format string, args ...any) error {
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
-	}
-	return noSuch(format, args...)
-}
 
 // ours reports a failure that is the server's rather than the caller's: the database,
 // the network, or the request running out of time. Everything else the store returns
