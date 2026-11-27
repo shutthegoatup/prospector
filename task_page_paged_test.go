@@ -15,14 +15,14 @@ func TestATasksPageHasPagesOfEachList(t *testing.T) {
 	for i := range notes {
 		notes[i] = TaskNote{OrgID: o.ID, TaskID: task.ID, CompanyID: co.ID, Actor: "agent:scout", Kind: "next", Text: fmt.Sprint("Left note ", i, ".")}
 	}
-	if err := s.db.CreateInBatches(notes, 50).Error; err != nil {
+	if err := s.DB.CreateInBatches(notes, 50).Error; err != nil {
 		t.Fatal(err)
 	}
 	runs := []AgentRun{{OrgID: o.ID, TaskID: task.ID, AgentName: "Still going", Status: RunWorking, StartedBy: "Nia", StartedAt: time.Now()}}
 	for i := range taskRunsPageSize + 3 {
 		runs = append(runs, AgentRun{OrgID: o.ID, TaskID: task.ID, AgentName: fmt.Sprint("Ended run ", i, "."), Status: "done", StartedBy: "Nia", StartedAt: time.Now()})
 	}
-	if err := s.db.Create(&runs).Error; err != nil {
+	if err := s.DB.Create(&runs).Error; err != nil {
 		t.Fatal(err)
 	}
 	start := time.Now().Add(-100 * time.Hour)
@@ -31,7 +31,7 @@ func TestATasksPageHasPagesOfEachList(t *testing.T) {
 		events = append(events, Event{OrgID: o.ID, TaskID: task.ID, User: fmt.Sprintf("agent:worker%d", i), KeyID: int64(i + 1), Action: "add:fact",
 			At: start.Add(time.Duration(i) * time.Hour)})
 	}
-	if err := s.db.CreateInBatches(events, 50).Error; err != nil {
+	if err := s.DB.CreateInBatches(events, 50).Error; err != nil {
 		t.Fatal(err)
 	}
 

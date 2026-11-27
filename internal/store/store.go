@@ -1,6 +1,10 @@
 package store
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 type User struct {
 	ID           int64  `gorm:"primaryKey"`
@@ -206,4 +210,40 @@ func Deref(p *string) string {
 		return ""
 	}
 	return *p
+}
+
+// Actor is who an operation is recorded against: a name ("agent:<key name>" for an
+// agent), the key behind it, and the task it is working on, if any.
+type Actor struct {
+	Task  int64
+	Name  string
+	KeyID int64
+	// ReadOnly is a key that can add nothing, so its reading a task isn't work on it.
+	ReadOnly bool
+	// Session is the MCP session calling, if any: two clients on one key are two agents.
+	Session string
+	// Offering is what Task is finding companies for; 0 is the organisation's own.
+	Offering int64
+}
+
+// Core is what every area's queries need: the database and the means to keep secrets.
+type Core struct {
+	DB *gorm.DB
+	// keys seal what is stored but mustn't be readable from the database alone; nil
+	// when the server was given none.
+	Keyring *Keyring
+	// dns says whether a domain takes mail; nil asks nothing, so tests never reach the network.
+	DNS MailDNS
+}
+
+// InOrg scopes a query to one organisation. Not every query uses it, so what holds the
+// store's exported methods to their organisation is TestNoMethodReachesIntoAnotherOrganisation.
+func (s *Core) InOrg(org int64) *gorm.DB { return s.DB.Where("org_id = ?", org) }
+
+func (s *Core) Log(tx *gorm.DB, org, contact int64, company *int64, actor, action string, value *string) error {
+	return s.LogAs(tx, org, contact, company, Actor{Name: actor}, action, value)
+}
+
+func (s *Core) LogAs(tx *gorm.DB, org, contact int64, company *int64, who Actor, action string, value *string) error {
+	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: who.Name, KeyID: who.KeyID, TaskID: who.Task, Action: action, Value: value, At: time.Now()}).Error
 }

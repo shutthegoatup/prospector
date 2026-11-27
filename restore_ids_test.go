@@ -20,7 +20,7 @@ func TestRestoreDoesntHandOutADroppedPersonsID(t *testing.T) {
 	}
 	omar := must(s.QuickAddPerson(o, QuickAdd{Name: "Omar Haddad", Company: deref(hannah.Maker)}, "ada"))
 	var inherited int64
-	s.in(o.ID).Model(&Event{}).Where("contact_id = ? and action <> ?", omar.ID, "add:person").Count(&inherited)
+	s.InOrg(o.ID).Model(&Event{}).Where("contact_id = ? and action <> ?", omar.ID, "add:person").Count(&inherited)
 	if omar.ID == nia.ID || inherited != 0 {
 		t.Fatalf("the next person added got id %d, which was Nia's (%d), and %d lines of her history", omar.ID, nia.ID, inherited)
 	}

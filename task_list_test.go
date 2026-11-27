@@ -15,10 +15,10 @@ import (
 func queries(t *testing.T, s *Store, do func()) (n int) {
 	t.Helper()
 	name := "count:" + t.Name()
-	if err := s.db.Callback().Query().Before("gorm:query").Register(name, func(*gorm.DB) { n++ }); err != nil {
+	if err := s.DB.Callback().Query().Before("gorm:query").Register(name, func(*gorm.DB) { n++ }); err != nil {
 		t.Fatal(err)
 	}
-	defer s.db.Callback().Query().Remove(name)
+	defer s.DB.Callback().Query().Remove(name)
 	do()
 	return n
 }

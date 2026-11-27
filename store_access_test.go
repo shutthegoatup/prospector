@@ -25,7 +25,9 @@ func TestOnlyTheStoreTouchesTheDatabase(t *testing.T) {
 	var parsed []*ast.File
 	// The store's unexported methods, and every other type's, by name: the check below
 	// goes by name alone, so a name both use would fail the other type's calls.
-	private, others := map[string]bool{"db": true, "in": true}, map[string]bool{}
+	// The core's handle on the database, its scoping to an organisation and its history
+	// log are exported from internal/store, but are the store's alone to use.
+	private, others := map[string]bool{"DB": true, "InOrg": true, "Log": true, "LogAs": true}, map[string]bool{}
 	for _, name := range files {
 		if strings.HasSuffix(name, "_test.go") {
 			continue
@@ -53,8 +55,8 @@ func TestOnlyTheStoreTouchesTheDatabase(t *testing.T) {
 	for _, f := range parsed {
 		for _, decl := range f.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
-			// Open makes the store, so it migrates it.
-			if !ok || fn.Body == nil || onStore(fn) || fn.Recv == nil && fn.Name.Name == "Open" {
+			// Open and connect make the store, so they reach its database.
+			if !ok || fn.Body == nil || onStore(fn) || fn.Recv == nil && (fn.Name.Name == "Open" || fn.Name.Name == "connect") {
 				continue
 			}
 			ast.Inspect(fn.Body, func(n ast.Node) bool {
@@ -73,8 +75,14 @@ func TestNoStoreMethodHandsOutTheDatabase(t *testing.T) {
 	t.Parallel()
 	handle := reflect.TypeOf(&gorm.DB{})
 	store := reflect.TypeOf(&Store{})
+	// The core's own helpers, which the areas' queries build on; the rule above keeps
+	// them out of everything else.
+	core := map[string]bool{"InOrg": true, "Log": true, "LogAs": true}
 	for i := range store.NumMethod() {
 		m := store.Method(i)
+		if core[m.Name] {
+			continue
+		}
 		for j := range m.Type.NumIn() {
 			if m.Type.In(j) == handle {
 				t.Errorf("Store.%s takes a *gorm.DB", m.Name)

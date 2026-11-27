@@ -38,7 +38,7 @@ func TestTextArrivesWithoutWhatPostgresWontKeep(t *testing.T) {
 	}
 	res.Body.Close()
 	var named int64
-	s.in(o.ID).Model(&Company{}).Where("name = ?", "Quay Marine").Count(&named)
+	s.InOrg(o.ID).Model(&Company{}).Where("name = ?", "Quay Marine").Count(&named)
 	if res.StatusCode >= 300 || named != 1 {
 		t.Errorf("a key holder's company with a NUL, sent as application/x-json: %d, kept as named %d", res.StatusCode, named)
 	}

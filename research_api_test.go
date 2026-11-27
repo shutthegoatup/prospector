@@ -94,7 +94,7 @@ func TestARobotAddsPeopleAndReviewsResearchAsItsScopesAllow(t *testing.T) {
 	// A detail found for someone already stored waits to be accepted.
 	must(s.AgentAddContact(o, scout, AddContactIn{Company: "Corvane Marine", Name: "Tom Ellery", Email: "tom@corvane.example", SourceURL: "https://corvane.example/team"}))
 	var pending []Suggestion
-	if err := s.db.Where("org_id = ? and contact_id = ? and decision = ''", o.ID, suggested.ID).Find(&pending).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and contact_id = ? and decision = ''", o.ID, suggested.ID).Find(&pending).Error; err != nil {
 		t.Fatal(err)
 	}
 	if len(pending) != 1 {
@@ -119,7 +119,7 @@ func TestARobotAddsPeopleAndReviewsResearchAsItsScopesAllow(t *testing.T) {
 func row[T any](t *testing.T, s *Store, org, id int64) T {
 	t.Helper()
 	var out T
-	if err := s.db.Where("org_id = ? and id = ?", org, id).First(&out).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and id = ?", org, id).First(&out).Error; err != nil {
 		t.Fatal(err)
 	}
 	return out

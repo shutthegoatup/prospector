@@ -76,9 +76,9 @@ func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
 		t.Fatalf("continuing a task made duplicates: %+v %+v %+v", again, same, known)
 	}
 	var companies, people, matches int64
-	s.in(o.ID).Model(&Company{}).Count(&companies)
-	s.in(o.ID).Model(&Contact{}).Count(&people)
-	s.in(o.ID).Model(&Event{}).Where("action = ?", "task:match").Count(&matches)
+	s.InOrg(o.ID).Model(&Company{}).Count(&companies)
+	s.InOrg(o.ID).Model(&Contact{}).Count(&people)
+	s.InOrg(o.ID).Model(&Event{}).Where("action = ?", "task:match").Count(&matches)
 	if companies != 3 || people != 1 || matches != 1 {
 		t.Fatalf("want 3 companies, 1 person and the one new match recorded once, got %d, %d, %d", companies, people, matches)
 	}
@@ -214,7 +214,7 @@ func TestErasingAPersonTakesTheNotesAroundThem(t *testing.T) {
 		t.Fatal(err)
 	}
 	var left []TaskNote
-	s.in(o.ID).Find(&left)
+	s.InOrg(o.ID).Find(&left)
 	if len(left) != 1 || left[0].Text != "No configurator." {
 		t.Fatalf("notes about the erased person's company and its task should be gone, others kept: %+v", left)
 	}
@@ -322,7 +322,7 @@ func TestTasksOverMCPAndThePages(t *testing.T) {
 		t.Fatalf("a read-only key reading a task: %v %+v", err, res)
 	}
 	var byReader int64
-	if s.in(o.ID).Model(&Event{}).Where(`"user" = ?`, "agent:reader").Count(&byReader); byReader != 0 {
+	if s.InOrg(o.ID).Model(&Event{}).Where(`"user" = ?`, "agent:reader").Count(&byReader); byReader != 0 {
 		t.Fatalf("a read-only key reading a task was recorded as picking it up: %d", byReader)
 	}
 	var names []string

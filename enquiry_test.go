@@ -204,7 +204,7 @@ func TestEnquiryFindsWhoSentIt(t *testing.T) {
 	if _, err := s.AddEnquiry(o.ID, "form", EnquiryIn{Email: "hannah@quay.example", Message: "An older note"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.db.Model(&Enquiry{}).Where("message = ?", "An older note").Update("contact_id", nil).Error; err != nil {
+	if err := s.DB.Model(&Enquiry{}).Where("message = ?", "An older note").Update("contact_id", nil).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := s.ErasePerson(o.ID, known.ID, "Ada Lovelace"); err != nil {

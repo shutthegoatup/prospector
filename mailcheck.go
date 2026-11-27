@@ -12,12 +12,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// mailDNS is the part of a resolver the check needs; *net.Resolver is one.
-type mailDNS interface {
-	LookupMX(ctx context.Context, name string) ([]*net.MX, error)
-	LookupHost(ctx context.Context, host string) ([]string, error)
-}
-
 type mailAnswer int
 
 const (

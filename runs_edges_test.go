@@ -31,7 +31,7 @@ func TestARunLongerThanAPageReadsIsShownNewestFirst(t *testing.T) {
 	for i := range 3 {
 		ev = append(ev, Event{OrgID: o.ID, User: "agent:b", KeyID: 2, Action: "add:fact", At: start.Add(2000*time.Minute + time.Duration(i)*2*time.Hour)})
 	}
-	mustDone(t, s.db.CreateInBatches(ev, 200).Error)
+	mustDone(t, s.DB.CreateInBatches(ev, 200).Error)
 	long, short := 0, 0
 	for _, r := range walkRuns(t, s, o.ID, 12) {
 		switch r.Actor {
@@ -58,7 +58,7 @@ func TestRunsThatEndedTogetherShareAPage(t *testing.T) {
 		{OrgID: o.ID, User: "agent:b", KeyID: 2, Action: "add:fact", At: at.Add(-time.Minute)},
 		{OrgID: o.ID, User: "agent:b", KeyID: 2, Action: "add:fact", At: at},
 	}
-	mustDone(t, s.db.Create(&ev).Error)
+	mustDone(t, s.DB.Create(&ev).Error)
 	if n := len(walkRuns(t, s, o.ID, 1)); n != 2 {
 		t.Fatalf("walked %d runs, want 2", n)
 	}
@@ -75,7 +75,7 @@ func TestWalkingRunsCarriesOnPastALongOne(t *testing.T) {
 	for j := range 4500 {
 		ev = append(ev, Event{OrgID: o.ID, User: "agent:a", KeyID: 1, Action: "add:fact", At: start.Add(2*time.Hour + time.Duration(j)*time.Minute)})
 	}
-	mustDone(t, s.db.CreateInBatches(ev, 200).Error)
+	mustDone(t, s.DB.CreateInBatches(ev, 200).Error)
 	all := walkRuns(t, s, o.ID, 12)
 	for _, r := range all {
 		if r.Changes == 1 {

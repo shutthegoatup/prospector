@@ -21,7 +21,7 @@ var keyless = map[string]bool{"CreateKey": true, "ChangeKey": true, "RevokeKey":
 func (s apiServer) GetConnect(ctx context.Context, _ api.GetConnectRequestObject) (api.GetConnectResponseObject, error) {
 	q := reqFrom(ctx)
 	base := s.a.baseURL(ctx.Value(requestKey{}).(*http.Request)) + q.Base()
-	out := api.GetConnect200JSONResponse{BaseUrl: base, McpUrl: base + "mcp", CanKeepKeys: s.a.s.keys != nil,
+	out := api.GetConnect200JSONResponse{BaseUrl: base, McpUrl: base + "mcp", CanKeepKeys: s.a.s.Keyring != nil,
 		Scopes: []api.Scope{}, Tools: []api.AgentToolScope{}, Kinds: []api.AgentKindLabel{}}
 	for _, sc := range Scopes {
 		out.Scopes = append(out.Scopes, api.Scope{Name: sc.Name, What: sc.What})

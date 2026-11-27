@@ -15,7 +15,7 @@ func TestASnapshotCarriesEveryContactColumn(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	rebuilt := []string{"org_id", "company_id"}
-	stmt := &gorm.Statement{DB: s.db}
+	stmt := &gorm.Statement{DB: s.DB}
 	if err := stmt.Parse(&Contact{}); err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func suggestedAndWorked(t *testing.T, s *Store, o *Org) (suggested, worked int64
 func contactsOf(t *testing.T, s *Store, org int64) []Contact {
 	t.Helper()
 	var rows []Contact
-	if err := s.in(org).Order("id").Find(&rows).Error; err != nil {
+	if err := s.InOrg(org).Order("id").Find(&rows).Error; err != nil {
 		t.Fatal(err)
 	}
 	return rows

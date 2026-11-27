@@ -222,7 +222,7 @@ func tryRoutesAsAnotherOrganisation(t *testing.T, gets, posts []string) int {
 	s := tempStore(t)
 	first := seedFirst(t, s)
 	// A run still going, since stopping one only looks among those.
-	if err := s.db.Model(&AgentRun{}).Where("org_id = ?", first.ID).Update("status", RunWorking).Error; err != nil {
+	if err := s.DB.Model(&AgentRun{}).Where("org_id = ?", first.ID).Update("status", RunWorking).Error; err != nil {
 		t.Fatal(err)
 	}
 	before := holdings(t, s, first.ID)

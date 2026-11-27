@@ -26,15 +26,15 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	nia := must(s.QuickAddPerson(o, QuickAdd{Name: "Nia Okafor", Company: deref(hannah.Maker), Email: "nia.okafor@larkmoor.example"}, "ada"))
 	do(s.Update(o.ID, nia.ID, "call_notes", "asked for a callback in spring", "ada"))
 	do(s.Mark(o.ID, nia.ID, "replied", "2020-01-02", "ada"))
-	do(s.db.Create(&Fact{OrgID: o.ID, CompanyID: *nia.CompanyID, ContactID: &nia.ID, Field: "role", Value: "Head of Digital", SourceURL: "https://larkmoor.example/team"}).Error)
-	do(s.db.Create(&Enquiry{OrgID: o.ID, Name: "Nia Okafor", Email: "nia.okafor@larkmoor.example", Message: "Could you call me?", ContactID: &nia.ID}).Error)
+	do(s.DB.Create(&Fact{OrgID: o.ID, CompanyID: *nia.CompanyID, ContactID: &nia.ID, Field: "role", Value: "Head of Digital", SourceURL: "https://larkmoor.example/team"}).Error)
+	do(s.DB.Create(&Enquiry{OrgID: o.ID, Name: "Nia Okafor", Email: "nia.okafor@larkmoor.example", Message: "Could you call me?", ContactID: &nia.ID}).Error)
 
 	if _, err := s.Restore(o.ID, before); err != nil {
 		t.Fatal(err)
 	}
 	history := func(id int64) map[string]bool {
 		var events []Event
-		do(s.in(o.ID).Where("contact_id = ?", id).Find(&events).Error)
+		do(s.InOrg(o.ID).Where("contact_id = ?", id).Find(&events).Error)
 		out := map[string]bool{}
 		for _, e := range events {
 			out[e.Action] = true
@@ -48,7 +48,7 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 		t.Fatalf("history is still filed under someone the restore dropped, for whoever gets her id next: %v", h)
 	}
 	var events []Event
-	do(s.in(o.ID).Find(&events).Error)
+	do(s.InOrg(o.ID).Find(&events).Error)
 	replied := false
 	for _, e := range events {
 		if v := strings.ToLower(deref(e.Value)); strings.Contains(v, "callback") || strings.Contains(v, "nia") {
@@ -60,12 +60,12 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 		t.Fatal("the history lost that a reply happened, which the counts are built from")
 	}
 	var facts int64
-	s.in(o.ID).Model(&Fact{}).Where("contact_id = ?", nia.ID).Count(&facts)
+	s.InOrg(o.ID).Model(&Fact{}).Where("contact_id = ?", nia.ID).Count(&facts)
 	if facts != 0 {
 		t.Fatal("a fact about someone the restore dropped is still filed under her id")
 	}
 	var enquiry Enquiry
-	do(s.in(o.ID).Where("email = ?", "nia.okafor@larkmoor.example").First(&enquiry).Error)
+	do(s.InOrg(o.ID).Where("email = ?", "nia.okafor@larkmoor.example").First(&enquiry).Error)
 	if enquiry.ContactID != nil || enquiry.Message == "" {
 		t.Fatalf("what she wrote to us should stay, matched to nobody: %+v", enquiry)
 	}
@@ -78,13 +78,13 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	}
 
 	// A snapshot from another host can number the same people differently.
-	do(s.db.Create(&Suggestion{OrgID: o.ID, ContactID: hannah.ID, Field: "phone", Value: "+44 20 7946 0111", By: "agent:scout"}).Error)
+	do(s.DB.Create(&Suggestion{OrgID: o.ID, ContactID: hannah.ID, Field: "phone", Value: "+44 20 7946 0111", By: "agent:scout"}).Error)
 	waitsFor := func() (id int64) {
-		s.db.Model(&Suggestion{}).Where("org_id = ?", o.ID).Limit(1).Pluck("contact_id", &id)
+		s.DB.Model(&Suggestion{}).Where("org_id = ?", o.ID).Limit(1).Pluck("contact_id", &id)
 		return id
 	}
 	var rows []Contact
-	do(s.in(o.ID).Find(&rows).Error)
+	do(s.InOrg(o.ID).Find(&rows).Error)
 	for i := range rows {
 		switch rows[i].ID {
 		case hannah.ID:
@@ -109,7 +109,7 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 		t.Fatalf("what was suggested for Hannah didn't follow her to her new id: it waits for %d", waitsFor())
 	}
 
-	do(s.in(o.ID).Find(&rows).Error)
+	do(s.InOrg(o.ID).Find(&rows).Error)
 	for i := range rows {
 		if rows[i].ID == jonas.ID {
 			rows[i].Key, rows[i].Person = "omar-haddad", str("Omar Haddad")

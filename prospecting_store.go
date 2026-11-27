@@ -25,28 +25,28 @@ type prospectingStore struct {
 
 func (s *prospectingStore) CompanyCount(org int64) (int64, error) {
 	var n int64
-	return n, s.in(org).Model(&Company{}).Count(&n).Error
+	return n, s.InOrg(org).Model(&Company{}).Count(&n).Error
 }
 
 // CompanyNotes is one page of the notes left on a company, newest first, and how many there are.
 func (s *prospectingStore) CompanyNotes(org, company int64, offset, limit int) ([]TaskNote, int64, error) {
 	var total int64
-	if err := s.in(org).Model(&TaskNote{}).Where("company_id = ?", company).Count(&total).Error; err != nil {
+	if err := s.InOrg(org).Model(&TaskNote{}).Where("company_id = ?", company).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	var notes []TaskNote
-	return notes, total, s.in(org).Where("company_id = ?", company).Order("id desc").Limit(limit).Offset(offset).Find(&notes).Error
+	return notes, total, s.InOrg(org).Where("company_id = ?", company).Order("id desc").Limit(limit).Offset(offset).Find(&notes).Error
 }
 
 func (s *prospectingStore) CompanyByID(org, id int64) (*Company, error) {
 	var c Company
-	return &c, s.in(org).First(&c, id).Error
+	return &c, s.InOrg(org).First(&c, id).Error
 }
 
 // companyRef resolves an agent's "company" argument: an id or a name.
 func (s *prospectingStore) companyRef(org int64, ref string) (*Company, error) {
 	var c Company
-	q := s.in(org)
+	q := s.InOrg(org)
 	var id int64
 	if _, err := fmt.Sscan(ref, &id); err == nil && fmt.Sprint(id) == strings.TrimSpace(ref) {
 		q = q.Where("id = ?", id)
@@ -61,12 +61,12 @@ func (s *prospectingStore) companyRef(org int64, ref string) (*Company, error) {
 
 func (s *prospectingStore) Facts(org, company int64) ([]Fact, error) {
 	var f []Fact
-	return f, s.in(org).Where("company_id = ?", company).Order("id").Find(&f).Error
+	return f, s.InOrg(org).Where("company_id = ?", company).Order("id").Find(&f).Error
 }
 
 func (s *prospectingStore) People(org, company int64) ([]Contact, error) {
 	var c []Contact
-	return c, s.in(org).Where("company_id = ? and key not like 'org:%'", company).Order("status desc, id").Find(&c).Error
+	return c, s.InOrg(org).Where("company_id = ? and key not like 'org:%'", company).Order("status desc, id").Find(&c).Error
 }
 
 // History is one page of what happened at a company, newest first.
@@ -82,18 +82,18 @@ func (s *prospectingStore) History(org, company int64, page int) ([]HistoryItem,
 
 func (s *prospectingStore) HistoryCount(org, company int64) (int, error) {
 	var total int64
-	err := s.in(org).Model(&Event{}).Where("company_id = ?", company).Count(&total).Error
+	err := s.InOrg(org).Model(&Event{}).Where("company_id = ?", company).Count(&total).Error
 	return int(total), err
 }
 
 func (s *prospectingStore) HistoryAt(org, company int64, offset, limit int) ([]HistoryItem, error) {
 	var events []Event
-	if err := s.in(org).Where("company_id = ?", company).Order("at desc, id desc").Limit(limit).Offset(offset).Find(&events).Error; err != nil {
+	if err := s.InOrg(org).Where("company_id = ?", company).Order("at desc, id desc").Limit(limit).Offset(offset).Find(&events).Error; err != nil {
 		return nil, err
 	}
 	names := map[int64]string{}
 	var people []Contact
-	if err := s.in(org).Where("company_id = ?", company).Find(&people).Error; err != nil {
+	if err := s.InOrg(org).Where("company_id = ?", company).Find(&people).Error; err != nil {
 		return nil, err
 	}
 	for _, p := range people {
@@ -110,7 +110,7 @@ func (s *prospectingStore) HistoryAt(org, company int64, offset, limit int) ([]H
 // of its history is on show.
 func (s *prospectingStore) Touches(org, company int64) (int, error) {
 	var n int64
-	err := s.in(org).Model(&Event{}).Where("company_id = ? and action in ?", company,
+	err := s.InOrg(org).Model(&Event{}).Where("company_id = ? and action in ?", company,
 		[]string{"mark:linkedin", "mark:email", "mark:followup", "mark:call"}).Count(&n).Error
 	return int(n), err
 }
@@ -119,19 +119,19 @@ func (s *prospectingStore) Touches(org, company int64) (int, error) {
 // being the organisation's own: its stages are the companies' own, another's are its
 // verdicts. People count towards the offering they are being reached for.
 func (s *prospectingStore) researchQuery(org, offering int64, filter string, task int64) (*gorm.DB, string, error) {
-	q := s.in(org).Model(&Company{})
+	q := s.InOrg(org).Model(&Company{})
 	if task != 0 {
 		// What a task found is what was done for it, or noted for it, at a company.
-		done := s.db.Model(&Event{}).Select("company_id").Where("org_id = ? and task_id = ?", org, task)
-		noted := s.db.Model(&TaskNote{}).Select("company_id").Where("org_id = ? and task_id = ?", org, task)
+		done := s.DB.Model(&Event{}).Select("company_id").Where("org_id = ? and task_id = ?", org, task)
+		noted := s.DB.Model(&TaskNote{}).Select("company_id").Where("org_id = ? and task_id = ?", org, task)
 		q = q.Where("(id in (?) or id in (?))", done, noted)
 	}
-	people := s.db.Model(&Contact{}).Select("company_id").Where("org_id = ? and company_id is not null and offering_id = ?", org, offering)
+	people := s.DB.Model(&Contact{}).Select("company_id").Where("org_id = ? and company_id is not null and offering_id = ?", org, offering)
 	staged := func(stage string) *gorm.DB {
 		if offering == 0 {
 			return q.Where("stage = ?", stage)
 		}
-		return q.Where("id in (?)", s.db.Model(&Verdict{}).Select("company_id").Where("org_id = ? and offering_id = ? and stage = ?", org, offering, stage))
+		return q.Where("id in (?)", s.DB.Model(&Verdict{}).Select("company_id").Where("org_id = ? and offering_id = ? and stage = ?", org, offering, stage))
 	}
 	// A company the never-contact list covers is kept, but nobody is asked to review it
 	// or find someone there.
@@ -155,7 +155,7 @@ func (s *prospectingStore) researchQuery(org, offering int64, filter string, tas
 		guess := people.Where("(email_status = 'guess' or flags like '%INFERRED%') and email_sent is null and hold is null")
 		return q.Where("id in (?)", guess), "name, id", nil
 	case "details":
-		waiting := people.Where("id in (?)", s.db.Model(&Suggestion{}).Select("contact_id").Where("org_id = ? and decision = ''", org))
+		waiting := people.Where("id in (?)", s.DB.Model(&Suggestion{}).Select("contact_id").Where("org_id = ? and decision = ''", org))
 		return q.Where("id in (?)", waiting), "name, id", nil
 	case "rejected":
 		if offering == 0 {
@@ -181,11 +181,11 @@ func (s *prospectingStore) researchRows(org int64, companies []Company) ([]Resea
 		at[c.ID], ids[i] = i, c.ID
 	}
 	var facts []Fact
-	if err := s.in(org).Where("company_id in ?", ids).Order("id").Find(&facts).Error; err != nil {
+	if err := s.InOrg(org).Where("company_id in ?", ids).Order("id").Find(&facts).Error; err != nil {
 		return nil, err
 	}
 	var people []Contact
-	if err := s.in(org).Where("company_id in ? and key not like 'org:%'", ids).Order("status desc, id").Find(&people).Error; err != nil {
+	if err := s.InOrg(org).Where("company_id in ? and key not like 'org:%'", ids).Order("status desc, id").Find(&people).Error; err != nil {
 		return nil, err
 	}
 	pending, err := s.Pending(org, people)
@@ -363,7 +363,7 @@ func (s *prospectingStore) detailsCount(org, offering, task int64) (int, error) 
 		return 0, err
 	}
 	var people []Contact
-	if err := s.in(org).Where("company_id in ? and key not like 'org:%'", ids).Find(&people).Error; err != nil {
+	if err := s.InOrg(org).Where("company_id in ? and key not like 'org:%'", ids).Find(&people).Error; err != nil {
 		return 0, err
 	}
 	pending, err := s.Pending(org, people)
@@ -409,7 +409,7 @@ func (s *prospectingStore) SetCompanyStage(org, id int64, stage, fit, actor stri
 	if stage != CompanyQualified && stage != CompanyRejected && stage != CompanyReview {
 		return fmt.Errorf("unknown stage %q", stage)
 	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		updates := map[string]any{"stage": stage, "found_for": 0}
 		if fit != "" {
 			updates["fit"] = fit
@@ -418,7 +418,7 @@ func (s *prospectingStore) SetCompanyStage(org, id int64, stage, fit, actor stri
 		if res.Error != nil || res.RowsAffected == 0 {
 			return missing(res.Error, "no company %d", id)
 		}
-		return s.log(tx, org, 0, &id, actor, "company:"+stage, nonEmpty(fit))
+		return s.Log(tx, org, 0, &id, actor, "company:"+stage, nonEmpty(fit))
 	})
 }
 
@@ -430,7 +430,7 @@ func (s *prospectingStore) PickContact(org int64, o *Org, id int64, actor string
 // PickContactFor picks someone for an offering, whatever they were suggested for, or for
 // what they were suggested for when it is nil.
 func (s *prospectingStore) PickContactFor(org int64, o *Org, id int64, offeringID *int64, actor string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var c Contact
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
 			return missing(err, "no contact %d", id)
@@ -485,18 +485,18 @@ func (s *prospectingStore) PickContactFor(org int64, o *Org, id int64, offeringI
 				return res.Error
 			}
 			if res.RowsAffected > 0 {
-				if err := s.log(tx, org, 0, c.CompanyID, actor, "company:"+CompanyQualified, nil); err != nil {
+				if err := s.Log(tx, org, 0, c.CompanyID, actor, "company:"+CompanyQualified, nil); err != nil {
 					return err
 				}
 			}
 		}
-		return s.log(tx, org, id, c.CompanyID, actor, "pick", nil)
+		return s.Log(tx, org, id, c.CompanyID, actor, "pick", nil)
 	})
 }
 
 func (s *prospectingStore) Conversations(org int64) (map[string][]Contact, error) {
 	var rows []Contact
-	if err := s.in(org).Where(inConversation).Order("next_date nulls first, id").Find(&rows).Error; err != nil {
+	if err := s.InOrg(org).Where(inConversation).Order("next_date nulls first, id").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := map[string][]Contact{}
@@ -538,9 +538,9 @@ func (s *prospectingStore) CompaniesList(org int64, q, segment, stage string, in
 
 // companiesQuery is the companies the filters leave, and each company's standing from its people.
 func (s *prospectingStore) companiesQuery(org int64, q, segment, stage string) (db, people *gorm.DB) {
-	people = s.db.Model(&Contact{}).Select("company_id, count(*) as people, "+furthestSQL+" as furthest").
+	people = s.DB.Model(&Contact{}).Select("company_id, count(*) as people, "+furthestSQL+" as furthest").
 		Where("org_id = ? and company_id is not null and key not like 'org:%'", org).Group("company_id")
-	db = s.db.Model(&Company{}).Where("companies.org_id = ?", org)
+	db = s.DB.Model(&Company{}).Where("companies.org_id = ?", org)
 	if q = strings.TrimSpace(strings.ToLower(q)); q != "" {
 		// A union, so each half is answered by its own search index.
 		company, args := s.companyMatch(q)
@@ -600,7 +600,7 @@ func (s *prospectingStore) companyRows(db, people *gorm.DB, offset, limit int) (
 
 func (s *prospectingStore) Segments(org int64) ([]string, error) {
 	var out []string
-	return out, logged(s.in(org).Model(&Company{}).Where("segment <> ''").Distinct().Order("segment").Pluck("segment", &out))
+	return out, logged(s.InOrg(org).Model(&Company{}).Where("segment <> ''").Distinct().Order("segment").Pluck("segment", &out))
 }
 
 func (s *prospectingStore) Week(org int64, now time.Time) Stats {
@@ -610,12 +610,12 @@ func (s *prospectingStore) Week(org int64, now time.Time) Stats {
 	// From the contacts' own dates, so history brought over from an import counts.
 	for _, col := range []string{"linkedin_added", "email_sent", "followup_sent", "called"} {
 		var n int64
-		_ = logged(s.in(org).Model(&Contact{}).Where(col+" >= ?", day).Count(&n))
+		_ = logged(s.InOrg(org).Model(&Contact{}).Where(col+" >= ?", day).Count(&n))
 		st.Touches += n
 	}
-	_ = logged(s.in(org).Model(&Contact{}).Where("replied >= ?", day).Count(&st.Replies))
-	_ = logged(s.in(org).Model(&Event{}).Where("at >= ? and action = ? and value = ?", since, "set:stage", "meeting").Count(&st.Meetings))
-	_ = logged(s.in(org).Model(&Company{}).Where("created_at >= ? and found_by <> 'import'", since).Count(&st.Researched))
+	_ = logged(s.InOrg(org).Model(&Contact{}).Where("replied >= ?", day).Count(&st.Replies))
+	_ = logged(s.InOrg(org).Model(&Event{}).Where("at >= ? and action = ? and value = ?", since, "set:stage", "meeting").Count(&st.Meetings))
+	_ = logged(s.InOrg(org).Model(&Company{}).Where("created_at >= ? and found_by <> 'import'", since).Count(&st.Researched))
 	return st
 }
 
@@ -630,7 +630,7 @@ func (s *prospectingStore) AgentActivity(org int64, page int) ([]AgentEvent, Pag
 // AgentEvents is limit of what agents did from offset, newest first, and how many they
 // did in all; a limit of 0 reads none, only the count.
 func (s *prospectingStore) AgentEvents(org int64, offset, limit int) ([]AgentEvent, int) {
-	agents := func() *gorm.DB { return s.in(org).Model(&Event{}).Where(`"user" like 'agent:%'`) }
+	agents := func() *gorm.DB { return s.InOrg(org).Model(&Event{}).Where(`"user" like 'agent:%'`) }
 	var total int64
 	_ = logged(agents().Count(&total))
 	if limit == 0 {
@@ -650,7 +650,7 @@ func (s *prospectingStore) AgentEvents(org int64, offset, limit int) ([]AgentEve
 // page starts, 0 once there is none, and how many there are in all. It reads from where
 // it left off rather than counting past every row before it.
 func (s *prospectingStore) AgentEventsBefore(org, atMicro, id int64, limit int) (events []AgentEvent, nextAt, nextID int64, total int) {
-	agents := func() *gorm.DB { return s.in(org).Model(&Event{}).Where(`"user" like 'agent:%'`) }
+	agents := func() *gorm.DB { return s.InOrg(org).Model(&Event{}).Where(`"user" like 'agent:%'`) }
 	var n int64
 	_ = logged(agents().Count(&n))
 	q := agents().Order("at desc, id desc").Limit(limit + 1)
@@ -684,11 +684,11 @@ func (s *prospectingStore) QuickAddPerson(o *Org, in QuickAdd, actor string) (*C
 	if err := s.Allowed(o, in.Email, in.Linkedin); err != nil {
 		return nil, err
 	}
-	if err := erased(s.db, o.ID, in.Name, in.Company, in.Email, in.Linkedin); err != nil {
+	if err := erased(s.DB, o.ID, in.Name, in.Company, in.Email, in.Linkedin); err != nil {
 		return nil, err
 	}
 	var out Contact
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := holdOrg(tx, o.ID); err != nil {
 			return err
 		}
@@ -719,12 +719,12 @@ func (s *prospectingStore) QuickAddPerson(o *Org, in QuickAdd, actor string) (*C
 		if err := tx.Create(&out).Error; err != nil {
 			return err
 		}
-		if err := s.log(tx, o.ID, out.ID, companyID, actor, "add:person", nil); err != nil {
+		if err := s.Log(tx, o.ID, out.ID, companyID, actor, "add:person", nil); err != nil {
 			return err
 		}
 		if strings.TrimSpace(in.Note) != "" {
 			// Recorded as an edit so an agent's draft doesn't replace a note the person wrote.
-			return s.log(tx, o.ID, out.ID, companyID, actor, "set:note", nil)
+			return s.Log(tx, o.ID, out.ID, companyID, actor, "set:note", nil)
 		}
 		return nil
 	})
@@ -743,7 +743,7 @@ func (s *prospectingStore) NeverContactCovers(o *Org) []string {
 		return nil
 	}
 	var people []Contact
-	_ = logged(s.in(o.ID).Where(openContacts).Where(companyNotRejected).Order("id").Find(&people))
+	_ = logged(s.InOrg(o.ID).Where(openContacts).Where(companyNotRejected).Order("id").Find(&people))
 	var names []string
 	for _, p := range people {
 		if o.Settings.Listed(deref(p.Email), deref(p.Linkedin)) != nil {
@@ -820,7 +820,7 @@ func (s *prospectingStore) suggest(tx *gorm.DB, who Actor, p Contact, before []S
 		return false, err
 	}
 	// The detail itself stays out of the history.
-	return true, s.logAs(tx, p.OrgID, p.ID, p.CompanyID, who, "suggest:"+field, nil)
+	return true, s.LogAs(tx, p.OrgID, p.ID, p.CompanyID, who, "suggest:"+field, nil)
 }
 
 // Pending groups the suggestions still waiting by the person they are for.
@@ -835,7 +835,7 @@ func (s *prospectingStore) Pending(org int64, people []Contact) (map[int64][]Pen
 		byID[p.ID], ids[i] = p, p.ID
 	}
 	var rows []Suggestion
-	if err := s.db.Where("org_id = ? and decision = '' and contact_id in ?", org, ids).Order("id").Find(&rows).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and decision = '' and contact_id in ?", org, ids).Order("id").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	for _, r := range rows {
@@ -854,7 +854,7 @@ func (s *prospectingStore) DecideSuggestion(org, id int64, decision, actor strin
 	if decision != SuggestionAccepted && decision != SuggestionDismissed {
 		return fmt.Errorf("unknown decision %q", decision)
 	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var sg Suggestion
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&sg).Error; err != nil {
 			return missing(err, "no suggestion %d", id)
@@ -877,7 +877,7 @@ func (s *prospectingStore) DecideSuggestion(org, id int64, decision, actor strin
 			if err := tx.Where("org_id = ? and id = ?", org, sg.ContactID).Limit(1).Find(&c).Error; err != nil {
 				return err
 			}
-			return s.log(tx, org, c.ID, c.CompanyID, actor, "dismiss:"+sg.Field, nil)
+			return s.Log(tx, org, c.ID, c.CompanyID, actor, "dismiss:"+sg.Field, nil)
 		}
 		if err := s.set(tx, org, sg.ContactID, sg.Field, sg.Value, actor); err != nil {
 			return err
@@ -892,7 +892,7 @@ func (s *prospectingStore) DecideSuggestion(org, id int64, decision, actor strin
 // indexSearch never stops the server starting: without the index, search scans as it always did.
 func (s *prospectingStore) indexSearch() {
 	for _, stmt := range postgresSearch {
-		if err := s.db.Exec(stmt).Error; err != nil {
+		if err := s.DB.Exec(stmt).Error; err != nil {
 			log.Printf("search index unavailable, searching by scan: %v", err)
 			return
 		}
@@ -927,7 +927,7 @@ func (s *prospectingStore) heldWhenFound(tx *gorm.DB, org int64, who Actor, c *C
 	if err != nil {
 		return err
 	}
-	return s.logAs(tx, org, 0, &c.ID, who, actionHeld, &why)
+	return s.LogAs(tx, org, 0, &c.ID, who, actionHeld, &why)
 }
 
 // heldWhenReached is heldWhenFound for a company an agent reaches through a fact or a
@@ -954,7 +954,7 @@ func (s *prospectingStore) withheld(org int64, who Actor, why string) {
 	if who.Task == 0 {
 		return
 	}
-	if err := s.logAs(s.db, org, 0, nil, who, actionWithheld, &why); err != nil {
+	if err := s.LogAs(s.DB, org, 0, nil, who, actionWithheld, &why); err != nil {
 		log.Printf("counting a refusal for task %d: %v", who.Task, err)
 	}
 }

@@ -23,11 +23,11 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 
 	task := must(s.CreateTask(first.ID, "Find them", "a brief", "Owner One"))
 	var request TaskRequest
-	if err := s.db.Where("task_id = ?", task.ID).First(&request).Error; err != nil {
+	if err := s.DB.Where("task_id = ?", task.ID).First(&request).Error; err != nil {
 		t.Fatal(err)
 	}
 	agent := Agent{OrgID: first.ID, Name: "scout"}
-	if err := s.db.Create(&agent).Error; err != nil {
+	if err := s.DB.Create(&agent).Error; err != nil {
 		t.Fatal(err)
 	}
 	lease := now.Add(-time.Minute).UnixMilli()
@@ -39,49 +39,49 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 	if err := s.RevokeKey(first.ID, key.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.db.Model(&request).Update("done_at", now).Error; err != nil {
+	if err := s.DB.Model(&request).Update("done_at", now).Error; err != nil {
 		t.Fatal(err)
 	}
 	claim := RequestClaim{RequestID: request.ID, OrgID: first.ID, TaskID: task.ID, Holder: fmt.Sprintf("key:%d", key.ID), Actor: "scout", ClaimedAt: now.UnixMilli()}
 	domain := must(s.AddSSODomain(first.ID, "alpha.example"))
 	campaign := Campaign{OrgID: first.ID, Name: "Spring", Status: CampaignSending}
-	if err := s.db.Create(&campaign).Error; err != nil {
+	if err := s.DB.Create(&campaign).Error; err != nil {
 		t.Fatal(err)
 	}
 	queued := CampaignRecipient{OrgID: first.ID, CampaignID: campaign.ID, Address: "ann@alpha.example", Status: MailQueued}
 	sent := CampaignRecipient{OrgID: first.ID, CampaignID: campaign.ID, Address: "bob@alpha.example", Status: MailSent, SentAt: &now}
 	note := TaskNote{OrgID: first.ID, TaskID: task.ID, CompanyID: 7, Actor: "scout", Kind: "skipped", Text: "not for us"}
 	for _, row := range []any{&claim, &queued, &sent, &note} {
-		if err := s.db.Create(row).Error; err != nil {
+		if err := s.DB.Create(row).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
 	ann := person(t, s, first, "Ann Alpha", "Alpha Works", "ann@alpha.example", false)
 	company := Company{ID: *ann.CompanyID}
-	if err := s.db.Model(&company).Update("stage", CompanyReview).Error; err != nil {
+	if err := s.DB.Model(&company).Update("stage", CompanyReview).Error; err != nil {
 		t.Fatal(err)
 	}
 	enquiry := Enquiry{OrgID: first.ID, Name: "Ann Alpha", Email: "ann@alpha.example", CompanyID: ann.CompanyID, ContactID: &ann.ID}
-	if err := s.db.Create(&enquiry).Error; err != nil {
+	if err := s.DB.Create(&enquiry).Error; err != nil {
 		t.Fatal(err)
 	}
 	reply := EnquiryMessage{OrgID: first.ID, EnquiryID: enquiry.ID, Ours: true, Text: "Thanks", By: "Owner One", CreatedAt: now}
 	onboarding := Onboarding{OrgID: first.ID, CompanyID: company.ID, Name: "Setup"}
 	subscription := Subscription{OrgID: first.ID, CompanyID: company.ID, Name: "Licence", Start: "2020-01-01"}
 	for _, row := range []any{&reply, &onboarding, &subscription} {
-		if err := s.db.Create(row).Error; err != nil {
+		if err := s.DB.Create(row).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
 	step := OnboardingStep{OrgID: first.ID, OnboardingID: onboarding.ID, Seq: 1, Name: "Send files", Who: StepTheirs}
 	grant := CustomerGrant{OrgID: first.ID, OnboardingID: onboarding.ID, ContactID: ann.ID}
 	for _, row := range []any{&step, &grant} {
-		if err := s.db.Create(row).Error; err != nil {
+		if err := s.DB.Create(row).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
 	link := randomToken(16)
-	if err := s.db.Create(&CustomerLink{OrgID: first.ID, GrantID: grant.ID, TokenHash: hashToken(link), ExpiresAt: now.Add(time.Hour)}).Error; err != nil {
+	if err := s.DB.Create(&CustomerLink{OrgID: first.ID, GrantID: grant.ID, TokenHash: hashToken(link), ExpiresAt: now.Add(time.Hour)}).Error; err != nil {
 		t.Fatal(err)
 	}
 	customer := &CustomerAccess{Grant: grant, Org: *first, Onboarding: onboarding, Contact: *ann}
@@ -175,8 +175,8 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 		"FinishIfDone": func(s *Store) error { return s.SkipMail(first.ID, queued.ID, "skipped") },
 	}
 	try := func(name string, call func(s *Store, org int64) any, org int64) (got any, changed bool) {
-		on := s.through(s.db.Begin())
-		defer on.db.Rollback()
+		on := s.through(s.DB.Begin())
+		defer on.DB.Rollback()
 		if ready[name] != nil {
 			if err := ready[name](on); err != nil {
 				t.Fatal(err)

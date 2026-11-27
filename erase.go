@@ -59,7 +59,7 @@ func erased(tx *gorm.DB, org int64, person, maker, email, link string) error {
 // names alternates ("A or B") goes whole. The company's history keeps that something
 // happened and when, which the counts are built from, but not to whom.
 func (s *Store) ErasePerson(org, id int64, actor string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var c Contact
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
 			return missing(err, "no contact %d", id)
@@ -167,7 +167,7 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 				return err
 			}
 		}
-		return s.log(tx, org, 0, c.CompanyID, actor, "erase", nil)
+		return s.Log(tx, org, 0, c.CompanyID, actor, "erase", nil)
 	})
 }
 

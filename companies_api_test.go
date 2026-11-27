@@ -201,7 +201,7 @@ func TestOnlyAnOwnerExportsOrErasesAPersonThroughTheAPI(t *testing.T) {
 		t.Fatalf("an owner erasing her: %d %s", code, body)
 	}
 	var left int64
-	s.in(o.ID).Model(&Contact{}).Where("id = ?", hannah.ID).Count(&left)
+	s.InOrg(o.ID).Model(&Contact{}).Where("id = ?", hannah.ID).Count(&left)
 	if left != 0 {
 		t.Fatal("she is still held after being erased")
 	}

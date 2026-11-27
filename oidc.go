@@ -33,17 +33,6 @@ var (
 // each ID token then names its own tenant's.
 const tenantPlaceholder = "{tenantid}"
 
-// idpSpec is this app as one OpenID Connect provider has it registered.
-type idpSpec struct {
-	Issuer, ClientID, Secret, Redirect string
-	// Plain is LinkedIn: it documents neither PKCE nor a nonce, wants the secret in the
-	// form, and says whether the email is verified only at its userinfo endpoint.
-	Plain bool
-	// ManyTenants allows an issuer that serves every tenant under one registration.
-	// Only Microsoft's social sign-in is one: an organisation's own must pin its tenant.
-	ManyTenants bool
-}
-
 var errManyTenants = errors.New("that issuer signs in every tenant under one registration, so it pins nobody to yours: use your own tenant's issuer")
 
 type idp struct {
@@ -145,15 +134,15 @@ var processKey = []byte(randomToken(32))
 // signAttempt signs the attempt cookie, so a callback nobody started here can't make
 // the server call a provider.
 func (a *App) signAttempt(value string) string {
-	if a.s.keys != nil {
-		return a.s.keys.sign(attempts, value)
+	if a.s.Keyring != nil {
+		return a.s.Keyring.Sign(attempts, value)
 	}
 	return mac(processKey, value)
 }
 
 func (a *App) attemptSigned(value, signature string) bool {
-	if a.s.keys != nil {
-		return a.s.keys.verify(attempts, value, signature)
+	if a.s.Keyring != nil {
+		return a.s.Keyring.Verify(attempts, value, signature)
 	}
 	return hmac.Equal([]byte(mac(processKey, value)), []byte(signature))
 }

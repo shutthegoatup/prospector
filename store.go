@@ -22,20 +22,6 @@ var Columns = []string{"id", "key", "file", "section", "fit", "maker", "person",
 	"linkedin_added", "email_sent", "followup_sent", "replied", "declined", "hold",
 	"sources", "phone", "called", "call_notes", "tz", "send_to", "accepted", "message"}
 
-// Actor is who an operation is recorded against: a name ("agent:<key name>" for an
-// agent), the key behind it, and the task it is working on, if any.
-type Actor struct {
-	Task  int64
-	Name  string
-	KeyID int64
-	// ReadOnly is a key that can add nothing, so its reading a task isn't work on it.
-	ReadOnly bool
-	// Session is the MCP session calling, if any: two clients on one key are two agents.
-	Session string
-	// Offering is what Task is finding companies for; 0 is the organisation's own.
-	Offering int64
-}
-
 var Editable = map[string]bool{"phone": true, "email": true, "linkedin": true, "sources": true,
 	"call_notes": true, "tz": true, "person": true, "send_to": true, "message": true, "note": true,
 	"body": true, "followup": true, "subject": true,
@@ -72,16 +58,6 @@ type Store struct {
 	onboardingStore
 }
 
-// core is what every area's queries need: the database and the means to keep secrets.
-type core struct {
-	db *gorm.DB
-	// keys seal what is stored but mustn't be readable from the database alone; nil
-	// when the server was given none.
-	keys *keyring
-	// dns says whether a domain takes mail; nil asks nothing, so tests never reach the network.
-	dns mailDNS
-}
-
 func newStore(c *core) *Store {
 	s := &Store{core: c, identityStore: identityStore{c}, agentStore: agentStore{c}, ssoStore: ssoStore{c},
 		suppressionStore: suppressionStore{c}, customerStore: customerStore{c}, dealStore: dealStore{c},
@@ -97,7 +73,7 @@ func newStore(c *core) *Store {
 
 // through is the same store working through db, such as a transaction.
 func (s *Store) through(db *gorm.DB) *Store {
-	return newStore(&core{db: db, keys: s.keys, dns: s.dns})
+	return newStore(&core{DB: db, Keyring: s.Keyring, DNS: s.DNS})
 }
 
 var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
@@ -134,12 +110,8 @@ func connect(dsn string) (*Store, error) {
 	pool.SetMaxOpenConns(20)
 	pool.SetMaxIdleConns(20)
 	pool.SetConnMaxIdleTime(5 * time.Minute)
-	return newStore(&core{db: db}), nil
+	return newStore(&core{DB: db}), nil
 }
-
-// in scopes a query to one organisation. Not every query uses it, so what holds the
-// store's exported methods to their organisation is TestNoMethodReachesIntoAnotherOrganisation.
-func (s *core) in(org int64) *gorm.DB { return s.db.Where("org_id = ?", org) }
 
 // holdOrg and hold make a transaction wait its turn on one row, so a rule that is
 // checked by reading and then kept by writing ("add it unless it is already here")
@@ -158,7 +130,7 @@ func hold(tx *gorm.DB, model any, org, id int64) error {
 // that already differ only in capitals keep it from being built, which costs the
 // check its backing and nothing else, so the server still starts.
 func (s *Store) oneNameWhateverItsCapitals() {
-	err := s.db.Exec("create unique index if not exists idx_companies_org_name_folded on companies (org_id, lower(name))").Error
+	err := s.DB.Exec("create unique index if not exists idx_companies_org_name_folded on companies (org_id, lower(name))").Error
 	if err != nil {
 		log.Printf("companies in one organisation share a name but for its capitals, so nothing but the look-up keeps another out: %v", err)
 	}
@@ -183,12 +155,4 @@ func nonEmpty(v string) *string {
 		return nil
 	}
 	return &v
-}
-
-func (s *core) log(tx *gorm.DB, org, contact int64, company *int64, actor, action string, value *string) error {
-	return s.logAs(tx, org, contact, company, Actor{Name: actor}, action, value)
-}
-
-func (s *core) logAs(tx *gorm.DB, org, contact int64, company *int64, who Actor, action string, value *string) error {
-	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: who.Name, KeyID: who.KeyID, TaskID: who.Task, Action: action, Value: value, At: time.Now()}).Error
 }

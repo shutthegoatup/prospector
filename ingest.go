@@ -24,7 +24,7 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 		return strings.EqualFold(strings.TrimSpace(fresh), strings.TrimSpace(deref(have)))
 	}
 	for _, d := range p.Drafts {
-		if err := erased(s.db, org, d.Person, d.Maker, d.Email, d.Linkedin); err != nil {
+		if err := erased(s.DB, org, d.Person, d.Maker, d.Email, d.Linkedin); err != nil {
 			if !errors.Is(err, errErased) {
 				return 0, err
 			}
@@ -35,7 +35,7 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 			continue
 		}
 		var have Contact
-		known := s.in(org).Where("key = ?", d.Key).First(&have).Error == nil
+		known := s.InOrg(org).Where("key = ?", d.Key).First(&have).Error == nil
 		if email != nil && !(known && stored(d.Email, have.Email)) { //nolint:staticcheck // unless it's already stored
 			blocked = append(blocked, fmt.Sprintf("%s in %s (%v)", d.Key, d.File, email))
 		}
@@ -47,7 +47,7 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 		return 0, fmt.Errorf("nothing imported: %s", strings.Join(blocked, "; "))
 	}
 	var total int64
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
 		for _, d := range p.Drafts {
 			if err := upsertDraft(tx, org, d); err != nil {
 				return err

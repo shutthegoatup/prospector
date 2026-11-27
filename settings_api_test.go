@@ -113,7 +113,7 @@ func TestOnlyWhatTakesEffectDifferentlyIsAChange(t *testing.T) {
 	changes := func() []string {
 		var out []string
 		var events []Event
-		s.db.Where("org_id = ? and action = ?", o.ID, "settings:change").Order("id").Find(&events)
+		s.DB.Where("org_id = ? and action = ?", o.ID, "settings:change").Order("id").Find(&events)
 		for _, e := range events {
 			out = append(out, deref(e.Value))
 		}

@@ -254,7 +254,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 	if err != nil || !cfg.Ready() {
 		return RunFailed, "the agent is no longer set up: see the Agents page"
 	}
-	key, err := a.s.keys.open(cfg.APIKey)
+	key, err := a.s.Keyring.Open(cfg.APIKey)
 	if err != nil {
 		return RunFailed, "the endpoint's key can't be read: an owner enters it again on the Agents page"
 	}

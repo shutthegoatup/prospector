@@ -2,9 +2,7 @@ package main
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
@@ -30,11 +28,6 @@ func randomToken(n int) string {
 		panic(err)
 	}
 	return base64.RawURLEncoding.EncodeToString(b)
-}
-
-func hashToken(t string) string {
-	h := sha256.Sum256([]byte(t))
-	return hex.EncodeToString(h[:])
 }
 
 func slugify(name string) string {

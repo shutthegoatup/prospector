@@ -289,7 +289,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	key := strings.TrimSpace(in.APIKey)
 	sameEndpoint := c.BaseURL == base && c.Kind == kind
 	if key == "" && c.APIKey != "" && sameEndpoint {
-		if key, err = a.s.keys.open(c.APIKey); err != nil {
+		if key, err = a.s.Keyring.Open(c.APIKey); err != nil {
 			return nil, fmt.Errorf("the saved key can't be read: enter it again (%w)", err)
 		}
 	}
@@ -299,10 +299,10 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	if len(key) > 4096 || strings.ContainsAny(key, " \r\n\t") {
 		return nil, errors.New("that doesn't look like an API key")
 	}
-	if a.s.keys == nil {
+	if a.s.Keyring == nil {
 		return nil, errors.New("this server has no secret key, so it can't keep an API key safely: ask whoever runs it to set PROSPECTOR_SECRET_KEYS")
 	}
-	sealedKey, err := a.s.keys.seal(key)
+	sealedKey, err := a.s.Keyring.Seal(key)
 	if err != nil {
 		return nil, err
 	}

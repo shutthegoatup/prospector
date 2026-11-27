@@ -64,7 +64,7 @@ func sqlQuote(p *string) string {
 // SnapshotText is the sorted text snapshot the Python tracker wrote, so the committed history carries on.
 func (s *Store) SnapshotText(org int64) (string, error) {
 	var rows []Contact
-	if err := s.in(org).Find(&rows).Error; err != nil {
+	if err := s.InOrg(org).Find(&rows).Error; err != nil {
 		return "", err
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].Key < rows[j].Key })
@@ -261,7 +261,7 @@ func (s *Store) ImportLegacy(org int64, path string) (int, error) {
 // laterColumns the rows' source doesn't hold: someone already here under the same key
 // keeps what they have in those, since the source says nothing about them.
 func (s *Store) replaceContacts(org int64, rows []Contact, absent []string) (int, error) {
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		kept := rows[:0]
 		for _, r := range rows {
 			err := erased(tx, org, displayName(r), deref(r.Maker), deref(r.Email), deref(r.Linkedin))

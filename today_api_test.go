@@ -125,7 +125,7 @@ func TestTodaysQueueIsInTheAPI(t *testing.T) {
 		}
 	}
 	var e Event
-	if err := s.db.Where("contact_id = ? and action = ?", hannah.ID, "mark:linkedin").First(&e).Error; err != nil || e.User != "Ada Lovelace" || e.KeyID != 0 {
+	if err := s.DB.Where("contact_id = ? and action = ?", hannah.ID, "mark:linkedin").First(&e).Error; err != nil || e.User != "Ada Lovelace" || e.KeyID != 0 {
 		t.Fatalf("the mark's event: %+v %v", e, err)
 	}
 }
@@ -175,7 +175,7 @@ func TestMarkingIsRefusedToWhoeverMayNot(t *testing.T) {
 		t.Fatalf("a key marking: %d %s", code, body)
 	}
 	var e Event
-	if err := s.db.Where("contact_id = ? and action = ?", c.ID, "mark:linkedin").First(&e).Error; err != nil || e.User != "agent:scout" || e.KeyID != k.ID || deref(e.Value) != day+" · Ada said she sent it" {
+	if err := s.DB.Where("contact_id = ? and action = ?", c.ID, "mark:linkedin").First(&e).Error; err != nil || e.User != "agent:scout" || e.KeyID != k.ID || deref(e.Value) != day+" · Ada said she sent it" {
 		t.Fatalf("a key's mark should be the agent's, with its date and note: %+v %v", e, err)
 	}
 }

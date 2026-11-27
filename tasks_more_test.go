@@ -19,7 +19,7 @@ func TestAKeyThatCanOnlyReadDoesNotPickATaskUp(t *testing.T) {
 		t.Fatalf("a read-only key should still read the task: %+v", got)
 	}
 	var events int64
-	s.in(o.ID).Model(&Event{}).Where(`"user" = ?`, reader.Name).Count(&events)
+	s.InOrg(o.ID).Model(&Event{}).Where(`"user" = ?`, reader.Name).Count(&events)
 	if list := must(firstOf(s.AgentTasks(o.ID, reader, paging.Page{}))); events != 0 || list[0].Status != TaskWaiting {
 		t.Fatalf("a key that can add nothing made the task look worked on: %d events, %s", events, list[0].Status)
 	}
@@ -51,7 +51,7 @@ func TestPickingUpATaskIsRecordedOnceARun(t *testing.T) {
 		must(s.AgentTask(o.ID, second, task.ID, paging.Page{}))
 	}
 	var pickups int64
-	s.in(o.ID).Model(&Event{}).Where("action = ?", "task:pickup").Count(&pickups)
+	s.InOrg(o.ID).Model(&Event{}).Where("action = ?", "task:pickup").Count(&pickups)
 	if pickups != 2 {
 		t.Fatalf("two agents reading a task in turn should each be recorded once, got %d", pickups)
 	}
@@ -61,7 +61,7 @@ func TestPickingUpATaskIsRecordedOnceARun(t *testing.T) {
 	if got := must(s.AgentTask(o.ID, Actor{Name: "agent:third", KeyID: 3}, task.ID, paging.Page{})); got.Status != TaskClosed {
 		t.Fatalf("a closed task can still be read, as closed: %s", got.Status)
 	}
-	if s.in(o.ID).Model(&Event{}).Where("action = ?", "task:pickup").Count(&pickups); pickups != 2 {
+	if s.InOrg(o.ID).Model(&Event{}).Where("action = ?", "task:pickup").Count(&pickups); pickups != 2 {
 		t.Fatal("reading a closed task was recorded as picking it up")
 	}
 	if err := s.SetTaskClosed(o.ID, task.ID, false, "Ada Lovelace"); err != nil {

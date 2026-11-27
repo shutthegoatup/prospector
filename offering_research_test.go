@@ -127,7 +127,7 @@ func TestEachOfferingHasAResearchQueueOfItsOwn(t *testing.T) {
 		t.Fatalf("picking for the offering: %d %s", code, body)
 	}
 	var got Contact
-	if err := s.in(o.ID).Where("id = ?", priya.ID).First(&got).Error; err != nil || got.OfferingID != roles.ID {
+	if err := s.InOrg(o.ID).Where("id = ?", priya.ID).First(&got).Error; err != nil || got.OfferingID != roles.ID {
 		t.Fatalf("someone picked for an offering should be reached for it: %d %v", got.OfferingID, err)
 	}
 	if _, page := queueAt(t, base+"?offering="+itoa(roles.ID)+"&filter=contact", secret); len(page.Items) != 0 {

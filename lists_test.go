@@ -15,7 +15,7 @@ func seedCompanies(t *testing.T, s *Store, org int64, n int, stage, segment stri
 	for i := range rows {
 		rows[i] = Company{OrgID: org, Name: fmt.Sprintf("Maker %03d", i+1), Stage: stage, Segment: segment}
 	}
-	if err := s.db.CreateInBatches(&rows, 100).Error; err != nil {
+	if err := s.DB.CreateInBatches(&rows, 100).Error; err != nil {
 		t.Fatal(err)
 	}
 	return rows
@@ -24,7 +24,7 @@ func seedCompanies(t *testing.T, s *Store, org int64, n int, stage, segment stri
 func seedContact(t *testing.T, s *Store, c Contact) Contact {
 	t.Helper()
 	c.File = "test"
-	if err := s.db.Create(&c).Error; err != nil {
+	if err := s.DB.Create(&c).Error; err != nil {
 		t.Fatal(err)
 	}
 	return c
@@ -107,7 +107,7 @@ func TestPipelineInSQL(t *testing.T) {
 		if strings.HasPrefix(name, "Turned down") {
 			c.Stage = CompanyRejected
 		}
-		if err := s.db.Create(&c).Error; err != nil {
+		if err := s.DB.Create(&c).Error; err != nil {
 			t.Fatal(err)
 		}
 		for i, p := range list {
@@ -177,7 +177,7 @@ func TestResearchIsPaged(t *testing.T) {
 	for _, i := range []int{0, 229} {
 		c := seeded[i]
 		for _, field := range []string{"platform", "team_page"} {
-			if err := s.db.Create(&Fact{OrgID: o.ID, CompanyID: c.ID, Field: field, Value: c.Name, SourceURL: "https://maker.example"}).Error; err != nil {
+			if err := s.DB.Create(&Fact{OrgID: o.ID, CompanyID: c.ID, Field: field, Value: c.Name, SourceURL: "https://maker.example"}).Error; err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -234,7 +234,7 @@ func TestSearch(t *testing.T) {
 	a, b := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
 	add := func(o *Org, c Company, people ...Contact) Company {
 		c.OrgID, c.Stage = o.ID, CompanyQualified
-		if err := s.db.Create(&c).Error; err != nil {
+		if err := s.DB.Create(&c).Error; err != nil {
 			t.Fatal(err)
 		}
 		for _, p := range people {
@@ -289,7 +289,7 @@ func TestSearch(t *testing.T) {
 	}
 
 	// The index follows edits and removals made by any route.
-	if err := s.db.Model(&Company{}).Where("id = ?", lark.ID).Updates(map[string]any{"name": "Windrush Marine"}).Error; err != nil {
+	if err := s.DB.Model(&Company{}).Where("id = ?", lark.ID).Updates(map[string]any{"name": "Windrush Marine"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	p, _ := s.FindOne(a.ID, "Hannah")
@@ -302,7 +302,7 @@ func TestSearch(t *testing.T) {
 	if search("larkmoor yachts") != "" || search("hannah pryce") != "" {
 		t.Error("search still finds the old names")
 	}
-	if err := s.db.Where("org_id = ?", a.ID).Delete(&Contact{}).Error; err != nil {
+	if err := s.DB.Where("org_id = ?", a.ID).Delete(&Contact{}).Error; err != nil {
 		t.Fatal(err)
 	}
 	if search("imogen") != "" || len(mustSearch(t, s, a.ID, "imogen")) != 0 {
@@ -320,7 +320,7 @@ func TestSearchIndexIsBuiltForExistingRows(t *testing.T) {
 	}
 	indexes := []string{"idx_companies_search", "idx_contacts_person_search", "idx_contacts_search"}
 	for _, name := range indexes {
-		if err := s.db.Exec("drop index " + name).Error; err != nil {
+		if err := s.DB.Exec("drop index " + name).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -329,7 +329,7 @@ func TestSearchIndexIsBuiltForExistingRows(t *testing.T) {
 	}
 	s.indexSearch()
 	var built int64
-	if err := s.db.Raw("select count(*) from pg_indexes where schemaname = current_schema() and indexname in ?", indexes).Scan(&built).Error; err != nil || built != int64(len(indexes)) {
+	if err := s.DB.Raw("select count(*) from pg_indexes where schemaname = current_schema() and indexname in ?", indexes).Scan(&built).Error; err != nil || built != int64(len(indexes)) {
 		t.Fatalf("%d of the %d search indexes were rebuilt: %v", built, len(indexes), err)
 	}
 	for _, q := range []string{"larkmoor", "pryce", "windrush", "imogen"} {

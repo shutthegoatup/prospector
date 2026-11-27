@@ -144,7 +144,7 @@ func (a *App) enrichField(ctx context.Context, o *Org, who Actor, c Contact, p e
 			continue
 		}
 		tried = true
-		key, err := s.keys.open(e.APIKey)
+		key, err := s.Keyring.Open(e.APIKey)
 		if err != nil {
 			asked = EnrichAsked{Field: field, Vendor: e.Kind, Outcome: "failed", Detail: err.Error()}
 			continue

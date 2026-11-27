@@ -15,7 +15,7 @@ import (
 func verdictFor(t *testing.T, s *Store, org, offering, company int64) Verdict {
 	t.Helper()
 	var v Verdict
-	if err := s.in(org).Where("offering_id = ? and company_id = ?", offering, company).First(&v).Error; err != nil {
+	if err := s.InOrg(org).Where("offering_id = ? and company_id = ?", offering, company).First(&v).Error; err != nil {
 		t.Fatal(err)
 	}
 	return v

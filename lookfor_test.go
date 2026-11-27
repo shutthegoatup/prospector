@@ -75,7 +75,7 @@ func TestOlderAgentsConfiguratorBecomesFacts(t *testing.T) {
 		t.Fatalf("an older agent's platform with no configurator link was refused: %v", err)
 	}
 	var uncited Fact
-	s.in(o.ID).Where("company_id = ? and field = 'platform'", corvane.ID).First(&uncited)
+	s.InOrg(o.ID).Where("company_id = ? and field = 'platform'", corvane.ID).First(&uncited)
 	if uncited.Value != "Kickflip" || uncited.SourceURL != "" || uncited.Actor != "agent:bot" {
 		t.Fatalf("a platform with nothing to cite: %+v", uncited)
 	}
@@ -87,7 +87,7 @@ func TestOlderAgentsConfiguratorBecomesFacts(t *testing.T) {
 func (s *Store) companyFacts(t *testing.T, org, company int64) map[string]string {
 	t.Helper()
 	var facts []Fact
-	if err := s.in(org).Where("company_id = ?", company).Find(&facts).Error; err != nil {
+	if err := s.InOrg(org).Where("company_id = ?", company).Find(&facts).Error; err != nil {
 		t.Fatal(err)
 	}
 	out := map[string]string{}
@@ -105,7 +105,7 @@ func TestImportedConfiguratorsShow(t *testing.T) {
 		t.Fatal(err)
 	}
 	var facts int64
-	s.in(o.ID).Model(&Fact{}).Where("field = 'configurator'").Count(&facts)
+	s.InOrg(o.ID).Model(&Fact{}).Where("field = 'configurator'").Count(&facts)
 	if o, _ = s.OrgBySlug("alpha"); facts == 0 || !strings.HasPrefix(o.Settings.LookFor, "configurator:") {
 		t.Fatalf("%d configurator facts imported, looking for %q", facts, o.Settings.LookFor)
 	}

@@ -10,25 +10,25 @@ import (
 var runGoing = []string{RunWorking, RunWaiting}
 
 func (s *agentStore) TaskOpen(org, task int64) error {
-	_, err := openTask(s.db, org, task)
+	_, err := openTask(s.DB, org, task)
 	return err
 }
 
 // RunsOn counts the runs of one agent working or waiting on a task.
 func (s *agentStore) RunsOn(org, task, agent int64) (int64, error) {
 	var n int64
-	return n, s.in(org).Model(&AgentRun{}).Where("task_id = ? and agent_id = ? and status in ?", task, agent, runGoing).Count(&n).Error
+	return n, s.InOrg(org).Model(&AgentRun{}).Where("task_id = ? and agent_id = ? and status in ?", task, agent, runGoing).Count(&n).Error
 }
 
 // AddRun fails if the agent already has a run going on the task, which an index keeps.
 func (s *agentStore) AddRun(org int64, run AgentRun) (*AgentRun, error) {
 	run.ID, run.OrgID = 0, org
-	return &run, s.db.Create(&run).Error
+	return &run, s.DB.Create(&run).Error
 }
 
 func (s *agentStore) RunByID(org, id int64) (*AgentRun, error) {
 	var run AgentRun
-	if err := s.in(org).First(&run, id).Error; err != nil {
+	if err := s.InOrg(org).First(&run, id).Error; err != nil {
 		return nil, missing(err, "no run %d in this organisation", id)
 	}
 	return &run, nil
@@ -37,7 +37,7 @@ func (s *agentStore) RunByID(org, id int64) (*AgentRun, error) {
 // AskRunStop reports whether the run was still going; one that has ended is as
 // stopped as it will get.
 func (s *agentStore) AskRunStop(org, id int64) (going bool, err error) {
-	res := s.in(org).Model(&AgentRun{}).Where("id = ? and status in ?", id, runGoing).Update("stop_asked", true)
+	res := s.InOrg(org).Model(&AgentRun{}).Where("id = ? and status in ?", id, runGoing).Update("stop_asked", true)
 	if res.Error != nil || res.RowsAffected > 0 {
 		return res.RowsAffected > 0, res.Error
 	}
@@ -50,14 +50,14 @@ func (s *agentStore) AskRunStop(org, id int64) (going bool, err error) {
 
 // RenewRun reports false once a person has stopped the run or another server took it.
 func (s *agentStore) RenewRun(org, id int64, owner string, until time.Time) (bool, error) {
-	res := s.in(org).Model(&AgentRun{}).Where("id = ? and owner = ? and stop_asked = ? and status in ?", id, owner, false, runGoing).
+	res := s.InOrg(org).Model(&AgentRun{}).Where("id = ? and owner = ? and stop_asked = ? and status in ?", id, owner, false, runGoing).
 		Update("lease_until", until.UnixMilli())
 	return res.RowsAffected > 0, res.Error
 }
 
 // HoldRun renews the lease as RenewRun does, and keeps the run's status and counts.
 func (s *agentStore) HoldRun(org int64, run AgentRun, status string, waitUntil *time.Time, until time.Time) (bool, error) {
-	res := s.in(org).Model(&AgentRun{}).Where("id = ? and owner = ? and stop_asked = ? and status in ?", run.ID, run.Owner, false, runGoing).
+	res := s.InOrg(org).Model(&AgentRun{}).Where("id = ? and owner = ? and stop_asked = ? and status in ?", run.ID, run.Owner, false, runGoing).
 		Updates(map[string]any{"lease_until": until.UnixMilli(), "status": status, "wait_until": waitUntil,
 			"turns": run.Turns, "episodes": run.Episodes, "tool_calls": run.ToolCalls, "added": run.Added,
 			"tokens_in": run.TokensIn, "tokens_out": run.TokensOut, "request_id": run.RequestID})
@@ -65,7 +65,7 @@ func (s *agentStore) HoldRun(org int64, run AgentRun, status string, waitUntil *
 }
 
 func (s *agentStore) EndRun(org int64, run AgentRun, status, reason string, at time.Time) error {
-	return s.in(org).Model(&AgentRun{}).Where("id = ? and owner = ?", run.ID, run.Owner).
+	return s.InOrg(org).Model(&AgentRun{}).Where("id = ? and owner = ?", run.ID, run.Owner).
 		Updates(map[string]any{"status": status, "stop_reason": reason, "ended_at": &at, "lease_until": 0, "wait_until": nil,
 			"turns": run.Turns, "episodes": run.Episodes, "tool_calls": run.ToolCalls, "added": run.Added,
 			"tokens_in": run.TokensIn, "tokens_out": run.TokensOut, "request_id": run.RequestID}).Error
@@ -74,19 +74,19 @@ func (s *agentStore) EndRun(org int64, run AgentRun, status, reason string, at t
 // LapsedRuns are those, in every organisation, whose server stopped renewing them.
 func (s *agentStore) LapsedRuns(now time.Time) ([]AgentRun, error) {
 	var lapsed []AgentRun
-	return lapsed, s.db.Where("status in ? and lease_until < ?", runGoing, now.UnixMilli()).Find(&lapsed).Error
+	return lapsed, s.DB.Where("status in ? and lease_until < ?", runGoing, now.UnixMilli()).Find(&lapsed).Error
 }
 
 // A lapsed run is ended or taken over only if its lease is still the one that lapsed,
 // so of two servers sweeping, one does it.
 
 func (s *agentStore) StopLapsedRun(org, id, lease int64, at time.Time) error {
-	return s.in(org).Model(&AgentRun{}).Where("id = ? and lease_until = ?", id, lease).
+	return s.InOrg(org).Model(&AgentRun{}).Where("id = ? and lease_until = ?", id, lease).
 		Updates(map[string]any{"status": RunStopped, "stop_reason": "stopped by a person", "ended_at": &at, "lease_until": 0}).Error
 }
 
 func (s *agentStore) TakeOverRun(org, id, lease int64, owner string, until time.Time, resumes int) (bool, error) {
-	res := s.in(org).Model(&AgentRun{}).Where("id = ? and lease_until = ?", id, lease).
+	res := s.InOrg(org).Model(&AgentRun{}).Where("id = ? and lease_until = ?", id, lease).
 		Updates(map[string]any{"owner": owner, "lease_until": until.UnixMilli(), "resumes": resumes, "status": RunWorking})
 	return res.RowsAffected > 0, res.Error
 }
@@ -94,18 +94,18 @@ func (s *agentStore) TakeOverRun(org, id, lease int64, owner string, until time.
 // DropKeyClaims lets go of the requests a key holds on a task, under any session.
 func (s *agentStore) DropKeyClaims(org, task, key int64) error {
 	mine := fmt.Sprintf("key:%d", key)
-	return s.in(org).Where("task_id = ? and (holder = ? or holder like ?)", task, mine, mine+" %").Delete(&RequestClaim{}).Error
+	return s.InOrg(org).Where("task_id = ? and (holder = ? or holder like ?)", task, mine, mine+" %").Delete(&RequestClaim{}).Error
 }
 
 func (s *agentStore) KeyRevoked(org, id int64) (bool, error) {
 	var revoked int64
-	err := s.in(org).Model(&APIKey{}).Where("id = ? and revoked_at is not null", id).Count(&revoked).Error
+	err := s.InOrg(org).Model(&APIKey{}).Where("id = ? and revoked_at is not null", id).Count(&revoked).Error
 	return revoked > 0, err
 }
 
 func (s *agentStore) RequestDone(org, id int64) (bool, error) {
 	var r TaskRequest
-	err := s.in(org).Where("id = ?", id).Limit(1).Find(&r).Error
+	err := s.InOrg(org).Where("id = ?", id).Limit(1).Find(&r).Error
 	return r.DoneAt != nil, err
 }
 
@@ -115,7 +115,7 @@ func (s *agentStore) RequestDone(org, id int64) (bool, error) {
 func (s *agentStore) AgentKey(org int64, c *Agent) (*APIKey, error) {
 	var k APIKey
 	if c.KeyID != 0 {
-		if err := s.in(org).Where("id = ?", c.KeyID).Limit(1).Find(&k).Error; err != nil {
+		if err := s.InOrg(org).Where("id = ?", c.KeyID).Limit(1).Find(&k).Error; err != nil {
 			return nil, err
 		}
 		if k.ID != 0 && k.RevokedAt == nil {
@@ -124,7 +124,7 @@ func (s *agentStore) AgentKey(org int64, c *Agent) (*APIKey, error) {
 	}
 	k = APIKey{OrgID: org, Name: builtinKeyName(c.Name), Prefix: builtinPrefix, Hash: "builtin:" + randomToken(24),
 		Scopes: "read research:write", CreatedBy: "prospector"}
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&k).Error; err != nil {
 			return err
 		}
@@ -148,10 +148,10 @@ func (s *agentStore) AgentKey(org int64, c *Agent) (*APIKey, error) {
 func (s *agentStore) AgentRuns(org, task int64, limit int) ([]AgentRun, error) {
 	going := []string{RunWorking, RunWaiting}
 	var out, ended []AgentRun
-	if err := s.db.Where("org_id = ? and task_id = ? and status in ?", org, task, going).Order("id desc").Find(&out).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and task_id = ? and status in ?", org, task, going).Order("id desc").Find(&out).Error; err != nil {
 		return nil, err
 	}
-	q := s.db.Where("org_id = ? and task_id = ? and status not in ?", org, task, going).Order("id desc")
+	q := s.DB.Where("org_id = ? and task_id = ? and status not in ?", org, task, going).Order("id desc")
 	if limit > 0 {
 		q = q.Limit(limit)
 	}

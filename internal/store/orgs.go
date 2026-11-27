@@ -1,6 +1,8 @@
 package store
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -47,4 +49,9 @@ func (k *APIKey) Has(scope string) bool {
 		}
 	}
 	return false
+}
+
+func HashToken(t string) string {
+	h := sha256.Sum256([]byte(t))
+	return hex.EncodeToString(h[:])
 }

@@ -112,7 +112,7 @@ func TestACustomerIsOnboardedStepByStep(t *testing.T) {
 	}
 
 	var said []Event
-	if err := s.db.Where("org_id = ? and company_id = ? and action like ?", o.ID, company, "onboard:%").Order("id").Find(&said).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and company_id = ? and action like ?", o.ID, company, "onboard:%").Order("id").Find(&said).Error; err != nil {
 		t.Fatal(err)
 	}
 	if len(said) != 8 || said[0].Action != "onboard:start" || deref(said[0].Value) != "2026-11-02" || deref(said[1].Value) != "Name a project lead" ||
@@ -159,7 +159,7 @@ func TestACustomerIsOnboardedStepByStep(t *testing.T) {
 		t.Fatal(err)
 	}
 	var steps int64
-	if err := s.db.Model(&OnboardingStep{}).Where("org_id = ?", o.ID).Count(&steps).Error; err != nil || steps != 4 {
+	if err := s.DB.Model(&OnboardingStep{}).Where("org_id = ?", o.ID).Count(&steps).Error; err != nil || steps != 4 {
 		t.Errorf("removing an onboarding left %d steps, want the other one's four (%v)", steps, err)
 	}
 }
@@ -363,7 +363,7 @@ func TestARobotWorksOnboardingAsItsScopesAllow(t *testing.T) {
 	// With no start given, steps are dated from today.
 	if code, body := asKey(t, "POST", base+"onboardings", writer, map[string]any{"company": *hannah.CompanyID, "name": "Second site"}); code != http.StatusCreated || !strings.Contains(body, `"start":"`+today()+`"`) {
 		t.Errorf("starting an onboarding with no start: %d %s", code, body)
-	} else if err := s.db.Where("name = ?", "Second site").Delete(&Onboarding{}).Error; err != nil {
+	} else if err := s.DB.Where("name = ?", "Second site").Delete(&Onboarding{}).Error; err != nil {
 		t.Fatal(err)
 	}
 	// Mailing a customer is a scope of its own.

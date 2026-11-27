@@ -46,7 +46,7 @@ func (s *subscriptionStore) AddSubscription(org int64, in SubscriptionIn, actor 
 		return nil, err
 	}
 	var sub Subscription
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
 		var c Company
 		if err := tx.Where("org_id = ? and id = ?", org, in.Company).First(&c).Error; err != nil {
 			return missing(err, "no company %d", in.Company)
@@ -60,7 +60,7 @@ func (s *subscriptionStore) AddSubscription(org int64, in SubscriptionIn, actor 
 		if err := tx.Create(&sub).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, 0, &c.ID, actor, "sub:new", &in.Start)
+		return s.Log(tx, org, 0, &c.ID, actor, "sub:new", &in.Start)
 	})
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (s *subscriptionStore) ChangeSubscription(org, id int64, field, value, acto
 // ChangeSubscriptionFields makes several changes or none: one that is refused takes
 // back those before it.
 func (s *subscriptionStore) ChangeSubscriptionFields(org, id int64, changes []SubscriptionChange, actor string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		for _, c := range changes {
 			if err := s.changeSubscription(tx, org, id, c.Field, strings.TrimSpace(c.Value), actor); err != nil {
 				return err
@@ -172,14 +172,14 @@ func (s *subscriptionStore) changeSubscription(tx *gorm.DB, org, id int64, field
 		if err := tx.Model(&sub).Updates(updates).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, 0, &sub.CompanyID, actor, "sub:"+field, nonEmpty(logged))
+		return s.Log(tx, org, 0, &sub.CompanyID, actor, "sub:"+field, nonEmpty(logged))
 	}
 }
 
 // RemoveSubscription takes back one recorded by mistake. One that ran its course is
 // given an end date instead, so the record of it stays.
 func (s *subscriptionStore) RemoveSubscription(org, id int64, actor string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var sub Subscription
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&sub).Error; err != nil {
 			return missing(err, "no subscription %d", id)
@@ -191,14 +191,14 @@ func (s *subscriptionStore) RemoveSubscription(org, id int64, actor string) erro
 		if err := tx.Model(&Deal{}).Where("org_id = ? and subscription_id = ?", org, id).Update("subscription_id", 0).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, 0, &sub.CompanyID, actor, "sub:remove", nil)
+		return s.Log(tx, org, 0, &sub.CompanyID, actor, "sub:remove", nil)
 	})
 }
 
 // Subscriptions lists an organisation's, the one needing attention soonest first;
 // company narrows it to one company's when it isn't 0.
 func (s *subscriptionStore) Subscriptions(org, company int64, day string) ([]SubscriptionRow, error) {
-	q := s.in(org)
+	q := s.InOrg(org)
 	if company != 0 {
 		q = q.Where("company_id = ?", company)
 	}
@@ -210,7 +210,7 @@ func (s *subscriptionStore) Subscriptions(org, company int64, day string) ([]Sub
 		return nil, nil
 	}
 	var companies []Company
-	if err := s.in(org).Where("id in (?)", s.in(org).Model(&Subscription{}).Select("company_id")).Find(&companies).Error; err != nil {
+	if err := s.InOrg(org).Where("id in (?)", s.InOrg(org).Model(&Subscription{}).Select("company_id")).Find(&companies).Error; err != nil {
 		return nil, err
 	}
 	names := make(map[int64]string, len(companies))
@@ -222,12 +222,12 @@ func (s *subscriptionStore) Subscriptions(org, company int64, day string) ([]Sub
 		rows[i] = SubscriptionRow{Subscription: sub, Company: names[sub.CompanyID], Standing: sub.On(day)}
 	}
 	var renewing []int64
-	if err := s.in(org).Model(&Deal{}).Where("subscription_id <> 0 and stage not in ?", []string{"won", "lost"}).
+	if err := s.InOrg(org).Model(&Deal{}).Where("subscription_id <> 0 and stage not in ?", []string{"won", "lost"}).
 		Pluck("subscription_id", &renewing).Error; err != nil {
 		return nil, err
 	}
 	var people []Contact
-	if err := s.in(org).Where("company_id in (?)", s.in(org).Model(&Subscription{}).Select("company_id")).
+	if err := s.InOrg(org).Where("company_id in (?)", s.InOrg(org).Model(&Subscription{}).Select("company_id")).
 		Where(inConversation).Order("id").Find(&people).Error; err != nil {
 		return nil, err
 	}
@@ -248,7 +248,7 @@ func (s *subscriptionStore) Subscriptions(org, company int64, day string) ([]Sub
 // year and closes when the term in hand ends, both of which can then be changed.
 func (s *subscriptionStore) StartRenewal(org, subscription, contact int64, actor string) (*Deal, error) {
 	var d Deal
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		// The subscription is held so two people can't each start its renewal with a
 		// different person at once, and the contact so their deals are numbered in turn.
 		if err := hold(tx, &Subscription{}, org, subscription); err != nil {
@@ -305,7 +305,7 @@ func (s *subscriptionStore) StartRenewal(org, subscription, contact int64, actor
 		if err := tx.Create(&d).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, contact, c.CompanyID, actor, "deal:start", str("renewal"))
+		return s.Log(tx, org, contact, c.CompanyID, actor, "deal:start", str("renewal"))
 	})
 	if err != nil {
 		return nil, err

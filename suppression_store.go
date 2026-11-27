@@ -20,7 +20,7 @@ func (s *suppressionStore) Suppress(org int64, address, actor string) (*Suppress
 	if err != nil {
 		return nil, err
 	}
-	return s.suppress(s.db, org, addr, SuppressAdded, actor)
+	return s.suppress(s.DB, org, addr, SuppressAdded, actor)
 }
 
 func (s *suppressionStore) suppress(tx *gorm.DB, org int64, addr, reason, actor string) (*Suppression, error) {
@@ -59,11 +59,11 @@ func (s *suppressionStore) suppress(tx *gorm.DB, org int64, addr, reason, actor 
 // from here: only they can ask again.
 func (s *suppressionStore) Unsuppress(org, id int64, actor string) error {
 	var row Suppression
-	if err := s.in(org).Where("id = ?", id).First(&row).Error; err != nil {
+	if err := s.InOrg(org).Where("id = ?", id).First(&row).Error; err != nil {
 		return missing(err, "no suppression %d", id)
 	}
 	// Checked again in the delete itself: they may have unsubscribed since it was read.
-	gone := s.in(org).Where("id = ? and reason in ?", id, []string{SuppressAdded, SuppressBounced}).Delete(&Suppression{})
+	gone := s.InOrg(org).Where("id = ? and reason in ?", id, []string{SuppressAdded, SuppressBounced}).Delete(&Suppression{})
 	if gone.Error != nil {
 		return gone.Error
 	}
@@ -82,7 +82,7 @@ func (s *suppressionStore) Suppressions(org int64, page paging.Page) ([]Suppress
 	if at[0] == paging.NoneBefore {
 		return []Suppression{}, "", nil
 	}
-	q := s.in(org)
+	q := s.InOrg(org)
 	if at[0] > 0 {
 		q = q.Where("id < ?", at[0])
 	}
@@ -145,7 +145,7 @@ func (s *suppressionStore) UnsubscribeByToken(token string) error {
 	if token == "" {
 		return nil
 	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var link UnsubscribeLink
 		found := tx.Where("token_hash = ?", hashToken(token)).Limit(1).Find(&link)
 		if found.Error != nil || found.RowsAffected == 0 {

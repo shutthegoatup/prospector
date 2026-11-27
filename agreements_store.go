@@ -36,16 +36,16 @@ func (s *agreementStore) AddAgreement(org, company int64, name, actor string) (*
 	if err != nil {
 		return nil, err
 	}
-	if err := s.in(org).Where("id = ?", company).First(&Company{}).Error; err != nil {
+	if err := s.InOrg(org).Where("id = ?", company).First(&Company{}).Error; err != nil {
 		return nil, missing(err, "no company %d", company)
 	}
 	a := Agreement{OrgID: org, CompanyID: company, Name: name, Status: AgreementDraft, Round: 1, InOrder: true, CreatedBy: actor, UpdatedBy: actor}
-	return &a, s.db.Create(&a).Error
+	return &a, s.DB.Create(&a).Error
 }
 
 func (s *agreementStore) Agreement(org, id int64) (*Agreement, error) {
 	var a Agreement
-	if err := s.in(org).Where("id = ?", id).First(&a).Error; err != nil {
+	if err := s.InOrg(org).Where("id = ?", id).First(&a).Error; err != nil {
 		return nil, missing(err, "no agreement %d", id)
 	}
 	return &a, nil
@@ -53,7 +53,7 @@ func (s *agreementStore) Agreement(org, id int64) (*Agreement, error) {
 
 // Agreements are an organisation's, or one company's when company isn't 0, newest first.
 func (s *agreementStore) Agreements(org, company int64) ([]Agreement, error) {
-	q := s.in(org)
+	q := s.InOrg(org)
 	if company != 0 {
 		q = q.Where("company_id = ?", company)
 	}
@@ -74,7 +74,7 @@ func (s *agreementStore) ChangeAgreement(org, id int64, name *string, inOrder *b
 	if inOrder != nil {
 		change["in_order"] = *inOrder
 	}
-	res := s.in(org).Model(&Agreement{}).Where("id = ? and status = ?", id, AgreementDraft).Updates(change)
+	res := s.InOrg(org).Model(&Agreement{}).Where("id = ? and status = ?", id, AgreementDraft).Updates(change)
 	if res.Error != nil {
 		return nil, res.Error
 	}
@@ -89,7 +89,7 @@ func (s *agreementStore) ChangeAgreement(org, id int64, name *string, inOrder *b
 }
 
 func (s *agreementStore) RemoveAgreement(org, id int64) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		res := tx.Where("org_id = ? and id = ? and status = ?", org, id, AgreementDraft).Delete(&Agreement{})
 		if res.Error != nil {
 			return res.Error
@@ -125,7 +125,7 @@ func (s *agreementStore) PutAgreementFile(org, id int64, name string, data []byt
 	}
 	sum := sha256.Sum256(data)
 	var a Agreement
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
 		res := tx.Model(&Agreement{}).Where("org_id = ? and id = ? and status = ?", org, id, AgreementDraft).
 			Updates(map[string]any{"file_name": fileName(name), "file_size": int64(len(data)), "file_hash": hex.EncodeToString(sum[:]), "page_count": pages, "updated_by": actor})
 		if res.Error != nil {
@@ -162,7 +162,7 @@ func (s *agreementStore) AgreementDocument(org, id int64) (*Agreement, []byte, e
 		Agreement
 		Data []byte
 	}
-	read := s.db.Model(&Agreement{}).Select("agreements.*, agreement_files.data as data").
+	read := s.DB.Model(&Agreement{}).Select("agreements.*, agreement_files.data as data").
 		Joins("join agreement_files on agreement_files.agreement_id = agreements.id and agreement_files.org_id = agreements.org_id").
 		Where("agreements.org_id = ? and agreements.id = ?", org, id).Limit(1).Scan(&both)
 	if read.Error != nil {
@@ -193,7 +193,7 @@ func (s *agreementStore) agreementPages(org int64, a *Agreement) (int, error) {
 		return 0, err
 	}
 	a.PageCount = n
-	return n, s.in(org).Model(&Agreement{}).Where("id = ? and file_hash = ?", a.ID, a.FileHash).Update("page_count", n).Error
+	return n, s.InOrg(org).Model(&Agreement{}).Where("id = ? and file_hash = ?", a.ID, a.FileHash).Update("page_count", n).Error
 }
 
 func (s *agreementStore) draft(tx *gorm.DB, org, id int64) (*Agreement, error) {
@@ -213,7 +213,7 @@ func (s *agreementStore) AgreementRecipients(org, id int64) ([]Party, error) {
 		return nil, err
 	}
 	out := []Party{}
-	err := s.db.Table("agreement_recipients").
+	err := s.DB.Table("agreement_recipients").
 		Select("agreement_recipients.*, coalesce(users.name, contacts.person, '') as name, coalesce(users.email, contacts.email, '') as email").
 		Joins("left join contacts on contacts.id = agreement_recipients.contact_id and contacts.org_id = agreement_recipients.org_id").
 		Joins("left join users on users.id = agreement_recipients.user_id").
@@ -234,7 +234,7 @@ func (s *agreementStore) AddRecipient(o *Org, id int64, role string, contact, me
 		return nil, errors.New("name one contact or one member")
 	}
 	var r AgreementRecipient
-	return &r, s.db.Transaction(func(tx *gorm.DB) error {
+	return &r, s.DB.Transaction(func(tx *gorm.DB) error {
 		a, err := s.draft(tx, o.ID, id)
 		if err != nil {
 			return err
@@ -273,7 +273,7 @@ func (s *agreementStore) AddRecipient(o *Org, id int64, role string, contact, me
 // Someone made a copy recipient loses the fields they had.
 func (s *agreementStore) ChangeRecipient(org, id, recipient int64, role *string, position *int) (*AgreementRecipient, error) {
 	var r AgreementRecipient
-	return &r, s.db.Transaction(func(tx *gorm.DB) error {
+	return &r, s.DB.Transaction(func(tx *gorm.DB) error {
 		if _, err := s.draft(tx, org, id); err != nil {
 			return err
 		}
@@ -319,7 +319,7 @@ func (s *agreementStore) ChangeRecipient(org, id, recipient int64, role *string,
 
 // RemoveRecipient takes someone off a draft, with the fields they had.
 func (s *agreementStore) RemoveRecipient(org, id, recipient int64) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		if _, err := s.draft(tx, org, id); err != nil {
 			return err
 		}
@@ -341,7 +341,7 @@ func (s *agreementStore) AgreementFields(org, id int64) ([]AgreementField, error
 		return nil, err
 	}
 	out := []AgreementField{}
-	return out, s.in(org).Where("agreement_id = ? and round = ?", id, a.Round).Order("page, y, x, id").Find(&out).Error
+	return out, s.InOrg(org).Where("agreement_id = ? and round = ?", id, a.Round).Order("page, y, x, id").Find(&out).Error
 }
 
 // PutAgreementFields replaces every field on a draft: the editor sends them all at once.
@@ -365,7 +365,7 @@ func (s *agreementStore) PutAgreementFields(org, id int64, fields []AgreementFie
 		return nil, err
 	}
 	out := []AgreementField{}
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
 		a, err := s.draft(tx, org, id)
 		if err != nil {
 			return err
@@ -438,7 +438,7 @@ func (s *agreementStore) Readiness(org int64, a Agreement) ([]string, error) {
 // their hashes.
 func (s *agreementStore) AgreementEvents(org, id int64) ([]AgreementEvent, error) {
 	out := []AgreementEvent{}
-	if err := s.in(org).Where("agreement_id = ?", id).Order("id").Find(&out).Error; err != nil {
+	if err := s.InOrg(org).Where("agreement_id = ?", id).Order("id").Find(&out).Error; err != nil {
 		return nil, err
 	}
 	return out, checkChain(out)
@@ -479,7 +479,7 @@ func (s *agreementStore) Preparing(o *Org, id int64) (*PreparePage, error) {
 // sealKey is the organisation's sealing key and certificate, made on first use.
 func (s *agreementStore) sealKey(o *Org) (*ecdsa.PrivateKey, *x509.Certificate, error) {
 	var k SealKey
-	err := s.db.Where("org_id = ?", o.ID).First(&k).Error
+	err := s.DB.Where("org_id = ?", o.ID).First(&k).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		if k, err = s.makeSealKey(o); err != nil {
 			return nil, nil, err
@@ -487,7 +487,7 @@ func (s *agreementStore) sealKey(o *Org) (*ecdsa.PrivateKey, *x509.Certificate, 
 	} else if err != nil {
 		return nil, nil, err
 	}
-	plain, err := s.keys.open(k.Key)
+	plain, err := s.Keyring.Open(k.Key)
 	if err != nil {
 		return nil, nil, fmt.Errorf("the organisation's sealing key: %w", err)
 	}
@@ -505,7 +505,7 @@ func (s *agreementStore) sealKey(o *Org) (*ecdsa.PrivateKey, *x509.Certificate, 
 // makeSealKey makes an organisation's key and its self-signed certificate. Two made at
 // once keep whichever was stored first.
 func (s *agreementStore) makeSealKey(o *Org) (SealKey, error) {
-	if s.keys == nil {
+	if s.Keyring == nil {
 		return SealKey{}, fmt.Errorf("sealing agreements needs a secret key to keep its own under: %w", errNoKeys)
 	}
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -534,15 +534,15 @@ func (s *agreementStore) makeSealKey(o *Org) (SealKey, error) {
 	if err != nil {
 		return SealKey{}, err
 	}
-	sealedKey, err := s.keys.seal(string(raw))
+	sealedKey, err := s.Keyring.Seal(string(raw))
 	if err != nil {
 		return SealKey{}, err
 	}
 	k := SealKey{OrgID: o.ID, Cert: der, Key: sealedKey, CreatedAt: now}
-	if err := s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&k).Error; err != nil {
+	if err := s.DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&k).Error; err != nil {
 		return SealKey{}, err
 	}
-	return k, s.db.Where("org_id = ?", o.ID).First(&k).Error
+	return k, s.DB.Where("org_id = ?", o.ID).First(&k).Error
 }
 
 // sealDocument fills an agreement's document in, adds its certificate and seals the whole with

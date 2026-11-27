@@ -12,7 +12,7 @@ import (
 
 func (s *prospectingStore) ContactByID(org, id int64) (*Contact, error) {
 	var c Contact
-	if err := s.in(org).First(&c, id).Error; err != nil {
+	if err := s.InOrg(org).First(&c, id).Error; err != nil {
 		return nil, missing(err, "no contact %d in this organisation", id)
 	}
 	return &c, nil
@@ -24,7 +24,7 @@ func (s *prospectingStore) ContactByID(org, id int64) (*Contact, error) {
 func (s *prospectingStore) Due(org int64, step string, now time.Time, set OrgSettings) ([]Contact, error) {
 	set = set.WithDefaults()
 	var rows []Contact
-	q := s.in(org).Model(&Contact{}).Where(companyNotRejected)
+	q := s.InOrg(org).Model(&Contact{}).Where(companyNotRejected)
 	switch step {
 	case "linkedin":
 		q = q.Where(openContacts + " and linkedin_added is null and note is not null and note <> ''").Order("fit nulls first, file")
@@ -69,7 +69,7 @@ func (s *prospectingStore) mark(org, id int64, step, date string, who Actor, not
 	if err := markDate(date, time.Now()); err != nil {
 		return err
 	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var c Contact
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
 			return missing(err, "no contact %d", id)
@@ -88,12 +88,12 @@ func (s *prospectingStore) mark(org, id int64, step, date string, who Actor, not
 		if note != "" {
 			value += " · " + note
 		}
-		return s.logAs(tx, org, id, c.CompanyID, who, "mark:"+step, &value)
+		return s.LogAs(tx, org, id, c.CompanyID, who, "mark:"+step, &value)
 	})
 }
 
 func (s *prospectingStore) Update(org, id int64, field, value, actor string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		if of, ok := strings.CutPrefix(field, "deal_"); ok {
 			return s.deals.setDeal(tx, org, id, of, value, actor)
 		}
@@ -104,7 +104,7 @@ func (s *prospectingStore) Update(org, id int64, field, value, actor string) err
 // ChangeContactFields makes several changes to a person, or none: one that is refused
 // takes back those before it.
 func (s *prospectingStore) ChangeContactFields(org, id int64, changes []Change, actor string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		for _, c := range changes {
 			if err := s.set(tx, org, id, c.Field, c.Value, actor); err != nil {
 				return err
@@ -160,14 +160,14 @@ func (s *prospectingStore) set(tx *gorm.DB, org, id int64, field, value, actor s
 	if loggedValue[field] {
 		logged = nonEmpty(value)
 	}
-	return s.log(tx, org, id, c.CompanyID, actor, "set:"+field, logged)
+	return s.Log(tx, org, id, c.CompanyID, actor, "set:"+field, logged)
 }
 
 // Find matches the CLI's name argument against person, maker or first name.
 func (s *prospectingStore) Find(org int64, name string) ([]Contact, error) {
 	var rows []Contact
 	like := "%" + strings.ToLower(name) + "%"
-	err := s.in(org).Where("lower(person) like ? or lower(maker) like ? or first = ?", like, like, name).Find(&rows).Error
+	err := s.InOrg(org).Where("lower(person) like ? or lower(maker) like ? or first = ?", like, like, name).Find(&rows).Error
 	return rows, err
 }
 
