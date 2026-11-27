@@ -384,9 +384,3 @@ func (s *Store) RemoveDeal(org, id int64, actor string) error {
 		return s.log(tx, org, c.ID, c.CompanyID, actor, "deal:remove", &d.Kind)
 	})
 }
-
-// allowSeveralDeals drops the index that held a contact to one deal. The release before
-// this one stopped declaring it, so going back to that one doesn't bring it back.
-func allowSeveralDeals(db *gorm.DB) error {
-	return db.Exec("drop index if exists idx_deal_contact").Error
-}

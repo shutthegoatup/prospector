@@ -182,20 +182,3 @@ func TestRemovingAnOfferingBringsWhatItFoundIntoTheOrganisationsOwnReview(t *tes
 		t.Fatalf("a closed task's search, after its offering was removed: %d %+v", code, page)
 	}
 }
-
-func TestExistingCompaniesAreInTheOrganisationsOwnReview(t *testing.T) {
-	t.Parallel()
-	s := tempStore(t)
-	o := mustOrg(t, s, "alpha")
-	must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "Larkmoor"}))
-	// A database from before the column existed, with companies already in it.
-	if err := s.db.Migrator().DropColumn(&Company{}, "found_for"); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.db.AutoMigrate(&Company{}); err != nil {
-		t.Fatalf("adding the column to a table with rows: %v", err)
-	}
-	if n := s.ResearchCount(o.ID, "review"); n != 1 {
-		t.Fatalf("an existing company after the upgrade should still wait in review: %d", n)
-	}
-}

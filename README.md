@@ -372,6 +372,8 @@ The app inside an organisation is a React front end in `web/` (TanStack Router, 
 
 `assets/css/output.css` is committed, so building needs no Tailwind. The React app is not: build it in `web/` before `go build` or `go test`, and again after changing `web/` or the spec. Goreleaser and the `Dockerfile` do this themselves; a binary built without it refuses to `serve`.
 
+The schema is in `migrations/`, applied by [goose](https://github.com/pressly/goose) each time the server starts: `baseline/schema.sql` is version 1, and every change after it is a numbered SQL file. A change to a model needs one; `TestTheMigrationsBuildWhatTheModelsSay` fails until the two agree.
+
 ## Releases
 
 Every push to `main` that passes CI is released as the next patch version (`v0.1.1`, `v0.1.2`, …) by `ci.yml`. Push a `v*` tag by hand for a minor or major bump; `release.yml` builds that one. Each release has binaries for Linux and macOS (amd64 and arm64) and `checksums.txt`. `prospector version` prints the version a binary was built from.
@@ -380,4 +382,4 @@ Every push to `main` that passes CI is released as the next patch version (`v0.1
 
 ## Data
 
-The repository holds code and invented test fixtures only. Databases, snapshots and exports contain the people you prospect, so `.gitignore` keeps `*.sqlite`, `*.sql`, `*.dump` and `*.csv` out, apart from `testdata/`.
+The repository holds code and invented test fixtures only. Databases, snapshots and exports contain the people you prospect, so `.gitignore` keeps `*.sqlite`, `*.sql`, `*.dump` and `*.csv` out, apart from `testdata/` and the schema in `migrations/`.

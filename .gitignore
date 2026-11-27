@@ -3,6 +3,8 @@
 *.sqlite-*
 *.sql
 !testdata/**
+# The schema, which holds no data.
+!migrations/**/*.sql
 *.dump
 *.csv
 !testdata/**/*.csv

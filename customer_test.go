@@ -709,7 +709,10 @@ func TestTakingBackAMarkRemovesOnlyThatMarksEntry(t *testing.T) {
 	}
 }
 
-func TestStepsMarkedBeforeTheEntryColumnSurviveIt(t *testing.T) {
+// TestTakingBackAMarkFromBeforeEntriesWereKeptLeavesTheEntry: a step marked before it
+// kept which history entry its mark wrote can still be taken back, and the entry stays,
+// since nothing says which was its.
+func TestTakingBackAMarkFromBeforeEntriesWereKeptLeavesTheEntry(t *testing.T) {
 	t.Parallel()
 	s, srv, member, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
@@ -726,18 +729,10 @@ func TestStepsMarkedBeforeTheEntryColumnSurviveIt(t *testing.T) {
 	as(t, c, "POST", srv.URL+customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1])
 	st := must(s.Onboardings(o.ID, 0, today()))[0].Steps[0]
 	as(t, c, "POST", srv.URL+"/c/steps/"+itoa(st.ID)+"/done")
-
-	// A database from before the column, with a step the customer already marked.
-	if err := s.db.Migrator().DropColumn(&OnboardingStep{}, "done_entry"); err != nil {
+	if err := s.db.Model(&OnboardingStep{}).Where("id = ?", st.ID).Update("done_entry", 0).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := s.db.AutoMigrate(&OnboardingStep{}); err != nil {
-		t.Fatalf("adding the column to a table with rows: %v", err)
-	}
-	if got := must(s.Onboardings(o.ID, 0, today()))[0].Steps[0]; got.DoneOn == nil || got.DoneBy != customerActor || got.DoneEntry != 0 {
-		t.Fatalf("the step after the upgrade: %+v", got)
-	}
-	// Taking it back leaves its entry, since nothing says which entry was its.
+
 	as(t, c, "POST", srv.URL+"/c/steps/"+itoa(st.ID)+"/undone")
 	var n int64
 	if err := s.db.Model(&Event{}).Where("org_id = ? and action = ?", o.ID, "onboard:done").Count(&n).Error; err != nil || n != 1 {

@@ -586,21 +586,3 @@ func TestAServiceNoticeStopsAtSomeoneNoLongerACustomer(t *testing.T) {
 		t.Errorf("the unsubscribed former customer's mail: %s %q", r.Status, r.Reason)
 	}
 }
-
-func TestCampaignsFromBeforeKindsAreMarketing(t *testing.T) {
-	t.Parallel()
-	s := tempStore(t)
-	o := mustOrg(t, s, "alpha")
-	if err := s.db.Create(&Campaign{OrgID: o.ID, Name: "Old", Audience: AudienceConversations, Status: CampaignDraft}).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := s.db.Migrator().DropColumn(&Campaign{}, "kind"); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.db.AutoMigrate(&Campaign{}); err != nil {
-		t.Fatal(err)
-	}
-	if c := must(s.Campaigns(o.ID))[0]; c.Kind != KindMarketing {
-		t.Errorf("a campaign from before kinds reads as %q", c.Kind)
-	}
-}

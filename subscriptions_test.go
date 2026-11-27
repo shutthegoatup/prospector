@@ -257,31 +257,6 @@ func dueSubs(t *testing.T, client *http.Client, site string) int {
 	return sum.Subscriptions
 }
 
-// A database written before subscriptions existed has companies and no such table.
-func TestADatabaseFromBeforeSubscriptionsOpens(t *testing.T) {
-	t.Parallel()
-	dsn := freshDatabase(t)
-	old := must(Open(dsn))
-	if err := old.db.Migrator().DropTable(models...); err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.AutoMigrate(models...); err != nil {
-		t.Fatal(err)
-	}
-	o := mustOrg(t, old, "alpha")
-	person := repliedPerson(t, old, o, "Hannah Pryce")
-	if err := old.db.Migrator().DropTable(&Subscription{}); err != nil {
-		t.Fatal(err)
-	}
-	s := must(Open(dsn))
-	if rows := must(s.Subscriptions(o.ID, 0, "2026-01-01")); len(rows) != 0 {
-		t.Fatalf("subscriptions nobody recorded: %+v", rows)
-	}
-	if _, err := s.AddSubscription(o.ID, SubscriptionIn{Company: *person.CompanyID, Name: "Plan", Start: "2026-01-01"}, "Ada Lovelace"); err != nil {
-		t.Errorf("the first subscription after the upgrade: %v", err)
-	}
-}
-
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
 
 func TestTodayPointsAtSubscriptionsComingDue(t *testing.T) {
@@ -455,37 +430,6 @@ func TestARenewalDealIsStartedFromASubscription(t *testing.T) {
 	}
 	if left := must(s.OtherDeals(o.ID))["won"]; len(left) != 1 || left[0].SubscriptionID != 0 {
 		t.Errorf("the renewal deal after its subscription was removed: %+v", left)
-	}
-}
-
-// A database from before a deal could point at a subscription has deals without the column.
-func TestDealsFromBeforeRenewalsPointedAtSubscriptions(t *testing.T) {
-	t.Parallel()
-	dsn := freshDatabase(t)
-	old := must(Open(dsn))
-	if err := old.db.Migrator().DropTable(models...); err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.AutoMigrate(models...); err != nil {
-		t.Fatal(err)
-	}
-	o := mustOrg(t, old, "alpha")
-	c := repliedPerson(t, old, o, "Hannah Pryce")
-	renewal := must(old.StartDeal(o.ID, c.ID, "renewal", "Ada Lovelace"))
-	if err := old.db.Migrator().DropIndex(&Deal{}, "idx_deals_subscription_id"); err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.Migrator().DropColumn(&Deal{}, "subscription_id"); err != nil {
-		t.Fatal(err)
-	}
-	s := must(Open(dsn))
-	deals := must(s.OtherDeals(o.ID))["replied"]
-	if len(deals) != 1 || deals[0].ID != renewal.ID || deals[0].SubscriptionID != 0 {
-		t.Fatalf("the renewal after the upgrade: %+v", deals)
-	}
-	sub := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *c.CompanyID, Name: "Plan", Start: today(), TermMonths: 12}, "Ada Lovelace"))
-	if _, err := s.StartRenewal(o.ID, sub.ID, c.ID, "Ada Lovelace"); err != nil {
-		t.Errorf("a renewal for a subscription after the upgrade: %v", err)
 	}
 }
 

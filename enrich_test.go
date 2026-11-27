@@ -349,46 +349,6 @@ func TestAnAgentWithTheScopeCanEnrichThroughMCP(t *testing.T) {
 	}
 }
 
-func TestADatabaseFromBeforeVendorsOpens(t *testing.T) {
-	t.Parallel()
-	dsn := freshDatabase(t)
-	old := must(Open(dsn))
-	if err := old.db.Migrator().DropTable(models...); err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.AutoMigrate(models...); err != nil {
-		t.Fatal(err)
-	}
-	o := mustOrg(t, old, "alpha")
-	c := person(t, old, o, "Hannah Pryce", "Larkmoor Yachts", "", false)
-	if err := old.db.Create(&Suggestion{OrgID: o.ID, ContactID: c.ID, Field: "phone", Value: "+44 20 7946 0111", By: "agent:scout"}).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := old.db.Migrator().DropColumn(&Suggestion{}, "vendor"); err != nil {
-		t.Fatal(err)
-	}
-	for _, gone := range []any{&Enricher{}, &EnrichUsage{}} {
-		if err := old.db.Migrator().DropTable(gone); err != nil {
-			t.Fatal(err)
-		}
-	}
-	s := must(Open(dsn))
-	var sg Suggestion
-	if err := s.db.Where("contact_id = ?", c.ID).First(&sg).Error; err != nil || sg.Vendor != "" || sg.Value != "+44 20 7946 0111" {
-		t.Errorf("a suggestion from before: %+v %v", sg, err)
-	}
-	if err := s.db.Create(&Suggestion{OrgID: o.ID, ContactID: c.ID, Field: "email", Value: "hannah@larkmoor.example", Vendor: "hunter", By: "Ada Lovelace"}).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := s.db.Create(&Enricher{OrgID: o.ID, Kind: "hunter", MonthlyLimit: 5}).Error; err != nil {
-		t.Errorf("a vendor after the upgrade: %v", err)
-	}
-	var kinds []string
-	if s.db.Model(&Suggestion{}).Where("contact_id = ?", c.ID).Order("id").Pluck("vendor", &kinds); len(kinds) != 2 || kinds[1] != "hunter" {
-		t.Errorf("vendors after the upgrade: %v", kinds)
-	}
-}
-
 func TestResearchSaysWhatVendorsFoundAndWhenTheyCanBeAskedAgain(t *testing.T) {
 	t.Parallel()
 	s, o, api, client, f := enrichSignedIn(t)

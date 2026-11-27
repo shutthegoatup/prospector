@@ -122,28 +122,3 @@ func TestWhateverAnAgentWorksOnForAnOfferingWaitsInItsReview(t *testing.T) {
 		t.Fatalf("companies an agent worked on for the offering should wait in its review: %v", waiting)
 	}
 }
-
-func TestExistingTasksAreForTheOrganisationsOwnOffering(t *testing.T) {
-	t.Parallel()
-	s := tempStore(t)
-	o := mustOrg(t, s, "alpha")
-	old := must(s.CreateTask(o.ID, "", "Find makers of kayaks", "Ada"))
-	// A database from before the column existed, with tasks already in it.
-	if err := s.db.Migrator().DropColumn(&Task{}, "offering_id"); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.db.AutoMigrate(&Task{}); err != nil {
-		t.Fatalf("adding the column to a table with rows: %v", err)
-	}
-	var got Task
-	if err := s.in(o.ID).Where("id = ?", old.ID).First(&got).Error; err != nil || got.OfferingID != 0 {
-		t.Fatalf("an existing task after the upgrade: %+v %v", got, err)
-	}
-	if out := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "Larkmoor", Task: old.ID})); out.Stage != CompanyReview {
-		t.Fatalf("an existing task still finds companies for the organisation: %+v", out)
-	}
-	var verdicts int64
-	if s.in(o.ID).Model(&Verdict{}).Count(&verdicts); verdicts != 0 {
-		t.Fatalf("a task for the organisation's own offering wrote %d verdicts", verdicts)
-	}
-}

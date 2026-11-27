@@ -78,27 +78,6 @@ func TestAWaitingAgentHandsItsTaskToItsFallback(t *testing.T) {
 	}
 }
 
-func TestExistingAgentsSurviveTheFallbackColumns(t *testing.T) {
-	t.Parallel()
-	s := tempStore(t)
-	o := mustOrg(t, s, "alpha")
-	if err := s.db.Create(&Agent{OrgID: o.ID, Name: "Gateway", Kind: kindOpenAI, Models: "[]", Tools: "[]", Allowed: "[]"}).Error; err != nil {
-		t.Fatal(err)
-	}
-	for _, col := range []string{"fallback_id", "fallback_minutes"} {
-		if err := s.db.Migrator().DropColumn(&Agent{}, col); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := s.db.AutoMigrate(models...); err != nil {
-		t.Fatalf("adding the fallback to a table with rows: %v", err)
-	}
-	got := must(s.AgentNamed(o.ID, "Gateway"))
-	if got.FallbackID != 0 || got.FallbackMinutes != 15 {
-		t.Fatalf("an agent from before fallbacks should have none, waiting 15 minutes if given one: %+v", got)
-	}
-}
-
 func TestAFallbackIsAnotherOfTheOrganisationsAgents(t *testing.T) {
 	t.Parallel()
 	r, _, _ := claudeSetup(t)
