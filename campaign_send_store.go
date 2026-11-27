@@ -1,9 +1,13 @@
 package main
 
 import (
+	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // FreeStaleMail gives up, in every organisation, on mails claimed before a time: their
@@ -96,4 +100,142 @@ func (s *Store) FinishIfDone(org, id int64) error {
 		return err
 	}
 	return s.in(org).Model(&Campaign{}).Where("id = ? and status = ?", id, CampaignSending).Update("status", CampaignSent).Error
+}
+
+// SendCampaign fixes who a draft goes to, as its audience stands now, and sets it
+// going. Asked twice at once, it is sent once.
+func (s *Store) SendCampaign(o *Org, id int64, actor string) (*Campaign, error) {
+	var c Campaign
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("org_id = ? and id = ?", o.ID, id).First(&c).Error; err != nil {
+			return missing(err, "no campaign %d", id)
+		}
+		if c.Status != CampaignDraft {
+			return errors.New("it has been sent already")
+		}
+		if strings.TrimSpace(c.Subject) == "" || strings.TrimSpace(c.Body) == "" {
+			return errors.New("a campaign needs a subject and something to say before it is sent")
+		}
+		now := time.Now()
+		flipped := tx.Model(&Campaign{}).Where("org_id = ? and id = ? and status = ?", o.ID, id, CampaignDraft).
+			Updates(map[string]any{"status": CampaignSending, "queued_by": actor, "queued_at": now, "paused": "", "failures": 0})
+		if flipped.Error != nil {
+			return flipped.Error
+		}
+		if flipped.RowsAffected == 0 {
+			return errors.New("it has been sent already")
+		}
+		// Read again now it is ours: a change that landed between the first read and the
+		// flip, or a row an older release wrote, must not send a service notice to anyone
+		// but customers.
+		if err := tx.Where("org_id = ? and id = ?", o.ID, id).First(&c).Error; err != nil {
+			return err
+		}
+		if err := c.fits(); err != nil {
+			return err
+		}
+		w, err := s.audienceWork(o)
+		if err != nil {
+			return err
+		}
+		people, err := s.audience(o, c, w)
+		if err != nil {
+			return err
+		}
+		var rows []CampaignRecipient
+		for _, p := range people {
+			if p.LeftOut != "" {
+				continue
+			}
+			contact := p.ContactID
+			rows = append(rows, CampaignRecipient{OrgID: o.ID, CampaignID: id, Address: p.Address, ContactID: &contact, Name: p.Name, Status: MailQueued})
+		}
+		if len(rows) == 0 {
+			return errors.New("nobody is left for it to go to")
+		}
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(rows, 200).Error; err != nil {
+			return err
+		}
+		return tx.Where("org_id = ? and id = ?", o.ID, id).First(&c).Error
+	})
+	return &c, err
+}
+
+// CancelCampaign stops what hasn't gone. What went stays recorded.
+func (s *Store) CancelCampaign(org, id int64) (*Campaign, error) {
+	var c Campaign
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		res := tx.Model(&Campaign{}).Where("org_id = ? and id = ? and status in ?", org, id, []string{CampaignSending, CampaignPaused}).
+			Update("status", CampaignCancelled)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
+				return missing(err, "no campaign %d", id)
+			}
+			return fmt.Errorf("a campaign that is %s can't be cancelled", c.Status)
+		}
+		if err := tx.Model(&CampaignRecipient{}).Where("org_id = ? and campaign_id = ? and status = ?", org, id, MailQueued).
+			Update("status", MailCancelled).Error; err != nil {
+			return err
+		}
+		return tx.Where("org_id = ? and id = ?", org, id).First(&c).Error
+	})
+	return &c, err
+}
+
+// ResumeCampaign sets a paused campaign going again, once someone has looked.
+func (s *Store) ResumeCampaign(org, id int64) (*Campaign, error) {
+	res := s.in(org).Model(&Campaign{}).Where("id = ? and status = ?", id, CampaignPaused).
+		Updates(map[string]any{"status": CampaignSending, "paused": "", "failures": 0})
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	c, err := s.Campaign(org, id)
+	if err != nil {
+		return nil, err
+	}
+	if res.RowsAffected == 0 {
+		return nil, fmt.Errorf("only a paused campaign can be resumed, and this one is %s", c.Status)
+	}
+	return c, nil
+}
+
+// CampaignTally counts a campaign's mails by how they went.
+func (s *Store) CampaignTally(org int64, ids []int64) (map[int64]map[string]int, error) {
+	out := map[int64]map[string]int{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	var rows []struct {
+		CampaignID int64
+		Status     string
+		N          int
+	}
+	if err := s.in(org).Model(&CampaignRecipient{}).Select("campaign_id, status, count(*) as n").Where("campaign_id in ?", ids).
+		Group("campaign_id, status").Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		if out[r.CampaignID] == nil {
+			out[r.CampaignID] = map[string]int{}
+		}
+		out[r.CampaignID][r.Status] = r.N
+	}
+	return out, nil
+}
+
+func (s *Store) CampaignRecipients(org, campaign int64) ([]CampaignRecipient, error) {
+	if _, err := s.Campaign(org, campaign); err != nil {
+		return nil, err
+	}
+	out := []CampaignRecipient{}
+	return out, s.in(org).Where("campaign_id = ?", campaign).Order("id").Find(&out).Error
+}
+
+func (s *Store) DropUnsubscribeLink(token string) {
+	if token != "" {
+		stored(s.db.Where("token_hash = ?", hashToken(token)).Delete(&UnsubscribeLink{}))
+	}
 }

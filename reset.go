@@ -7,9 +7,6 @@ import (
 	"log"
 	"strings"
 	"time"
-
-	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 )
 
 const (
@@ -45,95 +42,6 @@ var (
 	errTooSoon = errors.New("a reset link was sent to this account a moment ago")
 	errBadLink = errors.New("this link has expired or has been used: ask for a new one")
 )
-
-func (s *Store) newPasswordToken(user int64, invite bool) (string, error) {
-	life := resetLife
-	if invite {
-		life = inviteLife
-	}
-	token := randomToken(32)
-	return token, s.db.Create(&PasswordToken{TokenHash: hashToken(token), UserID: user, Invite: invite, ExpiresAt: time.Now().Add(life)}).Error
-}
-
-// ResetToken refuses a second one inside resetGap. It counts from the table, so a
-// restart doesn't reset the wait.
-func (s *Store) ResetToken(user int64) (string, error) {
-	var recent int64
-	if err := s.db.Model(&PasswordToken{}).Where("user_id = ? and invite = ? and created_at > ?", user, false, time.Now().Add(-resetGap)).Count(&recent).Error; err != nil {
-		return "", err
-	}
-	if recent > 0 {
-		return "", errTooSoon
-	}
-	_ = logged(s.db.Where("expires_at < ?", time.Now()).Delete(&PasswordToken{}))
-	return s.newPasswordToken(user, false)
-}
-
-// InviteToken replaces any earlier invitation, and refuses a second inside resetGap, so
-// adding someone over and over can't fill their inbox.
-func (s *Store) InviteToken(user int64) (string, error) {
-	var recent int64
-	if err := s.db.Model(&PasswordToken{}).Where("user_id = ? and invite = ? and created_at > ?", user, true, time.Now().Add(-resetGap)).Count(&recent).Error; err != nil {
-		return "", err
-	}
-	if recent > 0 {
-		return "", errTooSoon
-	}
-	if err := s.DropInvites(user); err != nil {
-		return "", err
-	}
-	return s.newPasswordToken(user, true)
-}
-
-func (s *Store) DropInvites(user int64) error {
-	return s.db.Where("user_id = ? and invite = ?", user, true).Delete(&PasswordToken{}).Error
-}
-
-func (s *Store) PasswordTokenUser(token string) (*User, error) {
-	var t PasswordToken
-	if err := s.db.Where("token_hash = ? and expires_at > ?", hashToken(token), time.Now()).First(&t).Error; err != nil {
-		return nil, errBadLink
-	}
-	var u User
-	return &u, s.db.First(&u, t.UserID).Error
-}
-
-// RedeemPasswordToken sets the password and signs the account out everywhere. The
-// token is spent first, inside the transaction, so two requests can't both use it.
-func (s *Store) RedeemPasswordToken(token, password string) error {
-	u, err := s.PasswordTokenUser(token)
-	if err != nil {
-		return err
-	}
-	if len(password) < 10 {
-		return errors.New("passwords need at least 10 characters")
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), passwordCost)
-	if err != nil {
-		return err
-	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		spent := tx.Where("token_hash = ? and expires_at > ?", hashToken(token), time.Now()).Delete(&PasswordToken{})
-		if spent.Error != nil {
-			return spent.Error
-		}
-		if spent.RowsAffected != 1 {
-			return errBadLink
-		}
-		return s.savePasswordIn(tx, u.ID, string(hash), "")
-	})
-}
-
-func (s *Store) OrgMail(org int64) (*OrgMail, error) {
-	var m OrgMail
-	return &m, s.db.First(&m, "org_id = ?", org).Error
-}
-
-func (s *Store) SaveOrgMail(m *OrgMail) error { return s.db.Save(m).Error }
-
-func (s *Store) DeleteOrgMail(org int64) error {
-	return s.db.Delete(&OrgMail{}, "org_id = ?", org).Error
-}
 
 // mailSlots bounds the sends running at once; a request past that is dropped rather
 // than queued, so a flood of them can't pile up.

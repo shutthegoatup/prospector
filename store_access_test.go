@@ -88,14 +88,53 @@ func TestNoStoreMethodHandsOutTheDatabase(t *testing.T) {
 	}
 }
 
-func onStore(fn *ast.FuncDecl) bool {
+// TestTheStoreKeepsFilesOfItsOwn keeps an area's queries apart from what the app and
+// the API do with them, so the store can be split by area and moved out of main.
+func TestTheStoreKeepsFilesOfItsOwn(t *testing.T) {
+	t.Parallel()
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fset := token.NewFileSet()
+	for _, name := range files {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, name, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var store, other string
+		for _, decl := range f.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Recv == nil {
+				continue
+			}
+			if onStore(fn) {
+				store = fn.Name.Name
+			} else if r := receiver(fn); r == "App" || r == "apiServer" {
+				other = r + "." + fn.Name.Name
+			}
+		}
+		if store != "" && other != "" {
+			t.Errorf("%s holds both Store.%s and %s: keep the store's methods in a file of their own, such as <area>_store.go", name, store, other)
+		}
+	}
+}
+
+func onStore(fn *ast.FuncDecl) bool { return receiver(fn) == "Store" }
+
+func receiver(fn *ast.FuncDecl) string {
 	if fn.Recv == nil || len(fn.Recv.List) != 1 {
-		return false
+		return ""
 	}
 	typ := fn.Recv.List[0].Type
 	if star, ok := typ.(*ast.StarExpr); ok {
 		typ = star.X
 	}
-	id, ok := typ.(*ast.Ident)
-	return ok && id.Name == "Store"
+	if id, ok := typ.(*ast.Ident); ok {
+		return id.Name
+	}
+	return ""
 }

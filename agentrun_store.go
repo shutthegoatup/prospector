@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 var runGoing = []string{RunWorking, RunWaiting}
@@ -105,4 +107,56 @@ func (s *Store) RequestDone(org, id int64) (bool, error) {
 	var r TaskRequest
 	err := s.in(org).Where("id = ?", id).Limit(1).Find(&r).Error
 	return r.DoneAt != nil, err
+}
+
+// AgentKey is the agent as an API key that no request can present: its hash is
+// nothing a secret could be looked up as. One revoked is replaced, so a deleted
+// agent's runs stop while a new one called the same starts clean.
+func (s *Store) AgentKey(org int64, c *Agent) (*APIKey, error) {
+	var k APIKey
+	if c.KeyID != 0 {
+		if err := s.in(org).Where("id = ?", c.KeyID).Limit(1).Find(&k).Error; err != nil {
+			return nil, err
+		}
+		if k.ID != 0 && k.RevokedAt == nil {
+			return &k, nil
+		}
+	}
+	k = APIKey{OrgID: org, Name: builtinKeyName(c.Name), Prefix: builtinPrefix, Hash: "builtin:" + randomToken(24),
+		Scopes: "read research:write", CreatedBy: "prospector"}
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&k).Error; err != nil {
+			return err
+		}
+		res := tx.Model(&Agent{}).Where("org_id = ? and id = ?", org, c.ID).Update("key_id", k.ID)
+		if res.Error == nil && res.RowsAffected == 0 {
+			return fmt.Errorf("no agent %d in this organisation", c.ID)
+		}
+		return res.Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	c.KeyID = k.ID
+	return &k, nil
+}
+
+// AgentRuns are a task's runs, newest first: every one going, however old, so each
+// can be stopped, and the latest that ended, up to limit.
+// AgentRuns is a task's runs still going, then the latest limit that ended; every one
+// that ended when limit is 0.
+func (s *Store) AgentRuns(org, task int64, limit int) ([]AgentRun, error) {
+	going := []string{RunWorking, RunWaiting}
+	var out, ended []AgentRun
+	if err := s.db.Where("org_id = ? and task_id = ? and status in ?", org, task, going).Order("id desc").Find(&out).Error; err != nil {
+		return nil, err
+	}
+	q := s.db.Where("org_id = ? and task_id = ? and status not in ?", org, task, going).Order("id desc")
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	if err := q.Find(&ended).Error; err != nil {
+		return nil, err
+	}
+	return append(out, ended...), nil
 }
