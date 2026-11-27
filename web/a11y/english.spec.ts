@@ -74,7 +74,10 @@ function english(seen: string[]) {
   // placeholders, such as {first}, stand for whatever went in them.
   const filled = words.filter((w) => /\{\w+\}/.test(w)).map((w) => new RegExp(w.replace(/[.*+?^$()|[\]\\]/g, "\\$&").replace(/\\?\{\w+\\?\}/g, ".*?"), "g"));
   return seen.filter((s) => {
-    const left = words.reduce((rest, w) => rest.replaceAll(w, ""), filled.reduce((rest, t) => rest.replace(t, ""), s));
+    const left = words.reduce(
+      (rest, w) => rest.replaceAll(w, ""),
+      filled.reduce((rest, t) => rest.replace(t, ""), s),
+    );
     return /[A-Za-z]{2,}/.test(left);
   });
 }
