@@ -51,14 +51,19 @@ export function TasksPage() {
   const { closed = false } = useSearch({ from: "/o/$org/tasks" });
   const [cursor, setCursor] = useState<string | undefined>();
   useEffect(() => setCursor(undefined), [closed]);
-  const tasks = $api.useQuery("get", "/o/{org}/api/v1/tasks", { params: { path: { org }, query: { closed, limit: 30, cursor } } }, { placeholderData: keepPreviousData });
+  const tasks = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/tasks",
+    { params: { path: { org }, query: { closed, limit: 30, cursor } } },
+    { placeholderData: keepPreviousData },
+  );
 
   return (
     <>
       <PageHead title="Tasks" />
       <p className="mb-5 max-w-[70ch] text-sm text-muted-foreground">
-        Write what you want found. An agent picks it up, and what it finds waits in Research for you. Anyone can ask for more later, and a
-        different agent can carry on from what is already here.
+        Write what you want found. An agent picks it up, and what it finds waits in Research for you. Anyone can ask for more later, and a different agent can
+        carry on from what is already here.
       </p>
       <Whose area="sales" work="Tasks for agents are" can={sales} />
       <div className="flex flex-wrap items-start gap-8">
@@ -78,7 +83,9 @@ export function TasksPage() {
               ))}
             </Placeholders>
           )}
-          {tasks.data?.items.map((t) => <TaskCard key={t.id} t={t} />)}
+          {tasks.data?.items.map((t) => (
+            <TaskCard key={t.id} t={t} />
+          ))}
           <Pager cursor={cursor} next={tasks.data?.next_cursor} go={setCursor} />
         </div>
         {sales && <TaskCreate />}
@@ -157,7 +164,11 @@ function TaskCreate() {
         {known && offerings.length > 0 && (
           <label className="flex flex-col gap-1.5">
             <Eyebrow>For</Eyebrow>
-            <select value={offering} onChange={(e) => setOffering(Number(e.target.value))} className="h-10 rounded-lg border border-input bg-muted px-3 text-sm">
+            <select
+              value={offering}
+              onChange={(e) => setOffering(Number(e.target.value))}
+              className="h-10 rounded-lg border border-input bg-muted px-3 text-sm"
+            >
               <option value={0}>Your own offering</option>
               {offerings.map((o) => (
                 <option key={o.id} value={o.id}>

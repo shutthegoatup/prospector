@@ -75,7 +75,7 @@ func (a *App) frontPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("content-type", "text/html; charset=utf-8")
-	w.Write(b)
+	_, _ = w.Write(b)
 }
 
 // apiDocPage serves /api, with this server's address in its examples.
@@ -87,5 +87,5 @@ func (a *App) apiDocPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("content-type", "text/html; charset=utf-8")
-	w.Write(withBase(b, a.baseURL(r)))
+	_, _ = w.Write(withBase(b, a.baseURL(r)))
 }

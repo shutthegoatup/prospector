@@ -250,7 +250,7 @@ func uploads(f api.StrictHandlerFunc, op string) api.StrictHandlerFunc {
 			return nil, nil
 		}
 		out, err := f(ctx, w, r, in)
-		http.NewResponseController(w).SetWriteDeadline(time.Now().Add(answerLimit))
+		_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(answerLimit))
 		return out, err
 	}
 }

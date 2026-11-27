@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/netip"
@@ -72,7 +73,7 @@ var toolName = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
 
 func decodeList[T any](raw string) []T {
 	var out []T
-	json.Unmarshal([]byte(raw), &out)
+	_ = json.Unmarshal([]byte(raw), &out)
 	return out
 }
 
@@ -266,7 +267,7 @@ func endpointURL(raw string) (string, error) {
 	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
 		return "", fmt.Errorf("%q isn't an address like https://llm.example.com/v1", raw)
 	}
-	if u.Scheme != "https" && !(u.Scheme == "http" && os.Getenv("PROSPECTOR_AGENT_ALLOW_PRIVATE") == "1") {
+	if u.Scheme != "https" && !(u.Scheme == "http" && os.Getenv("PROSPECTOR_AGENT_ALLOW_PRIVATE") == "1") { //nolint:staticcheck // plain http only when allowed
 		return "", errors.New("the address must start with https://")
 	}
 	return raw, nil
@@ -339,7 +340,7 @@ func (a *App) listTools(ctx context.Context, endpoint, key string) ([]AgentTool,
 	if err != nil {
 		return nil, fmt.Errorf("couldn't connect to the tools at %s: %w", endpoint, err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 	var out []AgentTool
 	for t, err := range session.Tools(ctx, nil) {
 		if err != nil {
@@ -599,7 +600,9 @@ func (a *App) deleteAgent(org, id int64) error {
 		return err
 	}
 	for _, run := range going {
-		a.StopRun(org, run.ID)
+		if err := a.StopRun(org, run.ID); err != nil {
+			log.Printf("agent %d: run %d not asked to stop: %v", c.ID, run.ID, err)
+		}
 	}
 	now := time.Now()
 	return a.s.db.Transaction(func(tx *gorm.DB) error {

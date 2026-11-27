@@ -86,7 +86,7 @@ func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
 		t.Errorf("after their answer the enquiry is %q", now.State)
 	}
 	code, body = call(t, member, "GET", base+"/messages", "", nil)
-	if code != http.StatusOK || strings.Index(body, "We can do Tuesday") < 0 || strings.Index(body, "We can do Tuesday") > strings.Index(body, "Tuesday is fine") {
+	if code != http.StatusOK || !strings.Contains(body, "We can do Tuesday") || strings.Index(body, "We can do Tuesday") > strings.Index(body, "Tuesday is fine") {
 		t.Errorf("the thread: %d %s", code, body)
 	}
 

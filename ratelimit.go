@@ -7,8 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/shutthegoatup/prospector/api"
 	"golang.org/x/time/rate"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
 // A token bucket per caller: a burst of requests goes straight through, after which they

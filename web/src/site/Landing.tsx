@@ -39,7 +39,13 @@ export function Landing() {
           <div className="grid items-center gap-12 pt-8 pb-[88px] lg:grid-cols-[minmax(0,620px)_minmax(0,1fr)] lg:pt-14 lg:pb-[104px]">
             <div>
               <Eyebrow className={cn("text-[#4a3d1c]", rise)}>Prospects and customers for small teams</Eyebrow>
-              <h1 className={cn("mt-5 mb-6 font-heading text-[clamp(38px,4.6vw,56px)] font-bold leading-[1.06] tracking-[-0.025em] [&>span]:block", rise, "delay-75")}>
+              <h1
+                className={cn(
+                  "mt-5 mb-6 font-heading text-[clamp(38px,4.6vw,56px)] font-bold leading-[1.06] tracking-[-0.025em] [&>span]:block",
+                  rise,
+                  "delay-75",
+                )}
+              >
                 <span>A few hundred accounts.</span>
                 <span>One queue a day.</span>
                 <span>
@@ -47,8 +53,8 @@ export function Landing() {
                 </span>
               </h1>
               <p className={cn("mb-8 max-w-[34em] text-[19px] text-[#3a3122]", rise, "delay-150")}>
-                Prospector is a workbench for teams selling to named accounts, from the first fact about a company to the agreement it signs. Agents research and
-                draft. People qualify, decide and send.
+                Prospector is a workbench for teams selling to named accounts, from the first fact about a company to the agreement it signs. Agents research
+                and draft. People qualify, decide and send.
               </p>
               <div className={cn("flex flex-wrap gap-3", rise, "delay-200")}>
                 <SiteButton big href="#pricing">
@@ -67,7 +73,13 @@ export function Landing() {
                   <i className="size-2.5 rounded-full bg-chart-2" />
                   <span className="ml-3 min-w-0 truncate font-mono text-xs text-[#b9b0a0]">prospector.example.com/o/example-co/today</span>
                 </div>
-                <img className="block h-auto w-full" src="/assets/img/today.webp" width={1440} height={900} alt="The Today page: everything due, best first, with a Do now list beside them" />
+                <img
+                  className="block h-auto w-full"
+                  src="/assets/img/today.webp"
+                  width={1440}
+                  height={900}
+                  alt="The Today page: everything due, best first, with a Do now list beside them"
+                />
               </Panel>
               <Chip tone="green" className="-bottom-4 left-3 lg:bottom-8 lg:-left-[30px]">
                 Tue 16:39 in London: good time to call
@@ -127,18 +139,29 @@ export function Landing() {
             flipped
             tag="02 · Today"
             title="One queue, best first"
-            shot={<Shot file="linkedin.webp" width={1440} height={900} alt="The LinkedIn queue: the connection note ready to copy, with keyboard shortcuts" tone="gold" />}
+            shot={
+              <Shot
+                file="linkedin.webp"
+                width={1440}
+                height={900}
+                alt="The LinkedIn queue: the connection note ready to copy, with keyboard shortcuts"
+                tone="gold"
+              />
+            }
           >
             <p>Everything due across LinkedIn, email and phone, in this order:</p>
             <ol className="grid gap-2 text-base text-foreground">
-              {["Conversations that need a next step", "Calls where it's office hours for the contact", "LinkedIn messages, emails and follow-ups", "LinkedIn adds"].map(
-                (item, i) => (
-                  <li key={item} className="flex items-center gap-3">
-                    <span className="grid size-[22px] flex-none place-items-center rounded-full bg-primary font-mono text-xs">{i + 1}</span>
-                    {item}
-                  </li>
-                ),
-              )}
+              {[
+                "Conversations that need a next step",
+                "Calls where it's office hours for the contact",
+                "LinkedIn messages, emails and follow-ups",
+                "LinkedIn adds",
+              ].map((item, i) => (
+                <li key={item} className="flex items-center gap-3">
+                  <span className="grid size-[22px] flex-none place-items-center rounded-full bg-primary font-mono text-xs">{i + 1}</span>
+                  {item}
+                </li>
+              ))}
             </ol>
             <div className="mt-5 flex flex-wrap gap-[18px] text-[15px]">
               {[
@@ -170,16 +193,16 @@ export function Landing() {
       <section className="pt-[72px] lg:pt-[104px]" id="customers">
         <Wrap>
           <SectionHead label="After it's won" title="The customer stays on the same record.">
-            Deals, the contract, what they're on, getting them live, what they write in about and what you write to them, all on the company you prospected. Each
-            has its operations in the published API.
+            Deals, the contract, what they're on, getting them live, what they write in about and what you write to them, all on the company you prospected.
+            Each has its operations in the published API.
           </SectionHead>
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             <Feature tone="coral" title="Deals with a value">
               Each conversation carries what it's worth, who has it and when it should close. Start a second one for a renewal or an expansion.
             </Feature>
             <Feature tone="violet" title="Agreements, ready to sign">
-              Upload the contract as a PDF. It is kept exactly as uploaded and checked against its hash on every download. Choose who signs and in what order, and
-              drag their fields onto the pages. Sending for signature comes next.
+              Upload the contract as a PDF. It is kept exactly as uploaded and checked against its hash on every download. Choose who signs and in what order,
+              and drag their fields onto the pages. Sending for signature comes next.
             </Feature>
             <Feature tone="gold" title="Subscriptions and their notice">
               What each customer is on, for how long, and the notice it needs. Today flags one a month before its date, and a renewal deal starts from it.
@@ -203,9 +226,9 @@ export function Landing() {
       <section className="mt-[72px] bg-sidebar py-[72px] text-background lg:mt-[104px] lg:py-24" id="agents">
         <Wrap>
           <SectionHead label={<Tag tone="violet">Agents and API</Tag>} title="Agents do the reading. You decide what they may send.">
-            Each organisation has an MCP endpoint and a REST API with scoped keys. Connect Claude or your own agent in one command, and decide what each key may do.
-            Or let Prospector run the agents itself, through Claude, any OpenAI-compatible endpoint or a model you host, with free search from your own SearXNG.
-            Each agent's card says whether it is ready, and why not.
+            Each organisation has an MCP endpoint and a REST API with scoped keys. Connect Claude or your own agent in one command, and decide what each key may
+            do. Or let Prospector run the agents itself, through Claude, any OpenAI-compatible endpoint or a model you host, with free search from your own
+            SearXNG. Each agent's card says whether it is ready, and why not.
           </SectionHead>
           <div className="grid gap-8 lg:grid-cols-2">
             <div className="grid content-start gap-8">
@@ -311,8 +334,8 @@ export function Landing() {
               Import companies from CSV and drafts from markdown. Re-importing never clears a date or an edit made in the app.
             </Feature>
             <Feature tone="gold" title="Your data stays yours">
-              Host it yourself on SQLite or Postgres, or let us. An owner can download everything the organisation holds as one file, and erase a person who asks to
-              be forgotten.
+              Host it yourself on SQLite or Postgres, or let us. An owner can download everything the organisation holds as one file, and erase a person who
+              asks to be forgotten.
             </Feature>
           </div>
         </Wrap>
@@ -324,10 +347,12 @@ export function Landing() {
         <Wrap className="grid items-center gap-14 py-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:py-[88px]">
           <div>
             <Eyebrow className="text-[#4d1c0e]">Rather run it yourself?</Eyebrow>
-            <h2 className="mt-3.5 mb-4 font-heading text-[clamp(32px,4.2vw,52px)] font-bold leading-[1.05] tracking-[-0.02em] text-balance">Self-host in four commands.</h2>
+            <h2 className="mt-3.5 mb-4 font-heading text-[clamp(32px,4.2vw,52px)] font-bold leading-[1.05] tracking-[-0.02em] text-balance">
+              Self-host in four commands.
+            </h2>
             <p className="mb-7 text-lg text-[#2c120a]">
-              Prospector is one program for Linux or macOS, on SQLite or Postgres, with every feature. Download it, name your organisation, add yourself and start
-              working the list. Your server, your mail, your models.
+              Prospector is one program for Linux or macOS, on SQLite or Postgres, with every feature. Download it, name your organisation, add yourself and
+              start working the list. Your server, your mail, your models.
             </p>
             <div className="flex flex-wrap gap-3">
               <SiteButton big href={`${repoURL}/releases/latest`} className="hover:shadow-[4px_4px_0_var(--primary)]!">
@@ -394,7 +419,21 @@ function Fact({ tone, n, title, children }: { tone: Tone; n: string; title: stri
   );
 }
 
-function Step({ tone, flipped, tag, title, shot, children }: { tone: Tone; flipped?: boolean; tag: string; title: string; shot: ReactNode; children: ReactNode }) {
+function Step({
+  tone,
+  flipped,
+  tag,
+  title,
+  shot,
+  children,
+}: {
+  tone: Tone;
+  flipped?: boolean;
+  tag: string;
+  title: string;
+  shot: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <div
       className={cn(
@@ -428,7 +467,17 @@ function Pound() {
 
 // A plan's button leads to the enquiry form, so the form's script draws it into the
 // plan's data-plan-cta slot, labelled as that says; with no form, the slot stays empty.
-function Plan({ dark, tone, name, note, audience, price, per, items, cta }: {
+function Plan({
+  dark,
+  tone,
+  name,
+  note,
+  audience,
+  price,
+  per,
+  items,
+  cta,
+}: {
   dark?: boolean;
   tone: Tone;
   name: string;
@@ -496,7 +545,11 @@ function Pricing() {
               </>
             }
             per={`up to ${freeUsers} users`}
-            items={["Every feature, including agents, campaigns and agreements", "Hosting, backups, sign-in mail and every release", "Help from the docs and GitHub issues"]}
+            items={[
+              "Every feature, including agents, campaigns and agreements",
+              "Hosting, backups, sign-in mail and every release",
+              "Help from the docs and GitHub issues",
+            ]}
             cta="Start free"
           />
           <Plan
@@ -512,7 +565,11 @@ function Pricing() {
               </>
             }
             per="a user a month"
-            items={["Everything in Free, for any number of users", `Pay only for users past your first ${freeUsers}`, "Help by email from the people who build it"]}
+            items={[
+              "Everything in Free, for any number of users",
+              `Pay only for users past your first ${freeUsers}`,
+              "Help by email from the people who build it",
+            ]}
             cta="Start with your team"
           />
           <Plan
@@ -527,13 +584,17 @@ function Pricing() {
           />
         </div>
         <p className="mt-8 text-sm text-muted-foreground">
-          A user is anyone who signs in to one of your organisations. API keys and agents are free. Billed monthly; prices exclude VAT. Campaigns go through your
-          own mail server.
+          A user is anyone who signs in to one of your organisations. API keys and agents are free. Billed monthly; prices exclude VAT. Campaigns go through
+          your own mail server.
         </p>
         <div role="note" className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3.5 rounded-[14px] border-2 border-dashed border-ink px-6 py-5">
           <strong className="font-heading text-[17px] font-semibold">No lock-in.</strong>
           <p className="min-w-0 flex-[1_1_24em] text-base text-muted-foreground">
-            An owner can download everything the organisation holds as one file, whenever they like. Or <a className="underline decoration-primary underline-offset-[3px]" href="#start">run Prospector yourself</a>, free.
+            An owner can download everything the organisation holds as one file, whenever they like. Or{" "}
+            <a className="underline decoration-primary underline-offset-[3px]" href="#start">
+              run Prospector yourself
+            </a>
+            , free.
           </p>
         </div>
       </Wrap>
@@ -613,8 +674,12 @@ export function EnquiryForm({ intake, nav, plans }: { intake: string; nav: Eleme
         <Wrap className="grid items-start gap-14 py-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:py-[88px]">
           <div>
             <Eyebrow>Contact</Eyebrow>
-            <h2 className="mt-3.5 mb-4 font-heading text-[clamp(32px,4.2vw,52px)] font-bold leading-[1.05] tracking-[-0.02em] text-balance">Ask us anything.</h2>
-            <p className="text-[19px] text-[#3a3122]">Hosting, a question, a demo, or help getting it running. Someone will write back to the address you give.</p>
+            <h2 className="mt-3.5 mb-4 font-heading text-[clamp(32px,4.2vw,52px)] font-bold leading-[1.05] tracking-[-0.02em] text-balance">
+              Ask us anything.
+            </h2>
+            <p className="text-[19px] text-[#3a3122]">
+              Hosting, a question, a demo, or help getting it running. Someone will write back to the address you give.
+            </p>
           </div>
           <Panel tone="gold" className="p-[26px] md:shadow-[12px_12px_0_var(--chart-1)]!">
             <form className="grid gap-[18px] sm:grid-cols-2" onSubmit={submit}>
@@ -649,7 +714,11 @@ export function EnquiryForm({ intake, nav, plans }: { intake: string; nav: Eleme
                 <input name="ref_note" tabIndex={-1} autoComplete="off" />
               </label>
               <div className="flex flex-wrap items-center gap-x-[18px] gap-y-3 sm:col-span-2">
-                <Button type="submit" disabled={sending} className="h-11 rounded-[10px] border-2 border-ink bg-ink px-5 text-[15px] font-semibold text-background hover:bg-ink">
+                <Button
+                  type="submit"
+                  disabled={sending}
+                  className="h-11 rounded-[10px] border-2 border-ink bg-ink px-5 text-[15px] font-semibold text-background hover:bg-ink"
+                >
                   Send
                 </Button>
                 <p className="text-[15px] text-muted-foreground" role="status">

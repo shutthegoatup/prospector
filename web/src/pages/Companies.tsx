@@ -47,7 +47,21 @@ export function usePages(of: string) {
   };
 }
 
-export function Pager({ n, total, size, next, onNext, onPrevious }: { n: number; total: number; size: number; next?: string; onNext: (cursor: string) => void; onPrevious: () => void }) {
+export function Pager({
+  n,
+  total,
+  size,
+  next,
+  onNext,
+  onPrevious,
+}: {
+  n: number;
+  total: number;
+  size: number;
+  next?: string;
+  onNext: (cursor: string) => void;
+  onPrevious: () => void;
+}) {
   const pages = Math.max(1, Math.ceil(total / size));
   // Past the first page, Previous stays: a page emptied by a change shouldn't strand anyone.
   if (pages <= 1 && n <= 1) return null;
@@ -103,9 +117,14 @@ export function CompaniesPage() {
   const navigate = useNavigate();
   const filters = JSON.stringify(search);
   const pages = usePages(filters);
-  const list = $api.useQuery("get", "/o/{org}/api/v1/companies", {
-    params: { path: { org }, query: { q: q || undefined, segment: segment || undefined, stage, limit: pageSize, cursor: pages.cursor } },
-  }, { placeholderData: keepPreviousData });
+  const list = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/companies",
+    {
+      params: { path: { org }, query: { q: q || undefined, segment: segment || undefined, stage, limit: pageSize, cursor: pages.cursor } },
+    },
+    { placeholderData: keepPreviousData },
+  );
   const segments = $api.useQuery("get", "/o/{org}/api/v1/segments", { params: { path: { org }, query: { limit: 200 } } });
 
   return (
@@ -122,7 +141,11 @@ export function CompaniesPage() {
           e.preventDefault();
           const form = new FormData(e.currentTarget);
           const value = (k: string) => (form.get(k) as string | null) || undefined;
-          navigate({ to: "/o/$org/companies", params: { org }, search: { q: value("q"), segment: value("segment"), stage: pipelines.find((p) => p === value("stage")) } });
+          navigate({
+            to: "/o/$org/companies",
+            params: { org },
+            search: { q: value("q"), segment: value("segment"), stage: pipelines.find((p) => p === value("stage")) },
+          });
         }}
       >
         <label className="sr-only" htmlFor="q">
@@ -140,7 +163,13 @@ export function CompaniesPage() {
           Segment
         </label>
         {/* Keyed on the segments arriving, so the one in the address is picked once it is an option. */}
-        <select key={segments.data ? "segments" : "loading"} id="segment" name="segment" defaultValue={segment} className="h-9 rounded-lg border border-input bg-muted px-2 text-sm">
+        <select
+          key={segments.data ? "segments" : "loading"}
+          id="segment"
+          name="segment"
+          defaultValue={segment}
+          className="h-9 rounded-lg border border-input bg-muted px-2 text-sm"
+        >
           <option value="">All segments</option>
           {(segments.data?.items ?? []).map((s) => (
             <option key={s} value={s}>
@@ -164,7 +193,9 @@ export function CompaniesPage() {
         </ActionButton>
       </form>
       <Failed errors={[list.error, segments.error]} />
-      {list.data && list.data.items.length === 0 && <Empty title="No companies match" hint="Clear the filters, or add companies through Research or an agent." />}
+      {list.data && list.data.items.length === 0 && (
+        <Empty title="No companies match" hint="Clear the filters, or add companies through Research or an agent." />
+      )}
       {!list.data && !list.error && (
         <Placeholders className="divide-y divide-border overflow-hidden panel">
           {Array.from({ length: placeholders }, (_, i) => (
@@ -186,9 +217,7 @@ export function CompaniesPage() {
           ))}
         </div>
       )}
-      {list.data && (
-        <Pager n={pages.n} total={list.data.total} size={pageSize} next={list.data.next_cursor} onNext={pages.next} onPrevious={pages.previous} />
-      )}
+      {list.data && <Pager n={pages.n} total={list.data.total} size={pageSize} next={list.data.next_cursor} onNext={pages.next} onPrevious={pages.previous} />}
     </>
   );
 }

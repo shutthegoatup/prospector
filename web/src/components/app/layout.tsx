@@ -16,8 +16,7 @@ const button =
   "focus-visible:border-ring focus-visible:ring-ring/50 rounded-lg border-2 border-transparent bg-clip-padding text-sm font-semibold focus-visible:ring-3 active:not-aria-[haspopup]:translate-y-px group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50";
 const primary =
   "border-foreground bg-primary text-primary-foreground shadow-[2px_2px_0_var(--foreground)] hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_var(--foreground)] h-8 gap-1.5 px-2.5";
-const outlineSm =
-  "border-foreground bg-card hover:bg-secondary hover:text-foreground h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem]";
+const outlineSm = "border-foreground bg-card hover:bg-secondary hover:text-foreground h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem]";
 
 // pageArea is the area whose work each sidebar page is; someone without it reads only.
 const pageArea: Partial<Record<string, Area>> = {
@@ -70,7 +69,8 @@ export function AppLayout() {
     }
   }, [nav.error]);
 
-  if (nav.error && !n) return <p className="p-8 text-sm text-[var(--stop)]">{nav.error.detail ?? "This organisation couldn't be read. Reload to try again."}</p>;
+  if (nav.error && !n)
+    return <p className="p-8 text-sm text-[var(--stop)]">{nav.error.detail ?? "This organisation couldn't be read. Reload to try again."}</p>;
   // Until the organisation has been read, the sidebar draws its outline and the page waits
   // beside it, so nothing already drawn moves when it comes.
   if (!n) {
@@ -136,8 +136,8 @@ function Sidebar({ org, n }: { org: string; n?: Nav }) {
       ) : (
         n.sales && (
           <Link to="/o/$org/add" params={{ org }} className={cn(button, primary, "w-full")}>
-          + Add person
-        </Link>
+            + Add person
+          </Link>
         )
       )}
       <nav className="flex flex-col gap-0.5" aria-label="Main">
@@ -154,7 +154,10 @@ function Sidebar({ org, n }: { org: string; n?: Nav }) {
           >
             <span>{i.label}</span>
             {i.view ? (
-              <span className="rounded border border-border px-1 font-mono text-[11px] uppercase tracking-wider opacity-70" title="You can read this page, not change it">
+              <span
+                className="rounded border border-border px-1 font-mono text-[11px] uppercase tracking-wider opacity-70"
+                title="You can read this page, not change it"
+              >
                 view
               </span>
             ) : (
@@ -164,7 +167,9 @@ function Sidebar({ org, n }: { org: string; n?: Nav }) {
         ))}
       </nav>
       <div className="mt-auto flex items-center gap-2.5 px-2.5 text-sm text-muted-foreground">
-        <span className="grid size-6 place-items-center rounded-full bg-secondary text-xs text-foreground">{n && initial((n.user?.name ?? "") + (n.user?.email ?? ""))}</span>
+        <span className="grid size-6 place-items-center rounded-full bg-secondary text-xs text-foreground">
+          {n && initial((n.user?.name ?? "") + (n.user?.email ?? ""))}
+        </span>
         <span className="flex-1 truncate">
           <Text value={n && n.user?.name} w="9ch" />
           {n && n.role !== "owner" && <span className="block font-mono text-[11px]">{n.work}</span>}

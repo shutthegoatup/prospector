@@ -16,8 +16,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/shutthegoatup/prospector/api"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
 // dummyHash keeps a wrong email as slow as a wrong password.
@@ -95,16 +96,16 @@ func (a *App) setDeadlines(w http.ResponseWriter, r *http.Request) {
 		write = answerLimit
 	}
 	if r.ContentLength != 0 {
-		rc.SetReadDeadline(time.Now().Add(read))
+		_ = rc.SetReadDeadline(time.Now().Add(read))
 	}
-	rc.SetWriteDeadline(time.Now().Add(write))
+	_ = rc.SetWriteDeadline(time.Now().Add(write))
 }
 
 // streaming lifts the answer deadline for a route whose answer stays open. It sits
 // behind the key check, so only a request that has shown a key is left unbounded.
 func streaming(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		http.NewResponseController(w).SetWriteDeadline(time.Time{})
+		_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 		next.ServeHTTP(w, r)
 	}
 }
@@ -177,7 +178,7 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 		return false
 	}
 	// The answer's clock starts once the body is in, so a slow upload doesn't use it up.
-	http.NewResponseController(w).SetWriteDeadline(time.Now().Add(answerLimit))
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(answerLimit))
 	return true
 }
 
@@ -328,7 +329,7 @@ var pdfPolicy = strings.Replace(contentPolicy, "script-src 'self';", "script-src
 
 func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { _, _ = fmt.Fprintln(w, "ok") })
 	mux.Handle("GET /assets/", assetHandler())
 	a.signInRoutes(mux)
 	mux.HandleFunc("GET /login/with/{way}", a.loginWith)
@@ -612,7 +613,7 @@ func (a *App) passwordChange(r *http.Request, u *User, current, next string) (de
 // until `prospector user add` has run against the same database.
 func serve(a *App, addr string) error {
 	var users int64
-	logged(a.s.db.Model(&User{}).Count(&users))
+	_ = logged(a.s.db.Model(&User{}).Count(&users))
 	if users == 0 {
 		log.Print("no users yet: create one with `prospector user add <email> <name>`")
 	}
@@ -661,7 +662,7 @@ func (a *App) serveUntil(asked context.Context, ln net.Listener, within time.Dur
 	grace, cancel := context.WithTimeout(context.Background(), within)
 	defer cancel()
 	if err := srv.Shutdown(grace); err != nil {
-		srv.Close()
+		_ = srv.Close()
 	}
 	sent := make(chan struct{})
 	go func() { a.sending.Wait(); close(sent) }()

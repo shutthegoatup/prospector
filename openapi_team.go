@@ -209,7 +209,7 @@ func (s apiServer) GetMailServer(ctx context.Context, _ api.GetMailServerRequest
 func (s apiServer) MakeBounceHook(ctx context.Context, _ api.MakeBounceHookRequestObject) (api.MakeBounceHookResponseObject, error) {
 	base, err := url.Parse(s.a.base)
 	if s.a.base == "" || err != nil || base.Scheme != "https" {
-		return nil, errors.New("Postmark needs this server's public https address (PROSPECTOR_URL) to post to")
+		return nil, errors.New("Postmark needs this server's public https address (PROSPECTOR_URL) to post to") //nolint:staticcheck // Postmark is a name
 	}
 	org := reqFrom(ctx).Org
 	secret, err := s.a.s.NewBounceHook(org.ID)

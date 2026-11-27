@@ -123,7 +123,7 @@ func (s *Store) DeleteEnricher(org, id int64) error {
 
 func (s *Store) EnricherUsed(org int64, kind string, now time.Time) int {
 	var u EnrichUsage
-	logged(s.db.Where("org_id = ? and kind = ? and month = ?", org, kind, now.UTC().Format("2006-01")).Limit(1).Find(&u))
+	_ = logged(s.db.Where("org_id = ? and kind = ? and month = ?", org, kind, now.UTC().Format("2006-01")).Limit(1).Find(&u))
 	return u.Calls
 }
 
@@ -371,7 +371,7 @@ func (s *Store) lookups(org int64, people []int64) (map[int64][]Lookup, error) {
 }
 
 func (a *App) logEnrich(org int64, who Actor, c Contact, field, value string) {
-	logged(a.s.db.Create(&Event{OrgID: org, ContactID: c.ID, CompanyID: c.CompanyID, User: who.Name, KeyID: who.KeyID, TaskID: who.Task,
+	_ = logged(a.s.db.Create(&Event{OrgID: org, ContactID: c.ID, CompanyID: c.CompanyID, User: who.Name, KeyID: who.KeyID, TaskID: who.Task,
 		Action: "enrich:" + field, Value: &value, At: time.Now()}))
 }
 

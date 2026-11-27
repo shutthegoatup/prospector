@@ -323,7 +323,7 @@ func oneGoingRunPerAgent(db *gorm.DB) error {
 	const name = "idx_agent_runs_one_going"
 	var def string
 	lookup := "select coalesce(sql, '') from sqlite_master where type = 'index' and name = ?"
-	if db.Dialector.Name() == "postgres" {
+	if db.Dialector.Name() == "postgres" { //nolint:staticcheck // the dialect's name, not the database's
 		lookup = "select indexdef from pg_indexes where indexname = ? and tablename = 'agent_runs' and schemaname = current_schema()"
 	}
 	if err := db.Raw(lookup, name).Scan(&def).Error; err != nil {
@@ -343,7 +343,7 @@ func oneGoingRunPerAgent(db *gorm.DB) error {
 	})
 }
 
-func (s *Store) postgres() bool { return s.db.Dialector.Name() == "postgres" }
+func (s *Store) postgres() bool { return s.db.Dialector.Name() == "postgres" } //nolint:staticcheck // the dialect's name
 
 // in scopes a query to one organisation. Not every query uses it, so what holds the
 // store's exported methods to their organisation is TestNoMethodReachesIntoAnotherOrganisation.

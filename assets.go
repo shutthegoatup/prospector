@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/fs"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -31,13 +32,16 @@ func webBuilt(fsys fs.FS) error {
 // assetVersion busts caches for the unhashed files (output.css, the app) on each build.
 var assetVersion = func() string {
 	h := sha256.New()
-	fs.WalkDir(assetFS, "assets", func(path string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(assetFS, "assets", func(path string, d fs.DirEntry, err error) error {
 		if err == nil && !d.IsDir() {
 			b, _ := assetFS.ReadFile(path)
 			h.Write(b)
 		}
 		return nil
 	})
+	if err != nil {
+		log.Printf("asset version: %v", err)
+	}
 	return hex.EncodeToString(h.Sum(nil))[:12]
 }()
 

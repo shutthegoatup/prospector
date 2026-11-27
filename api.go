@@ -106,7 +106,7 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 			return
 		}
 		w.Header().Set("content-type", "text/plain; charset=utf-8")
-		w.Write([]byte(text))
+		_, _ = w.Write([]byte(text))
 	}))
 
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {

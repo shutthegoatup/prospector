@@ -1,6 +1,9 @@
 openapi: 3.0.3
 info:
   title: Prospector
+  contact:
+    name: Prospector on GitHub
+    url: https://github.com/shutthegoatup/prospector
   version: "1"
   description: |
     Everything Prospector does, for people and robots alike. The web app uses this

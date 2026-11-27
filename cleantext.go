@@ -57,17 +57,6 @@ func cleanRequest(r *http.Request) (ok bool) {
 	return true
 }
 
-// parseForm parses a form body of at most limit bytes and cleans what it holds.
-func parseForm(w http.ResponseWriter, r *http.Request, limit int64) error {
-	r.Body = http.MaxBytesReader(w, r.Body, limit)
-	if err := r.ParseForm(); err != nil {
-		return err
-	}
-	cleanValues(r.PostForm)
-	cleanValues(r.Form)
-	return nil
-}
-
 // withoutNUL passes JSON through without its \u0000 escapes. Outside a string JSON has no
 // backslashes, so each escape can be read where it starts; one split across two reads
 // is held back until the rest arrives.

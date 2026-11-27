@@ -17,7 +17,12 @@ export const parseSearch = parseSearchWith(readValue);
 export const stringifySearch = stringifySearchWith(JSON.stringify);
 
 const text = z.catch(
-  z.optional(z.pipe(z.union([z.string(), z.number(), z.boolean()]), z.transform((v) => String(v)))),
+  z.optional(
+    z.pipe(
+      z.union([z.string(), z.number(), z.boolean()]),
+      z.transform((v) => String(v)),
+    ),
+  ),
   undefined,
 );
 

@@ -8,8 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"gorm.io/gorm"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // Methods that aren't about one organisation: people and their sessions, making

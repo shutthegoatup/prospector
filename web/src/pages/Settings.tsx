@@ -169,10 +169,7 @@ function Password({ me }: { me: Me }) {
   const change = $api.useMutation("post", "/o/{org}/api/v1/me/password");
   if (!me.has_password) {
     return (
-      <Section
-        title="Your sign-in"
-        hint="You sign in through a provider, so there is no password here to change. Whoever runs this server can give you one."
-      >
+      <Section title="Your sign-in" hint="You sign in through a provider, so there is no password here to change. Whoever runs this server can give you one.">
         {null}
       </Section>
     );
@@ -256,18 +253,23 @@ function Organisation({ settings: set, failed }: { settings?: Settings; failed: 
             <Input name="name" required defaultValue={set?.name} className={box} />
           </Row>
           <Row label="Colour">
-            <Input name="color" type="color" defaultValue={set?.color} className={cn("h-10 w-20 rounded-lg border border-input bg-muted p-1", loading && "animate-pulse")} />
+            <Input
+              name="color"
+              type="color"
+              defaultValue={set?.color}
+              className={cn("h-10 w-20 rounded-lg border border-input bg-muted p-1", loading && "animate-pulse")}
+            />
           </Row>
           <Row label="Email after">
             <span className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Input name="email_after_days" type="number" min={0} max={60} defaultValue={set?.email_after_days} className={`${box} w-24`} /> days
-              without a LinkedIn accept
+              <Input name="email_after_days" type="number" min={0} max={60} defaultValue={set?.email_after_days} className={`${box} w-24`} /> days without a
+              LinkedIn accept
             </span>
           </Row>
           <Row label="Follow up after">
             <span className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Input name="followup_after_days" type="number" min={0} max={60} defaultValue={set?.followup_after_days} className={`${box} w-24`} />{" "}
-              days without a reply
+              <Input name="followup_after_days" type="number" min={0} max={60} defaultValue={set?.followup_after_days} className={`${box} w-24`} /> days without
+              a reply
             </span>
           </Row>
           <Row label="Connection note">
@@ -297,8 +299,8 @@ function Organisation({ settings: set, failed }: { settings?: Settings; failed: 
               className={areaBox}
             />
             <Meta>
-              One per line, a name and what counts; put (must) after the name of anything a company is no fit without. Agents answer each yes, no or
-              unknown with a source, and Research ranks a search's companies by them.
+              One per line, a name and what counts; put (must) after the name of anything a company is no fit without. Agents answer each yes, no or unknown
+              with a source, and Research ranks a search's companies by them.
             </Meta>
           </Row>
           <Row label="Agent guidance">
@@ -313,9 +315,7 @@ function Organisation({ settings: set, failed }: { settings?: Settings; failed: 
           </Row>
           <Row label="Enquiry form sites">
             <Textarea name="enquiry_sites" rows={2} placeholder="https://www.example.com" defaultValue={set?.enquiry_sites} className={areaBox} />
-            <Meta>
-              One per line. A form on these sites can POST an enquiry as JSON to {intake} and it shows under Enquiries. Leave empty to accept none.
-            </Meta>
+            <Meta>One per line. A form on these sites can POST an enquiry as JSON to {intake} and it shows under Enquiries. Leave empty to accept none.</Meta>
           </Row>
           <Row label="Onboarding steps">
             <Textarea
@@ -326,16 +326,14 @@ function Organisation({ settings: set, failed }: { settings?: Settings; failed: 
               className={areaBox}
             />
             <Meta>
-              What a new customer goes through, one step a line, in order. Start a line with them: or us: for who does it (us when left out), and end
-              it with a number of days after the start when it is due. A customer counts as live once every step is done. Changing these leaves
-              onboardings already running as they are.
+              What a new customer goes through, one step a line, in order. Start a line with them: or us: for who does it (us when left out), and end it with a
+              number of days after the start when it is due. A customer counts as live once every step is done. Changing these leaves onboardings already
+              running as they are.
             </Meta>
           </Row>
           <Row label="Currency">
             <Input name="currency" defaultValue={set?.currency} maxLength={3} className={`${box} w-24`} />
-            <Meta>
-              The three-letter code deals are valued in, such as GBP, EUR or USD. Changing it leaves the deals you already valued as they are.
-            </Meta>
+            <Meta>The three-letter code deals are valued in, such as GBP, EUR or USD. Changing it leaves the deals you already valued as they are.</Meta>
           </Row>
           <Row label="Postal address">
             <Textarea
@@ -347,8 +345,7 @@ function Organisation({ settings: set, failed }: { settings?: Settings; failed: 
               className={areaBox}
             />
             <Meta>
-              Where you can be written to. It goes at the foot of every campaign, as the law on marketing mail expects, and a campaign can't be sent
-              without it.
+              Where you can be written to. It goes at the foot of every campaign, as the law on marketing mail expects, and a campaign can't be sent without it.
             </Meta>
           </Row>
           <Row label="Cold email">
@@ -504,7 +501,13 @@ function OfferingFields({ o }: { o?: Offering }) {
         <Input name="name" required maxLength={60} defaultValue={o?.name} placeholder="Contract roles" className={field} />
       </Row>
       <Row label="What you look for">
-        <Textarea name="look_for" rows={4} defaultValue={o?.look_for} placeholder={"ir35: outside IR35, or not stated\nopen_roles (must): a contract role open now"} className={area} />
+        <Textarea
+          name="look_for"
+          rows={4}
+          defaultValue={o?.look_for}
+          placeholder={"ir35: outside IR35, or not stated\nopen_roles (must): a contract role open now"}
+          className={area}
+        />
         <Meta>As above, one per line. Agents on a task for this offering check these in place of the organisation's own.</Meta>
       </Row>
       <Row label="What you do">
@@ -591,7 +594,10 @@ function OfferingRow({ o }: { o?: Offering }) {
         </span>
         <span className="min-w-0 font-mono text-xs text-muted-foreground">
           <Text
-            value={o && (fields.length === 0 ? "nothing to look for yet" : fields.slice(0, 4).join(" · ") + (fields.length > 4 ? ` · +${fields.length - 4} more` : ""))}
+            value={
+              o &&
+              (fields.length === 0 ? "nothing to look for yet" : fields.slice(0, 4).join(" · ") + (fields.length > 4 ? ` · +${fields.length - 4} more` : ""))
+            }
             w="24ch"
           />
         </span>
@@ -619,8 +625,9 @@ function OfferingRow({ o }: { o?: Offering }) {
                   size="sm"
                   className="ml-auto"
                   onClick={() =>
-                    window.confirm(`Remove ${o.name}? Where companies stand for it is forgotten, though their history keeps it, and people reached for it are then reached for the organisation's own.`) &&
-                    remove.mutate({ params: { path: { org, id: o.id } } })
+                    window.confirm(
+                      `Remove ${o.name}? Where companies stand for it is forgotten, though their history keeps it, and people reached for it are then reached for the organisation's own.`,
+                    ) && remove.mutate({ params: { path: { org, id: o.id } } })
                   }
                 >
                   Remove
@@ -718,9 +725,7 @@ function SingleSignOn() {
       title="Single sign-on"
       hint="Let people at your company's email domains sign in through your own provider: Okta, Entra ID, Google Workspace or anything else that speaks OpenID Connect."
     >
-      {sso.data && sso.data.redirect_uri === "" && (
-        <Meta>Set PROSPECTOR_URL to this app's address first: it is where the provider sends people back.</Meta>
-      )}
+      {sso.data && sso.data.redirect_uri === "" && <Meta>Set PROSPECTOR_URL to this app's address first: it is where the provider sends people back.</Meta>}
       {sso.data && sso.data.redirect_uri !== "" && (
         <>
           <Domains />
@@ -845,8 +850,8 @@ function Provider({ sso }: { sso: SSO }) {
           />
           {!sso.sealing && (
             <Meta>
-              A secret is kept sealed, so none can be saved until whoever runs this server sets PROSPECTOR_SECRET_KEYS (`prospector secret-key` makes
-              one). Everything else here can still be changed.
+              A secret is kept sealed, so none can be saved until whoever runs this server sets PROSPECTOR_SECRET_KEYS (`prospector secret-key` makes one).
+              Everything else here can still be changed.
             </Meta>
           )}
         </Row>
@@ -1038,8 +1043,8 @@ function YourData() {
   return (
     <Section title="Your data">
       <p className="text-sm text-muted-foreground">
-        Everything this organisation holds here, in one file: companies, people, facts, enquiries, history, settings and who has access. It holds no
-        passwords, keys or sign-on secrets.
+        Everything this organisation holds here, in one file: companies, people, facts, enquiries, history, settings and who has access. It holds no passwords,
+        keys or sign-on secrets.
       </p>
       <div>
         <ActionButton quiet size="sm" disabled={exported.isPending} onClick={() => exported.mutate({ params: { path: { org } }, headers: bodiless })}>

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
 	"github.com/shutthegoatup/prospector/api"
 )
 

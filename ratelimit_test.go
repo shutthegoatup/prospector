@@ -115,7 +115,7 @@ func TestAMembersPagesAreNotCountedOnlyTheirCalls(t *testing.T) {
 }
 
 func TestEveryLimitedOperationDeclaresThrottled(t *testing.T) {
-	spec, err := api.GetSwagger()
+	spec, err := api.GetSpec()
 	if err != nil {
 		t.Fatal(err)
 	}

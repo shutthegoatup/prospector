@@ -146,7 +146,8 @@ export function SingleSignOnPage() {
         Single sign-on<span className="text-coral">.</span>
       </SignedOutTitle>
       <Problem>
-        {failure(find.error) ?? (found && found.length === 0 && "No organisation here uses single sign-on for that address. Sign in with your password instead.")}
+        {failure(find.error) ??
+          (found && found.length === 0 && "No organisation here uses single sign-on for that address. Sign in with your password instead.")}
       </Problem>
       {theOne && <p className="text-sm text-muted-foreground">{theOne.name} asks its people to sign in through its own provider.</p>}
       {offered.map((o) => (
