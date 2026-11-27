@@ -1,4 +1,4 @@
-package main
+package tz
 
 import (
 	"regexp"
@@ -10,10 +10,10 @@ import (
 
 var countryTag = regexp.MustCompile(`\(([A-Z]{2})(?:/[A-Z]{2})?[,)]`)
 
-// GuessTZ uses libphonenumber's time zone data for the first phone number, else the
+// Guess uses libphonenumber's time zone data for the first phone number, else the
 // (XX) country tag in the maker name. Where a number or country spans several zones,
 // the zone of libphonenumber's example number for that country breaks the tie.
-func GuessTZ(phone, maker string) *string {
+func Guess(phone, maker string) *string {
 	first := strings.SplitN(phone, "/", 2)[0]
 	if n, err := phonenumbers.Parse(first, ""); err == nil && phonenumbers.IsPossibleNumber(n) {
 		// Mobile and toll-free ranges outside North America say nothing about where the person is.

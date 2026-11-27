@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/tz"
 )
 
 // Import merges a parsed repo into one organisation. Text from the markdown refreshes,
@@ -65,8 +67,8 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 			return err
 		}
 		for _, c := range missing {
-			if tz := GuessTZ(deref(c.Phone), deref(c.Maker)); tz != nil {
-				if err := tx.Model(&c).Update("tz", tz).Error; err != nil {
+			if zone := tz.Guess(deref(c.Phone), deref(c.Maker)); zone != nil {
+				if err := tx.Model(&c).Update("tz", zone).Error; err != nil {
 					return err
 				}
 			}

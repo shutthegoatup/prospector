@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/shutthegoatup/prospector/internal/cleantext"
 )
 
 // AgentRun is one go of Prospector's own agent at a task. It keeps counts, never what
@@ -662,7 +664,7 @@ func (t *turnState) requestDone() bool {
 func (t *turnState) call(ctx context.Context, name, rawArgs string) (string, error) {
 	args := map[string]any{}
 	if strings.TrimSpace(rawArgs) != "" {
-		clean, _ := dropNULEscapes([]byte(rawArgs), true)
+		clean, _ := cleantext.DropNULEscapes([]byte(rawArgs), true)
 		if err := json.Unmarshal(clean, &args); err != nil {
 			return "", fmt.Errorf("the arguments for %s weren't a JSON object", name)
 		}
