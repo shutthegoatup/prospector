@@ -901,6 +901,12 @@ function DataVendors() {
   );
 }
 
+// button runs go in place of what the click would do.
+const button = (go: () => void) => (ev: React.MouseEvent) => {
+  ev.preventDefault();
+  go();
+};
+
 // VendorCard is one vendor, or its outline while the list loads.
 function VendorCard({ vendor: e, n, up, down }: { vendor?: Enricher; n: number; up?: () => void; down?: () => void }) {
   const { org, owner } = useSession();
@@ -921,11 +927,6 @@ function VendorCard({ vendor: e, n, up, down }: { vendor?: Enricher; n: number; 
     if (!e) return;
     save.mutate({ params: { path: { org } }, body: { kind: e.kind, api_key: key, position: e.position, monthly_limit: Number(limit) } });
   };
-  const button = (go: () => void) => (ev: React.MouseEvent) => {
-    ev.preventDefault();
-    go();
-  };
-
   return (
     <details className={cardClass} data-state={rail}>
       {/* oxlint-disable-next-line jsx-a11y/control-has-associated-label -- labelled by the agent's name inside it */}

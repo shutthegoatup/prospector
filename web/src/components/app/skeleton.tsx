@@ -54,6 +54,7 @@ export function Settled({ children, className }: { children: ReactNode; classNam
       if (client.isFetching() === 0) setSettled(true);
     });
     return () => cancelAnimationFrame(frame);
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- fetching is read through client: each change in it is a reason to look again
   }, [client, fetching, settled]);
   return (
     <div aria-busy={!settled || undefined} className={cn(!settled && "invisible", className)}>
