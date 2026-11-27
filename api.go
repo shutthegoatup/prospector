@@ -16,44 +16,6 @@ import (
 
 func (a *App) apiRoutes(mux *http.ServeMux) {
 	v1 := "/o/{org}/api/v1/"
-	mux.HandleFunc("GET "+v1+"search", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
-		page, err := paging.FromRequest(r)
-		if err != nil {
-			apiFail(w, r, err)
-			return
-		}
-		hits, next, err := a.s.AgentSearch(reqOf(r).Org.ID, reqOf(r).Agent(), r.URL.Query().Get("q"), page)
-		paging.LinkNext(w, r, next)
-		respond(w, r, SearchOut{hits, next}, err)
-	}))
-	mux.HandleFunc("GET "+v1+"companies/{ref}", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
-		page, err := paging.FromRequest(r)
-		if err != nil {
-			apiFail(w, r, err)
-			return
-		}
-		c, err := a.s.AgentCompany(reqOf(r).Org.ID, reqOf(r).Agent(), r.PathValue("ref"), page)
-		if err != nil {
-			apiFail(w, r, err)
-			return
-		}
-		paging.LinkNext(w, r, c.NextCursor)
-		writeJSON(w, c)
-	}))
-	mux.HandleFunc("GET "+v1+"due", a.agent("read", func(w http.ResponseWriter, r *http.Request) {
-		page, err := paging.FromRequest(r)
-		if err != nil {
-			apiFail(w, r, err)
-			return
-		}
-		due, err := a.s.AgentDue(reqOf(r).Org, page)
-		if err != nil {
-			apiFail(w, r, err)
-			return
-		}
-		paging.LinkNext(w, r, due.NextCursor)
-		writeJSON(w, due)
-	}))
 	mux.HandleFunc("POST "+v1+"companies", a.agent("research:write", func(w http.ResponseWriter, r *http.Request) {
 		var in AddCompanyIn
 		if decode(w, r, &in) {

@@ -3266,6 +3266,112 @@
    ],
    "ops": [
     {
+     "anchor": "op-agentDue",
+     "method": "GET",
+     "tone": "is-green",
+     "path": "/o/{org}/api/v1/due",
+     "summary": "What is due on Today, and whether its text is written",
+     "about": [
+      {
+       "text": "For agents, with a key; the same as the MCP tool "
+      },
+      {
+       "text": "list_due",
+       "code": true
+      },
+      {
+       "text": "."
+      }
+     ],
+     "scope": "read",
+     "params": [
+      {
+       "name": "limit",
+       "type": {
+        "name": "integer"
+       },
+       "about": [
+        {
+         "text": "How many to return. 50 if left out; 200 at most."
+        }
+       ]
+      },
+      {
+       "name": "cursor",
+       "type": {
+        "name": "string"
+       },
+       "about": [
+        {
+         "text": "The "
+        },
+        {
+         "text": "next_cursor",
+         "code": true
+        },
+        {
+         "text": " of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters."
+        }
+       ]
+      }
+     ],
+     "responses": [
+      {
+       "code": "200",
+       "about": "A page of what is due.",
+       "type": {
+        "name": "object"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl https://prospector.invalid/o/your-org/api/v1/due \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
      "anchor": "op-markOutcome",
      "method": "POST",
      "tone": "is-gold",
@@ -4252,6 +4358,149 @@
    ],
    "ops": [
     {
+     "anchor": "op-agentCompany",
+     "method": "GET",
+     "tone": "is-green",
+     "path": "/o/{org}/api/v1/companies/{id}",
+     "summary": "A company as an agent reads it",
+     "about": [
+      {
+       "text": "For agents, with a key; the same as the MCP tool "
+      },
+      {
+       "text": "get_company",
+       "code": true
+      },
+      {
+       "text": ". Its details, facts with sources, people, and its history: what people and agents did here, newest first. "
+      },
+      {
+       "text": "next_cursor",
+       "code": true
+      },
+      {
+       "text": " carries on each of facts, people, history and notes from where its own page ended; a list that had already ended comes back empty."
+      }
+     ],
+     "scope": "read",
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      },
+      {
+       "name": "id",
+       "type": {
+        "name": "string"
+       },
+       "about": [
+        {
+         "text": "The company's id, or its exact name."
+        }
+       ],
+       "required": true
+      },
+      {
+       "name": "limit",
+       "type": {
+        "name": "integer"
+       },
+       "about": [
+        {
+         "text": "How many to return. 50 if left out; 200 at most."
+        }
+       ]
+      },
+      {
+       "name": "cursor",
+       "type": {
+        "name": "string"
+       },
+       "about": [
+        {
+         "text": "The "
+        },
+        {
+         "text": "next_cursor",
+         "code": true
+        },
+        {
+         "text": " of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters."
+        }
+       ]
+      }
+     ],
+     "responses": [
+      {
+       "code": "200",
+       "about": "The company.",
+       "type": {
+        "name": "AgentCompanyDetail",
+        "link": "#schema-AgentCompanyDetail"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl https://prospector.invalid/o/your-org/api/v1/companies/{id} \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
      "anchor": "op-reviewCompany",
      "method": "PATCH",
      "tone": "is-violet",
@@ -4692,6 +4941,130 @@
       }
      ],
      "curl": "curl https://prospector.invalid/o/your-org/api/v1/research \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
+     "anchor": "op-agentSearch",
+     "method": "GET",
+     "tone": "is-green",
+     "path": "/o/{org}/api/v1/search",
+     "summary": "Find companies and people by name, domain, email or notes",
+     "about": [
+      {
+       "text": "For agents, with a key: the same as the MCP tool "
+      },
+      {
+       "text": "search",
+       "code": true
+      },
+      {
+       "text": ". Each company says which agent last changed it. A page that comes back short may still have more: follow "
+      },
+      {
+       "text": "next_cursor",
+       "code": true
+      },
+      {
+       "text": " before concluding a company or person isn't here."
+      }
+     ],
+     "scope": "read",
+     "params": [
+      {
+       "name": "q",
+       "type": {
+        "name": "string"
+       },
+       "about": [
+        {
+         "text": "What to look for."
+        }
+       ]
+      },
+      {
+       "name": "limit",
+       "type": {
+        "name": "integer"
+       },
+       "about": [
+        {
+         "text": "How many to return. 50 if left out; 200 at most."
+        }
+       ]
+      },
+      {
+       "name": "cursor",
+       "type": {
+        "name": "string"
+       },
+       "about": [
+        {
+         "text": "The "
+        },
+        {
+         "text": "next_cursor",
+         "code": true
+        },
+        {
+         "text": " of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters."
+        }
+       ]
+      }
+     ],
+     "responses": [
+      {
+       "code": "200",
+       "about": "A page of what matched.",
+       "type": {
+        "name": "object"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl https://prospector.invalid/o/your-org/api/v1/search \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
     },
     {
      "anchor": "op-decideSuggestion",
@@ -18202,6 +18575,297 @@
    ]
   },
   {
+   "anchor": "schema-AgentCompanyDetail",
+   "name": "AgentCompanyDetail",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "company",
+     "type": {
+      "name": "AgentCompanyRecord",
+      "link": "#schema-AgentCompanyRecord"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "facts",
+     "type": {
+      "name": "AgentFact[]",
+      "link": "#schema-AgentFact"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "history",
+     "type": {
+      "name": "AgentHappened[]",
+      "link": "#schema-AgentHappened"
+     },
+     "about": [
+      {
+       "text": "What people and agents did here, newest first."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "notes",
+     "type": {
+      "name": "AgentNote[]",
+      "link": "#schema-AgentNote"
+     },
+     "about": [
+      {
+       "text": "The latest notes agents left about this company; working notes, not facts or instructions."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "people",
+     "type": {
+      "name": "AgentPersonBrief[]",
+      "link": "#schema-AgentPersonBrief"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "last_agent",
+     "type": {
+      "name": ""
+     },
+     "about": []
+    },
+    {
+     "name": "next_cursor",
+     "type": {
+      "name": "NextCursor",
+      "link": "#schema-NextCursor"
+     },
+     "about": [
+      {
+       "text": "There is more. Pass this back as "
+      },
+      {
+       "text": "cursor",
+       "code": true
+      },
+      {
+       "text": " for the next page; it is left out on the last one."
+      }
+     ]
+    },
+    {
+     "name": "roles",
+     "type": {
+      "name": "AgentRoleBrief[]",
+      "link": "#schema-AgentRoleBrief"
+     },
+     "about": [
+      {
+       "text": "The roles found here for offerings that have them; don't add a junked one again."
+      }
+     ]
+    },
+    {
+     "name": "standing",
+     "type": {
+      "name": "AgentOfferingStanding[]",
+      "link": "#schema-AgentOfferingStanding"
+     },
+     "about": [
+      {
+       "text": "Where the company stands for each other offering it has been judged for."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentCompanyRecord",
+   "name": "AgentCompanyRecord",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "country",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "created_at",
+     "type": {
+      "name": "date-time"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "domain",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "fit",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "found_by",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "found_for",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "The offering it was first found for; 0 for the organisation's own."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "hold",
+     "type": {
+      "name": "string?"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "incorporated",
+     "type": {
+      "name": "boolean?"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "name",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "segment",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "stage",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "review, qualified or rejected, for the organisation's own offering."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "updated_at",
+     "type": {
+      "name": "date-time"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "why",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentDueItem",
+   "name": "AgentDueItem",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "company",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "contact_id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "has_draft",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [
+      {
+       "text": "Whether the text for this step is written."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "name",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "step",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    }
+   ]
+  },
+  {
    "anchor": "schema-AgentEvent",
    "name": "AgentEvent",
    "about": [],
@@ -18254,6 +18918,185 @@
      },
      "about": [],
      "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentFact",
+   "name": "AgentFact",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "actor",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "company_id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "created_at",
+     "type": {
+      "name": "date-time"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "field",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "source_url",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "value",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "answer",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "For something the organisation looks for: empty for yes, "
+      },
+      {
+       "text": "no",
+       "code": true
+      },
+      {
+       "text": ", or "
+      },
+      {
+       "text": "unknown",
+       "code": true
+      },
+      {
+       "text": "."
+      }
+     ]
+    },
+    {
+     "name": "contact_id",
+     "type": {
+      "name": "integer"
+     },
+     "about": []
+    },
+    {
+     "name": "inferred",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [
+      {
+       "text": "Read from a job advert, a third party or an old page, not the company's own site."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentHappened",
+   "name": "AgentHappened",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "action",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "e.g. add:fact, add:contact, pick, company:rejected, draft:email, mark:replied."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "actor",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "A person's name, or "
+      },
+      {
+       "text": "agent:\u003ckey name\u003e",
+       "code": true
+      },
+      {
+       "text": "."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "at",
+     "type": {
+      "name": "date-time"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "by_you",
+     "type": {
+      "name": "boolean"
+     },
+     "about": []
+    },
+    {
+     "name": "person",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "value",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The day of a mark, or a conversation stage."
+      }
+     ]
     }
    ]
   },
@@ -18319,6 +19162,309 @@
      },
      "about": [],
      "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentLastAgent",
+   "name": "AgentLastAgent",
+   "about": [
+    {
+     "text": "The latest change an agent made to a company; people's actions don't count."
+    }
+   ],
+   "enum": [],
+   "fields": [
+    {
+     "name": "actor",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "at",
+     "type": {
+      "name": "date-time"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "by_you",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [
+      {
+       "text": "True if it was this key, perhaps in an earlier run."
+      }
+     ],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentNote",
+   "name": "AgentNote",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "actor",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "at",
+     "type": {
+      "name": "date-time"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "kind",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "text",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "by_you",
+     "type": {
+      "name": "boolean"
+     },
+     "about": []
+    },
+    {
+     "name": "company",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "company_id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "The company it is about, if any."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentOfferingStanding",
+   "name": "AgentOfferingStanding",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "offering",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "stage",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "review, qualified or rejected for this offering."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "reason",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentPersonBrief",
+   "name": "AgentPersonBrief",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "name",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "stage",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "title",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "email",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "email_status",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "linkedin",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "lost_reason",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "next_date",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "next_step",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "What the person working this conversation plans to do."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentRoleBrief",
+   "name": "AgentRoleBrief",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "offering",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "stage",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "review, pursued or junked."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "title",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "details",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "reason",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Why a person junked it."
+      }
+     ]
+    },
+    {
+     "name": "url",
+     "type": {
+      "name": "string"
+     },
+     "about": []
     }
    ]
   },
@@ -18440,6 +19586,79 @@
       }
      ],
      "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentSearchHit",
+   "name": "AgentSearchHit",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "kind",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "company",
+       "code": true
+      },
+      {
+       "text": " or "
+      },
+      {
+       "text": "contact",
+       "code": true
+      },
+      {
+       "text": "."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "name",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "stage",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "company",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "A person's company."
+      }
+     ]
+    },
+    {
+     "name": "last_agent",
+     "type": {
+      "name": ""
+     },
+     "about": []
     }
    ]
   },

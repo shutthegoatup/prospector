@@ -38,6 +38,10 @@ func TestEveryListInTheSpecComesInPages(t *testing.T) {
 		// A list written into the answer itself, as enquiries once were, under its own name.
 		if ref.Ref == "" {
 			for name, p := range schema.Properties {
+				// Agents read a search's hits, as its MCP tool names them, from before the spec had it.
+				if op.OperationID == "agentSearch" && name == "hits" {
+					continue
+				}
 				if name != "items" && p.Value.Type.Is("array") {
 					t.Errorf("GET %s (%s) answers a list as %q: call it items, beside next_cursor", path, op.OperationID, name)
 				}
