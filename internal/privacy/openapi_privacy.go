@@ -31,3 +31,12 @@ func (s PrivacyAPI) ErasePerson(ctx context.Context, in api.ErasePersonRequestOb
 
 // PrivacyAPI is a person's export and erasure, which apiServer embeds.
 type PrivacyAPI struct{ Store *PrivacyStore }
+
+// AgentSnapshot is what `prospector pull` writes to a file.
+func (s PrivacyAPI) AgentSnapshot(ctx context.Context, _ api.AgentSnapshotRequestObject) (api.AgentSnapshotResponseObject, error) {
+	text, err := s.Store.SnapshotText(request.ReqFrom(ctx).Org.ID)
+	if err != nil {
+		return nil, err
+	}
+	return api.AgentSnapshot200TextResponse(text), nil
+}

@@ -944,6 +944,59 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
+  /o/{org}/api/v1/import:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    post:
+      operationId: agentImport
+      tags: [people]
+      summary: Bring in the old tracker's drafts, companies and sent log
+      description: "What `prospector push` sends from a checkout of the old markdown tracker. Contacts are matched by their key and filled in; companies are linked by name."
+      security:
+        - bearer: [import]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentImportPayload" }
+      responses:
+        "200":
+          description: How many contacts the organisation holds after it.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [contacts]
+                properties:
+                  contacts: { type: integer, format: int64 }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /o/{org}/api/v1/snapshot:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: agentSnapshot
+      tags: [people]
+      summary: The organisation's contacts as SQL inserts
+      description: "What `prospector pull` writes to a file: the contacts table as the old tracker kept it, to restore from with `prospector restore`."
+      security:
+        - bearer: [import]
+      responses:
+        "200":
+          description: The snapshot.
+          content:
+            text/plain:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
   /o/{org}/api/v1/enquiries/{id}/messages:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -4942,6 +4995,48 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
 
   schemas:
+    AgentImportDraft:
+      type: object
+      description: One contact as the old tracker's outreach files held them.
+      required: [key]
+      properties:
+        key: { type: string }
+        file: { type: string }
+        section: { type: string }
+        fit: { type: string }
+        maker: { type: string }
+        person: { type: string }
+        first: { type: string }
+        linkedin: { type: string }
+        email: { type: string }
+        note: { type: string }
+        subject: { type: string }
+        body: { type: string }
+        followup: { type: string }
+        flags: { type: string }
+        hold: { type: string, nullable: true, x-go-type: "*string" }
+        sources: { type: string }
+        phone: { type: string }
+    AgentImportPayload:
+      type: object
+      properties:
+        drafts:
+          type: array
+          items: { $ref: "#/components/schemas/AgentImportDraft" }
+        companies:
+          type: array
+          description: The old tracker's company rows, column by column.
+          items:
+            type: object
+            additionalProperties: { type: string }
+        sent_log:
+          type: array
+          items:
+            type: object
+            required: [date, line]
+            properties:
+              date: { type: string }
+              line: { type: string }
     AgentOK:
       type: object
       required: [ok]

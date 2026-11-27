@@ -525,6 +525,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bring in the old tracker's drafts, companies and sent log
+         * @description What `prospector push` sends from a checkout of the old markdown tracker. Contacts are matched by their key and filled in; companies are linked by name.
+         */
+        post: operations["agentImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The organisation's contacts as SQL inserts
+         * @description What `prospector pull` writes to a file: the contacts table as the old tracker kept it, to restore from with `prospector restore`.
+         */
+        get: operations["agentSnapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/enquiries/{id}/messages": {
         parameters: {
             query?: never;
@@ -2788,6 +2834,37 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description One contact as the old tracker's outreach files held them. */
+        AgentImportDraft: {
+            key: string;
+            file?: string;
+            section?: string;
+            fit?: string;
+            maker?: string;
+            person?: string;
+            first?: string;
+            linkedin?: string;
+            email?: string;
+            note?: string;
+            subject?: string;
+            body?: string;
+            followup?: string;
+            flags?: string;
+            hold?: string | null;
+            sources?: string;
+            phone?: string;
+        };
+        AgentImportPayload: {
+            drafts?: components["schemas"]["AgentImportDraft"][];
+            /** @description The old tracker's company rows, column by column. */
+            companies?: {
+                [key: string]: string;
+            }[];
+            sent_log?: {
+                date: string;
+                line: string;
+            }[];
+        };
         AgentOK: {
             ok: boolean;
         };
@@ -5989,6 +6066,71 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    agentImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentImportPayload"];
+            };
+        };
+        responses: {
+            /** @description How many contacts the organisation holds after it. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        contacts: number;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    agentSnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The snapshot. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };

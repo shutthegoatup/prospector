@@ -14,25 +14,8 @@ import (
 	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
+// apiRoutes holds the one route the spec doesn't: MCP, a protocol of its own.
 func (a *App) apiRoutes(mux *http.ServeMux) {
-	v1 := "/o/{org}/api/v1/"
-	mux.HandleFunc("POST "+v1+"import", a.agent("import", func(w http.ResponseWriter, r *http.Request) {
-		var p ImportPayload
-		if decode(w, r, &p) {
-			total, err := a.s.Import(reqOf(r).Org.ID, &p)
-			respond(w, r, map[string]int64{"contacts": total}, err)
-		}
-	}))
-	mux.HandleFunc("GET "+v1+"snapshot", a.agent("import", func(w http.ResponseWriter, r *http.Request) {
-		text, err := a.s.SnapshotText(reqOf(r).Org.ID)
-		if err != nil {
-			apiFail(w, r, err)
-			return
-		}
-		w.Header().Set("content-type", "text/plain; charset=utf-8")
-		_, _ = w.Write([]byte(text))
-	}))
-
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		return a.mcpServer(reqOf(r))
 	}, nil)
@@ -43,14 +26,6 @@ func (a *App) apiRoutes(mux *http.ServeMux) {
 		return &auth.TokenInfo{UserID: strconv.FormatInt(k.ID, 10) + " " + k.Scopes}, nil
 	}, &auth.RequireBearerTokenOptions{AllowMissingExpiration: true})
 	mux.Handle("/o/{org}/mcp", a.agent("", streaming(sameKey(mcpHandler))))
-}
-
-func respond(w http.ResponseWriter, r *http.Request, v any, err error) {
-	if err != nil {
-		apiFail(w, r, err)
-		return
-	}
-	writeJSON(w, v)
 }
 
 type ok struct {

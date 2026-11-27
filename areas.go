@@ -18,7 +18,7 @@ var opArea = map[string]string{
 	"StartDeal": areaSales, "ChangeDeal": areaSales, "RemoveDeal": areaSales, "ChangeOwnDeal": areaSales,
 	"StartRun": areaSales, "StopRun": areaSales,
 	"CreateTask": areaSales, "ChangeTask": areaSales, "AskTask": areaSales, "ChangeTaskRequest": areaSales,
-	"AgentAddCompany": areaSales, "AgentAddFact": areaSales, "AgentAddContact": areaSales, "AgentDraft": areaSales, "AgentAddEnquiry": areaSupport,
+	"AgentAddCompany": areaSales, "AgentAddFact": areaSales, "AgentAddContact": areaSales, "AgentDraft": areaSales, "AgentAddEnquiry": areaSupport, "AgentImport": areaAny, "AgentSnapshot": areaAny,
 	"AddPerson": areaSales, "ChangeContact": areaSales, "MarkOutcome": areaSales, "PickContact": areaSales, "ReviewCompany": areaSales, "AddRole": areaSales, "JudgeRole": areaSales, "DecideSuggestion": areaSales,
 	"AddNote": areaSales, "FinishRequest": areaSales, "DeleteNote": areaSales,
 	"ConverseEnquiry": areaAny, "AddSuppression": areaAny, "RemoveSuppression": areaSales,
