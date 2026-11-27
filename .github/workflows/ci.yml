@@ -18,6 +18,18 @@ jobs:
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
+          cache: false
+      # A Go cache for this job alone, saved every run. setup-go's own is keyed on go.sum
+      # only and kept by whichever job finishes first, which has compiled the least.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ github.job }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-${{ github.job }}-${{ hashFiles('go.sum') }}-
+            go-${{ github.job }}-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26
@@ -44,6 +56,18 @@ jobs:
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
+          cache: false
+      # A Go cache for this job alone, saved every run. setup-go's own is keyed on go.sum
+      # only and kept by whichever job finishes first, which has compiled the least.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ github.job }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-${{ github.job }}-${{ hashFiles('go.sum') }}-
+            go-${{ github.job }}-
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.15.0
@@ -73,6 +97,18 @@ jobs:
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
+          cache: false
+      # A Go cache for this job alone, saved every run. setup-go's own is keyed on go.sum
+      # only and kept by whichever job finishes first, which has compiled the least.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ github.job }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-${{ github.job }}-${{ hashFiles('go.sum') }}-
+            go-${{ github.job }}-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26
@@ -89,13 +125,6 @@ jobs:
         run: |
           psql "$PROSPECTOR_TEST_PG" -c "alter system set fsync = off" -c "alter system set synchronous_commit = off" \
             -c "alter system set full_page_writes = off" -c "select pg_reload_conf()"
-      - name: Diagnose the build (temporary)
-        run: |
-          nproc
-          du -sh "$(go env GOCACHE)" || true
-          time go build -v -o /dev/null . 2>&1 | tail -3
-          go build -v -o /dev/null . 2>&1 | wc -l
-          time go test -vet=off -c -o /dev/null .
       # go vet is the lint job's (golangci's govet); run again here it is most of the build.
       - name: Test
         run: |
@@ -134,6 +163,18 @@ jobs:
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
+          cache: false
+      # A Go cache for this job alone, saved every run. setup-go's own is keyed on go.sum
+      # only and kept by whichever job finishes first, which has compiled the least.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ github.job }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-${{ github.job }}-${{ hashFiles('go.sum') }}-
+            go-${{ github.job }}-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26
