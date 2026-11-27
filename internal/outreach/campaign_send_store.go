@@ -1,14 +1,13 @@
 package outreach
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -113,10 +112,10 @@ func (s *OutreachStore) SendCampaign(o *store.Org, id int64, actor string) (*sto
 			return store.Missing(err, "no campaign %d", id)
 		}
 		if c.Status != CampaignDraft {
-			return errors.New("it has been sent already")
+			return say.New("it has been sent already")
 		}
 		if strings.TrimSpace(c.Subject) == "" || strings.TrimSpace(c.Body) == "" {
-			return errors.New("a campaign needs a subject and something to say before it is sent")
+			return say.New("a campaign needs a subject and something to say before it is sent")
 		}
 		now := time.Now()
 		flipped := tx.Model(&store.Campaign{}).Where("org_id = ? and id = ? and status = ?", o.ID, id, CampaignDraft).
@@ -125,7 +124,7 @@ func (s *OutreachStore) SendCampaign(o *store.Org, id int64, actor string) (*sto
 			return flipped.Error
 		}
 		if flipped.RowsAffected == 0 {
-			return errors.New("it has been sent already")
+			return say.New("it has been sent already")
 		}
 		// Read again now it is ours: a change that landed between the first read and the
 		// flip, or a row an older release wrote, must not send a service notice to anyone
@@ -153,7 +152,7 @@ func (s *OutreachStore) SendCampaign(o *store.Org, id int64, actor string) (*sto
 			rows = append(rows, store.CampaignRecipient{OrgID: o.ID, CampaignID: id, Address: p.Address, ContactID: &contact, Name: p.Name, Status: MailQueued})
 		}
 		if len(rows) == 0 {
-			return errors.New("nobody is left for it to go to")
+			return say.New("nobody is left for it to go to")
 		}
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(rows, 200).Error; err != nil {
 			return err
@@ -176,7 +175,7 @@ func (s *OutreachStore) CancelCampaign(org, id int64) (*store.Campaign, error) {
 			if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
 				return store.Missing(err, "no campaign %d", id)
 			}
-			return fmt.Errorf("a campaign that is %s can't be cancelled", c.Status)
+			return say.Errorf("a campaign that is %s can't be cancelled", c.Status)
 		}
 		if err := tx.Model(&store.CampaignRecipient{}).Where("org_id = ? and campaign_id = ? and status = ?", org, id, MailQueued).
 			Update("status", MailCancelled).Error; err != nil {
@@ -199,7 +198,7 @@ func (s *OutreachStore) ResumeCampaign(org, id int64) (*store.Campaign, error) {
 		return nil, err
 	}
 	if res.RowsAffected == 0 {
-		return nil, fmt.Errorf("only a paused campaign can be resumed, and this one is %s", c.Status)
+		return nil, say.Errorf("only a paused campaign can be resumed, and this one is %s", c.Status)
 	}
 	return c, nil
 }

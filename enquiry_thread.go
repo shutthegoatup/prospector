@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log"
 
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // notSent is a failure of the mail server, not of what was asked.
@@ -13,7 +13,7 @@ type notSent struct{ error }
 
 func (e notSent) Unwrap() error { return e.error }
 
-var errNoReplyMail = errors.New("mail isn't set up, so a reply can't be sent from here: an owner sets a mail server in Settings")
+var errNoReplyMail = say.New("mail isn't set up, so a reply can't be sent from here: an owner sets a mail server in Settings")
 
 // replyEnquiry emails a reply to whoever wrote in, at the address they gave and no
 // other. The mail carries only what was typed for it: nothing they sent us is quoted
@@ -40,7 +40,7 @@ func (a *App) replyEnquiry(ctx context.Context, o *Org, enquiry int64, text, act
 	if sendErr != nil {
 		// The mail server's own words name hosts and addresses, some of them the host's operator's.
 		log.Printf("a reply to enquiry %d wasn't sent: %v", enquiry, sendErr)
-		return nil, notSent{errors.New("the mail server didn't take the reply, and nothing was recorded; try again, or ask an owner to check the mail settings")}
+		return nil, notSent{say.New("the mail server didn't take the reply, and nothing was recorded; try again, or ask an owner to check the mail settings")}
 	}
 	return m, nil
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // A customer's page shows someone outside the organisation the onboarding steps that
@@ -21,7 +22,7 @@ const (
 	customerCookie = "customer"
 )
 
-var errNoCustomerMail = errors.New("mail isn't set up, so the link can't be sent: an owner sets a mail server in Settings, and the server needs PROSPECTOR_URL")
+var errNoCustomerMail = say.New("mail isn't set up, so the link can't be sent: an owner sets a mail server in Settings, and the server needs PROSPECTOR_URL")
 
 // customerMailOn is whether a link can be mailed for this organisation: it needs a mail
 // server, its own or the app's, and PROSPECTOR_URL, because a link is never built from
@@ -39,12 +40,13 @@ func (a *App) customerLinkMail(ctx context.Context, org *Org, to, token string) 
 	if via == nil || a.base == "" {
 		return errNoCustomerMail
 	}
-	return a.deliver(ctx, *via, mailer.Message{To: to, Subject: org.Name + ": your onboarding steps",
-		Body: org.Name + " has a page showing the steps that are yours while they set you up.\n\n" +
-			"Open it here:\n" + a.base + "/c/" + token + "\n\n" +
-			"The link works once, within 7 days, and opens the page in the browser you use it in. " +
-			"To open it somewhere else, use the link again and ask for a fresh one: it is sent to this address.\n\n" +
-			"If you weren't expecting this, ignore it: nothing happens unless the link is opened.\n"})
+	// A customer has no language of their own yet, and the organisation none to stand in.
+	return a.deliver(ctx, *via, mailer.Message{To: to, Subject: say.Errorf("%s: your onboarding steps", org.Name).Error(),
+		Body: say.Errorf("%[1]s has a page showing the steps that are yours while they set you up.\n\n"+
+			"Open it here:\n%[2]s\n\n"+
+			"The link works once, within 7 days, and opens the page in the browser you use it in. "+
+			"To open it somewhere else, use the link again and ask for a fresh one: it is sent to this address.\n\n"+
+			"If you weren't expecting this, ignore it: nothing happens unless the link is opened.\n", org.Name, a.base+"/c/"+token).Error()})
 }
 
 // customerHeaders are for every page an outsider opens: a link in the address mustn't

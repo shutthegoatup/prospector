@@ -1,12 +1,12 @@
 package research
 
 import (
-	"fmt"
 	"strings"
 
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -16,7 +16,7 @@ func nameFree(tx *gorm.DB, org, id int64, name string) error {
 		return err
 	}
 	if n > 0 {
-		return store.Conflict(fmt.Sprintf("there is already an offering called %q", name))
+		return store.Conflict{Text: say.Errorf("there is already an offering called %q", name)}
 	}
 	return nil
 }

@@ -2,11 +2,11 @@ package agents
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -30,7 +30,7 @@ func (s *AgentStore) AgentByID(org, id int64) (*store.Agent, error) {
 func (s *AgentStore) AgentNamed(org int64, name string) (*store.Agent, error) {
 	var c store.Agent
 	if err := s.DB.Where("org_id = ? and name = ?", org, name).Limit(1).Find(&c).Error; err != nil || c.ID == 0 {
-		return nil, errors.Join(err, fmt.Errorf("no agent called %q in this organisation", name))
+		return nil, errors.Join(err, say.Errorf("no agent called %q in this organisation", name))
 	}
 	return &c, nil
 }
@@ -48,7 +48,7 @@ func (s *AgentStore) SaveAgentRow(org int64, c *store.Agent) error {
 		Select("name", "kind", "base_url", "fallback_id", "fallback_minutes", "thinking_off", "api_key", "model", "tools_url", "search_url", "models", "tools", "allowed", "problem", "checked_at", "updated_by", "updated_at").
 		Updates(c)
 	if res.Error == nil && res.RowsAffected == 0 {
-		return fmt.Errorf("%s was deleted meanwhile", c.Name)
+		return say.Errorf("%s was deleted meanwhile", c.Name)
 	}
 	return res.Error
 }

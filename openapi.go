@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log"
 	"net/http"
 	"slices"
@@ -11,6 +10,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // The API in api/openapi.yaml is the one way to do anything: the web app calls it with
@@ -50,7 +50,7 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 
 	strict := api.NewStrictHandlerWithOptions(apiServer{a}, []api.StrictMiddlewareFunc{a.apiScope(scopes), func(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc { return listURL(f) }, uploads, withRequest, a.withSite}, api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeProblem(w, http.StatusBadRequest, err.Error())
+			writeProblem(w, r, http.StatusBadRequest, say.New(err.Error()))
 		},
 		ResponseErrorHandlerFunc: apiFail,
 	})
@@ -62,7 +62,7 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 		BaseRouter:  router,
 		Middlewares: []api.MiddlewareFunc{a.apiCaller(account), noEmptyLink},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeProblem(w, http.StatusBadRequest, err.Error())
+			writeProblem(w, r, http.StatusBadRequest, say.New(err.Error()))
 		},
 	})
 }
@@ -80,7 +80,7 @@ func (a *App) apiCaller(account map[string]bool) api.MiddlewareFunc {
 func (a *App) caller(account map[string]bool, next http.Handler) http.Handler {
 	member := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if hasKey(r) && r.PathValue("org") == "" {
-			writeProblem(w, http.StatusForbidden, "a key belongs to one organisation and can't start another: sign in to do that")
+			writeProblem(w, r, http.StatusForbidden, say.New("a key belongs to one organisation and can't start another: sign in to do that"))
 			return
 		}
 		if hasKey(r) {
@@ -89,7 +89,7 @@ func (a *App) caller(account map[string]bool, next http.Handler) http.Handler {
 		}
 		if _, u := a.session(r); u == nil {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="prospector"`)
-			writeTyped(w, http.StatusUnauthorized, api.ProblemTypeSignedOut, "sign in, or send an API key: Authorization: Bearer pk_…")
+			writeTyped(w, r, http.StatusUnauthorized, api.ProblemTypeSignedOut, say.New("sign in, or send an API key: Authorization: Bearer pk_…"))
 			return
 		}
 		a.member(next.ServeHTTP)(w, r)
@@ -113,16 +113,16 @@ func (a *App) apiScope(scopes map[string][]string) api.StrictMiddlewareFunc {
 			switch {
 			// One that names no key scope is for people signed in, never a key.
 			case q.Key != nil && (keyless[op] || len(need) == 0):
-				refuseKeys(w)
+				refuseKeys(w, r)
 				return nil, nil
 			case q.Key != nil && !slices.ContainsFunc(need, q.Key.Has):
-				challenge(w, http.StatusForbidden, "insufficient_scope", need[0], "this key lacks the "+strings.Join(need, " or ")+" scope")
+				challenge(w, r, http.StatusForbidden, "insufficient_scope", need[0], say.Errorf("this key lacks the %s scope", strings.Join(need, " or ")))
 				return nil, nil
 			case q.Key == nil && slices.ContainsFunc(need, ownersOnly) && !q.Owner():
-				writeProblem(w, http.StatusForbidden, "only an owner of this organisation can change that")
+				writeProblem(w, r, http.StatusForbidden, say.New("only an owner of this organisation can change that"))
 				return nil, nil
 			case q.Key == nil && q.Org != nil && !q.Member.Works(opArea[op]):
-				writeProblem(w, http.StatusForbidden, areaRefusal(opArea[op]))
+				writeProblem(w, r, http.StatusForbidden, areaRefusal(opArea[op]))
 				return nil, nil
 			}
 			return f(ctx, w, r, in)
@@ -190,7 +190,7 @@ func nonNil(s []string) []string {
 
 func settingsIn(id int64, b *api.AgentSettings) (AgentSettingsIn, error) {
 	if b == nil {
-		return AgentSettingsIn{}, errors.New("send the agent's settings")
+		return AgentSettingsIn{}, say.New("send the agent's settings")
 	}
 	return AgentSettingsIn{ID: id, Name: b.Name, Kind: b.Kind, BaseURL: b.BaseUrl, APIKey: b.ApiKey, Model: b.Model, ToolsURL: b.ToolsUrl, SearchURL: b.SearchUrl,
 		Tools: nonNil(b.Tools), Fallback: b.Fallback, FallbackMinutes: b.FallbackMinutes, ThinkingOff: b.ThinkingOff}, nil
@@ -292,7 +292,7 @@ func (s apiServer) ListRuns(ctx context.Context, in api.ListRunsRequestObject) (
 
 func (s apiServer) StartRun(ctx context.Context, in api.StartRunRequestObject) (api.StartRunResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("say which agent: {\"agent\": id}")
+		return nil, say.New("say which agent: {\"agent\": id}")
 	}
 	q := reqFrom(ctx)
 	run, err := s.a.StartRun(q.Org.ID, in.Task, in.Body.Agent, q.Actor())

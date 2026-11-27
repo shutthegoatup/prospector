@@ -1,12 +1,13 @@
 package main
 
 import (
-	"errors"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // ErasePerson deletes a contact row and everything that says who it was. A row that
@@ -19,7 +20,7 @@ func (s *Store) ErasePerson(org, id int64, actor string) error {
 			return missing(err, "no contact %d", id)
 		}
 		if strings.HasPrefix(c.Key, "org:") {
-			return errors.New("that row stands for a company, not a person")
+			return say.New("that row stands for a company, not a person")
 		}
 		// Agents' notes are free text that can't be searched for a name, so every note on a
 		// task their row was part of goes, as below does every note about their company.

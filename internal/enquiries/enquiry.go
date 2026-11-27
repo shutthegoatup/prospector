@@ -1,10 +1,10 @@
 package enquiries
 
 import (
-	"errors"
 	"strings"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -65,7 +65,7 @@ type EnquiryIn struct {
 
 const enquiryRepeat = 10 * time.Minute
 
-var ErrEnquiryEmail = errors.New("an email address is needed, so we can answer")
+var ErrEnquiryEmail = say.New("an email address is needed, so we can answer")
 
 type EnquiryFilter struct {
 	Kind string

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -39,10 +40,10 @@ func noteKindLabel(kind string) string {
 func words(text string, max int, what string) (string, error) {
 	text = strings.TrimSpace(text)
 	if text == "" {
-		return "", fmt.Errorf("%s is empty", what)
+		return "", say.Errorf("%s is empty", what)
 	}
 	if n := len([]rune(text)); n > max {
-		return "", fmt.Errorf("%s is %d characters; %d at most", what, n, max)
+		return "", say.Errorf("%s is %d characters; %d at most", what, n, max)
 	}
 	return text, nil
 }

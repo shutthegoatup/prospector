@@ -24,6 +24,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -102,7 +103,7 @@ func (s *AgreementStore) RemoveAgreement(org, id int64) error {
 			if err := tx.Where("org_id = ? and id = ?", org, id).First(&store.Agreement{}).Error; err != nil {
 				return store.Missing(err, "no agreement %d", id)
 			}
-			return errors.New("only a draft agreement can be removed; one that was sent is kept")
+			return say.New("only a draft agreement can be removed; one that was sent is kept")
 		}
 		for _, part := range []any{&store.AgreementFile{}, &store.AgreementRecipient{}, &store.AgreementField{}, &store.AgreementEvent{}} {
 			if err := tx.Where("org_id = ? and agreement_id = ?", org, id).Delete(part).Error; err != nil {
@@ -118,10 +119,10 @@ func (s *AgreementStore) RemoveAgreement(org, id int64) error {
 // is hashed as it arrives. Fields on pages the new one doesn't have go.
 func (s *AgreementStore) PutAgreementFile(org, id int64, name string, data []byte, actor string) (*store.Agreement, error) {
 	if len(data) > AgreementFileLimit {
-		return nil, fmt.Errorf("a document is %d MB at most", AgreementFileLimit>>20)
+		return nil, say.Errorf("a document is %d MB at most", AgreementFileLimit>>20)
 	}
 	if !bytes.HasPrefix(data, []byte("%PDF-")) {
-		return nil, errors.New("that isn't a PDF: save the agreement as a PDF first")
+		return nil, say.New("that isn't a PDF: save the agreement as a PDF first")
 	}
 	pages, err := pdfPages(data)
 	if err != nil {
@@ -232,10 +233,10 @@ func (s *AgreementStore) AgreementRecipients(org, id int64) ([]Party, error) {
 // never-contact list; a member has to be in the organisation.
 func (s *AgreementStore) AddRecipient(o *store.Org, id int64, role string, contact, member *int64, actor string) (*store.AgreementRecipient, error) {
 	if role != RecipientSigner && role != RecipientCopy {
-		return nil, errors.New(`a recipient is a "signer" or gets a "copy"`)
+		return nil, say.New(`a recipient is a "signer" or gets a "copy"`)
 	}
 	if (contact == nil) == (member == nil) {
-		return nil, errors.New("name one contact or one member")
+		return nil, say.New("name one contact or one member")
 	}
 	var r store.AgreementRecipient
 	return &r, s.DB.Transaction(func(tx *gorm.DB) error {
@@ -248,7 +249,7 @@ func (s *AgreementStore) AddRecipient(o *store.Org, id int64, role string, conta
 			return err
 		}
 		if len(on) >= agreementRecipientLimit {
-			return fmt.Errorf("an agreement goes to %d people at most", agreementRecipientLimit)
+			return say.Errorf("an agreement goes to %d people at most", agreementRecipientLimit)
 		}
 		if contact != nil {
 			var c store.Contact
@@ -264,7 +265,7 @@ func (s *AgreementStore) AddRecipient(o *store.Org, id int64, role string, conta
 		last := 0
 		for _, x := range on {
 			if (contact != nil && x.ContactID != nil && *x.ContactID == *contact) || (member != nil && x.UserID != nil && *x.UserID == *member) {
-				return errors.New("they are on this agreement already")
+				return say.New("they are on this agreement already")
 			}
 			last = max(last, x.Position)
 		}
@@ -286,7 +287,7 @@ func (s *AgreementStore) ChangeRecipient(org, id, recipient int64, role *string,
 		}
 		if role != nil {
 			if *role != RecipientSigner && *role != RecipientCopy {
-				return errors.New(`a recipient is a "signer" or gets a "copy"`)
+				return say.New(`a recipient is a "signer" or gets a "copy"`)
 			}
 			if *role == RecipientCopy {
 				if err := tx.Where("org_id = ? and recipient_id = ?", org, r.ID).Delete(&store.AgreementField{}).Error; err != nil {
@@ -352,7 +353,7 @@ func (s *AgreementStore) AgreementFields(org, id int64) ([]store.AgreementField,
 // Each belongs to one of its signers and lies wholly on one of its pages.
 func (s *AgreementStore) PutAgreementFields(org, id int64, fields []store.AgreementField) ([]store.AgreementField, error) {
 	if len(fields) > agreementFieldLimit {
-		return nil, fmt.Errorf("an agreement has %d fields at most", agreementFieldLimit)
+		return nil, say.Errorf("an agreement has %d fields at most", agreementFieldLimit)
 	}
 	a, err := s.Agreement(org, id)
 	if err != nil {
@@ -362,7 +363,7 @@ func (s *AgreementStore) PutAgreementFields(org, id int64, fields []store.Agreem
 		return nil, errNotDraft
 	}
 	if a.FileHash == "" {
-		return nil, errors.New("upload the PDF before placing fields on it")
+		return nil, say.New("upload the PDF before placing fields on it")
 	}
 	pages, err := s.agreementPages(org, a)
 	if err != nil {

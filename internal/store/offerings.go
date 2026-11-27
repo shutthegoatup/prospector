@@ -1,11 +1,11 @@
 package store
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // Offering is something an organisation sells besides what its settings describe, with
@@ -46,10 +46,10 @@ const OfferingNameMax = 60
 func (o *Offering) Check() error {
 	o.Name = strings.TrimSpace(o.Name)
 	if o.Name == "" {
-		return errors.New("an offering needs a name")
+		return say.New("an offering needs a name")
 	}
 	if utf8.RuneCountInString(o.Name) > OfferingNameMax {
-		return fmt.Errorf("an offering's name is %d characters at most", OfferingNameMax)
+		return say.Errorf("an offering's name is %d characters at most", OfferingNameMax)
 	}
 	_, err := OrgSettings{LookFor: o.LookFor}.Assets()
 	return err

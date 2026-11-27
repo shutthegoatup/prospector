@@ -1,13 +1,13 @@
 package outreach
 
 import (
-	"errors"
 	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -52,7 +52,7 @@ func (s *SuppressionStore) SuppressIn(tx *gorm.DB, org int64, addr, reason, acto
 			return &kept, nil
 		}
 	}
-	return nil, errors.New("the list was changing too fast to record that; try again")
+	return nil, say.New("the list was changing too fast to record that; try again")
 }
 
 // Unsuppress takes off an address a member or key added, or one that bounced, as when
@@ -69,7 +69,7 @@ func (s *SuppressionStore) Unsuppress(org, id int64, actor string) error {
 		return gone.Error
 	}
 	if gone.RowsAffected == 0 {
-		return errors.New("they asked themselves not to be mailed, by unsubscribing or marking a mail as spam, so only they can be mailed again by signing up again")
+		return say.New("they asked themselves not to be mailed, by unsubscribing or marking a mail as spam, so only they can be mailed again by signing up again")
 	}
 	return nil
 }

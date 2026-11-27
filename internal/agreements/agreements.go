@@ -1,11 +1,12 @@
 package agreements
 
 import (
-	"errors"
 	"path"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const (
@@ -14,18 +15,18 @@ const (
 	AgreementFileLimit = 10 << 20
 )
 
-var errNotDraft = errors.New("only a draft agreement can be changed")
+var errNotDraft = say.New("only a draft agreement can be changed")
 
 // ErrTampered is a document that no longer matches the hash it was kept with.
-var ErrTampered = errors.New("the document doesn't match the SHA-256 it was kept with")
+var ErrTampered = say.New("the document doesn't match the SHA-256 it was kept with")
 
 func agreementName(name string) (string, error) {
 	name = strings.Join(strings.Fields(name), " ")
 	switch {
 	case name == "":
-		return "", errors.New("an agreement needs a name")
+		return "", say.New("an agreement needs a name")
 	case utf8.RuneCountInString(name) > 120:
-		return "", errors.New("an agreement's name is 120 characters at most")
+		return "", say.New("an agreement's name is 120 characters at most")
 	}
 	return name, nil
 }

@@ -1,8 +1,6 @@
 package identity
 
 import (
-	"errors"
-	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -10,6 +8,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -31,7 +30,7 @@ func Slugify(name string) string {
 	return s
 }
 
-var ErrWrongCurrent = errors.New("the current password is wrong")
+var ErrWrongCurrent = say.New("the current password is wrong")
 
 // FrontOrgSlug is the organisation the front page's contact form sends enquiries to.
 const FrontOrgSlug = "prospector"
@@ -41,9 +40,9 @@ func createOrg(tx *gorm.DB, slug, name string) (*store.Org, error) {
 		slug = Slugify(name)
 	}
 	if !slugRe.MatchString(slug) {
-		return nil, fmt.Errorf("%q can't be used in a URL: use a-z, 0-9 and -", slug)
+		return nil, say.Errorf("%q can't be used in a URL: use a-z, 0-9 and -", slug)
 	}
-	inUse := store.Conflict(fmt.Sprintf("another organisation already has the address /o/%s: choose a different name", slug))
+	inUse := store.Conflict{Text: say.Errorf("another organisation already has the address /o/%s: choose a different name", slug)}
 	var same, n int64
 	if err := tx.Model(&store.Org{}).Where("slug = ?", slug).Count(&same).Error; err != nil {
 		return nil, err
@@ -65,7 +64,7 @@ func createOrg(tx *gorm.DB, slug, name string) (*store.Org, error) {
 	return o, nil
 }
 
-var errLastOwner = errors.New("an organisation needs an owner: make someone else an owner first")
+var errLastOwner = say.New("an organisation needs an owner: make someone else an owner first")
 
 func setRole(tx *gorm.DB, org int64, m *store.Membership, role string) error {
 	if m.Role == "owner" && role != "owner" && LastOwner(tx, org) {
@@ -99,7 +98,7 @@ type Member struct {
 	Email, Name string
 }
 
-var ErrWrongLogin = errors.New("wrong email or password")
+var ErrWrongLogin = say.New("wrong email or password")
 
 // Scopes an API key can carry. None can change members or keys or reach another org; only enquiries:reply, customers:invite and campaigns:send send mail, and only import skips review.
 var Scopes = []struct{ Name, What string }{
@@ -144,13 +143,13 @@ func ValidScope(s string) bool {
 func checkScopes(scopes []string) error {
 	for _, sc := range scopes {
 		if !ValidScope(sc) {
-			return fmt.Errorf("unknown scope %q", sc)
+			return say.Errorf("unknown scope %q", sc)
 		}
 	}
 	if len(scopes) == 0 {
-		return errors.New("pick at least one scope")
+		return say.New("pick at least one scope")
 	}
 	return nil
 }
 
-var errBuiltinKey = errors.New("this key belongs to one of Prospector's own agents, which change on the agent itself")
+var errBuiltinKey = say.New("this key belongs to one of Prospector's own agents, which change on the agent itself")

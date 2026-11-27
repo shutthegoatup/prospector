@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // Deal is what a conversation is worth, when it should close and whose it is. Where
@@ -76,12 +78,12 @@ func ParseMoney(text string) (int64, error) {
 	s := strings.NewReplacer(",", "", " ", "", "£", "", "$", "", "€", "").Replace(text)
 	s = leadingCode.ReplaceAllString(s, "")
 	if !moneyRe.MatchString(s) || s == "." {
-		return 0, fmt.Errorf("%q isn't an amount", text)
+		return 0, say.Errorf("%q isn't an amount", text)
 	}
 	whole, frac, _ := strings.Cut(s, ".")
 	n, err := strconv.ParseInt("0"+whole+(frac + "00")[:2], 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("%q isn't an amount", text)
+		return 0, say.Errorf("%q isn't an amount", text)
 	}
 	return n, nil
 }

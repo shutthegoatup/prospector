@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"embed"
 	"encoding/asn1"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -19,6 +18,8 @@ import (
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 	"golang.org/x/image/font/sfnt"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 //go:embed sealfonts/*.ttf
@@ -84,7 +85,7 @@ func (f sealFont) covers(s string) bool {
 // letter of it. A name it can't draw is refused before anything is sent.
 func drawable(s string) error {
 	if !textFont.covers(s) {
-		return fmt.Errorf("%q has letters the sealed document can't show yet", s)
+		return say.Errorf("%q has letters the sealed document can't show yet", s)
 	}
 	return nil
 }
@@ -173,7 +174,7 @@ func FillIn(rc *model.Context, stamps []Stamp) error {
 	byPage := map[int][]Stamp{}
 	for _, st := range stamps {
 		if st.Page < 1 || st.Page > len(bounds) {
-			return fmt.Errorf("a field is on page %d of a document with %d", st.Page, len(bounds))
+			return say.Errorf("a field is on page %d of a document with %d", st.Page, len(bounds))
 		}
 		byPage[st.Page] = append(byPage[st.Page], st)
 	}
@@ -376,15 +377,15 @@ func CheckSeal(doc []byte, cert *x509.Certificate) error {
 	roots.AddCert(cert)
 	r := d.Verify().TrustedRoots(roots).ExternalChecks(false).SkipRevocationCheck(true)
 	if !r.Valid() || r.Count() != 1 {
-		return fmt.Errorf("the seal doesn't hold: %v", r.Err())
+		return say.Errorf("the seal doesn't hold: %v", r.Err())
 	}
 	if !r.Signatures()[0].Certificate.Equal(cert) {
-		return errors.New("the document is sealed with another key")
+		return say.New("the document is sealed with another key")
 	}
 	// A valid signature still leaves room for an update written after it: what it covers
 	// has to run to the document's last byte.
 	if end, ok := byteRangeEnd(doc); !ok || end != len(doc) {
-		return errors.New("the document was added to after it was sealed")
+		return say.New("the document was added to after it was sealed")
 	}
 	return nil
 }

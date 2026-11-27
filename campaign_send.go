@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const (
@@ -31,8 +32,8 @@ const (
 )
 
 var (
-	errCampaignMail       = errors.New("a campaign goes through your organisation's own mail server, so an owner sets one in Settings first; the server's own is for sign-in mail")
-	errCampaignSubmission = errors.New("a campaign goes through a mail server you sign in to, with a username and password, on port 587, 465 or 2525; not straight to a recipient's server on port 25")
+	errCampaignMail       = say.New("a campaign goes through your organisation's own mail server, so an owner sets one in Settings first; the server's own is for sign-in mail")
+	errCampaignSubmission = say.New("a campaign goes through a mail server you sign in to, with a username and password, on port 587, 465 or 2525; not straight to a recipient's server on port 25")
 )
 
 // campaignMail is the organisation's own mail server, or nil. Never the server's
@@ -68,10 +69,10 @@ func (a *App) sendable(o *Org) error {
 		return errCampaignMail
 	}
 	if u, err := url.Parse(a.base); a.base == "" || err != nil || u.Scheme != "https" {
-		return errors.New("a campaign's unsubscribe link needs this server's public https address (PROSPECTOR_URL)")
+		return say.New("a campaign's unsubscribe link needs this server's public https address (PROSPECTOR_URL)")
 	}
 	if strings.TrimSpace(o.Settings.PostalAddress) == "" {
-		return errors.New("a campaign has to say where you can be written to: an owner sets the postal address in Settings")
+		return say.New("a campaign has to say where you can be written to: an owner sets the postal address in Settings")
 	}
 	return nil
 }

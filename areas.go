@@ -2,6 +2,8 @@ package main
 
 import (
 	"strings"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // opArea is the area whose people may make each API write. Keys go by their scopes
@@ -40,11 +42,11 @@ func landing(m *Membership) string {
 	return "today"
 }
 
-func areaRefusal(area string) string {
+func areaRefusal(area string) *say.Text {
 	if area == areaAny {
-		return "you read only here: an owner can give you an area on the Team list in Settings"
+		return say.New("you read only here: an owner can give you an area on the Team list in Settings")
 	}
-	return "that's " + area + " work, which you don't do here: an owner can add " + area + " to you on the Team list in Settings"
+	return say.Errorf("that's %[1]s work, which you don't do here: an owner can add %[1]s to you on the Team list in Settings", area)
 }
 
 func memberWork(m Membership) string {

@@ -4,15 +4,15 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
-var ErrBrokenChain = errors.New("the agreement's record has been changed since it was written")
+var ErrBrokenChain = say.New("the agreement's record has been changed since it was written")
 
 // EventHash is the SHA-256 of everything an event says, the hash before it included.
 func EventHash(e store.AgreementEvent) string {

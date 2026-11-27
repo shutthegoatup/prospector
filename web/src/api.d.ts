@@ -3434,10 +3434,16 @@ export interface components {
         };
         /** @description There is more. Pass this back as `cursor` for the next page; it is left out on the last one. */
         NextCursor: string;
-        /** @description What went wrong, as RFC 9457 lays it out. */
+        /**
+         * @description What went wrong, as RFC 9457 lays it out. Its `title` and `detail` are in the
+         *     language the request is answered in, which `Content-Language` names: the one chosen
+         *     with `?lang=` on a page (kept in the `lang` cookie), else the best of
+         *     `Accept-Language` that Prospector has been translated into, else British English.
+         *     Act on `type` and `status`, which don't change with it.
+         */
         Problem: {
             type: components["schemas"]["ProblemType"];
-            /** @description The same for every problem of a type; the status's own name for `about:blank`. */
+            /** @description The same for every problem of a type in a language; the status's own name, in English, for `about:blank`. */
             title: string;
             /** @description The HTTP status. */
             status: number;

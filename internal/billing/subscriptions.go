@@ -1,8 +1,7 @@
 package billing
 
 import (
-	"errors"
-
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -47,10 +46,10 @@ func validThen(then string) bool {
 
 func checkTerm(months, notice int) error {
 	if months < 0 || months > 120 {
-		return errors.New("a term is between 0 and 120 months")
+		return say.New("a term is between 0 and 120 months")
 	}
 	if notice < 0 || notice > 730 {
-		return errors.New("notice is between 0 and 730 days")
+		return say.New("notice is between 0 and 730 days")
 	}
 	return nil
 }

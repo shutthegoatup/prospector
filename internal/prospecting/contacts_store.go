@@ -1,12 +1,12 @@
 package prospecting
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tz"
 )
@@ -41,7 +41,7 @@ func (s *ProspectingStore) Due(org int64, step string, now time.Time, set store.
 		cutoff := now.AddDate(0, 0, -set.FollowupAfterDays).Format("2006-01-02")
 		q = q.Where(openContacts+" and followup_sent is null and email_sent <= ?", cutoff).Order("email_sent")
 	default:
-		return nil, fmt.Errorf("unknown step %q", step)
+		return nil, say.Errorf("unknown step %q", step)
 	}
 	if err := q.Order("id").Find(&rows).Error; err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (s *ProspectingStore) Mark(org, id int64, step, date, actor string) error {
 func (s *ProspectingStore) MarkAs(org, id int64, step, date string, who store.Actor, note string) error {
 	column, ok := Marks[step]
 	if !ok {
-		return fmt.Errorf("unknown step %q", step)
+		return say.Errorf("unknown step %q", step)
 	}
 	if err := MarkDate(date, time.Now()); err != nil {
 		return err
@@ -117,7 +117,7 @@ func (s *ProspectingStore) ChangeContactFields(org, id int64, changes []store.Ch
 
 func (s *ProspectingStore) set(tx *gorm.DB, org, id int64, field, value, actor string) error {
 	if !Editable[field] {
-		return fmt.Errorf("%q can't be edited", field)
+		return say.Errorf("%q can't be edited", field)
 	}
 	value = strings.TrimSpace(value)
 	var v any = store.NonEmpty(value)
@@ -182,7 +182,7 @@ func (s *ProspectingStore) FindOne(org int64, name string) (*store.Contact, erro
 		for _, r := range rows {
 			who = append(who, store.Deref(r.First)+" @ "+store.Deref(r.Maker))
 		}
-		return nil, fmt.Errorf("%d matches for %q: %s", len(rows), name, strings.Join(who, "; "))
+		return nil, say.Errorf("%d matches for %q: %s", len(rows), name, strings.Join(who, "; "))
 	}
 	return &rows[0], nil
 }

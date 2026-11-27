@@ -1,14 +1,14 @@
 package outreach
 
-import "errors"
+import "github.com/shutthegoatup/prospector/internal/say"
 
 const SuppressBounced = "bounced"
 
 const SuppressComplained = "complained"
 
-var ErrBounced = errors.New("mail to that address bounced: it doesn't exist or won't take mail")
+var ErrBounced = say.New("mail to that address bounced: it doesn't exist or won't take mail")
 
-var ErrComplained = errors.New("they marked a mail as spam")
+var ErrComplained = say.New("they marked a mail as spam")
 
 // bounceBy is who a bounced address is put on the list by.
 const bounceBy = "Postmark"

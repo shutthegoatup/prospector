@@ -11,6 +11,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -30,10 +31,10 @@ func (s *IdentityStore) InviteUser(email, name, password string) (*store.User, e
 func (s *IdentityStore) newUser(email, name, password string, mustChange bool) (*store.User, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if !strings.Contains(email, "@") {
-		return nil, fmt.Errorf("%q isn't an email address", email)
+		return nil, say.Errorf("%q isn't an email address", email)
 	}
 	if len(password) < 10 {
-		return nil, errors.New("passwords need at least 10 characters")
+		return nil, say.New("passwords need at least 10 characters")
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), PasswordCost)
 	if err != nil {
@@ -45,7 +46,7 @@ func (s *IdentityStore) newUser(email, name, password string, mustChange bool) (
 
 func (s *IdentityStore) SetPassword(email, password string) error {
 	if len(password) < 10 {
-		return errors.New("passwords need at least 10 characters")
+		return say.New("passwords need at least 10 characters")
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), PasswordCost)
 	if err != nil {
@@ -53,7 +54,7 @@ func (s *IdentityStore) SetPassword(email, password string) error {
 	}
 	u, err := s.UserByEmail(email)
 	if err != nil {
-		return fmt.Errorf("no user %s", email)
+		return say.Errorf("no user %s", email)
 	}
 	return s.savePassword(u.ID, string(hash), "")
 }
@@ -64,10 +65,10 @@ func (s *IdentityStore) ChangePassword(u *store.User, current, password, keepTok
 		return ErrWrongCurrent
 	}
 	if len(password) < 10 {
-		return errors.New("passwords need at least 10 characters")
+		return say.New("passwords need at least 10 characters")
 	}
 	if password == current {
-		return errors.New("choose a password different from the current one")
+		return say.New("choose a password different from the current one")
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), PasswordCost)
 	if err != nil {
@@ -185,7 +186,7 @@ func (s *IdentityStore) OrgBySlug(slug string) (*store.Org, error) {
 // AddMember adds a user to an organisation, or changes the role of one already in it.
 func (s *IdentityStore) AddMember(org, user int64, role, callerName string) error {
 	if role != "owner" && role != "member" {
-		return fmt.Errorf("a role is owner or member, not %q", role)
+		return say.Errorf("a role is owner or member, not %q", role)
 	}
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := lockOrg(tx, org); err != nil {
@@ -206,7 +207,7 @@ func (s *IdentityStore) AddMember(org, user int64, role, callerName string) erro
 // SetRole changes the role of someone already in the organisation.
 func (s *IdentityStore) SetRole(org, user int64, role string) error {
 	if role != "owner" && role != "member" {
-		return fmt.Errorf("a role is owner or member, not %q", role)
+		return say.Errorf("a role is owner or member, not %q", role)
 	}
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := lockOrg(tx, org); err != nil {
@@ -214,7 +215,7 @@ func (s *IdentityStore) SetRole(org, user int64, role string) error {
 		}
 		var m store.Membership
 		if err := tx.Where("org_id = ? and user_id = ?", org, user).First(&m).Error; errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("that person isn't in this organisation")
+			return say.New("that person isn't in this organisation")
 		} else if err != nil {
 			return err
 		}
@@ -232,7 +233,7 @@ func (s *IdentityStore) RemoveMember(org, user int64, actor string) (*store.User
 		}
 		var m store.Membership
 		if err := tx.Where("org_id = ? and user_id = ?", org, user).First(&m).Error; errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("that person isn't in this organisation")
+			return say.New("that person isn't in this organisation")
 		} else if err != nil {
 			return err
 		}
@@ -344,7 +345,7 @@ func (s *IdentityStore) Logout(token string) error {
 func (s *IdentityStore) CreateKey(org int64, name string, scopes []string, by string) (string, *store.APIKey, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return "", nil, errors.New("give the key a name")
+		return "", nil, say.New("give the key a name")
 	}
 	if err := checkScopes(scopes); err != nil {
 		return "", nil, err
@@ -392,7 +393,7 @@ func (s *IdentityStore) SetKeyScopes(org, id int64, scopes []string) error {
 	}
 	var k store.APIKey
 	if err := s.InOrg(org).Where("id = ? and revoked_at is null", id).First(&k).Error; errors.Is(err, gorm.ErrRecordNotFound) {
-		return errors.New("that key isn't in this organisation, or has been revoked")
+		return say.New("that key isn't in this organisation, or has been revoked")
 	} else if err != nil {
 		return err
 	}
@@ -419,7 +420,7 @@ func (s *IdentityStore) RevokeKey(org, id int64) error {
 
 func (s *IdentityStore) SaveOrg(o *store.Org) error {
 	if !colorRe.MatchString(o.Color) {
-		return fmt.Errorf("colour must look like #56c5f4")
+		return say.Errorf("colour must look like #56c5f4")
 	}
 	return s.DB.Model(o).Select("name", "color", "settings").Updates(o).Error
 }
@@ -431,7 +432,7 @@ func (s *IdentityStore) ChangeSettings(o *store.Org, who store.Actor, changed []
 		return nil
 	}
 	if !colorRe.MatchString(o.Color) {
-		return fmt.Errorf("colour must look like #56c5f4")
+		return say.Errorf("colour must look like #56c5f4")
 	}
 	what := strings.Join(changed, ", ")
 	return s.DB.Transaction(func(tx *gorm.DB) error {
@@ -472,7 +473,7 @@ func (s *IdentityStore) Users() (int64, error) {
 func (s *IdentityStore) SetAreas(org, user int64, areas []string) error {
 	for _, ar := range areas {
 		if ar != AreaSales && ar != AreaSupport {
-			return fmt.Errorf("unknown area %q", ar)
+			return say.Errorf("unknown area %q", ar)
 		}
 	}
 	var keep []string
@@ -483,7 +484,7 @@ func (s *IdentityStore) SetAreas(org, user int64, areas []string) error {
 	}
 	res := s.DB.Model(&store.Membership{}).Where("org_id = ? and user_id = ?", org, user).Update("areas", strings.Join(keep, " "))
 	if res.Error == nil && res.RowsAffected == 0 {
-		return errors.New("that person isn't in this organisation")
+		return say.New("that person isn't in this organisation")
 	}
 	return res.Error
 }

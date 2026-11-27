@@ -1,13 +1,12 @@
 package enquiries
 
 import (
-	"errors"
-	"fmt"
 	"net/mail"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -29,9 +28,9 @@ func threadText(text string) (string, error) {
 	text = strings.TrimSpace(strings.ReplaceAll(text, "\r\n", "\n"))
 	switch {
 	case text == "":
-		return "", errors.New("write something first")
+		return "", say.New("write something first")
 	case utf8.RuneCountInString(text) > ReplyLimit:
-		return "", fmt.Errorf("that is longer than %d characters", ReplyLimit)
+		return "", say.Errorf("that is longer than %d characters", ReplyLimit)
 	}
 	return text, nil
 }
@@ -40,11 +39,11 @@ func threadText(text string) (string, error) {
 // address, and that address isn't on the never-contact list.
 func answerable(o *store.Org, e store.Enquiry) (string, error) {
 	if e.Spam {
-		return "", errors.New("that was marked as spam, so there is nobody to answer")
+		return "", say.New("that was marked as spam, so there is nobody to answer")
 	}
 	to, err := mail.ParseAddress(strings.TrimSpace(e.Email))
 	if err != nil {
-		return "", errors.New("it gave no single email address to answer")
+		return "", say.New("it gave no single email address to answer")
 	}
 	if err := o.Settings.Listed(to.Address, ""); err != nil {
 		return "", err

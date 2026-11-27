@@ -2,12 +2,12 @@ package outreach
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"time"
 
 	"gorm.io/gorm/clause"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -56,7 +56,7 @@ func (s *OutreachStore) NoMailDomains() map[string]bool {
 func (s *OutreachStore) CheckMailDomains(email string) error {
 	for _, e := range store.EmailRe.FindAllString(strings.ToLower(email), -1) {
 		if domain := MailDomainOf(e); s.TakesMail(context.Background(), domain) == MailRefused {
-			return errors.New("nothing was stored: " + domain + " takes no mail, so " + e + " can't be right. Leave email out, or find the address on a page")
+			return say.Errorf("nothing was stored: %s takes no mail, so %s can't be right. Leave email out, or find the address on a page", domain, e)
 		}
 	}
 	return nil

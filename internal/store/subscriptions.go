@@ -1,8 +1,9 @@
 package store
 
 import (
-	"fmt"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // Subscription is what a customer is on: what it is, what it costs, when it started
@@ -56,7 +57,7 @@ func ParseDay(text string) (time.Time, error) {
 	d, err := time.Parse(DayLayout, text)
 	// A year typed short ("0026") would otherwise be terms counted for two thousand years.
 	if err != nil || d.Year() < 1990 || d.Year() > 2200 {
-		return d, fmt.Errorf("%q isn't a date", text)
+		return d, say.Errorf("%q isn't a date", text)
 	}
 	return d, nil
 }

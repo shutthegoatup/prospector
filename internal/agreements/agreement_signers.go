@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"net/mail"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -44,21 +44,21 @@ func pdfPages(data []byte) (int, error) {
 	ctx, err := api.ReadContext(context.Background(), bytes.NewReader(data), model.NewDefaultConfiguration())
 	if err != nil {
 		if errors.Is(err, pdfcpu.ErrWrongPassword) || strings.Contains(err.Error(), "password") {
-			return 0, errors.New("that PDF is password-protected: save it without a password first")
+			return 0, say.New("that PDF is password-protected: save it without a password first")
 		}
-		return 0, fmt.Errorf("that PDF can't be read to place fields on it: %v", err)
+		return 0, say.Errorf("that PDF can't be read to place fields on it: %v", err)
 	}
 	if ctx.XRefTable.Encrypt != nil || ctx.E != nil { //nolint:staticcheck // the xref table's, unlike ctx.E
-		return 0, errors.New("that PDF is encrypted: save it without protection first")
+		return 0, say.New("that PDF is encrypted: save it without protection first")
 	}
 	if signedPDF(ctx.XRefTable, data) {
-		return 0, errors.New("that PDF is already signed: upload the unsigned version")
+		return 0, say.New("that PDF is already signed: upload the unsigned version")
 	}
 	if err := ctx.EnsurePageCount(); err != nil {
-		return 0, fmt.Errorf("that PDF can't be read to place fields on it: %v", err)
+		return 0, say.Errorf("that PDF can't be read to place fields on it: %v", err)
 	}
 	if ctx.PageCount < 1 {
-		return 0, errors.New("that PDF has no pages")
+		return 0, say.New("that PDF has no pages")
 	}
 	return ctx.PageCount, nil
 }
@@ -86,14 +86,14 @@ func signedPDF(x *model.XRefTable, data []byte) bool {
 func signable(o *store.Org, company int64, c store.Contact) error {
 	switch {
 	case strings.HasPrefix(c.Key, "org:"):
-		return errors.New("that row stands for a company, not a person")
+		return say.New("that row stands for a company, not a person")
 	case c.CompanyID == nil || *c.CompanyID != company:
-		return errors.New("that person is not at the agreement's company")
+		return say.New("that person is not at the agreement's company")
 	case c.Status == store.ContactSuggested:
-		return errors.New("this contact is still a suggestion in Research; a person picks them first")
+		return say.New("this contact is still a suggestion in Research; a person picks them first")
 	}
 	if _, err := mail.ParseAddress(strings.TrimSpace(store.Deref(c.Email))); err != nil {
-		return errors.New("they have no single email address to send the agreement to")
+		return say.New("they have no single email address to send the agreement to")
 	}
 	return o.Settings.Listed(store.Deref(c.Email), store.Deref(c.Linkedin))
 }
@@ -104,19 +104,19 @@ func fieldFits(f store.AgreementField, pages int, signers map[int64]bool) error 
 	const least = 0.01
 	switch {
 	case !signers[f.RecipientID]:
-		return fmt.Errorf("recipient %d isn't one of this agreement's signers", f.RecipientID)
+		return say.Errorf("recipient %d isn't one of this agreement's signers", f.RecipientID)
 	case !Contains(fieldKinds, f.Kind):
-		return fmt.Errorf("a field is one of %s", strings.Join(fieldKinds, ", "))
+		return say.Errorf("a field is one of %s", strings.Join(fieldKinds, ", "))
 	case f.Page < 1 || f.Page > pages:
-		return fmt.Errorf("the document has pages 1 to %d", pages)
+		return say.Errorf("the document has pages 1 to %d", pages)
 	}
 	for _, v := range []float64{f.X, f.Y, f.W, f.H} {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
-			return errors.New("a field's place is four numbers between 0 and 1")
+			return say.New("a field's place is four numbers between 0 and 1")
 		}
 	}
 	if f.W < least || f.H < least || f.X < 0 || f.Y < 0 || f.X+f.W > 1+1e-9 || f.Y+f.H > 1+1e-9 {
-		return errors.New("a field has to lie wholly on its page")
+		return say.New("a field has to lie wholly on its page")
 	}
 	return nil
 }

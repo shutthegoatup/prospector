@@ -83,7 +83,7 @@ func TestATaskFindsCompaniesForItsOffering(t *testing.T) {
 	}
 
 	// Agents still on it would be left finding for the wrong thing.
-	if err := s.RemoveOffering(o.ID, cto.ID, "Ada"); err == nil || !strings.Contains(err.Error(), "close them first") {
+	if err := s.RemoveOffering(o.ID, cto.ID, "Ada"); err == nil || !strings.Contains(err.Error(), "1 open task is finding companies for Interim CTO: close it first") {
 		t.Fatalf("removing an offering an open task is finding for: %v", err)
 	}
 	if err := s.SetTaskClosed(o.ID, task.Id, true, "Ada"); err != nil {

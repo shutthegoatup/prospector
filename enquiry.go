@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 const (
@@ -96,7 +98,7 @@ func (a *App) intake(w http.ResponseWriter, r *http.Request) {
 	}
 	var in EnquiryIn
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, enquiryBodyLimit)).Decode(&in); err != nil {
-		fail(w, errors.New("the enquiry couldn't be read"), http.StatusBadRequest)
+		fail(w, say.New("the enquiry couldn't be read"), http.StatusBadRequest)
 		return
 	}
 	in.Site = r.Header.Get("Origin")

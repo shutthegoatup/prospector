@@ -1,8 +1,9 @@
 package store
 
 import (
-	"fmt"
 	"strings"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // Asset is something an organisation looks for at a company, such as a product
@@ -34,7 +35,7 @@ func (s OrgSettings) Assets() ([]Asset, error) {
 		field, must := CutMust(field)
 		key := AssetKey(field)
 		if key == "" {
-			return nil, fmt.Errorf("%q needs a name before the colon", strings.TrimSpace(line))
+			return nil, say.Errorf("%q needs a name before the colon", strings.TrimSpace(line))
 		}
 		if seen[key] {
 			continue

@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"strconv"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func subscriptionOut(r SubscriptionRow, day string) api.Subscription {
@@ -55,7 +55,7 @@ func (s apiServer) ListSubscriptions(ctx context.Context, in api.ListSubscriptio
 
 func (s apiServer) AddSubscription(ctx context.Context, in api.AddSubscriptionRequestObject) (api.AddSubscriptionResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send the subscription: {\"company\": id, \"name\": …, \"start\": …}")
+		return nil, say.New("send the subscription: {\"company\": id, \"name\": …, \"start\": …}")
 	}
 	q, b := reqFrom(ctx), in.Body
 	sub, err := s.a.s.AddSubscription(q.Org.ID, SubscriptionIn{Company: b.Company, Name: b.Name, Amount: b.Amount, Per: b.Per, Start: b.Start,
@@ -72,7 +72,7 @@ func (s apiServer) AddSubscription(ctx context.Context, in api.AddSubscriptionRe
 
 func (s apiServer) ChangeSubscription(ctx context.Context, in api.ChangeSubscriptionRequestObject) (api.ChangeSubscriptionResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("send what to change")
+		return nil, say.New("send what to change")
 	}
 	q, b := reqFrom(ctx), in.Body
 	number := func(n *int) *string {
@@ -102,7 +102,7 @@ func (s apiServer) ChangeSubscription(ctx context.Context, in api.ChangeSubscrip
 	}
 	changes = append(append(cleared, changes...), dated...)
 	if len(changes) == 0 {
-		return nil, errors.New("send what to change")
+		return nil, say.New("send what to change")
 	}
 	if err := s.a.s.ChangeSubscriptionFields(q.Org.ID, in.Id, changes, q.Actor()); err != nil {
 		return nil, err
@@ -124,7 +124,7 @@ func (s apiServer) RemoveSubscription(ctx context.Context, in api.RemoveSubscrip
 
 func (s apiServer) StartRenewal(ctx context.Context, in api.StartRenewalRequestObject) (api.StartRenewalResponseObject, error) {
 	if in.Body == nil {
-		return nil, errors.New("say who the renewal is with: {\"contact\": id}")
+		return nil, say.New("say who the renewal is with: {\"contact\": id}")
 	}
 	q := reqFrom(ctx)
 	d, err := s.a.s.StartRenewal(q.Org.ID, in.Id, in.Body.Contact, q.Actor())

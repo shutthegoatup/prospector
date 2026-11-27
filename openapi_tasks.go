@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func taskOut(t Task) api.Task {
@@ -17,7 +18,7 @@ func requestOut(r TaskRequest) api.TaskRequest {
 func (s apiServer) CreateTask(ctx context.Context, in api.CreateTaskRequestObject) (api.CreateTaskResponseObject, error) {
 	q := reqFrom(ctx)
 	if len(in.Body.Agents) > 0 && q.Key != nil && !q.Key.Has("agents:run") {
-		return nil, refused("starting agents on the task needs the agents:run scope as well")
+		return nil, refused{say.New("starting agents on the task needs the agents:run scope as well")}
 	}
 	t, err := s.a.s.CreateTaskWanting(q.Org.ID, in.Body.Offering, in.Body.Want, in.Body.Title, in.Body.Brief, q.Actor())
 	if err != nil {

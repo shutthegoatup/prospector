@@ -1,16 +1,15 @@
 package prospecting
 
 import (
-	"errors"
-
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // PageIn checks what a list was asked for as the other lists do. Zero is the limit
 // left out, which the generated code can't tell from 0 asked for.
 func PageIn(limit int, cursor string) (paging.Page, error) {
 	if limit < 0 {
-		return paging.Page{}, errors.New("limit is a whole number, 1 or more")
+		return paging.Page{}, say.New("limit is a whole number, 1 or more")
 	}
 	return paging.Page{Limit: limit, Cursor: cursor}, nil
 }

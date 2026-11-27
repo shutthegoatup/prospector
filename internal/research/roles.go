@@ -1,14 +1,13 @@
 package research
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 	"unicode/utf8"
 
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -37,15 +36,15 @@ func (in *RoleIn) check(needSource bool) error {
 	in.Title, in.SourceURL, in.Details = strings.TrimSpace(in.Title), strings.TrimSpace(in.SourceURL), strings.Join(strings.Fields(in.Details), " ")
 	switch {
 	case in.Title == "":
-		return errors.New("a role needs a title")
+		return say.New("a role needs a title")
 	case utf8.RuneCountInString(in.Title) > roleTitleMax:
-		return fmt.Errorf("a role's title is %d characters at most", roleTitleMax)
+		return say.Errorf("a role's title is %d characters at most", roleTitleMax)
 	case utf8.RuneCountInString(in.Details) > roleDetailsMax:
-		return fmt.Errorf("a role's details are %d characters at most", roleDetailsMax)
+		return say.Errorf("a role's details are %d characters at most", roleDetailsMax)
 	case in.SourceURL != "" && !prospecting.HttpURL.MatchString(in.SourceURL):
-		return errors.New("source_url must be an http(s) link")
+		return say.New("source_url must be an http(s) link")
 	case needSource && in.SourceURL == "":
-		return errors.New("a role needs the source_url of the posting or page that shows it")
+		return say.New("a role needs the source_url of the posting or page that shows it")
 	}
 	return nil
 }
@@ -54,14 +53,14 @@ func (in *RoleIn) check(needSource bool) error {
 // can't, as its wording isn't stored where a switch could be. The caller holds the company.
 func rolesOffering(tx *gorm.DB, org, id int64) (*store.Offering, error) {
 	if id == 0 {
-		return nil, store.Conflict("roles are kept for an offering that has them; the organisation's own doesn't")
+		return nil, store.Conflict{Text: say.New("roles are kept for an offering that has them; the organisation's own doesn't")}
 	}
 	o, err := prospecting.HeldOffering(tx, org, id)
 	if err != nil {
 		return nil, err
 	}
 	if !o.HasRoles {
-		return nil, store.Conflict(fmt.Sprintf("%s doesn't have roles: turn them on in its settings first", o.Name))
+		return nil, store.Conflict{Text: say.Errorf("%s doesn't have roles: turn them on in its settings first", o.Name)}
 	}
 	return o, nil
 }
@@ -91,12 +90,12 @@ func sameRole(tx *gorm.DB, org, offering, company int64, in RoleIn) (*store.Role
 func sameWords(s string) string { return strings.ToLower(strings.Join(strings.Fields(s), " ")) }
 
 // junkedSaid is what an agent is told when it brings back a role that was junked.
-func junkedSaid(r store.Role) string {
-	said := fmt.Sprintf("role %d, %q, was junked by %s on %s", r.ID, r.Title, r.By, r.UpdatedAt.Format("2 Jan 2006"))
+func junkedSaid(r store.Role) *say.Text {
+	day := r.UpdatedAt.Format("2 Jan 2006")
 	if r.Reason != "" {
-		said += ": " + r.Reason
+		return say.Errorf("role %d, %q, was junked by %s on %s: %s. Don't add it again", r.ID, r.Title, r.By, day, r.Reason)
 	}
-	return said + ". Don't add it again"
+	return say.Errorf("role %d, %q, was junked by %s on %s. Don't add it again", r.ID, r.Title, r.By, day)
 }
 
 // AddRoleIn is add_role's input.

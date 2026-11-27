@@ -2,13 +2,13 @@ package research
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -33,7 +33,7 @@ func factAnswer(raw string) (string, error) {
 	case prospecting.AnswerUnknown:
 		return prospecting.AnswerUnknown, nil
 	}
-	return "", fmt.Errorf("answer is yes, no or unknown, not %q", raw)
+	return "", say.Errorf("answer is yes, no or unknown, not %q", raw)
 }
 
 type AddCompanyIn struct {
@@ -59,7 +59,7 @@ type AddCompanyOut struct {
 
 func checkFact(f FactIn) error {
 	if strings.TrimSpace(f.Field) == "" || strings.TrimSpace(f.Value) == "" {
-		return errors.New("a fact needs a field and a value")
+		return say.New("a fact needs a field and a value")
 	}
 	answer, err := factAnswer(f.Answer)
 	if err != nil {
@@ -70,7 +70,7 @@ func checkFact(f FactIn) error {
 		return nil
 	}
 	if !prospecting.HttpURL.MatchString(strings.TrimSpace(f.SourceURL)) {
-		return fmt.Errorf("fact %q needs a source_url starting with http", f.Field)
+		return say.Errorf("fact %q needs a source_url starting with http", f.Field)
 	}
 	return nil
 }

@@ -1,8 +1,6 @@
 package outreach
 
 import (
-	"errors"
-	"fmt"
 	"sort"
 	"strings"
 
@@ -10,6 +8,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/billing"
 	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -59,7 +58,7 @@ func (s *OutreachStore) ChangeCampaign(org, id int64, changes []store.Change, ac
 			return store.Missing(err, "no campaign %d", id)
 		}
 		if c.Status != CampaignDraft {
-			return errors.New("only a draft can be changed")
+			return say.New("only a draft can be changed")
 		}
 		updates := map[string]any{"updated_by": actor}
 		after := c
@@ -89,7 +88,7 @@ func (s *OutreachStore) ChangeCampaign(org, id int64, changes []store.Change, ac
 			return res.Error
 		}
 		if res.RowsAffected == 0 {
-			return errors.New("only a draft can be changed")
+			return say.New("only a draft can be changed")
 		}
 		return tx.Where("org_id = ? and id = ?", org, id).First(&c).Error
 	})
@@ -109,7 +108,7 @@ func (s *OutreachStore) RemoveCampaign(org, id int64) error {
 		if n == 0 {
 			return store.NoSuch("no campaign %d", id)
 		}
-		return errors.New("only a draft can be removed; one that went is kept as a record of what was sent")
+		return say.New("only a draft can be removed; one that went is kept as a record of what was sent")
 	}
 	return nil
 }
@@ -164,7 +163,7 @@ func (s *OutreachStore) audience(o *store.Org, c store.Campaign, w *audienceWork
 		}
 		q = q.Where("company_id in ?", companies)
 	default:
-		return nil, fmt.Errorf("a campaign goes to %q or %q", AudienceConversations, store.AudienceCustomers)
+		return nil, say.Errorf("a campaign goes to %q or %q", AudienceConversations, store.AudienceCustomers)
 	}
 	var people []store.Contact
 	if err := q.Order("id").Find(&people).Error; err != nil {

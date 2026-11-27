@@ -2,10 +2,10 @@ package outreach
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -55,33 +55,33 @@ func campaignField(field, value string) (string, error) {
 	case "name":
 		value = strings.TrimSpace(value)
 		if value == "" {
-			return "", errors.New("a campaign needs a name")
+			return "", say.New("a campaign needs a name")
 		}
 		if utf8.RuneCountInString(value) > 120 {
-			return "", errors.New("a campaign's name is 120 characters at most")
+			return "", say.New("a campaign's name is 120 characters at most")
 		}
 	case "audience":
 		if audienceLabel(value) == "" {
-			return "", fmt.Errorf("a campaign goes to %q or %q", AudienceConversations, store.AudienceCustomers)
+			return "", say.Errorf("a campaign goes to %q or %q", AudienceConversations, store.AudienceCustomers)
 		}
 	case "kind":
 		if value != KindMarketing && value != store.KindService {
-			return "", fmt.Errorf("a campaign is %q or %q", KindMarketing, store.KindService)
+			return "", say.Errorf("a campaign is %q or %q", KindMarketing, store.KindService)
 		}
 	case "subject":
 		// One line: a subject is a header.
 		value = strings.Join(strings.Fields(value), " ")
 		if utf8.RuneCountInString(value) > campaignSubjectLimit {
-			return "", fmt.Errorf("a subject is %d characters at most", campaignSubjectLimit)
+			return "", say.Errorf("a subject is %d characters at most", campaignSubjectLimit)
 		}
 	case "body":
 		// Only trailing blank lines go: a line that ends in a space, as "-- " does, keeps it.
 		value = strings.TrimRight(strings.ReplaceAll(value, "\r\n", "\n"), "\n")
 		if utf8.RuneCountInString(value) > campaignBodyLimit {
-			return "", fmt.Errorf("a campaign is %d characters at most", campaignBodyLimit)
+			return "", say.Errorf("a campaign is %d characters at most", campaignBodyLimit)
 		}
 	default:
-		return "", fmt.Errorf("a campaign has no %q to set", field)
+		return "", say.Errorf("a campaign has no %q to set", field)
 	}
 	return value, nil
 }

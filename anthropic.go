@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -15,6 +14,8 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go/v2"
 	"github.com/anthropics/anthropic-sdk-go/v2/option"
+
+	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 // An agent reaches its model one of two ways: any OpenAI-compatible endpoint, or
@@ -157,7 +158,7 @@ func (c *claudeChat) next(ctx context.Context) (*modelTurn, error) {
 	}
 	c.params.Messages = append(c.params.Messages, said)
 	if resp.StopReason == anthropic.BetaStopReasonRefusal {
-		return nil, fmt.Errorf("%s declined to go on with this task", c.params.Model)
+		return nil, say.Errorf("%s declined to go on with this task", c.params.Model)
 	}
 	turn := &modelTurn{tokensIn: resp.Usage.InputTokens + resp.Usage.CacheReadInputTokens + resp.Usage.CacheCreationInputTokens,
 		tokensOut: resp.Usage.OutputTokens}

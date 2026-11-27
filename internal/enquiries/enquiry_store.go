@@ -2,7 +2,6 @@ package enquiries
 
 import (
 	"errors"
-	"fmt"
 	"net/mail"
 	"strings"
 	"time"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -53,13 +53,13 @@ func (s *EnquiryStore) setEnquiry(tx *gorm.DB, org, id int64, field, value, acto
 			return store.Missing(err, "no enquiry %d", id)
 		}
 		if e.Spam {
-			return errors.New("that was marked as spam, so there is nothing to answer")
+			return say.New("that was marked as spam, so there is nothing to answer")
 		}
 		logged := value
 		switch field {
 		case "state":
 			if enquiryStateLabel(value) == "" {
-				return fmt.Errorf("unknown state %q", value)
+				return say.Errorf("unknown state %q", value)
 			}
 		case "owner":
 			if value != "" && value != e.Owner {
@@ -69,13 +69,13 @@ func (s *EnquiryStore) setEnquiry(tx *gorm.DB, org, id int64, field, value, acto
 					return err
 				}
 				if n == 0 {
-					return fmt.Errorf("%q isn't a member of this organisation", value)
+					return say.Errorf("%q isn't a member of this organisation", value)
 				}
 			}
 		case "note":
 			value, logged = store.Clip(value, 2000), ""
 		default:
-			return fmt.Errorf("an enquiry has no %q to set", field)
+			return say.Errorf("an enquiry has no %q to set", field)
 		}
 		if err := tx.Model(&e).Update(field, value).Error; err != nil {
 			return err
@@ -269,7 +269,7 @@ func (s *EnquiryStore) ConverseEnquiry(o *store.Org, id int64, actor string) (*s
 		return nil, store.Missing(err, "no enquiry %d", id)
 	}
 	if e.Spam {
-		return nil, errors.New("that was marked as spam, so there is nobody to talk to")
+		return nil, say.New("that was marked as spam, so there is nobody to talk to")
 	}
 	var c store.Contact
 	if e.ContactID != nil {
@@ -305,7 +305,7 @@ func (s *EnquiryStore) ConverseEnquiry(o *store.Org, id int64, actor string) (*s
 		return nil, err
 	}
 	if c.Declined != nil {
-		return nil, errors.New("they are marked as not interested, which keeps them off the board")
+		return nil, say.New("they are marked as not interested, which keeps them off the board")
 	}
 	if c.Replied == nil {
 		if err := s.Prospecting.Mark(o.ID, c.ID, "replied", store.Today(), actor); err != nil {
