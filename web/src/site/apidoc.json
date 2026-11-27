@@ -24153,14 +24153,28 @@
      "code": true
     },
     {
-     "text": " cookie), else the best of "
+     "text": " cookie), else the signed-in member's own ("
+    },
+    {
+     "text": "language",
+     "code": true
+    },
+    {
+     "text": " in /me), else the best of "
     },
     {
      "text": "Accept-Language",
      "code": true
     },
     {
-     "text": " that Prospector has been translated into, else British English. Act on "
+     "text": " that Prospector has been translated into, else, for a signed-in member, the organisation's "
+    },
+    {
+     "text": "customer_language",
+     "code": true
+    },
+    {
+     "text": ", else British English. Act on "
     },
     {
      "text": "type",
