@@ -14,7 +14,8 @@ const mount = document.getElementById("app");
 if (mount) {
   // The server has already chosen the language (locale.go) and said it in <html lang>.
   const lang = document.documentElement.lang;
-  const messages = await catalogue(lang);
+  // A catalogue that can't be fetched leaves the page in the source language, not blank.
+  const messages = await catalogue(lang).catch(() => undefined);
   if (messages) speak(lang, messages);
   else document.documentElement.lang = intl.locale;
   const queries = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false, retry: retryQuery } } });
