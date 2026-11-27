@@ -21,12 +21,14 @@ type apiServer struct {
 	a *App
 	signingAPI
 	salesAPI
+	ticketsAPI
 }
 
 // newAPIServer hands each product's operations the part of the store they use.
 func newAPIServer(a *App) apiServer {
 	return apiServer{a: a,
 		signingAPI: signingAPI{Store: &a.s.agreementStore},
+		ticketsAPI: ticketsAPI{Enquiries: &a.s.enquiryStore, Mail: a},
 		salesAPI: salesAPI{Pipeline: &a.s.dealStore, Subscriptions: &a.s.subscriptionStore,
 			People: &a.s.prospectingStore, Onboarding: &a.s.onboardingStore},
 	}

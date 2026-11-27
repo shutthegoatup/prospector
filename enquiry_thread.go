@@ -15,12 +15,12 @@ func (e notSent) Unwrap() error { return e.error }
 
 var errNoReplyMail = say.New("mail isn't set up, so a reply can't be sent from here: an owner sets a mail server in Settings")
 
-// replyEnquiry emails a reply to whoever wrote in, at the address they gave and no
+// ReplyEnquiry emails a reply to whoever wrote in, at the address they gave and no
 // other. The mail carries only what was typed for it: nothing they sent us is quoted
 // back, so a form filled in with someone else's address can't be used to send that
 // person words of the sender's choosing. answers is where their answer should go.
-func (a *App) replyEnquiry(ctx context.Context, o *Org, enquiry int64, text, actor, answers string) (*EnquiryMessage, error) {
-	via, err := a.mailFor(o.ID)
+func (a *App) ReplyEnquiry(ctx context.Context, o *Org, enquiry int64, text, actor, answers string) (*EnquiryMessage, error) {
+	via, err := a.MailFor(o.ID)
 	if err != nil {
 		return nil, err
 	}

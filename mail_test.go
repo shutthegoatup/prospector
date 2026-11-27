@@ -579,11 +579,11 @@ func TestAMailPasswordFollowsAKeyChange(t *testing.T) {
 	}
 	// The old key retired, the password still opens.
 	s.Keyring = mustKeys(t, "2:"+newKey)
-	if via, err := (&App{s: s}).mailFor(o.ID); err != nil || via.Password != "s3cret-smtp-pass" {
+	if via, err := (&App{s: s}).MailFor(o.ID); err != nil || via.Password != "s3cret-smtp-pass" {
 		t.Fatalf("after the old key is removed: %+v %v", via, err)
 	}
 	s.Keyring = nil
-	if _, err := (&App{s: s}).mailFor(o.ID); !errors.Is(err, errNoKeys) {
+	if _, err := (&App{s: s}).MailFor(o.ID); !errors.Is(err, errNoKeys) {
 		t.Fatalf("a server with no key read a sealed mail password: %v", err)
 	}
 }
