@@ -573,9 +573,20 @@ type OfferingStanding struct {
 	Reason   string `json:"reason,omitempty"`
 }
 
+type RoleBrief struct {
+	ID       int64  `json:"id"`
+	Offering string `json:"offering"`
+	Title    string `json:"title"`
+	URL      string `json:"url,omitempty"`
+	Details  string `json:"details,omitempty"`
+	Stage    string `json:"stage" jsonschema:"review, pursued or junked"`
+	Reason   string `json:"reason,omitempty" jsonschema:"why a person junked it"`
+}
+
 type CompanyDetail struct {
 	Company   Company            `json:"company"`
 	Standing  []OfferingStanding `json:"standing,omitempty" jsonschema:"where the company stands for each other thing the organisation sells that it has been judged for; company.stage is for the organisation's own"`
+	Roles     []RoleBrief        `json:"roles,omitempty" jsonschema:"the roles found here for offerings that have them; don't add a junked one again"`
 	Facts     []Fact             `json:"facts"`
 	People    []PersonBrief      `json:"people"`
 	LastAgent *LastAgent         `json:"last_agent,omitempty" jsonschema:"the agent that last changed this company, if any"`
@@ -646,6 +657,9 @@ func (s *Store) AgentCompany(org int64, who Actor, ref string, page PageIn) (*Co
 	}
 	out := &CompanyDetail{Company: *c, People: []PersonBrief{}, History: []Happened{}, Notes: []NoteOut{}}
 	if out.Standing, err = s.standing(org, c.ID); err != nil {
+		return nil, err
+	}
+	if out.Roles, err = s.roleBriefs(org, c.ID); err != nil {
 		return nil, err
 	}
 	out.Facts, at[0] = afterID(facts, func(f Fact) int64 { return f.ID }, at[0], size)
@@ -759,7 +773,7 @@ func agentInstructions(o *Org, k *APIKey) string {
 	}
 	if k.Has("enrich:spend") {
 		parts = append(parts,
-			"enrich_contact asks the organisation's paid data vendors for an email someone already here lacks. It costs money, so use it only once your own search and reading found nothing, and only for someone worth contacting.")
+			"enrich_contact asks the organisation's paid data vendors for an email, mobile or LinkedIn profile someone already here lacks. It costs money, a mobile most of all, so use it only once your own search and reading found nothing, and only for someone worth contacting.")
 	}
 	if k.Has("outcomes:write") {
 		parts = append(parts,
@@ -826,7 +840,7 @@ func (s *Store) AgentScores(org int64) []AgentScore {
 		FoundBy, Stage string
 		N              int
 	}
-	logged(s.db.Raw(`select found_by, stage, count(*) as n from companies
+	_ = logged(s.db.Raw(`select found_by, stage, count(*) as n from companies
 		where org_id = ? and found_by like 'agent:%' group by found_by, stage`, org).Scan(&companies))
 	for _, r := range companies {
 		a := get(r.FoundBy)
@@ -842,7 +856,7 @@ func (s *Store) AgentScores(org int64) []AgentScore {
 		Actor                     string
 		Contacts, Picked, Replied int
 	}
-	logged(s.db.Raw(`select e."user" as actor, count(*) as contacts,
+	_ = logged(s.db.Raw(`select e."user" as actor, count(*) as contacts,
 		sum(case when exists (select 1 from events p where p.org_id = e.org_id and p.contact_id = e.contact_id and p.action = 'pick') then 1 else 0 end) as picked,
 		sum(case when c.replied is not null then 1 else 0 end) as replied
 		from events e join contacts c on c.id = e.contact_id
@@ -884,7 +898,7 @@ func (s *Store) AgentMarks(org int64, ids []int64) map[int64]map[string]string {
 		return out
 	}
 	var events []Event
-	logged(s.in(org).Where("contact_id in ? and action like 'mark:%'", ids).Order("at, id").Find(&events))
+	_ = logged(s.in(org).Where("contact_id in ? and action like 'mark:%'", ids).Order("at, id").Find(&events))
 	for _, e := range events {
 		step := strings.TrimPrefix(e.Action, "mark:")
 		if out[e.ContactID] == nil {

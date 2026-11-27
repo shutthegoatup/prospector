@@ -16,12 +16,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/shutthegoatup/prospector/api"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/shutthegoatup/prospector/api"
 )
 
 // dummyHash keeps a wrong email as slow as a wrong password.
-var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("unused"), bcrypt.DefaultCost)
+// passwordCost is how hard a password hash is to compute; the tests lower it.
+var passwordCost = bcrypt.DefaultCost
+
+var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("unused"), passwordCost)
 
 const sessionCookie = "session"
 
@@ -31,6 +35,7 @@ type App struct {
 	mcp       map[int64]builtMCP
 	logins    loginGuard
 	enquiries enquiryGuard
+	rates     rateGuard
 	// base is the address people reach the app at, when the operator has said: then
 	// links and the cookie's Secure mark don't depend on what a proxy forwards.
 	base string
@@ -91,16 +96,16 @@ func (a *App) setDeadlines(w http.ResponseWriter, r *http.Request) {
 		write = answerLimit
 	}
 	if r.ContentLength != 0 {
-		rc.SetReadDeadline(time.Now().Add(read))
+		_ = rc.SetReadDeadline(time.Now().Add(read))
 	}
-	rc.SetWriteDeadline(time.Now().Add(write))
+	_ = rc.SetWriteDeadline(time.Now().Add(write))
 }
 
 // streaming lifts the answer deadline for a route whose answer stays open. It sits
 // behind the key check, so only a request that has shown a key is left unbounded.
 func streaming(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		http.NewResponseController(w).SetWriteDeadline(time.Time{})
+		_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 		next.ServeHTTP(w, r)
 	}
 }
@@ -173,7 +178,7 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 		return false
 	}
 	// The answer's clock starts once the body is in, so a slow upload doesn't use it up.
-	http.NewResponseController(w).SetWriteDeadline(time.Now().Add(answerLimit))
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(answerLimit))
 	return true
 }
 
@@ -223,28 +228,28 @@ func (a *App) sessionCookie(r *http.Request, token string) *http.Cookie {
 // member resolves the signed-in user and, for /o/{org}/ routes, their membership.
 func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// A page is sent where it can go on; an API caller is told, with a code to act on.
-		refuse := func(status int, code api.ProblemCode, text, to string) {
+		// A page is sent where it can go on; an API caller is told, with a type to act on.
+		refuse := func(status int, kind api.ProblemType, text, to string) {
 			switch {
-			case strings.Contains(r.URL.Path, "/api/v1/"):
-				writeCoded(w, status, code, text)
+			case forAPI(r):
+				writeTyped(w, status, kind, text)
 			case r.Method == http.MethodGet:
 				http.Redirect(w, r, to, http.StatusSeeOther)
 			default:
 				http.Error(w, text, status)
 			}
 		}
-		signedOut := func(code api.ProblemCode) {
-			refuse(http.StatusUnauthorized, code, "signed out", "/login?next="+url.QueryEscape(r.URL.RequestURI()))
+		signedOut := func(kind api.ProblemType) {
+			refuse(http.StatusUnauthorized, kind, "signed out", "/login?next="+url.QueryEscape(r.URL.RequestURI()))
 		}
 		sess, u := a.session(r)
 		if u == nil {
-			signedOut(api.SignedOut)
+			signedOut(api.ProblemTypeSignedOut)
 			return
 		}
 		// Someone still on a password their inviter saw can only go and choose their own.
 		if u.MustChangePassword && r.URL.Path != "/password" {
-			refuse(http.StatusForbidden, api.MustChangePassword, "choose your own password first", "/password")
+			refuse(http.StatusForbidden, api.ProblemTypeMustChangePassword, "choose your own password first", "/password")
 			return
 		}
 		q := &Req{User: u, Session: sess}
@@ -261,20 +266,23 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 				m, err = a.s.Membership(org.ID, u.ID)
 			}
 			if err != nil {
-				http.NotFound(w, r)
+				refuseAs(w, r, http.StatusNotFound, "no organisation "+slug+" of yours")
 				return
 			}
 			// A session another organisation's provider began is no sign-in here.
 			if !sess.Opens(org.ID) {
-				signedOut(api.SessionLimited)
+				signedOut(api.ProblemTypeSessionLimited)
 				return
 			}
 			if a.ssoRequired(org, u, m, sess) {
-				refuse(http.StatusForbidden, api.SsoRequired, org.Name+" requires its single sign-on: reload the page to go through it",
+				refuse(http.StatusForbidden, api.ProblemTypeSsoRequired, org.Name+" requires its single sign-on: reload the page to go through it",
 					ssoPageURL(org, u.Email, r.URL.RequestURI()))
 				return
 			}
 			q.Org, q.Member = org, m
+		}
+		if forAPI(r) && !a.limited(w, r, userBucket(u), memberRate) {
+			return
 		}
 		next(w, r.WithContext(context.WithValue(r.Context(), reqKey{}, q)))
 	}
@@ -302,6 +310,9 @@ func (a *App) agent(scope string, next http.HandlerFunc) http.HandlerFunc {
 			challenge(w, http.StatusForbidden, "insufficient_scope", scope, "this key lacks the "+scope+" scope")
 			return
 		}
+		if !a.limited(w, r, keyBucket(k), keyRate) {
+			return
+		}
 		next(w, r.WithContext(context.WithValue(r.Context(), reqKey{}, &Req{Org: org, Key: k})))
 	}
 }
@@ -318,7 +329,7 @@ var pdfPolicy = strings.Replace(contentPolicy, "script-src 'self';", "script-src
 
 func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { _, _ = fmt.Fprintln(w, "ok") })
 	mux.Handle("GET /assets/", assetHandler())
 	a.signInRoutes(mux)
 	mux.HandleFunc("GET /login/with/{way}", a.loginWith)
@@ -326,6 +337,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /login/callback", a.loginCallback)
 	mux.HandleFunc("GET /u/{token}", a.unsubscribePage)
 	mux.HandleFunc("POST /u/{token}", a.unsubscribe)
+	mux.HandleFunc("POST /hooks/postmark", a.postmarkHook)
 	mux.HandleFunc("GET /c", a.customerPage)
 	mux.HandleFunc("POST /c/leave", a.customerLeave)
 	mux.HandleFunc("POST /c/steps/{id}/done", a.customerStep(true))
@@ -334,7 +346,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /c/{token}", a.customerOpen)
 	mux.HandleFunc("POST /c/{token}/again", a.customerAgain)
 	mux.HandleFunc("GET /{$}", a.front)
-	mux.HandleFunc("GET /api", a.apiDocPage())
+	mux.HandleFunc("GET /api", a.apiDocPage)
+	mux.HandleFunc("GET /api/problems/{name}", a.apiProblem())
 
 	mux.HandleFunc("GET /o/{org}/{$}", a.member(func(w http.ResponseWriter, r *http.Request) {
 		q := reqOf(r)
@@ -366,7 +379,7 @@ func (a *App) Routes() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a.setDeadlines(w, r)
 		if !cleanRequest(r) {
-			http.NotFound(w, r)
+			refuseAs(w, r, http.StatusNotFound, "404 page not found")
 			return
 		}
 		if wantsPage(r) {
@@ -389,7 +402,7 @@ func (a *App) Routes() http.Handler {
 		// and the CLI send neither header and carry a key, so they pass.
 		if !hasKey(r) {
 			if err := sameOrigin.Check(r); err != nil {
-				http.Error(w, "this request came from another site", http.StatusForbidden)
+				refuseAs(w, r, http.StatusForbidden, "this request came from another site")
 				return
 			}
 		}
@@ -398,7 +411,7 @@ func (a *App) Routes() http.Handler {
 		// organisation lists. The signed-out forms and the API key routes are exempt.
 		if r.Method == http.MethodPost && !signedOutForm(r.URL.Path) &&
 			!hasKey(r) && !strings.HasPrefix(r.Header.Get("content-type"), "application/json") {
-			http.Error(w, "POST bodies must be application/json", http.StatusUnsupportedMediaType)
+			refuseAs(w, r, http.StatusUnsupportedMediaType, "POST bodies must be application/json")
 			return
 		}
 		mux.ServeHTTP(w, r)
@@ -515,10 +528,7 @@ func (a *App) front(w http.ResponseWriter, r *http.Request) {
 		a.member(a.home)(w, r)
 		return
 	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	if err := LandingPage(a.frontIntake(r)).Render(r.Context(), w); err != nil {
-		log.Print(err)
-	}
+	a.frontPage(w, r)
 }
 
 // frontIntake is where the front page's form posts, and the origin a browser must be
@@ -562,8 +572,7 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login/sso?"+url.Values{"email": {q.User.Email}}.Encode(), http.StatusSeeOther)
 		return
 	}
-	w.Header().Set("content-type", "text/html; charset=utf-8")
-	NoOrgs(q.User).Render(r.Context(), w)
+	writeShell(w, http.StatusOK, map[string]string{"page": "start"}, "Start an organisation at /api/v1/orgs.\n")
 }
 
 const passwordChanged = "Password changed. Your other sessions are signed out."
@@ -604,9 +613,7 @@ func (a *App) passwordChange(r *http.Request, u *User, current, next string) (de
 // serve starts even with no users: every page needs a sign-in, so nobody gets in
 // until `prospector user add` has run against the same database.
 func serve(a *App, addr string) error {
-	var users int64
-	logged(a.s.db.Model(&User{}).Count(&users))
-	if users == 0 {
+	if users, err := a.s.Users(); noted(err) && users == 0 {
 		log.Print("no users yet: create one with `prospector user add <email> <name>`")
 	}
 	if a.base == "" && len(a.social) > 0 {
@@ -657,7 +664,7 @@ func (a *App) serveUntil(asked context.Context, ln net.Listener, within time.Dur
 	grace, cancel := context.WithTimeout(context.Background(), within)
 	defer cancel()
 	if err := srv.Shutdown(grace); err != nil {
-		srv.Close()
+		_ = srv.Close()
 	}
 	sent := make(chan struct{})
 	go func() { a.sending.Wait(); close(sent) }()

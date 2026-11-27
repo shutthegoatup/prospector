@@ -12,6 +12,7 @@ import (
 func firstOf[T, U any](v T, _ U, err error) (T, error) { return v, err }
 
 func TestACursorIsOnlyWhatAListGaveOut(t *testing.T) {
+	t.Parallel()
 	if at, err := (PageIn{}).at(2); err != nil || at[0] != 0 || at[1] != 0 {
 		t.Fatalf("no cursor is the start: %v %v", at, err)
 	}
@@ -52,6 +53,7 @@ func walk[T any](t *testing.T, limit int, page func(PageIn) ([]T, string, error)
 }
 
 func TestEveryListAnAgentReadsComesInPages(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	for i := range 5 {

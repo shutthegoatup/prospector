@@ -33,19 +33,34 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Generated templates, API code and page script are committed
+      # The tests read the built app, so this comes first. Its own output is ignored;
+      # what it regenerates from the spec (api.gen.go, api.d.ts) is committed.
+      - name: Build the web app; generated code is committed
         run: |
-          go tool templ generate
           go generate ./api
           npm ci --prefix web --no-audit --no-fund
           npm run build --prefix web
           git diff --exit-code
 
-      - run: go vet ./...
-      - name: Test on SQLite
-        run: go test ./...
-      - name: Test on Postgres
-        run: go test -count=1 -p 1 ./...
+      - name: Lint and check formatting
+        run: |
+          npm run lint --prefix web
+          npm run format:check --prefix web
+          npm run lint:api --prefix web
+      # go vet, staticcheck, errcheck and the rest, with gofmt and goimports (.golangci.yml).
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+      # A throwaway database needn't survive a crash, and syncing every commit to disk
+      # is most of what a test spends.
+      - name: Don't make the test database durable
+        run: |
+          psql "$PROSPECTOR_TEST_PG" -c "alter system set fsync = off" -c "alter system set synchronous_commit = off" \
+            -c "alter system set full_page_writes = off" -c "select pg_reload_conf()"
+        env:
+          PROSPECTOR_TEST_PG: postgres://postgres:test@localhost:5432/prospector?sslmode=disable
+      - name: Test
+        run: go test -count=1 ./...
         env:
           PROSPECTOR_TEST_PG: postgres://postgres:test@localhost:5432/prospector?sslmode=disable
 
@@ -69,6 +84,11 @@ jobs:
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
       - name: Tag the next patch version
         id: tag

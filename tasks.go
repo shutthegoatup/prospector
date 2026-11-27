@@ -201,6 +201,8 @@ func (s *Store) askTask(org, task int64, text, by string) (*TaskRequest, error) 
 }
 
 // taskRow and requestRow are one task, or one request, of the organisation's.
+func (s *Store) TaskByID(org, id int64) (*Task, error) { return s.taskRow(org, id) }
+
 func (s *Store) taskRow(org, id int64) (*Task, error) {
 	var t Task
 	if err := s.db.Where("org_id = ? and id = ?", org, id).First(&t).Error; err != nil {
@@ -464,7 +466,7 @@ func (s *Store) Runs(org int64, before time.Time, limit int) (runs []Run, titles
 		return q
 	}
 	var events []Event
-	logged(agents().Order("at desc, id desc").Limit(runsRead).Find(&events))
+	_ = logged(agents().Order("at desc, id desc").Limit(runsRead).Find(&events))
 	full := len(events) == runsRead
 	for i, j := 0, len(events)-1; i < j; i, j = i+1, j-1 {
 		events[i], events[j] = events[j], events[i]
@@ -481,7 +483,7 @@ func (s *Store) Runs(org int64, before time.Time, limit int) (runs []Run, titles
 				continue
 			}
 			var first Event
-			logged(s.in(org).Where(`key_id = ? and "user" = ? and at >= ?`, r.KeyID, r.Actor, before).Order("at, id").Limit(1).Find(&first))
+			_ = logged(s.in(org).Where(`key_id = ? and "user" = ? and at >= ?`, r.KeyID, r.Actor, before).Order("at, id").Limit(1).Find(&first))
 			cut[key] = first.At
 		}
 		runs = slices.DeleteFunc(runs, func(r Run) bool {
@@ -534,7 +536,7 @@ func (s *Store) Runs(org int64, before time.Time, limit int) (runs []Run, titles
 	titles = map[int64]string{}
 	if len(ids) > 0 {
 		var tasks []Task
-		logged(s.in(org).Where("id in ?", ids).Find(&tasks))
+		_ = logged(s.in(org).Where("id in ?", ids).Find(&tasks))
 		for _, t := range tasks {
 			titles[t.ID] = t.Title
 		}
@@ -572,7 +574,9 @@ type TaskView struct {
 func (v TaskView) LeftOut() []TaskCompany {
 	var out []TaskCompany
 	for _, c := range v.Companies {
-		if c.Held == "" || c.Stage == CompanyReview || (c.Held == heldRejected && c.Stage != CompanyRejected) {
+		switch {
+		case c.Held == heldNeverContact:
+		case c.Held == "" || c.Stage == CompanyReview, c.Held == heldRejected && c.Stage != CompanyRejected:
 			continue
 		}
 		out = append(out, c)
@@ -598,7 +602,7 @@ type TaskCompany struct {
 	Stage string    `json:"stage" jsonschema:"review, qualified or rejected: don't suggest a rejected company again"`
 	Since time.Time `json:"since"`
 	// Held is how the company already stood when the task first came to it.
-	Held string `json:"held,omitempty" jsonschema:"set when the company was already held when this task first came to it: rejected, customer, open_deal or qualified. It isn't a new find"`
+	Held string `json:"held,omitempty" jsonschema:"set when the company was already held when this task first came to it (rejected, customer, open_deal or qualified), or never_contact when its domain is on the never-contact list: keep adding what you find, but suggest nobody there. It isn't a new find"`
 }
 
 type TaskPerson struct {
@@ -711,6 +715,10 @@ func (s *Store) taskViews(tx *gorm.DB, org int64, tasks []Task, now time.Time) (
 	}
 
 	out := make([]TaskView, len(tasks))
+	o, err := s.OrgByID(org)
+	if err != nil {
+		return nil, err
+	}
 	for i, t := range tasks {
 		v := &out[i]
 		v.Task = t
@@ -745,6 +753,9 @@ func (s *Store) taskViews(tx *gorm.DB, org int64, tasks []Task, now time.Time) (
 		for _, id := range slices.Sorted(maps.Keys(companySince)) {
 			if c, here := companies[id]; here {
 				v.Companies = append(v.Companies, TaskCompany{ID: c.ID, Name: c.Name, Stage: c.Stage, Since: companySince[id], Held: heldAs[id]})
+				if o.Settings.coversCompany(c.Domain) {
+					v.Companies[len(v.Companies)-1].Held = heldNeverContact
+				}
 			}
 		}
 		// A task for an offering judges its companies by that offering's verdicts.
@@ -791,6 +802,14 @@ func (s *Store) taskViews(tx *gorm.DB, org int64, tasks []Task, now time.Time) (
 		v.Status = taskStatus(t, v.Open(), v.Last, now)
 	}
 	return out, nil
+}
+
+// TaskCounts is how many of an organisation's tasks are open, and how many it has.
+func (s *Store) TaskCounts(org int64) (open, all int64, err error) {
+	if err := s.in(org).Model(&Task{}).Where("closed_at is null").Count(&open).Error; err != nil {
+		return 0, 0, err
+	}
+	return open, all, s.in(org).Model(&Task{}).Count(&all).Error
 }
 
 func (s *Store) Task(org, id int64, now time.Time) (*TaskView, error) {
@@ -885,6 +904,7 @@ type NoteOut struct {
 type TaskOffering struct {
 	ID       int64  `json:"id"`
 	Name     string `json:"name"`
+	HasRoles bool   `json:"has_roles" jsonschema:"true when companies are judged for it by their roles: add each with add_role"`
 	Guidance string `json:"guidance" jsonschema:"what to look for and how to judge companies for this offering; it takes the place of the organisation's own look-for list for this task"`
 }
 
@@ -915,7 +935,7 @@ func asked(r RequestView, who Actor) AskedOut {
 func brief(v TaskView, who Actor) TaskBrief {
 	b := TaskBrief{ID: v.ID, Title: v.Title, Status: v.Status, Open: []AskedOut{}, Found: TaskCounts{len(v.Companies), len(v.People)}, Want: v.Want, OfferingID: v.OfferingID}
 	for _, c := range v.Companies {
-		if c.Stage == CompanyReview {
+		if c.Stage == CompanyReview && c.Held != heldNeverContact {
 			b.Review++
 		}
 	}
@@ -1037,9 +1057,7 @@ func (s *Store) agentTaskPage(org int64, who Actor, id int64, page PageIn, now t
 	if o, err := s.offeringOf(org, v.OfferingID); err != nil && !errors.As(err, &gone) {
 		return nil, err
 	} else if o != nil {
-		out.Offering = &TaskOffering{ID: o.ID, Name: o.Name, Guidance: "This task finds companies for " + o.Name + ". " +
-			"The stage on each company here, and in what add_company answers, is for " + o.Name + ": skip one rejected for it. " +
-			"A company rejected only for something else is still worth adding for this.\n\n" + lookForList(o.Name, o.LookFor)}
+		out.Offering = &TaskOffering{ID: o.ID, Name: o.Name, HasRoles: o.HasRoles, Guidance: offeringGuidance(o)}
 	}
 	for _, r := range v.Requests {
 		out.Requests = append(out.Requests, asked(r, who))
@@ -1156,4 +1174,17 @@ func taskPrompt(o *Org, t Task) string {
 		"Then do what the open request it keeps for you (claimed_request) asks. If another agent holds every open request, stop and say so. Pass task %d on everything you add, so it counts toward this task. Something already in Prospector that fits still counts: add it again with the task and it is linked, not duplicated. "+
 		"Leave a task_note when you skip a company or find nothing, saying why, and call finish_request with the request's id when it is done.",
 		t.ID, o.Name, t.Title, t.ID, t.ID)
+}
+
+// offeringGuidance is what an agent on a task for an offering is told about it.
+func offeringGuidance(o *Offering) string {
+	said := "This task finds companies for " + o.Name + ". "
+	if o.HasRoles {
+		said += "For " + o.Name + " each role open at a company is judged on its own: add the company with add_company, then each role " +
+			"with add_role, citing its posting. The stage on each company here is for " + o.Name + "; a rejected one had every role junked, " +
+			"and a new role there is still worth adding. get_company lists the roles already found: don't add a junked one again. "
+	} else {
+		said += "The stage on each company here, and in what add_company answers, is for " + o.Name + ": skip one rejected for it. "
+	}
+	return said + "A company rejected only for something else is still worth adding for this.\n\n" + lookForList(o.Name, o.LookFor)
 }

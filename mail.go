@@ -121,7 +121,7 @@ func smtpSend(ctx context.Context, via MailServer, m Message) error {
 	}
 	defer conn.Close()
 	deadline, _ := ctx.Deadline()
-	conn.SetDeadline(deadline)
+	_ = conn.SetDeadline(deadline)
 	secure := &tls.Config{ServerName: via.Host, MinVersion: tls.VersionTLS12}
 	return submit(conn, via, from, to, m, secure, !loopback(via.Host))
 }

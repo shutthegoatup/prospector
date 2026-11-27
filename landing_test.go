@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"html"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +14,7 @@ import (
 )
 
 func TestFrontPage(t *testing.T) {
+	t.Parallel()
 	_, _, srv, member := signedIn(t)
 	visitor := &http.Client{}
 
@@ -63,15 +66,27 @@ func TestFrontPage(t *testing.T) {
 }
 
 func TestFrontPageEnquiryForm(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	srv := httptest.NewServer((&App{s: s, frontOrg: "alpha"}).Routes())
 	t.Cleanup(srv.Close)
 	visitor := &http.Client{}
-	const form = `data-intake="/o/alpha/intake"`
+	// The page carries where its form posts, and the address it works at, for its script.
+	formOf := func(body string) (intake, origin string) {
+		m := regexp.MustCompile(`<div id="site" data-page="([^"]*)">`).FindStringSubmatch(body)
+		if m == nil {
+			return "", ""
+		}
+		var got struct{ Intake, Origin string }
+		if err := json.Unmarshal([]byte(html.UnescapeString(m[1])), &got); err != nil {
+			t.Fatalf("the front page's form: %v", err)
+		}
+		return got.Intake, got.Origin
+	}
 
 	// Named, but the organisation hasn't listed this address: a form would only be refused.
-	if _, body := call(t, visitor, "GET", srv.URL+"/", "", nil); strings.Contains(body, "data-intake") || strings.Contains(body, "<script") {
+	if _, body := call(t, visitor, "GET", srv.URL+"/", "", nil); strings.Contains(body, "data-page") || strings.Contains(body, "<script") {
 		t.Fatal("the front page has a form its organisation wouldn't take enquiries from")
 	}
 	takeEnquiriesFrom(t, s, o, "https://www.alpha.example\n"+srv.URL)
@@ -83,7 +98,7 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 	page, _ := io.ReadAll(res.Body)
 	res.Body.Close()
 	body := string(page)
-	if !strings.Contains(body, form) || !strings.Contains(body, `href="#contact"`) {
+	if intake, _ := formOf(body); intake != "/o/alpha/intake" {
 		t.Fatal("the front page has no enquiry form")
 	}
 	if !strings.Contains(res.Header.Get("Content-Security-Policy"), "connect-src 'self'") {
@@ -92,7 +107,7 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 	if found := regexp.MustCompile(`(?i)<script(?: [^>]*)?>[^<]|<[^>]*\son[a-z]+\s*=`).FindString(body); found != "" {
 		t.Errorf("the front page has an inline script or handler: %s", found)
 	}
-	script := regexp.MustCompile(`<script src="(/assets/js/landing\.js[^"]*)"`).FindStringSubmatch(body)
+	script := regexp.MustCompile(`<script type="module" src="(/assets/app/site\.js[^"]*)"`).FindStringSubmatch(body)
 	if script == nil {
 		t.Fatal("the form's script isn't loaded")
 	}
@@ -125,15 +140,15 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 	// route would refuse what it sent.
 	told := httptest.NewServer((&App{s: s, frontOrg: "alpha", base: "https://Crm.alpha.example:443"}).Routes())
 	t.Cleanup(told.Close)
-	if _, body := call(t, visitor, "GET", told.URL+"/", "", nil); strings.Contains(body, "data-intake") {
+	if _, body := call(t, visitor, "GET", told.URL+"/", "", nil); strings.Contains(body, "data-page") {
 		t.Error("the form shows for an address the organisation hasn't listed")
 	}
 	takeEnquiriesFrom(t, s, o, "https://crm.alpha.example")
-	if _, body := call(t, visitor, "GET", told.URL+"/", "", nil); !strings.Contains(body, form+` data-origin="https://crm.alpha.example"`) {
+	if _, body := call(t, visitor, "GET", told.URL+"/", "", nil); func() bool { i, o := formOf(body); return i != "/o/alpha/intake" || o != "https://crm.alpha.example" }() {
 		t.Error("the form doesn't name the origin it works on")
 	}
-	script2, _ := assetFS.ReadFile("assets/js/landing.js")
-	if !strings.Contains(string(script2), "form.dataset.origin === location.origin") {
+	script2, _ := os.ReadFile("web/src/site/main.tsx")
+	if !strings.Contains(string(script2), "got.origin === window.location.origin") {
 		t.Error("the script shows the form whatever address the page was reached at")
 	}
 
@@ -143,13 +158,14 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 		t.Cleanup(plain.Close)
 		takeEnquiriesFrom(t, s, o, plain.URL)
 		code, body := call(t, visitor, "GET", plain.URL+"/", "", nil)
-		if code != http.StatusOK || !strings.Contains(body, "One queue a day.") || strings.Contains(body, "data-intake") || strings.Contains(body, "<script") {
+		if code != http.StatusOK || !strings.Contains(body, "One queue a day.") || strings.Contains(body, "data-page") || strings.Contains(body, "<script") {
 			t.Errorf("a server whose front organisation is %q: %d, with a form or without the page", slug, code)
 		}
 	}
 }
 
 func TestFrontOrgIsMadeOnce(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	mustOrg(t, s, "alpha")
 	const address = "https://crm.alpha.example"
@@ -162,7 +178,7 @@ func TestFrontOrgIsMadeOnce(t *testing.T) {
 	}
 	srv := httptest.NewServer((&App{s: s, frontOrg: frontOrgSlug, base: address}).Routes())
 	t.Cleanup(srv.Close)
-	if _, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil); !strings.Contains(body, `data-intake="/o/prospector/intake" data-origin="`+address+`"`) {
+	if _, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil); !strings.Contains(body, `&quot;intake&quot;:&quot;/o/prospector/intake&quot;,&quot;origin&quot;:&quot;`+address+`&quot;`) {
 		t.Error("a server told its address starts without the front page's form")
 	}
 
@@ -191,6 +207,7 @@ func TestFrontOrgIsMadeOnce(t *testing.T) {
 
 // A server with no form on its front page says why at start-up, and how to put it right.
 func TestTheServerSaysWhyTheFrontPageHasNoForm(t *testing.T) {
+	t.Parallel()
 	const address = "https://crm.alpha.example"
 	for name, c := range map[string]struct {
 		base, sites, want string
@@ -214,6 +231,7 @@ func TestTheServerSaysWhyTheFrontPageHasNoForm(t *testing.T) {
 // The app shares the front page's light palette: a page left on the old dark class
 // would turn the components' dark variants back on.
 func TestAppUsesTheLightPalette(t *testing.T) {
+	t.Parallel()
 	_, _, srv, member := signedIn(t)
 	for _, page := range []string{"/o/alpha/today", "/o/alpha/settings"} {
 		_, body := call(t, member, "GET", srv.URL+page, "", nil)
@@ -234,6 +252,7 @@ func TestAppUsesTheLightPalette(t *testing.T) {
 // The front page says what a key may do. It names only scopes that exist, and every
 // scope that lets a key send mail is on it, so the page cannot promise no key sends.
 func TestTheFrontPageTellsTheTruthAboutKeys(t *testing.T) {
+	t.Parallel()
 	_, _, srv, _ := signedIn(t)
 	_, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil)
 	named := regexp.MustCompile(`<code>([a-z]+(?::[a-z]+)?)</code>`).FindAllStringSubmatch(body, -1)
@@ -255,5 +274,55 @@ func TestTheFrontPageTellsTheTruthAboutKeys(t *testing.T) {
 	}
 	if strings.Contains(body, "organisation's settings or members") || !strings.Contains(body, "<code>settings:write</code>") {
 		t.Error("the front page still says no key can change settings")
+	}
+}
+
+// The front page prices the hosted plans: free for the first five users, £5 a user
+// after, and a conversation for larger teams. Self-hosting has a section of its own,
+// not a plan. Each plan's button leads to the enquiry form, so the built page leaves it
+// to the form's script.
+func TestFrontPagePricing(t *testing.T) {
+	t.Parallel()
+	_, _, srv, _ := signedIn(t)
+	_, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil)
+	start := strings.Index(body, `id="pricing"`)
+	if start < 0 {
+		t.Fatal("the front page has no pricing section")
+	}
+	pricing := body[start : start+strings.Index(body[start:], "</section>")]
+	for _, want := range []string{"Free for your first 5 users.", "up to 5 users", `£</small>0</b>`, `£</small>5</b>`, "a user a month", "Larger teams", "prices exclude VAT",
+		`data-plan-cta="Start free"`, `data-plan-cta="Talk to us"`} {
+		if !strings.Contains(pricing, want) {
+			t.Errorf("the front page's pricing lacks %q", want)
+		}
+	}
+	if strings.Contains(pricing, "Self-host") || !strings.Contains(body, `id="start"`) {
+		t.Error("self-hosting is priced as a plan, or has lost its own section")
+	}
+	if strings.Contains(body, `href="#contact"`) {
+		t.Error("the built front page links to an enquiry form it may not have")
+	}
+	// Where the form's script mounts the form and the Contact link; renamed, the form
+	// would silently not appear.
+	for _, mount := range []string{`id="enquiry"></div>`, `id="site-links"`} {
+		if !strings.Contains(body, mount) {
+			t.Errorf("the front page lost the form script's mount %s", mount)
+		}
+	}
+}
+
+// The site's sections, cards and API operations are headings, so they can be navigated
+// as such: built from components that draw divs, they would quietly stop being.
+func TestSitePagesKeepTheirHeadings(t *testing.T) {
+	t.Parallel()
+	_, _, srv, _ := signedIn(t)
+	visitor := &http.Client{}
+	_, front := call(t, visitor, "GET", srv.URL+"/", "", nil)
+	if n := strings.Count(front, "<h3"); n < 20 {
+		t.Errorf("the front page has %d h3 headings, want a card or step title each", n)
+	}
+	_, ref := call(t, visitor, "GET", srv.URL+"/api", "", nil)
+	if ops, n := strings.Count(ref, `id="op-`), strings.Count(ref, "<h3"); ops == 0 || n < ops {
+		t.Errorf("/api has %d h3 headings for %d operations", n, ops)
 	}
 }

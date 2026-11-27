@@ -1,8 +1,10 @@
-import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
+import { type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api, fetchClient } from "@/client";
 import { ActionButton, Eyebrow, Failed, Meta, PageHead, useRefresh, Whose } from "@/components/app";
+import { Bar, Loading, Placeholders, Text } from "@/components/app/skeleton";
+import { cn } from "@/lib/utils";
 import { useSession } from "@/session";
 
 type Field = components["schemas"]["AgreementFieldIn"];
@@ -50,7 +52,9 @@ export function PreparePage() {
 
   const a = agreement.data;
   const all = recipients.data?.items ?? [];
-  const signers: Signer[] = all.filter((r) => r.role === "signer").map((r, i) => ({ id: r.id, name: r.name, colour: colours[i % colours.length] ?? "#ffc233" }));
+  const signers: Signer[] = all
+    .filter((r) => r.role === "signer")
+    .map((r, i) => ({ id: r.id, name: r.name, colour: colours[i % colours.length] ?? "#ffc233" }));
   const copies = all.filter((r) => r.role === "copy");
   const edit = sales && a?.status === "draft";
   const placing = signers.find((s) => s.id === picked) ?? signers[0];
@@ -73,7 +77,22 @@ export function PreparePage() {
   };
 
   if (agreement.error) return <Failed errors={[agreement.error]} />;
-  if (!a) return <Meta>Reading the agreement…</Meta>;
+  const head = (
+    <>
+      <Link to="/o/$org/companies/$id" params={{ org, id: a?.company_id ?? 0 }} disabled={!a} className="font-mono text-xs text-mark">
+        ← <Text value={a?.company} w="14ch" />
+      </Link>
+      <PageHead title="Prepare for signing">
+        <Meta>
+          <Text value={a && `${a.name} · ${a.file_name} · ${a.page_count} pages`} w="32ch" />
+        </Meta>
+      </PageHead>
+      <Whose area="sales" work="Preparing agreements is" can={sales} />
+    </>
+  );
+  // What follows depends on the agreement, so it appears below rather than pushing the head down.
+  if (!a) return <Loading busy>{head}</Loading>;
+  const known = recipients.data !== undefined || Boolean(recipients.error);
   const signed = new Set((fields ?? []).filter((f) => f.kind === "signature").map((f) => f.recipient_id));
   const asks = (fields ?? []).map((f, n) => ({ f, n })).filter(({ f }) => f.kind === "text" || f.kind === "tick");
   const missing = [
@@ -85,37 +104,33 @@ export function PreparePage() {
 
   return (
     <>
-      <Link to="/o/$org/companies/$id" params={{ org, id: a.company_id }} className="font-mono text-xs text-mark">
-        ← {a.company}
-      </Link>
-      <PageHead title="Prepare for signing">
-        <Meta>
-          {a.name} · {a.file_name} · {a.page_count} pages
-        </Meta>
-      </PageHead>
-      <Whose area="sales" work="Preparing agreements is" can={sales} />
+      {head}
       {a.problem && (
         <p className="mb-4 text-sm text-[var(--stop)]" role="alert">
           {a.problem}
         </p>
       )}
+      {(recipients.error || stored.error) && (
+        <div className="mb-4">
+          <Failed errors={[recipients.error, stored.error]} />
+        </div>
+      )}
       <div className="flex flex-wrap items-start gap-5">
         <div className="flex max-w-full flex-[1_1_240px] flex-col gap-4 md:max-w-[260px]">
           <section className="flex flex-col gap-2 panel p-3.5">
             <Eyebrow>Signers</Eyebrow>
-            {signers.length === 0 && <Meta>Nobody yet.</Meta>}
+            {known && signers.length === 0 && <Meta>Nobody yet.</Meta>}
+            {!known && (
+              <Placeholders className="flex flex-col gap-2">
+                {[0, 1].map((i) => (
+                  <SignerRow key={`loading-${i}`} edit={edit} />
+                ))}
+              </Placeholders>
+            )}
             {signers.map((s, i) => {
               const r = all.find((x) => x.id === s.id) as Recipient;
               return (
-                <div key={s.id} className="flex flex-col gap-1.5 rounded-lg border border-border p-2 text-sm">
-                  <label className="flex items-center gap-2">
-                    {edit && <input type="radio" name="placing" checked={placing?.id === s.id} onChange={() => setPicked(s.id)} />}
-                    <span className="shrink-0 rounded-sm" style={{ width: 10, height: 10, background: s.colour }} />
-                    <b>
-                      {i + 1} · {s.name}
-                    </b>
-                  </label>
-                  <Meta>{partyLine(r)}</Meta>
+                <SignerRow key={s.id} edit={edit} s={s} n={i + 1} r={r} placing={placing?.id === s.id} onPlace={() => setPicked(s.id)}>
                   {edit && (
                     <div className="flex flex-wrap gap-1.5">
                       {i > 0 && (
@@ -123,7 +138,12 @@ export function PreparePage() {
                           quiet
                           size="xs"
                           aria-label={`Move ${s.name} up`}
-                          onClick={() => change.mutate({ params: { path: { org, id, recipient: s.id } }, body: { position: all.find((x) => x.id === signers[i - 1]?.id)?.position } })}
+                          onClick={() =>
+                            change.mutate({
+                              params: { path: { org, id, recipient: s.id } },
+                              body: { position: all.find((x) => x.id === signers[i - 1]?.id)?.position },
+                            })
+                          }
                         >
                           ↑
                         </ActionButton>
@@ -134,13 +154,15 @@ export function PreparePage() {
                       <ActionButton
                         quiet
                         size="xs"
-                        onClick={() => window.confirm(`Take ${s.name} off, with their fields?`) && remove.mutate({ params: { path: { org, id, recipient: s.id } } })}
+                        onClick={() =>
+                          window.confirm(`Take ${s.name} off, with their fields?`) && remove.mutate({ params: { path: { org, id, recipient: s.id } } })
+                        }
                       >
                         Remove
                       </ActionButton>
                     </div>
                   )}
-                </div>
+                </SignerRow>
               );
             })}
             {edit ? (
@@ -154,12 +176,14 @@ export function PreparePage() {
           </section>
           <section className="flex flex-col gap-2 panel p-3.5">
             <Eyebrow>Gets a copy</Eyebrow>
-            {copies.length === 0 && <Meta>Nobody. Everyone who signs gets one anyway.</Meta>}
+            {known && copies.length === 0 && <Meta>Nobody. Everyone who signs gets one anyway.</Meta>}
+            {!known && (
+              <Placeholders>
+                <CopyRow />
+              </Placeholders>
+            )}
             {copies.map((r) => (
-              <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <span>
-                  {r.name} <span className="font-mono text-xs text-muted-foreground">{partyLine(r)}</span>
-                </span>
+              <CopyRow key={r.id} r={r}>
                 {edit && (
                   <span className="flex gap-1.5">
                     <ActionButton quiet size="xs" onClick={() => change.mutate({ params: { path: { org, id, recipient: r.id } }, body: { role: "signer" } })}>
@@ -170,7 +194,7 @@ export function PreparePage() {
                     </ActionButton>
                   </span>
                 )}
-              </div>
+              </CopyRow>
             ))}
           </section>
           {edit && (
@@ -204,10 +228,10 @@ export function PreparePage() {
               ))}
             </section>
           )}
-          {a.status === "draft" ? <Send a={a} missing={missing} edit={edit} /> : <Sent a={a} />}
+          {a.status === "draft" ? <Send a={a} missing={missing} ready={known && fields !== null} edit={edit} /> : <Sent a={a} />}
         </div>
         <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-3">
-          {edit && signers.length > 0 && (
+          {known && edit && signers.length > 0 && (
             <>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs text-muted-foreground">Place for {placing?.name}:</span>
@@ -229,8 +253,8 @@ export function PreparePage() {
               <Failed errors={[saveError]} />
             </>
           )}
-          {edit && signers.length === 0 && <Meta>Add someone to sign it, then place their fields on the pages.</Meta>}
-          {a.file_hash && fields && (
+          {known && edit && signers.length === 0 && <Meta>Add someone to sign it, then place their fields on the pages.</Meta>}
+          {known && a.file_hash && fields && (
             <Pages
               id={id}
               hash={a.file_hash}
@@ -250,7 +274,7 @@ export function PreparePage() {
 type Overview = components["schemas"]["AgreementOverview"];
 
 // Send is the panel a draft goes out from: what it still lacks, then the mail to its signers.
-function Send({ a, missing, edit }: { a: Overview; missing: string[]; edit: boolean }) {
+function Send({ a, missing, ready, edit }: { a: Overview; missing: string[]; ready: boolean; edit: boolean }) {
   const { org } = useSession();
   const navigate = useNavigate();
   const send = $api.useMutation("post", "/o/{org}/api/v1/agreements/{id}/send", {
@@ -259,14 +283,12 @@ function Send({ a, missing, edit }: { a: Overview; missing: string[]; edit: bool
   const [subject, setSubject] = useState(`Please sign: ${a.name}`);
   const [message, setMessage] = useState("");
   const [days, setDays] = useState(14);
-  const blocked = missing.length > 0 || a.cant_send !== "";
+  const blocked = !ready || missing.length > 0 || a.cant_send !== "";
   return (
     <section className="flex flex-col gap-2 panel p-3.5">
       <Eyebrow>Send</Eyebrow>
-      {missing.length === 0 && <p className="font-mono text-xs text-[var(--ok)]">✓ Everything is placed.</p>}
-      {missing.map((m) => (
-        <Meta key={m}>· {m}</Meta>
-      ))}
+      {ready && missing.length === 0 && <p className="font-mono text-xs text-[var(--ok)]">✓ Everything is placed.</p>}
+      {ready && missing.map((m) => <Meta key={m}>· {m}</Meta>)}
       {a.cant_send && <p className="font-mono text-xs text-[var(--stop)]">{a.cant_send}</p>}
       {edit && (
         <form
@@ -282,7 +304,13 @@ function Send({ a, missing, edit }: { a: Overview; missing: string[]; edit: bool
           </label>
           <label className="flex flex-col gap-1">
             <Eyebrow>Message</Eyebrow>
-            <textarea value={message} maxLength={2000} onChange={(e) => setMessage(e.currentTarget.value)} className="rounded-lg border border-input bg-muted p-2 text-sm" style={{ minHeight: 96 }} />
+            <textarea
+              value={message}
+              maxLength={2000}
+              onChange={(e) => setMessage(e.currentTarget.value)}
+              className="rounded-lg border border-input bg-muted p-2 text-sm"
+              style={{ minHeight: 96 }}
+            />
           </label>
           <label className="flex flex-col gap-1">
             <Eyebrow>Open for</Eyebrow>
@@ -322,6 +350,53 @@ function Sent({ a }: { a: Overview }) {
   );
 }
 
+// SignerRow is one signer, or their outline while the recipients load.
+function SignerRow({
+  edit,
+  s,
+  n,
+  r,
+  placing,
+  onPlace,
+  children,
+}: {
+  edit: boolean;
+  s?: Signer;
+  n?: number;
+  r?: Recipient;
+  placing?: boolean;
+  onPlace?: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border border-border p-2 text-sm">
+      <label className="flex items-center gap-2">
+        {edit && <input type="radio" name="placing" checked={placing ?? false} disabled={!s} onChange={onPlace} />}
+        <span className={cn("shrink-0 rounded-sm", !s && "animate-pulse bg-accent")} style={{ width: 10, height: 10, background: s?.colour }} />
+        <b>{s ? `${n} · ${s.name}` : <Bar w="12ch" />}</b>
+      </label>
+      <Meta>
+        <Text value={r && partyLine(r)} w="20ch" />
+      </Meta>
+      {children}
+    </div>
+  );
+}
+
+function CopyRow({ r, children }: { r?: Recipient; children?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+      <span>
+        <Text value={r?.name} w="10ch" />{" "}
+        <span className="font-mono text-xs text-muted-foreground">
+          <Text value={r && partyLine(r)} w="18ch" />
+        </span>
+      </span>
+      {children}
+    </div>
+  );
+}
+
 function partyLine(r: Recipient) {
   return r.member_id ? `${r.email} · member` : r.email;
 }
@@ -344,7 +419,15 @@ function pageInView() {
   return best;
 }
 
-function AddForm({ label, options, onAdd }: { label: string; options: components["schemas"]["Invitable"][]; onAdd: (who: number, role: "signer" | "copy") => void }) {
+function AddForm({
+  label,
+  options,
+  onAdd,
+}: {
+  label: string;
+  options: components["schemas"]["Invitable"][];
+  onAdd: (who: number, role: "signer" | "copy") => void;
+}) {
   const [who, setWho] = useState("");
   const [role, setRole] = useState<"signer" | "copy">("signer");
   return (
@@ -408,7 +491,7 @@ function Pages({
       pdfjs.GlobalWorkerOptions.workerSrc = "/assets/js/pdf.worker.min.mjs";
       const doc = await fetchClient.GET("/o/{org}/api/v1/agreements/{id}/document", { params: { path: { org, id } }, parseAs: "arrayBuffer" });
       if (doc.error || !doc.data) throw new Error("The document couldn't be fetched.");
-      const pdf = await pdfjs.getDocument({ data: new Uint8Array(doc.data), isEvalSupported: false }).promise;
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(doc.data) }).promise;
       const width = Math.min(here.current?.clientWidth || 640, 760);
       const pages: Sheet[] = [];
       for (let n = 1; n <= pdf.numPages; n++) {
@@ -473,7 +556,7 @@ function Canvas({ sheet }: { sheet: Sheet }) {
     const viewport = sheet.page.getViewport({ scale: (sheet.w / sheet.page.getViewport({ scale: 1 }).width) * devicePixelRatio });
     canvas.width = viewport.width;
     canvas.height = viewport.height;
-    const task = sheet.page.render({ canvasContext: canvas.getContext("2d")!, viewport });
+    const task = sheet.page.render({ canvas, viewport });
     return () => task.cancel();
   }, [sheet]);
   return <canvas ref={ref} className="block w-full" />;
@@ -535,7 +618,11 @@ function FieldBox({ f, signer, edit, onMove, onRemove }: { f: Field; signer?: Si
           >
             ×
           </button>
-          <span onPointerDown={(e) => start(e, true)} className="absolute" style={{ right: 0, bottom: 0, width: 10, height: 10, background: colour, cursor: "nwse-resize" }} />
+          <span
+            onPointerDown={(e) => start(e, true)}
+            className="absolute"
+            style={{ right: 0, bottom: 0, width: 10, height: 10, background: colour, cursor: "nwse-resize" }}
+          />
         </>
       )}
     </div>

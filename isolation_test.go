@@ -8,8 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"gorm.io/gorm"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // Methods that aren't about one organisation: people and their sessions, making
@@ -31,6 +32,9 @@ var acrossOrganisations = map[string]bool{
 	"SignerSigns": true, "SignerDeclines": true, "SignerDocument": true,
 	// These take a row that already names its organisation, which their callers read with it.
 	"SaveOrgMail": true, "SaveSSO": true,
+	// The server's own sweeps, over every organisation; what they find is then handled
+	// by methods that take its organisation.
+	"LapsedRuns": true, "CampaignsSending": true, "FreeStaleMail": true, "Users": true,
 }
 
 // theirs marks what the first organisation holds, so it shows if it turns up elsewhere.
@@ -358,12 +362,16 @@ func seedFirst(t *testing.T, s *Store) *Org {
 // what they were given.
 var saysNothingBack = map[string]bool{
 	"AddMember": true, "RemoveMember": true, "SetRole": true, "SetAreas": true, "SaveVoice": true, "SaveOrg": true, "ChangeSettings": true, "RevokeKey": true, "SetKeyScopes": true, "DeleteOrgMail": true,
+	// A webhook secret is new random words, and the others say yes or no of the caller's own.
+	"NewBounceHook": true, "DropBounceHook": true, "HasBounceHook": true,
 	"Mark": true, "Update": true, "SetCompanyStage": true, "PickContact": true, "PickContactFor": true, "ToReview": true, "DecideSuggestion": true,
 	"AgentDraft": true, "AgentMark": true, "AgentFinish": true, "AgentAddFact": true, "AgentAddContact": true,
 	"AskTask": true, "SetRequestDone": true, "SetTaskClosed": true, "DeleteNote": true, "DeleteEnquiry": true,
 	"StartDeal": true, "ChangeDeal": true, "RemoveDeal": true, "JudgeCompany": true, "RemoveOffering": true,
 	// AddOffering and ChangeOffering answer with the offering the call gave them.
 	"AddOffering": true, "ChangeOffering": true,
+	// AddRole and AgentAddRole answer with the role the call gave them, or an id.
+	"AddRole": true, "AgentAddRole": true,
 	"AddSubscription": true, "ChangeSubscription": true, "ChangeSubscriptionFields": true, "RemoveSubscription": true, "StartRenewal": true, "SetEnquiry": true, "ConverseEnquiry": true, "SetEnquiryFields": true, "ChangeDealFields": true, "SetDealFields": true, "HearEnquiry": true,
 	"StartOnboarding": true, "SetOnboardingStep": true, "RemoveOnboarding": true, "InviteCustomer": true, "RevokeCustomer": true, "Suppress": true, "Unsuppress": true, "AddCampaign": true, "Audience": true, "RemoveCampaign": true, "ResumeCampaign": true, "AddAgreement": true, "PutAgreementFile": true, "RemoveAgreement": true,
 	// Recipients and fields come back as ids, places and kinds; who they are is AgreementRecipients'.
@@ -376,10 +384,20 @@ var saysNothingBack = map[string]bool{
 	// FindOne answers only when one person matches, and Find makes its query. NeverContactCovers reads the organisation it is handed.
 	"FindOne": true, "NeverContactCovers": true,
 	// A vendor saved or removed, and a count, carry nothing of the organisation's data.
-	"SaveEnricher": true, "DeleteEnricher": true, "EnricherUsed": true,
+	"SaveEnricher": true, "DeleteEnricher": true, "EnricherUsed": true, "CompanyCount": true, "TaskCounts": true,
+	"ChangeContactFields": true, "KeepFind": true, "LogEnrich": true, "Erased": true, "FreshCustomerLink": true,
+	"AddRun": true, "RequiresSSO": true, "AddSSODomain": true, "UnsubscribeLink": true, "MailGate": true, "RenameKey": true, "DeleteAgent": true,
+	// These look for a run, a mail or a domain in a state the rows made above aren't in,
+	// or one held by a server they name: TestRunsAndMailsStayInTheirOrganisation tries them.
+	"SSODomain": true, "VerifySSODomain": true, "RemoveSSODomain": true, "AgentNameTaken": true, "CompanyNotes": true, "TaskOpen": true, "RunsOn": true, "AgentRunsGoing": true, "AskRunStop": true,
+	"RenewRun": true, "HoldRun": true, "EndRun": true, "StopLapsedRun": true, "TakeOverRun": true,
+	"DropKeyClaims": true, "KeyRevoked": true, "RequestDone": true,
+	"MailSentSince": true, "NextQueued": true, "SkipMail": true, "ClaimMail": true, "SettleMail": true,
+	"CampaignWent": true, "CampaignFailed": true, "PauseCampaign": true, "FinishIfDone": true,
 }
 
 func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	first := seedFirst(t, s)
 	before := holdings(t, s, first.ID)

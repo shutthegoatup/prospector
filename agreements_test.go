@@ -67,6 +67,7 @@ func upload(t *testing.T, c *http.Client, url, key, contentType string, body []b
 }
 
 func TestAnAgreementKeepsItsDocumentAsUploaded(t *testing.T) {
+	t.Parallel()
 	s, o, srv, member := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	key := func(org int64, scopes ...string) string {
@@ -168,6 +169,7 @@ func TestAnAgreementKeepsItsDocumentAsUploaded(t *testing.T) {
 }
 
 func TestAnAgreementIsWorkedFromItsCompanysPage(t *testing.T) {
+	t.Parallel()
 	s, o, srv, member := signedIn(t)
 	company := *must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace")).CompanyID
 	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/agreements", "application/json", map[string]any{"company": company, "name": "Service agreement"}); code != http.StatusCreated {
@@ -204,6 +206,7 @@ func TestAnAgreementIsWorkedFromItsCompanysPage(t *testing.T) {
 // What the review of documents found: a body cleaned of what looked like a NUL, a type
 // not checked, and names that hide what they are.
 func TestADocumentIsKeptByteForByte(t *testing.T) {
+	t.Parallel()
 	s, o, srv, member := signedIn(t)
 	company := *must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace")).CompanyID
 	a := must(s.AddAgreement(o.ID, company, "API agreement", "Ada Lovelace"))
@@ -221,7 +224,7 @@ func TestADocumentIsKeptByteForByte(t *testing.T) {
 			t.Errorf("a document sent as %q: %d", kind, code)
 		}
 	}
-	for given, want := range map[string]string{"..": "agreement.pdf", "evil‮fdp.exe": "evilfdp.exe.pdf", "Contract.PDF": "Contract.PDF"} {
+	for given, want := range map[string]string{"..": "agreement.pdf", "evil\u202efdp.exe": "evilfdp.exe.pdf", "Contract.PDF": "Contract.PDF"} {
 		if got := fileName(given); got != want {
 			t.Errorf("a file named %q is kept as %q, want %q", given, got, want)
 		}
@@ -238,6 +241,7 @@ func must2[A, B any](a A, b B, err error) (A, B) {
 // Someone who works only in support sees a company's agreements, and none of the controls
 // that change them, which are sales work.
 func TestOnlySalesWorksAgreements(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	company := *must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace")).CompanyID
 	a := must(s.AddAgreement(o.ID, company, "Service agreement", "Ada Lovelace"))

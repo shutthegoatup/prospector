@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/shutthegoatup/prospector/api"
 )
 
@@ -126,7 +127,7 @@ func bodyFields(t *testing.T) (numbers, texts, flags, lists map[string]bool) {
 }
 
 // formWords are tryWords and the choices a form checks before it looks anything up.
-var formWords = append([]string{"new", "renewal", "month", "year", "openai", "anthropic", "read", "owner", "sales", "hunter", "https://intruder.example"}, tryWords...)
+var formWords = append([]string{"new", "pursued", "renewal", "month", "year", "openai", "anthropic", "read", "owner", "sales", "hunter", "https://intruder.example"}, tryWords...)
 
 // stopsShort are the changes that never answer yes to these bodies, and why: each is
 // refused for what it was sent before or after it looked for a row, which the test
@@ -144,6 +145,7 @@ var stopsShort = map[string]string{
 	"POST /o/{org}/api/v1/campaigns/1/resume":               "needs a mail server to send through",
 	"POST /o/{org}/api/v1/campaigns/1/send":                 "needs a mail server to send through",
 	"POST /o/{org}/api/v1/enquiries/1/replies":              "needs a mail server to send through",
+	"POST /o/{org}/api/v1/mail-server/bounce-hook":          "needs this server's public https address for Postmark to post to",
 	"POST /o/{org}/api/v1/onboardings/1/invites":            "needs a mail server to send through",
 	"POST /o/{org}/api/v1/mail-server/test":                 "needs a mail server to send through",
 	"POST /o/{org}/api/v1/me/password":                      "needs the current password",
@@ -181,6 +183,7 @@ func signInAs(t *testing.T, srv *httptest.Server, email, password string) *http.
 // database themselves, so every one of them is tried here the same way: by the owner
 // of a second organisation, with the first one's ids and what would find its rows.
 func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	first := seedFirst(t, s)
 	// A run still going, since stopping one only looks among those.

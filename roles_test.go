@@ -11,6 +11,7 @@ import (
 )
 
 func TestChangingSomeonesRole(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	grace := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
 	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")
@@ -64,6 +65,7 @@ func TestChangingSomeonesRole(t *testing.T) {
 }
 
 func TestChangingAKeysScopes(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
 	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")

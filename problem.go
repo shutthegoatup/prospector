@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"log"
 	"net/http"
 	"strings"
 	"unicode"
@@ -13,6 +12,21 @@ import (
 // the page script, the CLI or an agent, which read an error as plain text.
 func wantsPage(r *http.Request) bool {
 	return strings.Contains(r.Header.Get("Accept"), "text/html") && !hasKey(r)
+}
+
+// forAPI is a call to the API, which is answered with a Problem whatever goes wrong.
+func forAPI(r *http.Request) bool {
+	return strings.Contains(r.URL.Path, "/api/v1/")
+}
+
+// refuseAs answers an API call with a Problem, and anything else as text, which a
+// browser is shown as a page.
+func refuseAs(w http.ResponseWriter, r *http.Request, status int, text string) {
+	if forAPI(r) {
+		writeProblem(w, status, text)
+		return
+	}
+	http.Error(w, text, status)
 }
 
 // hasKey is a request carrying an API key. A browser never attaches a Bearer header by
@@ -63,14 +77,18 @@ func (p *problemPage) finish() {
 	if p.code == 0 {
 		return
 	}
-	h := p.Header()
-	h.Set("Content-Type", "text/html; charset=utf-8")
-	h.Del("Content-Length")
-	p.ResponseWriter.WriteHeader(p.code)
+	p.Header().Del("Content-Length")
 	title, message := problemText(p.code, p.text.String())
-	if err := ProblemPage(p.code, title, message, "/").Render(p.r.Context(), p.ResponseWriter); err != nil {
-		log.Print(err)
-	}
+	writeShell(p.ResponseWriter, p.code, problemShown{"problem", p.code, title, message, "/"}, title+": "+message+"\n")
+}
+
+type problemShown struct {
+	Page    string `json:"page"`
+	Code    int    `json:"code"`
+	Title   string `json:"title"`
+	Message string `json:"message"`
+	// Back is where the page's one button goes.
+	Back string `json:"back"`
 }
 
 func problemText(code int, text string) (title, message string) {

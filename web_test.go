@@ -64,6 +64,7 @@ func newFakeWeb(t *testing.T, trusting *fakeEndpoint) *fakeWeb {
 }
 
 func TestWebSearchAsksSearXNGForJSON(t *testing.T) {
+	t.Parallel()
 	web := newFakeWeb(t, nil)
 	a := &App{agentClient: web.srv.Client()}
 	got, err := a.webSearch(context.Background(), web.srv.URL+"/", "yacht configurator", 2)
@@ -134,6 +135,7 @@ func TestFetchPageReadsWhatABrowserWouldShow(t *testing.T) {
 }
 
 func TestAnAgentSearchesAndReadsTheWebWithNoPaidService(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	web := newFakeWeb(t, fake)
 	r := newRunSetup(t, fake)
@@ -192,6 +194,7 @@ func TestAnAgentSearchesAndReadsTheWebWithNoPaidService(t *testing.T) {
 }
 
 func TestASearchThatDoesntAnswerIsReportedOnSave(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	web := newFakeWeb(t, fake)
 	r := newRunSetup(t, fake)
@@ -219,6 +222,7 @@ func toolNames(defs []toolDef) string {
 // A tool server's own web_search keeps working for an agent with no SearXNG: the name
 // is the built-in one's only when the built-in is what was offered.
 func TestAToolServersWebSearchIsntTakenOver(t *testing.T) {
+	t.Parallel()
 	server := mcp.NewServer(&mcp.Implementation{Name: "gateway", Version: "1"}, nil)
 	mcp.AddTool(server, &mcp.Tool{Name: webSearchTool, Description: "The gateway's search."},
 		func(ctx context.Context, req *mcp.CallToolRequest, in map[string]any) (*mcp.CallToolResult, any, error) {
@@ -243,6 +247,7 @@ func TestAToolServersWebSearchIsntTakenOver(t *testing.T) {
 }
 
 func TestAgentsTableGainsSearchWithRowsInIt(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	if err := s.db.Create(&Agent{OrgID: o.ID, Name: "Gateway", Kind: kindOpenAI, Models: "[]", Tools: "[]", Allowed: "[]"}).Error; err != nil {

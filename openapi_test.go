@@ -37,6 +37,7 @@ func asKey(t *testing.T, method, u, key string, body any) (int, string) {
 }
 
 func TestARobotWorksAgentsThroughTheAPIAsItsScopesAllow(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	s, srv, _ := agentSite(t, fake)
 	o := must(s.OrgBySlug("alpha"))
@@ -122,11 +123,15 @@ func TestARobotWorksAgentsThroughTheAPIAsItsScopesAllow(t *testing.T) {
 }
 
 func TestTheContractPageIsPublicAndShowsEveryOperation(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	_, srv, _ := agentSite(t, fake)
 	code, body := call(t, newMailClient(), "GET", srv.URL+"/api", "", nil)
 	if code != http.StatusOK || strings.Contains(body, "<script") {
 		t.Fatalf("the contract page, signed out: %d", code)
+	}
+	if !strings.Contains(body, "/o/your-org/api/v1/") || strings.Contains(body, docBase) {
+		t.Error("the page's examples don't use this server's address")
 	}
 	spec := must(api.Spec())
 	for path, item := range spec.Paths.Map() {
@@ -149,6 +154,7 @@ func TestTheContractPageIsPublicAndShowsEveryOperation(t *testing.T) {
 }
 
 func TestTheSpecIsServedAndEveryOperationNamesAScopeAKeyCanHave(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	_, srv, _ := agentSite(t, fake)
 	code, body := call(t, newMailClient(), "GET", srv.URL+"/api/openapi.json", "", nil)

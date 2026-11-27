@@ -25,6 +25,7 @@ import (
 )
 
 func TestSafeNext(t *testing.T) {
+	t.Parallel()
 	for next, want := range map[string]string{
 		"/o/alpha/today":             "/o/alpha/today",
 		"/o/alpha/add?popup=1&url=x": "/o/alpha/add?popup=1&url=x",
@@ -43,6 +44,7 @@ func TestSafeNext(t *testing.T) {
 }
 
 func TestLoginSlowsGuessing(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	if _, err := s.CreateUser("ada@example.com", "Ada", "correct horse battery"); err != nil {
 		t.Fatal(err)
@@ -152,6 +154,7 @@ func TestLoginSlowsGuessing(t *testing.T) {
 }
 
 func TestChangePassword(t *testing.T) {
+	t.Parallel()
 	s, _, srv, client := signedIn(t)
 	elsewhere, _, err := s.Login("ada@example.com", "correct horse battery")
 	if err != nil {
@@ -210,6 +213,7 @@ func TestChangePassword(t *testing.T) {
 }
 
 func TestNeverContactCatchesMistakes(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	p := readFixtures(t)
@@ -262,6 +266,7 @@ func TestNeverContactCatchesMistakes(t *testing.T) {
 }
 
 func TestMCPSessionsBelongToOneKey(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	owner, _, err := s.CreateKey(o.ID, "claude", []string{"read", "research:write"}, "test")
 	if err != nil {
@@ -337,6 +342,7 @@ func TestMCPSessionsBelongToOneKey(t *testing.T) {
 }
 
 func TestOnlyAssetsAreKeptByABrowser(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	key, _, err := s.CreateKey(o.ID, "bot", []string{"read"}, "test")
 	if err != nil {
@@ -370,6 +376,7 @@ func TestOnlyAssetsAreKeptByABrowser(t *testing.T) {
 }
 
 func TestTransportHeaders(t *testing.T) {
+	t.Parallel()
 	_, _, srv, _ := signedIn(t)
 	get := func(proto string) http.Header {
 		req, _ := http.NewRequest("GET", srv.URL+"/healthz", nil)
@@ -392,6 +399,7 @@ func TestTransportHeaders(t *testing.T) {
 }
 
 func TestLoginRedirects(t *testing.T) {
+	t.Parallel()
 	_, _, srv, _ := signedIn(t)
 	stay := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	wanted := "/o/alpha/add?popup=1&url=https%3A%2F%2Fwww.linkedin.com%2Fin%2Fhannah-pryce&name=Hannah"
@@ -416,6 +424,7 @@ func TestLoginRedirects(t *testing.T) {
 }
 
 func TestRemoveMember(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	join := func(email string, org *Org, role string) (*User, *http.Client) {
@@ -510,6 +519,7 @@ func TestRemoveMember(t *testing.T) {
 }
 
 func TestNeverContactLeavesTheQueue(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	c, err := s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah.pryce@larkmoor.example",
 		Linkedin: "https://www.linkedin.com/in/hannah-pryce"}, "test")
@@ -606,6 +616,7 @@ func TestNeverContactLeavesTheQueue(t *testing.T) {
 }
 
 func TestNeverContactEntries(t *testing.T) {
+	t.Parallel()
 	const email, profile = "hannah.pryce@larkmoor.example", "https://www.linkedin.com/in/hannah-pryce?trk=x"
 	search := "https://www.linkedin.com/search/results/people/?keywords=Hannah%20Pryce%20Larkmoor"
 	for _, c := range []struct {
@@ -642,6 +653,7 @@ func TestNeverContactEntries(t *testing.T) {
 }
 
 func TestContentPolicy(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	if _, err := s.Import(o.ID, readFixtures(t)); err != nil {
 		t.Fatal(err)
@@ -710,6 +722,7 @@ func TestContentPolicy(t *testing.T) {
 }
 
 func TestOrgIsCreatedWithItsOwner(t *testing.T) {
+	t.Parallel()
 	s, _, srv, client := signedIn(t)
 	ada, err := s.UserByEmail("ada@example.com")
 	if err != nil {
@@ -754,25 +767,24 @@ func TestOrgIsCreatedWithItsOwner(t *testing.T) {
 	}
 }
 
-// Someone in no organisation is offered a form that starts one through the API, and
+// Someone in no organisation is offered the page that starts one through the API, and
 // lands on its settings.
 func TestTheFirstOrganisationIsStartedThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, _, srv, _ := signedIn(t)
 	if _, err := s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"); err != nil {
 		t.Fatal(err)
 	}
 	grace := signInAs(t, srv, "grace@example.com", "correct horse battery")
-	_, page := call(t, grace, "GET", srv.URL+"/", "", nil)
-	form := regexp.MustCompile(`<form data-form="([^"]+)" data-go="([^"]+)"`).FindStringSubmatch(page)
-	if form == nil || form[1] != "/api/v1/orgs" || form[2] != "/o/{slug}/settings" {
-		t.Fatalf("the first-organisation form: %v in %s", form, page)
+	if _, page := call(t, grace, "GET", srv.URL+"/", "", nil); served(t, page).Page != "start" {
+		t.Fatalf("the first-organisation page: %s", page)
 	}
-	code, body := call(t, grace, "POST", srv.URL+form[1], "application/json", map[string]string{"name": "Grace Works"})
+	code, body := call(t, grace, "POST", srv.URL+"/api/v1/orgs", "application/json", map[string]string{"name": "Grace Works"})
 	var made struct{ Slug string }
 	if code != http.StatusCreated || json.Unmarshal([]byte(body), &made) != nil || made.Slug == "" {
 		t.Fatalf("starting it: %d %s", code, body)
 	}
-	if code, _ := call(t, grace, "GET", srv.URL+strings.Replace(form[2], "{slug}", made.Slug, 1), "", nil); code != http.StatusOK {
+	if code, _ := call(t, grace, "GET", srv.URL+"/o/"+made.Slug+"/settings", "", nil); code != http.StatusOK {
 		t.Fatalf("its settings: %d", code)
 	}
 	if code, _ := call(t, grace, "POST", srv.URL+"/orgs", "application/json", map[string]string{"name": "Again"}); code != http.StatusNotFound {
@@ -781,6 +793,7 @@ func TestTheFirstOrganisationIsStartedThroughTheAPI(t *testing.T) {
 }
 
 func TestHistoryNamesPeopleInFull(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct{ name, email, want string }{
 		{"Sam Reed", "sam.reed@example.com", "Sam Reed"},
 		{"  Sam Hale ", "sam.hale@example.com", "Sam Hale"},
@@ -820,6 +833,7 @@ func TestHistoryNamesPeopleInFull(t *testing.T) {
 }
 
 func TestFirstPasswordMustBeChanged(t *testing.T) {
+	t.Parallel()
 	s, _, srv, ada := signedIn(t)
 	code, body := call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json",
 		map[string]string{"email": "bob@example.com", "name": "Bob Stone", "role": "member"})
@@ -901,6 +915,7 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 }
 
 func TestExistingAccountsSurviveTheNewColumn(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	if _, err := s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery"); err != nil {
 		t.Fatal(err)
@@ -922,6 +937,7 @@ func TestExistingAccountsSurviveTheNewColumn(t *testing.T) {
 }
 
 func TestOtherSitesCantPost(t *testing.T) {
+	t.Parallel()
 	s, _, srv, client := signedIn(t)
 	host := strings.TrimPrefix(srv.URL, "http://")
 	signedInAs := func() bool {
@@ -999,6 +1015,7 @@ func TestOtherSitesCantPost(t *testing.T) {
 }
 
 func TestPublicURL(t *testing.T) {
+	t.Parallel()
 	for raw, want := range map[string]string{
 		"":                                 "",
 		"https://prospector.example.com":   "https://prospector.example.com",
@@ -1113,6 +1130,7 @@ func TestPublicURL(t *testing.T) {
 }
 
 func TestProblemsLookLikeTheApp(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	get := func(c *http.Client, method, path string, headers map[string]string) (int, string, string) {
 		t.Helper()
@@ -1130,7 +1148,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	}
 	browser := map[string]string{"Accept": "text/html,application/xhtml+xml,*/*;q=0.8"}
 	styled := func(body string) bool {
-		return strings.Contains(body, "Back to Prospector") && strings.Contains(body, "/assets/css/output.css")
+		return dataPage.MatchString(body) && strings.Contains(body, `data-page="{&quot;page&quot;:&quot;problem&quot;`) && strings.Contains(body, "/assets/css/output.css")
 	}
 
 	for path, want := range map[string]string{
@@ -1154,9 +1172,14 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 			t.Errorf("GET %s in a browser: %d %s %s, want %d as a problem", path, code, ctype, body, want)
 		}
 	}
-	code, _, body := get(client, "POST", "/api/v1/session", map[string]string{"Accept": browser["Accept"], "Sec-Fetch-Site": "cross-site", "content-type": "application/json"})
+	crossSite := map[string]string{"Accept": browser["Accept"], "Sec-Fetch-Site": "cross-site", "content-type": "application/json"}
+	code, _, body := get(client, "POST", "/c/some-link", crossSite)
 	if code != http.StatusForbidden || !styled(body) || !strings.Contains(body, "This request came from another site.") {
-		t.Fatalf("a sign-in from another site, in a browser: %d, styled=%v", code, styled(body))
+		t.Fatalf("a form from another site, in a browser: %d, styled=%v", code, styled(body))
+	}
+	code, ctype, body := get(client, "POST", "/api/v1/session", crossSite)
+	if code != http.StatusForbidden || ctype != "application/problem+json" || !strings.Contains(body, "this request came from another site") {
+		t.Fatalf("a sign-in from another site, in a browser: %d %s %s, want a problem", code, ctype, body)
 	}
 	if h := func() http.Header {
 		req, _ := http.NewRequest("GET", srv.URL+"/no/such/page", nil)
@@ -1188,7 +1211,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, ctype, body := get(http.DefaultClient, "GET", "/o/alpha/api/v1/companies/nope", map[string]string{"Accept": "text/html", "Authorization": "Bearer " + key})
+	code, ctype, body = get(http.DefaultClient, "GET", "/o/alpha/api/v1/companies/nope", map[string]string{"Accept": "text/html", "Authorization": "Bearer " + key})
 	if code != http.StatusNotFound || ctype != "application/problem+json" || styled(body) {
 		t.Fatalf("an agent's error: %d %s, styled=%v", code, ctype, styled(body))
 	}
@@ -1215,7 +1238,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	}
 	said, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	if res.StatusCode != http.StatusUnauthorized || !strings.Contains(string(said), `"code":"wrong_login"`) || styled(string(said)) {
+	if res.StatusCode != http.StatusUnauthorized || !strings.Contains(string(said), `"type":"/api/problems/wrong_login"`) || styled(string(said)) {
 		t.Fatalf("a wrong password in a browser: %d %s", res.StatusCode, said)
 	}
 	method, _ := http.NewRequest("DELETE", srv.URL+"/login", nil)
@@ -1254,6 +1277,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 }
 
 func TestRequestsHaveDeadlines(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	key, _, err := s.CreateKey(o.ID, "bot", []string{"read", "research:write"}, "test")
@@ -1363,6 +1387,7 @@ func TestRequestsHaveDeadlines(t *testing.T) {
 }
 
 func TestFontsAreServedFromHere(t *testing.T) {
+	t.Parallel()
 	_, _, srv, client := signedIn(t)
 	fetch := func(path string) (http.Header, []byte) {
 		t.Helper()
@@ -1418,6 +1443,7 @@ func TestFontsAreServedFromHere(t *testing.T) {
 }
 
 func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	for _, email := range []string{"ada@example.com", "bob@example.com"} {
 		if _, err := s.CreateUser(email, "Someone", "correct horse battery"); err != nil {

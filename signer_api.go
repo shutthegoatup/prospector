@@ -76,8 +76,8 @@ func (s signerServer) view(g *Signing) (signer.Signing, error) {
 		return out, nil
 	}
 	out.Name, out.Message, out.Pages, out.ExpiresAt = g.Recipient.SentName, g.Agreement.Message, g.Agreement.PageCount, g.Agreement.ExpiresAt
-	var signers []AgreementRecipient
-	if err := s.a.s.db.Where("org_id = ? and agreement_id = ? and role = ?", g.Org.ID, g.Agreement.ID, RecipientSigner).Order("position, id").Find(&signers).Error; err != nil {
+	signers, fields, err := s.a.s.signingView(g)
+	if err != nil {
 		return out, err
 	}
 	for _, r := range signers {
@@ -86,11 +86,6 @@ func (s signerServer) view(g *Signing) (signer.Signing, error) {
 			Signed bool   `json:"signed"`
 			You    bool   `json:"you"`
 		}{Name: r.SentName, Signed: r.Status == SignerSigned, You: r.ID == g.Recipient.ID})
-	}
-	var fields []AgreementField
-	if err := s.a.s.db.Where("org_id = ? and agreement_id = ? and round = ? and recipient_id = ?", g.Org.ID, g.Agreement.ID, g.Agreement.Round, g.Recipient.ID).
-		Order("page, y, x, id").Find(&fields).Error; err != nil {
-		return out, err
 	}
 	for _, f := range fields {
 		out.Fields = append(out.Fields, struct {

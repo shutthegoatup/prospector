@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/shutthegoatup/prospector/api"
 )
 
@@ -23,7 +24,7 @@ var _ api.StrictServerInterface = apiServer{}
 // routeAPI puts the spec's operations on the mux, each behind who-is-asking and the
 // scope its operation names.
 func (a *App) routeAPI(mux *http.ServeMux) {
-	spec, err := api.GetSwagger()
+	spec, err := api.GetSpec()
 	if err != nil {
 		log.Fatalf("the API spec: %v", err)
 	}
@@ -44,7 +45,7 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 	}
 	mux.HandleFunc("GET /api/openapi.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(doc)
+		_, _ = w.Write(doc)
 	})
 
 	strict := api.NewStrictHandlerWithOptions(apiServer{a}, []api.StrictMiddlewareFunc{a.apiScope(scopes), func(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc { return listURL(f) }, uploads, withRequest, a.withSite}, api.StrictHTTPServerOptions{
@@ -53,14 +54,22 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 		},
 		ResponseErrorHandlerFunc: apiFail,
 	})
+	var router api.ServeMux = mux
+	if watchAPI != nil {
+		router = watchAPI(mux)
+	}
 	api.HandlerWithOptions(strict, api.StdHTTPServerOptions{
-		BaseRouter:  mux,
+		BaseRouter:  router,
 		Middlewares: []api.MiddlewareFunc{a.apiCaller(account), noEmptyLink},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeProblem(w, http.StatusBadRequest, err.Error())
 		},
 	})
 }
+
+// watchAPI, when set, wraps the router the operations go on, so the tests can hold
+// the spec to what the server really answers.
+var watchAPI func(*http.ServeMux) api.ServeMux
 
 // apiCaller works out who is asking: a key, or a signed-in member of the organisation.
 // The account operations, named by route, are asked by whoever is there.
@@ -80,7 +89,7 @@ func (a *App) caller(account map[string]bool, next http.Handler) http.Handler {
 		}
 		if _, u := a.session(r); u == nil {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="prospector"`)
-			writeCoded(w, http.StatusUnauthorized, api.SignedOut, "sign in, or send an API key: Authorization: Bearer pk_…")
+			writeTyped(w, http.StatusUnauthorized, api.ProblemTypeSignedOut, "sign in, or send an API key: Authorization: Bearer pk_…")
 			return
 		}
 		a.member(next.ServeHTTP)(w, r)
@@ -262,7 +271,7 @@ func (s apiServer) DeleteAgent(ctx context.Context, in api.DeleteAgentRequestObj
 
 func (s apiServer) ListRuns(ctx context.Context, in api.ListRunsRequestObject) (api.ListRunsResponseObject, error) {
 	org := reqFrom(ctx).Org.ID
-	if err := s.a.s.db.Where("org_id = ? and id = ?", org, in.Task).First(&Task{}).Error; err != nil {
+	if _, err := s.a.s.TaskByID(org, in.Task); err != nil {
 		return nil, err
 	}
 	runs, err := s.a.s.AgentRuns(org, in.Task, 0)

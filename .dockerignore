@@ -1,2 +1,5 @@
 *.sqlite*
 Dockerfile
+web/node_modules
+assets/app
+assets/js

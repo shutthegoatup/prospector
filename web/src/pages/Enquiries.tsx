@@ -1,8 +1,10 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { ActionButton, Empty, Eyebrow, Failed, FilterChip, Meta, PageHead, Pill, Quote, type Tone, useRefresh, Whose } from "@/components/app";
+import { Bar, Placeholders, placeholders } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { actor, dated, stamp } from "@/lib/format";
@@ -77,9 +79,14 @@ export function EnquiriesPage() {
   useEffect(() => setCursors([]), [kind, state, spam]);
   const cursor = cursors[cursors.length - 1];
 
-  const list = $api.useQuery("get", "/o/{org}/api/v1/enquiries", {
-    params: { path: { org }, query: { kind: kind || undefined, state: state || undefined, spam: spam || undefined, cursor, limit: pageSize } },
-  });
+  const list = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/enquiries",
+    {
+      params: { path: { org }, query: { kind: kind || undefined, state: state || undefined, spam: spam || undefined, cursor, limit: pageSize } },
+    },
+    { placeholderData: keepPreviousData },
+  );
   const counts = $api.useQuery("get", "/o/{org}/api/v1/enquiry-counts", { params: { path: { org } } }).data;
   const members = $api.useQuery("get", "/o/{org}/api/v1/members", { params: { path: { org }, query: { limit: 200 } } }).data?.items ?? [];
 
@@ -92,11 +99,17 @@ export function EnquiriesPage() {
     <>
       <PageHead title="Enquiries" />
       <p className="mb-5 max-w-[70ch] text-sm text-muted-foreground">
-        What people sent through your sites' forms and your products, newest first. The words are theirs, exactly as sent. Each new one waits to
-        be answered: give it an owner, and say when you're waiting on them or it's closed. Reply from here and it is emailed to them; their answer
-        comes to your own mailbox, and you record it here.
+        What people sent through your sites' forms and your products, newest first. The words are theirs, exactly as sent. Each new one waits to be answered:
+        give it an owner, and say when you're waiting on them or it's closed. Reply from here and it is emailed to them; their answer comes to your own mailbox,
+        and you record it here.
       </p>
       <Whose area="support" work="Answering enquiries is" can={support} />
+      {/* Only "All" is sure to be there, so it holds the row's place until the counts come. */}
+      {!counts && (
+        <div className="mb-5 flex flex-wrap gap-2">
+          <FilterChip {...here} label="All" on={!kind && !state && !spam} />
+        </div>
+      )}
       {counts && (
         <div className="mb-5 flex flex-wrap gap-2">
           {states
@@ -117,8 +130,17 @@ export function EnquiriesPage() {
       {list.data && list.data.items.length === 0 && (
         <Empty title="Nothing yet" hint="Enquiries appear here once a site listed in Settings posts one, or a key with the enquiries:write scope does." />
       )}
+      {!list.data && !list.error && (
+        <Placeholders className="flex max-w-3xl flex-col gap-3">
+          {Array.from({ length: placeholders }, (_, i) => (
+            <EnquiryCard key={i} members={[]} canReply={false} />
+          ))}
+        </Placeholders>
+      )}
       <div className="flex max-w-3xl flex-col gap-3">
-        {list.data?.items.map((e) => <EnquiryCard key={e.id} e={e} members={members.map((m) => m.name)} canReply={list.data.can_reply} />)}
+        {list.data?.items.map((e) => (
+          <EnquiryCard key={e.id} e={e} members={members.map((m) => m.name)} canReply={list.data.can_reply} />
+        ))}
       </div>
       {(cursors.length > 0 || next) && (
         <nav className="mt-3 flex max-w-3xl flex-wrap items-center justify-between gap-3" aria-label="Pages">
@@ -143,17 +165,38 @@ export function EnquiriesPage() {
   );
 }
 
-function EnquiryCard({ e, members, canReply }: { e: Enquiry; members: string[]; canReply: boolean }) {
+// EnquiryCard is one enquiry, or its outline while the list loads.
+function EnquiryCard({ e, members, canReply }: { e?: Enquiry; members: string[]; canReply: boolean }) {
   const { org, sales, support, owner } = useSession();
   const refresh = useRefresh();
-  const path = { params: { path: { org, id: e.id } } };
   const change = $api.useMutation("patch", "/o/{org}/api/v1/enquiries/{id}", { onSuccess: refresh });
   const converse = $api.useMutation("post", "/o/{org}/api/v1/enquiries/{id}/conversation", { onSuccess: refresh });
   const remove = $api.useMutation("delete", "/o/{org}/api/v1/enquiries/{id}", { onSuccess: refresh });
+  if (!e) {
+    return (
+      <article className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span>
+            <b>
+              <Bar w="12ch" />
+            </b>{" "}
+            <Bar w="20ch" />
+          </span>
+          <Pill>
+            <Bar w="6ch" />
+          </Pill>
+        </div>
+        <Meta>
+          <Bar w="18ch" />
+        </Meta>
+      </article>
+    );
+  }
+  const path = { params: { path: { org, id: e.id } } };
   const set = (body: { state?: string; owner?: string; note?: string }) => change.mutate({ ...path, body });
   // The server takes a browser's POST only as JSON, even one with no body.
   const converseOn = { ...path, headers: { "content-type": "application/json" } };
-  const ownerLeft =e.owner !== "" && !members.includes(e.owner);
+  const ownerLeft = e.owner !== "" && !members.includes(e.owner);
 
   return (
     <article className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 text-sm">

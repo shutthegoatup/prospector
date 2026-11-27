@@ -65,7 +65,7 @@ func (s *Store) ResetToken(user int64) (string, error) {
 	if recent > 0 {
 		return "", errTooSoon
 	}
-	logged(s.db.Where("expires_at < ?", time.Now()).Delete(&PasswordToken{}))
+	_ = logged(s.db.Where("expires_at < ?", time.Now()).Delete(&PasswordToken{}))
 	return s.newPasswordToken(user, false)
 }
 
@@ -108,7 +108,7 @@ func (s *Store) RedeemPasswordToken(token, password string) error {
 	if len(password) < 10 {
 		return errors.New("passwords need at least 10 characters")
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), passwordCost)
 	if err != nil {
 		return err
 	}
@@ -231,7 +231,9 @@ func (a *App) invite(ctx context.Context, q *Req, u *User, created bool) (bool, 
 			"Then sign in with " + u.Email + ".\n"})
 	if err != nil {
 		// Nothing was sent, so the wait before another try doesn't apply.
-		a.s.dropInvites(u.ID)
+		if err := a.s.dropInvites(u.ID); err != nil {
+			log.Printf("user %d: unsent invite not dropped: %v", u.ID, err)
+		}
 	}
 	return err == nil, err
 }

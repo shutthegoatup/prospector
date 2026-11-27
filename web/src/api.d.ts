@@ -139,7 +139,7 @@ export interface paths {
         };
         /**
          * Whose password a link resets
-         * @description 410, with `code` `link_used`, once the link is used, out of date or replaced.
+         * @description 410, of type `/api/problems/link_used`, once the link is used, out of date or replaced.
          */
         get: operations["getPasswordReset"];
         put?: never;
@@ -1096,7 +1096,8 @@ export interface paths {
          * What a task found that isn't new
          * @description The companies the task came to that were already held when it first did, and still
          *     aren't up for review: rejected before, a customer, in an open conversation or
-         *     qualified already. How a company stood when the task first came to it is what
+         *     qualified already. With them, any whose domain the never-contact list covers now,
+         *     however they stand: they are kept, and never put up for review. How a company stood when the task first came to it is what
          *     counts; what happens to it afterwards doesn't. A rejected one can be put up for
          *     review again with `reviewCompany`, naming the task's offering.
          *
@@ -2204,6 +2205,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/companies/{id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The roles found at a company
+         * @description Junked ones included, with who junked them and why, so one can be put back.
+         */
+        get: operations["listCompanyRoles"];
+        put?: never;
+        /**
+         * Add a role open at a company, for an offering that has roles
+         * @description It waits for review, and brings the company back to review for the offering. A role
+         *     already there, by its posting or else its title, is a conflict, as is the title of one
+         *     junked, and a company a person rejected for the offering.
+         */
+        post: operations["addRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/roles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Pursue or junk a role, or put it back
+         * @description The company's verdict for the role's offering follows: up for review while a role waits,
+         *     else qualified while one is pursued, and rejected once every one is junked. While it has
+         *     roles, the company itself can't be judged for the offering. Junking sends nothing to anyone.
+         */
+        patch: operations["judgeRole"];
+        trace?: never;
+    };
     "/o/{org}/api/v1/companies": {
         parameters: {
             query?: never;
@@ -2604,6 +2661,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/o/{org}/api/v1/mail-server/bounce-hook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make the webhook Postmark reports bounces and spam complaints to
+         * @description Gives the address to paste into the webhook settings for the Postmark server your mail goes through,
+         *     with Bounce and Spam Complaint turned on. The address signs in with your organisation's slug and a new
+         *     secret, shown only now. Making another replaces it, so the old one stops working.
+         *
+         *     An address that bounces for good (Postmark's HardBounce, Blocked or Suppressed) goes on the list not to
+         *     be mailed as `bounced`, and its last campaign mail is marked failed; a soft bounce changes nothing. One
+         *     whose person marked a mail as spam goes on it as `complained`. Neither gets any campaign again, service
+         *     notices included. For a member, only an owner.
+         */
+        post: operations["makeBounceHook"];
+        /**
+         * Stop taking bounces from Postmark
+         * @description The webhook's secret stops working. What it already put on the list stays. For a member, only an owner.
+         */
+        delete: operations["dropBounceHook"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/sso": {
         parameters: {
             query?: never;
@@ -2815,6 +2906,8 @@ export interface components {
             /** Format: int64 */
             id: number;
             name: string;
+            /** @description Companies are judged for it by their roles, each pursued or junked: the company's verdict follows from them. Can't be turned off while it has roles. */
+            has_roles: boolean;
             /** @description What makes a company a fit for it, one `name: what counts` per line. Agents working a task for it are given this in place of the organisation's own list. */
             look_for: string;
             /** @description `look_for`, read into its fields. */
@@ -2834,12 +2927,63 @@ export interface components {
             look_for?: string;
             pitch?: string;
             note_template?: string;
+            has_roles?: boolean;
         };
         OfferingChange: {
             name?: string | null;
             look_for?: string | null;
             pitch?: string | null;
             note_template?: string | null;
+            has_roles?: boolean | null;
+        };
+        Role: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            offering_id: number;
+            /** Format: int64 */
+            company_id: number;
+            title: string;
+            /** @description The posting, or the page that shows the role is open; empty for none. */
+            url: string;
+            /** @description Rate, length, IR35, location and the like, in one line. */
+            details: string;
+            /** @enum {string} */
+            stage: "review" | "pursued" | "junked";
+            /** @description Why it was junked, as whoever junked it said it. */
+            reason: string;
+            /** @description Who last pursued, junked or put it back; empty until someone does. */
+            by: string;
+            found_by: string;
+            /**
+             * Format: int64
+             * @description The task it was found for; 0 for none.
+             */
+            task_id: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        RoleNew: {
+            /**
+             * Format: int64
+             * @description An offering that has roles.
+             */
+            offering: number;
+            title: string;
+            /** @description The posting. */
+            source_url?: string;
+            details?: string;
+        };
+        RoleJudgement: {
+            /**
+             * @description `pursued` qualifies the company for the offering once no role waits; once every role is junked it is rejected for it; `review` puts a role back.
+             * @enum {string}
+             */
+            stage: "review" | "pursued" | "junked";
+            /** @description Why, for a junked role only. */
+            reason?: string;
         };
         Verdict: {
             /** Format: int64 */
@@ -3101,10 +3245,10 @@ export interface components {
             /** Format: date-time */
             since: string;
             /**
-             * @description Set when the company was already held when the task first came to it: it isn't a new find.
+             * @description Set when the company was already held when the task first came to it, or `never_contact` while its domain is on the never-contact list: it isn't a new find. A never-contact company is kept and built on; nobody there is to be contacted.
              * @enum {string}
              */
-            held?: "rejected" | "customer" | "open_deal" | "qualified";
+            held?: "rejected" | "customer" | "open_deal" | "qualified" | "never_contact";
         };
         TaskPerson: {
             /** Format: int64 */
@@ -3140,6 +3284,8 @@ export interface components {
                 /** Format: int64 */
                 id: number;
                 name: string;
+                /** @description Agents add each role they find with add_role. */
+                has_roles: boolean;
                 /** @description What agents are told to look for and how to judge companies for it, in place of the organisation's own look-for list. */
                 guidance: string;
             };
@@ -3237,6 +3383,8 @@ export interface components {
             /** @description The facts besides the answers, older answers among them, oldest first. */
             facts: components["schemas"]["ResearchFact"][];
             people: components["schemas"]["ResearchPerson"][];
+            /** @description Its roles for the offering in view, when that offering has roles; oldest first. */
+            roles?: components["schemas"]["Role"][];
         };
         LookFor: {
             field: string;
@@ -3264,6 +3412,7 @@ export interface components {
             /** @description `suggested` until someone picks them. */
             status: string;
             has_email: boolean;
+            has_phone: boolean;
             /** @description `verified`, `guess`, or empty. */
             email_status: string;
             linkedin: string;
@@ -3273,6 +3422,8 @@ export interface components {
             pending: components["schemas"]["PendingDetail"][];
             /** @description Each vendor's latest lookup for them within the last 30 days, newest first. A vendor isn't asked again about the same detail until its lookup is older than that. */
             lookups: components["schemas"]["Lookup"][];
+            /** @description Why nothing about them may be sent to a data vendor (they declined, or they or their company is on the never-contact list), or empty if they can be looked up. */
+            unlookable: string;
         };
         Lookup: {
             /** @description email, phone or linkedin. */
@@ -3455,17 +3606,23 @@ export interface components {
         };
         /** @description There is more. Pass this back as `cursor` for the next page; it is left out on the last one. */
         NextCursor: string;
+        /** @description What went wrong, as RFC 9457 lays it out. */
         Problem: {
-            type?: string;
+            type: components["schemas"]["ProblemType"];
+            /** @description The same for every problem of a type; the status's own name for `about:blank`. */
             title: string;
+            /** @description The HTTP status. */
             status: number;
+            /** @description This one, in words to show a person. */
             detail?: string;
-            /**
-             * @description What a client can act on without reading `detail`. Absent when there is nothing to do but show it.
-             * @enum {string}
-             */
-            code?: "wrong_login" | "throttled" | "link_used" | "signed_out" | "must_change_password" | "sso_required" | "session_limited";
         };
+        /**
+         * @description Which problem it is, as a link to its entry on the reference page. `about:blank` is
+         *     any with nothing to do but show `detail`; the others a client acts on without
+         *     reading it.
+         * @enum {string}
+         */
+        ProblemType: "about:blank" | "/api/problems/signed_out" | "/api/problems/session_limited" | "/api/problems/wrong_login" | "/api/problems/throttled" | "/api/problems/link_used" | "/api/problems/must_change_password" | "/api/problems/sso_required";
         /**
          * @description `openai` is any OpenAI-compatible endpoint; `anthropic` is Claude through Anthropic's own API.
          * @enum {string}
@@ -3665,10 +3822,10 @@ export interface components {
             description: string;
         };
         /**
-         * @description The vendors Prospector can ask. `hunter` is Hunter.io, which finds work emails.
+         * @description The vendors Prospector can ask. `hunter` is Hunter.io, which finds work emails; `prospeo` is Prospeo, which finds work emails, mobiles and LinkedIn profiles.
          * @enum {string}
          */
-        EnricherKind: "hunter";
+        EnricherKind: "hunter" | "prospeo";
         EnricherSettings: {
             kind: components["schemas"]["EnricherKind"];
             /** @description The vendor's key for your account; empty keeps the saved one. */
@@ -4042,11 +4199,16 @@ export interface components {
             id: number;
             address: string;
             /**
-             * @description `unsubscribed` when they asked, by a link in a mail; `added` when a member or key put them here.
+             * @description `unsubscribed` when they asked, by a link in a mail; `complained` when they marked one as spam; `added` when a member or key put them here; `bounced` when it is here only because mail to it came back for good. Only `added` and `bounced` can be taken off. A complained address, or one with `bounced_at`, gets no service notices either.
              * @enum {string}
              */
-            reason: "unsubscribed" | "added";
-            /** @description Who added it; empty when they unsubscribed themselves. */
+            reason: "unsubscribed" | "complained" | "bounced" | "added";
+            /**
+             * Format: date-time
+             * @description When mail to it last came back for good, whatever the reason it is here.
+             */
+            bounced_at: string | null;
+            /** @description Who added it: `Postmark` for a bounce or complaint; empty when they unsubscribed themselves. */
             by: string;
             /** Format: date-time */
             created_at: string;
@@ -4455,6 +4617,8 @@ export interface components {
             sender?: string;
         };
         MailServer: {
+            /** @description Whether Postmark has a webhook here to report bounces and spam complaints to. */
+            has_bounce_hook: boolean;
             host: string;
             port: number;
             username: string;
@@ -4462,6 +4626,14 @@ export interface components {
             has_password: boolean;
             /** @description Whether this site has a server of its own that invitations fall back to. */
             site_mail: boolean;
+        };
+        BounceHook: {
+            /** @description The webhook's address, with the username and password in it, as Postmark takes it. */
+            url: string;
+            /** @description The organisation's slug. */
+            username: string;
+            /** @description The secret. It isn't kept and can't be shown again. */
+            password: string;
         };
         SSOSettings: {
             /** @description Like https://login.example.com; empty turns single sign-on off. */
@@ -4496,8 +4668,111 @@ export interface components {
         };
     };
     responses: {
-        /** @description What went wrong (RFC 9457). */
-        Problem: {
+        /** @description The request can't be done as sent; `detail` says what to change. */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /**
+         * @description No sign-in or key that holds here: `signed_out` with none, `session_limited` for a
+         *     session another organisation's single sign-on began, `wrong_login` from `signIn`.
+         */
+        Unauthorized: {
+            headers: {
+                /** @description `Bearer realm="prospector"`, with an `error` when a key was sent. */
+                "WWW-Authenticate"?: string;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /**
+         * @description Not for this caller: a key without the scope, a member without the role or area, a
+         *     key on a browser-only operation, or a browser request from another site. Untyped,
+         *     except `must_change_password` and `sso_required`, which say what to do first.
+         */
+        Forbidden: {
+            headers: {
+                /** @description With `error="insufficient_scope"` and the `scope` needed, for a key that lacks it. */
+                "WWW-Authenticate"?: string;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Nothing here by that name or id, or nothing this caller may see. */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description It clashes with what is already here; asking again won't help until one of the two changes. */
+        Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description `link_used`: the link is used, out of date or replaced. */
+        Gone: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description The body is bigger than this operation takes. */
+        TooLarge: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description A browser's body must be `application/json`, or what the operation names. */
+        NotJSON: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description `throttled`: too many tries, or too many requests. */
+        Throttled: {
+            headers: {
+                /** @description Seconds until the next try counts. */
+                "Retry-After"?: number;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description The server couldn't finish; try again in a moment. `detail` never says more. */
+        ServerError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description The mail server didn't take the message; `detail` says what was kept. */
+        NotSent: {
             headers: {
                 [name: string]: unknown;
             };
@@ -4544,7 +4819,9 @@ export interface operations {
                     "application/json": components["schemas"]["Session"];
                 };
             };
-            default: components["responses"]["Problem"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["ServerError"];
         };
     };
     signIn: {
@@ -4569,18 +4846,12 @@ export interface operations {
                     "application/json": components["schemas"]["Session"];
                 };
             };
-            /** @description Too many tries; `code` is `throttled`. */
-            429: {
-                headers: {
-                    /** @description Seconds until the next try counts. */
-                    "Retry-After"?: number;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     signOut: {
@@ -4599,7 +4870,8 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["ServerError"];
         };
     };
     changePassword: {
@@ -4625,7 +4897,11 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getSignInWays: {
@@ -4646,7 +4922,8 @@ export interface operations {
                     "application/json": components["schemas"]["SignInWays"];
                 };
             };
-            default: components["responses"]["Problem"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["ServerError"];
         };
     };
     findSingleSignOn: {
@@ -4677,7 +4954,11 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            415: components["responses"]["NotJSON"];
+            500: components["responses"]["ServerError"];
         };
     };
     requestPasswordReset: {
@@ -4702,7 +4983,11 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            415: components["responses"]["NotJSON"];
+            500: components["responses"]["ServerError"];
         };
     };
     getPasswordReset: {
@@ -4728,7 +5013,11 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            410: components["responses"]["Gone"];
+            500: components["responses"]["ServerError"];
         };
     };
     resetPassword: {
@@ -4756,7 +5045,12 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            410: components["responses"]["Gone"];
+            415: components["responses"]["NotJSON"];
+            500: components["responses"]["ServerError"];
         };
     };
     listAgents: {
@@ -4789,7 +5083,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     createAgent: {
@@ -4817,7 +5116,14 @@ export interface operations {
                     "application/json": components["schemas"]["AgentSaved"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getAgent: {
@@ -4842,7 +5148,12 @@ export interface operations {
                     "application/json": components["schemas"]["Agent"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     updateAgent: {
@@ -4871,7 +5182,13 @@ export interface operations {
                     "application/json": components["schemas"]["AgentSaved"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     deleteAgent: {
@@ -4894,7 +5211,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listRuns: {
@@ -4928,7 +5251,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     startRun: {
@@ -4963,7 +5291,14 @@ export interface operations {
                     "application/json": components["schemas"]["Run"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     stopRun: {
@@ -4986,7 +5321,14 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getConnect: {
@@ -5010,7 +5352,12 @@ export interface operations {
                     "application/json": components["schemas"]["Connect"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listKeys: {
@@ -5043,7 +5390,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     createKey: {
@@ -5071,7 +5423,14 @@ export interface operations {
                     "application/json": components["schemas"]["KeyMade"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     revokeKey: {
@@ -5094,7 +5453,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeKey: {
@@ -5125,7 +5490,13 @@ export interface operations {
                     "application/json": components["schemas"]["KeyChanged"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listAgentScores: {
@@ -5158,7 +5529,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listAgentWork: {
@@ -5191,7 +5567,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listAgentActivity: {
@@ -5226,7 +5607,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listEnquiryMessages: {
@@ -5260,7 +5646,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     replyToEnquiry: {
@@ -5289,7 +5680,15 @@ export interface operations {
                     "application/json": components["schemas"]["EnquiryMessage"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+            502: components["responses"]["NotSent"];
         };
     };
     recordEnquiryAnswer: {
@@ -5318,7 +5717,14 @@ export interface operations {
                     "application/json": components["schemas"]["EnquiryMessage"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listOnboardings: {
@@ -5353,7 +5759,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     startOnboarding: {
@@ -5381,7 +5792,14 @@ export interface operations {
                     "application/json": components["schemas"]["Onboarding"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     removeOnboarding: {
@@ -5404,7 +5822,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeOnboardingStep: {
@@ -5433,7 +5857,13 @@ export interface operations {
                     "application/json": components["schemas"]["OnboardingStep"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     inviteCustomer: {
@@ -5466,7 +5896,15 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+            502: components["responses"]["NotSent"];
         };
     };
     withdrawCustomerInvite: {
@@ -5489,7 +5927,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listSubscriptions: {
@@ -5526,7 +5970,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     addSubscription: {
@@ -5554,7 +6003,14 @@ export interface operations {
                     "application/json": components["schemas"]["Subscription"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     removeSubscription: {
@@ -5577,7 +6033,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeSubscription: {
@@ -5606,7 +6068,13 @@ export interface operations {
                     "application/json": components["schemas"]["Subscription"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     startRenewal: {
@@ -5646,7 +6114,14 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listDeals: {
@@ -5679,7 +6154,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     startDeal: {
@@ -5712,7 +6192,14 @@ export interface operations {
                     "application/json": components["schemas"]["Deal"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     removeDeal: {
@@ -5735,7 +6222,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeDeal: {
@@ -5764,7 +6257,13 @@ export interface operations {
                     "application/json": components["schemas"]["Deal"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeOwnDeal: {
@@ -5793,7 +6292,13 @@ export interface operations {
                     "application/json": components["schemas"]["Deal"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listConversations: {
@@ -5828,7 +6333,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listEnquiries: {
@@ -5869,7 +6379,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     countEnquiries: {
@@ -5893,7 +6408,12 @@ export interface operations {
                     "application/json": components["schemas"]["EnquiryCounts"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     deleteEnquiry: {
@@ -5916,7 +6436,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeEnquiry: {
@@ -5951,7 +6477,13 @@ export interface operations {
                     "application/json": components["schemas"]["Enquiry"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     converseEnquiry: {
@@ -5979,7 +6511,14 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listSuppressions: {
@@ -6012,7 +6551,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     addSuppression: {
@@ -6043,7 +6587,14 @@ export interface operations {
                     "application/json": components["schemas"]["Suppression"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     removeSuppression: {
@@ -6066,7 +6617,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listCampaigns: {
@@ -6101,7 +6658,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     createCampaign: {
@@ -6129,7 +6691,14 @@ export interface operations {
                     "application/json": components["schemas"]["Campaign"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     removeCampaign: {
@@ -6152,7 +6721,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeCampaign: {
@@ -6181,7 +6756,13 @@ export interface operations {
                     "application/json": components["schemas"]["Campaign"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listCampaignAudience: {
@@ -6219,7 +6800,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listResearch: {
@@ -6270,7 +6856,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listTasks: {
@@ -6312,7 +6903,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     createTask: {
@@ -6340,7 +6936,14 @@ export interface operations {
                     "application/json": components["schemas"]["TaskStarted"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listLeftOut: {
@@ -6384,6 +6987,8 @@ export interface operations {
                         open_deal: number;
                         /** @description Companies qualified already, with nothing under way. */
                         qualified: number;
+                        /** @description Companies whose domain the never-contact list covers: kept, never up for review. */
+                        listed: number;
                         /** @description Times a person on the never-contact list was refused. */
                         never_contact: number;
                         /** @description Times a person erased on request was refused. */
@@ -6391,7 +6996,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getTask: {
@@ -6422,7 +7032,12 @@ export interface operations {
                     "application/json": components["schemas"]["TaskOut"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeTask: {
@@ -6451,7 +7066,13 @@ export interface operations {
                     "application/json": components["schemas"]["Task"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getTaskPrompt: {
@@ -6478,7 +7099,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listTaskNotes: {
@@ -6512,7 +7138,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listTaskWork: {
@@ -6546,7 +7177,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     askTask: {
@@ -6578,7 +7214,14 @@ export interface operations {
                     "application/json": components["schemas"]["TaskRequest"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeTaskRequest: {
@@ -6609,7 +7252,13 @@ export interface operations {
                     "application/json": components["schemas"]["TaskRequest"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     sendCampaign: {
@@ -6634,7 +7283,14 @@ export interface operations {
                     "application/json": components["schemas"]["Campaign"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     cancelCampaign: {
@@ -6659,7 +7315,14 @@ export interface operations {
                     "application/json": components["schemas"]["Campaign"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     resumeCampaign: {
@@ -6684,7 +7347,14 @@ export interface operations {
                     "application/json": components["schemas"]["Campaign"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listCampaignMail: {
@@ -6718,7 +7388,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     addNote: {
@@ -6746,7 +7421,14 @@ export interface operations {
                     "application/json": components["schemas"]["Note"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     deleteNote: {
@@ -6769,7 +7451,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     finishRequest: {
@@ -6805,7 +7493,14 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listAgreements: {
@@ -6840,7 +7535,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     createAgreement: {
@@ -6872,7 +7572,14 @@ export interface operations {
                     "application/json": components["schemas"]["Agreement"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getAgreement: {
@@ -6897,7 +7604,12 @@ export interface operations {
                     "application/json": components["schemas"]["AgreementOverview"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     removeAgreement: {
@@ -6920,7 +7632,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeAgreement: {
@@ -6953,7 +7671,13 @@ export interface operations {
                     "application/json": components["schemas"]["Agreement"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getAgreementDocument: {
@@ -6979,7 +7703,12 @@ export interface operations {
                     "application/pdf": string;
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     putAgreementDocument: {
@@ -7011,7 +7740,15 @@ export interface operations {
                     "application/json": components["schemas"]["Agreement"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listAgreementRecipients: {
@@ -7045,7 +7782,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     addAgreementRecipient: {
@@ -7084,7 +7826,14 @@ export interface operations {
                     "application/json": components["schemas"]["AgreementRecipient"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     removeAgreementRecipient: {
@@ -7108,7 +7857,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeAgreementRecipient: {
@@ -7143,7 +7898,13 @@ export interface operations {
                     "application/json": components["schemas"]["AgreementRecipient"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     sendAgreement: {
@@ -7179,7 +7940,14 @@ export interface operations {
                     "application/json": components["schemas"]["Agreement"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     voidAgreement: {
@@ -7210,7 +7978,14 @@ export interface operations {
                     "application/json": components["schemas"]["Agreement"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     resendAgreementLink: {
@@ -7234,7 +8009,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     signAgreementAsMember: {
@@ -7263,7 +8044,14 @@ export interface operations {
                     "application/json": components["schemas"]["Agreement"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     declineAgreementAsMember: {
@@ -7294,7 +8082,14 @@ export interface operations {
                     "application/json": components["schemas"]["Agreement"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getSealedAgreement: {
@@ -7320,7 +8115,13 @@ export interface operations {
                     "application/pdf": string;
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listAgreementEvents: {
@@ -7354,7 +8155,13 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listAgreementFields: {
@@ -7388,7 +8195,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     putAgreementFields: {
@@ -7421,7 +8233,13 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listToday: {
@@ -7466,7 +8284,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getTodaySummary: {
@@ -7490,7 +8313,12 @@ export interface operations {
                     "application/json": components["schemas"]["TodaySummary"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     markOutcome: {
@@ -7520,7 +8348,14 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     addPerson: {
@@ -7548,7 +8383,14 @@ export interface operations {
                     "application/json": components["schemas"]["PersonAdded"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     draftPerson: {
@@ -7581,7 +8423,12 @@ export interface operations {
                     "application/json": components["schemas"]["PersonDraft"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeContact: {
@@ -7608,7 +8455,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     pickContact: {
@@ -7634,7 +8487,14 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     reviewCompany: {
@@ -7661,7 +8521,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     decideSuggestion: {
@@ -7691,7 +8557,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listEnrichers: {
@@ -7724,7 +8596,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     saveEnricher: {
@@ -7752,7 +8629,13 @@ export interface operations {
                     "application/json": components["schemas"]["Enricher"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     deleteEnricher: {
@@ -7775,7 +8658,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     enrichContact: {
@@ -7813,7 +8702,14 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getSettings: {
@@ -7837,7 +8733,12 @@ export interface operations {
                     "application/json": components["schemas"]["Settings"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeSettings: {
@@ -7865,7 +8766,13 @@ export interface operations {
                     "application/json": components["schemas"]["Settings"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listOfferings: {
@@ -7898,7 +8805,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     addOffering: {
@@ -7926,7 +8838,14 @@ export interface operations {
                     "application/json": components["schemas"]["Offering"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     removeOffering: {
@@ -7949,7 +8868,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeOffering: {
@@ -7978,7 +8903,13 @@ export interface operations {
                     "application/json": components["schemas"]["Offering"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listVerdicts: {
@@ -8014,7 +8945,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listCompanyVerdicts: {
@@ -8048,7 +8984,124 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    listCompanyRoles: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+                /** @description Only those for this offering. */
+                offering?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description By offering, oldest first. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Role"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    addRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleNew"];
+            };
+        };
+        responses: {
+            /** @description The role, added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    judgeRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleJudgement"];
+            };
+        };
+        responses: {
+            /** @description The role as it now is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listCompanies: {
@@ -8089,7 +9142,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listSegments: {
@@ -8122,7 +9180,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getCompanyOverview: {
@@ -8147,7 +9210,12 @@ export interface operations {
                     "application/json": components["schemas"]["CompanyOverview"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listCompanyHistory: {
@@ -8183,7 +9251,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listCompanyNotes: {
@@ -8219,7 +9292,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     exportPerson: {
@@ -8246,7 +9324,14 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     erasePerson: {
@@ -8269,7 +9354,14 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listNeverContactCovers: {
@@ -8304,7 +9396,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getMe: {
@@ -8328,7 +9425,12 @@ export interface operations {
                     "application/json": components["schemas"]["Me"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeMe: {
@@ -8356,7 +9458,13 @@ export interface operations {
                     "application/json": components["schemas"]["Me"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getNav: {
@@ -8380,7 +9488,12 @@ export interface operations {
                     "application/json": components["schemas"]["Nav"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     createOrg: {
@@ -8407,7 +9520,13 @@ export interface operations {
                     "application/json": components["schemas"]["OrgSummary"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeMyPassword: {
@@ -8439,17 +9558,14 @@ export interface operations {
                     "application/json": components["schemas"]["Said"];
                 };
             };
-            /** @description Too many attempts; try again after `Retry-After` seconds. */
-            429: {
-                headers: {
-                    "Retry-After"?: number;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listMembers: {
@@ -8482,7 +9598,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     addMember: {
@@ -8518,7 +9639,14 @@ export interface operations {
                     "application/json": components["schemas"]["Said"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     removeMember: {
@@ -8542,7 +9670,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     changeMember: {
@@ -8577,7 +9711,13 @@ export interface operations {
                     "application/json": components["schemas"]["Member"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getMailServer: {
@@ -8601,7 +9741,12 @@ export interface operations {
                     "application/json": components["schemas"]["MailServer"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     saveMailServer: {
@@ -8629,7 +9774,13 @@ export interface operations {
                     "application/json": components["schemas"]["MailServer"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     testMailServer: {
@@ -8653,7 +9804,72 @@ export interface operations {
                     "application/json": components["schemas"]["Said"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+            502: components["responses"]["NotSent"];
+        };
+    };
+    makeBounceHook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The webhook, with its secret this once. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BounceHook"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    dropBounceHook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stopped. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     getSSO: {
@@ -8677,7 +9893,12 @@ export interface operations {
                     "application/json": components["schemas"]["SSO"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     saveSSO: {
@@ -8705,7 +9926,13 @@ export interface operations {
                     "application/json": components["schemas"]["SSO"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     listSSODomains: {
@@ -8738,7 +9965,12 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     addSSODomain: {
@@ -8769,7 +10001,14 @@ export interface operations {
                     "application/json": components["schemas"]["SSODomain"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     removeSSODomain: {
@@ -8793,7 +10032,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     verifySSODomain: {
@@ -8819,7 +10064,14 @@ export interface operations {
                     "application/json": components["schemas"]["SSODomain"];
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
     exportOrg: {
@@ -8846,7 +10098,14 @@ export interface operations {
                     };
                 };
             };
-            default: components["responses"]["Problem"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
         };
     };
 }

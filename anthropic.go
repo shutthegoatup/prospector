@@ -99,7 +99,7 @@ func claudeTools(defs []toolDef) []anthropic.BetaToolUnionParam {
 	out := make([]anthropic.BetaToolUnionParam, 0, len(defs))
 	for _, d := range defs {
 		var schema map[string]any
-		json.Unmarshal(d.Function.Parameters, &schema)
+		_ = json.Unmarshal(d.Function.Parameters, &schema)
 		input := anthropic.BetaToolInputSchemaParam{Properties: schema["properties"], ExtraFields: map[string]any{}}
 		if req, ok := schema["required"].([]any); ok {
 			for _, r := range req {

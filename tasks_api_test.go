@@ -11,6 +11,7 @@ import (
 )
 
 func TestARobotWorksTasksThroughTheAPIAsItsScopesAllow(t *testing.T) {
+	t.Parallel()
 	s, srv, _ := agentSite(t, newFakeEndpoint(t))
 	o := must(s.OrgBySlug("alpha"))
 	key := func(name string, scopes ...string) string {

@@ -3,8 +3,9 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 // The app builds into assets/app, which the server embeds: index.html is the page the
-// server answers every app address with, and main.js its script. Names are fixed so the
-// committed build diffs cleanly; the server adds the version to them. Styles come from
+// server answers every app address with. Its script and each page's chunk are named for
+// their content, so a browser keeps them for good and the server adds no version to
+// them; a chunk imports the script by that name. Styles come from
 // the shared Tailwind build (assets/css/output.css), so nothing here processes CSS.
 export default defineConfig({
   plugins: [react()],
@@ -20,8 +21,8 @@ export default defineConfig({
       // link, with none of the members' app around it.
       input: { main: fileURLToPath(new URL("./index.html", import.meta.url)), sign: fileURLToPath(new URL("./sign.html", import.meta.url)) },
       output: {
-        entryFileNames: "[name].js",
-        chunkFileNames: "chunks/[name].js",
+        entryFileNames: "[name]-[hash].js",
+        chunkFileNames: "chunks/[name]-[hash].js",
         assetFileNames: "[name][extname]",
       },
     },

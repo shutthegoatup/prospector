@@ -248,10 +248,9 @@ func (a *App) keepSending(ctx context.Context, every time.Duration) {
 // sendRound gives up on mails claimed too long ago, then sends up to sendEach of each
 // campaign that is going. It is safe beside another server doing the same.
 func (a *App) sendRound(ctx context.Context, now time.Time) {
-	stored(a.s.db.Model(&CampaignRecipient{}).Where("status = ? and claimed_at < ?", MailSending, now.Add(-claimStale)).
-		Updates(map[string]any{"status": MailUnknown, "reason": "the server stopped while it was being sent"}))
-	var going []Campaign
-	if !stored(a.s.db.Where("status = ?", CampaignSending).Order("id").Find(&going)) {
+	noted(a.s.FreeStaleMail(now.Add(-claimStale)))
+	going, err := a.s.CampaignsSending()
+	if !noted(err) {
 		return
 	}
 	for _, c := range going {
@@ -261,6 +260,14 @@ func (a *App) sendRound(ctx context.Context, now time.Time) {
 
 // stored is whether a query went through, logging it when it didn't.
 func stored(res *gorm.DB) bool { return logged(res) == nil }
+
+// noted is stored for what the store answers with.
+func noted(err error) bool {
+	if err != nil {
+		log.Printf("database: %v", err)
+	}
+	return err == nil
+}
 
 func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 	o, err := a.s.OrgByID(c.OrgID)
@@ -277,7 +284,7 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 		a.pauseCampaign(c, errCampaignMail.Error())
 		return
 	}
-	gate, err := a.s.gate(a.s.db, o)
+	gate, err := a.s.MailGate(o)
 	if err != nil {
 		log.Printf("campaign %d: %v", c.ID, err)
 		return
@@ -296,8 +303,8 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 	}
 	// One organisation's day, and one round's time, are bounded: a host carries many,
 	// and a mail server that hangs mustn't hold up the rest.
-	var today int64
-	if !stored(a.s.db.Model(&CampaignRecipient{}).Where("org_id = ? and status = ? and sent_at >= ?", o.ID, MailSent, now.Add(-24*time.Hour)).Count(&today)) {
+	today, err := a.s.MailSentSince(o.ID, now.Add(-24*time.Hour))
+	if !noted(err) {
 		return
 	}
 	started := time.Now()
@@ -305,16 +312,15 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 		if ctx.Err() != nil || time.Since(started) > roundBudget {
 			return
 		}
-		var r CampaignRecipient
-		next := a.s.db.Where("org_id = ? and campaign_id = ? and status = ?", c.OrgID, c.ID, MailQueued).Order("id").Limit(1).Find(&r)
-		if !stored(next) {
+		r, err := a.s.NextQueued(c.OrgID, c.ID)
+		if !noted(err) {
 			return
 		}
-		if next.RowsAffected == 0 {
-			a.finishIfDone(c)
+		if r == nil {
+			noted(a.s.FinishIfDone(c.OrgID, c.ID))
 			return
 		}
-		if !a.sendOne(ctx, o, c, via, gate, customers, r) {
+		if !a.sendOne(ctx, o, c, via, gate, customers, *r) {
 			return
 		}
 	}
@@ -326,23 +332,10 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 // the round should go on: not once the mail server can't be reached, nor once the
 // campaign stops.
 func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, gate *mailGate, customers map[int64]bool, r CampaignRecipient) bool {
-	skip := func(reason string) bool {
-		return stored(a.s.db.Model(&CampaignRecipient{}).Where("id = ? and status = ?", r.ID, MailQueued).
-			Updates(map[string]any{"status": MailSkipped, "reason": reason}))
-	}
-	settle := func(status, reason string) bool {
-		updates := map[string]any{"status": status, "reason": reason}
-		if status == MailSent {
-			updates["sent_at"] = time.Now()
-		}
-		if status == MailQueued {
-			updates["claimed_at"] = nil
-		}
-		return stored(a.s.db.Model(&CampaignRecipient{}).Where("id = ?", r.ID).Updates(updates))
-	}
+	skip := func(reason string) bool { return noted(a.s.SkipMail(o.ID, r.ID, reason)) }
+	settle := func(status, reason string) bool { return noted(a.s.SettleMail(o.ID, r.ID, status, reason)) }
 	// Stopped since the round began: this one stays with the rest.
-	var now Campaign
-	if !stored(a.s.db.Where("id = ?", c.ID).First(&now)) || now.Status != CampaignSending {
+	if now, err := a.s.Campaign(o.ID, c.ID); !noted(err) || now.Status != CampaignSending {
 		return false
 	}
 	// Checked again as it goes: someone may have unsubscribed since it was sent.
@@ -350,13 +343,14 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 	var who Contact
 	found := false
 	if r.ContactID != nil {
-		read := a.s.db.Where("org_id = ? and id = ?", o.ID, *r.ContactID).Limit(1).Find(&who)
-		if read.Error != nil && c.Kind == KindService {
-			log.Printf("campaign %d: checking a mail: %v", c.ID, read.Error)
+		read, err := a.s.ContactByID(o.ID, *r.ContactID)
+		var gone notFound
+		if err != nil && !errors.As(err, &gone) && c.Kind == KindService {
+			log.Printf("campaign %d: checking a mail: %v", c.ID, err)
 			return false
 		}
-		if read.Error == nil && read.RowsAffected > 0 {
-			found, link = true, deref(who.Linkedin)
+		if err == nil {
+			who, found, link = *read, true, deref(read.Linkedin)
 		}
 	}
 	// A service notice passes the list not to be mailed only because they are a customer,
@@ -384,7 +378,7 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 		body = foot + "You are getting this as a customer of " + o.Name + ": it is about the service you have with them, so it reaches you even if you unsubscribed from their marketing.\n"
 	} else {
 		var err error
-		if token, err = a.s.unsubscribeLink(a.s.db, o.ID, r.Address); err != nil {
+		if token, err = a.s.UnsubscribeLink(o.ID, r.Address); err != nil {
 			log.Printf("campaign %d: %v", c.ID, err)
 			return false
 		}
@@ -393,18 +387,16 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 	}
 	// The link is made before the claim, so an erasure landing any time after deletes it;
 	// one made after the claim could outlast an erasure and keep its address.
-	claimed := a.s.db.Model(&CampaignRecipient{}).Where("id = ? and status = ? and address = ?", r.ID, MailQueued, r.Address).
-		Updates(map[string]any{"status": MailSending, "claimed_at": time.Now()})
-	if !stored(claimed) || claimed.RowsAffected == 0 {
+	if claimed, err := a.s.ClaimMail(o.ID, r.ID, r.Address); !noted(err) || !claimed {
 		a.s.dropUnsubscribeLink(token)
-		return claimed.Error == nil
+		return err == nil
 	}
 	sendCtx, cancel := context.WithTimeout(ctx, sendLimit)
 	defer cancel()
 	sendErr := a.deliver(sendCtx, *via, Message{To: r.Address, Subject: c.Subject, Body: body, Unsubscribe: unsubscribe})
 	switch {
 	case sendErr == nil:
-		stored(a.s.db.Model(&Campaign{}).Where("id = ?", c.ID).Updates(map[string]any{"failures": 0, "sent_at": time.Now()}))
+		noted(a.s.CampaignWent(o.ID, c.ID))
 		return settle(MailSent, "")
 	case errors.Is(sendErr, errRefusedRecipient):
 		// One refused address is that address; several in a row is the server refusing
@@ -431,9 +423,7 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *MailServer, 
 // failedToSend counts a send that didn't plainly go, and pauses the campaign after
 // several in a row. It reports whether the campaign is still sending.
 func (a *App) failedToSend(c Campaign) bool {
-	stored(a.s.db.Model(&Campaign{}).Where("id = ?", c.ID).Update("failures", gorm.Expr("failures + 1")))
-	var now Campaign
-	if stored(a.s.db.Where("id = ?", c.ID).First(&now)) && now.Failures >= failuresToPause {
+	if failures, err := a.s.CampaignFailed(c.OrgID, c.ID); noted(err) && failures >= failuresToPause {
 		a.pauseCampaign(c, "the mail server couldn't be reached, refused, or didn't confirm several mails in a row")
 		return false
 	}
@@ -441,17 +431,7 @@ func (a *App) failedToSend(c Campaign) bool {
 }
 
 func (a *App) pauseCampaign(c Campaign, why string) {
-	stored(a.s.db.Model(&Campaign{}).Where("id = ? and status = ?", c.ID, CampaignSending).
-		Updates(map[string]any{"status": CampaignPaused, "paused": why}))
-}
-
-// finishIfDone marks a campaign sent once nothing of it is waiting or on its way.
-func (a *App) finishIfDone(c Campaign) {
-	var left int64
-	if !stored(a.s.db.Model(&CampaignRecipient{}).Where("campaign_id = ? and status in ?", c.ID, []string{MailQueued, MailSending}).Count(&left)) || left > 0 {
-		return
-	}
-	stored(a.s.db.Model(&Campaign{}).Where("id = ? and status = ?", c.ID, CampaignSending).Update("status", CampaignSent))
+	noted(a.s.PauseCampaign(c.OrgID, c.ID, why))
 }
 
 func (s *Store) dropUnsubscribeLink(token string) {

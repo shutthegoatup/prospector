@@ -11,6 +11,7 @@ import (
 
 // The Settings page offers the owner's parts only to an owner, by the nav's word.
 func TestTheSettingsPageKnowsWhoIsAnOwner(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
 	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")
@@ -22,6 +23,7 @@ func TestTheSettingsPageKnowsWhoIsAnOwner(t *testing.T) {
 }
 
 func TestTheTeamThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	grace := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
 	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")
@@ -120,6 +122,7 @@ func keySecret(secret string, _ *APIKey, err error) string {
 }
 
 func TestYourOwnVoiceAndPasswordThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	me := srv.URL + "/o/alpha/api/v1/me"
 	reader := keySecret(s.CreateKey(o.ID, "robot", []string{"read"}, "Ada Lovelace"))
@@ -194,6 +197,7 @@ func TestYourOwnVoiceAndPasswordThroughTheAPI(t *testing.T) {
 }
 
 func TestOutgoingMailThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, srv, ada, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
@@ -256,6 +260,7 @@ func TestOutgoingMailThroughTheAPI(t *testing.T) {
 }
 
 func TestSingleSignOnThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	alpha, beta := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
 	mustUser(t, s, alpha, "ada@alpha.example", "Ada Lovelace", "owner")
@@ -332,6 +337,7 @@ func TestSingleSignOnThroughTheAPI(t *testing.T) {
 }
 
 func TestExportingEverythingThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
 	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")
@@ -361,6 +367,7 @@ func TestExportingEverythingThroughTheAPI(t *testing.T) {
 }
 
 func TestWhoTheNeverContactListHoldsBackThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	for _, name := range []string{"Hannah Pryce", "Ivo Marsh"} {
 		must(s.QuickAddPerson(o, QuickAdd{Name: name, Company: "Larkmoor Yachts", Email: strings.ToLower(strings.Fields(name)[0]) + "@larkmoor.example"}, "Ada Lovelace"))

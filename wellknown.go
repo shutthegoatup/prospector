@@ -26,7 +26,7 @@ func (a *App) wellKnownRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /sitemap.xml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
-		fmt.Fprint(w, sitemapXML(a.baseURL(r)))
+		_, _ = fmt.Fprint(w, sitemapXML(a.baseURL(r)))
 	})
 	mux.HandleFunc("GET /llms.txt", func(w http.ResponseWriter, r *http.Request) {
 		plainText(w, llmsTxt(doc, a.baseURL(r)))
@@ -43,7 +43,7 @@ func (a *App) wellKnownRoutes(mux *http.ServeMux) {
 func plainText(w http.ResponseWriter, body string) {
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	fmt.Fprint(w, body)
+	_, _ = fmt.Fprint(w, body)
 }
 
 // robotsTxt keeps crawlers out of what only a signed-in member can read. The
@@ -133,3 +133,5 @@ func securityContactFrom(raw string) (string, error) {
 	}
 	return raw, nil
 }
+
+const repoURL = "https://github.com/shutthegoatup/prospector"

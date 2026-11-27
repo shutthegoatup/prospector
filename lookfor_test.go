@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,6 +10,7 @@ import (
 )
 
 func TestLookForAssets(t *testing.T) {
+	t.Parallel()
 	got, err := OrgSettings{LookFor: "Careers page: a jobs page on their site\n\nats\ncareers-page: again"}.Assets()
 	if err != nil || len(got) != 2 || got[0] != (Asset{Field: "careers_page", Hint: "a jobs page on their site"}) || got[1] != (Asset{Field: "ats"}) {
 		t.Fatalf("assets: %+v %v", got, err)
@@ -20,7 +19,7 @@ func TestLookForAssets(t *testing.T) {
 		t.Fatal("an asset without a name was accepted")
 	}
 
-	s, o, srv, client := signedIn(t)
+	s, _, srv, client := signedIn(t)
 	save := func(lookFor string) (int, string) {
 		return call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/settings", "application/json",
 			map[string]any{"name": "Alpha", "color": "#56c5f4", "look_for": lookFor})
@@ -31,7 +30,7 @@ func TestLookForAssets(t *testing.T) {
 	if code, body := save("careers_page: a jobs page on their site\nats: the applicant tracking system they use"); code != http.StatusOK {
 		t.Fatalf("saving what we look for: %d %s", code, body)
 	}
-	o, _ = s.OrgBySlug("alpha")
+	o, _ := s.OrgBySlug("alpha")
 	k := &APIKey{Scopes: "research:write"}
 	if g := agentInstructions(o, k); !strings.Contains(g, "- careers_page: a jobs page on their site") || !strings.Contains(g, "- ats: the applicant tracking system") {
 		t.Fatalf("agents aren't told what to look for: %q", g)
@@ -46,7 +45,7 @@ func TestLookForAssets(t *testing.T) {
 	if len(queue.Items) != 1 || !strings.Contains(queue.body, "Lists 14 open roles") || queue.Items[0].Fit.Text != "1 of 2 · 1 unchecked" {
 		t.Errorf("Research doesn't show the careers page the company has, and how it fits: %s", queue.body)
 	}
-	if c := queue.Items[0].Criteria; len(c) != 2 || c[0].Field != "careers_page" || c[0].State != api.Met || c[1].Field != "ats" || c[1].State != api.Unchecked {
+	if c := queue.Items[0].Criteria; len(c) != 2 || c[0].Field != "careers_page" || c[0].State != api.CriterionStateMet || c[1].Field != "ats" || c[1].State != api.CriterionStateUnchecked {
 		t.Errorf("Research doesn't show the tracking system wasn't checked: %+v", c)
 	}
 	if strings.Contains(queue.body, "onfigurator") {
@@ -59,6 +58,7 @@ func TestLookForAssets(t *testing.T) {
 }
 
 func TestOlderAgentsConfiguratorBecomesFacts(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	out, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, AddCompanyIn{Name: "Larkmoor Yachts",
@@ -87,10 +87,8 @@ func TestOlderAgentsConfiguratorBecomesFacts(t *testing.T) {
 // TestConfiguratorColumnsMove starts from a database written before assets were the
 // organisation's to name, with the configurator columns filled in.
 func TestConfiguratorColumnsMove(t *testing.T) {
-	dsn := filepath.Join(t.TempDir(), "old.sqlite")
-	if pg := os.Getenv("PROSPECTOR_TEST_PG"); pg != "" {
-		dsn = pg
-	}
+	t.Parallel()
+	dsn := freshDatabase(t)
 	s, err := Open(dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -175,6 +173,7 @@ func (s *Store) companyFacts(t *testing.T, org, company int64) map[string]string
 }
 
 func TestImportedConfiguratorsShow(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	if _, err := s.Import(o.ID, readFixtures(t)); err != nil {

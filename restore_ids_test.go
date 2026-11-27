@@ -3,6 +3,7 @@ package main
 import "testing"
 
 func TestRestoreDoesntHandOutADroppedPersonsID(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	if _, err := s.Import(o.ID, readFixtures(t)); err != nil {

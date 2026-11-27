@@ -12,6 +12,7 @@ import (
 // The tasks page lists closed tasks after the open ones when asked, and counts both, as
 // the server-rendered page did.
 func TestTheTaskListTakesClosedTasksAfterTheOpenOnes(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	var ids []int64
 	for _, title := range []string{"Yachts", "Kitchens", "Bikes", "Tents"} {
@@ -89,6 +90,7 @@ func TestTheTaskListTakesClosedTasksAfterTheOpenOnes(t *testing.T) {
 // A task's page reads its prompt, a page of its notes with the company each is about,
 // and the stretches of work agents did on it, all through the API.
 func TestATasksPageReadsItsPromptNotesAndWorkThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	_, k, err := s.CreateKey(o.ID, "scout", []string{"read", "research:write"}, "Ada Lovelace")
 	if err != nil {
@@ -161,6 +163,7 @@ func TestATasksPageReadsItsPromptNotesAndWorkThroughTheAPI(t *testing.T) {
 // Deleting an agent's note is sales work, and a key needs tasks:write for it: an agent
 // that can only add research can't clear the notes others left.
 func TestDeletingANoteIsSalesWorkThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	grace := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
 	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")

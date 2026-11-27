@@ -79,6 +79,7 @@ func TestAWaitingAgentHandsItsTaskToItsFallback(t *testing.T) {
 }
 
 func TestExistingAgentsSurviveTheFallbackColumns(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	if err := s.db.Create(&Agent{OrgID: o.ID, Name: "Gateway", Kind: kindOpenAI, Models: "[]", Tools: "[]", Allowed: "[]"}).Error; err != nil {
@@ -99,6 +100,7 @@ func TestExistingAgentsSurviveTheFallbackColumns(t *testing.T) {
 }
 
 func TestAFallbackIsAnotherOfTheOrganisationsAgents(t *testing.T) {
+	t.Parallel()
 	r, _, _ := claudeSetup(t)
 	c := must(r.s.AgentByID(r.o.ID, r.agent))
 	first := must(r.s.agentNamed(r.o.ID, "Prospector"))

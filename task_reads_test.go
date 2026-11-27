@@ -12,6 +12,7 @@ import (
 // The task reads moved into the spec answer exactly what the store says, which is what
 // the MCP tools answer too: a field the spec lacks would be lost on the way through.
 func TestTheSpecsTaskReadsSayEverythingTheStoreDoes(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	key := func(name string) (string, Actor) {
 		secret, k, err := s.CreateKey(o.ID, name, []string{"read", "research:write"}, "Ada Lovelace")
@@ -78,6 +79,7 @@ func TestTheSpecsTaskReadsSayEverythingTheStoreDoes(t *testing.T) {
 // A person adds notes and finishes requests through the same operations agents use, as
 // sales work; a read-only key can do neither.
 func TestPeopleInSalesLeaveNotesAndFinishRequests(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	grace := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
 	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")

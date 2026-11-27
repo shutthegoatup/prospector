@@ -3,7 +3,9 @@ import { type CSSProperties, useEffect, useState } from "react";
 import type { components } from "@/api";
 import { $api } from "@/client";
 import { cn } from "@/lib/utils";
+import { mustGoFirst } from "@/problem";
 import { SessionContext } from "@/session";
+import { Bar, Text } from "./skeleton";
 
 type Nav = components["schemas"]["Nav"];
 type Area = "sales" | "support";
@@ -14,8 +16,7 @@ const button =
   "focus-visible:border-ring focus-visible:ring-ring/50 rounded-lg border-2 border-transparent bg-clip-padding text-sm font-semibold focus-visible:ring-3 active:not-aria-[haspopup]:translate-y-px group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50";
 const primary =
   "border-foreground bg-primary text-primary-foreground shadow-[2px_2px_0_var(--foreground)] hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_var(--foreground)] h-8 gap-1.5 px-2.5";
-const outlineSm =
-  "border-foreground bg-card hover:bg-secondary hover:text-foreground h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem]";
+const outlineSm = "border-foreground bg-card hover:bg-secondary hover:text-foreground h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem]";
 
 // pageArea is the area whose work each sidebar page is; someone without it reads only.
 const pageArea: Partial<Record<string, Area>> = {
@@ -62,14 +63,23 @@ export function AppLayout() {
     if (typeof failed !== "object" || failed === null) return;
     if ("status" in failed && failed.status === 401) {
       window.location.assign("/login?next=" + encodeURIComponent(window.location.pathname + window.location.search));
-    } else if ("code" in failed && (failed.code === "must_change_password" || failed.code === "sso_required")) {
+    } else if (mustGoFirst(failed)) {
       // Loaded as a page, this address takes the browser where it has to go first.
       window.location.reload();
     }
   }, [nav.error]);
 
+  if (nav.error && !n)
+    return <p className="p-8 text-sm text-[var(--stop)]">{nav.error.detail ?? "This organisation couldn't be read. Reload to try again."}</p>;
+  // Until the organisation has been read, the sidebar draws its outline and the page waits
+  // beside it, so nothing already drawn moves when it comes.
   if (!n) {
-    return nav.error ? <p className="p-8 text-sm text-[var(--stop)]">{nav.error.detail ?? "This organisation couldn't be read. Reload to try again."}</p> : null;
+    return popup ? null : (
+      <div className="flex min-h-svh flex-wrap">
+        <Sidebar org={org} />
+        <main id="content" aria-busy className="relative min-w-0 flex-[999_1_640px] px-4 pb-16 pt-7 sm:px-8 lg:px-12" />
+      </div>
+    );
   }
   const session = { org, sales: n.sales, support: n.support, owner: n.owner };
   if (popup) {
@@ -84,7 +94,7 @@ export function AppLayout() {
   return (
     <SessionContext.Provider value={session}>
       <div className="flex min-h-svh flex-wrap">
-        <Sidebar n={n} />
+        <Sidebar org={org} n={n} />
         <main id="content" className="relative min-w-0 flex-[999_1_640px] px-4 pb-16 pt-7 sm:px-8 lg:px-12" style={{ "--org": n.org.color } as CSSProperties}>
           <Outlet />
         </main>
@@ -93,23 +103,23 @@ export function AppLayout() {
   );
 }
 
-function Sidebar({ n }: { n: Nav }) {
-  const org = n.org.slug;
+function Sidebar({ org, n }: { org: string; n?: Nav }) {
   const signOut = $api.useMutation("delete", "/api/v1/session", { onSuccess: () => window.location.assign("/login") });
   const page = useLocation({ select: (l) => l.pathname.split("/")[3] ?? "" });
   const active = under[page] ?? page;
-  const can = (area?: Area) => !area || (area === "sales" ? n.sales : n.support);
+  const can = (area?: Area) => !area || !n || (area === "sales" ? n.sales : n.support);
   const item = (key: string, label: string, count = 0) => ({ key, label, count, view: !can(pageArea[key]), on: active === key });
+  const counts = n?.counts;
 
   const items = [
-    item("today", "Today", n.counts.today),
-    item("research", "Research", n.counts.research),
-    item("conversations", "Conversations", n.counts.conversations),
-    item("enquiries", "Enquiries", n.counts.enquiries),
+    item("today", "Today", counts?.today),
+    item("research", "Research", counts?.research),
+    item("conversations", "Conversations", counts?.conversations),
+    item("enquiries", "Enquiries", counts?.enquiries),
     item("onboarding", "Onboarding"),
     item("subscriptions", "Subscriptions"),
     item("campaigns", "Campaigns"),
-    item("companies", "Companies", n.counts.companies),
+    item("companies", "Companies", counts?.companies),
     item("settings", "Settings"),
     item("agents", "Agents & API"),
   ];
@@ -120,11 +130,15 @@ function Sidebar({ n }: { n: Nav }) {
         <img src="/assets/img/mark.svg" width="26" height="26" alt="" />
         Prospector.
       </a>
-      <OrgSwitcher n={n} />
-      {n.sales && (
-        <Link to="/o/$org/add" params={{ org }} className={cn(button, primary, "w-full")}>
-          + Add person
-        </Link>
+      {n ? <OrgSwitcher n={n} /> : <OrgOutline />}
+      {!n ? (
+        <span aria-hidden className="h-8 w-full animate-pulse rounded-lg bg-accent" />
+      ) : (
+        n.sales && (
+          <Link to="/o/$org/add" params={{ org }} className={cn(button, primary, "w-full")}>
+            + Add person
+          </Link>
+        )
       )}
       <nav className="flex flex-col gap-0.5" aria-label="Main">
         {items.map((i) => (
@@ -140,7 +154,10 @@ function Sidebar({ n }: { n: Nav }) {
           >
             <span>{i.label}</span>
             {i.view ? (
-              <span className="rounded border border-border px-1 font-mono text-[11px] uppercase tracking-wider opacity-70" title="You can read this page, not change it">
+              <span
+                className="rounded border border-border px-1 font-mono text-[11px] uppercase tracking-wider opacity-70"
+                title="You can read this page, not change it"
+              >
                 view
               </span>
             ) : (
@@ -150,16 +167,32 @@ function Sidebar({ n }: { n: Nav }) {
         ))}
       </nav>
       <div className="mt-auto flex items-center gap-2.5 px-2.5 text-sm text-muted-foreground">
-        <span className="grid size-6 place-items-center rounded-full bg-secondary text-xs text-foreground">{initial((n.user?.name ?? "") + (n.user?.email ?? ""))}</span>
+        <span className="grid size-6 place-items-center rounded-full bg-secondary text-xs text-foreground">
+          {n && initial((n.user?.name ?? "") + (n.user?.email ?? ""))}
+        </span>
         <span className="flex-1 truncate">
-          {n.user?.name}
-          {n.role !== "owner" && <span className="block font-mono text-[11px]">{n.work}</span>}
+          <Text value={n && n.user?.name} w="9ch" />
+          {n && n.role !== "owner" && <span className="block font-mono text-[11px]">{n.work}</span>}
         </span>
         <button type="button" className="text-xs hover:text-foreground" disabled={signOut.isPending} onClick={() => signOut.mutate({})}>
           Sign out
         </button>
       </div>
     </aside>
+  );
+}
+
+// OrgOutline is the switcher's closed face before the organisation has been read.
+function OrgOutline() {
+  return (
+    <div aria-hidden className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2">
+      <span className="size-7 shrink-0 animate-pulse rounded-md bg-accent" />
+      <span className="flex min-w-0 flex-1 flex-col leading-tight">
+        <Bar w="10ch" className="text-sm" />
+        <span className="font-mono text-xs text-muted-foreground">organisation</span>
+      </span>
+      <span className="size-3.5" />
+    </div>
   );
 }
 

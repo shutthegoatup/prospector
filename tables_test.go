@@ -48,6 +48,7 @@ var orgExportHolds = map[string]string{
 	"enquiries":            "enquiries",
 	"enquiry_messages":     "enquiry_messages",
 	"suppressions":         "not_to_be_mailed",
+	"bounce_hooks":         "not exported: the hash of the secret Postmark's webhook signs in with, which can only add bounces and complaints to the list",
 	"unsubscribe_links":    "not exported: the hash of the secret in one mail's unsubscribe link, which can only unsubscribe that address",
 	"campaigns":            "campaigns",
 	"agreements":           "agreements",
@@ -71,6 +72,7 @@ var orgExportHolds = map[string]string{
 	"agents":               "agents",
 	"offerings":            "offerings",
 	"verdicts":             "verdicts",
+	"roles":                "roles",
 	"enrichers":            "enrichment_vendors",
 	"enrich_usages":        "not exported: how many lookups each vendor was asked this month, which only its limit needs",
 	"agent_runs":           "not exported: counts, a lease and why each run ended; what a run did is in history, as the built-in agent's events",
@@ -89,6 +91,7 @@ var personExportHolds = map[string]string{
 }
 
 func TestEveryTableIsInTheExportsOrSaysWhyNot(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	check := func(table string, holds map[string]string, export any, name string) {
 		field, listed := holds[table]
@@ -149,6 +152,7 @@ func pointingAt(t *testing.T, s *Store, org, contact int64) func() map[string]in
 }
 
 func TestWhateverPointsAtAPersonGoesWhenTheyDo(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	add := func(name string) *Contact {
@@ -180,6 +184,7 @@ func TestWhateverPointsAtAPersonGoesWhenTheyDo(t *testing.T) {
 // follow moves what points at a contact when a restore gives them another id, table by
 // table from pointAtContacts.
 func TestARestoreMovesEveryTableThatPointsAtAContact(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	moved := map[string]bool{}
 	for _, m := range pointAtContacts {

@@ -23,6 +23,7 @@ func link(t *testing.T, s *Store, org int64, address string) string {
 }
 
 func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	hannah := link(t, s, o.ID, "Hannah@Larkmoor.example")
@@ -87,7 +88,7 @@ func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
 	}
 
 	// A link that was never made is answered as one that was, and records nothing.
-	if code, page := call(t, stranger, "POST", srv.URL+"/u/never-made", "application/x-www-form-urlencoded", nil); code != http.StatusOK || !strings.Contains(page, "won't get these again") {
+	if code, page := call(t, stranger, "POST", srv.URL+"/u/never-made", "application/x-www-form-urlencoded", nil); code != http.StatusOK || !served(t, page).Done {
 		t.Errorf("a made-up link: %d %.200s", code, page)
 	}
 	if listed(o.ID) != 1 {
@@ -104,6 +105,7 @@ func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
 }
 
 func TestTheListIsKeptByMembersAndKeys(t *testing.T) {
+	t.Parallel()
 	s, o, srv, member := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	key := func(org int64, scopes ...string) string {
@@ -194,6 +196,7 @@ func TestTheListIsKeptByMembersAndKeys(t *testing.T) {
 // Never-contact and erasure keep an address from marketing mail too, and erasing
 // someone takes their address off the list while still keeping them unmailed.
 func TestErasureAndNeverContactKeepAnAddressUnmailed(t *testing.T) {
+	t.Parallel()
 	s, o, _, _ := signedIn(t)
 	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	if err := s.UnsubscribeByToken(strings.TrimPrefix(link(t, s, o.ID, "hannah@larkmoor.example"), "/u/")); err != nil {
@@ -231,6 +234,7 @@ func TestErasureAndNeverContactKeepAnAddressUnmailed(t *testing.T) {
 }
 
 func TestAMarketingMailCarriesItsOneClickHeaders(t *testing.T) {
+	t.Parallel()
 	from, to := &mail.Address{Address: "news@alpha.example"}, &mail.Address{Address: "hannah@larkmoor.example"}
 	wire := func(unsubscribe string) string {
 		return string(compose(from, to, Message{Subject: "News", Body: "Hello", Unsubscribe: unsubscribe}, time.Now()))
@@ -249,16 +253,17 @@ func TestAMarketingMailCarriesItsOneClickHeaders(t *testing.T) {
 // What the review of the list found: a path aimed at another route, a delete racing an
 // unsubscribe, an address ending in a dot, and an address suggested for someone.
 func TestTheListHoldsAtItsEdges(t *testing.T) {
+	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	visitor := &http.Client{}
 	for _, aimed := range []string{"/u/..%2Flogout", "/u/..%2F..%2Fc%2Fsteps%2F1%2Fdone", "/u/short", "/u/" + strings.Repeat("a", 42) + "%2F"} {
 		_, page := call(t, visitor, "GET", srv.URL+aimed, "", nil)
-		if strings.Contains(page, "<form") || strings.Contains(page, "..") {
+		if served(t, page).Token != "" || strings.Contains(page, "..") {
 			t.Errorf("%s gave a page with a form, or kept the path: %.300s", aimed, page)
 		}
 	}
 	good := link(t, s, o.ID, "hannah@larkmoor.example")
-	if _, page := call(t, visitor, "GET", srv.URL+good, "", nil); !strings.Contains(page, `action="`+good+`"`) {
+	if _, page := call(t, visitor, "GET", srv.URL+good, "", nil); "/u/"+served(t, page).Token != good {
 		t.Errorf("a real link lost its form: %.300s", page)
 	}
 

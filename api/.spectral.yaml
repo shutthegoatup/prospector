@@ -1,0 +1,6 @@
+extends: ["spectral:oas"]
+rules:
+  # Each operation names the key scope it needs in its bearer requirement, which the
+  # server reads. OpenAPI 3.0 keeps that list for OAuth; 3.1 allows it for any scheme,
+  # but kin-openapi, which reads this spec, is 3.0 only.
+  oas3-operation-security-defined: off

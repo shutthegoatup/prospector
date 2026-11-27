@@ -12,6 +12,7 @@ import (
 )
 
 func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
+	t.Parallel()
 	s, srv, member, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	// Whoever filled the form in chose every field of it.
@@ -85,7 +86,7 @@ func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
 		t.Errorf("after their answer the enquiry is %q", now.State)
 	}
 	code, body = call(t, member, "GET", base+"/messages", "", nil)
-	if code != http.StatusOK || strings.Index(body, "We can do Tuesday") < 0 || strings.Index(body, "We can do Tuesday") > strings.Index(body, "Tuesday is fine") {
+	if code != http.StatusOK || !strings.Contains(body, "We can do Tuesday") || strings.Index(body, "We can do Tuesday") > strings.Index(body, "Tuesday is fine") {
 		t.Errorf("the thread: %d %s", code, body)
 	}
 
@@ -126,6 +127,7 @@ func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
 }
 
 func TestWhoCanBeRepliedToAndByWhom(t *testing.T) {
+	t.Parallel()
 	s, srv, member, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	other := mustOrg(t, s, "beta")
@@ -214,6 +216,7 @@ func TestWhoCanBeRepliedToAndByWhom(t *testing.T) {
 }
 
 func TestNoReplyWithoutAMailServer(t *testing.T) {
+	t.Parallel()
 	s, srv, member, box := mailSite(t, func(a *App) { a.mail = nil })
 	o := must(s.OrgBySlug("alpha"))
 	e := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Hannah Pryce", Email: "hannah@larkmoor.example", Message: "Do you cover Leith?"}))
@@ -232,6 +235,7 @@ func TestNoReplyWithoutAMailServer(t *testing.T) {
 }
 
 func TestAReplyToAddressCannotAddAHeader(t *testing.T) {
+	t.Parallel()
 	from, to := &mail.Address{Address: "site@prospector.example"}, &mail.Address{Address: "hannah@larkmoor.example"}
 	for _, answer := range []string{"ada@example.com\r\nBcc: victim@elsewhere.example", "not an address", ""} {
 		wire := string(compose(from, to, Message{Subject: "Your message", Body: "Hello", ReplyTo: answer}, time.Now()))
@@ -245,6 +249,7 @@ func TestAReplyToAddressCannotAddAHeader(t *testing.T) {
 // without end, a reply that never left showing in an export, and the mail server's own
 // words in an answer.
 func TestRepliesKeepToTheirLimits(t *testing.T) {
+	t.Parallel()
 	s, srv, member, box := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	for _, dressed := range []string{"Bob<bob@larkmoor.example>", "bob@larkmoor.example(c)", "\"Bob\" <bob@larkmoor.example>", "a@larkmoor.example,b@larkmoor.example"} {
@@ -318,6 +323,7 @@ func TestRepliesKeepToTheirLimits(t *testing.T) {
 // whether its sender is in Conversations, its thread, the chip counts, the members who
 // can own it, and whether a reply can be emailed.
 func TestTheEnquiriesAPIGivesWhatThePageShows(t *testing.T) {
+	t.Parallel()
 	s, srv, member, _ := mailSite(t, nil)
 	o := must(s.OrgBySlug("alpha"))
 	known := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Quay Marine", Email: "hannah@quay.example"}, "Ada Lovelace"))

@@ -20,6 +20,7 @@ import (
 )
 
 func TestAnAgreementsEventsShowAnyChangeAfterTheFact(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	add := func(kind, detail string) {
@@ -80,6 +81,7 @@ func TestAnAgreementsEventsShowAnyChangeAfterTheFact(t *testing.T) {
 }
 
 func TestAnOrganisationsSealingKeyIsMadeOnceAndKeptSealed(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	key, cert := must2(s.sealKey(o))
@@ -117,6 +119,7 @@ func TestAnOrganisationsSealingKeyIsMadeOnceAndKeptSealed(t *testing.T) {
 
 // A PDF that bends its version's rules is taken at upload, so it has to seal too.
 func TestAPDFTakenAtUploadCanBeSealed(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
@@ -152,6 +155,7 @@ func sealedDraft(t *testing.T) (*Store, *Org, *Agreement) {
 }
 
 func TestADraftCanBeFilledInAndSealedBeforeItIsSent(t *testing.T) {
+	t.Parallel()
 	s, o, a := sealedDraft(t)
 	if err := s.TrySeal(o, a.ID, "Ada Lovelace"); err != nil {
 		t.Fatalf("a dry run of sealing: %v", err)
@@ -170,6 +174,7 @@ func TestADraftCanBeFilledInAndSealedBeforeItIsSent(t *testing.T) {
 }
 
 func TestASealedAgreementIsFilledInCertifiedAndShowsAnyChange(t *testing.T) {
+	t.Parallel()
 	s, o, a := sealedDraft(t)
 	_, doc := must2(s.AgreementDocument(o.ID, a.ID))
 	when := time.Date(2026, 11, 27, 9, 31, 52, 0, time.UTC)
@@ -227,6 +232,7 @@ func TestASealedAgreementIsFilledInCertifiedAndShowsAnyChange(t *testing.T) {
 // installed: on a turned page, a cropped one and one whose box starts off the origin, it
 // lands where it was placed on the page as shown.
 func TestAStampLandsWhereItsFieldWasPlaced(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("pdftoppm"); err != nil {
 		t.Skip("pdftoppm isn't installed")
 	}

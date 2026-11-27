@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api } from "@/client";
-import { ActionButton, Empty, Eyebrow, Failed, Meta, PageHead, Pill, Section, useRefresh } from "@/components/app";
+import { ActionButton, Empty, Eyebrow, Failed, Meta, Pill, Section, useRefresh } from "@/components/app";
 import { Pager, Quote } from "@/components/app/more";
+import { Loading, Placeholders, placeholders, Text } from "@/components/app/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { actor, ago, clock, plural, stamp } from "@/lib/format";
 import { useSession } from "@/session";
@@ -12,6 +14,7 @@ import { TaskStatus, taskFound, taskLast } from "@/pages/Tasks";
 type Asked = components["schemas"]["Asked"];
 type Run = components["schemas"]["Run"];
 type Work = components["schemas"]["TaskWork"];
+type Note = components["schemas"]["TaskNoteOut"];
 
 const noteKinds: Record<string, string> = { skipped: "Skipped", dead_end: "Dead end", next: "Next" };
 
@@ -79,80 +82,108 @@ export function TaskPage() {
   const { id } = useParams({ from: "/o/$org/tasks/$id" });
   const refresh = useRefresh();
   const [foundAt, setFoundAt] = useState<string | undefined>();
-  const task = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}", { params: { path: { org, id }, query: { limit: 200, cursor: foundAt } } });
+  // Another page of what was found keeps this task on screen, but never another task.
+  const task = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/tasks/{id}",
+    { params: { path: { org, id }, query: { limit: 200, cursor: foundAt } } },
+    { placeholderData: (prev) => (prev?.id === id ? prev : undefined) },
+  );
   const change = $api.useMutation("patch", "/o/{org}/api/v1/tasks/{id}", { onSuccess: refresh });
+  // The queries the side column's first sections make, so it is drawn once they have come:
+  // Agents may not be there at all and the prompt runs to any number of lines, so either
+  // would otherwise push the rest down when it came.
+  const runs = $api.useQuery("get", "/o/{org}/api/v1/tasks/{task}/runs", { params: { path: { org, task: id }, query: { limit: 10, cursor: undefined } } });
+  const agents = $api.useQuery("get", "/o/{org}/api/v1/agents", { params: { path: { org } } });
+  const open = task.data ? task.data.status !== "closed" : undefined;
+  const prompt = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}/prompt", { params: { path: { org, id } } });
+  const side = !runs.isPending && !agents.isPending && !prompt.isPending;
 
   if (task.error) return <Empty title="No such task" hint="It may be in another organisation, or the link is wrong." />;
   const t = task.data;
-  if (!t) return null;
-  const open = t.status !== "closed";
 
+  // While the task loads, only what every task's page starts with: the rest depends on
+  // the task, and appears below rather than pushing this down.
   return (
-    <>
-      <PageHead title={t.title}>
-        {t.offering && <Pill>For {t.offering.name}</Pill>}
-        <TaskStatus status={t.status} />
-      </PageHead>
+    <Loading busy={!t}>
+      <header className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
+        <h1 className="font-heading text-4xl font-bold tracking-tight">
+          <Text value={t?.title} w="14ch" />
+          <span className="text-coral">.</span>
+        </h1>
+        {t?.offering && <Pill>For {t.offering.name}</Pill>}
+        <TaskStatus status={t?.status} />
+      </header>
       <div className="flex flex-wrap items-start gap-8">
         <div className="flex min-w-0 flex-[999_1_480px] flex-col gap-5">
-          <AskedSection id={id} requests={t.requests} last={taskLast(t)} open={open} />
-          <Section title="Found" hint="What agents added for this task, or matched to it. Companies and people wait in Research until someone qualifies or picks them.">
-            {t.companies.length === 0 && t.people.length === 0 && <p className="text-sm text-muted-foreground">Nothing yet.</p>}
-            {t.companies.map((c) => (
-              <div key={c.id} className="flex flex-wrap justify-between gap-2 border-b border-dashed border-border py-2.5 text-sm">
-                <Link to="/o/$org/companies/$id" params={{ org, id: c.id }} className="font-medium underline">
-                  {c.name}
-                </Link>
-                <span className="font-mono text-xs text-muted-foreground">{c.stage}</span>
-              </div>
-            ))}
-            {t.people.map((p) => {
-              const about = [p.title, p.company].filter((s) => s?.trim()).join(", ");
-              return (
-                <div key={p.id} className="flex flex-wrap justify-between gap-2 border-b border-dashed border-border py-2.5 text-sm">
-                  <span>
-                    <b>{p.name}</b> <span className="text-muted-foreground">{about && "· " + about}</span>
-                  </span>
-                  <span className="font-mono text-xs text-muted-foreground">{p.stage}</span>
+          <AskedSection id={id} requests={t?.requests} last={t && taskLast(t)} open={open} />
+          {t && (
+            <Section
+              title="Found"
+              hint="What agents added for this task, or matched to it. Companies and people wait in Research until someone qualifies or picks them."
+            >
+              {t.companies.length === 0 && t.people.length === 0 && <p className="text-sm text-muted-foreground">Nothing yet.</p>}
+              {t.companies.map((c) => (
+                <div key={c.id} className="flex flex-wrap justify-between gap-2 border-b border-dashed border-border py-2.5 text-sm">
+                  <Link to="/o/$org/companies/$id" params={{ org, id: c.id }} className="font-medium underline">
+                    {c.name}
+                  </Link>
+                  <span className="font-mono text-xs text-muted-foreground">{c.stage}</span>
                 </div>
-              );
-            })}
-            <Pager cursor={foundAt} next={t.next_cursor} go={setFoundAt} />
-          </Section>
-          <Notes id={id} />
+              ))}
+              {t.people.map((p) => {
+                const about = [p.title, p.company].filter((s) => s?.trim()).join(", ");
+                return (
+                  <div key={p.id} className="flex flex-wrap justify-between gap-2 border-b border-dashed border-border py-2.5 text-sm">
+                    <span>
+                      <b>{p.name}</b> <span className="text-muted-foreground">{about && "· " + about}</span>
+                    </span>
+                    <span className="font-mono text-xs text-muted-foreground">{p.stage}</span>
+                  </div>
+                );
+              })}
+              <Pager cursor={foundAt} next={t.next_cursor} go={setFoundAt} />
+            </Section>
+          )}
+          {t && <Notes key={id} id={id} />}
         </div>
         <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-5">
-          <Agents id={id} open={open} />
-          {open && <Prompt id={id} />}
-          <WorkSoFar id={id} />
-          {sales && (
-            <div>
-              {open ? (
-                <ActionButton
-                  quiet
-                  size="sm"
-                  onClick={() =>
-                    window.confirm("Close this task? Agents stop seeing it; what was found stays.") &&
-                    change.mutate({ params: { path: { org, id } }, body: { closed: true } })
-                  }
-                >
-                  Close task
-                </ActionButton>
-              ) : (
-                <ActionButton quiet size="sm" onClick={() => change.mutate({ params: { path: { org, id } }, body: { closed: false } })}>
-                  Reopen task
-                </ActionButton>
+          {open !== undefined && side && (
+            <>
+              <Agents key={id} id={id} open={open} />
+              {open && <Prompt id={id} />}
+              <WorkSoFar key={id} id={id} />
+              {sales && (
+                <div>
+                  {open ? (
+                    <ActionButton
+                      quiet
+                      size="sm"
+                      onClick={() =>
+                        window.confirm("Close this task? Agents stop seeing it; what was found stays.") &&
+                        change.mutate({ params: { path: { org, id } }, body: { closed: true } })
+                      }
+                    >
+                      Close task
+                    </ActionButton>
+                  ) : (
+                    <ActionButton quiet size="sm" onClick={() => change.mutate({ params: { path: { org, id } }, body: { closed: false } })}>
+                      Reopen task
+                    </ActionButton>
+                  )}
+                  <Failed errors={[change.error]} />
+                </div>
               )}
-              <Failed errors={[change.error]} />
-            </div>
+            </>
           )}
         </aside>
       </div>
-    </>
+    </Loading>
   );
 }
 
-function AskedSection({ id, requests, last, open }: { id: number; requests: Asked[]; last: string; open: boolean }) {
+// AskedSection is what has been asked of the task's agents; without the task, its heading.
+function AskedSection({ id, requests = [], last, open = false }: { id: number; requests?: Asked[]; last?: string; open?: boolean }) {
   const { org, sales } = useSession();
   const refresh = useRefresh();
   const [text, setText] = useState("");
@@ -218,42 +249,30 @@ function AskedSection({ id, requests, last, open }: { id: number; requests: Aske
 }
 
 function Notes({ id }: { id: number }) {
-  const { org, sales } = useSession();
+  const { org } = useSession();
   const refresh = useRefresh();
   const [cursor, setCursor] = useState<string | undefined>();
-  const notes = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}/notes", { params: { path: { org, id }, query: { limit: 20, cursor } } });
+  const notes = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/tasks/{id}/notes",
+    { params: { path: { org, id }, query: { limit: 20, cursor } } },
+    { placeholderData: keepPreviousData },
+  );
   const remove = $api.useMutation("delete", "/o/{org}/api/v1/notes/{id}", { onSuccess: refresh });
   const items = notes.data?.items ?? [];
 
   return (
     <Section title="Agents' notes" hint="What they skipped or couldn't find, in their words. Not checked by anyone.">
       {notes.data && items.length === 0 && <p className="text-sm text-muted-foreground">None.</p>}
+      {!notes.data && !notes.error && (
+        <Placeholders className="flex flex-col gap-3">
+          {Array.from({ length: placeholders }, (_, i) => (
+            <NoteRow key={i} />
+          ))}
+        </Placeholders>
+      )}
       {items.map((n) => (
-        <div key={n.id} className="flex flex-col gap-1.5 border-b border-dashed border-border py-2.5 text-sm last:border-0">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="flex flex-wrap items-center gap-2">
-              <Pill tone="agent">{noteKinds[n.kind] ?? n.kind}</Pill>
-              {n.company && n.company_id !== undefined && (
-                <Link to="/o/$org/companies/$id" params={{ org, id: n.company_id }} className="font-mono text-xs text-mark underline">
-                  {n.company}
-                </Link>
-              )}
-            </span>
-            {sales && (
-              <ActionButton
-                quiet
-                size="xs"
-                onClick={() => window.confirm("Delete this note?") && remove.mutate({ params: { path: { org, id: n.id } } })}
-              >
-                Delete
-              </ActionButton>
-            )}
-          </div>
-          <p className="whitespace-pre-wrap">{n.text}</p>
-          <Meta>
-            {actor(n.actor)} · {stamp(n.at)}
-          </Meta>
-        </div>
+        <NoteRow key={n.id} n={n} onDelete={() => window.confirm("Delete this note?") && remove.mutate({ params: { path: { org, id: n.id } } })} />
       ))}
       <Failed errors={[remove.error]} />
       <Pager cursor={cursor} next={notes.data?.next_cursor} go={setCursor} />
@@ -261,11 +280,47 @@ function Notes({ id }: { id: number }) {
   );
 }
 
+// NoteRow is one agent's note, or its outline while the notes load: its text, which runs
+// to any number of lines, comes with the note.
+function NoteRow({ n, onDelete }: { n?: Note; onDelete?: () => void }) {
+  const { org, sales } = useSession();
+  return (
+    <div className="flex flex-col gap-1.5 border-b border-dashed border-border py-2.5 text-sm last:border-0">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="flex flex-wrap items-center gap-2">
+          <Pill tone="agent">
+            <Text value={n && (noteKinds[n.kind] ?? n.kind)} w="7ch" />
+          </Pill>
+          {n?.company && n.company_id !== undefined && (
+            <Link to="/o/$org/companies/$id" params={{ org, id: n.company_id }} className="font-mono text-xs text-mark underline">
+              {n.company}
+            </Link>
+          )}
+        </span>
+        {n && sales && (
+          <ActionButton quiet size="xs" onClick={onDelete}>
+            Delete
+          </ActionButton>
+        )}
+      </div>
+      {n && <p className="whitespace-pre-wrap">{n.text}</p>}
+      <Meta>
+        <Text value={n && `${actor(n.actor)} · ${stamp(n.at)}`} w="24ch" />
+      </Meta>
+    </div>
+  );
+}
+
 function Agents({ id, open }: { id: number; open: boolean }) {
   const { org, sales } = useSession();
   const refresh = useRefresh();
   const [cursor, setCursor] = useState<string | undefined>();
-  const runs = $api.useQuery("get", "/o/{org}/api/v1/tasks/{task}/runs", { params: { path: { org, task: id }, query: { limit: 10, cursor } } });
+  const runs = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/tasks/{task}/runs",
+    { params: { path: { org, task: id }, query: { limit: 10, cursor } } },
+    { placeholderData: keepPreviousData },
+  );
   const agents = $api.useQuery("get", "/o/{org}/api/v1/agents", { params: { path: { org } } });
   const start = $api.useMutation("post", "/o/{org}/api/v1/tasks/{task}/runs", { onSuccess: refresh });
   const stop = $api.useMutation("post", "/o/{org}/api/v1/runs/{id}/stop", { onSuccess: refresh });
@@ -354,19 +409,42 @@ function Prompt({ id }: { id: number }) {
 function WorkSoFar({ id }: { id: number }) {
   const { org } = useSession();
   const [cursor, setCursor] = useState<string | undefined>();
-  const work = $api.useQuery("get", "/o/{org}/api/v1/tasks/{id}/work", { params: { path: { org, id }, query: { limit: 10, cursor } } });
+  const work = $api.useQuery(
+    "get",
+    "/o/{org}/api/v1/tasks/{id}/work",
+    { params: { path: { org, id }, query: { limit: 10, cursor } } },
+    { placeholderData: keepPreviousData },
+  );
   const items = work.data?.items ?? [];
 
   return (
     <Section title="Work so far" hint="Each stretch of an agent's changes. An agent that is only reading doesn't show.">
       {work.data && items.length === 0 && <p className="text-sm text-muted-foreground">None yet.</p>}
+      {!work.data && !work.error && (
+        <Placeholders className="flex flex-col gap-3">
+          {Array.from({ length: placeholders }, (_, i) => (
+            <WorkRow key={i} />
+          ))}
+        </Placeholders>
+      )}
       {items.map((w) => (
-        <div key={`${w.actor} ${w.start}`} className="border-b border-dashed border-border py-2 text-sm last:border-0">
-          <b className="font-mono text-[13px] text-mark">{actor(w.actor)}</b>
-          <span className="block text-muted-foreground">{workText(w)}</span>
-        </div>
+        <WorkRow key={`${w.actor} ${w.start}`} w={w} />
       ))}
       <Pager cursor={cursor} next={work.data?.next_cursor} go={setCursor} />
     </Section>
+  );
+}
+
+// WorkRow is one stretch of an agent's changes, or its outline while they load.
+function WorkRow({ w }: { w?: Work }) {
+  return (
+    <div className="border-b border-dashed border-border py-2 text-sm last:border-0">
+      <b className="font-mono text-[13px] text-mark">
+        <Text value={w && actor(w.actor)} w="10ch" />
+      </b>
+      <span className="block text-muted-foreground">
+        <Text value={w && workText(w)} w="28ch" />
+      </span>
+    </div>
   );
 }

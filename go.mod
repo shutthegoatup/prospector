@@ -3,8 +3,6 @@ module github.com/shutthegoatup/prospector
 go 1.27.4
 
 require (
-	github.com/Oudwins/tailwind-merge-go v0.2.3
-	github.com/a-h/templ v0.3.1118
 	github.com/anthropics/anthropic-sdk-go/v2 v2.15.0
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/digitorus/pdfsign v1.0.0
@@ -19,30 +17,23 @@ require (
 	github.com/oapi-codegen/runtime v1.9.1
 	github.com/pdfcpu/pdfcpu v0.16.4
 	golang.org/x/crypto v0.59.0
-	golang.org/x/image v0.47.0
+	golang.org/x/image v0.48.0
 	golang.org/x/net v0.63.0
 	golang.org/x/oauth2 v0.38.0
+	golang.org/x/time v0.16.0
 	gorm.io/driver/postgres v1.6.3
 	gorm.io/gorm v1.31.2
 )
 
 require (
-	github.com/a-h/parse v0.0.42 // indirect
-	github.com/andybalholm/brotli v1.3.0 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
-	github.com/axadrn/shadcn-templ/v2 v2.0.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
-	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
-	github.com/cli/browser v1.3.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/digitorus/pdf v0.3.0 // indirect
 	github.com/digitorus/pkcs7 v0.0.0-20260914070511-d678ea5ea03f // indirect
 	github.com/digitorus/timestamp v0.0.0-20250524132541-c45532741eea // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/evanw/esbuild v0.28.2 // indirect
-	github.com/fatih/color v1.19.0 // indirect
-	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v1.0.2 // indirect
@@ -56,10 +47,8 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/mattetti/filebuffer v1.0.1 // indirect
-	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mattn/go-runewidth v0.0.31 // indirect
-	github.com/natefinch/atomic v1.0.1 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/oapi-codegen/oapi-codegen/v2 v2.9.0 // indirect
 	github.com/oasdiff/yaml v0.1.3 // indirect
@@ -87,7 +76,6 @@ require (
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/text v0.44.0 // indirect
-	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.53.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	modernc.org/libc v1.74.1 // indirect
@@ -96,8 +84,4 @@ require (
 	modernc.org/sqlite v1.55.0 // indirect
 )
 
-tool (
-	github.com/a-h/templ/cmd/templ
-	github.com/axadrn/shadcn-templ/v2/cmd/shadcn-templ
-	github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
-)
+tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen

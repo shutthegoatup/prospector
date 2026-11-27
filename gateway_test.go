@@ -123,6 +123,7 @@ func (f *federatedMCP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func TestOnlyAToolServersPassingFailuresAreWaitedOut(t *testing.T) {
+	t.Parallel()
 	for msg, passes := range map[string]bool{
 		`calling "initialize": rejected by transport: sending "initialize": Too Many Requests`: true,
 		`sending "tools/list": Service Unavailable`:                                            true,
@@ -139,6 +140,7 @@ func TestOnlyAToolServersPassingFailuresAreWaitedOut(t *testing.T) {
 }
 
 func TestARunWaitsOutAGatewaysLimitOnItsTools(t *testing.T) {
+	t.Parallel()
 	for _, method := range []string{"initialize", "tools/list", "tools/call"} {
 		t.Run(method, func(t *testing.T) {
 			gateway := &federatedMCP{limited: map[string]int{method: 2}}
@@ -178,6 +180,7 @@ func TestARunWaitsOutAGatewaysLimitOnItsTools(t *testing.T) {
 }
 
 func TestTheAgentWorksThroughAGatewaysFederatedTools(t *testing.T) {
+	t.Parallel()
 	gateway := &federatedMCP{page: "Larkmoor Yachts was founded in 1987 on the Solent. " + strings.Repeat("It builds day cruisers to order, each finished by hand in its own yard. ", 4)}
 	tools := httptest.NewTLSServer(gateway)
 	t.Cleanup(tools.Close)

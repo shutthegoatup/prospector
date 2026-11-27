@@ -45,9 +45,9 @@ type SignerLink struct {
 	ExpiresAt   time.Time `gorm:"not null"`
 	// Codes is how many codes have been mailed from this link on the day CodesOn: a link
 	// sent again starts afresh, so someone who wastes one link's codes can't lock its signer out.
-	Codes   int    `gorm:"not null;default:0"`
-	CodesOn string `gorm:"not null;default:''"`
-	CreatedAt   time.Time
+	Codes     int    `gorm:"not null;default:0"`
+	CodesOn   string `gorm:"not null;default:''"`
+	CreatedAt time.Time
 }
 
 // SignerSession is one browser a link was opened in, stored as its cookie's hash. Proven
@@ -164,14 +164,14 @@ func (s *Store) SigningCode(g *Signing, token, ip, browser string, send func(to,
 	res = s.db.Model(&SignerLink{}).Where("id = ? and not (codes_on = ? and codes >= ?)", g.Link.ID, day, codesADay).
 		Updates(map[string]any{"codes": gorm.Expr("case when codes_on = ? then codes + 1 else 1 end", day), "codes_on": day})
 	if res.Error != nil || res.RowsAffected == 0 {
-		logged(s.db.Model(&SignerSession{}).Where("id = ?", g.Session.ID).Update("code_hash", ""))
+		_ = logged(s.db.Model(&SignerSession{}).Where("id = ?", g.Session.ID).Update("code_hash", ""))
 		return "", errors.Join(res.Error, errors.New("that's as many codes as can go in a day: try again tomorrow"))
 	}
 	// The record says a code went only once the mail server has taken it. One that
 	// didn't go leaves nothing to enter, and asking again isn't held back.
 	if send != nil {
 		if err := send(g.Recipient.SentEmail, code); err != nil {
-			logged(s.db.Model(&SignerSession{}).Where("id = ?", g.Session.ID).Updates(map[string]any{"code_hash": "", "code_sent_at": nil}))
+			_ = logged(s.db.Model(&SignerSession{}).Where("id = ?", g.Session.ID).Updates(map[string]any{"code_hash": "", "code_sent_at": nil}))
 			return "", fmt.Errorf("the code couldn't be emailed just now: try again in a moment (%w)", err)
 		}
 	}
@@ -329,4 +329,14 @@ func masked(email string) string {
 	}
 	r := []rune(local)
 	return string(r[0]) + strings.Repeat("•", max(len(r)-1, 2)) + "@" + domain
+}
+
+// signingView is who signs a session's agreement, in order, and the places on it that
+// are the session's signer's own.
+func (s *Store) signingView(g *Signing) (signers []AgreementRecipient, fields []AgreementField, err error) {
+	if err := s.in(g.Org.ID).Where("agreement_id = ? and role = ?", g.Agreement.ID, RecipientSigner).Order("position, id").Find(&signers).Error; err != nil {
+		return nil, nil, err
+	}
+	err = s.in(g.Org.ID).Where("agreement_id = ? and round = ? and recipient_id = ?", g.Agreement.ID, g.Agreement.Round, g.Recipient.ID).Order("page, y, x, id").Find(&fields).Error
+	return signers, fields, err
 }

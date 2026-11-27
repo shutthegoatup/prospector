@@ -324,6 +324,10 @@ func leftOutBecause(err error) (string, bool) {
 	switch {
 	case errors.Is(err, errSuppressed):
 		return "on the list not to be mailed", true
+	case errors.Is(err, errBounced):
+		return "mail to them bounced", true
+	case errors.Is(err, errComplained):
+		return "marked a mail as spam", true
 	case errors.Is(err, errErased):
 		return "erased on request", true
 	case errors.Is(err, errNeverContact):

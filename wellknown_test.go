@@ -25,6 +25,7 @@ func getText(t *testing.T, url string) (*http.Response, string) {
 }
 
 func TestWellKnownFilesAreServedSignedOut(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer((&App{s: tempStore(t), securityContact: "mailto:security@prospector.example"}).Routes())
 	t.Cleanup(srv.Close)
 	for path, kind := range map[string]string{
@@ -44,6 +45,7 @@ func TestWellKnownFilesAreServedSignedOut(t *testing.T) {
 }
 
 func TestRobotsKeepsPublicPagesOpen(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer((&App{s: tempStore(t), base: "https://prospector.example"}).Routes())
 	t.Cleanup(srv.Close)
 	_, body := getText(t, srv.URL+"/robots.txt")
@@ -68,6 +70,7 @@ func TestRobotsKeepsPublicPagesOpen(t *testing.T) {
 }
 
 func TestLLMsTxtLinksWork(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer((&App{s: tempStore(t)}).Routes())
 	t.Cleanup(srv.Close)
 	_, body := getText(t, srv.URL+"/llms.txt")
@@ -97,6 +100,7 @@ func TestLLMsTxtLinksWork(t *testing.T) {
 }
 
 func TestSecurityTxt(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	none := httptest.NewServer((&App{s: s}).Routes())
 	t.Cleanup(none.Close)
@@ -122,6 +126,7 @@ func TestSecurityTxt(t *testing.T) {
 }
 
 func TestSecurityContactFrom(t *testing.T) {
+	t.Parallel()
 	for raw, ok := range map[string]bool{
 		"":                                   true,
 		"mailto:security@prospector.example": true,

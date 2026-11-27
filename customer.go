@@ -197,6 +197,25 @@ func (s *Store) newCustomerLink(tx *gorm.DB, g CustomerGrant) (string, error) {
 	return token, tx.Create(&CustomerLink{OrgID: g.OrgID, GrantID: g.ID, TokenHash: hashToken(token), ExpiresAt: time.Now().Add(customerLinkLife)}).Error
 }
 
+// Mailable is the people at these companies who could be sent a link: known, with an address.
+func (s *Store) Mailable(org int64, companies []int64) ([]Contact, error) {
+	var people []Contact
+	return people, s.in(org).Where("company_id in ? and status <> ? and key not like ?", companies, ContactSuggested, "org:%").
+		Where("coalesce(email, '') <> ''").Order("id").Find(&people).Error
+}
+
+// FreshCustomerLink makes another link for someone already let in.
+func (s *Store) FreshCustomerLink(org, grant int64) (token string, err error) {
+	return token, s.db.Transaction(func(tx *gorm.DB) error {
+		var g CustomerGrant
+		if err := tx.Where("org_id = ? and id = ?", org, grant).First(&g).Error; err != nil {
+			return missing(err, "no customer %d in this organisation", grant)
+		}
+		token, err = s.newCustomerLink(tx, g)
+		return err
+	})
+}
+
 // InviteCustomer lets a contact at the onboarding's company see their steps, and
 // returns the link to mail them. Inviting someone again makes a fresh link, and brings
 // back access that was withdrawn.
@@ -325,7 +344,7 @@ func (a *App) customerMailOn(org int64) bool {
 }
 
 func (s *Store) dropCustomerLink(token string) {
-	logged(s.db.Where("token_hash = ?", hashToken(token)).Delete(&CustomerLink{}))
+	_ = logged(s.db.Where("token_hash = ?", hashToken(token)).Delete(&CustomerLink{}))
 }
 
 func (a *App) customerLinkMail(ctx context.Context, org *Org, to, token string) error {
@@ -354,10 +373,31 @@ func customerHeaders(w http.ResponseWriter) {
 
 func (a *App) customerRender(w http.ResponseWriter, r *http.Request, code int, v CustomerView) {
 	customerHeaders(w)
-	w.WriteHeader(code)
-	if err := CustomerPage(v).Render(r.Context(), w); err != nil {
-		log.Print(err)
+	shown := customerShown{Page: "customer", State: v.State, Token: v.Token, Org: v.Org, Email: v.Email, Day: v.Day, Steps: []customerStepShown{}}
+	for _, st := range v.Steps {
+		shown.Steps = append(shown.Steps, customerStepShown{st.ID, st.Name, st.Due, st.DoneOn, st.DoneBy == customerActor})
 	}
+	writeShell(w, code, shown, "This page needs a browser with JavaScript.\n")
+}
+
+// customerShown is CustomerView as the page gets it. A step says only whether the
+// customer marked it, never which member did.
+type customerShown struct {
+	Page  string              `json:"page"`
+	State string              `json:"state"`
+	Token string              `json:"token,omitempty"`
+	Org   string              `json:"org,omitempty"`
+	Email string              `json:"email,omitempty"`
+	Day   string              `json:"day,omitempty"`
+	Steps []customerStepShown `json:"steps"`
+}
+
+type customerStepShown struct {
+	ID     int64   `json:"id"`
+	Name   string  `json:"name"`
+	Due    *string `json:"due"`
+	DoneOn *string `json:"done_on"`
+	Mine   bool    `json:"mine"`
 }
 
 // CustomerView is what a customer's page shows. It holds no teammate's name and no
@@ -370,7 +410,6 @@ type CustomerView struct {
 	Org   string
 	Email string
 	Steps []OnboardingStep
-	Done  int
 	Day   string
 }
 
@@ -414,13 +453,7 @@ func (a *App) customerOpen(w http.ResponseWriter, r *http.Request) {
 func (a *App) customerAgain(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 	if acc, err := a.s.CustomerByToken("link", token); err == nil && a.customerMailOn(acc.Org.ID) {
-		var fresh string
-		err := a.s.db.Transaction(func(tx *gorm.DB) error {
-			var err error
-			fresh, err = a.s.newCustomerLink(tx, acc.Grant)
-			return err
-		})
-		if err == nil {
+		if fresh, err := a.s.FreshCustomerLink(acc.Org.ID, acc.Grant.ID); err == nil {
 			org, to := acc.Org, deref(acc.Contact.Email)
 			a.background(func() {
 				ctx, cancel := context.WithTimeout(context.Background(), sendLimit)
@@ -460,11 +493,6 @@ func (a *App) customerPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := CustomerView{State: "steps", Org: acc.Org.Name, Email: deref(acc.Contact.Email), Steps: steps, Day: today()}
-	for _, st := range steps {
-		if st.DoneOn != nil {
-			v.Done++
-		}
-	}
 	a.customerRender(w, r, http.StatusOK, v)
 }
 
@@ -493,9 +521,8 @@ func (a *App) customerControls(org int64, rows []OnboardingRow) error {
 	for _, r := range rows {
 		companies = append(companies, r.CompanyID)
 	}
-	var people []Contact
-	if err := a.s.in(org).Where("company_id in ? and status <> ? and key not like ?", companies, ContactSuggested, "org:%").
-		Where("coalesce(email, \x27\x27) <> \x27\x27").Order("id").Find(&people).Error; err != nil {
+	people, err := a.s.Mailable(org, companies)
+	if err != nil {
 		return err
 	}
 	mailOn := a.customerMailOn(org)
@@ -536,26 +563,26 @@ func (s *Store) customerSetStep(a *CustomerAccess, step int64, done bool) error 
 		case done && st.DoneOn != nil, !done && (st.DoneOn == nil || st.DoneBy != customerActor):
 			return nil
 		case !done:
-			updates = map[string]any{"done_on": nil, "done_by": ""}
+			updates = map[string]any{"done_on": nil, "done_by": "", "done_entry": 0}
 		}
-		marked := tx.Model(&OnboardingStep{}).Where("id = ? and org_id = ? and done_by = ?", st.ID, org, st.DoneBy).Updates(updates)
+		marked := tx.Model(&OnboardingStep{}).Where("id = ? and org_id = ? and done_by = ? and done_entry = ?", st.ID, org, st.DoneBy, st.DoneEntry).Updates(updates)
 		if marked.Error != nil || marked.RowsAffected == 0 {
 			return marked.Error
 		}
 		if done {
-			return s.log(tx, org, a.Contact.ID, &a.Onboarding.CompanyID, customerActor, action, nonEmpty(st.Name))
+			entry := Event{OrgID: org, ContactID: a.Contact.ID, CompanyID: &a.Onboarding.CompanyID, User: customerActor, Action: action, Value: nonEmpty(st.Name), At: time.Now()}
+			if err := tx.Create(&entry).Error; err != nil {
+				return err
+			}
+			return tx.Model(&OnboardingStep{}).Where("id = ?", st.ID).Update("done_entry", entry.ID).Error
 		}
-		// Taking a mark back removes its entry, not adds one: someone outside pressing the
-		// two buttons in turn can't fill the company's history.
-		var entry Event
-		err := tx.Where("org_id = ? and company_id = ? and \"user\" = ? and action = ? and value = ?", org, a.Onboarding.CompanyID, customerActor, "onboard:done", st.Name).Order("id desc").First(&entry).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		// Taking a mark back removes the entry it wrote, not adds one: someone outside
+		// pressing the two buttons in turn can't fill the company's history. A mark made
+		// before steps kept their entry leaves it, since which one is theirs isn't known.
+		if st.DoneEntry == 0 {
 			return nil
 		}
-		if err != nil {
-			return err
-		}
-		return tx.Delete(&entry).Error
+		return tx.Where("org_id = ? and id = ? and action = ?", org, st.DoneEntry, "onboard:done").Delete(&Event{}).Error
 	})
 }
 

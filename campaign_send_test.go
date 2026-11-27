@@ -78,6 +78,7 @@ func mailOf(t *testing.T, s *Store, o *Org, c *Campaign) map[string]CampaignReci
 }
 
 func TestACampaignIsSentOnceToEachPersonThroughTheOrganisationsOwnServer(t *testing.T) {
+	t.Parallel()
 	a, s, o, list, member, box := campaignSite(t)
 	c := draft(t, s, o)
 	code, body := call(t, member, "POST", list+"/"+itoa(c.ID)+"/send", "application/json", map[string]any{})
@@ -128,6 +129,7 @@ func TestACampaignIsSentOnceToEachPersonThroughTheOrganisationsOwnServer(t *test
 }
 
 func TestACampaignIsRefusedWhereItCannotBeSentProperly(t *testing.T) {
+	t.Parallel()
 	_, s, o, list, member, _ := campaignSite(t)
 	c := draft(t, s, o)
 	send := func() (int, string) {
@@ -172,6 +174,7 @@ func TestACampaignIsRefusedWhereItCannotBeSentProperly(t *testing.T) {
 }
 
 func TestACampaignOnlyGoesWhereItShould(t *testing.T) {
+	t.Parallel()
 	a, s, o, _, _, box := campaignSite(t)
 	c := draft(t, s, o)
 	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
@@ -193,6 +196,7 @@ func TestACampaignOnlyGoesWhereItShould(t *testing.T) {
 }
 
 func TestAMailServerThatIsDownPausesACampaignWithoutLosingAnyone(t *testing.T) {
+	t.Parallel()
 	a, s, o, list, member, box := campaignSite(t)
 	c := draft(t, s, o)
 	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
@@ -225,6 +229,7 @@ func TestAMailServerThatIsDownPausesACampaignWithoutLosingAnyone(t *testing.T) {
 }
 
 func TestAMailThatMayHaveGoneIsNeverSentAgain(t *testing.T) {
+	t.Parallel()
 	a, s, o, _, _, box := campaignSite(t)
 	c := draft(t, s, o)
 	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
@@ -257,6 +262,7 @@ func TestAMailThatMayHaveGoneIsNeverSentAgain(t *testing.T) {
 }
 
 func TestAMailClaimedByAServerThatStoppedIsGivenUp(t *testing.T) {
+	t.Parallel()
 	a, s, o, _, _, box := campaignSite(t)
 	c := draft(t, s, o)
 	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
@@ -281,6 +287,7 @@ func TestAMailClaimedByAServerThatStoppedIsGivenUp(t *testing.T) {
 }
 
 func TestACancelledCampaignSendsNoMore(t *testing.T) {
+	t.Parallel()
 	a, s, o, list, member, box := campaignSite(t)
 	c := draft(t, s, o)
 	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
@@ -298,6 +305,7 @@ func TestACancelledCampaignSendsNoMore(t *testing.T) {
 
 // Asked to send twice at once, a campaign gets one set of mail.
 func TestACampaignSentTwiceAtOnceIsSentOnce(t *testing.T) {
+	t.Parallel()
 	_, s, o, _, _, _ := campaignSite(t)
 	c := draft(t, s, o)
 	var wg sync.WaitGroup
@@ -325,6 +333,7 @@ func TestACampaignSentTwiceAtOnceIsSentOnce(t *testing.T) {
 
 // Erasing someone takes their name and address off a campaign's mail, and keeps it counted.
 func TestErasingSomeoneScrubsTheirCampaignMail(t *testing.T) {
+	t.Parallel()
 	a, s, o, _, _, _ := campaignSite(t)
 	c := draft(t, s, o)
 	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
@@ -353,6 +362,7 @@ func TestErasingSomeoneScrubsTheirCampaignMail(t *testing.T) {
 // A mail read for sending before its person was erased isn't sent, and leaves no
 // unsubscribe link holding their address.
 func TestAMailReadBeforeAnErasureIsNotSent(t *testing.T) {
+	t.Parallel()
 	a, s, o, _, _, box := campaignSite(t)
 	c := must(s.SendCampaign(o, draft(t, s, o).ID, "Ada Lovelace"))
 	via := must(a.campaignMail(o.ID))
@@ -379,6 +389,7 @@ func TestAMailReadBeforeAnErasureIsNotSent(t *testing.T) {
 // What the review of sending found: a relay, a race to the host's mail, an erasure that
 // stalled a campaign, refusals that used up the list, and a server that hangs.
 func TestCampaignSendingHoldsAtItsEdges(t *testing.T) {
+	t.Parallel()
 	a, s, o, list, member, box := campaignSite(t)
 
 	// Never straight to a recipient's server, and never without signing in.
@@ -449,6 +460,7 @@ func TestCampaignSendingHoldsAtItsEdges(t *testing.T) {
 }
 
 func TestAServiceNoticeReachesCustomersWhoUnsubscribedButNobodyElse(t *testing.T) {
+	t.Parallel()
 	a, s, o, list, member, box := campaignSite(t)
 	// Everyone made by campaignSite is at Larkmoor Yachts; make it a current customer.
 	var hannah Contact
@@ -524,6 +536,7 @@ func TestAServiceNoticeReachesCustomersWhoUnsubscribedButNobodyElse(t *testing.T
 // are refused when the campaign is sent, not only when it is written, and a new column
 // reads right on rows that were there before it.
 func TestAServiceNoticeIsCheckedAgainAsItIsSent(t *testing.T) {
+	t.Parallel()
 	_, s, o, _, _, _ := campaignSite(t)
 	c := draft(t, s, o)
 	// As a rollback to a release without kinds, or an edit racing the send, could leave it.
@@ -548,6 +561,7 @@ func TestAServiceNoticeIsCheckedAgainAsItIsSent(t *testing.T) {
 // A service notice skips the list not to be mailed only for customers, so a subscription
 // that ends while the notice is still going out stops the rest of it reaching them.
 func TestAServiceNoticeStopsAtSomeoneNoLongerACustomer(t *testing.T) {
+	t.Parallel()
 	a, s, o, _, _, box := campaignSite(t)
 	var hannah Contact
 	if err := s.db.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
@@ -574,6 +588,7 @@ func TestAServiceNoticeStopsAtSomeoneNoLongerACustomer(t *testing.T) {
 }
 
 func TestCampaignsFromBeforeKindsAreMarketing(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	if err := s.db.Create(&Campaign{OrgID: o.ID, Name: "Old", Audience: AudienceConversations, Status: CampaignDraft}).Error; err != nil {

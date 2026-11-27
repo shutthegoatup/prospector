@@ -124,7 +124,7 @@ func TestTheSignersPageIsServedWithoutTheApp(t *testing.T) {
 	}
 	body, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	if res.StatusCode != http.StatusOK || !strings.Contains(string(body), `id="sign"`) || !strings.Contains(string(body), "/assets/app/sign.js?v=") || strings.Contains(string(body), "main.js") {
+	if res.StatusCode != http.StatusOK || !strings.Contains(string(body), `id="sign"`) || !strings.Contains(string(body), `src="/assets/app/sign-`) || strings.Contains(string(body), "/assets/app/main-") {
 		t.Errorf("the signer's page: %d %.300s", res.StatusCode, body)
 	}
 	for header, want := range map[string]string{"Content-Security-Policy": pdfPolicy, "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex, nofollow"} {

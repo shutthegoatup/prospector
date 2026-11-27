@@ -30,7 +30,7 @@ export function Document({ load, over }: { load: () => Promise<ArrayBuffer>; ove
     (async () => {
       const pdfjs = await import("pdfjs-dist");
       pdfjs.GlobalWorkerOptions.workerSrc = "/assets/js/pdf.worker.min.mjs";
-      const pdf = await pdfjs.getDocument({ data: new Uint8Array(await load()), isEvalSupported: false }).promise;
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(await load()) }).promise;
       const width = Math.min(here.current?.clientWidth || 640, 760);
       const out: Sheet[] = [];
       for (let n = 1; n <= pdf.numPages; n++) {
@@ -72,7 +72,7 @@ function Canvas({ sheet }: { sheet: Sheet }) {
     const viewport = sheet.page.getViewport({ scale: (sheet.w / sheet.page.getViewport({ scale: 1 }).width) * devicePixelRatio });
     canvas.width = viewport.width;
     canvas.height = viewport.height;
-    const task = sheet.page.render({ canvasContext: canvas.getContext("2d")!, viewport });
+    const task = sheet.page.render({ canvas, viewport });
     return () => task.cancel();
   }, [sheet]);
   return <canvas ref={ref} className="block w-full" />;
@@ -110,8 +110,8 @@ export function SignForm({
   return (
     <>
       <p className="text-sm text-muted-foreground">
-        You have {places.length === 1 ? "1 place" : `${places.length} places`} to fill in{pages.length ? `, on page ${pages.join(", ")}` : ""}. Read every page; the whole
-        document is below.
+        You have {places.length === 1 ? "1 place" : `${places.length} places`} to fill in{pages.length ? `, on page ${pages.join(", ")}` : ""}. Read every page;
+        the whole document is below.
       </p>
       <Document
         load={load}
@@ -123,9 +123,32 @@ export function SignForm({
                 key={p.id}
                 title={p.label || label[p.kind]}
                 className="absolute flex items-center overflow-hidden rounded px-1 text-[11px] font-semibold"
-                style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%`, width: `${p.w * 100}%`, height: `${p.h * 100}%`, border: "2px solid var(--coral)", background: "#ff745214" }}
+                style={{
+                  left: `${p.x * 100}%`,
+                  top: `${p.y * 100}%`,
+                  width: `${p.w * 100}%`,
+                  height: `${p.h * 100}%`,
+                  border: "2px solid var(--coral)",
+                  background: "#ff745214",
+                }}
               >
-                {p.kind === "signature" || p.kind === "name" ? (typed ? <span className="font-heading italic">{typed}</span> : label[p.kind]) : p.kind === "tick" ? (values[p.id] ? "✓" : "") : p.kind === "text" ? values[p.id] || p.label : label[p.kind]}
+                {p.kind === "signature" || p.kind === "name" ? (
+                  typed ? (
+                    <span className="font-heading italic">{typed}</span>
+                  ) : (
+                    label[p.kind]
+                  )
+                ) : p.kind === "tick" ? (
+                  values[p.id] ? (
+                    "✓"
+                  ) : (
+                    ""
+                  )
+                ) : p.kind === "text" ? (
+                  values[p.id] || p.label
+                ) : (
+                  label[p.kind]
+                )}
               </div>
             ))
         }
@@ -156,11 +179,18 @@ export function SignForm({
         ))}
         <label className="flex flex-col gap-1">
           <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Type your full name</span>
-          <input value={typed} maxLength={120} onChange={(e) => setTyped(e.currentTarget.value)} className="h-10 rounded-lg border border-input bg-muted px-3" />
+          <input
+            value={typed}
+            maxLength={120}
+            onChange={(e) => setTyped(e.currentTarget.value)}
+            className="h-10 rounded-lg border border-input bg-muted px-3"
+          />
         </label>
         <div className="flex flex-col gap-1">
           <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">How it will appear</span>
-          <span className="border-b border-ink pb-1 font-heading text-3xl italic" style={{ maxWidth: 320 }}>{typed || " "}</span>
+          <span className="border-b border-ink pb-1 font-heading text-3xl italic" style={{ maxWidth: 320 }}>
+            {typed || " "}
+          </span>
         </div>
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.currentTarget.checked)} className="mt-1" />
@@ -191,13 +221,15 @@ export function SignForm({
               maxLength={1000}
               onChange={(e) => setReason(e.currentTarget.value)}
               placeholder="Why, for whoever sent it (optional)"
-              className="rounded-lg border border-input bg-muted p-2 text-sm" style={{ minHeight: 80 }}
+              className="rounded-lg border border-input bg-muted p-2 text-sm"
+              style={{ minHeight: 80 }}
             />
             <button
               type="button"
               disabled={busy}
               onClick={() => window.confirm("Decline to sign? It ends the agreement, and whoever sent it is told.") && onDecline(reason)}
-              className="h-9 self-start rounded-lg border-2 bg-card px-3 text-sm font-semibold text-[var(--stop)]" style={{ borderColor: "var(--stop)" }}
+              className="h-9 self-start rounded-lg border-2 bg-card px-3 text-sm font-semibold text-[var(--stop)]"
+              style={{ borderColor: "var(--stop)" }}
             >
               Decline to sign
             </button>

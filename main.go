@@ -191,6 +191,9 @@ func run(args []string) error {
 	s.dns = net.DefaultResolver
 	switch cmd {
 	case "serve":
+		if err := webBuilt(assetFS); err != nil {
+			return err
+		}
 		addr := "127.0.0.1:8766"
 		if port := os.Getenv("PORT"); port != "" {
 			addr = ":" + port
@@ -226,7 +229,7 @@ func run(args []string) error {
 		if os.Getenv("PROSPECTOR_FRONT_ORG") != "" {
 			fmt.Fprintf(os.Stderr, "PROSPECTOR_FRONT_ORG is no longer read: the front page's form sends to the %q organisation\n", frontOrgSlug)
 		}
-		return serve(&App{s: s, base: base, frontOrg: frontOrgSlug, securityContact: contact, social: social, mail: via}, arg(rest, 0, addr))
+		return serve(&App{s: s, rates: rateGuard{on: true}, base: base, frontOrg: frontOrgSlug, securityContact: contact, social: social, mail: via}, arg(rest, 0, addr))
 	case "sso":
 		return ssoCommand(s, rest)
 	case "agent":

@@ -14,6 +14,7 @@ import (
 // A search that comes to companies already here says so, by how each stood when it
 // came to it, and leaves them out of what it found new.
 func TestASearchLeavesOutWhatWasAlreadyHere(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	today := time.Now().Format(dayLayout)
@@ -102,6 +103,7 @@ func TestASearchLeavesOutWhatWasAlreadyHere(t *testing.T) {
 // An agent can reach a company first through a person or a fact; it is judged the same
 // as one it adds, so a customer reached that way isn't a new find either.
 func TestACompanyReachedThroughAPersonIsHeldToo(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	belair := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Belair Kitchens", Domain: "belair.example"}))
@@ -129,6 +131,7 @@ func TestACompanyReachedThroughAPersonIsHeldToo(t *testing.T) {
 // A rejection for another offering says nothing about this one, so a company rejected
 // for the organisation's own waits in an offering's search like any other.
 func TestARejectionForAnotherOfferingIsntLeftOut(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO"}, "Ada"))
@@ -146,6 +149,7 @@ func TestARejectionForAnotherOfferingIsntLeftOut(t *testing.T) {
 // People an agent is refused for a search are counted by why, and nothing else: the
 // count outlives an erasure and goes out in exports.
 func TestASearchCountsThePeopleItWasRefused(t *testing.T) {
+	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	gone := must(s.QuickAddPerson(o, QuickAdd{Name: "Ines Ward", Company: "Larkmoor Yachts"}, "Ada Lovelace"))

@@ -107,6 +107,7 @@ func claudeSetup(t *testing.T) (*runSetup, *fakeClaude, *fakeEndpoint) {
 }
 
 func TestAClaudeAgentIsSetUpFromAnthropicsModelList(t *testing.T) {
+	t.Parallel()
 	r, _, tools := claudeSetup(t)
 	c := must(r.s.AgentByID(r.o.ID, r.agent))
 	if c.Kind != kindAnthropic || c.Model != defaultClaude || strings.Join(c.ModelList(), " ") != "claude-haiku-5-5 claude-opus-5-5" || !c.Ready() {
@@ -133,6 +134,7 @@ func TestAClaudeAgentIsSetUpFromAnthropicsModelList(t *testing.T) {
 }
 
 func TestAClaudeAgentWorksATaskThroughAnthropicsAPI(t *testing.T) {
+	t.Parallel()
 	r, claude, tools := claudeSetup(t)
 	claude.reply = func(n int) (int, string) {
 		switch n {
@@ -195,6 +197,7 @@ func TestAClaudeAgentWorksATaskThroughAnthropicsAPI(t *testing.T) {
 }
 
 func TestAnAgentChangesKindOnlyWhenTold(t *testing.T) {
+	t.Parallel()
 	r, _, tools := claudeSetup(t)
 	ctx := context.Background()
 	c := must(r.s.AgentByID(r.o.ID, r.agent))
@@ -218,6 +221,7 @@ func TestAnAgentChangesKindOnlyWhenTold(t *testing.T) {
 }
 
 func TestAClaudeRunWaitsOutAnOverloadAnOutageAndADroppedConnection(t *testing.T) {
+	t.Parallel()
 	r, claude, _ := claudeSetup(t)
 	claude.reply = func(n int) (int, string) {
 		switch n {
@@ -247,6 +251,7 @@ func TestAClaudeRunWaitsOutAnOverloadAnOutageAndADroppedConnection(t *testing.T)
 }
 
 func TestAClaudeRunWaitsOutItsLimitAndEndsOnAWrongModelOrARefusal(t *testing.T) {
+	t.Parallel()
 	r, claude, _ := claudeSetup(t)
 	claude.reply = func(n int) (int, string) {
 		if n == 0 {
@@ -299,6 +304,7 @@ func TestAClaudeAgentNeverUsesTheServersOwnAnthropicCredentials(t *testing.T) {
 }
 
 func TestClaudeToolsKeepTheirSchemas(t *testing.T) {
+	t.Parallel()
 	defs := []toolDef{{Type: "function"}}
 	defs[0].Function.Name, defs[0].Function.Description = "add_fact", "Add a fact."
 	defs[0].Function.Parameters = json.RawMessage(`{"type":"object","properties":{"company":{"type":"string"}},"required":["company"],"additionalProperties":false}`)

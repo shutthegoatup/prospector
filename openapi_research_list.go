@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
 )
@@ -56,8 +57,20 @@ func (s apiServer) ListResearch(ctx context.Context, in api.ListResearchRequestO
 	out.Body.Items, out.Body.Ranked, out.Body.NextCursor = []api.ResearchCompany{}, ranked, next
 	out.Body.OfferingId = offering
 	out.Body.Counts = s.a.s.researchCountsFor(q.Org.ID, offering, in.Params.Task)
+	ids := make([]int64, len(rows))
+	for i, r := range rows {
+		ids[i] = r.ID
+	}
+	roles, err := s.a.s.rolesAt(q.Org.ID, offering, ids)
+	if err != nil {
+		return nil, err
+	}
 	for _, r := range rows {
-		out.Body.Items = append(out.Body.Items, researchOut(set, r))
+		c := researchOut(set, r)
+		for _, role := range roles[r.ID] {
+			c.Roles = append(c.Roles, roleOut(role))
+		}
+		out.Body.Items = append(out.Body.Items, c)
 	}
 	return out, nil
 }
@@ -94,9 +107,10 @@ func researchOut(set OrgSettings, r ResearchRow) api.ResearchCompany {
 			Answer: factAnswerOut(f.Answer), Inferred: f.Inferred, By: f.Actor, At: f.CreatedAt})
 	}
 	for _, p := range r.People {
-		person := api.ResearchPerson{Id: p.ID, Name: displayName(p), Title: p.Title, Status: p.Status, HasEmail: deref(p.Email) != "",
+		person := api.ResearchPerson{Id: p.ID, Name: displayName(p), Title: p.Title, Status: p.Status, HasEmail: deref(p.Email) != "", HasPhone: deref(p.Phone) != "",
 			EmailStatus: p.EmailStatus, Linkedin: deref(p.Linkedin), SourceUrl: firstLine(deref(p.Sources)),
-			Pending: []api.PendingDetail{}, Lookups: []api.Lookup{}}
+			Pending: []api.PendingDetail{}, Lookups: []api.Lookup{},
+			Unlookable: set.unlookable(p, strings.ToLower(strings.TrimSpace(r.Domain)))}
 		for _, d := range r.Pending[p.ID] {
 			person.Pending = append(person.Pending, pendingOut(d))
 		}

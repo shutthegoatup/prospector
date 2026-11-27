@@ -82,7 +82,8 @@ function SignPage() {
           {!codeSent ? (
             <>
               <p className="text-sm text-muted-foreground">
-                We'll email a 6-digit code to <b className="text-foreground">{s.sent_to}</b>, the address this was sent to. The document opens once you enter it.
+                We'll email a 6-digit code to <b className="text-foreground">{s.sent_to}</b>, the address this was sent to. The document opens once you enter
+                it.
               </p>
               <button
                 type="button"
@@ -119,7 +120,8 @@ function SignPage() {
                   autoComplete="one-time-code"
                   maxLength={6}
                   onChange={(e) => setCode(e.currentTarget.value.replace(/\D/g, ""))}
-                  className="w-40 rounded-lg border-2 border-ink bg-card px-3 font-mono text-2xl" style={{ height: 48, letterSpacing: "0.3em" }}
+                  className="w-40 rounded-lg border-2 border-ink bg-card px-3 font-mono text-2xl"
+                  style={{ height: 48, letterSpacing: "0.3em" }}
                 />
               </label>
               <div className="flex flex-wrap gap-3">
@@ -209,9 +211,7 @@ function SignPage() {
       return (
         <>
           <Title>Signed by everyone</Title>
-          <p className="text-sm text-muted-foreground">
-            {s.agreement} has been signed and sealed. The certificate of signing is its last page.
-          </p>
+          <p className="text-sm text-muted-foreground">{s.agreement} has been signed and sealed. The certificate of signing is its last page.</p>
           <a href="/s/api/v1/sealed" className={button + " inline-flex items-center self-start no-underline"}>
             Download the signed copy
           </a>

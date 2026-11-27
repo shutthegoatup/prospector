@@ -16,6 +16,7 @@ import (
 // makes a caller read. A query written as a statement by itself has dropped it, and a
 // database that is down then looks like an empty list.
 func TestNoQueryDropsItsError(t *testing.T) {
+	t.Parallel()
 	ends := map[string]bool{"Find": true, "First": true, "Take": true, "Scan": true, "Count": true, "Pluck": true,
 		"Create": true, "CreateInBatches": true, "Save": true, "Update": true, "Updates": true, "UpdateColumn": true,
 		"Delete": true, "Exec": true, "AutoMigrate": true}
@@ -56,6 +57,7 @@ func TestNoQueryDropsItsError(t *testing.T) {
 }
 
 func TestAFailedQueryIsntTakenForNothingThere(t *testing.T) {
+	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	co := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "Larkmoor"}))

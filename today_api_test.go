@@ -41,6 +41,7 @@ func cardOf(t *testing.T, page todayPage, step string) api.DueCard {
 }
 
 func TestTodaysQueueIsInTheAPI(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	ada := must(s.UserByEmail("ada@example.com"))
 	if err := s.SaveVoice(o.ID, ada.ID, "Ada Lovelace", "Ada\nAlpha Ltd"); err != nil {
@@ -130,6 +131,7 @@ func TestTodaysQueueIsInTheAPI(t *testing.T) {
 }
 
 func TestMarkingIsRefusedToWhoeverMayNot(t *testing.T) {
+	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	c := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace"))
 	marks := srv.URL + "/o/alpha/api/v1/marks"

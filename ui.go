@@ -57,8 +57,8 @@ func (a *App) nav(q *Req) Nav {
 			n.Conversations += len(list)
 		}
 	}
-	var companies int64
-	logged(a.s.in(q.Org.ID).Model(&Company{}).Count(&companies))
+	companies, err := a.s.CompanyCount(q.Org.ID)
+	noted(err)
 	n.Companies = int(companies)
 	return n
 }

@@ -88,6 +88,21 @@ func bareDomain(v string) string {
 	return strings.TrimPrefix(v, "www.")
 }
 
+func (s *Store) CompanyCount(org int64) (int64, error) {
+	var n int64
+	return n, s.in(org).Model(&Company{}).Count(&n).Error
+}
+
+// CompanyNotes is one page of the notes left on a company, newest first, and how many there are.
+func (s *Store) CompanyNotes(org, company int64, offset, limit int) ([]TaskNote, int64, error) {
+	var total int64
+	if err := s.in(org).Model(&TaskNote{}).Where("company_id = ?", company).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var notes []TaskNote
+	return notes, total, s.in(org).Where("company_id = ?", company).Order("id desc").Limit(limit).Offset(offset).Find(&notes).Error
+}
+
 func (s *Store) CompanyByID(org, id int64) (*Company, error) {
 	var c Company
 	return &c, s.in(org).First(&c, id).Error
@@ -221,6 +236,15 @@ func (s *Store) researchQuery(org, offering int64, filter string, task int64) (*
 			return q.Where("stage = ?", stage)
 		}
 		return q.Where("id in (?)", s.db.Model(&Verdict{}).Select("company_id").Where("org_id = ? and offering_id = ? and stage = ?", org, offering, stage))
+	}
+	// A company the never-contact list covers is kept, but nobody is asked to review it
+	// or find someone there.
+	if filter == "review" || filter == "contact" {
+		o, err := s.OrgByID(org)
+		if err != nil {
+			return nil, "", err
+		}
+		q = notListed(q, o.Settings)
 	}
 	switch filter {
 	case "review":
@@ -444,7 +468,7 @@ func (s *Store) researchCount(org, offering int64, filter string, task int64) in
 		return 0
 	}
 	var n int64
-	logged(q.Count(&n))
+	_ = logged(q.Count(&n))
 	return int(n)
 }
 
@@ -750,12 +774,12 @@ func (s *Store) Week(org int64, now time.Time) Stats {
 	// From the contacts' own dates, so history brought over from an import counts.
 	for _, col := range []string{"linkedin_added", "email_sent", "followup_sent", "called"} {
 		var n int64
-		logged(s.in(org).Model(&Contact{}).Where(col+" >= ?", day).Count(&n))
+		_ = logged(s.in(org).Model(&Contact{}).Where(col+" >= ?", day).Count(&n))
 		st.Touches += n
 	}
-	logged(s.in(org).Model(&Contact{}).Where("replied >= ?", day).Count(&st.Replies))
-	logged(s.in(org).Model(&Event{}).Where("at >= ? and action = ? and value = ?", since, "set:stage", "meeting").Count(&st.Meetings))
-	logged(s.in(org).Model(&Company{}).Where("created_at >= ? and found_by <> 'import'", since).Count(&st.Researched))
+	_ = logged(s.in(org).Model(&Contact{}).Where("replied >= ?", day).Count(&st.Replies))
+	_ = logged(s.in(org).Model(&Event{}).Where("at >= ? and action = ? and value = ?", since, "set:stage", "meeting").Count(&st.Meetings))
+	_ = logged(s.in(org).Model(&Company{}).Where("created_at >= ? and found_by <> 'import'", since).Count(&st.Researched))
 	return st
 }
 
@@ -770,9 +794,9 @@ const activityPageSize = 20
 
 // AgentActivity is one page of what agents did, newest first.
 func (s *Store) AgentActivity(org int64, page int) ([]AgentEvent, Page) {
-	events, total := s.agentEvents(org, 0, 0)
+	_, total := s.agentEvents(org, 0, 0)
 	pg := pageOf(page, activityPageSize, total)
-	events, _ = s.agentEvents(org, pg.offset(), pg.Size)
+	events, _ := s.agentEvents(org, pg.offset(), pg.Size)
 	return events, pg
 }
 
@@ -781,12 +805,12 @@ func (s *Store) AgentActivity(org int64, page int) ([]AgentEvent, Page) {
 func (s *Store) agentEvents(org int64, offset, limit int) ([]AgentEvent, int) {
 	agents := func() *gorm.DB { return s.in(org).Model(&Event{}).Where(`"user" like 'agent:%'`) }
 	var total int64
-	logged(agents().Count(&total))
+	_ = logged(agents().Count(&total))
 	if limit == 0 {
 		return nil, int(total)
 	}
 	var events []Event
-	logged(agents().Order("at desc, id desc").Limit(limit).Offset(offset).Find(&events))
+	_ = logged(agents().Order("at desc, id desc").Limit(limit).Offset(offset).Find(&events))
 	out := make([]AgentEvent, len(events))
 	for i, e := range events {
 		out[i] = AgentEvent{e.At, strings.TrimPrefix(e.User, "agent:"), e.Action, deref(e.Value)}
@@ -868,7 +892,7 @@ func uniqueKey(tx *gorm.DB, org int64, key string) string {
 	try := key
 	for i := 2; ; i++ {
 		var n int64
-		logged(tx.Model(&Contact{}).Where("org_id = ? and key = ?", org, try).Count(&n))
+		_ = logged(tx.Model(&Contact{}).Where("org_id = ? and key = ?", org, try).Count(&n))
 		if n == 0 {
 			return try
 		}
@@ -911,6 +935,43 @@ func (set OrgSettings) listed(email, link string) error {
 
 var schemeRe = regexp.MustCompile(`^[a-z]+://`)
 
+// neverDomains are the list's domain entries, the ones that cover a whole company.
+func (set OrgSettings) neverDomains() []string {
+	var out []string
+	for _, raw := range strings.FieldsFunc(strings.ToLower(set.NeverContact), func(r rune) bool { return r == ',' || r == '\n' || r == ' ' }) {
+		entry := strings.TrimRight(strings.TrimPrefix(schemeRe.ReplaceAllString(strings.TrimSpace(raw), ""), "www."), "/")
+		if entry == "" || linkedinPath(entry) != "" || strings.Contains(entry, "@") {
+			continue
+		}
+		host, _, _ := strings.Cut(entry, "/")
+		out = append(out, host)
+	}
+	return out
+}
+
+// coversCompany is whether a company's web domain, or one it is under, is on the list.
+// The company is kept and built on; only contacting it is barred.
+func (set OrgSettings) coversCompany(domain string) bool {
+	domain = bareDomain(domain)
+	if domain == "" {
+		return false
+	}
+	for _, host := range set.neverDomains() {
+		if domain == host || strings.HasSuffix(domain, "."+host) {
+			return true
+		}
+	}
+	return false
+}
+
+// notListed keeps the companies the list covers out of a query, as coversCompany does.
+func notListed(q *gorm.DB, set OrgSettings) *gorm.DB {
+	for _, host := range set.neverDomains() {
+		q = q.Where("not (lower(domain) = ? or lower(domain) like ?)", host, "%."+host)
+	}
+	return q
+}
+
 // linkedinPath is what identifies a LinkedIn page whatever the subdomain: "in/hannah-pryce".
 func linkedinPath(link string) string {
 	_, path, found := strings.Cut(strings.ToLower(strings.TrimSpace(link)), "linkedin.com/")
@@ -930,7 +991,7 @@ func (s *Store) NeverContactCovers(o *Org) []string {
 		return nil
 	}
 	var people []Contact
-	logged(s.in(o.ID).Where(openContacts).Where(companyNotRejected).Order("id").Find(&people))
+	_ = logged(s.in(o.ID).Where(openContacts).Where(companyNotRejected).Order("id").Find(&people))
 	var names []string
 	for _, p := range people {
 		if o.Settings.listed(deref(p.Email), deref(p.Linkedin)) != nil {

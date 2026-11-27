@@ -26,7 +26,9 @@ export function SignPage() {
   if (agreement.error) return <Failed errors={[agreement.error]} />;
   if (!a || !fields.data || !recipients.data) return <Meta>Reading the agreement…</Meta>;
   const me = recipients.data.items.find((r) => r.id === a.my_recipient);
-  const places: Place[] = fields.data.items.filter((f) => f.recipient_id === a.my_recipient).map(({ id, page, kind, label, x, y, w, h }) => ({ id, page, kind, label: label ?? "", x, y, w, h }));
+  const places: Place[] = fields.data.items
+    .filter((f) => f.recipient_id === a.my_recipient)
+    .map(({ id, page, kind, label, x, y, w, h }) => ({ id, page, kind, label: label ?? "", x, y, w, h }));
 
   if (done || !a.my_turn) {
     return (
@@ -53,7 +55,9 @@ export function SignPage() {
           consent={a.consent}
           busy={sign.isPending || decline.isPending}
           error={(sign.error ?? decline.error)?.detail ?? ""}
-          onSign={(x) => sign.mutate({ ...path, body: { typed_name: x.typed, consent: true, values: x.values } }, { onSuccess: () => setDone("You've signed") })}
+          onSign={(x) =>
+            sign.mutate({ ...path, body: { typed_name: x.typed, consent: true, values: x.values } }, { onSuccess: () => setDone("You've signed") })
+          }
           onDecline={(reason) => decline.mutate({ ...path, body: { reason } }, { onSuccess: () => setDone("You declined it") })}
         />
       </div>

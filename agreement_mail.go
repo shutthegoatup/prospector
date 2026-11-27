@@ -96,25 +96,22 @@ func (a *App) keepSigning(ctx context.Context, every time.Duration) {
 
 // signingRound is one go of the loop; safe beside another server doing the same.
 func (a *App) signingRound(ctx context.Context, now time.Time) {
-	logged(a.s.db.Model(&AgreementMail{}).Where("status = ? and next_at < ?", mailSending, now.Add(-10*time.Minute)).Update("status", mailQueued))
-	// Spent sessions and links open nothing; what they did is in the events.
-	logged(a.s.db.Where("expires_at < ?", now.Add(-24*time.Hour)).Delete(&SignerSession{}))
-	logged(a.s.db.Where("expires_at < ?", now.Add(-24*time.Hour)).Delete(&SignerLink{}))
+	a.s.tidySigning(now)
 	if err := a.s.expireAgreements(now); err != nil {
 		log.Printf("ending agreements whose time ran out: %v", err)
 	}
-	var sealing []Agreement
-	if err := a.s.db.Where("status = ?", AgreementSealing).Find(&sealing).Error; err != nil {
+	sealing, err := a.s.agreementsSealing()
+	if err != nil {
 		log.Print(err)
 	}
 	for _, ag := range sealing {
 		if err := a.sealAgreement(ag); err != nil {
 			log.Printf("sealing agreement %d: %v", ag.ID, err)
-			logged(a.s.db.Model(&Agreement{}).Where("id = ? and status = ?", ag.ID, AgreementSealing).Update("seal_problem", err.Error()))
+			a.s.noteSealProblem(ag, err)
 		}
 	}
-	var queued []AgreementMail
-	if err := a.s.db.Where("status = ? and next_at <= ?", mailQueued, now).Order("id").Limit(50).Find(&queued).Error; err != nil {
+	queued, err := a.s.queuedAgreementMail(now)
+	if err != nil {
 		log.Print(err)
 	}
 	for _, m := range queued {
@@ -129,31 +126,37 @@ func (a *App) signingRound(ctx context.Context, now time.Time) {
 // signer gave, the certificate drawn from its events, then sealed and kept, and the
 // sealed copy sent to everyone on it.
 func (a *App) sealAgreement(ag Agreement) error {
-	var o Org
-	if err := a.s.db.First(&o, ag.OrgID).Error; err != nil {
+	o, err := a.s.OrgByID(ag.OrgID)
+	if err != nil {
 		return err
 	}
 	_, doc, err := a.s.AgreementDocument(o.ID, ag.ID)
 	if err != nil {
 		return err
 	}
-	var fields []AgreementField
-	if err := a.s.db.Where("org_id = ? and agreement_id = ? and round = ?", o.ID, ag.ID, ag.Round).Find(&fields).Error; err != nil {
+	fields, err := a.s.AgreementFields(o.ID, ag.ID)
+	if err != nil {
 		return err
 	}
 	stamps := make([]Stamp, 0, len(fields))
 	for _, f := range fields {
 		stamps = append(stamps, Stamp{Page: f.Page, X: f.X, Y: f.Y, W: f.W, H: f.H, Kind: f.Kind, Value: f.Value})
 	}
-	c, err := a.s.certificateFor(&o, ag)
+	c, err := a.s.certificateFor(o, ag)
 	if err != nil {
 		return err
 	}
-	out, err := a.s.seal(&o, doc, stamps, *c)
+	out, err := a.s.seal(o, doc, stamps, *c)
 	if err != nil {
 		return err
 	}
-	return a.s.db.Transaction(func(tx *gorm.DB) error {
+	return a.s.keepSealed(o, ag, out)
+}
+
+// keepSealed keeps a sealed copy, completes its agreement and queues the copy to
+// everyone on it, unless something else moved the agreement on meanwhile.
+func (s *Store) keepSealed(o *Org, ag Agreement, out *Sealed) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
 		locked, err := lockAgreement(tx, o.ID, ag.ID)
 		if err != nil {
 			return err
@@ -235,8 +238,7 @@ func (s *Store) certificateFor(o *Org, ag Agreement) (*Certificate, error) {
 // sendAgreementMail claims a queued mail, writes it and sends it. What has to happen
 // with it (a link made, an event recorded) happens once the server has taken it.
 func (a *App) sendAgreementMail(ctx context.Context, m AgreementMail) {
-	res := a.s.db.Model(&AgreementMail{}).Where("id = ? and status = ?", m.ID, mailQueued).Updates(map[string]any{"status": mailSending, "next_at": time.Now()})
-	if res.Error != nil || res.RowsAffected == 0 {
+	if !a.s.claimAgreementMail(m) {
 		return
 	}
 	err := a.writeAndSend(ctx, m)
@@ -248,7 +250,7 @@ func (a *App) sendAgreementMail(ctx context.Context, m AgreementMail) {
 	if m.Tries >= mailTries || errors.Is(err, errNoMailToSend) {
 		status = mailFailed
 	}
-	logged(a.s.db.Model(&AgreementMail{}).Where("id = ?", m.ID).Updates(map[string]any{"status": status, "tries": m.Tries, "next_at": next, "error": err.Error()}))
+	a.s.agreementMailFailed(m, status, next, err)
 	if !errors.Is(err, errNoMailToSend) {
 		log.Printf("agreement %d's mail %d: %v", m.AgreementID, m.ID, err)
 	}
@@ -259,16 +261,16 @@ func (a *App) sendAgreementMail(ctx context.Context, m AgreementMail) {
 var errNoMailToSend = errors.New("nothing to send any more")
 
 func (a *App) writeAndSend(ctx context.Context, m AgreementMail) error {
-	var o Org
-	if err := a.s.db.First(&o, m.OrgID).Error; err != nil {
+	o, err := a.s.OrgByID(m.OrgID)
+	if err != nil {
 		return err
 	}
 	ag, err := a.s.Agreement(o.ID, m.AgreementID)
 	if err != nil {
 		return err
 	}
-	var r AgreementRecipient
-	if err := a.s.db.Where("org_id = ? and id = ?", o.ID, m.RecipientID).First(&r).Error; err != nil || r.Erased {
+	r, err := a.s.mailRecipient(m)
+	if err != nil || r.Erased {
 		return errNoMailToSend
 	}
 	// The never-contact list is checked as each mail goes, not only when it was sent:
@@ -283,15 +285,28 @@ func (a *App) writeAndSend(ctx context.Context, m AgreementMail) error {
 	if via == nil || a.base == "" {
 		return errors.New("the organisation's own mail server, or this server's public address, has gone")
 	}
-	to, kind, event := r.SentEmail, EventLinkSent, ""
-	var msg Message
+	// The link is made, and the mail written, first; it is sent with no transaction open,
+	// since a mail server can take its time; then what went is recorded.
+	msg, kind, event, err := a.s.writeAgreementMail(a.base, o, ag, r, m)
+	if err != nil {
+		return err
+	}
+	if err := a.deliver(ctx, *via, msg); err != nil {
+		return err
+	}
+	return a.s.agreementMailSent(o, ag, r, m, kind, event)
+}
+
+// writeAgreementMail makes what a queued mail needs (a signer's link) and writes it:
+// the message, and the kind and wording of the event to record once it has gone.
+func (s *Store) writeAgreementMail(base string, o *Org, ag *Agreement, r *AgreementRecipient, m AgreementMail) (msg Message, kind, event string, err error) {
+	to := r.SentEmail
+	kind = EventLinkSent
 	until := ""
 	if ag.ExpiresAt != nil {
 		until = ag.ExpiresAt.Format("2 January 2006")
 	}
-	// The link is made, and the mail written, first; it is sent with no transaction open,
-	// since a mail server can take its time; then what went is recorded.
-	err = a.s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.db.Transaction(func(tx *gorm.DB) error {
 		var link string
 		switch m.Kind {
 		case mailLink:
@@ -299,9 +314,9 @@ func (a *App) writeAndSend(ctx context.Context, m AgreementMail) error {
 				return errNoMailToSend
 			}
 			if r.UserID != nil {
-				link = fmt.Sprintf("%s/o/%s/agreements/%d/sign", a.base, o.Slug, ag.ID)
-			} else if link, err = newSignerLink(tx, *ag, r, *ag.ExpiresAt); err == nil {
-				link = a.base + "/s/" + link
+				link = fmt.Sprintf("%s/o/%s/agreements/%d/sign", base, o.Slug, ag.ID)
+			} else if link, err = newSignerLink(tx, *ag, *r, *ag.ExpiresAt); err == nil {
+				link = base + "/s/" + link
 			}
 			msg = Message{Subject: ag.Subject, Body: fmt.Sprintf("%s has sent you %s to sign.\n\n%s\n\nOpen it here:\n%s\n\nTo sign you'll be asked for a code we email to this address, and to type your name. "+
 				"The link works until %s.\n\nIf this wasn't meant for you, you can ignore it.\n", ag.SentOrg, ag.Name, mailQuote(ag.Message), link, until)}
@@ -311,9 +326,9 @@ func (a *App) writeAndSend(ctx context.Context, m AgreementMail) error {
 				return errNoMailToSend
 			}
 			if r.UserID != nil {
-				link = fmt.Sprintf("%s/o/%s/companies/%d", a.base, o.Slug, ag.CompanyID)
-			} else if link, err = newSignerLink(tx, *ag, r, time.Now().Add(copyLife)); err == nil {
-				link = a.base + "/s/" + link
+				link = fmt.Sprintf("%s/o/%s/companies/%d", base, o.Slug, ag.CompanyID)
+			} else if link, err = newSignerLink(tx, *ag, *r, time.Now().Add(copyLife)); err == nil {
+				link = base + "/s/" + link
 			}
 			msg = Message{Subject: "Signed: " + ag.Name, Body: fmt.Sprintf("%s has been signed by everyone and sealed. Download the signed copy, with its certificate, here:\n%s\n\n"+
 				"You'll be asked for a code we email to this address. The link works for 90 days.\n", ag.Name, link)}
@@ -333,7 +348,7 @@ func (a *App) writeAndSend(ctx context.Context, m AgreementMail) error {
 				reason = "\n\nTheir reason:\n" + mailQuote(r.DeclineReason)
 			}
 			msg = Message{Subject: "Declined: " + ag.Name, Body: fmt.Sprintf("%s declined to sign %s.%s\n\nIt can't be signed now. Start it again from %s/o/%s/companies/%d.\n",
-				r.SentName, ag.Name, reason, a.base, o.Slug, ag.CompanyID)}
+				r.SentName, ag.Name, reason, base, o.Slug, ag.CompanyID)}
 			kind = ""
 		default:
 			return errNoMailToSend
@@ -353,14 +368,13 @@ func (a *App) writeAndSend(ctx context.Context, m AgreementMail) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	if err := a.deliver(ctx, *via, msg); err != nil {
-		return err
-	}
+	return msg, kind, event, err
+}
+
+// agreementMailSent records that the mail server took a queued mail, and what it did.
+func (s *Store) agreementMailSent(o *Org, ag *Agreement, r *AgreementRecipient, m AgreementMail, kind, event string) error {
 	now := time.Now().UTC()
-	return a.s.db.Transaction(func(tx *gorm.DB) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&AgreementMail{}).Where("id = ?", m.ID).Updates(map[string]any{"status": mailSent, "sent_at": now, "error": ""}).Error; err != nil {
 			return err
 		}
@@ -374,6 +388,46 @@ func (a *App) writeAndSend(ctx context.Context, m AgreementMail) error {
 		_, err := recordAgreementEvent(tx, AgreementEvent{OrgID: o.ID, AgreementID: ag.ID, Round: ag.Round, At: now, Kind: kind, RecipientID: &rid, Detail: event})
 		return err
 	})
+}
+
+// tidySigning frees mail a stopped server was sending, and forgets signer sessions and
+// links spent a day ago: they open nothing, and what they did is in the events.
+func (s *Store) tidySigning(now time.Time) {
+	_ = logged(s.db.Model(&AgreementMail{}).Where("status = ? and next_at < ?", mailSending, now.Add(-10*time.Minute)).Update("status", mailQueued))
+	_ = logged(s.db.Where("expires_at < ?", now.Add(-24*time.Hour)).Delete(&SignerSession{}))
+	_ = logged(s.db.Where("expires_at < ?", now.Add(-24*time.Hour)).Delete(&SignerLink{}))
+}
+
+// agreementsSealing are, across organisations, the agreements everyone has signed.
+func (s *Store) agreementsSealing() ([]Agreement, error) {
+	var out []Agreement
+	return out, s.db.Where("status = ?", AgreementSealing).Find(&out).Error
+}
+
+func (s *Store) noteSealProblem(ag Agreement, why error) {
+	_ = logged(s.db.Model(&Agreement{}).Where("org_id = ? and id = ? and status = ?", ag.OrgID, ag.ID, AgreementSealing).Update("seal_problem", why.Error()))
+}
+
+// queuedAgreementMail is, across organisations, the mail due to go.
+func (s *Store) queuedAgreementMail(now time.Time) ([]AgreementMail, error) {
+	var out []AgreementMail
+	return out, s.db.Where("status = ? and next_at <= ?", mailQueued, now).Order("id").Limit(50).Find(&out).Error
+}
+
+// claimAgreementMail says whether this server is the one to send m: only one of two
+// at once can move it from queued.
+func (s *Store) claimAgreementMail(m AgreementMail) bool {
+	res := s.db.Model(&AgreementMail{}).Where("id = ? and status = ?", m.ID, mailQueued).Updates(map[string]any{"status": mailSending, "next_at": time.Now()})
+	return res.Error == nil && res.RowsAffected == 1
+}
+
+func (s *Store) agreementMailFailed(m AgreementMail, status string, next time.Time, why error) {
+	_ = logged(s.db.Model(&AgreementMail{}).Where("id = ?", m.ID).Updates(map[string]any{"status": status, "tries": m.Tries, "next_at": next, "error": why.Error()}))
+}
+
+func (s *Store) mailRecipient(m AgreementMail) (*AgreementRecipient, error) {
+	var r AgreementRecipient
+	return &r, s.in(m.OrgID).Where("id = ?", m.RecipientID).First(&r).Error
 }
 
 // mailQuote is a sender's own words set apart in a plain-text mail.

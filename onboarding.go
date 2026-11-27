@@ -36,6 +36,8 @@ type OnboardingStep struct {
 	Due    *string `json:"due"`
 	DoneOn *string `json:"done_on"`
 	DoneBy string  `gorm:"not null;default:''" json:"done_by"`
+	// DoneEntry is the history entry a customer's mark wrote, which taking it back removes.
+	DoneEntry int64 `gorm:"not null;default:0" json:"done_entry"`
 }
 
 const (
@@ -144,6 +146,14 @@ func (s *Store) StartOnboarding(org int64, in OnboardingIn, actor string) (*Onbo
 	return &ob, nil
 }
 
+func (s *Store) OnboardingStepByID(org, id int64) (*OnboardingStep, error) {
+	var st OnboardingStep
+	if err := s.in(org).Where("id = ?", id).First(&st).Error; err != nil {
+		return nil, missing(err, "no onboarding step %d", id)
+	}
+	return &st, nil
+}
+
 // SetOnboardingStep marks a step done or not, or moves the day it is due. The steps
 // are the organisation's own wording, so the history names the one that was done.
 func (s *Store) SetOnboardingStep(org, id int64, field, value, actor string) error {
@@ -163,7 +173,7 @@ func (s *Store) SetOnboardingStep(org, id int64, field, value, actor string) err
 		case "done":
 			switch {
 			case value == "":
-				updates["done_on"], updates["done_by"], action = nil, "", "onboard:undone"
+				updates["done_on"], updates["done_by"], updates["done_entry"], action = nil, "", 0, "onboard:undone"
 			case value != "yes":
 				return fmt.Errorf("a step is done (yes) or not (empty), not %q", value)
 			case st.DoneOn != nil:

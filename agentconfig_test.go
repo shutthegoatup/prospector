@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
 	"github.com/shutthegoatup/prospector/api"
 )
 
@@ -118,6 +119,7 @@ func agentSite(t *testing.T, fake *fakeEndpoint) (*Store, *httptest.Server, *htt
 }
 
 func TestAnOwnerSetsUpTheAgent(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	s, srv, ada := agentSite(t, fake)
 	o := must(s.OrgBySlug("alpha"))
@@ -195,6 +197,7 @@ func TestAnOwnerSetsUpTheAgent(t *testing.T) {
 }
 
 func TestAnOrganisationHasSeveralAgents(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	s, srv, ada := agentSite(t, fake)
 	o := must(s.OrgBySlug("alpha"))
@@ -275,6 +278,7 @@ func TestAnOrganisationHasSeveralAgents(t *testing.T) {
 }
 
 func TestAToolServerElsewhereIsntSentTheKey(t *testing.T) {
+	t.Parallel()
 	fake, other := newFakeEndpoint(t), newFakeEndpoint(t)
 	s, srv, ada := agentSite(t, fake)
 	pool := fake.srv.Client()
@@ -302,6 +306,7 @@ func slicesContainsPrefix(list []string, prefix string) bool {
 }
 
 func TestAnEndpointAtItsLimitStillSaves(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	fake.limited = true
 	s, srv, ada := agentSite(t, fake)
@@ -322,6 +327,7 @@ func TestAnEndpointAtItsLimitStillSaves(t *testing.T) {
 }
 
 func TestOnlyOwnersSetUpTheAgentAndOnlyWithASecretKey(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	s, srv, _ := agentSite(t, fake)
 	o := must(s.OrgBySlug("alpha"))
@@ -344,6 +350,7 @@ func TestOnlyOwnersSetUpTheAgentAndOnlyWithASecretKey(t *testing.T) {
 }
 
 func TestTheAgentsClientRefusesThisMachine(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	_, err := (&App{}).listModels(context.Background(), fake.srv.URL+"/v1", agentTestKey)
 	if err == nil || !strings.Contains(err.Error(), "isn't a public address") {
@@ -355,6 +362,7 @@ func TestTheAgentsClientRefusesThisMachine(t *testing.T) {
 }
 
 func TestAnAgentKeyMovesToANewSecretKey(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	s, _, _ := agentSite(t, fake)
 	o := must(s.OrgBySlug("alpha"))
@@ -375,6 +383,7 @@ func TestAnAgentKeyMovesToANewSecretKey(t *testing.T) {
 // A database as the release with one agent per organisation left it: its settings in
 // agent_configs, its built-in key, and a run it had going when the server stopped.
 func TestTheOneAgentFromBeforeCarriesOnAsOneOfSeveral(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	s := r.s
@@ -428,6 +437,7 @@ func TestTheOneAgentFromBeforeCarriesOnAsOneOfSeveral(t *testing.T) {
 }
 
 func TestGoingBackAReleaseAndForwardAgainStillStarts(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	s := r.s
@@ -487,6 +497,7 @@ func TestGoingBackAReleaseAndForwardAgainStillStarts(t *testing.T) {
 }
 
 func TestAMovedAgentNeverTakesAKeyAnotherAgentHolds(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	s := r.s
@@ -526,6 +537,7 @@ func TestAMovedAgentNeverTakesAKeyAnotherAgentHolds(t *testing.T) {
 }
 
 func TestAnAgentDeletedWhileSavingStaysDeleted(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	c := must(r.s.AgentByID(r.o.ID, r.agent))
@@ -554,6 +566,7 @@ func TestAnAgentDeletedWhileSavingStaysDeleted(t *testing.T) {
 }
 
 func TestEveryGoingRunIsOnTheTaskPage(t *testing.T) {
+	t.Parallel()
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	now := time.Now()
@@ -569,6 +582,7 @@ func TestEveryGoingRunIsOnTheTaskPage(t *testing.T) {
 }
 
 func TestRefusalsReadBothErrorShapes(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	for _, body := range []string{`{"error":{"code":"429","message":"slow down"}}`, `{"error":{"code":429,"message":"slow down"}}`} {
 		rec := httptest.NewRecorder()

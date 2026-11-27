@@ -27,6 +27,7 @@ func leftOut(people []Recipient) map[string]string {
 }
 
 func TestACampaignGoesOnlyToPeopleWithARelationship(t *testing.T) {
+	t.Parallel()
 	s, o, _, _ := signedIn(t)
 	person(t, s, o, "Hannah Pryce", "Larkmoor Yachts", "hannah@larkmoor.example", true)
 	person(t, s, o, "Tom Ellery", "Larkmoor Yachts", "", true)
@@ -107,6 +108,7 @@ func TestACampaignGoesOnlyToPeopleWithARelationship(t *testing.T) {
 }
 
 func TestCampaignDraftsAreKeptByMembersAndKeys(t *testing.T) {
+	t.Parallel()
 	s, o, srv, member := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	key := func(org int64, scopes ...string) string {
@@ -199,6 +201,7 @@ func TestCampaignDraftsAreKeptByMembersAndKeys(t *testing.T) {
 
 // The postal address is a setting like the others, and saving the rest keeps it.
 func TestThePostalAddressIsKept(t *testing.T) {
+	t.Parallel()
 	s, o, srv, member := signedIn(t)
 	save := func(postal string) {
 		t.Helper()
@@ -219,6 +222,7 @@ func TestThePostalAddressIsKept(t *testing.T) {
 // What the review of drafts found: a never-contact LinkedIn profile, a subscription not
 // yet started, and a body's last line.
 func TestTheAudienceHoldsAtItsEdges(t *testing.T) {
+	t.Parallel()
 	s, o, srv, member := signedIn(t)
 	listedByProfile := must(s.QuickAddPerson(o, QuickAdd{Name: "Profile Listed", Company: "Larkmoor Yachts", Email: "listed@larkmoor.example", Linkedin: "https://www.linkedin.com/in/li-never"}, "Ada Lovelace"))
 	if err := s.Mark(o.ID, listedByProfile.ID, "replied", today(), "Ada Lovelace"); err != nil {
