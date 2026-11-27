@@ -30,7 +30,6 @@ var Areas = identity.Areas
 var Scopes = identity.Scopes
 var browserOrigin = identity.BrowserOrigin
 var deviceMAC = identity.DeviceMAC
-var dropRecipients = identity.DropRecipients
 var errBadLink = identity.ErrBadLink
 var errTooSoon = identity.ErrTooSoon
 var errWrongCurrent = identity.ErrWrongCurrent

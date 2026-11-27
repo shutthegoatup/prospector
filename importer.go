@@ -31,8 +31,6 @@ type Draft struct {
 	Phone    string  `json:"phone"`
 }
 
-type CompanyRow map[string]string
-
 type SentLogEntry struct {
 	Date string `json:"date"`
 	Line string `json:"line"`

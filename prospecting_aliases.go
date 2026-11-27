@@ -50,7 +50,6 @@ type vendorFind = prospecting.VendorFind
 var Marks = prospecting.Marks
 var assetsFound = prospecting.AssetsFound
 var detailOf = prospecting.DetailOf
-var ensureCompany = prospecting.EnsureCompany
 var erased = prospecting.ErasedIn
 var fill = prospecting.Fill
 var firstField = prospecting.FirstField
