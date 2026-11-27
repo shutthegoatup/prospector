@@ -10,14 +10,14 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-func (s *Store) Enrichers(org int64) ([]Enricher, error) {
+func (s *prospectingStore) Enrichers(org int64) ([]Enricher, error) {
 	var out []Enricher
 	return out, s.db.Where("org_id = ?", org).Order("position, id").Find(&out).Error
 }
 
 // SaveEnricher adds a vendor, or changes the one of that kind. An empty key keeps
 // the saved one.
-func (s *Store) SaveEnricher(org int64, in EnricherIn, by string) (*Enricher, error) {
+func (s *prospectingStore) SaveEnricher(org int64, in EnricherIn, by string) (*Enricher, error) {
 	kind := strings.ToLower(strings.TrimSpace(in.Kind))
 	if vendors[kind] == nil {
 		return nil, fmt.Errorf("unknown vendor %q: one of %s", in.Kind, strings.Join(vendorKinds(), ", "))
@@ -44,7 +44,7 @@ func (s *Store) SaveEnricher(org int64, in EnricherIn, by string) (*Enricher, er
 	return &e, s.db.Save(&e).Error
 }
 
-func (s *Store) DeleteEnricher(org, id int64) error {
+func (s *prospectingStore) DeleteEnricher(org, id int64) error {
 	res := s.db.Where("org_id = ? and id = ?", org, id).Delete(&Enricher{})
 	if res.Error == nil && res.RowsAffected == 0 {
 		return noSuch("no vendor %d in this organisation", id)
@@ -52,7 +52,7 @@ func (s *Store) DeleteEnricher(org, id int64) error {
 	return res.Error
 }
 
-func (s *Store) EnricherUsed(org int64, kind string, now time.Time) int {
+func (s *prospectingStore) EnricherUsed(org int64, kind string, now time.Time) int {
 	var u EnrichUsage
 	_ = logged(s.db.Where("org_id = ? and kind = ? and month = ?", org, kind, now.UTC().Format("2006-01")).Limit(1).Find(&u))
 	return u.Calls
@@ -60,7 +60,7 @@ func (s *Store) EnricherUsed(org int64, kind string, now time.Time) int {
 
 // Spend takes one lookup of a vendor's month, unless its limit is reached. One
 // statement, so two lookups at once can't both take the last.
-func (s *Store) Spend(org int64, e Enricher, now time.Time) (bool, error) {
+func (s *prospectingStore) Spend(org int64, e Enricher, now time.Time) (bool, error) {
 	month := now.UTC().Format("2006-01")
 	if err := s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&EnrichUsage{OrgID: org, Kind: e.Kind, Month: month}).Error; err != nil {
 		return false, err
@@ -71,7 +71,7 @@ func (s *Store) Spend(org int64, e Enricher, now time.Time) (bool, error) {
 }
 
 // KeepFind suggests what a vendor found for a person, and reports whether it was new.
-func (s *Store) KeepFind(org int64, who Actor, contact int64, field, kind, value, status string) (made bool, err error) {
+func (s *prospectingStore) KeepFind(org int64, who Actor, contact int64, field, kind, value, status string) (made bool, err error) {
 	return made, s.db.Transaction(func(tx *gorm.DB) error {
 		if err := hold(tx, &Contact{}, org, contact); err != nil {
 			return err
@@ -88,13 +88,13 @@ func (s *Store) KeepFind(org int64, who Actor, contact int64, field, kind, value
 }
 
 // Erased says so if an address or a profile belongs to someone erased on request.
-func (s *Store) Erased(org int64, email, link string) error {
+func (s *prospectingStore) Erased(org int64, email, link string) error {
 	return erased(s.db, org, "", "", email, link)
 }
 
 // AskedLately is when a vendor was last asked for this field of this person, if it
 // was recently enough that asking again would only spend a lookup.
-func (s *Store) AskedLately(org, contact int64, field, kind string) *time.Time {
+func (s *prospectingStore) AskedLately(org, contact int64, field, kind string) *time.Time {
 	var e Event
 	res := s.db.Where("org_id = ? and contact_id = ? and action = ? and value like ? and at > ?", org, contact, "enrich:"+field, kind+":%", time.Now().Add(-enrichAgain)).
 		Order("at desc").Limit(1).Find(&e)
@@ -106,7 +106,7 @@ func (s *Store) AskedLately(org, contact int64, field, kind string) *time.Time {
 
 // lookupsOf are each vendor's latest lookup per detail for these people, within the
 // time a vendor isn't asked again, newest first.
-func (s *Store) lookupsOf(org int64, people []int64) (map[int64][]Lookup, error) {
+func (s *prospectingStore) lookupsOf(org int64, people []int64) (map[int64][]Lookup, error) {
 	out := map[int64][]Lookup{}
 	if len(people) == 0 {
 		return out, nil
@@ -132,7 +132,7 @@ func (s *Store) lookupsOf(org int64, people []int64) (map[int64][]Lookup, error)
 }
 
 // LogEnrich records a lookup that kept nothing, so the same one isn't paid for again soon.
-func (s *Store) LogEnrich(org int64, who Actor, contact int64, field, value string) error {
+func (s *prospectingStore) LogEnrich(org int64, who Actor, contact int64, field, value string) error {
 	c, err := s.ContactByID(org, contact)
 	if err != nil {
 		return err

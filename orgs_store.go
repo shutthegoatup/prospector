@@ -452,3 +452,9 @@ func (s *identityStore) KnownDevice(email, token string) (who string, ok bool) {
 	}
 	return signInBucket(u.Email) + "\x00" + nonce, true
 }
+
+// Users is how many people can sign in, in any organisation.
+func (s *identityStore) Users() (int64, error) {
+	var n int64
+	return n, s.db.Model(&User{}).Count(&n).Error
+}
