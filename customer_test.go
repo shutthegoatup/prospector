@@ -708,3 +708,37 @@ func TestTakingBackAMarkRemovesOnlyThatMarksEntry(t *testing.T) {
 		t.Errorf("one marking and another taking back left %d entries", len(left))
 	}
 }
+
+// TestTakingBackAMarkFromBeforeEntriesWereKeptLeavesTheEntry: a step marked before it
+// kept which history entry its mark wrote can still be taken back, and the entry stays,
+// since nothing says which was its.
+func TestTakingBackAMarkFromBeforeEntriesWereKeptLeavesTheEntry(t *testing.T) {
+	t.Parallel()
+	s, srv, member, box := mailSite(t, nil)
+	o := must(s.OrgBySlug("alpha"))
+	o.Settings.OnboardingSteps = "them: Send your product files"
+	if err := s.SaveOrg(o); err != nil {
+		t.Fatal(err)
+	}
+	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	ob := must(s.StartOnboarding(o.ID, OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
+	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": hannah.ID}); code != http.StatusNoContent {
+		t.Fatalf("inviting: %d %s", code, body)
+	}
+	c := newMailClient()
+	as(t, c, "POST", srv.URL+customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1])
+	st := must(s.Onboardings(o.ID, 0, today()))[0].Steps[0]
+	as(t, c, "POST", srv.URL+"/c/steps/"+itoa(st.ID)+"/done")
+	if err := s.db.Model(&OnboardingStep{}).Where("id = ?", st.ID).Update("done_entry", 0).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	as(t, c, "POST", srv.URL+"/c/steps/"+itoa(st.ID)+"/undone")
+	var n int64
+	if err := s.db.Model(&Event{}).Where("org_id = ? and action = ?", o.ID, "onboard:done").Count(&n).Error; err != nil || n != 1 {
+		t.Errorf("after taking back an old mark: %d entries (%v)", n, err)
+	}
+	if got := must(s.Onboardings(o.ID, 0, today()))[0].Steps[0]; got.DoneOn != nil {
+		t.Errorf("the old mark wasn't taken back: %+v", got)
+	}
+}

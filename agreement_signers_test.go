@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -481,5 +483,47 @@ func TestAnAgreementRefusesAPDFItCouldntSeal(t *testing.T) {
 		if code, body, _ := upload(t, member, base+"/document", "", "application/pdf", data); code != http.StatusBadRequest {
 			t.Errorf("%s: %d %s", why, code, body)
 		}
+	}
+}
+
+// TestAgreementsSavedBeforePagesWereCountedArePrepared: an agreement saved before its
+// pages were counted has them counted when first needed, and one whose document can't
+// be read says so until it is uploaded again.
+func TestAgreementsSavedBeforePagesWereCountedArePrepared(t *testing.T) {
+	t.Parallel()
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	readable := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Service agreement", "Ada Lovelace"))
+	must(s.PutAgreementFile(o.ID, readable.ID, "service.pdf", testPDF(2, ""), "Ada Lovelace"))
+	legacy := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Old agreement", "Ada Lovelace"))
+	scrap := []byte("%PDF-1.7 only its first bytes were ever checked")
+	sum := sha256.Sum256(scrap)
+	if err := s.db.Create(&AgreementFile{AgreementID: legacy.ID, OrgID: o.ID, Data: scrap}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.Model(&Agreement{}).Where("id = ?", legacy.ID).Updates(map[string]any{"file_name": "old.pdf", "file_hash": hex.EncodeToString(sum[:])}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.Model(&Agreement{}).Where("org_id = ?", o.ID).Update("page_count", 0).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	r := must(s.AddRecipient(o, readable.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	if _, err := s.PutAgreementFields(o.ID, readable.ID, []AgreementField{{RecipientID: r.ID, Page: 2, Kind: "signature", X: 0.1, Y: 0.8, W: 0.3, H: 0.05}}); err != nil {
+		t.Fatalf("placing a field on an agreement whose pages weren't counted: %v", err)
+	}
+	if a := must(s.Agreement(o.ID, readable.ID)); a.PageCount != 2 {
+		t.Errorf("its pages, counted when first needed: %d", a.PageCount)
+	}
+
+	l := must(s.AddRecipient(o, legacy.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	field := []AgreementField{{RecipientID: l.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.8, W: 0.3, H: 0.05}}
+	if _, err := s.PutAgreementFields(o.ID, legacy.ID, field); err == nil || !strings.Contains(err.Error(), "can't be read") {
+		t.Errorf("fields on a document that can't be read: %v", err)
+	}
+	must(s.PutAgreementFile(o.ID, legacy.ID, "old.pdf", testPDF(1, ""), "Ada Lovelace"))
+	if _, err := s.PutAgreementFields(o.ID, legacy.ID, field); err != nil {
+		t.Errorf("fields once it is uploaded again: %v", err)
 	}
 }

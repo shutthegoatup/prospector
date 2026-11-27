@@ -358,7 +358,7 @@ func deref(p *string) string {
 	return *p
 }
 
-// Due returns one outreach step's queue for an organisation. NULLS FIRST keeps SQLite's ordering on Postgres.
+// Due returns one outreach step's queue for an organisation.
 // People on the never-contact list are left out here rather than marked, so the list
 // and the queue can't drift apart: listing someone hides them, unlisting brings them back.
 func (s *Store) Due(org int64, step string, now time.Time, set OrgSettings) ([]Contact, error) {
