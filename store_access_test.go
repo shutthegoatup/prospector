@@ -24,7 +24,7 @@ func TestOnlyTheStoreTouchesTheDatabase(t *testing.T) {
 	fset := token.NewFileSet()
 	var parsed []*ast.File
 	// The store's unexported methods, and every other type's, by name: the check below
-	// goes by name alone, so a name both use would hide a call.
+	// goes by name alone, so a name both use would fail the other type's calls.
 	private, others := map[string]bool{"db": true, "in": true}, map[string]bool{}
 	for _, name := range files {
 		if strings.HasSuffix(name, "_test.go") {
@@ -47,7 +47,7 @@ func TestOnlyTheStoreTouchesTheDatabase(t *testing.T) {
 	}
 	for name := range private {
 		if others[name] {
-			t.Errorf("Store.%s shares its name with another type's method, which hides calls to it from this test: rename one", name)
+			t.Errorf("Store.%s shares its name with another type's method, whose calls this test can't tell from the store's: rename one", name)
 		}
 	}
 	for _, f := range parsed {
