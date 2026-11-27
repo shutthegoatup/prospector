@@ -975,8 +975,14 @@ func TestAnAccountWithNoPasswordIsRefusedAsSlowlyAsAnyOther(t *testing.T) {
 		}
 		return time.Since(start)
 	}
-	// Otherwise the time taken says which addresses sign in through a provider.
-	if unknown, none := timed("nobody@example.com"), timed("dan@example.com"); none < unknown/4 {
+	// Otherwise the time taken says which addresses sign in through a provider. The
+	// fastest of several tries each, taken in turn, so a pause on a busy machine during
+	// one of them isn't taken for a difference.
+	unknown, none := time.Hour, time.Hour
+	for range 7 {
+		unknown, none = min(unknown, timed("nobody@example.com")), min(none, timed("dan@example.com"))
+	}
+	if none < unknown/4 {
 		t.Fatalf("an account with no password was refused in %v, an unknown address in %v", none, unknown)
 	}
 }
