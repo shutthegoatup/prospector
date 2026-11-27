@@ -300,7 +300,7 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			if _, err = s.PutAgreementFields(first.ID, a.ID, []AgreementField{{RecipientID: r.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.1, W: 0.3, H: 0.05}}); err != nil {
 				return err
 			}
-			if _, _, err := s.sealKey(first); err != nil {
+			if _, _, err := s.SealKey(first); err != nil {
 				return err
 			}
 			return s.DB.Transaction(func(tx *gorm.DB) error {
@@ -371,6 +371,9 @@ var saysNothingBack = map[string]bool{
 	// A webhook secret is new random words, and the others say yes or no of the caller's own.
 	"NewBounceHook": true, "DropBounceHook": true, "HasBounceHook": true,
 	"Mark": true, "MarkAs": true, "Withheld": true, "Update": true,
+	// A key and certificate of its own, made on first use; seal_test.go checks another organisation gets its own.
+	"SealKey": true, "SealDocument": true,
+
 	// Only listed with suggestions waiting; TestTheDetailsCountIsTheDetailsList tries both.
 	"DetailsToCheck": true, "DetailsCount": true,
 	"SetCompanyStage": true, "PickContact": true, "PickContactFor": true, "ToReview": true, "DecideSuggestion": true,

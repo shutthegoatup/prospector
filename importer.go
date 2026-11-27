@@ -88,15 +88,6 @@ func evidence(text, ownDomain string) (string, string) {
 	return strings.Join(urls, "\n"), strings.Join(phones, " / ")
 }
 
-func contains(xs []string, x string) bool {
-	for _, v := range xs {
-		if v == x {
-			return true
-		}
-	}
-	return false
-}
-
 // spaced breaks a one-line LinkedIn note into the paragraphs it is pasted as.
 func spaced(note string) string {
 	note = hiCommaRe.ReplaceAllString(note, "$1,\n\n")
