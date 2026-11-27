@@ -7,6 +7,7 @@ package say
 import (
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path"
 	"reflect"
@@ -37,6 +38,9 @@ func Errorf(format string, args ...any) *Text { return &Text{format: format, arg
 
 func (t *Text) Error() string { return t.In(Source) }
 
+// MarshalText is the English, for JSON an agent or a log reads.
+func (t *Text) MarshalText() ([]byte, error) { return []byte(t.Error()), nil }
+
 // In is the text in lang, or in English where lang has no translation of it.
 func (t *Text) In(lang string) string {
 	args := make([]any, len(t.args))
@@ -57,6 +61,16 @@ func (t *Text) In(lang string) string {
 		return format
 	}
 	return fmt.Sprintf(format, args...)
+}
+
+// ErrorIn is err in lang when it is the words of one Sayer, and as it stands otherwise:
+// another error wrapped round one adds words a catalogue can't know.
+func ErrorIn(err error, lang string) string {
+	var s Sayer
+	if errors.As(err, &s) && s.Error() == err.Error() {
+		return s.In(lang)
+	}
+	return err.Error()
 }
 
 // Sayer is an error with words for a person, which errors.As finds under the kinds of

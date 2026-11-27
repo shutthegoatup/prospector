@@ -230,6 +230,16 @@ const appPages: { name: string; files: string[]; path: (tab: Page) => Promise<st
   { name: "add", files: ["src/pages/Add.tsx"], path: async () => "add" },
   { name: "the bookmarklet's window", files: ["src/pages/Add.tsx"], path: async () => "add?popup=1" },
   { name: "research", files: ["src/pages/Research.tsx"], path: async () => "research" },
+  { name: "conversations", files: ["src/pages/Conversations.tsx"], path: async () => "conversations" },
+  { name: "enquiries", files: ["src/pages/Enquiries.tsx"], path: async () => "enquiries" },
+  { name: "onboarding", files: ["src/pages/Onboarding.tsx"], path: async () => "onboarding" },
+  { name: "subscriptions", files: ["src/pages/Subscriptions.tsx", "src/components/app/subscription.tsx"], path: async () => "subscriptions" },
+  { name: "campaigns", files: ["src/pages/Campaigns.tsx"], path: async () => "campaigns" },
+  {
+    name: "an agreement's preparation",
+    files: ["src/pages/Prepare.tsx"],
+    path: async (tab) => `agreements/${await first(tab, "agreements")}/prepare`,
+  },
 ];
 
 async function first(tab: Page, list: string) {

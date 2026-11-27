@@ -7,6 +7,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -171,7 +172,7 @@ func (s apiServer) ListCompanyHistory(ctx context.Context, in api.ListCompanyHis
 	out := api.ListCompanyHistory200JSONResponse{Headers: api.ListCompanyHistory200ResponseHeaders{Link: nextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor, out.Body.Total = []api.HistoryEntry{}, next, total
 	for _, h := range items {
-		out.Body.Items = append(out.Body.Items, api.HistoryEntry{At: h.At, Actor: h.Actor, Action: h.Action, Value: h.Value, Person: h.Person, Text: historyText(h)})
+		out.Body.Items = append(out.Body.Items, api.HistoryEntry{At: h.At, Actor: h.Actor, Action: h.Action, Value: h.Value, Person: h.Person, Text: historyText(h).In(request.LanguageFrom(ctx))})
 	}
 	return out, nil
 }
@@ -232,55 +233,59 @@ func (s apiServer) ErasePerson(ctx context.Context, in api.ErasePersonRequestObj
 
 var pipelineStages = []string{"research", "outreach", "replied", "meeting", "proposal", "won", "lost", "rejected"}
 
-func historyText(h HistoryItem) string {
-	verb := map[string]string{
-		"mark:linkedin": "added on LinkedIn", "mark:email": "sent the email", "mark:followup": "sent the follow-up",
-		"mark:call": "called", "mark:replied": "marked replied", "mark:declined": "marked not interested",
-		"mark:hold": "put on hold", "mark:accepted": "marked accepted", "add:company": "added the company",
-		"add:facts": "added facts", "add:fact": "added a fact", "add:contact": "suggested a contact",
-		"add:person": "added", "pick": "picked for outreach", "company:qualified": "qualified the company",
-		"company:rejected": "rejected the company", "company:review": "sent back to review",
-		"verdict:qualified": "qualified it for an offering", "verdict:rejected": "junked it for an offering", "verdict:review": "sent it back to review for an offering", "add:role": "added a role", "role:pursued": "pursued a role", "role:junked": "junked a role", "role:review": "put a role back for review",
-		"offering:added": "added an offering", "offering:changed": "changed an offering", "offering:removed": "removed an offering",
-		"erase": "erased a person on request", "enquiry": "sent an enquiry",
-		"suggest:email": "suggested an email", "suggest:phone": "suggested a phone number", "suggest:linkedin": "suggested a LinkedIn profile",
-		"dismiss:email": "dismissed a suggested email", "dismiss:phone": "dismissed a suggested phone number", "dismiss:linkedin": "dismissed a suggested LinkedIn profile",
-		"export": "exported what is held on them", "task:match": "matched to a task", "task:held": "found again by a search",
-		"note:skipped": "left a note: skipped", "note:dead_end": "left a note: found nothing", "note:next": "left a note: what to do next",
-		"task:new": "wrote a task", "task:ask": "asked for more on a task", "task:pickup": "picked up a task",
-		"task:done": "finished a request", "task:reopen": "reopened a request", "task:close": "closed a task", "task:open": "reopened a task",
-		"deal:start": "started another deal", "deal:remove": "removed a deal",
-		"sub:new": "recorded a subscription", "sub:remove": "removed a subscription",
-		"onboard:start": "started an onboarding", "onboard:remove": "removed an onboarding",
-		"onboard:invite": "emailed a link to their onboarding page", "onboard:revoke": "withdrew access to their onboarding page",
-		"onboard:done": "finished an onboarding step", "onboard:undone": "reopened an onboarding step",
-		"onboard:due":   "moved an onboarding step's date",
-		"enquiry:reply": "emailed a reply to their enquiry", "enquiry:heard": "recorded their answer to an enquiry",
-	}[h.Action]
-	if verb == "" {
-		if f, ok := strings.CutPrefix(h.Action, "set:"); ok {
-			verb = "set " + strings.ReplaceAll(f, "_", " ")
-		} else if f, ok := strings.CutPrefix(h.Action, "enquiry:"); ok {
-			verb = "set an enquiry's " + f
-		} else if f, ok := strings.CutPrefix(h.Action, "deal:"); ok {
-			verb = "set the deal's " + strings.ReplaceAll(f, "_", " ")
-		} else if f, ok := strings.CutPrefix(h.Action, "sub:"); ok {
-			verb = "changed a subscription's " + strings.ReplaceAll(f, "_", " ")
-		} else if k, ok := strings.CutPrefix(h.Action, "draft:"); ok {
-			verb = "drafted the " + k
-		} else {
-			verb = h.Action
-		}
+// historyVerbs say what each kind of history entry was, as the entry's line begins.
+var historyVerbs = map[string]*say.Text{
+	"mark:linkedin": say.New("added on LinkedIn"), "mark:email": say.New("sent the email"), "mark:followup": say.New("sent the follow-up"),
+	"mark:call": say.New("called"), "mark:replied": say.New("marked replied"), "mark:declined": say.New("marked not interested"),
+	"mark:hold": say.New("put on hold"), "mark:accepted": say.New("marked accepted"), "add:company": say.New("added the company"),
+	"add:facts": say.New("added facts"), "add:fact": say.New("added a fact"), "add:contact": say.New("suggested a contact"),
+	"add:person": say.New("added"), "pick": say.New("picked for outreach"), "company:qualified": say.New("qualified the company"),
+	"company:rejected": say.New("rejected the company"), "company:review": say.New("sent back to review"),
+	"verdict:qualified": say.New("qualified it for an offering"), "verdict:rejected": say.New("junked it for an offering"), "verdict:review": say.New("sent it back to review for an offering"), "add:role": say.New("added a role"), "role:pursued": say.New("pursued a role"), "role:junked": say.New("junked a role"), "role:review": say.New("put a role back for review"),
+	"offering:added": say.New("added an offering"), "offering:changed": say.New("changed an offering"), "offering:removed": say.New("removed an offering"),
+	"erase": say.New("erased a person on request"), "enquiry": say.New("sent an enquiry"),
+	"suggest:email": say.New("suggested an email"), "suggest:phone": say.New("suggested a phone number"), "suggest:linkedin": say.New("suggested a LinkedIn profile"),
+	"dismiss:email": say.New("dismissed a suggested email"), "dismiss:phone": say.New("dismissed a suggested phone number"), "dismiss:linkedin": say.New("dismissed a suggested LinkedIn profile"),
+	"export": say.New("exported what is held on them"), "task:match": say.New("matched to a task"), "task:held": say.New("found again by a search"),
+	"note:skipped": say.New("left a note: skipped"), "note:dead_end": say.New("left a note: found nothing"), "note:next": say.New("left a note: what to do next"),
+	"task:new": say.New("wrote a task"), "task:ask": say.New("asked for more on a task"), "task:pickup": say.New("picked up a task"),
+	"task:done": say.New("finished a request"), "task:reopen": say.New("reopened a request"), "task:close": say.New("closed a task"), "task:open": say.New("reopened a task"),
+	"deal:start": say.New("started another deal"), "deal:remove": say.New("removed a deal"),
+	"sub:new": say.New("recorded a subscription"), "sub:remove": say.New("removed a subscription"),
+	"onboard:start": say.New("started an onboarding"), "onboard:remove": say.New("removed an onboarding"),
+	"onboard:invite": say.New("emailed a link to their onboarding page"), "onboard:revoke": say.New("withdrew access to their onboarding page"),
+	"onboard:done": say.New("finished an onboarding step"), "onboard:undone": say.New("reopened an onboarding step"),
+	"onboard:due":   say.New("moved an onboarding step's date"),
+	"enquiry:reply": say.New("emailed a reply to their enquiry"), "enquiry:heard": say.New("recorded their answer to an enquiry"),
+}
+
+// historyText is a history entry's line: what was done, to whom, and what with.
+func historyText(h HistoryItem) say.Sayer {
+	var verb say.Sayer
+	if v, ok := historyVerbs[h.Action]; ok {
+		verb = v
+	} else if f, ok := strings.CutPrefix(h.Action, "set:"); ok {
+		verb = say.Errorf("set %s", strings.ReplaceAll(f, "_", " "))
+	} else if f, ok := strings.CutPrefix(h.Action, "enquiry:"); ok {
+		verb = say.Errorf("set an enquiry's %s", f)
+	} else if f, ok := strings.CutPrefix(h.Action, "deal:"); ok {
+		verb = say.Errorf("set the deal's %s", strings.ReplaceAll(f, "_", " "))
+	} else if f, ok := strings.CutPrefix(h.Action, "sub:"); ok {
+		verb = say.Errorf("changed a subscription's %s", strings.ReplaceAll(f, "_", " "))
+	} else if k, ok := strings.CutPrefix(h.Action, "draft:"); ok {
+		verb = say.Errorf("drafted the %s", k)
+	} else {
+		verb = say.New(h.Action)
 	}
 	s := verb
 	if h.Person != "" {
-		s += " · " + h.Person
+		s = say.Errorf("%s · %s", s, h.Person)
 	}
 	if _, note, found := strings.Cut(h.Value, " · "); found && strings.HasPrefix(h.Action, "mark:") {
-		s += ": " + note
+		s = say.Errorf("%s: %s", s, note)
 	}
 	if h.Value != "" && !strings.HasPrefix(h.Action, "mark:") && h.Action != "add:contact" && len(h.Value) < 80 {
-		s += ": " + h.Value
+		s = say.Errorf("%s: %s", s, h.Value)
 	}
 	return s
 }

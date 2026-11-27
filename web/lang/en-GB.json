@@ -15,21 +15,49 @@
     "defaultMessage": "{count}{n, plural, one {thing due} other {things due}}, best first: next steps, calls where it's office hours, messages, emails, follow-ups, then LinkedIn adds.",
     "description": "Top of the Today page. {count} is the number of things due, drawn with its own space after it; {n} is the same number"
   },
+  "+UBn4I": {
+    "defaultMessage": "Copy only",
+    "description": "Button making a signer someone who only gets a copy of the agreement"
+  },
   "+auOns": {
     "defaultMessage": "Look up {detail}",
     "description": "Button to ask an enrichment vendor for a person's detail. {detail} is the detail, such as email"
+  },
+  "+cNnh1": {
+    "defaultMessage": "That didn't work. Reload and try again.",
+    "description": "When sending a reply or recording an answer failed with nothing from the server to say why"
   },
   "+g0jsI": {
     "defaultMessage": "They land in Today under LinkedIn adds, with your note ready: <o>o</o> opens the profile and copies the note, <a>a</a> marks them added.",
     "description": "What happens after adding someone. <o>o</o> and <a>a</a> are the keyboard keys that do it, shown in bold"
   },
+  "+m0YFB": {
+    "defaultMessage": "Another deal",
+    "description": "Small heading on someone's card before the choice to start another deal with them"
+  },
   "+m6MKx": {
     "defaultMessage": "Back to Prospector",
     "description": "Button on an error page, back to the app"
   },
+  "+xZN/W": {
+    "defaultMessage": "Place for {name}:",
+    "description": "Before the buttons for the kinds of field to place on an agreement. {name} is the signer they are for"
+  },
+  "/7/ivi": {
+    "defaultMessage": "Date signed",
+    "description": "A kind of field placed on an agreement's page: the date it is signed"
+  },
   "/SrQDl": {
     "defaultMessage": "This page is open for {email} in this browser.",
     "description": "At the foot of a customer's onboarding page"
+  },
+  "/Tjak5": {
+    "defaultMessage": "Start a draft above, then see who it would go to.",
+    "description": "Hint when an organisation has no campaigns"
+  },
+  "/jQEvP": {
+    "defaultMessage": "Kind",
+    "description": "Label of the choice of a deal's kind: new business, renewal or expansion"
   },
   "/lC2L6": {
     "defaultMessage": "Touches",
@@ -95,9 +123,17 @@
     "defaultMessage": "Use your organisation's single sign-on",
     "description": "Button to sign in through an organisation's own provider"
   },
+  "10Hi0u": {
+    "defaultMessage": "Sign-up",
+    "description": "What an enquiry is about: signing up. A filter and a label on each enquiry"
+  },
   "12dWYp": {
     "defaultMessage": "Research is sales work, so here you read it.",
     "description": "On the research page, to a member who doesn't do sales: why they can only read it"
+  },
+  "1C5aX2": {
+    "defaultMessage": "{kind} · {name}",
+    "description": "Written in a field placed on an agreement's page. {kind} is the kind of field, such as Signature; {name} the signer's first name"
   },
   "1FV3pz": {
     "defaultMessage": "That didn't go through. Check your connection and try again.",
@@ -111,9 +147,17 @@
     "defaultMessage": "Last 7 days",
     "description": "Heading of the Today page's panel of counts for the past week"
   },
+  "1Nblfr": {
+    "defaultMessage": "Text",
+    "description": "A kind of field placed on an agreement's page: text the signer types"
+  },
   "1OUt4r": {
     "defaultMessage": "Stop marketing mail from this sender to the address this link was sent to.",
     "description": "What the unsubscribe button does"
+  },
+  "1Oa9ED": {
+    "defaultMessage": "ended {on}",
+    "description": "When a subscription ended. {on} is a date"
   },
   "1ScrsB": {
     "defaultMessage": "hold",
@@ -126,6 +170,10 @@
   "1VB59v": {
     "defaultMessage": "Nothing named yet",
     "description": "When the organisation has named nothing to look for in a company"
+  },
+  "1gF6jj": {
+    "defaultMessage": "The pages appear here.",
+    "description": "Where an agreement's pages are drawn, while they load"
   },
   "1nOXrK": {
     "defaultMessage": "Loading…",
@@ -147,13 +195,37 @@
     "defaultMessage": "{who}, {when}",
     "description": "Beside a company's verdict for an offering. {who} is who decided, {when} the date and time"
   },
+  "2Gc4ge": {
+    "defaultMessage": "Name",
+    "description": "What a screen reader calls the box with a draft campaign's name"
+  },
+  "2GslWn": {
+    "defaultMessage": "Remove draft",
+    "description": "Button deleting a draft campaign"
+  },
   "2OK37z": {
     "defaultMessage": "There's no such page here.",
     "description": "Under the 'Not found' heading"
   },
+  "2SyN4n": {
+    "defaultMessage": "Value",
+    "description": "Label of the field for what a deal is worth"
+  },
+  "2VEkh4": {
+    "defaultMessage": "Send to {n, plural, one {# person} other {# people}}",
+    "description": "Button sending a draft campaign to everyone it would go to"
+  },
   "2ZkiXy": {
     "defaultMessage": "Agreements",
     "description": "Small heading over a company's agreements"
+  },
+  "2jQ/sM": {
+    "defaultMessage": "signs",
+    "description": "Choice when adding someone to an agreement: they sign it"
+  },
+  "2p7s9N": {
+    "defaultMessage": "No campaigns yet",
+    "description": "Title when an organisation has no campaigns"
   },
   "2qC45m": {
     "defaultMessage": "Send LinkedIn messages",
@@ -171,6 +243,18 @@
     "defaultMessage": "Rejected",
     "description": "Filter on the research page: companies rejected for the organisation's own offering"
   },
+  "32xeoG": {
+    "defaultMessage": "{step} · {date}",
+    "description": "On a deal's card: its next step and the day it is due. {step} is what the member wrote; {date} is a day, such as 5 Mar"
+  },
+  "35/Dia": {
+    "defaultMessage": "Feature request",
+    "description": "What an enquiry is about: asking for a feature. A filter and a label on each enquiry"
+  },
+  "3S7eks": {
+    "defaultMessage": "Delete this enquiry from {email} for good?",
+    "description": "Asked before deleting an enquiry. {email} is the enquirer's address"
+  },
   "3hSmdD": {
     "defaultMessage": "Search companies, people, notes",
     "description": "Placeholder of the search box on the companies page"
@@ -183,9 +267,21 @@
     "defaultMessage": "To review",
     "description": "A company's verdict for an offering: still to be looked at"
   },
+  "3qEhNr": {
+    "defaultMessage": "What it says, as plain text. Your postal address is added at the foot, and for marketing an unsubscribe link.",
+    "description": "Placeholder in the empty box for a campaign mail's text"
+  },
+  "4KnQ8O": {
+    "defaultMessage": "<b>{kind}</b><muted> with {person}</muted>",
+    "description": "Heading of a renewal or expansion's card. {kind} is the kind of deal, such as Renewal; {person} is who it is with"
+  },
   "4MZWhE": {
     "defaultMessage": "That didn't work. Reload and try again.",
     "description": "When adding a person failed and the server said nothing about why"
+  },
+  "4QQelz": {
+    "defaultMessage": "Remove: recorded by mistake",
+    "description": "Button to delete a subscription recorded by mistake"
   },
   "4S4kkc": {
     "defaultMessage": "a year",
@@ -203,9 +299,25 @@
     "defaultMessage": "LinkedIn adds",
     "description": "Filter on the Today page: people to add on LinkedIn"
   },
+  "4iElTm": {
+    "defaultMessage": "term ends {term} · cancel by {by}",
+    "description": "Where a subscription stands: when its term ends and the last day to cancel. Each is a date"
+  },
+  "4iTVHH": {
+    "defaultMessage": "withdrawn",
+    "description": "A customer whose access to their page was withdrawn"
+  },
+  "4mDVKP": {
+    "defaultMessage": "on track",
+    "description": "An onboarding with nothing late or due today"
+  },
   "4qzFVJ": {
     "defaultMessage": "Put back",
     "description": "Button to put a rejected company back up for review"
+  },
+  "4vytQM": {
+    "defaultMessage": "Signs",
+    "description": "Button making someone who gets a copy of an agreement one of its signers"
   },
   "54Xc1m": {
     "defaultMessage": "Every search, closed ones too",
@@ -214,6 +326,14 @@
   "594pUG": {
     "defaultMessage": "An email, phone or profile an agent finds for someone already here waits for you to accept it.",
     "description": "On the research page when no found detail waits to be accepted"
+  },
+  "5AGMji": {
+    "defaultMessage": "Marketing",
+    "description": "A campaign's kind: a marketing mail"
+  },
+  "5BKDBR": {
+    "defaultMessage": "Service notice to customers",
+    "description": "Choice of kind for a new campaign: a notice to customers about what they already have"
   },
   "5E4w2C": {
     "defaultMessage": "met",
@@ -238,6 +358,10 @@
   "5jhLCi": {
     "defaultMessage": "Not being onboarded.",
     "description": "When a company has no onboarding"
+  },
+  "5nCYQu": {
+    "defaultMessage": "Who it is for",
+    "description": "What a screen reader calls the choice of whom a marketing campaign goes to"
   },
   "5nZjIa": {
     "defaultMessage": "within 30 days",
@@ -271,6 +395,10 @@
     "defaultMessage": "Not found",
     "description": "Heading of the page for an address that doesn't exist"
   },
+  "6TbXnv": {
+    "defaultMessage": "{n} · {name}",
+    "description": "A signer of an agreement. {n} is their place in the order, {name} their name"
+  },
   "6UuOrU": {
     "defaultMessage": "{who} · {when}",
     "description": "Under an agent's note. {who} is the agent that left it, {when} the date and time"
@@ -279,13 +407,25 @@
     "defaultMessage": "proposal",
     "description": "A person's stage: a proposal is with them"
   },
+  "6dTQKZ": {
+    "defaultMessage": "{n} cancelled",
+    "description": "Count of a campaign's mails cancelled, in the line under its name"
+  },
   "6efxNd": {
     "defaultMessage": "The company you're prospecting for. You can add more later and switch between them.",
     "description": "What an organisation is, on the page to start a first one"
   },
+  "6gGSHy": {
+    "defaultMessage": "Renewal under way in Conversations",
+    "description": "Link to the renewal deal of a subscription on the deals board"
+  },
   "74idfF": {
     "defaultMessage": "in place of {current}",
     "description": "Under a suggested detail: the one the person holds now, which it would replace"
+  },
+  "7F4Sps": {
+    "defaultMessage": "No steps written yet",
+    "description": "When the organisation has written no onboarding steps"
   },
   "7QmOpI": {
     "defaultMessage": "Single sign-on",
@@ -299,9 +439,17 @@
     "defaultMessage": "This organisation couldn't be opened",
     "description": "Heading of the page shown when an organisation fails to load"
   },
+  "7b0Vu/": {
+    "defaultMessage": "late, was due {on}",
+    "description": "An onboarding step past its due date. {on} is a date"
+  },
   "7fXu3t": {
     "defaultMessage": "Flags",
     "description": "Heading of what the research flagged to look at"
+  },
+  "7tglVP": {
+    "defaultMessage": "What kind of mail",
+    "description": "What a screen reader calls the choice between a marketing mail and a service notice"
   },
   "7v4UCq": {
     "defaultMessage": "Page {n} of {pages}",
@@ -323,9 +471,17 @@
     "defaultMessage": "LinkedIn profile",
     "description": "A detail a vendor can find about a person: their LinkedIn profile, in the middle of a sentence"
   },
+  "8UoIiK": {
+    "defaultMessage": "Answering enquiries is support work, so here you read it.",
+    "description": "On the Enquiries page, to a member without support work: why they can read it but not act"
+  },
   "8a6W7E": {
     "defaultMessage": "Keys: {o} open profile and copy the note · {a} added · {s} skip",
     "description": "Keyboard shortcuts on the LinkedIn adds. {o}, {a} and {s} are the keys themselves, which stay the same"
+  },
+  "8a8HM5": {
+    "defaultMessage": "Nobody yet",
+    "description": "In the choice of who is answering an enquiry: no member"
   },
   "8ideLH": {
     "defaultMessage": "view",
@@ -335,9 +491,21 @@
     "defaultMessage": "Start an onboarding",
     "description": "Line that opens the form to start an onboarding"
   },
+  "94B7zC": {
+    "defaultMessage": "Would go to {people}; {leftOut} left out",
+    "description": "Opens a draft campaign's recipients. {people} is how many it would go to, such as 3 people; {leftOut} is how many it leaves out"
+  },
+  "960dTG": {
+    "defaultMessage": "What they're on",
+    "description": "Label of a subscription's name, such as the plan the customer is on"
+  },
   "97VVE5": {
     "defaultMessage": "{org} · Prospector",
     "description": "The browser tab's title while the page's own name is still loading"
+  },
+  "97gM+/": {
+    "defaultMessage": "term ends {term} and the next is committed to · cancel by {by} to end {ends}",
+    "description": "Where a subscription stands when its next term is already committed to. Each placeholder is a date"
   },
   "9EV7uU": {
     "defaultMessage": "Calls",
@@ -355,6 +523,10 @@
     "defaultMessage": "source ↗",
     "description": "Link to the web page a fact or suggestion came from"
   },
+  "9hzC6X": {
+    "defaultMessage": "Cancel the rest",
+    "description": "Button stopping a campaign's mails not yet sent"
+  },
   "9viMdO": {
     "defaultMessage": "{first}, {second}",
     "description": "Two notes under a suggested detail, such as 'a guess' and 'in place of …'"
@@ -362,6 +534,10 @@
   "ADTSld": {
     "defaultMessage": "· {title}",
     "description": "After a person's name: their job title"
+  },
+  "AEtvaQ": {
+    "defaultMessage": "Drag one onto a page, or click it to put it on the page in view. Drag a field to move it, its corner to size it.",
+    "description": "Under the buttons for the kinds of field to place on an agreement's pages"
   },
   "AJlMQH": {
     "defaultMessage": "No one yet.",
@@ -371,9 +547,17 @@
     "defaultMessage": "Qualify",
     "description": "Button to mark a company as worth pursuing"
   },
+  "AjPv3Q": {
+    "defaultMessage": "Start the renewal deal",
+    "description": "Button to start a deal to renew a subscription"
+  },
   "Ak+wss": {
     "defaultMessage": "Main",
     "description": "What a screen reader calls the sidebar's list of pages"
+  },
+  "B/3qsk": {
+    "defaultMessage": "live since {on}",
+    "description": "An onboarding that has finished. {on} is a date"
   },
   "B/Gqh6": {
     "defaultMessage": "{org} set up a page for you",
@@ -383,9 +567,25 @@
     "defaultMessage": "People an agent tried to add and was refused. They can't be included, and who they were isn't kept, so one person tried twice counts twice.",
     "description": "In the panel of what a search left out, under the people refused"
   },
+  "B5f1u5": {
+    "defaultMessage": "Campaigns are sales work, so here you read it.",
+    "description": "On the Campaigns page, to a member without sales work: why they can read it but not act"
+  },
   "B71vd+": {
     "defaultMessage": "That didn't work. Reload and try again.",
     "description": "Shown when a change failed and the server said nothing about why"
+  },
+  "BEgYdK": {
+    "defaultMessage": "Nobody has been invited yet.",
+    "description": "When no customer has been invited to their page"
+  },
+  "BPPNDa": {
+    "defaultMessage": "Where answering it stands",
+    "description": "What a screen reader calls the choice of where answering an enquiry stands"
+  },
+  "BPlmGS": {
+    "defaultMessage": "Our note: not emailed, but theirs to see if they ask",
+    "description": "Placeholder of the field for the members' note on an enquiry"
   },
   "BQ+Tmb": {
     "defaultMessage": "Then",
@@ -403,6 +603,26 @@
     "defaultMessage": "Add someone from LinkedIn, or check Research for companies waiting on you.",
     "description": "Hint when the Today page has nothing to do; Research is the name of a page"
   },
+  "CBHS4N": {
+    "defaultMessage": "no date",
+    "description": "An onboarding step with no due date"
+  },
+  "CDQhq2": {
+    "defaultMessage": "A service notice goes to everyone at a current customer, including anyone who unsubscribed from your marketing, because it is about what they already have: a price or terms change, an outage, a date that matters. Keep it to that. Anything promotional in it makes it marketing, whatever it is called. It never goes to anyone on the never-contact list or erased, and carries no unsubscribe link.",
+    "description": "On a draft campaign that is a service notice: what one is for and whom it reaches"
+  },
+  "CG1A6M": {
+    "defaultMessage": "Nothing yet",
+    "description": "Title when there are no enquiries under the filter chosen"
+  },
+  "CKD81Q": {
+    "defaultMessage": "Resume",
+    "description": "Button starting a paused campaign sending again"
+  },
+  "COjdHd": {
+    "defaultMessage": "Someone you invite is emailed a link to a page showing the steps that are theirs, which they can mark done, and nothing else. It needs no password and opens in one browser at a time.",
+    "description": "What inviting a customer to their own page does"
+  },
   "CYJzap": {
     "defaultMessage": "A link opens the page once, in one browser. We can send a fresh one to the address this one was sent to.",
     "description": "Why a customer's link stopped working, and what can be done"
@@ -419,9 +639,21 @@
     "defaultMessage": "Dismiss",
     "description": "Button to turn down a suggested detail for a person"
   },
+  "Ct7x4z": {
+    "defaultMessage": "Open a company and record what they are on.",
+    "description": "Under 'No subscriptions yet'"
+  },
+  "D7MX2J": {
+    "defaultMessage": "{n, plural, one {# step} other {# steps}} due today",
+    "description": "How many of an onboarding's steps are due today"
+  },
   "DGGnaQ": {
     "defaultMessage": "Accept",
     "description": "Button to accept a suggested detail for a person"
+  },
+  "DLHvp2": {
+    "defaultMessage": "Spam",
+    "description": "Filter on the Enquiries page showing the enquiries taken for spam"
   },
   "DM8OQs": {
     "defaultMessage": "Stage",
@@ -439,9 +671,33 @@
     "defaultMessage": "unchecked",
     "description": "No agent has checked a company's criterion"
   },
+  "DR1R9k": {
+    "defaultMessage": "Remove this {kind, select, signature {signature} initials {initials} name {name} date {date signed} text {text} tick {tick box} other {}} field",
+    "description": "What a screen reader calls the button taking a field off an agreement's page; the choices are the kinds of field"
+  },
+  "DSMaR+": {
+    "defaultMessage": "sent by {who}",
+    "description": "In the line under a sent campaign's name, between its kind and its mail counts. {who} is a member or an agent"
+  },
   "DXkbGZ": {
     "defaultMessage": "Filter by step",
     "description": "What a screen reader calls the row of filters by step on the Today page"
+  },
+  "DtEQxO": {
+    "defaultMessage": "Open a company and start one.",
+    "description": "Under 'Nobody is being onboarded'"
+  },
+  "DvtELE": {
+    "defaultMessage": "Enquiries appear here once a site listed in Settings posts one, or a key with the enquiries:write scope does.",
+    "description": "Hint when there are no enquiries; Settings is the name of a page, enquiries:write the name of an API key scope"
+  },
+  "E+o1ZU": {
+    "defaultMessage": "{name} has it",
+    "description": "On an enquiry, after where answering it stands. {name} is the member answering it"
+  },
+  "E2mO80": {
+    "defaultMessage": "Notice given on",
+    "description": "Label of the date notice to end was given"
   },
   "E9oEyL": {
     "defaultMessage": "Send follow-ups",
@@ -450,6 +706,10 @@
   "EIULF9": {
     "defaultMessage": "Added",
     "description": "Button marking someone added on LinkedIn"
+  },
+  "EYmnLm": {
+    "defaultMessage": "Add",
+    "description": "Button adding someone to an agreement"
   },
   "Eccjcs": {
     "defaultMessage": "For",
@@ -471,6 +731,14 @@
     "defaultMessage": "Twenty more, in Scotland this time.",
     "description": "Example in the box for asking a search for more"
   },
+  "F6XpbN": {
+    "defaultMessage": "{name} (left)",
+    "description": "The owner choice for a deal whose owner is no longer a member. {name} is theirs"
+  },
+  "FQQ+lf": {
+    "defaultMessage": "Someone in your organisation",
+    "description": "Choice of a member of the organisation to add to an agreement"
+  },
   "FZDrq9": {
     "defaultMessage": "Call",
     "description": "Top of a card on the Today page: a call to make"
@@ -482,6 +750,10 @@
   "Fnd5y4": {
     "defaultMessage": "Delete this note?",
     "description": "Asked before deleting an agent's note"
+  },
+  "Friped": {
+    "defaultMessage": "The enquiries couldn't be read. Reload to try again.",
+    "description": "When the list of enquiries failed to load"
   },
   "GAdsC7": {
     "defaultMessage": "Drag this to your bookmarks bar. On someone's LinkedIn profile, click it: this form opens filled in with their name, role and company.",
@@ -503,6 +775,10 @@
     "defaultMessage": "Starts",
     "description": "Label of the date an onboarding or subscription starts"
   },
+  "Gsjaem": {
+    "defaultMessage": "Enquiries",
+    "description": "Title of the page listing enquiries from the website"
+  },
   "Gtr29S": {
     "defaultMessage": "Nothing due right now.",
     "description": "In the Do now panel when there is nothing to do"
@@ -515,6 +791,10 @@
     "defaultMessage": "{facts, plural, one {# other fact} other {# other facts}} · {people, plural, one {# person} other {# people}}",
     "description": "Summary of a company's card that opens to show its facts and people"
   },
+  "H7f6JZ": {
+    "defaultMessage": "Deals are sales work, so here you read it.",
+    "description": "On the conversations page, to someone not in sales: why they can read the deals but not change them"
+  },
   "HPuNNE": {
     "defaultMessage": "It reads only the profile's title and headline, when you click. Nothing runs on LinkedIn by itself.",
     "description": "What the bookmarklet reads"
@@ -526,6 +806,10 @@
   "HVKPd7": {
     "defaultMessage": "Accept",
     "description": "Button to accept a detail found for a person"
+  },
+  "HXFdEQ": {
+    "defaultMessage": "Who is answering it",
+    "description": "What a screen reader calls the choice of the member answering an enquiry"
   },
   "HYsRxB": {
     "defaultMessage": "Email",
@@ -547,6 +831,18 @@
     "defaultMessage": "{org} asks its people to sign in through its own provider.",
     "description": "When an organisation sent someone to its single sign-on. {org} is its name"
   },
+  "Htu8Hi": {
+    "defaultMessage": "No next step yet",
+    "description": "On a deal's card when it has no next step"
+  },
+  "HvA02s": {
+    "defaultMessage": "Sent",
+    "description": "A campaign's state: every mail has been dealt with"
+  },
+  "I+sw6j": {
+    "defaultMessage": "Sent.",
+    "description": "After a customer's link was mailed"
+  },
   "I6brYQ": {
     "defaultMessage": "Nothing here",
     "description": "Heading on the research page when no company was rejected"
@@ -563,6 +859,14 @@
     "defaultMessage": "Older →",
     "description": "Button on to the next page of a list, of older things"
   },
+  "ItNsS4": {
+    "defaultMessage": "Page {n}",
+    "description": "Between the buttons of a long list whose length isn't known: which page this is"
+  },
+  "JF4NIn": {
+    "defaultMessage": "Update",
+    "description": "Opens the fields to change a deal, under its card"
+  },
   "JGEzpW": {
     "defaultMessage": "Filter",
     "description": "Button applying the companies page's search and filters"
@@ -574,6 +878,10 @@
   "JLb18k": {
     "defaultMessage": "e.g. the Leith site",
     "description": "Example in the field naming what an onboarding is for"
+  },
+  "JM2kvo": {
+    "defaultMessage": "Everyone who replied, until it's won or lost. Each needs a next step with a date; ones without, or due today, also show on Today. Give one a value and each stage shows what it is worth. A renewal or an expansion with someone already here is a deal of its own, started from their card.",
+    "description": "Under the conversations page's title, saying what the board is. Today is the name of another page"
   },
   "JODtyS": {
     "defaultMessage": "Companies",
@@ -615,6 +923,30 @@
     "defaultMessage": "suggested {field, select, linkedin {{linkedin} profile} phone {phone number} other {{field}}}",
     "description": "Over a detail suggested for a person. {field} is which detail, such as email; {linkedin} is the name LinkedIn"
   },
+  "KAgz+u": {
+    "defaultMessage": "People need one email address and can't be on the never-contact list. Nobody is emailed yet.",
+    "description": "Under the forms adding someone to an agreement"
+  },
+  "KD99+8": {
+    "defaultMessage": "Tick box",
+    "description": "A kind of field placed on an agreement's page: a box the signer ticks"
+  },
+  "KGKrVx": {
+    "defaultMessage": "Preparing agreements is sales work, so here you read it.",
+    "description": "On the page preparing an agreement, to a member without sales work: why they can read it but not act"
+  },
+  "KHQH/4": {
+    "defaultMessage": "{months, plural, one {# month} other {# months}}",
+    "description": "A subscription's term: how many months it is committed for"
+  },
+  "KHhvY5": {
+    "defaultMessage": "Sign in this order",
+    "description": "Checkbox: the signers sign one after another, in the order listed"
+  },
+  "KetojS": {
+    "defaultMessage": "Nobody yet",
+    "description": "The owner choice for a deal nobody owns"
+  },
   "KoActI": {
     "defaultMessage": "Reject",
     "description": "Button to reject a company"
@@ -631,13 +963,29 @@
     "defaultMessage": "{n, plural, one {# call} other {# calls}} outside office hours right now",
     "description": "In the Later panel: calls to make once it is office hours where the person is"
   },
+  "L3fhRh": {
+    "defaultMessage": "Delete",
+    "description": "Button deleting an enquiry"
+  },
   "L6iW3x": {
     "defaultMessage": "No search open.",
     "description": "On the research page when no search is open"
   },
+  "LMExaj": {
+    "defaultMessage": "Start onboarding",
+    "description": "Button on a won deal's card to begin onboarding the company"
+  },
   "LTWfbQ": {
     "defaultMessage": "Check your email",
     "description": "Heading after asking for a fresh link"
+  },
+  "LgfOmL": {
+    "defaultMessage": "Onboarding under way",
+    "description": "Link on a won deal's card when the company's onboarding has begun"
+  },
+  "LmHyI8": {
+    "defaultMessage": "In Conversations",
+    "description": "Link on an enquiry already made a conversation; Conversations is the name of a page"
   },
   "LmNULy": {
     "defaultMessage": "· drafted by {who}",
@@ -646,6 +994,10 @@
   "Ls0JRD": {
     "defaultMessage": "There is nothing for you to do at the moment.",
     "description": "On a customer's onboarding page with no steps of theirs"
+  },
+  "M2H8VT": {
+    "defaultMessage": "{stage, select, replied {Replied} meeting {Meeting} proposal {Proposal} won {Won} lost {Lost} other {{stage}}}",
+    "description": "A stage of a deal, as a column heading of the deals board and a choice: replied, meeting, proposal, won or lost"
   },
   "M6xWaL": {
     "defaultMessage": "Choose a password",
@@ -679,6 +1031,14 @@
     "defaultMessage": "Left out · {n}",
     "description": "Heading of the panel of what a search left out. {n} is how many"
   },
+  "MzTbJx": {
+    "defaultMessage": "Subscriptions",
+    "description": "Title of the page of customers' subscriptions"
+  },
+  "N5m6RU": {
+    "defaultMessage": "Waiting on them",
+    "description": "Where answering an enquiry stands: answered, waiting on the enquirer. A filter, a choice and a label on each enquiry"
+  },
   "N9IPcM": {
     "defaultMessage": "Review for this",
     "description": "Button to put a company up for review for one offering"
@@ -699,9 +1059,21 @@
     "defaultMessage": "{stage, select, research {research} outreach {outreach} replied {replied} meeting {meeting} proposal {proposal} won {won} lost {lost} rejected {rejected} other {{stage}}}",
     "description": "Where a company stands in the pipeline: research, outreach, replied, meeting, proposal, won, lost or rejected. Shown in small capitals"
   },
+  "NbvPnY": {
+    "defaultMessage": "Next step",
+    "description": "Label of the field for the next thing to do on a deal"
+  },
+  "Nfv3Zi": {
+    "defaultMessage": "For",
+    "description": "What a screen reader calls the choice of a price's period"
+  },
   "Njrfrv": {
     "defaultMessage": "Name what you look for",
     "description": "Link to settings, for an owner, when nothing is named to look for in a company"
+  },
+  "NwGjP1": {
+    "defaultMessage": "Nobody yet.",
+    "description": "Under Signers when nobody signs the agreement yet"
   },
   "O3c/qR": {
     "defaultMessage": "Faster: from LinkedIn itself",
@@ -711,9 +1083,17 @@
     "defaultMessage": "{per, select, year {{figure} a year} month {{figure} a month} other {{figure} a {per}}}",
     "description": "A subscription's price. {figure} is the amount with its currency, {per} the period (year or month)"
   },
+  "OFMRAO": {
+    "defaultMessage": "{name} · {email}",
+    "description": "A person to choose to add to an agreement. {name} is their name, {email} their email address"
+  },
   "OLWuEw": {
     "defaultMessage": "This link isn't one we sent. Use the link in the mail itself.",
     "description": "On an unsubscribe page whose link is malformed"
+  },
+  "OM6iz1": {
+    "defaultMessage": "The document couldn't be fetched.",
+    "description": "When an agreement's PDF couldn't be loaded to show its pages"
   },
   "OP+zjF": {
     "defaultMessage": "Send me a new link",
@@ -735,6 +1115,18 @@
     "defaultMessage": "{name} unchecked",
     "description": "Tag for something the organisation looks for that no one has checked yet. {name} is what it is"
   },
+  "Obnnbe": {
+    "defaultMessage": "Why lost",
+    "description": "Label of the field for why a deal was lost"
+  },
+  "OcHfxi": {
+    "defaultMessage": "The first {n} are shown. The API lists them all.",
+    "description": "Under a draft campaign's list of recipients when only some are shown"
+  },
+  "OdIgb0": {
+    "defaultMessage": "Before it can be sent",
+    "description": "Heading of the list of what an agreement needs before it can be sent"
+  },
   "OnlYXy": {
     "defaultMessage": "An owner writes the onboarding steps under Settings; then one can be started here.",
     "description": "When the organisation has no onboarding steps yet"
@@ -742,6 +1134,22 @@
   "OsvY74": {
     "defaultMessage": "Emails",
     "description": "Filter on the Today page: emails to send"
+  },
+  "OwBy3m": {
+    "defaultMessage": "Everyone in conversation",
+    "description": "Whom a campaign goes to: everyone in a conversation with the organisation"
+  },
+  "P2V68J": {
+    "defaultMessage": "Not tracked",
+    "description": "Where answering an enquiry stands, when nobody has said"
+  },
+  "PO4dho": {
+    "defaultMessage": "{seq} · {who, select, them {them} other {us}} ·",
+    "description": "Before an onboarding step's name: its number, and whose it is to do, the customer's (them) or ours (us)"
+  },
+  "PS/xSv": {
+    "defaultMessage": "Remove this deal",
+    "description": "Button on a renewal or expansion's card to remove it"
   },
   "PYDd6K": {
     "defaultMessage": "Meeting",
@@ -755,9 +1163,17 @@
     "defaultMessage": "looked",
     "description": "How a criterion was checked: an agent looked and found nothing"
   },
+  "PgG+wU": {
+    "defaultMessage": "To answer",
+    "description": "Where answering an enquiry stands: not answered yet. A filter, a choice and a label on each enquiry"
+  },
   "PiieMg": {
     "defaultMessage": "Rejected",
     "description": "A company's verdict for the organisation's own offering: ruled out"
+  },
+  "PjBuiK": {
+    "defaultMessage": "scheduled",
+    "description": "A subscription's status: it starts on a later day"
   },
   "Pk0UKs": {
     "defaultMessage": "replied",
@@ -766,6 +1182,10 @@
   "PkuvpQ": {
     "defaultMessage": "Any stage",
     "description": "The stage filter's choice of every stage"
+  },
+  "PlNJEO": {
+    "defaultMessage": "no commitment, {per, select, month {a month} other {a year}} at a time",
+    "description": "A subscription's term when it isn't committed for any months"
   },
   "PoLBvs": {
     "defaultMessage": "Contacts whose email is a pattern guess show up here.",
@@ -791,13 +1211,37 @@
     "defaultMessage": "Reset your password",
     "description": "Title of the page to ask for a password reset link"
   },
+  "QAbkpp": {
+    "defaultMessage": "None",
+    "description": "In a column of the deals board with no deals at that stage"
+  },
+  "QCX+/9": {
+    "defaultMessage": "left out: {reason}",
+    "description": "Beside someone a draft campaign would not go to. {reason} is the server's reason, such as no email address"
+  },
+  "QIll+I": {
+    "defaultMessage": "Sending it for signature comes in the next release. Until then nothing here leaves {brand}.",
+    "description": "Under the list of what an agreement needs before it can be sent. {brand} is the product's name, Prospector"
+  },
   "QOH77B": {
     "defaultMessage": "Sign out",
     "description": "Button to sign out"
   },
+  "QQ/laW": {
+    "defaultMessage": "Campaigns",
+    "description": "Title of the page of mail campaigns"
+  },
+  "QTmUBQ": {
+    "defaultMessage": "{by} replied · {at}",
+    "description": "Above a reply in an enquiry's thread. {by} is who replied, {at} the date and time"
+  },
   "QYg3/2": {
     "defaultMessage": "{n} / {max} chars",
     "description": "Beside a LinkedIn connection note: how many characters it has of the most LinkedIn allows"
+  },
+  "QdYH9f": {
+    "defaultMessage": "Move {name} up",
+    "description": "What a screen reader calls the button moving a signer up the order. {name} is the signer's name"
   },
   "QfMDej": {
     "defaultMessage": "What they're on",
@@ -811,13 +1255,33 @@
     "defaultMessage": "Fit {grade}",
     "description": "Choice of the grade to qualify a company at. {grade} is A, B or C"
   },
+  "QwzLyU": {
+    "defaultMessage": "Name",
+    "description": "A kind of field placed on an agreement's page: where the signer's name goes"
+  },
+  "RHiXhj": {
+    "defaultMessage": "Onboarding is support work, so here you read it.",
+    "description": "For a member who doesn't do support work, on the onboarding page"
+  },
   "RHnee5": {
     "defaultMessage": "Agents check each of these, from Settings › What you look for, and record what they find as a fact with its source. <link>Change them</link>",
     "description": "Under the search box, below what agents check at every company. Settings › What you look for is a place in Settings"
   },
+  "RHztYC": {
+    "defaultMessage": "Record their answer",
+    "description": "Button recording an enquirer's answer pasted from mail"
+  },
+  "RKIbNa": {
+    "defaultMessage": "{n, plural, one {# step} other {# steps}} late",
+    "description": "How many of an onboarding's steps are late"
+  },
   "RMzu66": {
     "defaultMessage": "← Companies",
     "description": "Link from a company's page back to the list of companies"
+  },
+  "RYVKBb": {
+    "defaultMessage": "What each customer is on, and until when. The one that needs someone soonest comes first: a day to cancel by, a renewal or an end. Record one from a company's page. {prospector} notes what was agreed and when it's due; it takes no payment and sends no invoice.",
+    "description": "What the subscriptions page is, under its title. {prospector} is the app's name"
   },
   "RtYccE": {
     "defaultMessage": "Erase {whom, select, row {everyone on this row ({several})} other {{name}}}? Their details, drafts and notes are deleted for good, along with agents' notes about this company and its tasks, and they can't be added again. Facts about the company, and the briefs and requests on tasks, that mention them aren't found for you, and nor are your own lead files: take them out there too.",
@@ -830,6 +1294,10 @@
   "S7V2h5": {
     "defaultMessage": "why it fits",
     "description": "Beside an agent's reason a company fits"
+  },
+  "SCe5HK": {
+    "defaultMessage": "Answering",
+    "description": "Small heading on an enquiry, before where answering it stands and who has it"
   },
   "SNTPLC": {
     "defaultMessage": "Next step",
@@ -847,9 +1315,17 @@
     "defaultMessage": "Name",
     "description": "Label of the field for a person's name"
   },
+  "SfIQnz": {
+    "defaultMessage": "Email this reply",
+    "description": "Button emailing a reply to an enquiry"
+  },
   "SiTJ6W": {
     "defaultMessage": "Pick",
     "description": "Button to pick a suggested person as the company's contact"
+  },
+  "SinXwo": {
+    "defaultMessage": "Cancelled",
+    "description": "A campaign's state: someone stopped it"
   },
   "SmcTbd": {
     "defaultMessage": "Dismiss",
@@ -887,9 +1363,25 @@
     "defaultMessage": "An owner can add {area, select, sales {sales} other {support}} to you on the Team list in Settings.",
     "description": "After saying a page is work the member doesn't do: how they could be given it. {area} is the area of work, sales or support"
   },
+  "TVTRQS": {
+    "defaultMessage": "Expected to close",
+    "description": "Label of the field for the date a deal is expected to close"
+  },
+  "TZFIp7": {
+    "defaultMessage": "To start a renewal deal, someone at this company needs to be on the Conversations board first.",
+    "description": "Why a renewal deal can't be started yet"
+  },
+  "TcCW6A": {
+    "defaultMessage": "A marketing mail written once, for everyone in conversation or everyone at a company that is a customer now. Never for prospects who haven't replied: that stays one person writing to one person. Anyone on the list not to be mailed, on the never-contact list or erased is left out, and each draft shows who that leaves. It goes through your own mail server a few dozen a minute, each with your postal address and a link to unsubscribe, and nobody is mailed twice.",
+    "description": "Introduction at the top of the Campaigns page"
+  },
   "TfEvtW": {
     "defaultMessage": "Password saved. Sign in with it.",
     "description": "On the sign-in page after choosing a new password from a reset link"
+  },
+  "Tjl+Ta": {
+    "defaultMessage": "Sending",
+    "description": "A campaign's state: its mails are going out"
   },
   "Tjl3hP": {
     "defaultMessage": "Research",
@@ -899,9 +1391,33 @@
     "defaultMessage": "Show these",
     "description": "Button to show only one search's companies on the research page"
   },
+  "TuHm1d": {
+    "defaultMessage": "{n} waiting",
+    "description": "Count of a campaign's mails waiting to go, in the line under its name"
+  },
+  "TwURc5": {
+    "defaultMessage": "e.g. Spring price list",
+    "description": "Example in the empty box for a new campaign's name"
+  },
+  "U4zyRn": {
+    "defaultMessage": "Notice to end, days",
+    "description": "Label of how many days' notice ending a subscription takes"
+  },
+  "U9jxGD": {
+    "defaultMessage": "{n} unknown",
+    "description": "Count of a campaign's mails whose fate is unknown, in the line under its name"
+  },
   "UAooGb": {
     "defaultMessage": "Or",
     "description": "Small heading above the other ways to sign in"
+  },
+  "UCu3U6": {
+    "defaultMessage": "Reply, or record their answer",
+    "description": "Opens the fields under an enquiry to reply to it or record what they said back"
+  },
+  "UGydkf": {
+    "defaultMessage": "At the end of the term",
+    "description": "Label of what happens when a subscription's term ends"
   },
   "UJC7aR": {
     "defaultMessage": "Prepare for signing",
@@ -923,9 +1439,17 @@
     "defaultMessage": "Junked",
     "description": "A company's verdict for an offering: ruled out"
   },
+  "UuJ//c": {
+    "defaultMessage": "Everyone at a customer",
+    "description": "Whom a campaign goes to: everyone at a company that is a customer"
+  },
   "UxaOfn": {
     "defaultMessage": "Password you were given",
     "description": "Label of the field for the password a new member was given"
+  },
+  "V5m+z7": {
+    "defaultMessage": "closes {date}",
+    "description": "On a deal's card: when it is expected to close. {date} is a day, such as 5 Mar"
   },
   "V8IBGd": {
     "defaultMessage": "People",
@@ -939,6 +1463,14 @@
     "defaultMessage": "with",
     "description": "Before the agents a search is sent to, as in: Find about 20 companies with Claude"
   },
+  "ViIW8d": {
+    "defaultMessage": "{name} (left)",
+    "description": "In the choice of who is answering an enquiry: a member who has since left. {name} is their name"
+  },
+  "Vjg0KF": {
+    "defaultMessage": "{n} sent",
+    "description": "Count of a campaign's mails sent, in the line under its name"
+  },
   "Vk7CpX": {
     "defaultMessage": "Sidebar",
     "description": "What a screen reader calls the sidebar of every page in an organisation"
@@ -951,6 +1483,10 @@
     "defaultMessage": "Note",
     "description": "What a screen reader calls the box with a LinkedIn connection note to edit"
   },
+  "W+i2Rb": {
+    "defaultMessage": "Started",
+    "description": "Label of the date a subscription started"
+  },
   "W5kGDV": {
     "defaultMessage": "{state, select, stopping {stopping} waiting {waiting for its endpoint} running {running} finished {finished} stopped {stopped} failed {failed} other {{state}}}",
     "description": "Where an agent's run on a search is. {state} is one of stopping, waiting, running, finished, stopped, failed"
@@ -959,17 +1495,49 @@
     "defaultMessage": "Email (optional)",
     "description": "Label of the field for a person's email address"
   },
+  "WGhG+1": {
+    "defaultMessage": "done {on} · {who}",
+    "description": "When an onboarding step was done, and by whom. {on} is a date"
+  },
   "WIXyfe": {
     "defaultMessage": "Review researched companies",
     "description": "In the Do now panel, beside a count of researched companies to review"
+  },
+  "WJbOhK": {
+    "defaultMessage": "Start a conversation",
+    "description": "Button making an enquiry a conversation"
+  },
+  "WLHhzC": {
+    "defaultMessage": "Someone at {company}",
+    "description": "Choice of a person at the company to add to an agreement. {company} is the company's name"
+  },
+  "WPvnJ8": {
+    "defaultMessage": "Conversations",
+    "description": "Title of the page of deals with everyone who replied"
   },
   "WQEfWF": {
     "defaultMessage": "Needs verifying",
     "description": "Filter on the research page: contacts whose email is a guess"
   },
+  "WTQZoW": {
+    "defaultMessage": "{kind} for someone no longer signing",
+    "description": "Tooltip on a field placed on an agreement's page whose signer was taken off. {kind} is the kind of field, such as Signature"
+  },
   "WWGyJJ": {
     "defaultMessage": "Erase",
     "description": "Button to delete a person and what is held about them for good"
+  },
+  "Wa0eMr": {
+    "defaultMessage": "Nobody is being onboarded",
+    "description": "When no onboarding is running"
+  },
+  "WacP+p": {
+    "defaultMessage": "Initials",
+    "description": "A kind of field placed on an agreement's page: where a signer initials"
+  },
+  "Wc2DxA": {
+    "defaultMessage": "What it says",
+    "description": "What a screen reader calls the box with a campaign mail's text"
   },
   "WfNo1q": {
     "defaultMessage": "Other ways to sign in",
@@ -982,6 +1550,10 @@
   "Wfckmw": {
     "defaultMessage": "If that address has an account, a link is on its way. It lasts an hour.",
     "description": "After asking for a reset link; it says the same whether or not the address has an account"
+  },
+  "WkxVFJ": {
+    "defaultMessage": "Other",
+    "description": "What an enquiry is about: anything else. A filter and a label on each enquiry"
   },
   "WnjdPv": {
     "defaultMessage": "No details to check",
@@ -1007,6 +1579,10 @@
     "defaultMessage": "declined",
     "description": "A person's stage: they said no"
   },
+  "XNsziM": {
+    "defaultMessage": "a year",
+    "description": "A price's period: per year"
+  },
   "XUzj4e": {
     "defaultMessage": "{vendor} ({left} of {limit} left)",
     "description": "A vendor a lookup would go to. {vendor} is its name; {left} the lookups left this month of {limit}"
@@ -1015,6 +1591,14 @@
     "defaultMessage": "Follow-up",
     "description": "Top of a card on the Today page: a follow-up to send"
   },
+  "Xf/BPe": {
+    "defaultMessage": "{after, select, renews {renews for the same term} rolls {rolls on, a period at a time} other {ends}}",
+    "description": "What a subscription does at the end of its term: renews for the same term, rolls on a period at a time, or ends"
+  },
+  "XhsQeO": {
+    "defaultMessage": "Ended early on",
+    "description": "Label of the date a subscription ended before its term"
+  },
   "Xm3zph": {
     "defaultMessage": "{done} of {total, plural, one {# of your steps is} other {# of your steps are}} done. Mark each one when you have done it.",
     "description": "How many of a customer's own onboarding steps are done"
@@ -1022,6 +1606,10 @@
   "XxgWDg": {
     "defaultMessage": "Send to",
     "description": "Label of the choice of whom at a company to send to"
+  },
+  "XzzEGx": {
+    "defaultMessage": "Subject",
+    "description": "Placeholder and screen reader name of the box with a campaign mail's subject"
   },
   "Y/oI8e": {
     "defaultMessage": "That search isn't here.",
@@ -1035,6 +1623,26 @@
     "defaultMessage": "Next step",
     "description": "Label of the field for the next step in a conversation"
   },
+  "Y86spi": {
+    "defaultMessage": "{kind, select, new {New business} renewal {Renewal} expansion {Expansion} other {{kind}}}",
+    "description": "The kind of a deal: new business, a renewal or an expansion"
+  },
+  "YBb7M+": {
+    "defaultMessage": "Add someone to sign it, then place their fields on the pages.",
+    "description": "Where the fields are placed, when nobody signs the agreement yet"
+  },
+  "YLZcVa": {
+    "defaultMessage": "No subject yet",
+    "description": "In place of a draft campaign's subject when it has none"
+  },
+  "YQSb3c": {
+    "defaultMessage": "Signers",
+    "description": "Heading of the people who sign an agreement"
+  },
+  "YYWBQh": {
+    "defaultMessage": "Demo",
+    "description": "What an enquiry is about: asking for a demo. A filter and a label on each enquiry"
+  },
   "YhpmCA": {
     "defaultMessage": "No companies match",
     "description": "When no company matches the companies page's filters"
@@ -1043,6 +1651,18 @@
     "defaultMessage": "Not done yet",
     "description": "Button for a customer to take back marking a step done"
   },
+  "Yqa7Gd": {
+    "defaultMessage": "nobody has it yet",
+    "description": "On an enquiry, after where answering it stands: no member is answering it"
+  },
+  "Z/1XxQ": {
+    "defaultMessage": "Not done",
+    "description": "Button taking back an onboarding step's being done"
+  },
+  "Z1+Ad9": {
+    "defaultMessage": "done {on}",
+    "description": "When an onboarding step was done. {on} is a date"
+  },
   "Z1lVj5": {
     "defaultMessage": "Answer enquiries",
     "description": "In the Do now panel, beside a count of unanswered enquiries"
@@ -1050,6 +1670,14 @@
   "ZQ5Y/A": {
     "defaultMessage": "No date",
     "description": "In place of a next step's date when it has none"
+  },
+  "ZbHsgv": {
+    "defaultMessage": "Saved ✓",
+    "description": "After a reply was sent or an answer recorded"
+  },
+  "Zxy8BI": {
+    "defaultMessage": "Renewal with",
+    "description": "Small heading before choosing who a renewal deal is with"
   },
   "a/lXfh": {
     "defaultMessage": "Qualified already",
@@ -1066,6 +1694,18 @@
   "aSiD4J": {
     "defaultMessage": "Pages",
     "description": "What a screen reader calls the links between pages of a long list"
+  },
+  "ablhav": {
+    "defaultMessage": "a month",
+    "description": "A price's period: per month"
+  },
+  "ahRYK4": {
+    "defaultMessage": "Update",
+    "description": "Opens the form to change a subscription"
+  },
+  "aibbmm": {
+    "defaultMessage": "{worth} a year at today's prices",
+    "description": "Beside the title: what every subscription comes to in a year. {worth} is an amount of money"
   },
   "auv4T1": {
     "defaultMessage": "Agents & API",
@@ -1087,13 +1727,33 @@
     "defaultMessage": "Close it here",
     "description": "Button to close a customer's onboarding page in this browser"
   },
+  "bWjJSC": {
+    "defaultMessage": "Start",
+    "description": "Button to start another deal with someone, of the kind chosen"
+  },
+  "be0lfg": {
+    "defaultMessage": "Enter a number, or 0 for none.",
+    "description": "When a number field of a subscription was emptied"
+  },
+  "bl7mMD": {
+    "defaultMessage": "Due",
+    "description": "What a screen reader calls a step's due date field"
+  },
   "blZ73x": {
     "defaultMessage": "Replied",
     "description": "A conversation's stage: they replied"
   },
+  "boDw4Q": {
+    "defaultMessage": "within 30 days",
+    "description": "Tag on a subscription that needs someone within 30 days"
+  },
   "bqXVSi": {
     "defaultMessage": "current",
     "description": "What a screen reader says for the tick beside the organisation now open"
+  },
+  "bryZPN": {
+    "defaultMessage": "Stage",
+    "description": "Label of the choice of a deal's stage"
   },
   "bujAVD": {
     "defaultMessage": "organisation",
@@ -1111,6 +1771,10 @@
     "defaultMessage": "{status, select, draft {draft} other {{status}}} · by {who}",
     "description": "Beside an agreement's name. {status} is where it stands (draft), {who} who started it"
   },
+  "cHEmjo": {
+    "defaultMessage": "What they said back, pasted from your mail. Nothing is sent.",
+    "description": "Placeholder of the field recording an enquirer's answer"
+  },
   "cL1i3L": {
     "defaultMessage": "Skipped",
     "description": "Kind of an agent's note: something it chose not to do"
@@ -1122,6 +1786,10 @@
   "cVVVDW": {
     "defaultMessage": "New password",
     "description": "Label of the field for a new password"
+  },
+  "cWgNpe": {
+    "defaultMessage": "Stop sending {name}? What went stays sent.",
+    "description": "Asked before cancelling a campaign's mails not yet sent. {name} is the campaign's name"
   },
   "cbitp9": {
     "defaultMessage": "Deals by stage",
@@ -1155,6 +1823,10 @@
     "defaultMessage": "That didn't go through. Check your connection and try again.",
     "description": "When creating an organisation failed with nothing from the server to say why"
   },
+  "dGSIwS": {
+    "defaultMessage": "{n} refused",
+    "description": "Count of a campaign's mails the mail server refused, in the line under its name"
+  },
   "dK/U8c": {
     "defaultMessage": "For {email}. 10 characters or more.",
     "description": "On the page a reset link opens: whose password it is, and how long it must be"
@@ -1162,6 +1834,10 @@
   "dMepNA": {
     "defaultMessage": "agent · {name}",
     "description": "Who did something, when it was one of the organisation's AI agents"
+  },
+  "dXt4Ta": {
+    "defaultMessage": "Kind of deal",
+    "description": "What a screen reader calls the choice of what kind of deal to start"
   },
   "dbFG9c": {
     "defaultMessage": "Details to check",
@@ -1195,6 +1871,10 @@
     "defaultMessage": "Nothing recorded yet.",
     "description": "When a company has no history"
   },
+  "e8uBxQ": {
+    "defaultMessage": "Withdraw {name}'s access? Their page closes in every browser at once.",
+    "description": "Asked before withdrawing a customer's access to their page"
+  },
   "e9fTe/": {
     "defaultMessage": "meetings",
     "description": "Under a count in the Last 7 days panel: meetings booked"
@@ -1202,6 +1882,10 @@
   "eD55lX": {
     "defaultMessage": "{n} more on the search's own page",
     "description": "Link to a search's own page, for the companies it left out that aren't listed here"
+  },
+  "eHEAep": {
+    "defaultMessage": "notice given",
+    "description": "A subscription's status: the customer has given notice to end it"
   },
   "eRNQKX": {
     "defaultMessage": "Forgot your password?",
@@ -1211,9 +1895,21 @@
     "defaultMessage": "We'll email you a link to choose a new one.",
     "description": "On the page to ask for a password reset link"
   },
+  "ehKP45": {
+    "defaultMessage": "{n} skipped",
+    "description": "Count of a campaign's mails skipped, in the line under its name"
+  },
   "epZJG2": {
     "defaultMessage": "Never contact, kept on file",
     "description": "Why a company a search came to was left out: it is on the never-contact list"
+  },
+  "epxAxw": {
+    "defaultMessage": "Add someone to sign it.",
+    "description": "In the list of what an agreement needs before it can be sent"
+  },
+  "erqsBj": {
+    "defaultMessage": "Service notice",
+    "description": "A campaign's kind: a notice to customers about what they already have"
   },
   "eu9lWY": {
     "defaultMessage": "About how many companies",
@@ -1231,6 +1927,10 @@
     "defaultMessage": "Find",
     "description": "Button to start a search"
   },
+  "fTUmeI": {
+    "defaultMessage": "Your reply to {email}. Only what you write here is sent; their answer comes to your own mailbox.",
+    "description": "Placeholder of the field for a reply to an enquiry. {email} is the enquirer's address"
+  },
   "fh5d6n": {
     "defaultMessage": "Onboarding",
     "description": "Small heading over a company's onboardings"
@@ -1242,6 +1942,10 @@
   "fzP2kj": {
     "defaultMessage": "Say who you're looking for and an agent goes to find them. What agents, jobs and imports find waits here: nothing reaches outreach until someone qualifies it and picks a contact. Every fact keeps the link it came from.",
     "description": "Paragraph under the research page's heading saying what the page is for"
+  },
+  "g2DMOw": {
+    "defaultMessage": "can open it",
+    "description": "A customer who can open their page"
   },
   "gA7E5s": {
     "defaultMessage": "Adding people is sales work. An owner can add sales to you on the Team list in Settings.",
@@ -1266,6 +1970,10 @@
   "gQL8tA": {
     "defaultMessage": "Fit",
     "description": "Tooltip on a company's fit score"
+  },
+  "gSfVRQ": {
+    "defaultMessage": "Who to invite",
+    "description": "What a screen reader calls the choice of who to invite"
   },
   "gU6T/w": {
     "defaultMessage": "None yet. Start one, then upload the contract as a PDF.",
@@ -1307,6 +2015,10 @@
     "defaultMessage": "Where it stands",
     "description": "Small heading over a company's verdict for each offering"
   },
+  "hG1D2X": {
+    "defaultMessage": "The steps between a signature and a live customer. Each onboarding is a copy of your steps, made the day it starts, so changing them in Settings later leaves the ones running as they are. Start one from a company's page. Ones running late come first.",
+    "description": "What the onboarding page is, under its title"
+  },
   "hMigST": {
     "defaultMessage": "{org} · your onboarding",
     "description": "Browser tab title of a customer's onboarding page. {org} is who is setting them up"
@@ -1315,17 +2027,37 @@
     "defaultMessage": "Price",
     "description": "Label of a subscription's price"
   },
+  "hrqAIq": {
+    "defaultMessage": "ending",
+    "description": "A subscription's status: it ends at the end of its term"
+  },
   "i28Gr1": {
     "defaultMessage": "Companies your agents and discovery jobs add will wait here.",
     "description": "On the research page when nothing is waiting to be reviewed"
+  },
+  "i9Qbxx": {
+    "defaultMessage": "To invite anyone, an owner sets a mail server in Settings and the server needs its public address (PROSPECTOR_URL).",
+    "description": "Why nobody can be invited: mail isn't set up"
   },
   "iCmTO/": {
     "defaultMessage": "Settings",
     "description": "Sidebar: the organisation's settings page"
   },
+  "iDuNyR": {
+    "defaultMessage": "Prepare for signing",
+    "description": "Title of the page preparing an agreement to be signed"
+  },
   "iI+i6h": {
     "defaultMessage": "That didn't work. Try again.",
     "description": "When creating an organisation failed and the server said nothing about why"
+  },
+  "iIO9P4": {
+    "defaultMessage": "{figure} {per, select, month {a month} other {a year}}",
+    "description": "A subscription's price. {figure} is an amount of money"
+  },
+  "iR6303": {
+    "defaultMessage": "Onboarding",
+    "description": "Title of the page of new customers being set up"
   },
   "iT6cv9": {
     "defaultMessage": "Filter",
@@ -1347,6 +2079,18 @@
     "defaultMessage": "won",
     "description": "A person's stage: the deal is won"
   },
+  "jKRBkE": {
+    "defaultMessage": "starts {on}",
+    "description": "When a scheduled subscription starts. {on} is a date"
+  },
+  "jRA7LR": {
+    "defaultMessage": "Nobody at this company has an email address here to send a link to.",
+    "description": "Why nobody can be invited: no email addresses"
+  },
+  "jS3GJQ": {
+    "defaultMessage": "They can sign in any order.",
+    "description": "Under Signers, read only: they need not sign in the order listed"
+  },
   "jSsJTy": {
     "defaultMessage": "Rejected before",
     "description": "Why a company a search came to was left out: it was rejected before"
@@ -1354,6 +2098,18 @@
   "jVc7oA": {
     "defaultMessage": "Searches",
     "description": "Heading of the research page's list of open searches, and what a screen reader calls it"
+  },
+  "jXBRhM": {
+    "defaultMessage": "Start a draft",
+    "description": "Button creating a new campaign as a draft"
+  },
+  "jawOeQ": {
+    "defaultMessage": "Who the renewal is with",
+    "description": "What a screen reader calls the choice of who a renewal deal is with"
+  },
+  "jkBdoO": {
+    "defaultMessage": "Onboarded",
+    "description": "Link on a won deal's card when the company's onboarding is done"
   },
   "jtASEY": {
     "defaultMessage": "Nothing to show here",
@@ -1375,9 +2131,29 @@
     "defaultMessage": "Stage",
     "description": "Label of where a conversation stands"
   },
+  "kQaFXv": {
+    "defaultMessage": "An owner writes the steps under Settings, one a line. Then start an onboarding from a company's page.",
+    "description": "Under 'No steps written yet'"
+  },
+  "ka0pPD": {
+    "defaultMessage": "Page {n} of {total}",
+    "description": "What a screen reader calls one of an agreement's pages. {n} is the page's number, {total} how many pages there are"
+  },
   "km4QGa": {
     "defaultMessage": "Ask",
     "description": "Button to send a request for more to a search"
+  },
+  "knZaft": {
+    "defaultMessage": "Committed for, months",
+    "description": "Label of how many months a subscription is committed for"
+  },
+  "ktFVs8": {
+    "defaultMessage": "They sign in this order.",
+    "description": "Under Signers, read only: they sign one after another, in the order listed"
+  },
+  "lA8Isj": {
+    "defaultMessage": "Subscriptions are support work, so here you read it.",
+    "description": "For a member who doesn't do support work, on the subscriptions page"
   },
   "lXKsMn": {
     "defaultMessage": "Delete",
@@ -1411,6 +2187,10 @@
     "defaultMessage": "Review again",
     "description": "Button to put a company rejected before back up for review"
   },
+  "m7FgGD": {
+    "defaultMessage": "{n, plural, one {# person} other {# people}}",
+    "description": "How many a draft campaign would go to, shown after Would go to"
+  },
   "mAMWFh": {
     "defaultMessage": "Remove the draft {name} and its document?",
     "description": "Asked before removing a draft agreement. {name} is the agreement's name"
@@ -1439,6 +2219,10 @@
     "defaultMessage": "Add",
     "description": "Button to create the new organisation named beside it"
   },
+  "n1er1P": {
+    "defaultMessage": "Their page",
+    "description": "Small heading of the part about a customer's own page"
+  },
   "n8d2rY": {
     "defaultMessage": "{agent} · {state}",
     "description": "An agent running on a search. {agent} is its name; {state} where its run is, such as running"
@@ -1455,9 +2239,17 @@
     "defaultMessage": "<b>{agent}</b> · {state}",
     "description": "An agent's run on a search. {agent} is its name; {state} where its run is, such as finished"
   },
+  "no4k0a": {
+    "defaultMessage": "{kind} for {name}",
+    "description": "Tooltip on a field placed on an agreement's page. {kind} is the kind of field, such as Signature; {name} the signer it is for"
+  },
   "np+FZ1": {
     "defaultMessage": "Who are you looking for?",
     "description": "Label of the box where a search is described"
+  },
+  "nppeRC": {
+    "defaultMessage": "Email them a link",
+    "description": "Button mailing a customer the link to their page"
   },
   "nzC5dc": {
     "defaultMessage": "Send emails",
@@ -1470,6 +2262,14 @@
   "oDszhZ": {
     "defaultMessage": "inferred",
     "description": "How a criterion was checked: an agent inferred it"
+  },
+  "oO4acB": {
+    "defaultMessage": "{name} · {file} · {n, plural, one {# page} other {# pages}}",
+    "description": "Under the title of the page preparing an agreement. {name} is the agreement's name, {file} its PDF's file name, {n} its number of pages"
+  },
+  "ovjeHu": {
+    "defaultMessage": "e.g. 14,000",
+    "description": "Example price shown in an empty price field"
   },
   "oyGplP": {
     "defaultMessage": "Your own",
@@ -1499,6 +2299,10 @@
     "defaultMessage": "Looking for",
     "description": "Small heading over what the organisation looks for in a company, and whether this one has it"
   },
+  "peu3qk": {
+    "defaultMessage": "✓ Every signer has a signature field.",
+    "description": "When an agreement has all it needs before it can be sent"
+  },
   "plpp7+": {
     "defaultMessage": "Campaigns",
     "description": "Sidebar: the page of mail campaigns"
@@ -1507,13 +2311,37 @@
     "defaultMessage": "Dead end",
     "description": "Kind of an agent's note: something it tried that led nowhere"
   },
+  "q45QDW": {
+    "defaultMessage": "gets a copy",
+    "description": "Choice when adding someone to an agreement: they only get a copy"
+  },
+  "q9MVmm": {
+    "defaultMessage": "Send {name} to {n, plural, one {# person} other {# people}} now?",
+    "description": "Asked before sending a campaign. {name} is the campaign's name"
+  },
   "qCBlOC": {
     "defaultMessage": "Head of Marketing",
     "description": "Example job title shown in the empty role field"
   },
+  "qMSVO6": {
+    "defaultMessage": "Remove",
+    "description": "Button taking someone off an agreement"
+  },
+  "qgxe5Q": {
+    "defaultMessage": "Remove the draft {name}?",
+    "description": "Asked before deleting a draft campaign. {name} is the campaign's name"
+  },
+  "qitIYd": {
+    "defaultMessage": "Done",
+    "description": "Button marking an onboarding step done"
+  },
   "qzUXSB": {
     "defaultMessage": "+ Add person",
     "description": "Sidebar button to add a person to prospect"
+  },
+  "r5Zsvr": {
+    "defaultMessage": "ends {on}",
+    "description": "When a subscription ends. {on} is a date"
   },
   "rJg0SS": {
     "defaultMessage": "Then",
@@ -1539,9 +2367,17 @@
     "defaultMessage": "Never contact",
     "description": "In the panel of what a search left out: people refused as on the never-contact list"
   },
+  "rgzXkp": {
+    "defaultMessage": "{done} of {total} · started {on}",
+    "description": "How many of an onboarding's steps are done, and when it started. {on} is a date"
+  },
   "rtXs/J": {
     "defaultMessage": "refused {n}×",
     "description": "How many times an agent was refused adding people of this kind"
+  },
+  "s/p1B1": {
+    "defaultMessage": "Gets a copy",
+    "description": "Heading of the people who get a copy of an agreement without signing it"
   },
   "s1zF84": {
     "defaultMessage": "For, if they have several",
@@ -1554,6 +2390,14 @@
   "sAXDZu": {
     "defaultMessage": "Company",
     "description": "What a screen reader calls a company's page while it loads"
+  },
+  "sMvOY0": {
+    "defaultMessage": "No subscriptions yet",
+    "description": "When no subscription has been recorded"
+  },
+  "sOH1iG": {
+    "defaultMessage": "they said · recorded by {by} · {at}",
+    "description": "Above an enquirer's answer in the thread. {by} is the member who recorded it, {at} the date and time"
   },
   "scH4Dg": {
     "defaultMessage": "{n, plural, one {# company} other {# companies}}",
@@ -1579,6 +2423,14 @@
     "defaultMessage": "Asked.",
     "description": "After a request for more was sent to a search"
   },
+  "t5mCpG": {
+    "defaultMessage": "{name} · {email}",
+    "description": "Someone who can be invited, in the list to choose from"
+  },
+  "tAkbqW": {
+    "defaultMessage": "Sales",
+    "description": "What an enquiry is about: buying. A filter and a label on each enquiry"
+  },
   "tIzXly": {
     "defaultMessage": "Save password",
     "description": "Button to save a new password"
@@ -1595,6 +2447,10 @@
     "defaultMessage": "New organisation",
     "description": "Label and placeholder of the box to name a new organisation"
   },
+  "tcIdgR": {
+    "defaultMessage": "ended",
+    "description": "A subscription's status: it has ended"
+  },
   "tm5UAO": {
     "defaultMessage": "Email",
     "description": "Label of the email address field"
@@ -1602,6 +2458,14 @@
   "tnYITz": {
     "defaultMessage": "fit {grade}",
     "description": "In the line under a company's name: how well it fits. {grade} is a letter grade, such as A"
+  },
+  "tqu/z4": {
+    "defaultMessage": "What people sent through your sites' forms and your products, newest first. The words are theirs, exactly as sent. Each new one waits to be answered: give it an owner, and say when you're waiting on them or it's closed. Reply from here and it is emailed to them; their answer comes to your own mailbox, and you record it here.",
+    "description": "Under the title of the Enquiries page: what it shows and how it is used"
+  },
+  "ttK/9z": {
+    "defaultMessage": "e.g. send renewal terms",
+    "description": "Placeholder of a renewal or expansion's next step field: an example step"
   },
   "u+8kmh": {
     "defaultMessage": "Find my organisation",
@@ -1619,6 +2483,10 @@
     "defaultMessage": "Remove",
     "description": "Button to remove a draft agreement"
   },
+  "ufF1TC": {
+    "defaultMessage": "By",
+    "description": "Label of the field for the date the next step is due"
+  },
   "ui6JIn": {
     "defaultMessage": "Sent",
     "description": "Button marking a message, email or follow-up sent"
@@ -1634,6 +2502,14 @@
   "uzH+V4": {
     "defaultMessage": "Next →",
     "description": "Button on to the next page of a list"
+  },
+  "uzmeyM": {
+    "defaultMessage": "Add someone",
+    "description": "Heading of the forms adding a signer or someone to get a copy"
+  },
+  "v7TFRo": {
+    "defaultMessage": "Name of the campaign",
+    "description": "What a screen reader calls the box for a new campaign's name"
   },
   "v8v3AO": {
     "defaultMessage": "Already here when this search came to them, or on a domain the never-contact list covers: kept, never up for review.",
@@ -1659,6 +2535,18 @@
     "defaultMessage": "Name of the agreement",
     "description": "What a screen reader calls the field naming a new agreement"
   },
+  "vf6SN/": {
+    "defaultMessage": "due {on}",
+    "description": "When an onboarding step is due. {on} is a date"
+  },
+  "vhpYOv": {
+    "defaultMessage": "Help",
+    "description": "What an enquiry is about: asking for help. A filter and a label on each enquiry"
+  },
+  "vk2Kcb": {
+    "defaultMessage": "Withdraw",
+    "description": "Button withdrawing a customer's access to their page"
+  },
   "vq2NQX": {
     "defaultMessage": "source ↗",
     "description": "Link to the page a fact came from"
@@ -1671,9 +2559,17 @@
     "defaultMessage": "the customer",
     "description": "Who did something, when it was the customer themselves"
   },
+  "w6pRqA": {
+    "defaultMessage": "e.g. send recap",
+    "description": "Placeholder of a deal's next step field: an example step"
+  },
   "wBVcnU": {
     "defaultMessage": "meeting",
     "description": "A person's stage: a meeting is arranged"
+  },
+  "wRJhmv": {
+    "defaultMessage": "{months, plural, one {# month} other {# months}}, then {after}",
+    "description": "A subscription's term: how many months it is committed for, then what happens"
   },
   "waRVnL": {
     "defaultMessage": "Messages",
@@ -1683,6 +2579,10 @@
     "defaultMessage": "member · {work, select, none {reads only} sales {sales} support {support} other {sales, support}}",
     "description": "Under a member's name in the sidebar: their role and the areas of work they do. {work} is which areas"
   },
+  "wjb+Jf": {
+    "defaultMessage": "Saving…",
+    "description": "While the fields placed on an agreement are being saved"
+  },
   "wlw5/B": {
     "defaultMessage": "Interested",
     "description": "Button marking that the person called was interested"
@@ -1691,9 +2591,25 @@
     "defaultMessage": "Agents look for what you write. Settings › What you sell adds what they check at every company. <link>Change them</link>",
     "description": "Under the search box, with nothing set to check, for another offering. Settings › What you sell is a place in Settings"
   },
+  "x+lq22": {
+    "defaultMessage": "Closed",
+    "description": "Where answering an enquiry stands: done with. A choice and a label on each enquiry"
+  },
+  "xA8Bif": {
+    "defaultMessage": "{step} · overdue since {date}",
+    "description": "On a deal's card: its next step, past the day it was due. {step} is what the member wrote; {date} is a day, such as 5 Mar"
+  },
+  "xAPIJu": {
+    "defaultMessage": "To reply from here an owner sets a mail server in Settings. Until then, answer from your own mail.",
+    "description": "Under an enquiry, in place of the reply field, when no mail server is set; Settings is the name of a page"
+  },
   "xGB6d2": {
     "defaultMessage": "Replace the PDF",
     "description": "Label of the file field to replace an agreement's PDF"
+  },
+  "xGCq8P": {
+    "defaultMessage": "Remove",
+    "description": "Button removing an onboarding"
   },
   "xOHwOr": {
     "defaultMessage": "Search",
@@ -1703,6 +2619,10 @@
     "defaultMessage": "Clear the filters, or add companies through Research or an agent.",
     "description": "Under 'No companies match'"
   },
+  "xR+kpe": {
+    "defaultMessage": "What they do",
+    "description": "What a screen reader calls the choice of whether someone added signs or gets a copy"
+  },
   "xUQKbh": {
     "defaultMessage": "email is a guess",
     "description": "A person's email address was worked out from the company's pattern"
@@ -1710,6 +2630,10 @@
   "xfJnWy": {
     "defaultMessage": "Phone",
     "description": "Label of a person's phone number"
+  },
+  "xfzi4R": {
+    "defaultMessage": "e.g. 14,000",
+    "description": "Placeholder of the field for what a deal is worth: an example amount"
   },
   "xkqhRH": {
     "defaultMessage": "Open my steps",
@@ -1735,9 +2659,41 @@
     "defaultMessage": "Follow-ups",
     "description": "Filter on the Today page: follow-ups to send"
   },
+  "yNSaJj": {
+    "defaultMessage": "Take {name} off, with their fields?",
+    "description": "Asked before taking a signer off an agreement. {name} is the signer's name"
+  },
+  "yWoXW0": {
+    "defaultMessage": "Nobody. Everyone who signs gets one anyway.",
+    "description": "Under Gets a copy when nobody only gets a copy"
+  },
+  "yZSQsb": {
+    "defaultMessage": "Our note",
+    "description": "What a screen reader calls the field for the members' note on an enquiry"
+  },
+  "ybCtLn": {
+    "defaultMessage": "Place a signature for {name}.",
+    "description": "In the list of what an agreement needs before it can be sent. {name} is a signer's name"
+  },
+  "yfmW86": {
+    "defaultMessage": "Signature",
+    "description": "A kind of field placed on an agreement's page: where a signer signs"
+  },
+  "yla9ZH": {
+    "defaultMessage": "Paused: {reason}",
+    "description": "A campaign's state when sending stopped by itself. {reason} is the server's reason"
+  },
   "yxe9Ac": {
     "defaultMessage": "Continue with {provider}",
     "description": "Button to sign in through a provider. {provider} is its name, such as Google"
+  },
+  "z1RTXa": {
+    "defaultMessage": "Remove this onboarding and its steps? Use this for one started by mistake.",
+    "description": "Asked before removing an onboarding"
+  },
+  "z23zX3": {
+    "defaultMessage": "{n} going now",
+    "description": "Count of a campaign's mails going out now, in the line under its name"
   },
   "z5Md+V": {
     "defaultMessage": "No document yet",
@@ -1746,6 +2702,26 @@
   "z6/sFR": {
     "defaultMessage": "Who are you looking for, for {offering}?",
     "description": "Label of the box where a search is described. {offering} is the name of what the search is for"
+  },
+  "zByJ0E": {
+    "defaultMessage": "Saved ✓",
+    "description": "Once the fields placed on an agreement are saved"
+  },
+  "zFcu5E": {
+    "defaultMessage": "Upload the PDF.",
+    "description": "In the list of what an agreement needs before it can be sent"
+  },
+  "zH/xCa": {
+    "defaultMessage": "{email} · member",
+    "description": "Under someone on an agreement who is a member of the organisation. {email} is their email address"
+  },
+  "zH3KfT": {
+    "defaultMessage": "Not yet ready to send: {reason}.",
+    "description": "On the Campaigns page when nothing can be sent yet. {reason} is the server's reason, such as a postal address missing"
+  },
+  "zJ6dfh": {
+    "defaultMessage": "Owner",
+    "description": "Label of the choice of the member who owns a deal"
   },
   "zL5xPp": {
     "defaultMessage": "{name} · {kb} KB · SHA-256 {hash}…",
@@ -1762,5 +2738,9 @@
   "zba2Hc": {
     "defaultMessage": "Heads of procurement at UK kitchen makers with their own showrooms. About twenty, with the page that shows each one's role.",
     "description": "Example in the box where a search is described"
+  },
+  "zec65k": {
+    "defaultMessage": "All",
+    "description": "Filter on the Enquiries page showing every enquiry"
   }
 }

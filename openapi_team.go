@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -19,7 +20,7 @@ func withRequest(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc {
 	}
 }
 
-func requestFrom(ctx context.Context) *http.Request { return ctx.Value(requestKey{}).(*http.Request) }
+var requestFrom = request.RequestFrom
 
 // someone is the signed-in person asking: an API key is no one, so what is a person's
 // own is refused to it.

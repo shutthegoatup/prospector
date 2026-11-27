@@ -23,7 +23,10 @@ func person(t *testing.T, s *Store, o *Org, name, company, email string, replied
 func leftOut(people []Recipient) map[string]string {
 	out := map[string]string{}
 	for _, p := range people {
-		out[p.Name] = p.LeftOut
+		out[p.Name] = ""
+		if p.LeftOut != nil {
+			out[p.Name] = p.LeftOut.Error()
+		}
 	}
 	return out
 }
@@ -66,7 +69,7 @@ func TestACampaignGoesOnlyToPeopleWithARelationship(t *testing.T) {
 			t.Errorf("%s is in the audience of a campaign to people in conversation", never)
 		}
 	}
-	if people[0].Name != "Hannah Pryce" || people[0].LeftOut != "" {
+	if people[0].Name != "Hannah Pryce" || people[0].LeftOut != nil {
 		t.Errorf("those it goes to don't come first: %+v", people)
 	}
 

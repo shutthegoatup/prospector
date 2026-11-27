@@ -145,7 +145,7 @@ func (s *OutreachStore) SendCampaign(o *store.Org, id int64, actor string) (*sto
 		}
 		var rows []store.CampaignRecipient
 		for _, p := range people {
-			if p.LeftOut != "" {
+			if p.LeftOut != nil {
 				continue
 			}
 			contact := p.ContactID
