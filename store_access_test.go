@@ -123,7 +123,23 @@ func TestTheStoreKeepsFilesOfItsOwn(t *testing.T) {
 	}
 }
 
-func onStore(fn *ast.FuncDecl) bool { return receiver(fn) == "Store" }
+// storeTypes are Store and the types it embeds: the core and each area's queries.
+var storeTypes = func() map[string]bool {
+	out := map[string]bool{"Store": true}
+	typ := reflect.TypeOf(Store{})
+	for i := range typ.NumField() {
+		if f := typ.Field(i); f.Anonymous {
+			t := f.Type
+			if t.Kind() == reflect.Pointer {
+				t = t.Elem()
+			}
+			out[t.Name()] = true
+		}
+	}
+	return out
+}()
+
+func onStore(fn *ast.FuncDecl) bool { return storeTypes[receiver(fn)] }
 
 func receiver(fn *ast.FuncDecl) string {
 	if fn.Recv == nil || len(fn.Recv.List) != 1 {
