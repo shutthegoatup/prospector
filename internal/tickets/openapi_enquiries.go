@@ -175,3 +175,20 @@ type ticketMail interface {
 	MailFor(org int64) (*mailer.Server, error)
 	ReplyEnquiry(ctx context.Context, o *store.Org, enquiry int64, text, actor, answers string) (*store.EnquiryMessage, error)
 }
+
+// AgentAddEnquiry records an enquiry sent with a key, as the form's would be but never
+// held as spam by its trap: a key is no bot filling a form.
+func (s TicketsAPI) AgentAddEnquiry(ctx context.Context, in api.AgentAddEnquiryRequestObject) (api.AgentAddEnquiryResponseObject, error) {
+	q := request.ReqFrom(ctx)
+	body, err := request.Recast[EnquiryIn](in.Body)
+	if err != nil {
+		return nil, err
+	}
+	body.Trap = ""
+	e, err := s.Enquiries.AddEnquiry(q.Org.ID, q.Actor(), body)
+	if err != nil {
+		return nil, err
+	}
+	answer, err := request.Recast[api.AgentEnquiry](e)
+	return api.AgentAddEnquiry200JSONResponse(answer), err
+}

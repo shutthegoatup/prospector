@@ -4358,6 +4358,220 @@
    ],
    "ops": [
     {
+     "anchor": "op-agentAddCompany",
+     "method": "POST",
+     "tone": "is-gold",
+     "path": "/o/{org}/api/v1/companies",
+     "summary": "Add a company to Research for a person to review",
+     "about": [
+      {
+       "text": "For agents, with a key; the same as the MCP tool "
+      },
+      {
+       "text": "add_company",
+       "code": true
+      },
+      {
+       "text": ". If its name or domain is already known, the facts it lacks are added to that company."
+      }
+     ],
+     "scope": "research:write",
+     "params": [],
+     "body": {
+      "of": {
+       "name": "AgentAddCompanyIn",
+       "link": "#schema-AgentAddCompanyIn"
+      },
+      "fields": [
+       {
+        "name": "name",
+        "type": {
+         "name": "string"
+        },
+        "about": [],
+        "required": true
+       },
+       {
+        "name": "built_by",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "Older clients only; add a fact instead."
+         }
+        ]
+       },
+       {
+        "name": "configurator_url",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "Older clients only; add a fact instead."
+         }
+        ]
+       },
+       {
+        "name": "country",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "ISO country code."
+         }
+        ]
+       },
+       {
+        "name": "domain",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "The company's own website domain; leave it empty rather than give a shared site."
+         }
+        ]
+       },
+       {
+        "name": "facts",
+        "type": {
+         "name": "AgentFactIn[]",
+         "link": "#schema-AgentFactIn"
+        },
+        "about": []
+       },
+       {
+        "name": "fit",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "Suggested fit grade A, B or C."
+         }
+        ]
+       },
+       {
+        "name": "platform",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "Older clients only; add a fact instead."
+         }
+        ]
+       },
+       {
+        "name": "segment",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       },
+       {
+        "name": "task",
+        "type": {
+         "name": "integer"
+        },
+        "about": [
+         {
+          "text": "The task this is for, if any."
+         }
+        ]
+       },
+       {
+        "name": "why",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "Why it fits, one sentence."
+         }
+        ]
+       }
+      ]
+     },
+     "responses": [
+      {
+       "code": "200",
+       "about": "The company it was filed under.",
+       "type": {
+        "name": "AgentAddCompanyOut",
+        "link": "#schema-AgentAddCompanyOut"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "409",
+       "bad": true,
+       "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/companies \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"name\": \"…\", \"built_by\": \"…\", \"configurator_url\": \"…\", \"country\": \"…\"}'"
+    },
+    {
      "anchor": "op-agentCompany",
      "method": "GET",
      "tone": "is-green",
@@ -4643,6 +4857,209 @@
      "curl": "curl -X PATCH https://prospector.invalid/o/your-org/api/v1/companies/{id} \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"stage\": \"…\", \"fit\": \"…\", \"offering\": 1, \"reason\": \"…\"}'"
     },
     {
+     "anchor": "op-agentAddContact",
+     "method": "POST",
+     "tone": "is-gold",
+     "path": "/o/{org}/api/v1/contacts",
+     "summary": "Suggest a person at a company",
+     "about": [
+      {
+       "text": "For agents, with a key; the same as the MCP tool "
+      },
+      {
+       "text": "add_contact",
+       "code": true
+      },
+      {
+       "text": ". They wait in Research until a person picks them; someone already at the company comes back as "
+      },
+      {
+       "text": "existed",
+       "code": true
+      },
+      {
+       "text": ", with what you sent that they lack in "
+      },
+      {
+       "text": "suggested",
+       "code": true
+      },
+      {
+       "text": "."
+      }
+     ],
+     "scope": "research:write",
+     "params": [],
+     "body": {
+      "of": {
+       "name": "AgentAddContactIn",
+       "link": "#schema-AgentAddContactIn"
+      },
+      "fields": [
+       {
+        "name": "company",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "The company's id or exact name."
+         }
+        ],
+        "required": true
+       },
+       {
+        "name": "name",
+        "type": {
+         "name": "string"
+        },
+        "about": [],
+        "required": true
+       },
+       {
+        "name": "source_url",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "The page that shows this person has this role."
+         }
+        ],
+        "required": true
+       },
+       {
+        "name": "email",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       },
+       {
+        "name": "email_status",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "verified when a page you cite shows the address, guess when inferred from a pattern, else empty."
+         }
+        ]
+       },
+       {
+        "name": "linkedin",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "Profile URL, found by search, never scraped."
+         }
+        ]
+       },
+       {
+        "name": "phone",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       },
+       {
+        "name": "task",
+        "type": {
+         "name": "integer"
+        },
+        "about": [
+         {
+          "text": "The task this is for, if any."
+         }
+        ]
+       },
+       {
+        "name": "title",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       }
+      ]
+     },
+     "responses": [
+      {
+       "code": "200",
+       "about": "Who they are now.",
+       "type": {
+        "name": "AgentAddContactOut",
+        "link": "#schema-AgentAddContactOut"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "409",
+       "bad": true,
+       "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/contacts \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"company\": \"…\", \"name\": \"…\", \"source_url\": \"…\", \"email\": \"…\"}'"
+    },
+    {
      "anchor": "op-pickContact",
      "method": "POST",
      "tone": "is-gold",
@@ -4754,6 +5171,261 @@
       }
      ],
      "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/contacts/{id}/pick \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
+     "anchor": "op-agentDraft",
+     "method": "POST",
+     "tone": "is-gold",
+     "path": "/o/{org}/api/v1/drafts",
+     "summary": "Write the text a person will send",
+     "about": [
+      {
+       "text": "For agents, with a key; the same as the MCP tool "
+      },
+      {
+       "text": "draft_message",
+       "code": true
+      },
+      {
+       "text": ". Text a person has edited, or that has already gone out, is refused."
+      }
+     ],
+     "scope": "drafts:write",
+     "params": [],
+     "body": {
+      "of": {
+       "name": "AgentDraftIn",
+       "link": "#schema-AgentDraftIn"
+      },
+      "fields": [
+       {
+        "name": "contact_id",
+        "type": {
+         "name": "integer"
+        },
+        "about": [],
+        "required": true
+       },
+       {
+        "name": "kind",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "note (LinkedIn request), message (after accepting), email or followup."
+         }
+        ],
+        "required": true
+       },
+       {
+        "name": "text",
+        "type": {
+         "name": "string"
+        },
+        "about": [],
+        "required": true
+       },
+       {
+        "name": "subject",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "The email's subject, for kind email."
+         }
+        ]
+       },
+       {
+        "name": "task",
+        "type": {
+         "name": "integer"
+        },
+        "about": [
+         {
+          "text": "The task this is for, if any."
+         }
+        ]
+       }
+      ]
+     },
+     "responses": [
+      {
+       "code": "200",
+       "about": "Written.",
+       "type": {
+        "name": "AgentOK",
+        "link": "#schema-AgentOK"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "409",
+       "bad": true,
+       "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/drafts \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"contact_id\": 1, \"kind\": \"…\", \"text\": \"…\", \"subject\": \"…\"}'"
+    },
+    {
+     "anchor": "op-agentAddFact",
+     "method": "POST",
+     "tone": "is-gold",
+     "path": "/o/{org}/api/v1/facts",
+     "summary": "Add one fact about a company, with the page that shows it",
+     "about": [
+      {
+       "text": "For agents, with a key; the same as the MCP tool "
+      },
+      {
+       "text": "add_fact",
+       "code": true
+      },
+      {
+       "text": ". A fact the company already has from that page isn't added twice."
+      }
+     ],
+     "scope": "research:write",
+     "params": [],
+     "body": {
+      "of": {
+       "name": "AgentAddFactIn",
+       "link": "#schema-AgentAddFactIn"
+      },
+      "fields": []
+     },
+     "responses": [
+      {
+       "code": "200",
+       "about": "The fact, and whether it was already there.",
+       "type": {
+        "name": "AgentAddFactOut",
+        "link": "#schema-AgentAddFactOut"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "409",
+       "bad": true,
+       "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/facts \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{}'"
     },
     {
      "anchor": "op-listResearch",
@@ -6969,6 +7641,169 @@
       }
      ],
      "curl": "curl https://prospector.invalid/o/your-org/api/v1/enquiries \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
+     "anchor": "op-agentAddEnquiry",
+     "method": "POST",
+     "tone": "is-gold",
+     "path": "/o/{org}/api/v1/enquiries",
+     "summary": "Record an enquiry from somewhere other than the form",
+     "about": [
+      {
+       "text": "For a back office or another site, with a key: an enquiry as the front page's form would make one, never marked as spam by its trap."
+      }
+     ],
+     "scope": "enquiries:write",
+     "params": [],
+     "body": {
+      "of": {
+       "name": "AgentEnquiryIn",
+       "link": "#schema-AgentEnquiryIn"
+      },
+      "fields": [
+       {
+        "name": "company",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       },
+       {
+        "name": "email",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       },
+       {
+        "name": "kind",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       },
+       {
+        "name": "message",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       },
+       {
+        "name": "name",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       },
+       {
+        "name": "page",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       },
+       {
+        "name": "phone",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       },
+       {
+        "name": "site",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       },
+       {
+        "name": "trap",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "Ignored for a key, which is never a bot filling a form."
+         }
+        ]
+       }
+      ]
+     },
+     "responses": [
+      {
+       "code": "200",
+       "about": "The enquiry as recorded.",
+       "type": {
+        "name": "AgentEnquiry",
+        "link": "#schema-AgentEnquiry"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "409",
+       "bad": true,
+       "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/enquiries \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"company\": \"…\", \"email\": \"…\", \"kind\": \"…\", \"message\": \"…\"}'"
     },
     {
      "anchor": "op-changeEnquiry",
@@ -18575,6 +19410,332 @@
    ]
   },
   {
+   "anchor": "schema-AgentAddCompanyIn",
+   "name": "AgentAddCompanyIn",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "name",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "built_by",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Older clients only; add a fact instead."
+      }
+     ]
+    },
+    {
+     "name": "configurator_url",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Older clients only; add a fact instead."
+      }
+     ]
+    },
+    {
+     "name": "country",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "ISO country code."
+      }
+     ]
+    },
+    {
+     "name": "domain",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The company's own website domain; leave it empty rather than give a shared site."
+      }
+     ]
+    },
+    {
+     "name": "facts",
+     "type": {
+      "name": "AgentFactIn[]",
+      "link": "#schema-AgentFactIn"
+     },
+     "about": []
+    },
+    {
+     "name": "fit",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Suggested fit grade A, B or C."
+      }
+     ]
+    },
+    {
+     "name": "platform",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Older clients only; add a fact instead."
+      }
+     ]
+    },
+    {
+     "name": "segment",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "task",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "The task this is for, if any."
+      }
+     ]
+    },
+    {
+     "name": "why",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Why it fits, one sentence."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentAddCompanyOut",
+   "name": "AgentAddCompanyOut",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "existed",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [
+      {
+       "text": "The company was already known; facts it didn't have were still added."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "name",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The name it is filed under, which can differ from yours if the domain was already known."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "stage",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentAddContactIn",
+   "name": "AgentAddContactIn",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "company",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The company's id or exact name."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "name",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "source_url",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The page that shows this person has this role."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "email",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "email_status",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "verified when a page you cite shows the address, guess when inferred from a pattern, else empty."
+      }
+     ]
+    },
+    {
+     "name": "linkedin",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Profile URL, found by search, never scraped."
+      }
+     ]
+    },
+    {
+     "name": "phone",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "task",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "The task this is for, if any."
+      }
+     ]
+    },
+    {
+     "name": "title",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentAddContactOut",
+   "name": "AgentAddContactOut",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "existed",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [
+      {
+       "text": "This person was already at the company; nothing about them was changed."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "status",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "suggested: waits in Research until a person picks them; empty once picked."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "suggested",
+     "type": {
+      "name": "string[]"
+     },
+     "about": [
+      {
+       "text": "For someone already here, which of email, phone and linkedin you sent are waiting for a person to accept."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentAddFactIn",
+   "name": "AgentAddFactIn",
+   "about": [],
+   "enum": [],
+   "fields": []
+  },
+  {
+   "anchor": "schema-AgentAddFactOut",
+   "name": "AgentAddFactOut",
+   "about": [],
+   "enum": [],
+   "fields": []
+  },
+  {
    "anchor": "schema-AgentCompanyDetail",
    "name": "AgentCompanyDetail",
    "about": [],
@@ -18814,6 +19975,64 @@
    ]
   },
   {
+   "anchor": "schema-AgentDraftIn",
+   "name": "AgentDraftIn",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "contact_id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "kind",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "note (LinkedIn request), message (after accepting), email or followup."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "text",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "subject",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The email's subject, for kind email."
+      }
+     ]
+    },
+    {
+     "name": "task",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "The task this is for, if any."
+      }
+     ]
+    }
+   ]
+  },
+  {
    "anchor": "schema-AgentDueItem",
    "name": "AgentDueItem",
    "about": [],
@@ -18862,6 +20081,225 @@
      },
      "about": [],
      "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentEnquiry",
+   "name": "AgentEnquiry",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "company",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "company_id",
+     "type": {
+      "name": "integer?"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "contact_id",
+     "type": {
+      "name": "integer?"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "created_at",
+     "type": {
+      "name": "date-time"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "email",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "kind",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "message",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "name",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "note",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "owner",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "page",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "phone",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "site",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "spam",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "state",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "via",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentEnquiryIn",
+   "name": "AgentEnquiryIn",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "company",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "email",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "kind",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "message",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "name",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "page",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "phone",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "site",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    },
+    {
+     "name": "trap",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Ignored for a key, which is never a bot filling a form."
+      }
+     ]
     }
    ]
   },
@@ -19023,6 +20461,72 @@
      "about": [
       {
        "text": "Read from a job advert, a third party or an old page, not the company's own site."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentFactIn",
+   "name": "AgentFactIn",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "field",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "What the fact is about, e.g. team_page or press, or one of the things the organisation looks for."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "source_url",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The page that shows it; required unless answer is unknown."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "value",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The fact itself, one sentence; for answer unknown, where you looked."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "answer",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "For something the organisation looks for: yes (the default), no, or unknown."
+      }
+     ]
+    },
+    {
+     "name": "inferred",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [
+      {
+       "text": "Read from a job advert, a third party or an old page rather than their own site."
       }
      ]
     }
@@ -19275,6 +20779,22 @@
        "text": "The company it is about, if any."
       }
      ]
+    }
+   ]
+  },
+  {
+   "anchor": "schema-AgentOK",
+   "name": "AgentOK",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "ok",
+     "type": {
+      "name": "boolean"
+     },
+     "about": [],
+     "required": true
     }
    ]
   },

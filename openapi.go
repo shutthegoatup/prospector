@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -54,13 +55,13 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 	if err != nil {
 		log.Fatalf("the API spec: %v", err)
 	}
-	scopes, account, keysOnly := map[string][]string{}, map[string]bool{}, map[string]bool{}
+	scopes, account, keysOnly, agentOps := map[string][]string{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for path, item := range spec.Paths.Map() {
 		for method, op := range item.Operations() {
 			if s := opScopes(op); len(s) > 0 {
 				scopes[op.OperationID] = s
 				if !sessionAllowed(op) {
-					keysOnly[method+" "+path] = true
+					keysOnly[method+" "+path], agentOps[op.OperationID] = true, true
 				}
 			}
 			if slices.Contains(op.Tags, "account") {
@@ -77,8 +78,13 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 		_, _ = w.Write(doc)
 	})
 
-	strict := api.NewStrictHandlerWithOptions(newAPIServer(a), []api.StrictMiddlewareFunc{a.apiScope(scopes), func(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc { return listURL(f) }, uploads, withRequest, a.withSite}, api.StrictHTTPServerOptions{
+	strict := api.NewStrictHandlerWithOptions(newAPIServer(a), []api.StrictMiddlewareFunc{a.apiScope(scopes), func(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc { return listURL(f) }, uploads, answerAfterBody(agentOps), withRequest, a.withSite}, api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			// The agents' operations say it as the routes they came from did.
+			if keysOnly[r.Pattern] {
+				writeProblem(w, r, http.StatusBadRequest, say.Errorf("bad request body: %s", err.Error()))
+				return
+			}
 			writeProblem(w, r, http.StatusBadRequest, say.New(err.Error()))
 		},
 		ResponseErrorHandlerFunc: apiFail,
@@ -95,6 +101,23 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 		},
 	})
 }
+
+// answerAfterBody starts an agent operation's answer clock once its body is in, as
+// the routes it came from did, so a slow upload doesn't use up the time to answer.
+func answerAfterBody(ops map[string]bool) api.StrictMiddlewareFunc {
+	return func(f api.StrictHandlerFunc, op string) api.StrictHandlerFunc {
+		if !ops[op] {
+			return f
+		}
+		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, in any) (any, error) {
+			_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(answerLimit))
+			return f(ctx, w, r, in)
+		}
+	}
+}
+
+// agentBodyLimit is the most an agent's write may send.
+const agentBodyLimit = 64 << 20
 
 // watchAPI, when set, wraps the router the operations go on, so the tests can hold
 // the spec to what the server really answers.
@@ -114,6 +137,10 @@ func (a *App) caller(account, keysOnly map[string]bool, next http.Handler) http.
 			return
 		}
 		if hasKey(r) || keysOnly[r.Pattern] {
+			// What a key sends is held to what the routes it came from always took.
+			if keysOnly[r.Pattern] {
+				r.Body = http.MaxBytesReader(w, r.Body, agentBodyLimit)
+			}
 			a.agent("", next.ServeHTTP)(w, r)
 			return
 		}

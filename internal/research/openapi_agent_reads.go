@@ -5,6 +5,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/request"
 )
 
@@ -64,4 +65,61 @@ func (s ResearchAPI) AgentDue(ctx context.Context, in api.AgentDueRequestObject)
 	out.Body.Items = append([]api.AgentDueItem{}, out.Body.Items...)
 	out.Body.NextCursor = due.NextCursor
 	return out, nil
+}
+
+// An agent's writes take what the MCP tools of the same names do, carried into the
+// store's types by their JSON, and answer as those routes always did.
+
+func (s ResearchAPI) AgentAddCompany(ctx context.Context, in api.AgentAddCompanyRequestObject) (api.AgentAddCompanyResponseObject, error) {
+	q := request.ReqFrom(ctx)
+	body, err := request.Recast[AddCompanyIn](in.Body)
+	if err != nil {
+		return nil, err
+	}
+	out, err := s.Research.AgentAddCompany(q.Org.ID, q.Agent(), body)
+	if err != nil {
+		return nil, err
+	}
+	answer, err := request.Recast[api.AgentAddCompanyOut](out)
+	return api.AgentAddCompany200JSONResponse(answer), err
+}
+
+func (s ResearchAPI) AgentAddFact(ctx context.Context, in api.AgentAddFactRequestObject) (api.AgentAddFactResponseObject, error) {
+	q := request.ReqFrom(ctx)
+	body, err := request.Recast[AddFactIn](in.Body)
+	if err != nil {
+		return nil, err
+	}
+	out, err := s.Research.AgentAddFact(q.Org.ID, q.Agent(), body)
+	if err != nil {
+		return nil, err
+	}
+	answer, err := request.Recast[api.AgentAddFactOut](out)
+	return api.AgentAddFact200JSONResponse(answer), err
+}
+
+func (s ResearchAPI) AgentAddContact(ctx context.Context, in api.AgentAddContactRequestObject) (api.AgentAddContactResponseObject, error) {
+	q := request.ReqFrom(ctx)
+	body, err := request.Recast[prospecting.AddContactIn](in.Body)
+	if err != nil {
+		return nil, err
+	}
+	out, err := s.Research.AgentAddContact(q.Org, q.Agent(), body)
+	if err != nil {
+		return nil, err
+	}
+	answer, err := request.Recast[api.AgentAddContactOut](out)
+	return api.AgentAddContact200JSONResponse(answer), err
+}
+
+func (s ResearchAPI) AgentDraft(ctx context.Context, in api.AgentDraftRequestObject) (api.AgentDraftResponseObject, error) {
+	q := request.ReqFrom(ctx)
+	body, err := request.Recast[DraftIn](in.Body)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.Research.AgentDraft(q.Org.ID, q.Agent(), body); err != nil {
+		return nil, err
+	}
+	return api.AgentDraft200JSONResponse{Ok: true}, nil
 }

@@ -860,6 +860,90 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
+  /o/{org}/api/v1/facts:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    post:
+      operationId: agentAddFact
+      tags: [research]
+      summary: Add one fact about a company, with the page that shows it
+      description: "For agents, with a key; the same as the MCP tool `add_fact`. A fact the company already has from that page isn't added twice."
+      security:
+        - bearer: ["research:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentAddFactIn" }
+      responses:
+        "200":
+          description: The fact, and whether it was already there.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentAddFactOut" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /o/{org}/api/v1/contacts:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    post:
+      operationId: agentAddContact
+      tags: [research]
+      summary: Suggest a person at a company
+      description: "For agents, with a key; the same as the MCP tool `add_contact`. They wait in Research until a person picks them; someone already at the company comes back as `existed`, with what you sent that they lack in `suggested`."
+      security:
+        - bearer: ["research:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentAddContactIn" }
+      responses:
+        "200":
+          description: Who they are now.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentAddContactOut" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /o/{org}/api/v1/drafts:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    post:
+      operationId: agentDraft
+      tags: [research]
+      summary: Write the text a person will send
+      description: "For agents, with a key; the same as the MCP tool `draft_message`. Text a person has edited, or that has already gone out, is refused."
+      security:
+        - bearer: ["drafts:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentDraftIn" }
+      responses:
+        "200":
+          description: Written.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentOK" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
   /o/{org}/api/v1/enquiries/{id}/messages:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -1532,6 +1616,31 @@ paths:
         "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
+    post:
+      operationId: agentAddEnquiry
+      tags: [enquiries]
+      summary: Record an enquiry from somewhere other than the form
+      description: "For a back office or another site, with a key: an enquiry as the front page's form would make one, never marked as spam by its trap."
+      security:
+        - bearer: ["enquiries:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentEnquiryIn" }
+      responses:
+        "200":
+          description: The enquiry as recorded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentEnquiry" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
   /o/{org}/api/v1/enquiry-counts:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -3842,6 +3951,31 @@ paths:
         "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
+    post:
+      operationId: agentAddCompany
+      tags: [research]
+      summary: Add a company to Research for a person to review
+      description: "For agents, with a key; the same as the MCP tool `add_company`. If its name or domain is already known, the facts it lacks are added to that company."
+      security:
+        - bearer: ["research:write"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentAddCompanyIn" }
+      responses:
+        "200":
+          description: The company it was filed under.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentAddCompanyOut" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
   /o/{org}/api/v1/segments:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -4808,6 +4942,127 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
 
   schemas:
+    AgentOK:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+    AgentFactIn:
+      type: object
+      required: [field, value, source_url]
+      properties:
+        field: { type: string, description: "What the fact is about, e.g. team_page or press, or one of the things the organisation looks for." }
+        value: { type: string, description: "The fact itself, one sentence; for answer unknown, where you looked." }
+        source_url: { type: string, description: "The page that shows it; required unless answer is unknown." }
+        answer: { type: string, description: "For something the organisation looks for: yes (the default), no, or unknown." }
+        inferred: { type: boolean, description: "Read from a job advert, a third party or an old page rather than their own site." }
+    AgentAddCompanyIn:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        domain: { type: string, description: "The company's own website domain; leave it empty rather than give a shared site." }
+        country: { type: string, description: ISO country code. }
+        segment: { type: string }
+        fit: { type: string, description: "Suggested fit grade A, B or C." }
+        configurator_url: { type: string, deprecated: true, description: Older clients only; add a fact instead. }
+        platform: { type: string, deprecated: true, description: Older clients only; add a fact instead. }
+        built_by: { type: string, deprecated: true, description: Older clients only; add a fact instead. }
+        why: { type: string, description: "Why it fits, one sentence." }
+        facts:
+          type: array
+          items: { $ref: "#/components/schemas/AgentFactIn" }
+        task: { type: integer, format: int64, description: "The task this is for, if any." }
+    AgentAddCompanyOut:
+      type: object
+      required: [id, name, existed, stage]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string, description: "The name it is filed under, which can differ from yours if the domain was already known." }
+        existed: { type: boolean, description: "The company was already known; facts it didn't have were still added." }
+        stage: { type: string }
+    AgentAddFactIn:
+      allOf:
+        - $ref: "#/components/schemas/AgentFactIn"
+        - type: object
+          required: [company]
+          properties:
+            company: { type: string, description: "The company's id or exact name." }
+            task: { type: integer, format: int64, description: "The task this is for, if any." }
+    AgentAddFactOut:
+      allOf:
+        - $ref: "#/components/schemas/AgentFact"
+        - type: object
+          required: [existed]
+          properties:
+            existed: { type: boolean, description: "The company already had this fact from this page; nothing was added." }
+    AgentAddContactIn:
+      type: object
+      required: [company, name, source_url]
+      properties:
+        company: { type: string, description: "The company's id or exact name." }
+        name: { type: string }
+        title: { type: string }
+        email: { type: string }
+        email_status: { type: string, description: "verified when a page you cite shows the address, guess when inferred from a pattern, else empty." }
+        linkedin: { type: string, description: "Profile URL, found by search, never scraped." }
+        phone: { type: string }
+        source_url: { type: string, description: "The page that shows this person has this role." }
+        task: { type: integer, format: int64, description: "The task this is for, if any." }
+    AgentAddContactOut:
+      type: object
+      required: [id, status, existed]
+      properties:
+        id: { type: integer, format: int64 }
+        status: { type: string, description: "suggested: waits in Research until a person picks them; empty once picked." }
+        existed: { type: boolean, description: "This person was already at the company; nothing about them was changed." }
+        suggested:
+          type: array
+          description: For someone already here, which of email, phone and linkedin you sent are waiting for a person to accept.
+          items: { type: string }
+          x-go-type-skip-optional-pointer: false
+    AgentDraftIn:
+      type: object
+      required: [contact_id, kind, text]
+      properties:
+        contact_id: { type: integer, format: int64 }
+        kind: { type: string, description: "note (LinkedIn request), message (after accepting), email or followup." }
+        subject: { type: string, description: "The email's subject, for kind email." }
+        text: { type: string }
+        task: { type: integer, format: int64, description: "The task this is for, if any." }
+    AgentEnquiryIn:
+      type: object
+      properties:
+        kind: { type: string }
+        name: { type: string }
+        email: { type: string }
+        company: { type: string }
+        phone: { type: string }
+        message: { type: string }
+        page: { type: string }
+        site: { type: string }
+        trap: { type: string, description: "Ignored for a key, which is never a bot filling a form." }
+    AgentEnquiry:
+      type: object
+      required: [id, kind, name, email, company, phone, message, site, page, via, spam, contact_id, company_id, created_at, state, owner, note]
+      properties:
+        id: { type: integer, format: int64 }
+        kind: { type: string }
+        name: { type: string }
+        email: { type: string }
+        company: { type: string }
+        phone: { type: string }
+        message: { type: string }
+        site: { type: string }
+        page: { type: string }
+        via: { type: string }
+        spam: { type: boolean }
+        contact_id: { type: integer, format: int64, nullable: true, x-go-type: "*int64" }
+        company_id: { type: integer, format: int64, nullable: true, x-go-type: "*int64" }
+        created_at: { type: string, format: date-time }
+        state: { type: string }
+        owner: { type: string }
+        note: { type: string }
     AgentLastAgent:
       type: object
       description: The latest change an agent made to a company; people's actions don't count.

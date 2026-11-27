@@ -62,12 +62,12 @@ func orgRoutes(t *testing.T) (gets, posts []string) {
 		}
 		path = strings.Replace(pathParam.ReplaceAllString(path, "{id}"), "/o/{id}/", "/o/{org}/", 1)
 		// Operations for keys alone aren't a page's or a form's; another organisation's key
-		// is refused before them (TestAnAgentsReadsAnswerAsTheyAlwaysHave).
+		// is refused before them (TestAnAgentsReadsAnswerAsTheyAlwaysHave and the writes').
 		if item.Get != nil && sessionAllowed(item.Get) {
 			gets = append(gets, path)
 		}
 		for method, op := range map[string]*openapi3.Operation{"POST": item.Post, "PUT": item.Put, "PATCH": item.Patch, "DELETE": item.Delete} {
-			if op != nil {
+			if op != nil && sessionAllowed(op) {
 				posts = append(posts, method+" "+path)
 			}
 		}
