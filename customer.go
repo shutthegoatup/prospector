@@ -28,12 +28,12 @@ var errNoCustomerMail = say.New("mail isn't set up, so the link can't be sent: a
 // server, its own or the app's, and PROSPECTOR_URL, because a link is never built from
 // what a request claims its host is.
 func (a *App) customerMailOn(org int64) bool {
-	via, err := a.mailFor(org)
+	via, err := a.MailFor(org)
 	return err == nil && via != nil && a.base != ""
 }
 
 func (a *App) customerLinkMail(ctx context.Context, org *Org, to, token string) error {
-	via, err := a.mailFor(org.ID)
+	via, err := a.MailFor(org.ID)
 	if err != nil {
 		return err
 	}

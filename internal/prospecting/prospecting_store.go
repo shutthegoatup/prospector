@@ -318,7 +318,7 @@ func (s *ProspectingStore) ResearchList(org, offering int64, set store.OrgSettin
 			return nil, false, "", err
 		}
 		if ranked {
-			page, next, err := ListPage(rows, in.Limit, in.Cursor)
+			page, next, err := paging.ListPage(rows, in.Limit, in.Cursor)
 			return page, true, next, err
 		}
 	case filter == "details":
@@ -326,7 +326,7 @@ func (s *ProspectingStore) ResearchList(org, offering int64, set store.OrgSettin
 		if err != nil {
 			return nil, false, "", err
 		}
-		page, next, err := ListPage(rows, in.Limit, in.Cursor)
+		page, next, err := paging.ListPage(rows, in.Limit, in.Cursor)
 		return page, false, next, err
 	}
 	at, err := in.At(1)
@@ -704,7 +704,7 @@ func (s *ProspectingStore) QuickAddPerson(o *store.Org, in QuickAdd, actor strin
 			}
 			companyID = &c.ID
 		}
-		first := FirstField(in.Name)
+		first := store.FirstField(in.Name)
 		note := strings.TrimSpace(in.Note)
 		if note == "" {
 			note = Fill(o.Settings.WithDefaults().NoteTemplate, first, maker, o.Name)

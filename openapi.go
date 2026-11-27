@@ -17,7 +17,22 @@ import (
 // its session, agents and scripts with a key. api.gen.go is generated from the spec.
 
 // apiServer implements the spec's operations.
-type apiServer struct{ a *App }
+type apiServer struct {
+	a *App
+	signingAPI
+	salesAPI
+	ticketsAPI
+}
+
+// newAPIServer hands each product's operations the part of the store they use.
+func newAPIServer(a *App) apiServer {
+	return apiServer{a: a,
+		signingAPI: signingAPI{Store: &a.s.agreementStore},
+		ticketsAPI: ticketsAPI{Enquiries: &a.s.enquiryStore, Mail: a},
+		salesAPI: salesAPI{Pipeline: &a.s.dealStore, Subscriptions: &a.s.subscriptionStore,
+			People: &a.s.prospectingStore, Onboarding: &a.s.onboardingStore},
+	}
+}
 
 var _ api.StrictServerInterface = apiServer{}
 
@@ -48,7 +63,7 @@ func (a *App) routeAPI(mux *http.ServeMux) {
 		_, _ = w.Write(doc)
 	})
 
-	strict := api.NewStrictHandlerWithOptions(apiServer{a}, []api.StrictMiddlewareFunc{a.apiScope(scopes), func(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc { return listURL(f) }, uploads, withRequest, a.withSite}, api.StrictHTTPServerOptions{
+	strict := api.NewStrictHandlerWithOptions(newAPIServer(a), []api.StrictMiddlewareFunc{a.apiScope(scopes), func(f api.StrictHandlerFunc, _ string) api.StrictHandlerFunc { return listURL(f) }, uploads, withRequest, a.withSite}, api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeProblem(w, r, http.StatusBadRequest, say.New(err.Error()))
 		},

@@ -14,3 +14,8 @@ type SubscriptionChange = sales.SubscriptionChange
 type SubscriptionIn = sales.SubscriptionIn
 type SubscriptionRow = sales.SubscriptionRow
 type subscriptionStore = sales.SubscriptionStore
+
+type salesAPI = sales.SalesAPI
+
+var contracted = sales.Contracted
+var subscriptionOut = sales.SubscriptionOut

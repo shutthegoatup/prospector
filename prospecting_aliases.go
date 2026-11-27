@@ -1,12 +1,16 @@
 package main
 
-import "github.com/shutthegoatup/prospector/internal/prospecting"
+import (
+	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/store"
+)
 
 // What moved to internal/prospecting keeps its name here.
 
 // listPage is generic, so a wrapper rather than an alias.
 func listPage[T any](all []T, limit int, cursor string) ([]T, string, error) {
-	return prospecting.ListPage(all, limit, cursor)
+	return paging.ListPage(all, limit, cursor)
 }
 
 const CompanyQualified = prospecting.CompanyQualified
@@ -52,11 +56,11 @@ var assetsFound = prospecting.AssetsFound
 var detailOf = prospecting.DetailOf
 var erased = prospecting.ErasedIn
 var fill = prospecting.Fill
-var firstField = prospecting.FirstField
+var firstField = store.FirstField
 var fitOf = prospecting.FitOf
 var httpURL = prospecting.HttpURL
 var markDate = prospecting.MarkDate
-var pageIn = prospecting.PageIn
+var pageIn = paging.PageIn
 var pipeline = prospecting.Pipeline
 var suggestable = prospecting.Suggestable
 var vendors = prospecting.Vendors

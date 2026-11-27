@@ -11,7 +11,7 @@ import (
 )
 
 func CompanyStem(maker string) string {
-	return strings.Trim(strings.ToLower(prospecting.FirstField(maker)), "(")
+	return strings.Trim(strings.ToLower(store.FirstField(maker)), "(")
 }
 
 func CompetitorHold(r CompanyRow) *string {

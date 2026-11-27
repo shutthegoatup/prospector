@@ -2,6 +2,7 @@ package store
 
 import (
 	"log"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -292,4 +293,20 @@ func NonEmpty(v string) *string {
 		return nil
 	}
 	return &v
+}
+
+// IDOf is an optional id as the API gives one: 0 for none.
+func IDOf(id *int64) int64 {
+	if id == nil {
+		return 0
+	}
+	return *id
+}
+
+// FirstField is the first word of s, or "" when it has none.
+func FirstField(s string) string {
+	if f := strings.Fields(s); len(f) > 0 {
+		return f[0]
+	}
+	return ""
 }

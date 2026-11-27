@@ -12,7 +12,8 @@ const replyLimit = tickets.ReplyLimit
 
 type EnquiryFilter = tickets.EnquiryFilter
 type EnquiryIn = tickets.EnquiryIn
-type enquiriesAround = tickets.EnquiriesAround
 type enquiryStore = tickets.EnquiryStore
 
 var errEnquiryEmail = tickets.ErrEnquiryEmail
+
+type ticketsAPI = tickets.TicketsAPI

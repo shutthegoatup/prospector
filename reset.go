@@ -44,8 +44,8 @@ func (a *App) deliver(ctx context.Context, via mailer.Server, m mailer.Message) 
 	return mailer.Send(ctx, via, m)
 }
 
-// mailFor is the organisation's own server when it has one, else the app's, else nil.
-func (a *App) mailFor(org int64) (*mailer.Server, error) {
+// MailFor is the organisation's own server when it has one, else the app's, else nil.
+func (a *App) MailFor(org int64) (*mailer.Server, error) {
 	m, err := a.s.OrgMail(org)
 	if err != nil {
 		return a.mail, nil
@@ -94,7 +94,7 @@ func (a *App) sendReset(email, lang string) {
 func (a *App) invite(ctx context.Context, q *Req, u *User, created bool) (bool, error) {
 	via, err := a.mail, error(nil)
 	if created {
-		via, err = a.mailFor(q.Org.ID)
+		via, err = a.MailFor(q.Org.ID)
 	}
 	if a.base == "" || (via == nil && err == nil) {
 		return false, nil
@@ -179,7 +179,7 @@ func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 }
 
 func (a *App) testMail(ctx context.Context, q *Req) (string, error) {
-	via, err := a.mailFor(q.Org.ID)
+	via, err := a.MailFor(q.Org.ID)
 	if err == nil && via == nil {
 		err = say.New("there is no mail server to test: save one first")
 	}

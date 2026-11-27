@@ -1,6 +1,6 @@
 package request
 
-import "github.com/shutthegoatup/prospector/internal/prospecting"
+import "github.com/shutthegoatup/prospector/internal/store"
 
 // Voice is who is calling and signing, from the org's settings and the member's own.
 type Voice struct {
@@ -17,7 +17,7 @@ func (v Voice) PitchFor(offering int64) string {
 }
 
 func (v Voice) CallerFirst() string {
-	if f := prospecting.FirstField(v.Caller); f != "" {
+	if f := store.FirstField(v.Caller); f != "" {
 		return f
 	}
 	return "[YOUR NAME]"

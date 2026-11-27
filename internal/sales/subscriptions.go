@@ -1,6 +1,9 @@
 package sales
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
@@ -65,4 +68,21 @@ type SubscriptionRow struct {
 	Renewing bool
 	// People are those at the company already in conversation: who a renewal can be with.
 	People []store.Contact
+}
+
+// Contracted is what the subscriptions still running add up to for a year, a sum for
+// each currency: pounds and euros don't add.
+func Contracted(rows []SubscriptionRow) string {
+	sums := map[string]int64{}
+	for _, r := range rows {
+		if (r.Status == store.SubActive || r.Status == store.SubNotice || r.Status == store.SubEnding) && r.Amount != 0 {
+			sums[r.Currency] += r.Yearly()
+		}
+	}
+	var parts []string
+	for currency, sum := range sums {
+		parts = append(parts, store.FormatMoney(sum, currency))
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, " + ")
 }
