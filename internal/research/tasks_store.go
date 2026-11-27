@@ -14,7 +14,7 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/shutthegoatup/prospector/internal/identity"
-	"github.com/shutthegoatup/prospector/internal/outreach"
+	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/say"
@@ -30,7 +30,7 @@ type ResearchStore struct {
 	// left out, and an address is only kept where its domain takes mail.
 	Prospecting *prospecting.ProspectingStore
 	Identity    *identity.IdentityStore
-	Outreach    *outreach.OutreachStore
+	Outreach    *marketing.OutreachStore
 }
 
 func (s *ResearchStore) CreateTask(org int64, title, brief, by string) (*store.Task, error) {

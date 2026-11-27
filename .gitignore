@@ -24,5 +24,6 @@ node_modules/
 /web/src/lang/
 # Written by npm run a11y in web/.
 /web/a11y/.signed-in.json
+/web/a11y/.reader.json
 /web/test-results/
 /web/playwright-report/

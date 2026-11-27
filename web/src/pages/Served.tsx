@@ -281,7 +281,7 @@ function CustomerPage({ state, token, org, email, day, steps }: Extract<Served, 
                     <div key={st.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 text-sm last:border-0">
                       {st.done_on ? <span className="text-muted-foreground">{st.name}</span> : <b>{st.name}</b>}
                       <span className="flex flex-wrap items-center gap-3">
-                        <span className="font-mono text-xs text-muted-foreground">{meta && say(v.stepMeta, { said: meta.said, on: onDay(meta.on) })}</span>
+                        <span className="font-mono text-xs text-muted-foreground">{meta && say(v.stepMeta, { said: meta.said, on: onDay(meta.on, day) })}</span>
                         {!st.done_on ? (
                           <Post to={`/c/steps/${st.id}/done`} small>
                             {say(m.markDone)}

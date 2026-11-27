@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -153,47 +152,6 @@ func statusOf(err error) int {
 		return http.StatusInternalServerError
 	}
 	return http.StatusBadRequest
-}
-
-// problem is an API error as RFC 9457 lays one out.
-type problem struct {
-	Type   api.ProblemType `json:"type"`
-	Title  string          `json:"title"`
-	Status int             `json:"status"`
-	Detail string          `json:"detail,omitempty"`
-}
-
-// problemTitles are the titles of the problems a client acts on, one for each type as
-// RFC 9457 asks.
-var problemTitles = map[api.ProblemType]*say.Text{
-	api.ProblemTypeSignedOut:          say.New("Signed out"),
-	api.ProblemTypeSessionLimited:     say.New("Signed in for another organisation"),
-	api.ProblemTypeWrongLogin:         say.New("Wrong email or password"),
-	api.ProblemTypeThrottled:          say.New("Slow down"),
-	api.ProblemTypeLinkUsed:           say.New("Link no longer works"),
-	api.ProblemTypeMustChangePassword: say.New("Choose your own password"),
-	api.ProblemTypeSsoRequired:        say.New("Single sign-on required"),
-}
-
-func writeProblem(w http.ResponseWriter, r *http.Request, status int, detail say.Sayer) {
-	writeTyped(w, r, status, api.ProblemTypeUntyped, detail)
-}
-
-// writeTyped answers with a Problem in r's language, which RFC 9457 lets its title and
-// detail be.
-func writeTyped(w http.ResponseWriter, r *http.Request, status int, kind api.ProblemType, detail say.Sayer) {
-	lang := speaking(w, r)
-	title := http.StatusText(status)
-	if t, ok := problemTitles[kind]; ok {
-		title = t.In(lang)
-	} else {
-		kind = api.ProblemTypeUntyped
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(problem{Type: kind, Title: title, Status: status, Detail: detail.In(lang)}); err != nil {
-		log.Print(err)
-	}
 }
 
 // typed is a refusal a client acts on by its type rather than by reading it.

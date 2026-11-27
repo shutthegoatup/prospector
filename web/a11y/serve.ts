@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { base, member, org, port } from "./world.ts";
+import { base, member, org, port, reader } from "./world.ts";
 
 const server = process.env.PROSPECTOR_TEST_PG;
 if (!server) {
@@ -46,6 +46,8 @@ try {
   env.PROSPECTOR_SECRET_KEYS = cli(["secret-key"]);
   cli(["user", "add", member.email, member.name], member.password + "\n");
   cli(["org", "add", org.slug, org.name, `--owner=${member.email}`]);
+  cli(["user", "add", reader.email, reader.name], reader.password + "\n");
+  cli(["member", "add", org.slug, reader.email, "member"]);
 } catch (err) {
   cleanUp();
   throw err;

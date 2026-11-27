@@ -2,7 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 import { serve, served, servedWords } from "./served.ts";
-import { base, member, org } from "./world.ts";
+import { base, member, org, reader } from "./world.ts";
 
 // In en-XA every word the app says is accented and bracketed, so plain letters left on a
 // page are words that never went through react-intl. A page is checked once its file is
@@ -19,7 +19,7 @@ const months = Array.from({ length: 12 }, (_, i) =>
 );
 
 // What a page may show as it is: the data the test put there, the name, and Intl's months.
-const allowed = ["Prospector", member.name, member.email, org.name, ...servedWords, ...months];
+const allowed = ["Prospector", member.name, member.email, reader.name, reader.email, org.name, ...servedWords, ...months];
 
 // said is everything a person sees or hears inside the first element matching scope:
 // text, screen-reader-only text included and hidden text not, the attributes read out
@@ -68,8 +68,13 @@ test.beforeEach(async ({ context }) => {
 test("the check sees English", async ({ page: tab }) => {
   await tab.goto("/login");
   await expect(tab.locator("form")).toBeVisible();
-  await tab.evaluate(() => document.querySelector("main")?.append("Plain words"));
-  expect(english(await said(tab, "body"))).toEqual(["Plain words"]);
+  await tab.evaluate(() => {
+    const main = document.querySelector("main")!;
+    main.append("Plain words");
+    main.querySelector("input")?.setAttribute("placeholder", "Plain placeholder");
+    main.setAttribute("aria-label", "Plain label");
+  });
+  expect(new Set(english(await said(tab, "body")))).toEqual(new Set(["Plain label", "Plain placeholder", "Plain words"]));
 });
 
 test.describe("signed out", () => {
@@ -86,6 +91,35 @@ test.describe("signed out", () => {
       await inPseudo(tab, "body");
     });
   }
+
+  test("a wrong password", async ({ page: tab }) => {
+    await tab.goto("/login");
+    await tab.getByRole("textbox").first().fill(member.email);
+    await tab.locator("input[type=password]").fill("not the password at all");
+    await tab.locator("form button[type=submit]").click();
+    await expect(tab.getByRole("alert")).toBeVisible();
+    await inPseudo(tab, "body");
+  });
+
+  test("signing in after choosing a password", async ({ page: tab }) => {
+    await tab.goto("/login?reset=1");
+    await tab.waitForLoadState("networkidle");
+    await inPseudo(tab, "body");
+  });
+
+  test("a reset link asked for", async ({ page: tab }) => {
+    await tab.goto("/forgot");
+    await tab.locator("input[type=email]").fill("nobody@prospector.example");
+    await tab.locator("form button[type=submit]").click();
+    await expect(tab.getByRole("status")).toBeVisible();
+    await inPseudo(tab, "body");
+  });
+
+  test("single sign-on that covers no one", async ({ page: tab }) => {
+    await tab.goto("/login/sso?email=nobody%40prospector.example");
+    await expect(tab.getByRole("alert")).toBeVisible();
+    await inPseudo(tab, "body");
+  });
 });
 
 test.describe("served", () => {
@@ -125,6 +159,12 @@ test.describe("signed in", () => {
     await inPseudo(tab, "body");
   });
 
+  test("an organisation that isn't there", async ({ page: tab }) => {
+    await tab.goto("/o/nowhere/today");
+    await tab.waitForLoadState("networkidle");
+    await inPseudo(tab, "body");
+  });
+
   test("an organisation that can't be read", async ({ page: tab }) => {
     await tab.route(`**/o/${org.slug}/api/v1/nav`, (route) =>
       route.fulfill({ status: 429, contentType: "application/problem+json", json: { type: "/api/problems/throttled", title: "", status: 429 } }),
@@ -132,5 +172,16 @@ test.describe("signed in", () => {
     await tab.goto(at);
     await expect(tab.getByRole("alert")).toBeVisible();
     await inPseudo(tab, "main");
+  });
+});
+
+test.describe("signed in, only reading", () => {
+  test.use({ storageState: "a11y/.reader.json" });
+  test.skip(!translated("src/components/app/layout.tsx"), "layout.tsx is still to be translated");
+
+  test("the sidebar", async ({ page: tab }) => {
+    await tab.goto(`/o/${org.slug}/companies`);
+    await expect(tab.locator("aside").getByText(reader.name)).toBeVisible();
+    await inPseudo(tab, "aside");
   });
 });

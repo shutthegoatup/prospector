@@ -57,12 +57,15 @@ func (a *App) callbackURL() string { return a.base + "/login/callback" }
 
 // signInProblem is a sign-in through a provider that went wrong, said on a page of the
 // server's own: its words never travel in an address, where anyone could write them.
-func (a *App) signInProblem(w http.ResponseWriter, r *http.Request, next string, code int, problem string) {
+func (a *App) signInProblem(w http.ResponseWriter, r *http.Request, next string, code int, problem say.Sayer) {
 	back := "/login"
 	if next != "" {
 		back += "?" + url.Values{"next": {safeNext(next)}}.Encode()
 	}
-	writeShell(w, languageOf(r), code, problemShown{"problem", code, "Couldn't sign in", problem, back}, "Couldn't sign in: "+problem+"\n")
+	lang := languageOf(r)
+	title := say.New("Couldn't sign in").In(lang)
+	_, message := problemText(lang, http.StatusBadRequest, problem.In(lang))
+	writeShell(w, lang, code, problemShown{"problem", code, title, message, back}, title+": "+message+"\n")
 }
 
 func (a *App) loginWith(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +77,7 @@ func (a *App) loginWith(w http.ResponseWriter, r *http.Request) {
 		p, err := a.idp(r.Context(), way.spec())
 		if err != nil {
 			log.Printf("sign-in with %s: %v", way.Key, err)
-			a.signInProblem(w, r, next, http.StatusBadGateway, way.Label+" couldn't be reached. Try again, or sign in another way.")
+			a.signInProblem(w, r, next, http.StatusBadGateway, say.Errorf("%s couldn't be reached. Try again, or sign in another way.", way.Label))
 			return
 		}
 		a.beginAttempt(w, r, p, attempt{Way: way.Key, Next: next})
@@ -120,7 +123,7 @@ func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 		sso, err = a.s.SSO(org.ID)
 	}
 	if a.base == "" || err != nil || !sso.On() || !sso.Proves(email) {
-		a.signInProblem(w, r, query.Get("next"), http.StatusBadRequest, "That organisation has no single sign-on for that address.")
+		a.signInProblem(w, r, query.Get("next"), http.StatusBadRequest, say.New("That organisation has no single sign-on for that address."))
 		return
 	}
 	spec, err := a.s.Keyring.IdpSpec(sso)
@@ -132,7 +135,7 @@ func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 	p, err := a.idp(r.Context(), spec)
 	if err != nil {
 		log.Printf("single sign-on for %s: %v", org.Slug, err)
-		a.signInProblem(w, r, query.Get("next"), http.StatusBadGateway, org.Name+"'s sign-in couldn't be reached. Try again shortly.")
+		a.signInProblem(w, r, query.Get("next"), http.StatusBadGateway, say.Errorf("%s's sign-in couldn't be reached. Try again shortly.", org.Name))
 		return
 	}
 	a.beginAttempt(w, r, p, attempt{Way: "sso", Org: org.ID, Next: query.Get("next")}, oauth2.SetAuthURLParam("login_hint", email))
@@ -141,8 +144,8 @@ func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 // unopenable is what people are told when a connection's kept secret can't be opened.
 // It isn't an outage, and trying again won't help: the server needs its key back, or
 // an owner has to type the secret again.
-func unopenable(org *Org) string {
-	return org.Name + "'s single sign-on isn't working here, and trying again won't help. Tell one of its owners, or whoever runs this server."
+func unopenable(org *Org) *say.Text {
+	return say.Errorf("%s's single sign-on isn't working here, and trying again won't help. Tell one of its owners, or whoever runs this server.", org.Name)
 }
 
 func (a *App) loginCallback(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +156,7 @@ func (a *App) loginCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	refuse := func(err error) {
 		log.Printf("sign-in through %s refused: %v", att.Way, err)
-		problem := "That sign-in couldn't be completed. Try again, or sign in another way."
+		var problem say.Sayer = say.New("That sign-in couldn't be completed. Try again, or sign in another way.")
 		for _, known := range []error{errNoAccount, errUnvouched, errElsewhere, errNotMember, errWrongDomain, errDisowned} {
 			if errors.Is(err, known) {
 				problem = sentence(err)
@@ -273,10 +276,10 @@ func (a *App) finishSSO(w http.ResponseWriter, r *http.Request, att attempt, ref
 	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
-func sentence(err error) string {
+// sentence is what a sign-in that failed with err tells the person.
+func sentence(err error) say.Sayer {
 	_, text := telling("single sign-on", err, http.StatusBadRequest)
-	_, message := problemText(locales.Source, http.StatusBadRequest, text.Error())
-	return message
+	return text
 }
 
 // ssoRequired is whether this member must come through the organisation's own sign-in

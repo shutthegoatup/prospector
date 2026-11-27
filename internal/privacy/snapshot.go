@@ -13,8 +13,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/shutthegoatup/prospector/internal/customers"
 	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
@@ -385,7 +385,7 @@ func forgetStrays(tx *gorm.DB, org int64) error {
 		return err
 	}
 	// Nobody is left to open a page that was theirs.
-	if err := customers.DropCustomerGrants(tx, org, tx.Where("org_id = ? and contact_id not in (?)", org, here), false); err != nil {
+	if err := onboarding.DropCustomerGrants(tx, org, tx.Where("org_id = ? and contact_id not in (?)", org, here), false); err != nil {
 		return err
 	}
 	if err := identity.DropRecipients(tx, tx.Where("org_id = ? and contact_id is not null and contact_id not in (?)", org, here)); err != nil {
