@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"reflect"
 	"strings"
 
 	"golang.org/x/text/feature/plural"
@@ -63,7 +64,7 @@ type Sayer interface {
 }
 
 // Message is one entry of a catalogue: a translation, or one for each plural form of
-// the format's first int, as CLDR names them ("one", "few", "other"…).
+// the format's first signed integer, as CLDR names them ("one", "few", "other"…).
 type Message struct {
 	Text  string
 	Forms map[string]string
@@ -90,7 +91,8 @@ func (m Message) choose(lang string, args []any) string {
 		return m.Text
 	}
 	for _, a := range args {
-		if n, ok := a.(int); ok {
+		if v := reflect.ValueOf(a); v.CanInt() {
+			n := int(v.Int())
 			if f, ok := m.Forms[formNames[plural.Cardinal.MatchPlural(language.Make(lang), max(n, -n), 0, 0, 0, 0)]]; ok {
 				return f
 			}

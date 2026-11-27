@@ -66,29 +66,43 @@ func serverFormats(t *testing.T) []string {
 	}
 	found := map[string]bool{}
 	for _, f := range files {
-		ast.Inspect(f, func(n ast.Node) bool {
-			call, ok := n.(*ast.CallExpr)
-			if !ok {
-				return true
-			}
-			name := ""
-			switch fn := call.Fun.(type) {
-			case *ast.Ident:
-				name = fn.Name
-			case *ast.SelectorExpr:
-				if x, ok := fn.X.(*ast.Ident); ok {
-					name = x.Name + "." + fn.Sel.Name
+		for _, d := range f.Decls {
+			fn, _ := d.(*ast.FuncDecl)
+			ast.Inspect(d, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
 				}
-			}
-			i, ok := wordsFor[name]
-			if !ok || len(call.Args) <= i {
+				name := ""
+				switch fn := call.Fun.(type) {
+				case *ast.Ident:
+					name = fn.Name
+				case *ast.SelectorExpr:
+					if x, ok := fn.X.(*ast.Ident); ok {
+						name = x.Name + "." + fn.Sel.Name
+					}
+				}
+				i, ok := wordsFor[name]
+				if !ok || len(call.Args) <= i {
+					return true
+				}
+				if s, ok := constant(call.Args[i], consts); ok {
+					found[s] = true
+					return true
+				}
+				// The wrappers pass on a format they were handed, which is gathered where
+				// they are called; say.New also passes on words that aren't the server's.
+				wrapper := false
+				if fn != nil {
+					_, wrapper = wordsFor[fn.Name.Name]
+				}
+				if name != "say.New" && !wrapper {
+					t.Errorf("%s: %s's format isn't written out, so it can't be translated: write it whole, with verbs for what varies",
+						fset.Position(call.Pos()), name)
+				}
 				return true
-			}
-			if s, ok := constant(call.Args[i], consts); ok {
-				found[s] = true
-			}
-			return true
-		})
+			})
+		}
 	}
 	return slices.Sorted(maps.Keys(found))
 }

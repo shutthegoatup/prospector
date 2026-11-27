@@ -12,6 +12,8 @@ func TestWordsReadInEnglishAsErrorsDo(t *testing.T) {
 		{Errorf("too many attempts: try again in %d seconds", 1), "too many attempts: try again in 1 second"},
 		{Errorf("too many attempts: try again in %d seconds", 30), "too many attempts: try again in 30 seconds"},
 		{Errorf("%s has %d roles, so it keeps them", "Lark", 1), "Lark has 1 role, so it keeps it"},
+		// As a database's count comes.
+		{Errorf("%s has %d roles, so it keeps them", "Lark", int64(1)), "Lark has 1 role, so it keeps it"},
 		{Errorf("not catalogued %q", "x"), `not catalogued "x"`},
 	} {
 		if got := c.text.Error(); got != c.want {

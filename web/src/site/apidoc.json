@@ -24066,7 +24066,63 @@
    "name": "Problem",
    "about": [
     {
-     "text": "What went wrong, as RFC 9457 lays it out."
+     "text": "What went wrong, as RFC 9457 lays it out. Its "
+    },
+    {
+     "text": "title",
+     "code": true
+    },
+    {
+     "text": " and "
+    },
+    {
+     "text": "detail",
+     "code": true
+    },
+    {
+     "text": " are in the language the request is answered in, which "
+    },
+    {
+     "text": "Content-Language",
+     "code": true
+    },
+    {
+     "text": " names: the one chosen with "
+    },
+    {
+     "text": "?lang=",
+     "code": true
+    },
+    {
+     "text": " on a page (kept in the "
+    },
+    {
+     "text": "lang",
+     "code": true
+    },
+    {
+     "text": " cookie), else the best of "
+    },
+    {
+     "text": "Accept-Language",
+     "code": true
+    },
+    {
+     "text": " that Prospector has been translated into, else British English. Act on "
+    },
+    {
+     "text": "type",
+     "code": true
+    },
+    {
+     "text": " and "
+    },
+    {
+     "text": "status",
+     "code": true
+    },
+    {
+     "text": ", which don't change with it."
     }
    ],
    "enum": [],
@@ -24090,7 +24146,7 @@
      },
      "about": [
       {
-       "text": "The same for every problem of a type; the status's own name for "
+       "text": "The same for every problem of a type in a language; the status's own name, in English, for "
       },
       {
        "text": "about:blank",
