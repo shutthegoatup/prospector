@@ -42,8 +42,7 @@ func count(t *testing.T, s *Store, model any, where string, args ...any) int64 {
 const atOnce = 8
 
 // What an agent's repeated work mustn't double, it mustn't double when two agents do
-// it in the same moment either. SQLite takes writers one at a time, so it is the
-// Postgres run that tries these.
+// it in the same moment either.
 func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)

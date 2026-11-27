@@ -232,9 +232,6 @@ func TestSearch(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	a, b := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
-	if !s.postgres() && !s.fts {
-		t.Fatal("SQLite opened without its search index")
-	}
 	add := func(o *Org, c Company, people ...Contact) Company {
 		c.OrgID, c.Stage = o.ID, CompanyQualified
 		if err := s.db.Create(&c).Error; err != nil {
@@ -321,48 +318,23 @@ func TestSearchIndexIsBuiltForExistingRows(t *testing.T) {
 	if _, err := s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "test"); err != nil {
 		t.Fatal(err)
 	}
-	drop := []string{"drop trigger companies_fts_insert", "drop trigger companies_fts_update", "drop trigger companies_fts_delete",
-		"drop trigger contacts_fts_insert", "drop trigger contacts_fts_update", "drop trigger contacts_fts_delete",
-		"drop table companies_fts", "drop table contacts_fts"}
-	if s.postgres() {
-		drop = []string{"drop index idx_companies_search", "drop index idx_contacts_person_search", "drop index idx_contacts_search"}
-	}
-	for _, stmt := range drop {
-		if err := s.db.Exec(stmt).Error; err != nil {
+	indexes := []string{"idx_companies_search", "idx_contacts_person_search", "idx_contacts_search"}
+	for _, name := range indexes {
+		if err := s.db.Exec("drop index " + name).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
 	if _, err := s.QuickAddPerson(o, QuickAdd{Name: "Imogen Vale", Company: "Windrush Marine"}, "test"); err != nil {
 		t.Fatal(err)
 	}
-	s.fts = false
 	s.indexSearch()
-	if !s.postgres() && !s.fts {
-		t.Fatal("the index wasn't rebuilt")
+	var built int64
+	if err := s.db.Raw("select count(*) from pg_indexes where schemaname = current_schema() and indexname in ?", indexes).Scan(&built).Error; err != nil || built != int64(len(indexes)) {
+		t.Fatalf("%d of the %d search indexes were rebuilt: %v", built, len(indexes), err)
 	}
 	for _, q := range []string{"larkmoor", "pryce", "windrush", "imogen"} {
 		if rows, _, err := s.Companies(o.ID, q, "", "", 1); err != nil || len(rows) != 1 {
 			t.Errorf("search %q after the index was built: %d rows, %v", q, len(rows), err)
-		}
-	}
-	if !s.postgres() {
-		// An edit made while a rebuilt table had lost its triggers is put right at the next start.
-		for _, stmt := range []string{"drop trigger companies_fts_update", "update companies set name = 'Renamed Marine' where name = 'Larkmoor Yachts'"} {
-			if err := s.db.Exec(stmt).Error; err != nil {
-				t.Fatal(err)
-			}
-		}
-		s.indexSearch()
-		old, _, _ := s.Companies(o.ID, "larkmoor", "", "", 1)
-		if now, _, _ := s.Companies(o.ID, "renamed", "", "", 1); len(old) != 0 || len(now) != 1 {
-			t.Fatalf("a company is still found by its old name (%d) and not its new one (%d)", len(old), len(now))
-		}
-	}
-	var plan []map[string]any
-	query := "explain query plan select id from companies where " + "companies.id in (select rowid from companies_fts where companies_fts match 'windrush')"
-	if !s.postgres() {
-		if err := s.db.Raw(query).Scan(&plan).Error; err != nil || !strings.Contains(fmt.Sprint(plan), "VIRTUAL TABLE INDEX") {
-			t.Fatalf("the search doesn't use the index: %v %v", plan, err)
 		}
 	}
 }

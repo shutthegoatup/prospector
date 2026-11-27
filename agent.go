@@ -94,7 +94,7 @@ func addFact(tx *gorm.DB, org, company int64, in FactIn, actor string) (*Fact, b
 	if err := tx.Where("org_id = ? and company_id = ? and source_url = ?", org, company, f.SourceURL).Order("id").Find(&from).Error; err != nil {
 		return nil, false, err
 	}
-	// Compared here because SQLite's lower() only folds ASCII; newest first, so the same
+	// Newest first, so the same
 	// fact said twice is matched to its latest saying.
 	for i := len(from) - 1; i >= 0; i-- {
 		had := from[i]
