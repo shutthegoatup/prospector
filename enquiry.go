@@ -63,7 +63,6 @@ func enquiryStateLabel(state string) string {
 	return ""
 }
 
-// SetEnquiry changes where answering an enquiry stands, who has it, or our note on it.
 func (s *Store) EnquiryByID(org, id int64) (*Enquiry, error) {
 	var e Enquiry
 	if err := s.in(org).Where("id = ?", id).First(&e).Error; err != nil {
@@ -72,6 +71,7 @@ func (s *Store) EnquiryByID(org, id int64) (*Enquiry, error) {
 	return &e, nil
 }
 
+// SetEnquiry changes where answering an enquiry stands, who has it, or our note on it.
 func (s *Store) SetEnquiry(org, id int64, field, value, actor string) error {
 	return s.SetEnquiryFields(org, id, []Change{{field, value}}, actor)
 }

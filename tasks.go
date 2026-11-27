@@ -201,6 +201,8 @@ func (s *Store) askTask(org, task int64, text, by string) (*TaskRequest, error) 
 }
 
 // taskRow and requestRow are one task, or one request, of the organisation's.
+func (s *Store) TaskByID(org, id int64) (*Task, error) { return s.taskRow(org, id) }
+
 func (s *Store) taskRow(org, id int64) (*Task, error) {
 	var t Task
 	if err := s.db.Where("org_id = ? and id = ?", org, id).First(&t).Error; err != nil {

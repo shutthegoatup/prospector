@@ -253,14 +253,14 @@ func (s *Store) OtherDeals(org int64) (map[string][]OtherDeal, error) {
 	return out, nil
 }
 
-// StartDeal opens another deal with someone already in conversation: a renewal, an
-// expansion or a second piece of new business. It starts at the first stage.
 // OwnDeal is the deal a conversation is, empty if it has none yet.
 func (s *Store) OwnDeal(org, contact int64) (*Deal, error) {
 	var d Deal
 	return &d, s.in(org).Where("contact_id = ? and seq = 0", contact).Limit(1).Find(&d).Error
 }
 
+// StartDeal opens another deal with someone already in conversation: a renewal, an
+// expansion or a second piece of new business. It starts at the first stage.
 func (s *Store) StartDeal(org, contact int64, kind, actor string) (*Deal, error) {
 	if !kindOfDeal(kind) {
 		return nil, fmt.Errorf("unknown kind of deal %q", kind)
