@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func (s *Store) newPasswordToken(user int64, invite bool) (string, error) {
+func (s *identityStore) newPasswordToken(user int64, invite bool) (string, error) {
 	life := resetLife
 	if invite {
 		life = inviteLife
@@ -19,7 +19,7 @@ func (s *Store) newPasswordToken(user int64, invite bool) (string, error) {
 
 // ResetToken refuses a second one inside resetGap. It counts from the table, so a
 // restart doesn't reset the wait.
-func (s *Store) ResetToken(user int64) (string, error) {
+func (s *identityStore) ResetToken(user int64) (string, error) {
 	var recent int64
 	if err := s.db.Model(&PasswordToken{}).Where("user_id = ? and invite = ? and created_at > ?", user, false, time.Now().Add(-resetGap)).Count(&recent).Error; err != nil {
 		return "", err
@@ -33,7 +33,7 @@ func (s *Store) ResetToken(user int64) (string, error) {
 
 // InviteToken replaces any earlier invitation, and refuses a second inside resetGap, so
 // adding someone over and over can't fill their inbox.
-func (s *Store) InviteToken(user int64) (string, error) {
+func (s *identityStore) InviteToken(user int64) (string, error) {
 	var recent int64
 	if err := s.db.Model(&PasswordToken{}).Where("user_id = ? and invite = ? and created_at > ?", user, true, time.Now().Add(-resetGap)).Count(&recent).Error; err != nil {
 		return "", err
@@ -47,11 +47,11 @@ func (s *Store) InviteToken(user int64) (string, error) {
 	return s.newPasswordToken(user, true)
 }
 
-func (s *Store) DropInvites(user int64) error {
+func (s *identityStore) DropInvites(user int64) error {
 	return s.db.Where("user_id = ? and invite = ?", user, true).Delete(&PasswordToken{}).Error
 }
 
-func (s *Store) PasswordTokenUser(token string) (*User, error) {
+func (s *identityStore) PasswordTokenUser(token string) (*User, error) {
 	var t PasswordToken
 	if err := s.db.Where("token_hash = ? and expires_at > ?", hashToken(token), time.Now()).First(&t).Error; err != nil {
 		return nil, errBadLink
@@ -62,7 +62,7 @@ func (s *Store) PasswordTokenUser(token string) (*User, error) {
 
 // RedeemPasswordToken sets the password and signs the account out everywhere. The
 // token is spent first, inside the transaction, so two requests can't both use it.
-func (s *Store) RedeemPasswordToken(token, password string) error {
+func (s *identityStore) RedeemPasswordToken(token, password string) error {
 	u, err := s.PasswordTokenUser(token)
 	if err != nil {
 		return err
@@ -86,13 +86,13 @@ func (s *Store) RedeemPasswordToken(token, password string) error {
 	})
 }
 
-func (s *Store) OrgMail(org int64) (*OrgMail, error) {
+func (s *identityStore) OrgMail(org int64) (*OrgMail, error) {
 	var m OrgMail
 	return &m, s.db.First(&m, "org_id = ?", org).Error
 }
 
-func (s *Store) SaveOrgMail(m *OrgMail) error { return s.db.Save(m).Error }
+func (s *identityStore) SaveOrgMail(m *OrgMail) error { return s.db.Save(m).Error }
 
-func (s *Store) DeleteOrgMail(org int64) error {
+func (s *identityStore) DeleteOrgMail(org int64) error {
 	return s.db.Delete(&OrgMail{}, "org_id = ?", org).Error
 }
