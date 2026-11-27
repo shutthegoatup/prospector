@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func (s *Store) EnquiryByID(org, id int64) (*Enquiry, error) {
@@ -173,21 +175,21 @@ func (s *Store) enquiriesMatching(org int64, f EnquiryFilter) *gorm.DB {
 // EnquiriesBefore is a page of the enquiries a filter matches, newest first, after
 // the one a cursor names. The cursor is that enquiry's id, so one answered or marked
 // as spam while the list is walked, or one arriving, moves no other between pages.
-func (s *Store) EnquiriesBefore(org int64, f EnquiryFilter, page PageIn) (rows []Enquiry, next string, err error) {
-	at, err := page.at(1)
+func (s *Store) EnquiriesBefore(org int64, f EnquiryFilter, page paging.Page) (rows []Enquiry, next string, err error) {
+	at, err := page.At(1)
 	if err != nil {
 		return nil, "", err
 	}
-	q := s.enquiriesMatching(org, f).Order("id desc").Limit(page.size() + 1)
+	q := s.enquiriesMatching(org, f).Order("id desc").Limit(page.Size() + 1)
 	if at[0] > 0 {
 		q = q.Where("id < ?", at[0])
 	}
 	if err := q.Find(&rows).Error; err != nil {
 		return nil, "", err
 	}
-	if len(rows) > page.size() {
-		rows = rows[:page.size()]
-		next = cursorOf(rows[len(rows)-1].ID)
+	if len(rows) > page.Size() {
+		rows = rows[:page.Size()]
+		next = paging.Cursor(rows[len(rows)-1].ID)
 	}
 	return rows, next, nil
 }

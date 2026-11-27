@@ -17,6 +17,8 @@ import (
 	"github.com/glebarez/sqlite"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func mustOrg(t *testing.T, s *Store, slug string) *Org {
@@ -166,7 +168,7 @@ func TestOrganisationsAreIsolated(t *testing.T) {
 	if err := s.Update(b.ID, ca.ID, "email", "x@y.z", "test"); err == nil {
 		t.Fatal("org beta edited org alpha's contact")
 	}
-	if hits, _, _ := s.AgentSearch(b.ID, Actor{}, "analytical", PageIn{}); len(hits) != 2 {
+	if hits, _, _ := s.AgentSearch(b.ID, Actor{}, "analytical", paging.Page{}); len(hits) != 2 {
 		t.Fatalf("beta's search should see only its own company and person, got %+v", hits)
 	}
 	for _, h := range mustSearch(t, s, b.ID, "ada") {
@@ -177,7 +179,7 @@ func TestOrganisationsAreIsolated(t *testing.T) {
 }
 
 func mustSearch(t *testing.T, s *Store, org int64, q string) []SearchHit {
-	hits, _, err := s.AgentSearch(org, Actor{}, q, PageIn{})
+	hits, _, err := s.AgentSearch(org, Actor{}, q, paging.Page{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -502,7 +504,7 @@ func TestAgentMarks(t *testing.T) {
 		t.Fatalf("agent marks should keep the agent's decline and drop the accept Ada re-marked: %v", got)
 	}
 	var h []HistoryItem
-	for _, it := range must(firstOf(s.History(o.ID, must(s.AgentCompany(o.ID, Actor{}, "Larkmoor Yachts", PageIn{})).Company.ID, 1))) {
+	for _, it := range must(firstOf(s.History(o.ID, must(s.AgentCompany(o.ID, Actor{}, "Larkmoor Yachts", paging.Page{})).Company.ID, 1))) {
 		if it.Action == "mark:declined" {
 			h = append(h, it)
 		}

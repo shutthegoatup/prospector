@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // postmark posts one webhook record as Postmark does, signed in with a slug and secret.
@@ -36,7 +38,7 @@ func complaint(email string) map[string]any {
 
 func reasons(t *testing.T, s *Store, org int64) map[string]string {
 	t.Helper()
-	rows, _, err := s.Suppressions(org, PageIn{})
+	rows, _, err := s.Suppressions(org, paging.Page{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +130,7 @@ func TestPostmarkBouncesAndComplaintsStopEveryCampaign(t *testing.T) {
 
 	// A bounce can be taken off, as when the address was mended; a complaint can't.
 	ids := map[string]int64{}
-	rows, _, _ := s.Suppressions(o.ID, PageIn{})
+	rows, _, _ := s.Suppressions(o.ID, paging.Page{})
 	for _, r := range rows {
 		ids[r.Address] = r.ID
 	}

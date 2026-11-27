@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // person adds someone at a company with an address, in conversation unless cold.
@@ -69,7 +71,7 @@ func TestACampaignGoesOnlyToPeopleWithARelationship(t *testing.T) {
 	}
 
 	// Two people sharing an address get one mail.
-	listed, _, err := s.Suppressions(o.ID, PageIn{})
+	listed, _, err := s.Suppressions(o.ID, paging.Page{})
 	if err != nil || len(listed) != 1 {
 		t.Fatalf("the list: %+v (%v)", listed, err)
 	}

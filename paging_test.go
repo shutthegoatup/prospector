@@ -6,33 +6,17 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // firstOf drops the middle of three results, for must.
 func firstOf[T, U any](v T, _ U, err error) (T, error) { return v, err }
 
-func TestACursorIsOnlyWhatAListGaveOut(t *testing.T) {
-	t.Parallel()
-	if at, err := (PageIn{}).at(2); err != nil || at[0] != 0 || at[1] != 0 {
-		t.Fatalf("no cursor is the start: %v %v", at, err)
-	}
-	if at, err := (PageIn{Cursor: cursorOf(7, 9)}).at(2); err != nil || at[0] != 7 || at[1] != 9 {
-		t.Fatalf("a cursor read back: %v %v", at, err)
-	}
-	for _, bad := range []string{"nonsense", cursorOf(7), cursorOf(1, 2, 3), cursorOf(-1, 2), "W10", "!!"} {
-		if _, err := (PageIn{Cursor: bad}).at(2); err != errCursor {
-			t.Errorf("cursor %q was taken: %v", bad, err)
-		}
-	}
-	if (PageIn{}).size() != pageUsual || (PageIn{Limit: 3}).size() != 3 || (PageIn{Limit: 100000}).size() != pageMost {
-		t.Fatal("the page size isn't the usual one, the one asked for, or the most allowed")
-	}
-}
-
 // walk follows next cursors to the end of a list, and fails if it never ends.
-func walk[T any](t *testing.T, limit int, page func(PageIn) ([]T, string, error)) (all []T, pages int) {
+func walk[T any](t *testing.T, limit int, page func(paging.Page) ([]T, string, error)) (all []T, pages int) {
 	t.Helper()
-	in := PageIn{Limit: limit}
+	in := paging.Page{Limit: limit}
 	for {
 		got, next, err := page(in)
 		if err != nil {
@@ -62,7 +46,7 @@ func TestEveryListAnAgentReadsComesInPages(t *testing.T) {
 		must(s.CreateTask(o.ID, "", fmt.Sprint("Find makers of garden rooms, part ", i), "Nia"))
 	}
 
-	hits, pages := walk(t, 2, func(in PageIn) ([]SearchHit, string, error) { return s.AgentSearch(o.ID, scout, "larkmoor", in) })
+	hits, pages := walk(t, 2, func(in paging.Page) ([]SearchHit, string, error) { return s.AgentSearch(o.ID, scout, "larkmoor", in) })
 	seen := map[string]int{}
 	for _, h := range hits {
 		seen[fmt.Sprint(h.Kind, h.ID)]++
@@ -70,14 +54,14 @@ func TestEveryListAnAgentReadsComesInPages(t *testing.T) {
 	if len(hits) != 10 || len(seen) != 10 || pages != 3 {
 		t.Fatalf("5 companies and their 5 people, two of each a page: %d hits, %d different, %d pages", len(hits), len(seen), pages)
 	}
-	if all, next, err := s.AgentSearch(o.ID, scout, "larkmoor", PageIn{}); err != nil || len(all) != 10 || next != "" {
+	if all, next, err := s.AgentSearch(o.ID, scout, "larkmoor", paging.Page{}); err != nil || len(all) != 10 || next != "" {
 		t.Fatalf("a search that fits one page: %d hits, next %q, %v", len(all), next, err)
 	}
-	if _, _, err := s.AgentSearch(o.ID, scout, "larkmoor", PageIn{Cursor: "nonsense"}); err != errCursor {
+	if _, _, err := s.AgentSearch(o.ID, scout, "larkmoor", paging.Page{Cursor: "nonsense"}); err != paging.ErrCursor {
 		t.Fatalf("a made-up cursor: %v", err)
 	}
 
-	tasks, pages := walk(t, 2, func(in PageIn) ([]TaskBrief, string, error) { return s.AgentTasks(o.ID, scout, in) })
+	tasks, pages := walk(t, 2, func(in paging.Page) ([]TaskBrief, string, error) { return s.AgentTasks(o.ID, scout, in) })
 	if len(tasks) != 5 || pages != 3 {
 		t.Fatalf("5 tasks two a page: %d in %d pages", len(tasks), pages)
 	}
@@ -87,17 +71,17 @@ func TestEveryListAnAgentReadsComesInPages(t *testing.T) {
 		}
 	}
 	// One opened between two pages doesn't push an earlier one onto the next page.
-	firstPage, next, err := s.AgentTasks(o.ID, scout, PageIn{Limit: 2})
+	firstPage, next, err := s.AgentTasks(o.ID, scout, paging.Page{Limit: 2})
 	if err != nil {
 		t.Fatal(err)
 	}
 	must(s.CreateTask(o.ID, "", "Opened meanwhile", "Nia"))
-	second, _, err := s.AgentTasks(o.ID, scout, PageIn{Limit: 2, Cursor: next})
+	second, _, err := s.AgentTasks(o.ID, scout, paging.Page{Limit: 2, Cursor: next})
 	if err != nil || len(second) != 2 || second[0].ID >= firstPage[1].ID {
 		t.Fatalf("the page after a task was opened: %+v %v", second, err)
 	}
 
-	due, pages := walk(t, 2, func(in PageIn) ([]DueItem, string, error) {
+	due, pages := walk(t, 2, func(in paging.Page) ([]DueItem, string, error) {
 		out, err := s.AgentDue(o, in)
 		if err != nil {
 			return nil, "", err

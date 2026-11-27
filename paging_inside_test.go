@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
@@ -35,7 +37,7 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 
 	// A company: every fact, person, line of history and note turns up once.
 	facts, people, notes, history := map[int64]int{}, map[int64]int{}, map[int64]int{}, 0
-	in, pages := PageIn{Limit: 2}, 0
+	in, pages := paging.Page{Limit: 2}, 0
 	for {
 		got := must(s.AgentCompany(o.ID, scout, co.Name, in))
 		if len(got.Facts) > 2 || len(got.People) > 2 || len(got.History) > 2 || len(got.Notes) > 2 {
@@ -65,18 +67,18 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 		t.Fatalf("walking a company two at a time: %d of %d lines of history in %d pages", history, events, pages)
 	}
 	// Asked for no particular size, the latest history and notes come as they did.
-	usual := must(s.AgentCompany(o.ID, scout, co.Name, PageIn{}))
+	usual := must(s.AgentCompany(o.ID, scout, co.Name, paging.Page{}))
 	if len(usual.Facts) != 5 || len(usual.People) != 5 || len(usual.Notes) != agentNotes || usual.NextCursor == "" {
 		t.Fatalf("a company with no limit asked for: %d facts, %d people, %d notes, next %q", len(usual.Facts), len(usual.People), len(usual.Notes), usual.NextCursor)
 	}
-	if _, err := s.AgentCompany(o.ID, scout, co.Name, PageIn{Cursor: cursorOf(1, 2)}); err != errCursor {
+	if _, err := s.AgentCompany(o.ID, scout, co.Name, paging.Page{Cursor: paging.Cursor(1, 2)}); err != paging.ErrCursor {
 		t.Fatalf("a cursor from another list: %v", err)
 	}
 
 	// A task: the companies and people found and the notes left, with the count of
 	// all of them on every page.
 	companies, found, left := map[int64]int{}, map[int64]int{}, map[int64]int{}
-	in, pages = PageIn{Limit: 2}, 0
+	in, pages = paging.Page{Limit: 2}, 0
 	for {
 		got := must(s.AgentTask(o.ID, scout, task.ID, in))
 		if got.Found.Companies != 6 || got.Found.People != 5 || len(got.Requests) != 1 || got.Brief == "" {
@@ -110,7 +112,7 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 	if err := s.db.CreateInBatches(extra, 60).Error; err != nil {
 		t.Fatal(err)
 	}
-	left, in, pages = map[int64]int{}, PageIn{Limit: 50}, 0
+	left, in, pages = map[int64]int{}, paging.Page{Limit: 50}, 0
 	for {
 		got := must(s.AgentTask(o.ID, scout, task.ID, in))
 		for _, n := range got.Notes {
@@ -127,12 +129,12 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 	}
 
 	// Carrying on from a company's short first answer reads full pages.
-	more := must(s.AgentCompany(o.ID, scout, co.Name, PageIn{Cursor: usual.NextCursor}))
+	more := must(s.AgentCompany(o.ID, scout, co.Name, paging.Page{Cursor: usual.NextCursor}))
 	if len(more.Notes) != 5-agentNotes || more.NextCursor != "" {
 		t.Fatalf("the rest of a company's notes after its first answer: %d notes, next %q", len(more.Notes), more.NextCursor)
 	}
 
-	if whole := must(s.AgentTask(o.ID, scout, task.ID, PageIn{})); len(whole.Companies) != 6 || whole.NextCursor != "" {
+	if whole := must(s.AgentTask(o.ID, scout, task.ID, paging.Page{})); len(whole.Companies) != 6 || whole.NextCursor != "" {
 		t.Fatalf("a task that fits one page: %d companies, next %q", len(whole.Companies), whole.NextCursor)
 	}
 

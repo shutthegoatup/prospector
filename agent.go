@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
-	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -12,6 +11,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/tz"
 )
 
@@ -458,7 +458,7 @@ func (s *Store) AgentDraft(org int64, who Actor, in DraftIn) error {
 
 type SearchIn struct {
 	Query string `json:"query" jsonschema:"words in a company, person, email or notes"`
-	PageIn
+	paging.Page
 }
 
 type SearchHit struct {
@@ -502,27 +502,24 @@ func (s *Store) lastAgents(org int64, who Actor, companies []int64) (map[int64]*
 	return out, nil
 }
 
-// ranOut is where a cursor stands once one kind of match has run out.
-const ranOut = math.MaxInt64
-
 // AgentSearch lists a page of matching companies and a page of matching people, each
 // in the order they were added. The cursor holds the last of each kind listed.
-func (s *Store) AgentSearch(org int64, who Actor, q string, page PageIn) (hits []SearchHit, next string, err error) {
+func (s *Store) AgentSearch(org int64, who Actor, q string, page paging.Page) (hits []SearchHit, next string, err error) {
 	q = strings.ToLower(strings.TrimSpace(q))
 	if len(q) < 2 {
 		return nil, "", errors.New("search for at least two characters")
 	}
-	at, err := page.at(2)
+	at, err := page.At(2)
 	if err != nil {
 		return nil, "", err
 	}
-	size, more := page.size(), false
+	size, more := page.Size(), false
 	var companies []Company
 	cond, args := s.companyMatch(q)
 	if err := s.in(org).Where("id > ?", at[0]).Where(cond, args...).Order("id").Limit(size + 1).Find(&companies).Error; err != nil {
 		return nil, "", err
 	}
-	if at[0] = ranOut; len(companies) > size {
+	if at[0] = paging.RanOut; len(companies) > size {
 		companies, more = companies[:size], true
 		at[0] = companies[size-1].ID
 	}
@@ -543,7 +540,7 @@ func (s *Store) AgentSearch(org int64, who Actor, q string, page PageIn) (hits [
 	if err := s.in(org).Where("id > ? and key not like 'org:%'", at[1]).Where(cond, args...).Order("id").Limit(size + 1).Find(&people).Error; err != nil {
 		return nil, "", err
 	}
-	if at[1] = ranOut; len(people) > size {
+	if at[1] = paging.RanOut; len(people) > size {
 		people, more = people[:size], true
 		at[1] = people[size-1].ID
 	}
@@ -551,7 +548,7 @@ func (s *Store) AgentSearch(org int64, who Actor, q string, page PageIn) (hits [
 		hits = append(hits, SearchHit{Kind: "contact", ID: p.ID, Name: displayName(p), Company: deref(p.Maker), Stage: contactStage(p)})
 	}
 	if more {
-		next = cursorOf(at...)
+		next = paging.Cursor(at...)
 	}
 	return hits, next, nil
 }
@@ -629,8 +626,8 @@ const agentHistory = 20
 // oldest first, and its history and notes, newest first. The cursor holds where each
 // of the four was left. With no limit asked for, the history and the notes come in
 // their own shorter pages: the latest is what an agent starting on a company needs.
-func (s *Store) AgentCompany(org int64, who Actor, ref string, page PageIn) (*CompanyDetail, error) {
-	at, err := page.at(4)
+func (s *Store) AgentCompany(org int64, who Actor, ref string, page paging.Page) (*CompanyDetail, error) {
+	at, err := page.At(4)
 	if err != nil {
 		return nil, err
 	}
@@ -651,7 +648,7 @@ func (s *Store) AgentCompany(org int64, who Actor, ref string, page PageIn) (*Co
 	for _, p := range people {
 		names[p.ID] = displayName(p)
 	}
-	size, historySize, notesSize := page.size(), page.size(), page.size()
+	size, historySize, notesSize := page.Size(), page.Size(), page.Size()
 	// Only the first answer is the short one: carrying on from it reads full pages, so
 	// the rest takes a few calls and not one for every three notes.
 	if page.Limit <= 0 && page.Cursor == "" {
@@ -664,11 +661,11 @@ func (s *Store) AgentCompany(org int64, who Actor, ref string, page PageIn) (*Co
 	if out.Roles, err = s.roleBriefs(org, c.ID); err != nil {
 		return nil, err
 	}
-	out.Facts, at[0] = afterID(facts, func(f Fact) int64 { return f.ID }, at[0], size)
+	out.Facts, at[0] = paging.AfterID(facts, func(f Fact) int64 { return f.ID }, at[0], size)
 	if out.Facts == nil {
 		out.Facts = []Fact{}
 	}
-	people, at[1] = afterID(people, func(p Contact) int64 { return p.ID }, at[1], size)
+	people, at[1] = paging.AfterID(people, func(p Contact) int64 { return p.ID }, at[1], size)
 	for _, p := range people {
 		out.People = append(out.People, PersonBrief{ID: p.ID, Name: displayName(p), Title: p.Title, Email: deref(p.Email),
 			EmailStatus: p.EmailStatus, Linkedin: deref(p.Linkedin), Stage: contactStage(p),
@@ -692,7 +689,7 @@ func (s *Store) AgentCompany(org int64, who Actor, ref string, page PageIn) (*Co
 	if err := before(at[2]).Limit(historySize + 1).Find(&events).Error; err != nil {
 		return nil, err
 	}
-	events, at[2] = beforeID(events, func(e Event) int64 { return e.ID }, 0, historySize)
+	events, at[2] = paging.BeforeID(events, func(e Event) int64 { return e.ID }, 0, historySize)
 	for _, e := range events {
 		// Only what erasure would keep: an event's value can hold a note or someone's details.
 		out.History = append(out.History, Happened{At: e.At, Actor: e.User, Action: e.Action, Value: deref(keptValue(e)),
@@ -702,13 +699,13 @@ func (s *Store) AgentCompany(org int64, who Actor, ref string, page PageIn) (*Co
 	if err := before(at[3]).Limit(notesSize + 1).Find(&notes).Error; err != nil {
 		return nil, err
 	}
-	notes, at[3] = beforeID(notes, func(n TaskNote) int64 { return n.ID }, 0, notesSize)
+	notes, at[3] = paging.BeforeID(notes, func(n TaskNote) int64 { return n.ID }, 0, notesSize)
 	for _, n := range notes {
 		out.Notes = append(out.Notes, NoteOut{ID: n.ID, Kind: n.Kind, Text: n.Text, Actor: n.Actor, At: n.CreatedAt,
 			ByYou: who.did(Event{User: n.Actor, KeyID: n.KeyID})})
 	}
-	if at[0] != ranOut || at[1] != ranOut || at[2] != noneBefore || at[3] != noneBefore {
-		out.NextCursor = cursorOf(at...)
+	if at[0] != paging.RanOut || at[1] != paging.RanOut || at[2] != paging.NoneBefore || at[3] != paging.NoneBefore {
+		out.NextCursor = paging.Cursor(at...)
 	}
 	return out, nil
 }
@@ -730,8 +727,8 @@ type DueOut struct {
 // AgentDue lists a page of what is due, step by step in the order Today works them.
 // The queues are worked out whole each time, so the cursor is how far down them the
 // last page ended: someone marked in between moves the rest up by one.
-func (s *Store) AgentDue(o *Org, page PageIn) (*DueOut, error) {
-	at, err := page.at(1)
+func (s *Store) AgentDue(o *Org, page paging.Page) (*DueOut, error) {
+	at, err := page.At(1)
 	if err != nil {
 		return nil, err
 	}
@@ -747,10 +744,10 @@ func (s *Store) AgentDue(o *Org, page PageIn) (*DueOut, error) {
 		}
 	}
 	from := min(int(at[0]), len(items))
-	to := min(from+page.size(), len(items))
+	to := min(from+page.Size(), len(items))
 	out := &DueOut{Items: items[from:to]}
 	if to < len(items) {
-		out.NextCursor = cursorOf(int64(to))
+		out.NextCursor = paging.Cursor(int64(to))
 	}
 	return out, nil
 }

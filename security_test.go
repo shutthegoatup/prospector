@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func TestSafeNext(t *testing.T) {
@@ -598,7 +600,7 @@ func TestNeverContactLeavesTheQueue(t *testing.T) {
 	do(s.db.Model(&back).Updates(map[string]any{"replied": nil, "stage": ""}).Error)
 	fresh, err := s.OrgByID(o.ID)
 	do(err)
-	due, err := s.AgentDue(fresh, PageIn{Limit: pageMost})
+	due, err := s.AgentDue(fresh, paging.Page{Limit: paging.Most})
 	do(err)
 	for _, item := range due.Items {
 		if item.ContactID == c.ID {

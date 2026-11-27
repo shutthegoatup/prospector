@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // TestRunsAndMailsStayInTheirOrganisation tries, as another organisation, the methods
@@ -145,11 +147,11 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 			return err == nil
 		}},
 		{"TaskBriefsFor", 0, func(s *Store, org int64) any {
-			briefs, _, err := s.TaskBriefsFor(org, Actor{}, false, nil, PageIn{})
+			briefs, _, err := s.TaskBriefsFor(org, Actor{}, false, nil, paging.Page{})
 			return len(must(briefs, err))
 		}},
 		{"ResearchList", 0, func(s *Store, org int64) any {
-			rows, _, _, err := s.ResearchList(org, 0, first.Settings, "review", 0, PageIn{})
+			rows, _, _, err := s.ResearchList(org, 0, first.Settings, "review", 0, paging.Page{})
 			return len(must(rows, err))
 		}},
 		{"HistoryCount", 0, func(s *Store, org int64) any { return answer(s.HistoryCount(org, company.ID)) }},
