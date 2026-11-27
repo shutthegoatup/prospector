@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"slices"
 	"strings"
@@ -183,16 +184,17 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 	if len(in.Fields) == 0 {
 		return nil, errors.New("fields is needed: which of email, phone and linkedin to look for")
 	}
-	var c Contact
-	if err := s.db.Where("org_id = ? and id = ?", o.ID, in.ContactID).Limit(1).Find(&c).Error; err != nil || c.ID == 0 {
-		return nil, missing(err, "no contact %d in this organisation", in.ContactID)
+	found, err := s.ContactByID(o.ID, in.ContactID)
+	if err != nil {
+		return nil, err
 	}
+	c := *found
 	if strings.HasPrefix(c.Key, "org:") {
 		return nil, errors.New("that is a company's own row, not a person")
 	}
-	var co Company
+	co := &Company{}
 	if c.CompanyID != nil {
-		if err := s.db.Where("org_id = ? and id = ?", o.ID, *c.CompanyID).Limit(1).Find(&co).Error; err != nil {
+		if co, err = s.CompanyByID(o.ID, *c.CompanyID); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}
 	}
@@ -291,7 +293,7 @@ func (a *App) keepFind(o *Org, who Actor, c Contact, field, kind, value, status 
 	if err := s.allowed(o, email, link); err != nil {
 		return EnrichAsked{Field: field, Vendor: kind, Outcome: "skipped", Detail: err.Error()}
 	}
-	if err := erased(s.db, o.ID, "", "", email, link); err != nil {
+	if err := s.Erased(o.ID, email, link); err != nil {
 		return EnrichAsked{Field: field, Vendor: kind, Outcome: "skipped", Detail: "it belongs to someone erased on request"}
 	}
 	if field == "phone" && phoneLooksWrong(value) {
@@ -300,23 +302,36 @@ func (a *App) keepFind(o *Org, who Actor, c Contact, field, kind, value, status 
 	if field == "email" && s.takesMail(context.Background(), mailDomainOf(value)) == mailRefused {
 		return EnrichAsked{Field: field, Vendor: kind, Outcome: "skipped", Detail: "its domain takes no mail"}
 	}
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := hold(tx, &Contact{}, o.ID, c.ID); err != nil {
-			return err
-		}
-		made, err := s.suggestOne(tx, who, c, field, value, status, "", kind)
-		if err != nil {
-			return err
-		}
-		if !made {
-			asked.Outcome, asked.Detail = "has", "it was already suggested, or they have it"
-		}
-		return s.logAs(tx, o.ID, c.ID, c.CompanyID, who, "enrich:"+field, str(kind+": "+lookupFound))
-	})
+	made, err := s.KeepFind(o.ID, who, c.ID, field, kind, value, status)
 	if err != nil {
 		return EnrichAsked{Field: field, Vendor: kind, Outcome: "failed", Detail: err.Error()}
 	}
+	if !made {
+		asked.Outcome, asked.Detail = "has", "it was already suggested, or they have it"
+	}
 	return asked
+}
+
+// KeepFind suggests what a vendor found for a person, and reports whether it was new.
+func (s *Store) KeepFind(org int64, who Actor, contact int64, field, kind, value, status string) (made bool, err error) {
+	return made, s.db.Transaction(func(tx *gorm.DB) error {
+		if err := hold(tx, &Contact{}, org, contact); err != nil {
+			return err
+		}
+		var c Contact
+		if err := tx.Where("org_id = ? and id = ?", org, contact).First(&c).Error; err != nil {
+			return missing(err, "no contact %d in this organisation", contact)
+		}
+		if made, err = s.suggestOne(tx, who, c, field, value, status, "", kind); err != nil {
+			return err
+		}
+		return s.logAs(tx, org, c.ID, c.CompanyID, who, "enrich:"+field, str(kind+": "+lookupFound))
+	})
+}
+
+// Erased says so if an address or a profile belongs to someone erased on request.
+func (s *Store) Erased(org int64, email, link string) error {
+	return erased(s.db, org, "", "", email, link)
 }
 
 // askedLately is when a vendor was last asked for this field of this person, if it
@@ -371,8 +386,18 @@ func (s *Store) lookups(org int64, people []int64) (map[int64][]Lookup, error) {
 }
 
 func (a *App) logEnrich(org int64, who Actor, c Contact, field, value string) {
-	logged(a.s.db.Create(&Event{OrgID: org, ContactID: c.ID, CompanyID: c.CompanyID, User: who.Name, KeyID: who.KeyID, TaskID: who.Task,
-		Action: "enrich:" + field, Value: &value, At: time.Now()}))
+	if err := a.s.LogEnrich(org, who, c.ID, field, value); err != nil {
+		log.Printf("database: %v", err)
+	}
+}
+
+// LogEnrich records a lookup that kept nothing, so the same one isn't paid for again soon.
+func (s *Store) LogEnrich(org int64, who Actor, contact int64, field, value string) error {
+	c, err := s.ContactByID(org, contact)
+	if err != nil {
+		return err
+	}
+	return s.logAs(s.db, org, c.ID, c.CompanyID, who, "enrich:"+field, &value)
 }
 
 func (a *App) vendorHTTP() *http.Client {

@@ -32,6 +32,7 @@ Tests call `t.Parallel()` and get a database from `tempStore(t)` (one migrated t
 - `assets/css/output.css` is a committed Tailwind build. A utility class that isn't already in it renders unstyled until the CSS is rebuilt (`node build-css.mjs <node_modules with tailwindcss v4>`), so prefer classes already in use.
 - Pages are served under a Content-Security-Policy that allows only the app's own scripts: no inline `<script>`, no `on…=` attributes. `TestContentPolicy` checks every page.
 - A behaviour change ships with a test in the top-level `*_test.go` files.
+- Every query is on an exported `Store` method that takes its organisation first, which `TestNoMethodReachesIntoAnotherOrganisation` then tries as another one; a sweep over every organisation is named in its `acrossOrganisations`. `TestOnlyTheStoreTouchesTheDatabase` fails on a query made anywhere else. A method that only acts on rows in a state the fuzzing can't guess (a run held by a named server, a mail still queued) goes in `saysNothingBack` and into `TestRunsAndMailsStayInTheirOrganisation`.
 - A new table that holds an organisation's data, or points at a contact, has to be carried by the exports, erasure and restore. `tables_test.go` fails until it is, or until it says why not.
 - A column added to a model reaches existing databases through auto-migration on start-up. Give it a not-null default and test it against a table that already has rows.
 

@@ -611,9 +611,7 @@ func (a *App) passwordChange(r *http.Request, u *User, current, next string) (de
 // serve starts even with no users: every page needs a sign-in, so nobody gets in
 // until `prospector user add` has run against the same database.
 func serve(a *App, addr string) error {
-	var users int64
-	logged(a.s.db.Model(&User{}).Count(&users))
-	if users == 0 {
+	if users, err := a.s.Users(); err == nil && users == 0 {
 		log.Print("no users yet: create one with `prospector user add <email> <name>`")
 	}
 	if a.base == "" && len(a.social) > 0 {

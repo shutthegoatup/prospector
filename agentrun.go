@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"gorm.io/gorm"
 )
 
 // AgentRun is one go of Prospector's own agent at a task. It keeps counts, never what
@@ -180,18 +179,13 @@ func (a *App) startRun(org, task, agent int64, by string, replacing int64) (*Age
 	if !cfg.Ready() {
 		return nil, fmt.Errorf("%s isn't set up: an owner gives it an endpoint and a model on the Agents page", cfg.Name)
 	}
-	if _, err := openTask(a.s.db, org, task); err != nil {
+	if err := a.s.TaskOpen(org, task); err != nil {
 		return nil, err
 	}
 	already := conflict(cfg.Name + " is already working this task")
-	goingHere := func() *gorm.DB {
-		return a.s.db.Model(&AgentRun{}).Where("org_id = ? and task_id = ? and agent_id = ? and status in ?", org, task, cfg.ID, []string{RunWorking, RunWaiting})
-	}
-	var going int64
-	if err := goingHere().Count(&going).Error; err != nil {
+	if going, err := a.s.RunsOn(org, task, cfg.ID); err != nil {
 		return nil, err
-	}
-	if going > 0 {
+	} else if going > 0 {
 		return nil, already
 	}
 	a.runs.mu.Lock()
@@ -204,34 +198,22 @@ func (a *App) startRun(org, task, agent int64, by string, replacing int64) (*Age
 		return nil, fmt.Errorf("this server is already running %d agents: try again when one finishes", busy)
 	}
 	now := time.Now()
-	run := AgentRun{OrgID: org, TaskID: task, AgentID: cfg.ID, AgentName: cfg.Name, StartedBy: by, Model: cfg.Model, Status: RunWorking,
-		Owner: a.runOwner(), LeaseUntil: now.Add(runLease).UnixMilli(), StartedAt: now}
-	if err := a.s.db.Create(&run).Error; err != nil {
+	run, err := a.s.AddRun(org, AgentRun{TaskID: task, AgentID: cfg.ID, AgentName: cfg.Name, StartedBy: by, Model: cfg.Model, Status: RunWorking,
+		Owner: a.runOwner(), LeaseUntil: now.Add(runLease).UnixMilli(), StartedAt: now})
+	if err != nil {
 		// Another start of this agent won the race to this task.
-		if logged(goingHere().Count(&going)); going > 0 {
+		if going, _ := a.s.RunsOn(org, task, cfg.ID); going > 0 {
 			return nil, already
 		}
 		return nil, err
 	}
-	a.launch(run)
-	return &run, nil
+	a.launch(*run)
+	return run, nil
 }
 
 func (a *App) StopRun(org, id int64) error {
-	res := a.s.db.Model(&AgentRun{}).Where("org_id = ? and id = ? and status in ?", org, id, []string{RunWorking, RunWaiting}).Update("stop_asked", true)
-	if res.Error != nil {
-		return res.Error
-	}
-	// A run that ended meanwhile is as stopped as it will get.
-	if res.RowsAffected == 0 {
-		var ended int64
-		if err := a.s.db.Model(&AgentRun{}).Where("org_id = ? and id = ?", org, id).Count(&ended).Error; err != nil {
-			return err
-		}
-		if ended == 0 {
-			return noSuch("no run %d in this organisation", id)
-		}
-		return nil
+	if going, err := a.s.AskRunStop(org, id); err != nil || !going {
+		return err
 	}
 	a.runs.mu.Lock()
 	cancel := a.runs.cancel[id]
@@ -262,9 +244,7 @@ func (a *App) launch(run AgentRun) {
 			case <-ctx.Done():
 				return
 			case <-tick.C:
-				res := a.s.db.Model(&AgentRun{}).Where("id = ? and owner = ? and stop_asked = ? and status in ?", run.ID, run.Owner, false, []string{RunWorking, RunWaiting}).
-					Update("lease_until", time.Now().Add(runLease).UnixMilli())
-				if res.Error == nil && res.RowsAffected == 0 {
+				if held, err := a.s.RenewRun(run.OrgID, run.ID, run.Owner, time.Now().Add(runLease)); err == nil && !held {
 					cancel()
 					return
 				}
@@ -283,11 +263,9 @@ func (a *App) launch(run AgentRun) {
 		if status == "" {
 			return
 		}
-		now := time.Now()
-		logged(a.s.db.Model(&AgentRun{}).Where("id = ? and owner = ?", run.ID, run.Owner).
-			Updates(map[string]any{"status": status, "stop_reason": reason, "ended_at": &now, "lease_until": 0, "wait_until": nil,
-				"turns": run.Turns, "episodes": run.Episodes, "tool_calls": run.ToolCalls, "added": run.Added,
-				"tokens_in": run.TokensIn, "tokens_out": run.TokensOut, "request_id": run.RequestID}))
+		if err := a.s.EndRun(run.OrgID, run, status, reason, time.Now()); err != nil {
+			log.Printf("database: %v", err)
+		}
 	}()
 }
 
@@ -304,8 +282,10 @@ func (a *App) keepRunsGoing(ctx context.Context, every time.Duration) {
 }
 
 func (a *App) resumeLapsed(now time.Time) {
-	var lapsed []AgentRun
-	logged(a.s.db.Where("status in ? and lease_until < ?", []string{RunWorking, RunWaiting}, now.UnixMilli()).Find(&lapsed))
+	lapsed, err := a.s.LapsedRuns(now)
+	if err != nil {
+		log.Printf("database: %v", err)
+	}
 	for _, run := range lapsed {
 		a.runs.mu.Lock()
 		_, mine := a.runs.cancel[run.ID]
@@ -316,17 +296,16 @@ func (a *App) resumeLapsed(now time.Time) {
 			continue
 		}
 		if run.StopAsked {
-			logged(a.s.db.Model(&AgentRun{}).Where("id = ? and lease_until = ?", run.ID, run.LeaseUntil).
-				Updates(map[string]any{"status": RunStopped, "stop_reason": "stopped by a person", "ended_at": &now, "lease_until": 0}))
+			if err := a.s.StopLapsedRun(run.OrgID, run.ID, run.LeaseUntil, now); err != nil {
+				log.Printf("database: %v", err)
+			}
 			continue
 		}
 		if busy >= maxRunning {
 			continue
 		}
 		owner := a.runOwner()
-		res := a.s.db.Model(&AgentRun{}).Where("id = ? and lease_until = ?", run.ID, run.LeaseUntil).
-			Updates(map[string]any{"owner": owner, "lease_until": now.Add(runLease).UnixMilli(), "resumes": run.Resumes + 1, "status": RunWorking})
-		if res.Error != nil || res.RowsAffected == 0 {
+		if took, err := a.s.TakeOverRun(run.OrgID, run.ID, run.LeaseUntil, owner, now.Add(runLease), run.Resumes+1); err != nil || !took {
 			continue
 		}
 		run.Owner, run.LeaseUntil, run.Resumes, run.Status = owner, now.Add(runLease).UnixMilli(), run.Resumes+1, RunWorking
@@ -341,11 +320,7 @@ func (a *App) hold(ctx context.Context, run *AgentRun, status string, waitUntil 
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
-	res := a.s.db.Model(&AgentRun{}).Where("id = ? and owner = ? and stop_asked = ? and status in ?", run.ID, run.Owner, false, []string{RunWorking, RunWaiting}).
-		Updates(map[string]any{"lease_until": time.Now().Add(runLease).UnixMilli(), "status": status, "wait_until": waitUntil,
-			"turns": run.Turns, "episodes": run.Episodes, "tool_calls": run.ToolCalls, "added": run.Added,
-			"tokens_in": run.TokensIn, "tokens_out": run.TokensOut, "request_id": run.RequestID})
-	return res.RowsAffected == 1, res.Error
+	return a.s.HoldRun(run.OrgID, *run, status, waitUntil, time.Now().Add(runLease))
 }
 
 // drive works the run until its request is done, a person stops it, or it can't go
@@ -369,9 +344,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 	}
 	// An agent works a task once at a time, so a claim of its key's on the task is this
 	// run's from before a restart, under a session that is gone.
-	mine := fmt.Sprintf("key:%d", bk.ID)
-	if err := a.s.db.Where("org_id = ? and task_id = ? and (holder = ? or holder like ?)", run.OrgID, run.TaskID, mine, mine+" %").
-		Delete(&RequestClaim{}).Error; err != nil {
+	if err := a.s.DropKeyClaims(run.OrgID, run.TaskID, bk.ID); err != nil {
 		return RunFailed, "the task's claims couldn't be read"
 	}
 	own, err := a.ownSession(ctx, o, bk)
@@ -420,9 +393,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 			if goOn, err := a.hold(ctx, run, RunWorking, nil); err != nil || !goOn {
 				return a.ended(ctx, run, err)
 			}
-			var revoked int64
-			logged(a.s.db.Model(&APIKey{}).Where("id = ? and revoked_at is not null", bk.ID).Count(&revoked))
-			if revoked > 0 {
+			if revoked, _ := a.s.KeyRevoked(run.OrgID, bk.ID); revoked {
 				return RunStopped, "its key was revoked on the Agents page"
 			}
 			reply, err := chat.next(ctx)
@@ -537,7 +508,11 @@ func toolsPassing(err error) bool {
 // server is going away, nobody's if another server took it over, else failed.
 func (a *App) ended(ctx context.Context, run *AgentRun, err error) (string, string) {
 	var now AgentRun
-	logged(a.s.db.Where("id = ?", run.ID).Limit(1).Find(&now))
+	if got, err := a.s.RunByID(run.OrgID, run.ID); err == nil {
+		now = *got
+	} else {
+		log.Printf("database: %v", err)
+	}
 	switch {
 	case now.Owner != run.Owner:
 		return "", ""
@@ -577,17 +552,12 @@ func (a *App) handOver(run *AgentRun, c *Agent, bk *APIKey, waited time.Duration
 		return "", false
 	}
 	why := fmt.Sprintf("its endpoint stayed limited or away for over %d minutes", c.FallbackMinutes)
-	var going int64
-	logged(a.s.db.Model(&AgentRun{}).Where("org_id = ? and task_id = ? and agent_id = ? and status in ?",
-		run.OrgID, run.TaskID, next.ID, []string{RunWorking, RunWaiting}).Count(&going))
-	if going > 0 {
+	if going, _ := a.s.RunsOn(run.OrgID, run.TaskID, next.ID); going > 0 {
 		return fmt.Sprintf("left the task to %s, already working it: %s", next.Name, why), true
 	}
 	// The request this run holds goes with the task, or the fallback would find
 	// nothing it may work until the claim lapsed.
-	mine := fmt.Sprintf("key:%d", bk.ID)
-	if err := a.s.db.Where("org_id = ? and task_id = ? and (holder = ? or holder like ?)", run.OrgID, run.TaskID, mine, mine+" %").
-		Delete(&RequestClaim{}).Error; err != nil {
+	if err := a.s.DropKeyClaims(run.OrgID, run.TaskID, bk.ID); err != nil {
 		return "", false
 	}
 	if _, err := a.startRun(run.OrgID, run.TaskID, next.ID, c.Name+" (fallback)", run.ID); err != nil {
@@ -733,9 +703,11 @@ func sources(name string, args map[string]any) []string {
 }
 
 func (t *turnState) requestDone() bool {
-	var r TaskRequest
-	logged(t.app.s.db.Where("org_id = ? and id = ?", t.run.OrgID, t.run.RequestID).Limit(1).Find(&r))
-	return r.DoneAt != nil
+	done, err := t.app.s.RequestDone(t.run.OrgID, t.run.RequestID)
+	if err != nil {
+		log.Printf("database: %v", err)
+	}
+	return done
 }
 
 // call runs one tool the model asked for and returns what to tell it.

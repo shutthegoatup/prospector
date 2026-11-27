@@ -27,6 +27,9 @@ var acrossOrganisations = map[string]bool{
 	"UnsubscribeByToken": true,
 	// These take a row that already names its organisation, which their callers read with it.
 	"SaveOrgMail": true, "SaveSSO": true,
+	// The server's own sweeps, over every organisation; what they find is then handled
+	// by methods that take its organisation.
+	"LapsedRuns": true, "CampaignsSending": true, "FreeStaleMail": true, "Users": true,
 }
 
 // theirs marks what the first organisation holds, so it shows if it turns up elsewhere.
@@ -375,6 +378,15 @@ var saysNothingBack = map[string]bool{
 	"FindOne": true, "NeverContactCovers": true,
 	// A vendor saved or removed, and a count, carry nothing of the organisation's data.
 	"SaveEnricher": true, "DeleteEnricher": true, "EnricherUsed": true,
+	"ChangeContactFields": true, "KeepFind": true, "LogEnrich": true, "Erased": true, "FreshCustomerLink": true,
+	"AddRun": true, "RequiresSSO": true, "AddSSODomain": true, "RemoveSSODomain": true, "VerifySSODomain": true, "UnsubscribeLink": true, "AgentNameTaken": true, "RenameKey": true, "DeleteAgent": true,
+	// These look for a run, a mail or a domain in a state the rows made above aren't in,
+	// or one held by a server they name: TestRunsAndMailsStayInTheirOrganisation tries them.
+	"SSODomain": true, "TaskOpen": true, "RunsOn": true, "AgentRunsGoing": true, "AskRunStop": true,
+	"RenewRun": true, "HoldRun": true, "EndRun": true, "StopLapsedRun": true, "TakeOverRun": true,
+	"DropKeyClaims": true, "KeyRevoked": true, "RequestDone": true,
+	"MailGate": true, "MailSentSince": true, "NextQueued": true, "SkipMail": true, "ClaimMail": true, "SettleMail": true,
+	"CampaignWent": true, "CampaignFailed": true, "PauseCampaign": true, "FinishIfDone": true,
 }
 
 func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {

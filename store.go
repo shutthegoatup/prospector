@@ -349,6 +349,20 @@ func (s *Store) postgres() bool { return s.db.Dialector.Name() == "postgres" }
 // store's exported methods to their organisation is TestNoMethodReachesIntoAnotherOrganisation.
 func (s *Store) in(org int64) *gorm.DB { return s.db.Where("org_id = ?", org) }
 
+func (s *Store) ContactByID(org, id int64) (*Contact, error) {
+	var c Contact
+	if err := s.in(org).First(&c, id).Error; err != nil {
+		return nil, missing(err, "no contact %d in this organisation", id)
+	}
+	return &c, nil
+}
+
+// Users is how many people can sign in, in any organisation.
+func (s *Store) Users() (int64, error) {
+	var n int64
+	return n, s.db.Model(&User{}).Count(&n).Error
+}
+
 // holdOrg and hold make a transaction wait its turn on one row, so a rule that is
 // checked by reading and then kept by writing ("add it unless it is already here")
 // holds when two callers arrive together. Taken before the first read; an organisation
@@ -489,6 +503,19 @@ func (s *Store) Update(org, id int64, field, value, actor string) error {
 			return s.setDeal(tx, org, id, of, value, actor)
 		}
 		return s.set(tx, org, id, field, value, actor)
+	})
+}
+
+// ChangeContactFields makes several changes to a person, or none: one that is refused
+// takes back those before it.
+func (s *Store) ChangeContactFields(org, id int64, changes []Change, actor string) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		for _, c := range changes {
+			if err := s.set(tx, org, id, c.Field, c.Value, actor); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
