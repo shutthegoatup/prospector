@@ -42,6 +42,8 @@ var acrossOrganisations = map[string]bool{
 	// The core's own: what the areas' queries are written with, not queries of their own.
 	// TestOnlyTheStoreTouchesTheDatabase keeps them inside the store.
 	"InOrg": true, "Log": true, "LogAs": true,
+	// The deals area's, which prospecting writes a contact's deal through inside its own transaction.
+	"SetDeal": true,
 }
 
 // theirs marks what the first organisation holds, so it shows if it turns up elsewhere.

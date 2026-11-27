@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -64,3 +65,26 @@ func (d Deal) NeedsNextStep(day string) bool {
 	}
 	return d.NextStep == "" || (d.NextDate != nil && *d.NextDate <= day)
 }
+
+var moneyRe = regexp.MustCompile(`^\d{0,12}(\.\d{0,2})?$`)
+
+var leadingCode = regexp.MustCompile(`^[A-Za-z]{3}`)
+
+// ParseMoney reads "14,000", "£14000.5", "14 000.50" or "CHF 14,000" into hundredths:
+// whatever formatMoney writes, since the card shows a value in the box it is edited in.
+func ParseMoney(text string) (int64, error) {
+	s := strings.NewReplacer(",", "", " ", "", "£", "", "$", "", "€", "").Replace(text)
+	s = leadingCode.ReplaceAllString(s, "")
+	if !moneyRe.MatchString(s) || s == "." {
+		return 0, fmt.Errorf("%q isn't an amount", text)
+	}
+	whole, frac, _ := strings.Cut(s, ".")
+	n, err := strconv.ParseInt("0"+whole+(frac + "00")[:2], 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%q isn't an amount", text)
+	}
+	return n, nil
+}
+
+// Change is one field given a new value.
+type Change struct{ Field, Value string }

@@ -16,8 +16,6 @@ const companyNotRejected = "(company_id is null" +
 	" or (offering_id <> 0 and not exists (select 1 from verdicts v where v.org_id = contacts.org_id" +
 	" and v.offering_id = contacts.offering_id and v.company_id = contacts.company_id and v.stage = '" + CompanyRejected + "')))"
 
-const inConversation = "replied is not null and declined is null and status <> 'suggested'"
-
 // markDate compares days as text, in the zone today() uses: parsing the day as UTC
 // midnight would call today "the future" for the first hours of it east of UTC.
 func markDate(date string, now time.Time) error {

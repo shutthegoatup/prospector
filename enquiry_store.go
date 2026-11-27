@@ -29,7 +29,7 @@ func (s *enquiryStore) EnquiryByID(org, id int64) (*Enquiry, error) {
 
 // SetEnquiry changes where answering an enquiry stands, who has it, or our note on it.
 func (s *enquiryStore) SetEnquiry(org, id int64, field, value, actor string) error {
-	return s.SetEnquiryFields(org, id, []Change{{field, value}}, actor)
+	return s.SetEnquiryFields(org, id, []Change{{Field: field, Value: value}}, actor)
 }
 
 // SetEnquiryFields makes several of those changes or none.

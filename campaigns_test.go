@@ -95,7 +95,7 @@ func TestACampaignGoesOnlyToPeopleWithARelationship(t *testing.T) {
 	if _, err := s.AddSubscription(o.ID, SubscriptionIn{Company: *declined.CompanyID, Name: "Old plan", Start: "2020-01-01", TermMonths: 12, Then: ThenEnds}, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	c = must(s.ChangeCampaign(o.ID, c.ID, []Change{{"audience", AudienceCustomers}}, "Ada Lovelace"))
+	c = must(s.ChangeCampaign(o.ID, c.ID, []Change{{Field: "audience", Value: AudienceCustomers}}, "Ada Lovelace"))
 	got = leftOut(must(s.Audience(o, *c)))
 	for _, name := range []string{"Hannah Pryce", "Tom Ellery", "Jo Marsh"} {
 		if _, there := got[name]; !there {
@@ -246,7 +246,7 @@ func TestTheAudienceHoldsAtItsEdges(t *testing.T) {
 	if _, err := s.AddSubscription(o.ID, SubscriptionIn{Company: *later.CompanyID, Name: "Starts later", Start: "2099-01-01", TermMonths: 12}, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	c = must(s.ChangeCampaign(o.ID, c.ID, []Change{{"audience", AudienceCustomers}}, "Ada Lovelace"))
+	c = must(s.ChangeCampaign(o.ID, c.ID, []Change{{Field: "audience", Value: AudienceCustomers}}, "Ada Lovelace"))
 	if _, there := leftOut(must(s.Audience(o, *c)))["Not Yet"]; there {
 		t.Error("someone at a company whose subscription has not started is in the customers' audience")
 	}

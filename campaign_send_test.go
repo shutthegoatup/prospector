@@ -554,7 +554,7 @@ func TestAServiceNoticeIsCheckedAgainAsItIsSent(t *testing.T) {
 
 	// Changing a draft to a service notice takes it to customers.
 	m := draft(t, s, o)
-	changed := must(s.ChangeCampaign(o.ID, m.ID, []Change{{"kind", KindService}}, "Ada Lovelace"))
+	changed := must(s.ChangeCampaign(o.ID, m.ID, []Change{{Field: "kind", Value: KindService}}, "Ada Lovelace"))
 	if changed.Kind != KindService || changed.Audience != AudienceCustomers {
 		t.Errorf("after making it a service notice: %s to %s", changed.Kind, changed.Audience)
 	}

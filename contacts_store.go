@@ -95,7 +95,7 @@ func (s *prospectingStore) mark(org, id int64, step, date string, who Actor, not
 func (s *prospectingStore) Update(org, id int64, field, value, actor string) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		if of, ok := strings.CutPrefix(field, "deal_"); ok {
-			return s.deals.setDeal(tx, org, id, of, value, actor)
+			return s.deals.SetDeal(tx, org, id, of, value, actor)
 		}
 		return s.set(tx, org, id, field, value, actor)
 	})

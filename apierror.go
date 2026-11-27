@@ -20,12 +20,6 @@ import (
 	"github.com/shutthegoatup/prospector/api"
 )
 
-// conflict is an error about something that can't be made because what is already here
-// has its place: asking again won't help until one of the two changes.
-type conflict string
-
-func (e conflict) Error() string { return string(e) }
-
 // refused is an error about something the caller may not do, whatever it sends.
 type refused string
 

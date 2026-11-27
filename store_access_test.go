@@ -27,7 +27,7 @@ func TestOnlyTheStoreTouchesTheDatabase(t *testing.T) {
 	// goes by name alone, so a name both use would fail the other type's calls.
 	// The core's handle on the database, its scoping to an organisation and its history
 	// log are exported from internal/store, but are the store's alone to use.
-	private, others := map[string]bool{"DB": true, "InOrg": true, "Log": true, "LogAs": true}, map[string]bool{}
+	private, others := map[string]bool{"DB": true, "InOrg": true, "Log": true, "LogAs": true, "SetDeal": true}, map[string]bool{}
 	for _, name := range files {
 		if strings.HasSuffix(name, "_test.go") {
 			continue
@@ -77,7 +77,8 @@ func TestNoStoreMethodHandsOutTheDatabase(t *testing.T) {
 	store := reflect.TypeOf(&Store{})
 	// The core's own helpers, which the areas' queries build on; the rule above keeps
 	// them out of everything else.
-	core := map[string]bool{"InOrg": true, "Log": true, "LogAs": true}
+	// SetDeal is the deals area's, which prospecting calls inside its own transaction.
+	core := map[string]bool{"InOrg": true, "Log": true, "LogAs": true, "SetDeal": true}
 	for i := range store.NumMethod() {
 		m := store.Method(i)
 		if core[m.Name] {

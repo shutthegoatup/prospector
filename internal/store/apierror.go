@@ -22,3 +22,9 @@ func Missing(err error, format string, args ...any) error {
 	}
 	return NoSuch(format, args...)
 }
+
+// Conflict is an error about something that can't be made because what is already here
+// has its place: asking again won't help until one of the two changes.
+type Conflict string
+
+func (e Conflict) Error() string { return string(e) }
