@@ -47,6 +47,9 @@ func (s *AgentStore) AskRunStop(org, id int64) (going bool, err error) {
 	return false, err
 }
 
+// The rest change a run only while the server named as its owner still holds it, each
+// in one statement, so of two servers only one ever drives a run.
+
 // RenewRun reports false once a person has stopped the run or another server took it.
 func (s *AgentStore) RenewRun(org, id int64, owner string, until time.Time) (bool, error) {
 	res := s.InOrg(org).Model(&store.AgentRun{}).Where("id = ? and owner = ? and stop_asked = ? and status in ?", id, owner, false, runGoing).
@@ -76,6 +79,8 @@ func (s *AgentStore) LapsedRuns(now time.Time) ([]store.AgentRun, error) {
 	return lapsed, s.DB.Where("status in ? and lease_until < ?", runGoing, now.UnixMilli()).Find(&lapsed).Error
 }
 
+// A lapsed run is ended or taken over only if its lease is still the one that lapsed,
+// so of two servers sweeping, one does it.
 func (s *AgentStore) StopLapsedRun(org, id, lease int64, at time.Time) error {
 	return s.InOrg(org).Model(&store.AgentRun{}).Where("id = ? and lease_until = ?", id, lease).
 		Updates(map[string]any{"status": RunStopped, "stop_reason": "stopped by a person", "ended_at": &at, "lease_until": 0}).Error
