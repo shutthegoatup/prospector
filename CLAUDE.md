@@ -41,4 +41,4 @@ Tests call `t.Parallel()` and get a database from `tempStore(t)` (one migrated t
 
 ## Merging is releasing
 
-`main` only takes pull requests, and the `test` and `vulncheck` checks must pass. Every green push to `main` is tagged as the next patch version and published as a release, which `deploy.yml` then installs on the host its `DEPLOY_*` secrets name. Treat a merge as a deploy. To go back, run the `deploy` workflow by hand with an earlier version.
+`main` only takes pull requests, and the `test` and `vulncheck` checks must pass. `test` passes only when the `web`, `lint` and `tests` jobs all did; `tests` runs every third test on each of three runners, so a test that leans on another having run first breaks there. Every green push to `main` is tagged as the next patch version and published as a release, which `deploy.yml` then installs on the host its `DEPLOY_*` secrets name. Treat a merge as a deploy. To go back, run the `deploy` workflow by hand with an earlier version.

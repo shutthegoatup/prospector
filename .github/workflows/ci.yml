@@ -9,8 +9,76 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  # The web app's checks: what it regenerates from the spec (api.gen.go, api.d.ts) is
+  # committed, and it passes its linters.
+  web:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      # A Go cache for this job alone, saved every run. setup-go's own is keyed on go.sum
+      # only and kept by whichever job finishes first, which has compiled the least.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ github.job }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-${{ github.job }}-${{ hashFiles('go.sum') }}-
+            go-${{ github.job }}-
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build the web app; generated code is committed
+        run: |
+          go generate ./api
+          npm ci --prefix web --no-audit --no-fund
+          npm run build --prefix web
+          git diff --exit-code
+      - name: Lint and check formatting
+        run: |
+          npm run lint --prefix web
+          npm run format:check --prefix web
+          npm run lint:api --prefix web
+
+  # go vet, staticcheck, errcheck and the rest, with gofmt and goimports (.golangci.yml).
+  # It needs no built app: the embed finds the committed CSS.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      # A Go cache for this job alone, saved every run. setup-go's own is keyed on go.sum
+      # only and kept by whichever job finishes first, which has compiled the least.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ github.job }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-${{ github.job }}-${{ hashFiles('go.sum') }}-
+            go-${{ github.job }}-
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+
+  # The tests, split across runners by name: each runs every third.
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
     services:
       postgres:
         image: postgres:19
@@ -21,48 +89,64 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PROSPECTOR_TEST_PG: postgres://postgres:test@localhost:5432/prospector?sslmode=disable
+      SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
-
+          cache: false
+      # A Go cache for this job alone, saved every run. setup-go's own is keyed on go.sum
+      # only and kept by whichever job finishes first, which has compiled the least.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ github.job }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-${{ github.job }}-${{ hashFiles('go.sum') }}-
+            go-${{ github.job }}-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26
           cache: npm
           cache-dependency-path: web/package-lock.json
-
-      # The tests read the built app, so this comes first. Its own output is ignored;
-      # what it regenerates from the spec (api.gen.go, api.d.ts) is committed.
-      - name: Build the web app; generated code is committed
+      # The tests read the built app.
+      - name: Build the web app
         run: |
-          go generate ./api
           npm ci --prefix web --no-audit --no-fund
           npm run build --prefix web
-          git diff --exit-code
-
-      - name: Lint and check formatting
-        run: |
-          npm run lint --prefix web
-          npm run format:check --prefix web
-          npm run lint:api --prefix web
-      # go vet, staticcheck, errcheck and the rest, with gofmt and goimports (.golangci.yml).
-      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          version: v2.15.0
       # A throwaway database needn't survive a crash, and syncing every commit to disk
       # is most of what a test spends.
       - name: Don't make the test database durable
         run: |
           psql "$PROSPECTOR_TEST_PG" -c "alter system set fsync = off" -c "alter system set synchronous_commit = off" \
             -c "alter system set full_page_writes = off" -c "select pg_reload_conf()"
-        env:
-          PROSPECTOR_TEST_PG: postgres://postgres:test@localhost:5432/prospector?sslmode=disable
+      # go vet is the lint job's (golangci's govet); run again here it is most of the build.
       - name: Test
-        run: go test -count=1 ./...
-        env:
-          PROSPECTOR_TEST_PG: postgres://postgres:test@localhost:5432/prospector?sslmode=disable
+        run: |
+          # Only the root package's Test functions are shared out: anything else would never run.
+          others=$(go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vx 'github.com/shutthegoatup/prospector' || true)
+          if [ -n "$others" ]; then echo "tests outside the root package aren't run here: $others"; exit 1; fi
+          listed=$(go test -vet=off -list . .)
+          if echo "$listed" | grep -Ev '^(Test|ok )'; then echo "only Test functions are run here"; exit 1; fi
+          names=$(echo "$listed" | grep '^Test' | sort | awk -v n=3 -v i="$SHARD" 'NR % n == i' | paste -sd'|')
+          test -n "$names"
+          go test -vet=off -count=1 -run "^($names)\$" .
+
+  # The one check main requires: everything above passed.
+  test:
+    if: always()
+    needs: [web, lint, tests]
+    runs-on: ubuntu-latest
+    env:
+      NEEDS: ${{ toJSON(needs) }}
+    steps:
+      - name: Everything passed
+        run: echo "$NEEDS" | jq -e 'all(.[]; .result == "success")'
 
   # Every green push to main becomes the next patch release, which deploy.yml installs.
   # A tag pushed with GITHUB_TOKEN doesn't start release.yml, so goreleaser runs here.
@@ -84,6 +168,18 @@ jobs:
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
+          cache: false
+      # A Go cache for this job alone, saved every run. setup-go's own is keyed on go.sum
+      # only and kept by whichever job finishes first, which has compiled the least.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ github.job }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-${{ github.job }}-${{ hashFiles('go.sum') }}-
+            go-${{ github.job }}-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26

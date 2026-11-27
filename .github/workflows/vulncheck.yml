@@ -20,4 +20,16 @@ jobs:
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
+          cache: false
+      # A Go cache for this job alone, saved every run. setup-go's own is keyed on go.sum
+      # only and kept by whichever job finishes first, which has compiled the least.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ github.job }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-${{ github.job }}-${{ hashFiles('go.sum') }}-
+            go-${{ github.job }}-
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...

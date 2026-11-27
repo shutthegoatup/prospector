@@ -15,7 +15,9 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -180,6 +182,42 @@ func signInAs(t *testing.T, srv *httptest.Server, email, password string) *http.
 // of a second organisation, with the first one's ids and what would find its rows.
 func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 	t.Parallel()
+	gets, posts := orgRoutes(t)
+	if len(gets) < 10 || len(posts) < 19 {
+		t.Fatalf("found only %d reads and %d changes in the API spec: has the way it is read changed?", len(gets), len(posts))
+	}
+	var shown atomic.Int64
+	t.Run("shares", func(t *testing.T) {
+		for i := range isolationShares {
+			t.Run(strconv.Itoa(i), func(t *testing.T) {
+				t.Parallel()
+				shown.Add(int64(tryRoutesAsAnotherOrganisation(t, share(gets, i), share(posts, i))))
+			})
+		}
+	})
+	// The first organisation's own owner does see its rows on those pages, so not
+	// seeing them as another means something.
+	if shown.Load() < 20 {
+		t.Fatalf("only %d of %d pages show the first organisation its own rows", shown.Load(), len(gets))
+	}
+}
+
+// isolationShares is how many databases the isolation tests split their work across,
+// each seeded alike, so the shares run at once.
+const isolationShares = 4
+
+// share is every isolationShares-th of all, from the i-th.
+func share[T any](all []T, i int) []T {
+	var out []T
+	for j := i; j < len(all); j += isolationShares {
+		out = append(out, all[j])
+	}
+	return out
+}
+
+// tryRoutesAsAnotherOrganisation tries the routes on a database of its own, and
+// answers how many of the pages showed the first organisation its own rows.
+func tryRoutesAsAnotherOrganisation(t *testing.T, gets, posts []string) int {
 	s := tempStore(t)
 	first := seedFirst(t, s)
 	// A run still going, since stopping one only looks among those.
@@ -204,10 +242,6 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 	intruder := signInAs(t, srv, "owner@beta.example", "another long password")
 	theirOwner := signInAs(t, srv, "owner@alpha.example", "a long enough password")
 
-	gets, posts := orgRoutes(t)
-	if len(gets) < 10 || len(posts) < 19 {
-		t.Fatalf("found only %d reads and %d changes in the API spec: has the way it is read changed?", len(gets), len(posts))
-	}
 	unchanged := func(after string) {
 		t.Helper()
 		now := holdings(t, s, first.ID)
@@ -237,11 +271,6 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 		if _, body := call(t, theirOwner, "GET", srv.URL+strings.Replace(path, "{org}", "alpha", 1), "", nil); strings.Contains(body, theirs) {
 			shown++
 		}
-	}
-	// The first organisation's own owner does see its rows on those pages, so not
-	// seeing them above means something.
-	if shown < 20 {
-		t.Fatalf("only %d of %d pages show the first organisation its own rows", shown, len(gets))
 	}
 	unchanged("reading the pages")
 
@@ -349,4 +378,5 @@ func TestNoPageOrFormReachesIntoAnotherOrganisation(t *testing.T) {
 	if code, body := call(t, intruder, "GET", srv.URL+"/o/beta/api/v1/nav", "", nil); code != http.StatusOK || !strings.Contains(body, `"slug":"beta"`) {
 		t.Fatalf("the second organisation's owner is no longer signed in: %d", code)
 	}
+	return shown
 }
