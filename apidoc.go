@@ -69,7 +69,7 @@ func apiDocOf(spec *openapi3.T) APIDoc {
 		doc.Intro = append(doc.Intro, strings.Join(strings.Fields(p), " "))
 	}
 	for _, s := range Scopes {
-		doc.Scopes = append(doc.Scopes, APIScope{Name: s.Name, What: s.What, Owner: ownersOnly(s.Name)})
+		doc.Scopes = append(doc.Scopes, APIScope{Name: s.Name, What: s.What.Error(), Owner: ownersOnly(s.Name)})
 	}
 	groups := map[string]*APIGroup{}
 	var order []string

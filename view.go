@@ -35,6 +35,22 @@ type Local struct {
 
 type Line struct{ Cue, Say say.Sayer }
 
+var months = map[time.Month]*say.Text{
+	time.January: say.New("Jan"), time.February: say.New("Feb"), time.March: say.New("Mar"), time.April: say.New("Apr"),
+	time.May: say.New("May"), time.June: say.New("Jun"), time.July: say.New("Jul"), time.August: say.New("Aug"),
+	time.September: say.New("Sep"), time.October: say.New("Oct"), time.November: say.New("Nov"), time.December: say.New("Dec"),
+}
+
+// at is a moment as the server writes one for a person: "2 Jan 15:04".
+func at(t time.Time) say.Sayer {
+	return say.Errorf("%d %s %s", t.Day(), months[t.Month()], t.Format("15:04"))
+}
+
+// onDate is a day as the server writes one for a person: "2 Jan 2006".
+func onDate(t time.Time) say.Sayer {
+	return say.Errorf("%d %s %d", t.Day(), months[t.Month()], t.Year())
+}
+
 var weekdays = map[string]*say.Text{
 	"Mon": say.New("Mon"), "Tue": say.New("Tue"), "Wed": say.New("Wed"), "Thu": say.New("Thu"),
 	"Fri": say.New("Fri"), "Sat": say.New("Sat"), "Sun": say.New("Sun"),
@@ -314,16 +330,6 @@ func Today(byStep map[string][]Contact, v Voice, now time.Time, noMail map[strin
 		}
 	}
 	return cards, counts
-}
-
-func joinNonEmpty(sep string, parts ...string) string {
-	var out []string
-	for _, p := range parts {
-		if strings.TrimSpace(p) != "" {
-			out = append(out, p)
-		}
-	}
-	return strings.Join(out, sep)
 }
 
 // safeHref lets only web links through, so a stored javascript: link (from an agent

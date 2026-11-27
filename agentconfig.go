@@ -452,58 +452,62 @@ func agentView(c Agent, all []Agent) AgentView {
 
 // AgentState is how an agent's card looks: ok, warn or stop, a line saying so, and
 // what to do about it.
-type AgentState struct{ Rail, Line, Todo string }
+type AgentState struct {
+	Rail       string
+	Line, Todo say.Sayer
+}
 
 func (v AgentView) State() AgentState {
-	checked := ""
+	var checked say.Sayer = say.Nothing
 	if v.CheckedAt != nil {
-		checked = " · checked " + v.CheckedAt.Format("2 Jan 15:04")
+		checked = say.Errorf(" · checked %s", at(*v.CheckedAt))
 	}
 	switch {
 	case !v.HasKey:
-		return AgentState{"stop", "✕ Can't run", "It needs an API key."}
+		return AgentState{"stop", say.New("✕ Can't run"), say.New("It needs an API key.")}
 	case v.Kind == kindOpenAI && v.BaseURL == "":
-		return AgentState{"stop", "✕ Can't run", "It needs the endpoint's address."}
+		return AgentState{"stop", say.New("✕ Can't run"), say.New("It needs the endpoint's address.")}
 	case v.Model == "":
-		return AgentState{"stop", "✕ Can't run" + checked, "Pick one of the models the endpoint lists."}
+		return AgentState{"stop", say.Errorf("✕ Can't run%s", checked), say.New("Pick one of the models the endpoint lists.")}
 	case v.Problem != "":
-		return AgentState{"warn", "● Its last check found a problem" + checked, "Last check: " + v.Problem}
+		// The problem is what that check found, in its own words.
+		return AgentState{"warn", say.Errorf("● Its last check found a problem%s", checked), say.Errorf("Last check: %s", v.Problem)}
 	case !v.Searches():
-		return AgentState{"warn", "● Runs, but can't search the web" + checked,
-			"Add a search address or allow a search tool; until then it only reads pages it's given."}
+		return AgentState{"warn", say.Errorf("● Runs, but can't search the web%s", checked),
+			say.New("Add a search address or allow a search tool; until then it only reads pages it's given.")}
 	}
-	return AgentState{"ok", "✓ Ready" + checked, ""}
+	return AgentState{"ok", say.Errorf("✓ Ready%s", checked), say.Nothing}
 }
 
 // FallbackText says who takes its task over, and when.
-func (v AgentView) FallbackText() string {
+func (v AgentView) FallbackText() say.Sayer {
 	for _, o := range v.Others {
 		if o.ID == v.FallbackID {
-			return o.Name + ", after " + plural(agentFallbackMinutes(v), "minute")
+			return say.Errorf("%s, after %d minutes", o.Name, agentFallbackMinutes(v))
 		}
 	}
-	return "nobody: it waits"
+	return say.New("nobody: it waits")
 }
 
-func (v AgentView) ToolsText() string {
+func (v AgentView) ToolsText() say.Sayer {
 	switch offered := len(v.ToolList()); {
 	case v.ToolsURL == "":
-		return "built-in only"
+		return say.New("built-in only")
 	case offered == 0:
-		return "none listed"
+		return say.New("none listed")
 	default:
-		return fmt.Sprintf("%d of %d allowed", len(v.AllowedTools()), offered)
+		return say.Errorf("%d of %d allowed", len(v.AllowedTools()), offered)
 	}
 }
 
-func (v AgentView) SearchText() string {
+func (v AgentView) SearchText() say.Sayer {
 	switch {
 	case v.SearchURL != "":
-		return "✓ SearXNG"
+		return say.Errorf("✓ %s", "SearXNG")
 	case v.Searches():
-		return "✓ through its tools"
+		return say.New("✓ through its tools")
 	}
-	return "none"
+	return say.New("none")
 }
 
 func agentFallbackMinutes(v AgentView) int {

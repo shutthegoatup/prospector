@@ -45,15 +45,7 @@
   "jsPlugins": ["eslint-plugin-formatjs"],
   "overrides": [
     {
-      "files": [
-        "src/components/app/site.tsx",
-        "src/pages/Agents.tsx",
-        "src/pages/Settings.tsx",
-        "src/pages/Tasks.tsx",
-        "src/pages/Task.tsx",
-        "src/site/ApiReference.tsx",
-        "src/site/Landing.tsx"
-      ],
+      "files": ["src/components/app/site.tsx", "src/site/ApiReference.tsx", "src/site/Landing.tsx"],
       "rules": { "formatjs/no-literal-string-in-jsx": "off" }
     }
   ],

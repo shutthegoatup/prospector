@@ -26,6 +26,5 @@ var writeTyped = request.WriteTyped
 
 type refused = request.Refused
 
-var plural = request.Plural
 var put = request.Put
 var worker = request.Worker

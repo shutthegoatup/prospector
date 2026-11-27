@@ -10,6 +10,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -195,7 +196,7 @@ func ownersOnly(scope string) bool {
 
 // agentOut is an agent with its card worked out as the Agents page shows it; all is
 // every agent of the organisation, the ones it could fall back to among them.
-func agentOut(c Agent, all []Agent) api.Agent {
+func agentOut(c Agent, all []Agent, lang string) api.Agent {
 	v := agentView(c, all)
 	st := v.State()
 	tools := []api.Tool{}
@@ -205,14 +206,14 @@ func agentOut(c Agent, all []Agent) api.Agent {
 	return api.Agent{Id: c.ID, Name: c.Name, Kind: api.AgentKind(c.Kind), BaseUrl: c.BaseURL, Model: c.Model, ToolsUrl: c.ToolsURL, SearchUrl: c.SearchURL,
 		Models: nonNil(c.ModelList()), Tools: tools, AllowedTools: nonNil(c.AllowedTools()), Fallback: c.FallbackID, FallbackMinutes: c.FallbackMinutes,
 		ThinkingOff: c.ThinkingOff, Problem: c.Problem, CheckedAt: c.CheckedAt, HasKey: c.APIKey != "", Ready: c.Ready(), UpdatedBy: c.UpdatedBy, UpdatedAt: c.UpdatedAt,
-		State: api.AgentState{Rail: api.AgentStateRail(st.Rail), Line: st.Line, Todo: st.Todo}, Searches: c.Searches(), SearchText: v.SearchText(),
-		ToolsText: v.ToolsText(), FallbackText: v.FallbackText()}
+		State: api.AgentState{Rail: api.AgentStateRail(st.Rail), Line: st.Line.In(lang), Todo: st.Todo.In(lang)}, Searches: c.Searches(), SearchText: v.SearchText().In(lang),
+		ToolsText: v.ToolsText().In(lang), FallbackText: v.FallbackText().In(lang)}
 }
 
 // oneAgentOut is agentOut for an agent read on its own.
-func (s apiServer) oneAgentOut(org int64, c Agent) (api.Agent, error) {
+func (s apiServer) oneAgentOut(ctx context.Context, org int64, c Agent) (api.Agent, error) {
 	all, err := s.a.s.Agents(org)
-	return agentOut(c, all), err
+	return agentOut(c, all, request.LanguageFrom(ctx)), err
 }
 
 func nonNil(s []string) []string {
@@ -253,7 +254,7 @@ func (s apiServer) ListAgents(ctx context.Context, in api.ListAgentsRequestObjec
 	out := api.ListAgents200JSONResponse{Headers: api.ListAgents200ResponseHeaders{Link: nextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor = []api.Agent{}, next
 	for _, c := range list {
-		out.Body.Items = append(out.Body.Items, agentOut(c, all))
+		out.Body.Items = append(out.Body.Items, agentOut(c, all, request.LanguageFrom(ctx)))
 	}
 	return out, nil
 }
@@ -264,7 +265,7 @@ func (s apiServer) GetAgent(ctx context.Context, in api.GetAgentRequestObject) (
 	if err != nil {
 		return nil, err
 	}
-	out, err := s.oneAgentOut(org, *c)
+	out, err := s.oneAgentOut(ctx, org, *c)
 	return api.GetAgent200JSONResponse(out), err
 }
 
@@ -278,7 +279,7 @@ func (s apiServer) CreateAgent(ctx context.Context, in api.CreateAgentRequestObj
 	if err != nil {
 		return nil, err
 	}
-	out, err := s.oneAgentOut(q.Org.ID, *c)
+	out, err := s.oneAgentOut(ctx, q.Org.ID, *c)
 	return api.CreateAgent201JSONResponse{Agent: out, Message: savedMessage(c)}, err
 }
 
@@ -292,7 +293,7 @@ func (s apiServer) UpdateAgent(ctx context.Context, in api.UpdateAgentRequestObj
 	if err != nil {
 		return nil, err
 	}
-	out, err := s.oneAgentOut(q.Org.ID, *c)
+	out, err := s.oneAgentOut(ctx, q.Org.ID, *c)
 	return api.UpdateAgent200JSONResponse{Agent: out, Message: savedMessage(c)}, err
 }
 
