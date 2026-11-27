@@ -59,8 +59,8 @@ func (a *App) campaignMail(org int64) (*mailer.Server, error) {
 	return via, nil
 }
 
-// sendable is why a campaign can't be sent from this server for this organisation.
-func (a *App) sendable(o *Org) error {
+// Sendable is why a campaign can't be sent from this server for this organisation.
+func (a *App) Sendable(o *Org) error {
 	via, err := a.campaignMail(o.ID)
 	if err != nil {
 		return err
@@ -114,7 +114,7 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 		log.Printf("campaign %d: %v", c.ID, err)
 		return
 	}
-	if err := a.sendable(o); err != nil {
+	if err := a.Sendable(o); err != nil {
 		a.pauseCampaign(c, err.Error())
 		return
 	}

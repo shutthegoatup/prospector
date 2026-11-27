@@ -39,3 +39,5 @@ type outreachStore = marketing.OutreachStore
 var askDNS = marketing.AskDNS
 var leftOutBecause = marketing.LeftOutBecause
 var mailDomainOf = marketing.MailDomainOf
+
+type marketingAPI = marketing.MarketingAPI

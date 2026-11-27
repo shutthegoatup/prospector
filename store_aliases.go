@@ -85,7 +85,6 @@ var Stages = store.Stages
 var addMonths = store.AddMonths
 var assetKey = store.AssetKey
 var deref = store.Deref
-var idOf = store.IDOf
 var enquiryOrigins = store.EnquiryOrigins
 var formatMoney = store.FormatMoney
 var mustDay = store.MustDay
@@ -135,3 +134,5 @@ var errErased = store.ErrErased
 var identifiers = store.Identifiers
 var personKey = store.PersonKey
 var unusableHash = store.UnusableHash
+
+type notSent = store.NotSent

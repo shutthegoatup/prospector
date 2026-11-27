@@ -191,7 +191,7 @@ func (a *App) testMail(ctx context.Context, q *Req) (string, error) {
 	err = a.deliver(ctx, *via, mailer.Message{To: q.User.Email, Subject: say.Errorf("Prospector can send mail for %s", q.Org.Name).In(lang),
 		Body: say.Errorf("This is the test %s asked for in Settings.\n\nIt was sent through %s as %s.\n", q.Actor(), via.Host, via.From).In(lang)})
 	if err != nil {
-		return "", notSent{err}
+		return "", notSent{Err: err}
 	}
 	return say.Errorf("Sent to %s through %s.", q.User.Email, via.Host).In(lang), nil
 }

@@ -310,3 +310,13 @@ func FirstField(s string) string {
 	}
 	return ""
 }
+
+// CustomerActor is the actor recorded for what a customer does on their onboarding page.
+const CustomerActor = "customer"
+
+// NotSent is a failure of the mail server, not of what was asked.
+type NotSent struct{ Err error }
+
+func (e NotSent) Error() string { return e.Err.Error() }
+
+func (e NotSent) Unwrap() error { return e.Err }

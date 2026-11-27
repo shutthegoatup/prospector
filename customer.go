@@ -22,17 +22,15 @@ const (
 	customerCookie = "customer"
 )
 
-var errNoCustomerMail = say.New("mail isn't set up, so the link can't be sent: an owner sets a mail server in Settings, and the server needs PROSPECTOR_URL")
-
-// customerMailOn is whether a link can be mailed for this organisation: it needs a mail
+// CustomerMailOn is whether a link can be mailed for this organisation: it needs a mail
 // server, its own or the app's, and PROSPECTOR_URL, because a link is never built from
 // what a request claims its host is.
-func (a *App) customerMailOn(org int64) bool {
+func (a *App) CustomerMailOn(org int64) bool {
 	via, err := a.MailFor(org)
 	return err == nil && via != nil && a.base != ""
 }
 
-func (a *App) customerLinkMail(ctx context.Context, org *Org, to, token string) error {
+func (a *App) CustomerLinkMail(ctx context.Context, org *Org, to, token string) error {
 	via, err := a.MailFor(org.ID)
 	if err != nil {
 		return err
@@ -141,13 +139,13 @@ func (a *App) customerOpen(w http.ResponseWriter, r *http.Request) {
 // was ever real, nor to reach any address but the invited one.
 func (a *App) customerAgain(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
-	if acc, err := a.s.CustomerByToken("link", token); err == nil && a.customerMailOn(acc.Org.ID) {
+	if acc, err := a.s.CustomerByToken("link", token); err == nil && a.CustomerMailOn(acc.Org.ID) {
 		if fresh, err := a.s.FreshCustomerLink(acc.Org.ID, acc.Grant.ID); err == nil {
 			org, to := acc.Org, deref(acc.Contact.Email)
 			a.background(func() {
 				ctx, cancel := context.WithTimeout(context.Background(), mailer.SendLimit)
 				defer cancel()
-				if err := a.customerLinkMail(ctx, &org, to, fresh); err != nil {
+				if err := a.CustomerLinkMail(ctx, &org, to, fresh); err != nil {
 					// Nothing was sent, so the wait before another try doesn't apply.
 					a.s.DropCustomerLink(fresh)
 					log.Printf("a customer's link wasn't sent: %v", err)
@@ -197,9 +195,9 @@ func (a *App) customerLeave(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/c", http.StatusSeeOther)
 }
 
-// customerControls fills in, for the members' pages, who has been let see each
+// CustomerControls fills in, for the members' pages, who has been let see each
 // onboarding and who at its company could be: anyone picked, with an email address.
-func (a *App) customerControls(org int64, rows []OnboardingRow) error {
+func (a *App) CustomerControls(org int64, rows []OnboardingRow) error {
 	if len(rows) == 0 {
 		return nil
 	}
@@ -215,7 +213,7 @@ func (a *App) customerControls(org int64, rows []OnboardingRow) error {
 	if err != nil {
 		return err
 	}
-	mailOn := a.customerMailOn(org)
+	mailOn := a.CustomerMailOn(org)
 	for i := range rows {
 		rows[i].Invites, rows[i].MailOn = invites[rows[i].ID], mailOn
 		for _, p := range people {

@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/shutthegoatup/prospector/internal/identity"
-	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -31,7 +30,7 @@ func (q *Req) Actor() string {
 		return "agent:" + q.Key.Name
 	}
 	name := strings.TrimSpace(q.User.Name)
-	if name == "" || strings.HasPrefix(name, "agent:") || name == "cli" || name == "import" || name == onboarding.CustomerActor {
+	if name == "" || strings.HasPrefix(name, "agent:") || name == "cli" || name == "import" || name == store.CustomerActor {
 		return q.User.Email
 	}
 	return name
