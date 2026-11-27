@@ -26,7 +26,7 @@ func TestPeopleAreReachedForTheOfferingTheyWerePickedFor(t *testing.T) {
 	}
 
 	var picked Contact
-	if err := s.in(o.ID).Where("id = ?", ctoPerson.ID).First(&picked).Error; err != nil {
+	if err := s.InOrg(o.ID).Where("id = ?", ctoPerson.ID).First(&picked).Error; err != nil {
 		t.Fatal(err)
 	}
 	if picked.OfferingID != cto.ID || !strings.HasPrefix(deref(picked.Note), "Hi Bram, about technology leadership at Northwind Payments") {
@@ -65,7 +65,7 @@ func TestPeopleAreReachedForTheOfferingTheyWerePickedFor(t *testing.T) {
 	if _, err := s.Restore(o.ID, snapshot); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.in(o.ID).Where("id = ?", ctoPerson.ID).First(&picked).Error; err != nil || picked.OfferingID != cto.ID {
+	if err := s.InOrg(o.ID).Where("id = ?", ctoPerson.ID).First(&picked).Error; err != nil || picked.OfferingID != cto.ID {
 		t.Fatalf("a snapshot and restore should keep what someone is reached for: %d %v", picked.OfferingID, err)
 	}
 
@@ -76,14 +76,14 @@ func TestPeopleAreReachedForTheOfferingTheyWerePickedFor(t *testing.T) {
 	if err := s.RemoveOffering(o.ID, cto.ID, "Ada"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.in(o.ID).Where("id = ?", ctoPerson.ID).First(&picked).Error; err != nil || picked.OfferingID != 0 {
+	if err := s.InOrg(o.ID).Where("id = ?", ctoPerson.ID).First(&picked).Error; err != nil || picked.OfferingID != 0 {
 		t.Fatalf("removing an offering should hand its people to the organisation's own: %d %v", picked.OfferingID, err)
 	}
 	// A snapshot from before the removal names an offering that is no longer there.
 	if _, err := s.Restore(o.ID, snapshot); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.in(o.ID).Where("id = ?", ctoPerson.ID).First(&picked).Error; err != nil || picked.OfferingID != 0 {
+	if err := s.InOrg(o.ID).Where("id = ?", ctoPerson.ID).First(&picked).Error; err != nil || picked.OfferingID != 0 {
 		t.Fatalf("a restore naming a removed offering should leave them the organisation's own: %d %v", picked.OfferingID, err)
 	}
 }
@@ -109,7 +109,7 @@ func TestPickingForAnOfferingLeavesTheCompanysOwnStage(t *testing.T) {
 		t.Fatalf("picking someone only for an offering changed the company's own stage to %s", got)
 	}
 	var c Contact
-	if err := s.in(o.ID).Where("id = ?", p.ID).First(&c).Error; err != nil || deref(c.Note) != "Hello Rhea from "+o.Name+"." {
+	if err := s.InOrg(o.ID).Where("id = ?", p.ID).First(&c).Error; err != nil || deref(c.Note) != "Hello Rhea from "+o.Name+"." {
 		t.Fatalf("an offering without a note of its own should use the organisation's: %q %v", deref(c.Note), err)
 	}
 	script := scriptText(callScript(c, "Rhea Moss", Voice{Org: "alpha", Pitch: o.Settings.Pitch, Pitches: map[int64]string{plain.ID: ""}}))

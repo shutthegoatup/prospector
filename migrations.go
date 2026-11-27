@@ -39,7 +39,7 @@ func (s *Store) migrate() error {
 }
 
 func (s *Store) migrateWith(files fs.FS, dir string) error {
-	db, err := s.db.DB()
+	db, err := s.DB.DB()
 	if err != nil {
 		return err
 	}

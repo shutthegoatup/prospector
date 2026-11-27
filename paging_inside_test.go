@@ -59,7 +59,7 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 		in.Cursor = got.NextCursor
 	}
 	var events int64
-	s.in(o.ID).Model(&Event{}).Where("company_id = ?", co.ID).Count(&events)
+	s.InOrg(o.ID).Model(&Event{}).Where("company_id = ?", co.ID).Count(&events)
 	once("facts", facts, 5)
 	once("people", people, 5)
 	once("notes", notes, 5)
@@ -109,7 +109,7 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 	for i := range extra {
 		extra[i] = TaskNote{OrgID: o.ID, TaskID: task.ID, Actor: "agent:scout", Kind: "next", Text: fmt.Sprint("Later note ", i)}
 	}
-	if err := s.db.CreateInBatches(extra, 60).Error; err != nil {
+	if err := s.DB.CreateInBatches(extra, 60).Error; err != nil {
 		t.Fatal(err)
 	}
 	left, in, pages = map[int64]int{}, paging.Page{Limit: 50}, 0
@@ -124,7 +124,7 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 		in.Cursor = got.NextCursor
 	}
 	once("notes on a task with many", left, taskNotesShown+25)
-	if err := s.db.Where("task_id = ? and text like ?", task.ID, "Later note%").Delete(&TaskNote{}).Error; err != nil {
+	if err := s.DB.Where("task_id = ? and text like ?", task.ID, "Later note%").Delete(&TaskNote{}).Error; err != nil {
 		t.Fatal(err)
 	}
 

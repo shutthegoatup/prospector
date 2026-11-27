@@ -125,7 +125,7 @@ func TestACampaignIsSentOnceToEachPersonThroughTheOrganisationsOwnServer(t *test
 	if err := s.UnsubscribeByToken(token); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.marketable(s.db, o, m.To, ""); err != errSuppressed {
+	if err := s.marketable(s.DB, o, m.To, ""); err != errSuppressed {
 		t.Errorf("after unsubscribing by the mail's link: %v", err)
 	}
 }
@@ -258,7 +258,7 @@ func TestAMailThatMayHaveGoneIsNeverSentAgain(t *testing.T) {
 		t.Errorf("the campaign is %s", now.Status)
 	}
 	var links int64
-	if err := s.db.Model(&UnsubscribeLink{}).Where("address = ?", "sven@nordkap.example").Count(&links).Error; err != nil || links != 0 {
+	if err := s.DB.Model(&UnsubscribeLink{}).Where("address = ?", "sven@nordkap.example").Count(&links).Error; err != nil || links != 0 {
 		t.Errorf("a mail that was refused left %d unsubscribe links (%v)", links, err)
 	}
 }
@@ -270,7 +270,7 @@ func TestAMailClaimedByAServerThatStoppedIsGivenUp(t *testing.T) {
 	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
 	// As if a server claimed one and stopped before settling it.
 	long := time.Now().Add(-2 * claimStale)
-	if err := s.db.Model(&CampaignRecipient{}).Where("address = ?", "hannah@larkmoor.example").Updates(map[string]any{"status": MailSending, "claimed_at": long}).Error; err != nil {
+	if err := s.DB.Model(&CampaignRecipient{}).Where("address = ?", "hannah@larkmoor.example").Updates(map[string]any{"status": MailSending, "claimed_at": long}).Error; err != nil {
 		t.Fatal(err)
 	}
 	a.sendRound(context.Background(), time.Now())
@@ -368,7 +368,7 @@ func TestAMailReadBeforeAnErasureIsNotSent(t *testing.T) {
 	a, s, o, _, _, box := campaignSite(t)
 	c := must(s.SendCampaign(o, draft(t, s, o).ID, "Ada Lovelace"))
 	via := must(a.campaignMail(o.ID))
-	gate := must(s.gate(s.db, o))
+	gate := must(s.gate(s.DB, o))
 	hannah := mailOf(t, s, o, c)["hannah@larkmoor.example"]
 
 	if err := s.ErasePerson(o.ID, *hannah.ContactID, "Ada Lovelace"); err != nil {
@@ -379,7 +379,7 @@ func TestAMailReadBeforeAnErasureIsNotSent(t *testing.T) {
 		t.Fatalf("mail went to someone erased while it was being sent: %v", got)
 	}
 	var links int64
-	s.db.Model(&UnsubscribeLink{}).Where("address = ?", hannah.Address).Count(&links)
+	s.DB.Model(&UnsubscribeLink{}).Where("address = ?", hannah.Address).Count(&links)
 	if links != 0 {
 		t.Error("an unsubscribe link keeps the erased address")
 	}
@@ -466,7 +466,7 @@ func TestAServiceNoticeReachesCustomersWhoUnsubscribedButNobodyElse(t *testing.T
 	a, s, o, list, member, box := campaignSite(t)
 	// Everyone made by campaignSite is at Larkmoor Yachts; make it a current customer.
 	var hannah Contact
-	if err := s.db.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.AddSubscription(o.ID, SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"); err != nil {
@@ -542,7 +542,7 @@ func TestAServiceNoticeIsCheckedAgainAsItIsSent(t *testing.T) {
 	_, s, o, _, _, _ := campaignSite(t)
 	c := draft(t, s, o)
 	// As a rollback to a release without kinds, or an edit racing the send, could leave it.
-	if err := s.db.Model(&Campaign{}).Where("id = ?", c.ID).Update("kind", KindService).Error; err != nil {
+	if err := s.DB.Model(&Campaign{}).Where("id = ?", c.ID).Update("kind", KindService).Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.SendCampaign(o, c.ID, "Ada Lovelace"); err == nil || !strings.Contains(err.Error(), "customers only") {
@@ -566,7 +566,7 @@ func TestAServiceNoticeStopsAtSomeoneNoLongerACustomer(t *testing.T) {
 	t.Parallel()
 	a, s, o, _, _, box := campaignSite(t)
 	var hannah Contact
-	if err := s.db.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
 		t.Fatal(err)
 	}
 	sub := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"))
@@ -577,7 +577,7 @@ func TestAServiceNoticeStopsAtSomeoneNoLongerACustomer(t *testing.T) {
 		t.Fatal("the unsubscribed customer was not queued")
 	}
 
-	if err := s.db.Model(&Subscription{}).Where("id = ?", sub.ID).Update("ended_on", "2026-02-01").Error; err != nil {
+	if err := s.DB.Model(&Subscription{}).Where("id = ?", sub.ID).Update("ended_on", "2026-02-01").Error; err != nil {
 		t.Fatal(err)
 	}
 	a.sendRound(context.Background(), time.Now())

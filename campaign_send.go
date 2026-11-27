@@ -60,7 +60,7 @@ func (a *App) campaignMail(org int64) (*mailer.Server, error) {
 	}
 	via := &mailer.Server{Host: m.Host, Port: m.Port, Username: m.Username, From: m.Sender}
 	if m.Password != "" {
-		if via.Password, err = a.s.keys.open(m.Password); err != nil {
+		if via.Password, err = a.s.Keyring.Open(m.Password); err != nil {
 			return nil, fmt.Errorf("this organisation's mail password can't be read: %w", err)
 		}
 	}

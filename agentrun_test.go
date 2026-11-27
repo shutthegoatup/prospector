@@ -51,7 +51,7 @@ type runSetup struct {
 func newRunSetup(t *testing.T, fake *fakeEndpoint) *runSetup {
 	t.Helper()
 	r := &runSetup{s: tempStore(t)}
-	r.s.keys = mustKeys(t, "1:"+mailTestKey)
+	r.s.Keyring = mustKeys(t, "1:"+mailTestKey)
 	r.o = mustOrg(t, r.s, "alpha")
 	r.a = &App{s: r.s, agentClient: fake.srv.Client(), sleep: func(ctx context.Context, d time.Duration) error {
 		r.mu.Lock()
@@ -71,7 +71,7 @@ func (r *runSetup) finished(t *testing.T, id int64) AgentRun {
 	t.Helper()
 	r.a.runs.wg.Wait()
 	var run AgentRun
-	if err := r.s.db.First(&run, id).Error; err != nil {
+	if err := r.s.DB.First(&run, id).Error; err != nil {
 		t.Fatal(err)
 	}
 	return run
@@ -161,7 +161,7 @@ func TestTheAgentWorksATaskToTheEnd(t *testing.T) {
 		t.Fatal("the model wasn't told why its made-up source was refused")
 	}
 	var claims int64
-	if r.s.db.Model(&RequestClaim{}).Count(&claims); claims != 0 {
+	if r.s.DB.Model(&RequestClaim{}).Count(&claims); claims != 0 {
 		t.Fatal("finishing should end the agent's claim")
 	}
 }
@@ -248,7 +248,7 @@ func TestAPersonStopsTheAgent(t *testing.T) {
 	fake.chat = func(n int, _ map[string]any) (int, string) {
 		if n == 1 {
 			var run AgentRun
-			r.s.db.Last(&run)
+			r.s.DB.Last(&run)
 			if err := r.a.StopRun(r.o.ID, run.ID); err != nil {
 				t.Error(err)
 			}
@@ -276,11 +276,11 @@ func TestARunCarriesOnAfterItsServerStops(t *testing.T) {
 		Owner: "a server that stopped", LeaseUntil: lapsed, StartedAt: time.Now(), Turns: 7}
 	stopped := left
 	stopped.StopAsked, stopped.TaskID = true, must(r.s.CreateTask(r.o.ID, "Kitchens", "Kitchen makers.", "Ada Lovelace")).ID
-	r.s.db.Create(&left)
-	r.s.db.Create(&stopped)
+	r.s.DB.Create(&left)
+	r.s.DB.Create(&stopped)
 	held := AgentRun{OrgID: r.o.ID, AgentID: r.agent, TaskID: must(r.s.CreateTask(r.o.ID, "Boats", "Boat builders.", "Ada Lovelace")).ID, Status: RunWorking,
 		Owner: "a live server", LeaseUntil: time.Now().Add(time.Minute).UnixMilli(), StartedAt: time.Now()}
-	r.s.db.Create(&held)
+	r.s.DB.Create(&held)
 
 	r.a.resumeLapsed(time.Now())
 	got := r.finished(t, left.ID)
@@ -404,14 +404,14 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 	close(release)
 	var runs []AgentRun
 	waitFor(t, func() bool {
-		s.db.Where("task_id = ?", task.ID).Find(&runs)
+		s.DB.Where("task_id = ?", task.ID).Find(&runs)
 		return len(runs) == 2 && !runs[0].Going() && !runs[1].Going()
 	})
 	if runs[0].RequestID == 0 || runs[0].RequestID == runs[1].RequestID {
 		t.Fatalf("two agents on one task should take different requests: %d and %d", runs[0].RequestID, runs[1].RequestID)
 	}
 	var keys []int64
-	s.db.Model(&AgentRun{}).Where("task_id = ?", task.ID).Distinct().Pluck("agent_id", &keys)
+	s.DB.Model(&AgentRun{}).Where("task_id = ?", task.ID).Distinct().Pluck("agent_id", &keys)
 	if len(keys) != 2 {
 		t.Fatalf("each run should be its agent's: %v", keys)
 	}
@@ -513,7 +513,7 @@ func TestOnlyOneRunStartsOnATask(t *testing.T) {
 		t.Fatalf("%d runs started on one task", started)
 	}
 	bad := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, Status: RunWaiting, StartedAt: time.Now()}
-	if err := r.s.db.Create(&bad).Error; err == nil {
+	if err := r.s.DB.Create(&bad).Error; err == nil {
 		t.Fatal("the database let a second going run onto the task")
 	}
 }
@@ -528,11 +528,11 @@ func TestARunCarriedOnKeepsItsOwnClaim(t *testing.T) {
 	bk := must(r.s.AgentKey(r.o.ID, must(r.s.AgentByID(r.o.ID, r.agent))))
 	now := time.Now()
 	// The claim its run took before the server stopped, under a session that is gone.
-	r.s.db.Create(&RequestClaim{RequestID: r.brief, OrgID: r.o.ID, TaskID: r.task.ID, Holder: fmt.Sprintf("key:%d session:gone", bk.ID),
+	r.s.DB.Create(&RequestClaim{RequestID: r.brief, OrgID: r.o.ID, TaskID: r.task.ID, Holder: fmt.Sprintf("key:%d session:gone", bk.ID),
 		Actor: "agent:prospector", ClaimedAt: now.Add(-5 * time.Minute).UnixMilli(), ExpiresAt: now.Add(10 * time.Minute).UnixMilli()})
 	left := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, StartedBy: "Ada Lovelace", Model: "router/auto", Status: RunWorking,
 		Owner: "a server that stopped", LeaseUntil: now.Add(-time.Second).UnixMilli(), StartedAt: now}
-	r.s.db.Create(&left)
+	r.s.DB.Create(&left)
 	r.a.resumeLapsed(now)
 	if got := r.finished(t, left.ID); got.Status != RunFinished || got.StopReason != "the request is done" {
 		t.Fatalf("a run carried on should pick up its own request again: %+v", got)
@@ -578,7 +578,7 @@ func TestARunStartingLeavesOtherKeysClaimsAlone(t *testing.T) {
 	bk := must(r.s.AgentKey(r.o.ID, must(r.s.AgentByID(r.o.ID, r.agent))))
 	other := fmt.Sprintf("key:%d0 session:abc", bk.ID)
 	now := time.Now()
-	r.s.db.Create(&RequestClaim{RequestID: r.brief, OrgID: r.o.ID, TaskID: r.task.ID, Holder: other, Actor: "agent:claude",
+	r.s.DB.Create(&RequestClaim{RequestID: r.brief, OrgID: r.o.ID, TaskID: r.task.ID, Holder: other, Actor: "agent:claude",
 		ClaimedAt: now.UnixMilli(), ExpiresAt: now.Add(10 * time.Minute).UnixMilli()})
 	fake.chat = func(int, map[string]any) (int, string) { return 200, chatText("unused") }
 	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
@@ -586,7 +586,7 @@ func TestARunStartingLeavesOtherKeysClaimsAlone(t *testing.T) {
 		t.Fatalf("another agent's claim, on a key whose id starts like the built-in one's, was dropped: %+v", got)
 	}
 	var c RequestClaim
-	if r.s.db.First(&c, "request_id = ?", r.brief); c.Holder != other {
+	if r.s.DB.First(&c, "request_id = ?", r.brief); c.Holder != other {
 		t.Fatalf("the other agent's claim: %+v", c)
 	}
 }
@@ -632,7 +632,7 @@ func TestRevokingTheAgentsKeyStopsItsRun(t *testing.T) {
 	fake.chat = func(n int, _ map[string]any) (int, string) {
 		if n == 1 {
 			bk := must(r.s.AgentKey(r.o.ID, must(r.s.AgentByID(r.o.ID, r.agent))))
-			r.s.db.Model(&APIKey{}).Where("id = ?", bk.ID).Update("revoked_at", time.Now())
+			r.s.DB.Model(&APIKey{}).Where("id = ?", bk.ID).Update("revoked_at", time.Now())
 		}
 		return 200, chatTools(searchTool, `{"query":"yachts"}`)
 	}

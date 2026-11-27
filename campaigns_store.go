@@ -44,13 +44,13 @@ func (s *outreachStore) AddCampaign(org int64, in CampaignIn, actor string) (*Ca
 	if err := c.Fits(); err != nil {
 		return nil, err
 	}
-	return &c, s.db.Create(&c).Error
+	return &c, s.DB.Create(&c).Error
 }
 
 // ChangeCampaign makes several changes to a draft, or none.
 func (s *outreachStore) ChangeCampaign(org, id int64, changes []Change, actor string) (*Campaign, error) {
 	var c Campaign
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
 			return missing(err, "no campaign %d", id)
 		}
@@ -93,13 +93,13 @@ func (s *outreachStore) ChangeCampaign(org, id int64, changes []Change, actor st
 }
 
 func (s *outreachStore) RemoveCampaign(org, id int64) error {
-	res := s.in(org).Where("id = ? and status = ?", id, CampaignDraft).Delete(&Campaign{})
+	res := s.InOrg(org).Where("id = ? and status = ?", id, CampaignDraft).Delete(&Campaign{})
 	if res.Error != nil {
 		return res.Error
 	}
 	if res.RowsAffected == 0 {
 		var n int64
-		if err := s.in(org).Model(&Campaign{}).Where("id = ?", id).Count(&n).Error; err != nil {
+		if err := s.InOrg(org).Model(&Campaign{}).Where("id = ?", id).Count(&n).Error; err != nil {
 			return err
 		}
 		if n == 0 {
@@ -113,12 +113,12 @@ func (s *outreachStore) RemoveCampaign(org, id int64) error {
 // Campaigns are an organisation's, newest first.
 func (s *outreachStore) Campaigns(org int64) ([]Campaign, error) {
 	out := []Campaign{}
-	return out, s.in(org).Order("id desc").Find(&out).Error
+	return out, s.InOrg(org).Order("id desc").Find(&out).Error
 }
 
 func (s *outreachStore) Campaign(org, id int64) (*Campaign, error) {
 	var c Campaign
-	if err := s.in(org).Where("id = ?", id).First(&c).Error; err != nil {
+	if err := s.InOrg(org).Where("id = ?", id).First(&c).Error; err != nil {
 		return nil, missing(err, "no campaign %d", id)
 	}
 	return &c, nil
@@ -134,7 +134,7 @@ func (s *outreachStore) Audience(o *Org, c Campaign) ([]Recipient, error) {
 }
 
 func (s *outreachStore) audienceWork(o *Org) (*audienceWork, error) {
-	g, err := s.suppression.gate(s.db, o)
+	g, err := s.suppression.gate(s.DB, o)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (s *outreachStore) audience(o *Org, c Campaign, w *audienceWork) ([]Recipie
 	if c.OrgID != o.ID {
 		return nil, noSuch("no campaign %d", c.ID)
 	}
-	q := s.in(o.ID).Where("key not like 'org:%'").Where("status <> ?", ContactSuggested).Where("declined is null")
+	q := s.InOrg(o.ID).Where("key not like 'org:%'").Where("status <> ?", ContactSuggested).Where("declined is null")
 	switch c.Audience {
 	case AudienceConversations:
 		q = q.Where(inConversation)
@@ -234,7 +234,7 @@ func (s *outreachStore) companyNames(org int64, people []Contact) (map[int64]str
 		return names, nil
 	}
 	var companies []Company
-	if err := s.in(org).Where("id in ?", ids).Find(&companies).Error; err != nil {
+	if err := s.InOrg(org).Where("id in ?", ids).Find(&companies).Error; err != nil {
 		return nil, err
 	}
 	for _, c := range companies {

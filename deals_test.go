@@ -86,7 +86,7 @@ func TestADealIsValuedOnceSomeoneReplies(t *testing.T) {
 		t.Errorf("the deal's value reads %q", got)
 	}
 	var said []Event
-	if err := s.db.Where("org_id = ? and contact_id = ? and action = ?", o.ID, c.ID, "deal:amount").Find(&said).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and contact_id = ? and action = ?", o.ID, c.ID, "deal:amount").Find(&said).Error; err != nil {
 		t.Fatal(err)
 	}
 	if len(said) != 1 || deref(said[0].Value) != "£14,000.50" || said[0].User != "Ada Lovelace" {
@@ -131,7 +131,7 @@ func TestADealIsInBothExportsAndGoesWithItsPerson(t *testing.T) {
 		t.Errorf("erasing the person left their deal: %+v", deals)
 	}
 	var said []Event
-	if err := s.db.Where("org_id = ? and action = ?", o.ID, "deal:amount").Find(&said).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and action = ?", o.ID, "deal:amount").Find(&said).Error; err != nil {
 		t.Fatal(err)
 	}
 	if len(said) != 1 || said[0].Value != nil || said[0].ContactID != 0 {
@@ -164,7 +164,7 @@ func TestADealKeepsItsCurrencyWhenTheSettingChanges(t *testing.T) {
 		t.Errorf("a deal cleared and valued afresh reads %q, not the new currency", d.Value())
 	}
 	var cleared []Event
-	if err := s.db.Where("org_id = ? and action = ? and value is null", o.ID, "deal:amount").Find(&cleared).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and action = ? and value is null", o.ID, "deal:amount").Find(&cleared).Error; err != nil {
 		t.Fatal(err)
 	}
 	if len(cleared) != 1 {
@@ -183,7 +183,7 @@ func TestADealFollowsItsPersonThroughARestore(t *testing.T) {
 		}
 	}
 	var renumbered Contact
-	if err := s.db.First(&renumbered, stays.ID).Error; err != nil {
+	if err := s.DB.First(&renumbered, stays.ID).Error; err != nil {
 		t.Fatal(err)
 	}
 	renumbered.ID = goes.ID + 50
@@ -307,7 +307,7 @@ func TestAnotherDealWithSomeoneInConversation(t *testing.T) {
 		t.Errorf("the expansion on the board: %+v", board)
 	}
 	var said []Event
-	if err := s.db.Where("org_id = ? and contact_id = ? and action like ?", o.ID, c.ID, "deal:%").Order("id").Find(&said).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and contact_id = ? and action like ?", o.ID, c.ID, "deal:%").Order("id").Find(&said).Error; err != nil {
 		t.Fatal(err)
 	}
 	if len(said) != 7 || said[0].Action != "deal:start" || deref(said[0].Value) != "renewal" || said[4].Action != "deal:next_step" || said[4].Value != nil {
@@ -361,7 +361,7 @@ func TestAnotherDealWithSomeoneInConversation(t *testing.T) {
 		t.Fatal(err)
 	}
 	var left int64
-	if err := s.db.Model(&Deal{}).Where("org_id = ?", o.ID).Count(&left).Error; err != nil || left != 0 {
+	if err := s.DB.Model(&Deal{}).Where("org_id = ?", o.ID).Count(&left).Error; err != nil || left != 0 {
 		t.Errorf("erasing the person left %d of their deals (%v)", left, err)
 	}
 }
@@ -374,7 +374,7 @@ func TestARenewalIsStartedAndWorkedFromTheBoard(t *testing.T) {
 		t.Fatalf("starting a renewal: %d %s", code, body)
 	}
 	var renewal Deal
-	if err := s.db.Where("org_id = ? and seq > 0", o.ID).First(&renewal).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and seq > 0", o.ID).First(&renewal).Error; err != nil {
 		t.Fatal(err)
 	}
 	if code, body := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/deals/"+itoa(renewal.ID), "application/json", map[string]any{"amount": "9,500"}); code != http.StatusOK {
@@ -498,7 +498,7 @@ func TestARobotWorksDealsAndEnquiriesAsItsScopesAllow(t *testing.T) {
 		t.Fatalf("starting another deal: %d %s", code, body)
 	}
 	var second Deal
-	if err := s.db.Where("org_id = ? and seq = 1", o.ID).First(&second).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and seq = 1", o.ID).First(&second).Error; err != nil {
 		t.Fatal(err)
 	}
 	one := "deals/" + itoa(second.ID)
@@ -507,7 +507,7 @@ func TestARobotWorksDealsAndEnquiriesAsItsScopesAllow(t *testing.T) {
 	}
 	if code, body := asKey(t, "PATCH", base+one, worker, map[string]any{"next_step": "Chase", "stage": "signed"}); code != http.StatusBadRequest {
 		t.Errorf("a stage that is not one: %d %s", code, body)
-	} else if err := s.db.First(&second, second.ID).Error; err != nil || second.NextStep != "Send the order form" {
+	} else if err := s.DB.First(&second, second.ID).Error; err != nil || second.NextStep != "Send the order form" {
 		t.Errorf("the part before the refused one was saved: %q (%v)", second.NextStep, err)
 	}
 	for what, try := range map[string][2]string{"changing": {"PATCH", theirs + one}, "removing": {"DELETE", theirs + one}, "valuing": {"PATCH", theirs + "contacts/" + itoa(c.ID) + "/deal"}} {

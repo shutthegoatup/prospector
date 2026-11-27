@@ -19,7 +19,7 @@ func (s *onboardingStore) StartOnboarding(org int64, in OnboardingIn, actor stri
 		return nil, err
 	}
 	var ob Onboarding
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
 		var c Company
 		if err := tx.Where("org_id = ? and id = ?", org, in.Company).First(&c).Error; err != nil {
 			return missing(err, "no company %d", in.Company)
@@ -49,7 +49,7 @@ func (s *onboardingStore) StartOnboarding(org int64, in OnboardingIn, actor stri
 		if err := tx.Create(&steps).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, 0, &c.ID, actor, "onboard:start", &in.Start)
+		return s.Log(tx, org, 0, &c.ID, actor, "onboard:start", &in.Start)
 	})
 	if err != nil {
 		return nil, err
@@ -59,7 +59,7 @@ func (s *onboardingStore) StartOnboarding(org int64, in OnboardingIn, actor stri
 
 func (s *onboardingStore) OnboardingStepByID(org, id int64) (*OnboardingStep, error) {
 	var st OnboardingStep
-	if err := s.in(org).Where("id = ?", id).First(&st).Error; err != nil {
+	if err := s.InOrg(org).Where("id = ?", id).First(&st).Error; err != nil {
 		return nil, missing(err, "no onboarding step %d", id)
 	}
 	return &st, nil
@@ -69,7 +69,7 @@ func (s *onboardingStore) OnboardingStepByID(org, id int64) (*OnboardingStep, er
 // are the organisation's own wording, so the history names the one that was done.
 func (s *onboardingStore) SetOnboardingStep(org, id int64, field, value, actor string) error {
 	value = strings.TrimSpace(value)
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var st OnboardingStep
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&st).Error; err != nil {
 			return missing(err, "no onboarding step %d", id)
@@ -109,13 +109,13 @@ func (s *onboardingStore) SetOnboardingStep(org, id int64, field, value, actor s
 		if err := tx.Model(&st).Updates(updates).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, 0, &ob.CompanyID, actor, action, nonEmpty(logged))
+		return s.Log(tx, org, 0, &ob.CompanyID, actor, action, nonEmpty(logged))
 	})
 }
 
 // RemoveOnboarding takes back one started by mistake, with its steps.
 func (s *onboardingStore) RemoveOnboarding(org, id int64, actor string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var ob Onboarding
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&ob).Error; err != nil {
 			return missing(err, "no onboarding %d", id)
@@ -129,14 +129,14 @@ func (s *onboardingStore) RemoveOnboarding(org, id int64, actor string) error {
 		if err := tx.Delete(&ob).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, 0, &ob.CompanyID, actor, "onboard:remove", nil)
+		return s.Log(tx, org, 0, &ob.CompanyID, actor, "onboard:remove", nil)
 	})
 }
 
 // Onboardings lists an organisation's with the ones running late first, then the rest
 // still running, then those that are done; company narrows it to one company's.
 func (s *onboardingStore) Onboardings(org, company int64, day string) ([]OnboardingRow, error) {
-	q := s.in(org)
+	q := s.InOrg(org)
 	if company != 0 {
 		q = q.Where("company_id = ?", company)
 	}
@@ -152,11 +152,11 @@ func (s *onboardingStore) Onboardings(org, company int64, day string) ([]Onboard
 		ids[i], companyIDs[i] = ob.ID, ob.CompanyID
 	}
 	var steps []OnboardingStep
-	if err := s.in(org).Where("onboarding_id in ?", ids).Order("onboarding_id, seq").Find(&steps).Error; err != nil {
+	if err := s.InOrg(org).Where("onboarding_id in ?", ids).Order("onboarding_id, seq").Find(&steps).Error; err != nil {
 		return nil, err
 	}
 	var companies []Company
-	if err := s.in(org).Where("id in ?", companyIDs).Find(&companies).Error; err != nil {
+	if err := s.InOrg(org).Where("id in ?", companyIDs).Find(&companies).Error; err != nil {
 		return nil, err
 	}
 	names := make(map[int64]string, len(companies))

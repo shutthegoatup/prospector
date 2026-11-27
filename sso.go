@@ -23,36 +23,6 @@ const (
 
 var googleIssuer = "https://accounts.google.com"
 
-type SSO struct {
-	SSOConnection
-	Domains []SSODomain
-}
-
-func (c *SSO) On() bool { return c.Issuer != "" }
-
-func emailDomain(email string) string {
-	_, domain, _ := strings.Cut(strings.ToLower(strings.TrimSpace(email)), "@")
-	return domain
-}
-
-// Proves is whether the organisation's sign-in may speak for an address: only one at
-// a domain it has shown is its own, matched whole.
-func (c *SSO) Proves(email string) bool {
-	domain := emailDomain(email)
-	for _, d := range c.Domains {
-		if d.VerifiedAt != nil && d.Domain == domain && domain != "" {
-			return true
-		}
-	}
-	return false
-}
-
-// idpSpec opens the connection's client secret, which the database holds sealed.
-func (k *keyring) idpSpec(c *SSO) (idpSpec, error) {
-	secret, err := k.open(c.ClientSecret)
-	return idpSpec{Issuer: c.Issuer, ClientID: c.ClientID, Secret: secret}, err
-}
-
 var (
 	errNoAccount = errors.New("there's no account here for that address: ask whoever runs your organisation to add you")
 	errUnvouched = errors.New("the provider didn't confirm that address is yours, so it can't be matched to an account here")
@@ -211,7 +181,7 @@ func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 		a.signInProblem(w, r, query.Get("next"), http.StatusBadRequest, "That organisation has no single sign-on for that address.")
 		return
 	}
-	spec, err := a.s.keys.idpSpec(sso)
+	spec, err := a.s.Keyring.IdpSpec(sso)
 	if err != nil {
 		log.Printf("single sign-on for %s: %v", org.Slug, err)
 		a.signInProblem(w, r, query.Get("next"), http.StatusServiceUnavailable, unopenable(org))
@@ -300,7 +270,7 @@ func (a *App) finishSSO(w http.ResponseWriter, r *http.Request, att attempt, ref
 		refuse(errors.Join(err, errors.New("the organisation's single sign-on is off")))
 		return
 	}
-	spec, err := a.s.keys.idpSpec(sso)
+	spec, err := a.s.Keyring.IdpSpec(sso)
 	if err != nil {
 		log.Printf("single sign-on for %s: %v", org.Slug, err)
 		a.signInProblem(w, r, att.Next, http.StatusServiceUnavailable, unopenable(org))
@@ -415,12 +385,12 @@ func (a *App) saveSSO(ctx context.Context, q *Req, in ssoIn) error {
 	}
 	secret := strings.TrimSpace(in.Secret)
 	switch {
-	case secret != "" && a.s.keys == nil:
+	case secret != "" && a.s.Keyring == nil:
 		return fmt.Errorf("a client secret is kept sealed, and %w", errNoKeys)
 	case secret != "":
 		// Sealed here, where it is known to have been typed: one that happens to look
 		// sealed already would otherwise be stored as it came.
-		if c.ClientSecret, err = a.s.keys.seal(secret); err != nil {
+		if c.ClientSecret, err = a.s.Keyring.Seal(secret); err != nil {
 			return err
 		}
 	// The kept secret belongs to the provider and client it was typed for, and goes to
@@ -429,7 +399,7 @@ func (a *App) saveSSO(ctx context.Context, q *Req, in ssoIn) error {
 	case c.Issuer == sso.Issuer && c.ClientID == sso.ClientID:
 		c.ClientSecret = sso.ClientSecret
 		// But nobody is made to depend on a sign-in that can't work.
-		if _, oerr := a.s.keys.open(c.ClientSecret); oerr != nil && ((c.Required && !sso.Required) || (c.AutoJoin && !sso.AutoJoin)) {
+		if _, oerr := a.s.Keyring.Open(c.ClientSecret); oerr != nil && ((c.Required && !sso.Required) || (c.AutoJoin && !sso.AutoJoin)) {
 			return errors.New("this server can't open the kept client secret, so single sign-on isn't working here: type the secret again before requiring it or letting people join")
 		}
 	}
@@ -531,7 +501,7 @@ func agentCommand(s *Store, rest []string) error {
 		if len(rest) < 5 {
 			return usage
 		}
-		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
+		if s.Keyring, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
 			return err
 		}
 		in := AgentSettingsIn{Name: rest[2], Kind: os.Getenv("PROSPECTOR_AGENT_KIND"), BaseURL: rest[3], Model: rest[4],

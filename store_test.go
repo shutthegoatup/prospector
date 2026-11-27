@@ -87,7 +87,7 @@ func TestSnapshotRoundTrip(t *testing.T) {
 	}
 	s, o = s2, o2
 	var linked int64
-	s.in(o.ID).Model(&Contact{}).Where("company_id is not null").Count(&linked)
+	s.InOrg(o.ID).Model(&Contact{}).Where("company_id is not null").Count(&linked)
 	if linked == 0 {
 		t.Fatal("restore linked no contacts to companies")
 	}
@@ -120,7 +120,7 @@ func TestImportLegacy(t *testing.T) {
 		t.Fatalf("imported %d: %v", n, err)
 	}
 	var c Contact
-	s.in(o.ID).First(&c, 7)
+	s.InOrg(o.ID).First(&c, 7)
 	if c.Key != "Ada Lovelace" || deref(c.Accepted) != "2026-11-22" || c.CompanyID == nil {
 		t.Fatalf("legacy row not carried over: %+v", c)
 	}
@@ -145,7 +145,7 @@ func TestImportKeepsRecordedDates(t *testing.T) {
 		t.Fatal(err)
 	}
 	var after Contact
-	s.db.First(&after, c.ID)
+	s.DB.First(&after, c.ID)
 	if deref(after.EmailSent) != "2026-01-02" || after.CompanyID == nil {
 		t.Fatalf("re-import lost email_sent or the company link: %+v", after)
 	}
@@ -442,7 +442,7 @@ func TestMCP(t *testing.T) {
 		t.Fatalf("a fact sent twice should say it existed: %v %+v", err, res)
 	}
 	var keyed int64
-	if s.in(o.ID).Model(&Event{}).Where("key_id > 0").Count(&keyed); keyed != 1 {
+	if s.InOrg(o.ID).Model(&Event{}).Where("key_id > 0").Count(&keyed); keyed != 1 {
 		t.Fatalf("want the one change recorded against its key, got %d events", keyed)
 	}
 	res, err = session.CallTool(ctx, &mcp.CallToolParams{Name: "get_company", Arguments: map[string]any{"company": "Larkmoor Yachts"}})

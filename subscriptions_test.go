@@ -157,7 +157,7 @@ func TestASubscriptionIsRecordedAgainstACompany(t *testing.T) {
 
 	// The history says what was agreed and when, never the name or the price.
 	var said []Event
-	if err := s.db.Where("org_id = ? and company_id = ? and action like ?", o.ID, company, "sub:%").Order("id").Find(&said).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and company_id = ? and action like ?", o.ID, company, "sub:%").Order("id").Find(&said).Error; err != nil {
 		t.Fatal(err)
 	}
 	if len(said) != 6 || deref(said[0].Value) != "2026-01-12" || said[2].Value != nil || said[3].Value != nil || deref(said[5].Value) != "2026-11-25" || said[0].ContactID != 0 {

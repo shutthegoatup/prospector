@@ -11,17 +11,17 @@ type customerStore struct{ *core }
 
 func (s *customerStore) customerAccess(grant int64) (*CustomerAccess, error) {
 	var a CustomerAccess
-	if err := s.db.Where("id = ? and revoked_at is null", grant).First(&a.Grant).Error; err != nil {
+	if err := s.DB.Where("id = ? and revoked_at is null", grant).First(&a.Grant).Error; err != nil {
 		return nil, errNoCustomer
 	}
 	org := a.Grant.OrgID
-	if err := s.db.First(&a.Org, org).Error; err != nil {
+	if err := s.DB.First(&a.Org, org).Error; err != nil {
 		return nil, errNoCustomer
 	}
-	if err := s.db.Where("org_id = ? and id = ?", org, a.Grant.OnboardingID).First(&a.Onboarding).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and id = ?", org, a.Grant.OnboardingID).First(&a.Onboarding).Error; err != nil {
 		return nil, errNoCustomer
 	}
-	if err := s.db.Where("org_id = ? and id = ?", org, a.Grant.ContactID).First(&a.Contact).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and id = ?", org, a.Grant.ContactID).First(&a.Contact).Error; err != nil {
 		return nil, errNoCustomer
 	}
 	// What made them invitable has to hold still, each time: someone who has left the
@@ -42,7 +42,7 @@ func (s *customerStore) CustomerByToken(kind, token string) (*CustomerAccess, er
 	switch kind {
 	case "link":
 		var l CustomerLink
-		if err := s.db.Where("token_hash = ?", hashToken(token)).First(&l).Error; err != nil {
+		if err := s.DB.Where("token_hash = ?", hashToken(token)).First(&l).Error; err != nil {
 			return nil, errNoCustomer
 		}
 		a, err := s.customerAccess(l.GrantID)
@@ -53,7 +53,7 @@ func (s *customerStore) CustomerByToken(kind, token string) (*CustomerAccess, er
 		return a, nil
 	case "session":
 		var sess CustomerSession
-		if err := s.db.Where("token_hash = ? and expires_at > ?", hashToken(token), time.Now()).First(&sess).Error; err != nil {
+		if err := s.DB.Where("token_hash = ? and expires_at > ?", hashToken(token), time.Now()).First(&sess).Error; err != nil {
 			return nil, errNoCustomer
 		}
 		return s.customerAccess(sess.GrantID)
@@ -65,7 +65,7 @@ func (s *customerStore) CustomerByToken(kind, token string) (*CustomerAccess, er
 // The link is spent inside the transaction, so two requests can't both use it.
 func (s *customerStore) RedeemCustomerLink(org int64, a *CustomerAccess, token string) (string, error) {
 	session := randomToken(32)
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		now := time.Now()
 		spent := tx.Model(&CustomerLink{}).Where("org_id = ? and grant_id = ? and token_hash = ? and used_at is null and expires_at > ?", org, a.Grant.ID, hashToken(token), now).Update("used_at", now)
 		if spent.Error != nil {
@@ -83,7 +83,7 @@ func (s *customerStore) RedeemCustomerLink(org int64, a *CustomerAccess, token s
 }
 
 func (s *customerStore) EndCustomerSession(token string) error {
-	return s.db.Where("token_hash = ?", hashToken(token)).Delete(&CustomerSession{}).Error
+	return s.DB.Where("token_hash = ?", hashToken(token)).Delete(&CustomerSession{}).Error
 }
 
 // newCustomerLink makes a link for a grant, unless one was made inside customerLinkGap.
@@ -109,13 +109,13 @@ func (s *customerStore) newCustomerLink(tx *gorm.DB, g CustomerGrant) (string, e
 // Mailable is the people at these companies who could be sent a link: known, with an address.
 func (s *customerStore) Mailable(org int64, companies []int64) ([]Contact, error) {
 	var people []Contact
-	return people, s.in(org).Where("company_id in ? and status <> ? and key not like ?", companies, ContactSuggested, "org:%").
+	return people, s.InOrg(org).Where("company_id in ? and status <> ? and key not like ?", companies, ContactSuggested, "org:%").
 		Where("coalesce(email, '') <> ''").Order("id").Find(&people).Error
 }
 
 // FreshCustomerLink makes another link for someone already let in.
 func (s *customerStore) FreshCustomerLink(org, grant int64) (token string, err error) {
-	return token, s.db.Transaction(func(tx *gorm.DB) error {
+	return token, s.DB.Transaction(func(tx *gorm.DB) error {
 		var g CustomerGrant
 		if err := tx.Where("org_id = ? and id = ?", org, grant).First(&g).Error; err != nil {
 			return missing(err, "no customer %d in this organisation", grant)
@@ -131,7 +131,7 @@ func (s *customerStore) FreshCustomerLink(org, grant int64) (token string, err e
 func (s *customerStore) InviteCustomer(o *Org, onboarding, contact int64, actor string) (string, *Contact, error) {
 	var token string
 	var c Contact
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := holdOrg(tx, o.ID); err != nil {
 			return err
 		}
@@ -158,14 +158,14 @@ func (s *customerStore) InviteCustomer(o *Org, onboarding, contact int64, actor 
 		if token, err = s.newCustomerLink(tx, g); err != nil {
 			return err
 		}
-		return s.log(tx, o.ID, c.ID, c.CompanyID, actor, "onboard:invite", nil)
+		return s.Log(tx, o.ID, c.ID, c.CompanyID, actor, "onboard:invite", nil)
 	})
 	return token, &c, err
 }
 
 // RevokeCustomer withdraws someone's access at once, in every browser.
 func (s *customerStore) RevokeCustomer(org, grant int64, actor string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var g CustomerGrant
 		if err := tx.Where("org_id = ? and id = ?", org, grant).First(&g).Error; err != nil {
 			return missing(err, "no access %d", grant)
@@ -177,7 +177,7 @@ func (s *customerStore) RevokeCustomer(org, grant int64, actor string) error {
 		if err := tx.Where("org_id = ? and id = ?", org, g.ContactID).First(&c).Error; err != nil {
 			return nil
 		}
-		return s.log(tx, org, c.ID, c.CompanyID, actor, "onboard:revoke", nil)
+		return s.Log(tx, org, c.ID, c.CompanyID, actor, "onboard:revoke", nil)
 	})
 }
 
@@ -185,7 +185,7 @@ func (s *customerStore) RevokeCustomer(org, grant int64, actor string) error {
 // onboarding, with those whose access was withdrawn.
 func (s *customerStore) CustomerInvites(org int64) (map[int64][]CustomerInvite, error) {
 	var grants []CustomerGrant
-	if err := s.in(org).Order("id").Find(&grants).Error; err != nil {
+	if err := s.InOrg(org).Order("id").Find(&grants).Error; err != nil {
 		return nil, err
 	}
 	out := map[int64][]CustomerInvite{}
@@ -193,7 +193,7 @@ func (s *customerStore) CustomerInvites(org int64) (map[int64][]CustomerInvite, 
 		return out, nil
 	}
 	var people []Contact
-	if err := s.in(org).Where("id in (?)", s.in(org).Model(&CustomerGrant{}).Select("contact_id")).Find(&people).Error; err != nil {
+	if err := s.InOrg(org).Where("id in (?)", s.InOrg(org).Model(&CustomerGrant{}).Select("contact_id")).Find(&people).Error; err != nil {
 		return nil, err
 	}
 	who := make(map[int64]Contact, len(people))
@@ -212,18 +212,18 @@ func (s *customerStore) CustomerInvites(org int64) (map[int64][]CustomerInvite, 
 // organisation's own steps were written for its own eyes and are never read for this page.
 func (s *customerStore) CustomerSteps(org int64, a *CustomerAccess) ([]OnboardingStep, error) {
 	var steps []OnboardingStep
-	return steps, s.in(org).Where("onboarding_id = ? and who = ?", a.Onboarding.ID, StepTheirs).Order("seq").Find(&steps).Error
+	return steps, s.InOrg(org).Where("onboarding_id = ? and who = ?", a.Onboarding.ID, StepTheirs).Order("seq").Find(&steps).Error
 }
 
 func (s *customerStore) DropCustomerLink(token string) {
-	_ = logged(s.db.Where("token_hash = ?", hashToken(token)).Delete(&CustomerLink{}))
+	_ = logged(s.DB.Where("token_hash = ?", hashToken(token)).Delete(&CustomerLink{}))
 }
 
 // CustomerSetStep marks one of the customer's own steps done, or takes back a mark they
 // made. A step a member marked stays as the member left it, and so does a step that
 // isn't theirs or belongs to another onboarding.
 func (s *customerStore) CustomerSetStep(org int64, a *CustomerAccess, step int64, done bool) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		// Held and read again inside, so access withdrawn or a person erased a moment ago marks nothing.
 		if err := hold(tx, &CustomerGrant{}, org, a.Grant.ID); err != nil {
 			return err

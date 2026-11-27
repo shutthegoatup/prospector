@@ -61,7 +61,7 @@ func TestAFailedQueryIsntTakenForNothingThere(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	co := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "Larkmoor"}))
-	if err := s.db.Migrator().DropTable(&Contact{}, &Membership{}); err != nil {
+	if err := s.DB.Migrator().DropTable(&Contact{}, &Membership{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := firstOf(s.History(o.ID, co.ID, 1)); err == nil {
@@ -75,7 +75,7 @@ func TestAFailedQueryIsntTakenForNothingThere(t *testing.T) {
 	if _, err := srv.ListCompanyHistory(ctx, api.ListCompanyHistoryRequestObject{Id: co.ID}); err == nil {
 		t.Error("a company's history with its people unreadable came back instead of failing")
 	}
-	if !lastOwner(s.db, o.ID) {
+	if !lastOwner(s.DB, o.ID) {
 		t.Error("with the owners uncountable, the one being removed was taken not to be the last")
 	}
 }

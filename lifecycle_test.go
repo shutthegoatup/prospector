@@ -102,7 +102,7 @@ func TestQueriesAgreeWithPhase(t *testing.T) {
 	for i := range all {
 		all[i].OrgID = o.ID
 	}
-	if err := s.db.CreateInBatches(all, 50).Error; err != nil {
+	if err := s.DB.CreateInBatches(all, 50).Error; err != nil {
 		t.Fatal(err)
 	}
 	keys := func(rows []Contact) []string {
@@ -157,7 +157,7 @@ func TestRejectedCompanysPeopleLeaveTheQueues(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	co := Company{OrgID: o.ID, Name: "Larkmoor", Stage: CompanyQualified}
-	if err := s.db.Create(&co).Error; err != nil {
+	if err := s.DB.Create(&co).Error; err != nil {
 		t.Fatal(err)
 	}
 	old := str("2020-01-01")
@@ -169,7 +169,7 @@ func TestRejectedCompanysPeopleLeaveTheQueues(t *testing.T) {
 		{OrgID: o.ID, Key: "followup", File: "test", Person: str("Ines Duarte"), EmailSent: old, CompanyID: &co.ID},
 		{OrgID: o.ID, Key: "elsewhere", File: "test", Person: str("Tomas Reed"), Note: str("Hello")},
 	}
-	if err := s.db.Create(&people).Error; err != nil {
+	if err := s.DB.Create(&people).Error; err != nil {
 		t.Fatal(err)
 	}
 	queued := func() int {
@@ -204,7 +204,7 @@ func TestRejectedCompanysPeopleLeaveTheQueues(t *testing.T) {
 	}
 	listed := *o
 	listed.Settings.NeverContact = "larkmoor.example"
-	if err := s.db.Model(&Contact{}).Where("key = ?", "new").Update("email", "hannah.pryce@larkmoor.example").Error; err != nil {
+	if err := s.DB.Model(&Contact{}).Where("key = ?", "new").Update("email", "hannah.pryce@larkmoor.example").Error; err != nil {
 		t.Fatal(err)
 	}
 	if names := s.NeverContactCovers(&listed); len(names) != 0 {
@@ -226,7 +226,7 @@ func TestStageIsOneOfTheBoardsColumns(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	c := Contact{OrgID: o.ID, Key: "hannah", File: "test", Person: str("Hannah Pryce")}
-	if err := s.db.Create(&c).Error; err != nil {
+	if err := s.DB.Create(&c).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Update(o.ID, c.ID, "stage", "meeting", "test"); err == nil {
@@ -247,7 +247,7 @@ func TestStageIsOneOfTheBoardsColumns(t *testing.T) {
 		t.Fatalf("a lost conversation couldn't be reopened: %v", err)
 	}
 	var events int64
-	s.in(o.ID).Model(&Event{}).Where("action = ?", "set:stage").Count(&events)
+	s.InOrg(o.ID).Model(&Event{}).Where("action = ?", "set:stage").Count(&events)
 	if int(events) != len(Stages)+1 {
 		t.Fatalf("%d stage changes logged, want %d: a refused one left a history line", events, len(Stages)+1)
 	}
@@ -260,7 +260,7 @@ func TestMarkChecksApplyToEveryCaller(t *testing.T) {
 	suggested := Contact{OrgID: o.ID, Key: "jonas", File: "test", Person: str("Jonas Weber"), Status: ContactSuggested}
 	picked := Contact{OrgID: o.ID, Key: "hannah", File: "test", Person: str("Hannah Pryce")}
 	for _, c := range []*Contact{&suggested, &picked} {
-		if err := s.db.Create(c).Error; err != nil {
+		if err := s.DB.Create(c).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -294,19 +294,19 @@ func TestPickingSomeoneQualifiesTheirCompanyOnTheRecord(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	co := Company{OrgID: o.ID, Name: "Larkmoor", Stage: CompanyReview}
-	if err := s.db.Create(&co).Error; err != nil {
+	if err := s.DB.Create(&co).Error; err != nil {
 		t.Fatal(err)
 	}
 	people := []Contact{
 		{OrgID: o.ID, Key: "hannah", File: "test", Person: str("Hannah Pryce"), Status: ContactSuggested, CompanyID: &co.ID},
 		{OrgID: o.ID, Key: "jonas", File: "test", Person: str("Jonas Weber"), Status: ContactSuggested, CompanyID: &co.ID},
 	}
-	if err := s.db.Create(&people).Error; err != nil {
+	if err := s.DB.Create(&people).Error; err != nil {
 		t.Fatal(err)
 	}
 	qualified := func() int64 {
 		var n int64
-		s.in(o.ID).Model(&Event{}).Where("company_id = ? and action = ? and \"user\" = ?", co.ID, "company:"+CompanyQualified, "ada").Count(&n)
+		s.InOrg(o.ID).Model(&Event{}).Where("company_id = ? and action = ? and \"user\" = ?", co.ID, "company:"+CompanyQualified, "ada").Count(&n)
 		return n
 	}
 	if err := s.PickContact(o.ID, o, people[0].ID, "ada"); err != nil {

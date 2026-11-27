@@ -100,7 +100,7 @@ func TestProspeoFindsAMobileAnEmailAndAProfile(t *testing.T) {
 		}
 	}
 	var found []Suggestion
-	s.db.Where("contact_id = ?", nell.ID).Order("field").Find(&found)
+	s.DB.Where("contact_id = ?", nell.ID).Order("field").Find(&found)
 	got := map[string]string{}
 	for _, sg := range found {
 		got[sg.Field] = sg.Value + " " + sg.EmailStatus + " " + sg.Vendor
@@ -165,7 +165,7 @@ func TestProspeoMissesFailuresAndMaskedFinds(t *testing.T) {
 		t.Errorf("an impossible number: %+v", out)
 	}
 	var n int64
-	s.db.Model(&Suggestion{}).Count(&n)
+	s.DB.Model(&Suggestion{}).Count(&n)
 	if n != 0 {
 		t.Errorf("%d suggestions kept, want none", n)
 	}
@@ -193,7 +193,7 @@ func TestAVendorThatFindsNothingGivesWayToTheNext(t *testing.T) {
 		t.Fatalf("asked: %+v", out)
 	}
 	var sg Suggestion
-	s.db.Where("contact_id = ?", nell.ID).First(&sg)
+	s.DB.Where("contact_id = ?", nell.ID).First(&sg)
 	if sg.Vendor != "prospeo" || sg.EmailStatus != "guess" {
 		t.Errorf("the suggestion: %+v", sg)
 	}

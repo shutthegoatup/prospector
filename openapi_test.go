@@ -95,7 +95,7 @@ func TestARobotWorksAgentsThroughTheAPIAsItsScopesAllow(t *testing.T) {
 	}
 	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
 		var ended AgentRun
-		if err := s.db.First(&ended, run.Id).Error; err == nil && ended.Status != RunWorking && ended.Status != RunWaiting {
+		if err := s.DB.First(&ended, run.Id).Error; err == nil && ended.Status != RunWorking && ended.Status != RunWaiting {
 			break
 		}
 		if time.Now().After(deadline) {

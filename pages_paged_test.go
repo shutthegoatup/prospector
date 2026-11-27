@@ -16,7 +16,7 @@ func TestTheTasksPageHasPages(t *testing.T) {
 	for i := range rows {
 		rows[i] = Task{OrgID: o.ID, Title: fmt.Sprint("Brief number ", i), CreatedBy: "Nia"}
 	}
-	if err := s.db.CreateInBatches(rows, 50).Error; err != nil {
+	if err := s.DB.CreateInBatches(rows, 50).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetTaskClosed(o.ID, rows[0].ID, true, "Nia"); err != nil {
@@ -82,7 +82,7 @@ func TestTheEnquiriesPageHasPages(t *testing.T) {
 		rows[i] = Enquiry{OrgID: o.ID, Kind: "demo", Name: fmt.Sprint("Sender ", i), Email: fmt.Sprintf("sender%d@larkmoor.example", i),
 			Message: "Could you show us?", CreatedAt: time.Now().Add(time.Duration(i) * time.Second)}
 	}
-	if err := s.db.CreateInBatches(rows, 50).Error; err != nil {
+	if err := s.DB.CreateInBatches(rows, 50).Error; err != nil {
 		t.Fatal(err)
 	}
 	first, pg, err := s.Enquiries(o.ID, EnquiryFilter{}, 1)

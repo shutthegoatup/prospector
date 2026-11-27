@@ -65,7 +65,7 @@ func (a *App) mailFor(org int64) (*mailer.Server, error) {
 	}
 	via := &mailer.Server{Host: m.Host, Port: m.Port, Username: m.Username, From: m.Sender}
 	if m.Password != "" {
-		if via.Password, err = a.s.keys.open(m.Password); err != nil {
+		if via.Password, err = a.s.Keyring.Open(m.Password); err != nil {
 			return nil, fmt.Errorf("this organisation's mail password can't be read: %w", err)
 		}
 	}
@@ -171,10 +171,10 @@ func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 	if old, err := a.s.OrgMail(org); err == nil && in.Password == "" && old.Host == m.Host && old.Username == m.Username {
 		m.Password = old.Password
 	} else if in.Password != "" {
-		if a.s.keys == nil {
+		if a.s.Keyring == nil {
 			return false, errors.New("this server has no secret key, so it can't keep a mail password safely: ask whoever runs it")
 		}
-		if m.Password, err = a.s.keys.seal(in.Password); err != nil {
+		if m.Password, err = a.s.Keyring.Seal(in.Password); err != nil {
 			return false, err
 		}
 	}

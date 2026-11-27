@@ -16,7 +16,7 @@ func (s *outreachStore) TakesMail(ctx context.Context, domain string) mailAnswer
 		return mailUnknown
 	}
 	var kept MailDomain
-	if s.db.Where("domain = ?", domain).Limit(1).Find(&kept).RowsAffected > 0 {
+	if s.DB.Where("domain = ?", domain).Limit(1).Find(&kept).RowsAffected > 0 {
 		fresh := mailTakenFor
 		if !kept.TakesMail {
 			fresh = mailRefusedFor
@@ -25,15 +25,15 @@ func (s *outreachStore) TakesMail(ctx context.Context, domain string) mailAnswer
 			return answerOf(kept.TakesMail)
 		}
 	}
-	if s.dns == nil {
+	if s.DNS == nil {
 		return mailUnknown
 	}
 	asking, cancel := context.WithTimeout(ctx, mailLookupFor)
 	defer cancel()
-	answer := askDNS(asking, s.dns, domain)
+	answer := askDNS(asking, s.DNS, domain)
 	if answer != mailUnknown {
 		row := MailDomain{Domain: domain, TakesMail: answer == mailTaken, CheckedAt: time.Now()}
-		_ = logged(s.db.Clauses(clause.OnConflict{UpdateAll: true}).Create(&row))
+		_ = logged(s.DB.Clauses(clause.OnConflict{UpdateAll: true}).Create(&row))
 	}
 	return answer
 }
@@ -41,7 +41,7 @@ func (s *outreachStore) TakesMail(ctx context.Context, domain string) mailAnswer
 // NoMailDomains are the domains known not to take mail, for pages that mustn't wait on DNS.
 func (s *outreachStore) NoMailDomains() map[string]bool {
 	var domains []string
-	_ = logged(s.db.Model(&MailDomain{}).Where("takes_mail = ? and checked_at > ?", false, time.Now().Add(-mailRefusedFor)).Pluck("domain", &domains))
+	_ = logged(s.DB.Model(&MailDomain{}).Where("takes_mail = ? and checked_at > ?", false, time.Now().Add(-mailRefusedFor)).Pluck("domain", &domains))
 	out := make(map[string]bool, len(domains))
 	for _, d := range domains {
 		out[d] = true
@@ -61,7 +61,7 @@ func (s *outreachStore) checkMailDomains(email string) error {
 }
 
 func (s *outreachStore) CheckSomeMail(ctx context.Context, most int) {
-	if s.dns == nil {
+	if s.DNS == nil {
 		return
 	}
 	// A batch of people at a time, in the order they were added, until the round's
@@ -74,7 +74,7 @@ func (s *outreachStore) CheckSomeMail(ctx context.Context, most int) {
 			ID    int64
 			Email string
 		}
-		if err := logged(s.db.Model(&Contact{}).Select("id, email").Where("id > ? and email is not null and email <> ''", after).
+		if err := logged(s.DB.Model(&Contact{}).Select("id, email").Where("id > ? and email is not null and email <> ''", after).
 			Order("id").Limit(batch).Scan(&rows)); err != nil || len(rows) == 0 {
 			return
 		}
@@ -94,7 +94,7 @@ func (s *outreachStore) CheckSomeMail(ctx context.Context, most int) {
 		// Fresh answers are passed over without counting, so a round reaches past them.
 		if len(fresh) > 0 {
 			var kept []MailDomain
-			if err := logged(s.db.Where("domain in ?", fresh).Find(&kept)); err != nil {
+			if err := logged(s.DB.Where("domain in ?", fresh).Find(&kept)); err != nil {
 				return
 			}
 			for _, k := range kept {

@@ -64,7 +64,7 @@ func storeOn(t *testing.T, url string) *Store {
 		t.Fatal(err)
 	}
 	limitConnections(s)
-	if s.keys, err = parseKeys("1:" + testKey); err != nil {
+	if s.Keyring, err = parseKeys("1:" + testKey); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { closeStore(s) })
@@ -73,7 +73,7 @@ func storeOn(t *testing.T, url string) *Store {
 
 // Each test holds its own pool, and Postgres takes only so many connections at once.
 func limitConnections(s *Store) {
-	if db, err := s.db.DB(); err == nil {
+	if db, err := s.DB.DB(); err == nil {
 		db.SetMaxOpenConns(10)
 	}
 }
@@ -81,7 +81,7 @@ func limitConnections(s *Store) {
 var testKey = strings.Repeat("0a", 32)
 
 func closeStore(s *Store) {
-	if db, err := s.db.DB(); err == nil {
+	if db, err := s.DB.DB(); err == nil {
 		db.Close()
 	}
 }

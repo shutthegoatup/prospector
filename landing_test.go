@@ -191,7 +191,7 @@ func TestFrontOrgIsMadeOnce(t *testing.T) {
 		t.Errorf("a restart listed %q again", o.Settings.EnquirySites)
 	}
 	var orgs int64
-	if s.db.Model(&Org{}).Count(&orgs); orgs != 2 {
+	if s.DB.Model(&Org{}).Count(&orgs); orgs != 2 {
 		t.Errorf("%d organisations after two starts", orgs)
 	}
 

@@ -38,7 +38,7 @@ func (s *identityStore) newUser(email, name, password string, mustChange bool) (
 		return nil, err
 	}
 	u := &User{Email: email, Name: strings.TrimSpace(name), PasswordHash: string(hash), MustChangePassword: mustChange}
-	return u, s.db.Create(u).Error
+	return u, s.DB.Create(u).Error
 }
 
 func (s *identityStore) SetPassword(email, password string) error {
@@ -76,7 +76,7 @@ func (s *identityStore) ChangePassword(u *User, current, password, keepToken str
 
 // savePassword also signs the user out everywhere except the session in keepToken.
 func (s *identityStore) savePassword(user int64, hash, keepToken string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error { return s.savePasswordIn(tx, user, hash, keepToken) })
+	return s.DB.Transaction(func(tx *gorm.DB) error { return s.savePasswordIn(tx, user, hash, keepToken) })
 }
 
 // A new password also ends any emailed link that could still have set one.
@@ -88,17 +88,17 @@ func (s *identityStore) savePasswordIn(tx *gorm.DB, user int64, hash, keepToken 
 	if err := tx.Where("user_id = ?", user).Delete(&PasswordToken{}).Error; err != nil {
 		return err
 	}
-	return tx.Where("user_id = ? and token_hash not in ?", user, s.keys.lookups(sessions, keepToken)).Delete(&Session{}).Error
+	return tx.Where("user_id = ? and token_hash not in ?", user, s.Keyring.Lookups(sessions, keepToken)).Delete(&Session{}).Error
 }
 
 func (s *identityStore) UserByEmail(email string) (*User, error) {
 	var u User
-	return &u, s.db.Where("email = ?", strings.ToLower(strings.TrimSpace(email))).First(&u).Error
+	return &u, s.DB.Where("email = ?", strings.ToLower(strings.TrimSpace(email))).First(&u).Error
 }
 
 // CreateOrg makes an organisation nobody belongs to yet, for the CLI to add members to.
 func (s *identityStore) CreateOrg(slug, name string) (*Org, error) {
-	return createOrg(s.db, slug, name)
+	return createOrg(s.DB, slug, name)
 }
 
 // EnsureFrontOrg makes that organisation on a server that hasn't one. A new one takes
@@ -109,7 +109,7 @@ func (s *identityStore) EnsureFrontOrg(base string) error {
 		return err
 	}
 	// Made and given its site together: one left without would never be given it.
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		o, err := createOrg(tx, frontOrgSlug, "Prospector")
 		if err != nil || base == "" {
 			return err
@@ -157,7 +157,7 @@ func (s *identityStore) FrontFormOff(base string) string {
 // can't leave one nobody can get into.
 func (s *identityStore) CreateOrgWithOwner(slug, name string, owner *User) (*Org, error) {
 	var o *Org
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		var err error
 		if o, err = createOrg(tx, slug, name); err != nil {
 			return err
@@ -172,12 +172,12 @@ func (s *identityStore) CreateOrgWithOwner(slug, name string, owner *User) (*Org
 
 func (s *identityStore) OrgByID(id int64) (*Org, error) {
 	var o Org
-	return &o, s.db.First(&o, id).Error
+	return &o, s.DB.First(&o, id).Error
 }
 
 func (s *identityStore) OrgBySlug(slug string) (*Org, error) {
 	var o Org
-	return &o, s.db.Where("slug = ?", slug).First(&o).Error
+	return &o, s.DB.Where("slug = ?", slug).First(&o).Error
 }
 
 // AddMember adds a user to an organisation, or changes the role of one already in it.
@@ -185,7 +185,7 @@ func (s *identityStore) AddMember(org, user int64, role, callerName string) erro
 	if role != "owner" && role != "member" {
 		return fmt.Errorf("a role is owner or member, not %q", role)
 	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := lockOrg(tx, org); err != nil {
 			return err
 		}
@@ -206,7 +206,7 @@ func (s *identityStore) SetRole(org, user int64, role string) error {
 	if role != "owner" && role != "member" {
 		return fmt.Errorf("a role is owner or member, not %q", role)
 	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := lockOrg(tx, org); err != nil {
 			return err
 		}
@@ -224,7 +224,7 @@ func (s *identityStore) SetRole(org, user int64, role string) error {
 // account, and anything they added, stays.
 func (s *identityStore) RemoveMember(org, user int64, actor string) (*User, error) {
 	var u User
-	return &u, s.db.Transaction(func(tx *gorm.DB) error {
+	return &u, s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := lockOrg(tx, org); err != nil {
 			return err
 		}
@@ -246,13 +246,13 @@ func (s *identityStore) RemoveMember(org, user int64, actor string) (*User, erro
 		if err := dropRecipients(tx, tx.Where("org_id = ? and user_id = ?", org, user)); err != nil {
 			return err
 		}
-		return s.log(tx, org, 0, nil, actor, "member:remove", &u.Email)
+		return s.Log(tx, org, 0, nil, actor, "member:remove", &u.Email)
 	})
 }
 
 func (s *identityStore) OrgsFor(user int64) ([]OrgMembership, error) {
 	var out []OrgMembership
-	err := s.db.Table("orgs").Select("orgs.*, memberships.role").
+	err := s.DB.Table("orgs").Select("orgs.*, memberships.role").
 		Joins("join memberships on memberships.org_id = orgs.id").
 		Where("memberships.user_id = ?", user).Order("orgs.name").Scan(&out).Error
 	return out, err
@@ -260,12 +260,12 @@ func (s *identityStore) OrgsFor(user int64) ([]OrgMembership, error) {
 
 func (s *identityStore) Membership(org, user int64) (*Membership, error) {
 	var m Membership
-	return &m, s.db.Where("org_id = ? and user_id = ?", org, user).First(&m).Error
+	return &m, s.DB.Where("org_id = ? and user_id = ?", org, user).First(&m).Error
 }
 
 func (s *identityStore) Members(org int64) ([]Member, error) {
 	var out []Member
-	err := s.db.Table("memberships").Select("memberships.*, users.email, users.name").
+	err := s.DB.Table("memberships").Select("memberships.*, users.email, users.name").
 		Joins("join users on users.id = memberships.user_id").
 		Where("memberships.org_id = ?", org).Order("users.name").Scan(&out).Error
 	return out, err
@@ -298,35 +298,35 @@ func (s *identityStore) Login(email, password string) (string, *User, error) {
 // limited to that organisation: its provider vouches for nothing else.
 func (s *identityStore) NewSession(user, ssoOrg int64) (string, error) {
 	token := randomToken(32)
-	sess := &Session{TokenHash: s.keys.lookup(sessions, token), UserID: user, ExpiresAt: time.Now().Add(sessionLife)}
+	sess := &Session{TokenHash: s.Keyring.Lookup(sessions, token), UserID: user, ExpiresAt: time.Now().Add(sessionLife)}
 	if ssoOrg != 0 {
 		sess.Limited = true
 		sess.Prove(ssoOrg, time.Now())
 	}
-	return token, s.db.Create(sess).Error
+	return token, s.DB.Create(sess).Error
 }
 
 // AddProof records that a session already open has now been through org's own sign-in too.
 func (s *identityStore) AddProof(sess *Session, org int64) error {
 	sess.Prove(org, time.Now())
-	return s.db.Model(sess).Update("sso_orgs", sess.SSOOrgs).Error
+	return s.DB.Model(sess).Update("sso_orgs", sess.SSOOrgs).Error
 }
 
 func (s *identityStore) SessionFor(token string) (*Session, *User, error) {
 	var sess Session
-	if err := s.db.Where("token_hash in ? and expires_at > ?", s.keys.lookups(sessions, token), time.Now()).First(&sess).Error; err != nil {
+	if err := s.DB.Where("token_hash in ? and expires_at > ?", s.Keyring.Lookups(sessions, token), time.Now()).First(&sess).Error; err != nil {
 		return nil, nil, err
 	}
 	// Found by an older key: moved to the current one, so that key can be removed. One
 	// under a newer key is another server's doing and is left alone.
-	if s.keys.lookupBehind(sess.TokenHash) {
-		current := s.keys.lookup(sessions, token)
-		if s.db.Model(&sess).Update("token_hash", current).Error == nil {
+	if s.Keyring.LookupBehind(sess.TokenHash) {
+		current := s.Keyring.Lookup(sessions, token)
+		if s.DB.Model(&sess).Update("token_hash", current).Error == nil {
 			sess.TokenHash = current
 		}
 	}
 	var u User
-	return &sess, &u, s.db.First(&u, sess.UserID).Error
+	return &sess, &u, s.DB.First(&u, sess.UserID).Error
 }
 
 func (s *identityStore) SessionUser(token string) (*User, error) {
@@ -335,7 +335,7 @@ func (s *identityStore) SessionUser(token string) (*User, error) {
 }
 
 func (s *identityStore) Logout(token string) error {
-	return s.db.Where("token_hash in ?", s.keys.lookups(sessions, token)).Delete(&Session{}).Error
+	return s.DB.Where("token_hash in ?", s.Keyring.Lookups(sessions, token)).Delete(&Session{}).Error
 }
 
 // CreateKey returns the secret once; only its hash is stored.
@@ -348,8 +348,8 @@ func (s *identityStore) CreateKey(org int64, name string, scopes []string, by st
 		return "", nil, err
 	}
 	secret := "pk_" + randomToken(24)
-	k := &APIKey{OrgID: org, Name: name, Prefix: secret[:7], Hash: s.keys.lookup(apiKeys, secret), Scopes: strings.Join(scopes, " "), CreatedBy: by}
-	return secret, k, s.db.Create(k).Error
+	k := &APIKey{OrgID: org, Name: name, Prefix: secret[:7], Hash: s.Keyring.Lookup(apiKeys, secret), Scopes: strings.Join(scopes, " "), CreatedBy: by}
+	return secret, k, s.DB.Create(k).Error
 }
 
 func (s *identityStore) KeyFor(secret string) (*APIKey, error) {
@@ -358,8 +358,8 @@ func (s *identityStore) KeyFor(secret string) (*APIKey, error) {
 	// agent can't be asked to sign in again the way a person can. It moves on first
 	// use. The cost is that a row written straight into the database with a plain hash
 	// is taken for one of those, so the keyed lookup guards sessions and not API keys.
-	found := append(s.keys.lookups(apiKeys, secret), hashToken(secret))
-	if err := s.db.Where("hash in ? and revoked_at is null", found).First(&k).Error; err != nil {
+	found := append(s.Keyring.Lookups(apiKeys, secret), hashToken(secret))
+	if err := s.DB.Where("hash in ? and revoked_at is null", found).First(&k).Error; err != nil {
 		return nil, err
 	}
 	now := time.Now()
@@ -369,18 +369,18 @@ func (s *identityStore) KeyFor(secret string) (*APIKey, error) {
 	if k.LastUsedAt == nil || now.Sub(*k.LastUsedAt) >= time.Minute {
 		set["last_used_at"] = now
 	}
-	if s.keys.lookupBehind(k.Hash) {
-		set["hash"] = s.keys.lookup(apiKeys, secret)
+	if s.Keyring.LookupBehind(k.Hash) {
+		set["hash"] = s.Keyring.Lookup(apiKeys, secret)
 	}
 	if len(set) > 0 {
-		_ = logged(s.db.Model(&k).Updates(set))
+		_ = logged(s.DB.Model(&k).Updates(set))
 	}
 	return &k, nil
 }
 
 func (s *identityStore) Keys(org int64) ([]APIKey, error) {
 	var keys []APIKey
-	return keys, s.in(org).Where("revoked_at is null").Order("created_at desc").Find(&keys).Error
+	return keys, s.InOrg(org).Where("revoked_at is null").Order("created_at desc").Find(&keys).Error
 }
 
 // SetKeyScopes changes what a key may do without changing its secret.
@@ -389,7 +389,7 @@ func (s *identityStore) SetKeyScopes(org, id int64, scopes []string) error {
 		return err
 	}
 	var k APIKey
-	if err := s.in(org).Where("id = ? and revoked_at is null", id).First(&k).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+	if err := s.InOrg(org).Where("id = ? and revoked_at is null", id).First(&k).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		return errors.New("that key isn't in this organisation, or has been revoked")
 	} else if err != nil {
 		return err
@@ -404,11 +404,11 @@ func (s *identityStore) SetKeyScopes(org, id int64, scopes []string) error {
 			ordered = append(ordered, sc.Name)
 		}
 	}
-	return s.in(org).Model(&APIKey{}).Where("id = ? and revoked_at is null", id).Update("scopes", strings.Join(ordered, " ")).Error
+	return s.InOrg(org).Model(&APIKey{}).Where("id = ? and revoked_at is null", id).Update("scopes", strings.Join(ordered, " ")).Error
 }
 
 func (s *identityStore) RevokeKey(org, id int64) error {
-	res := s.in(org).Model(&APIKey{}).Where("id = ?", id).Update("revoked_at", time.Now())
+	res := s.InOrg(org).Model(&APIKey{}).Where("id = ?", id).Update("revoked_at", time.Now())
 	if res.Error == nil && res.RowsAffected == 0 {
 		return gorm.ErrRecordNotFound
 	}
@@ -419,7 +419,7 @@ func (s *identityStore) SaveOrg(o *Org) error {
 	if !colorRe.MatchString(o.Color) {
 		return fmt.Errorf("colour must look like #56c5f4")
 	}
-	return s.db.Model(o).Select("name", "color", "settings").Updates(o).Error
+	return s.DB.Model(o).Select("name", "color", "settings").Updates(o).Error
 }
 
 // ChangeSettings saves o and notes in its history who changed which settings, since a
@@ -432,16 +432,16 @@ func (s *identityStore) ChangeSettings(o *Org, who Actor, changed []string) erro
 		return fmt.Errorf("colour must look like #56c5f4")
 	}
 	what := strings.Join(changed, ", ")
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(o).Select("name", "color", "settings").Updates(o).Error; err != nil {
 			return err
 		}
-		return s.logAs(tx, o.ID, 0, nil, who, "settings:change", &what)
+		return s.LogAs(tx, o.ID, 0, nil, who, "settings:change", &what)
 	})
 }
 
 func (s *identityStore) SaveVoice(org, user int64, caller, signature string) error {
-	return s.db.Model(&Membership{}).Where("org_id = ? and user_id = ?", org, user).
+	return s.DB.Model(&Membership{}).Where("org_id = ? and user_id = ?", org, user).
 		Updates(map[string]any{"caller_name": strings.TrimSpace(caller), "signature": strings.TrimSpace(signature)}).Error
 }
 
@@ -463,7 +463,7 @@ func (s *identityStore) KnownDevice(email, token string) (who string, ok bool) {
 // Users is how many people can sign in, in any organisation.
 func (s *identityStore) Users() (int64, error) {
 	var n int64
-	return n, s.db.Model(&User{}).Count(&n).Error
+	return n, s.DB.Model(&User{}).Count(&n).Error
 }
 
 // SetAreas says what someone works on. None leaves them reading only.
@@ -479,7 +479,7 @@ func (s *identityStore) SetAreas(org, user int64, areas []string) error {
 			keep = append(keep, ar.Name)
 		}
 	}
-	res := s.db.Model(&Membership{}).Where("org_id = ? and user_id = ?", org, user).Update("areas", strings.Join(keep, " "))
+	res := s.DB.Model(&Membership{}).Where("org_id = ? and user_id = ?", org, user).Update("areas", strings.Join(keep, " "))
 	if res.Error == nil && res.RowsAffected == 0 {
 		return errors.New("that person isn't in this organisation")
 	}

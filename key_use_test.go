@@ -18,14 +18,14 @@ func TestAKeysLastUseIsWrittenOnceAMinute(t *testing.T) {
 	lastUse := func() time.Time {
 		t.Helper()
 		var k APIKey
-		if err := s.db.First(&k, key.ID).Error; err != nil || k.LastUsedAt == nil {
+		if err := s.DB.First(&k, key.ID).Error; err != nil || k.LastUsedAt == nil {
 			t.Fatalf("no last use: %+v %v", k, err)
 		}
 		return *k.LastUsedAt
 	}
 	setLastUse := func(at time.Time) {
 		t.Helper()
-		if err := s.db.Model(&APIKey{}).Where("id = ?", key.ID).Update("last_used_at", at).Error; err != nil {
+		if err := s.DB.Model(&APIKey{}).Where("id = ?", key.ID).Update("last_used_at", at).Error; err != nil {
 			t.Fatal(err)
 		}
 	}

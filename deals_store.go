@@ -15,7 +15,7 @@ type dealStore struct{ *core }
 // Deals are an organisation's deals by the contact each belongs to.
 func (s *dealStore) Deals(org int64) (map[int64]Deal, error) {
 	var rows []Deal
-	if err := s.in(org).Where("seq = 0").Find(&rows).Error; err != nil {
+	if err := s.InOrg(org).Where("seq = 0").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make(map[int64]Deal, len(rows))
@@ -65,7 +65,7 @@ func (s *dealStore) setDeal(tx *gorm.DB, org, contact int64, field, value, actor
 	if err := tx.Model(&d).Updates(updates).Error; err != nil {
 		return err
 	}
-	return s.log(tx, org, contact, c.CompanyID, actor, "deal:"+field, nonEmpty(logged))
+	return s.Log(tx, org, contact, c.CompanyID, actor, "deal:"+field, nonEmpty(logged))
 }
 
 // OtherDeals are the renewals, expansions and further deals, by the stage each stands
@@ -73,14 +73,14 @@ func (s *dealStore) setDeal(tx *gorm.DB, org, contact int64, field, value, actor
 // it has a value and an outcome of its own, and somebody has to close it.
 func (s *dealStore) OtherDeals(org int64) (map[string][]OtherDeal, error) {
 	var deals []Deal
-	if err := s.in(org).Where("seq > 0").Order("next_date nulls first, id").Find(&deals).Error; err != nil {
+	if err := s.InOrg(org).Where("seq > 0").Order("next_date nulls first, id").Find(&deals).Error; err != nil {
 		return nil, err
 	}
 	if len(deals) == 0 {
 		return map[string][]OtherDeal{}, nil
 	}
 	var people []Contact
-	if err := s.in(org).Where("id in (?)", s.in(org).Model(&Deal{}).Select("contact_id").Where("seq > 0")).Find(&people).Error; err != nil {
+	if err := s.InOrg(org).Where("id in (?)", s.InOrg(org).Model(&Deal{}).Select("contact_id").Where("seq > 0")).Find(&people).Error; err != nil {
 		return nil, err
 	}
 	with := make(map[int64]Contact, len(people))
@@ -99,7 +99,7 @@ func (s *dealStore) OtherDeals(org int64) (map[string][]OtherDeal, error) {
 // OwnDeal is the deal a conversation is, empty if it has none yet.
 func (s *dealStore) OwnDeal(org, contact int64) (*Deal, error) {
 	var d Deal
-	return &d, s.in(org).Where("contact_id = ? and seq = 0", contact).Limit(1).Find(&d).Error
+	return &d, s.InOrg(org).Where("contact_id = ? and seq = 0", contact).Limit(1).Find(&d).Error
 }
 
 // StartDeal opens another deal with someone already in conversation: a renewal, an
@@ -109,7 +109,7 @@ func (s *dealStore) StartDeal(org, contact int64, kind, actor string) (*Deal, er
 		return nil, fmt.Errorf("unknown kind of deal %q", kind)
 	}
 	var d Deal
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		// Held, so two started together are numbered one after the other.
 		if err := hold(tx, &Contact{}, org, contact); err != nil {
 			return err
@@ -134,7 +134,7 @@ func (s *dealStore) StartDeal(org, contact int64, kind, actor string) (*Deal, er
 		if err := tx.Create(&d).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, contact, c.CompanyID, actor, "deal:start", &kind)
+		return s.Log(tx, org, contact, c.CompanyID, actor, "deal:start", &kind)
 	})
 	if err != nil {
 		return nil, err
@@ -163,7 +163,7 @@ func (s *dealStore) ChangeDeal(org, id int64, field, value, actor string) error 
 // ChangeDealFields makes several changes to a deal after the conversation's own, or
 // none: one that is refused takes back those before it.
 func (s *dealStore) ChangeDealFields(org, id int64, changes []Change, actor string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		for _, c := range changes {
 			if err := s.changeDeal(tx, org, id, c.Field, strings.TrimSpace(c.Value), actor); err != nil {
 				return err
@@ -175,7 +175,7 @@ func (s *dealStore) ChangeDealFields(org, id int64, changes []Change, actor stri
 
 // SetDealFields does the same for a conversation's own deal, which is its contact's.
 func (s *dealStore) SetDealFields(org, contact int64, changes []Change, actor string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		for _, c := range changes {
 			if err := s.setDeal(tx, org, contact, c.Field, c.Value, actor); err != nil {
 				return err
@@ -206,14 +206,14 @@ func (s *dealStore) changeDeal(tx *gorm.DB, org, id int64, field, value, actor s
 		if err := tx.Model(&d).Updates(updates).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, c.ID, c.CompanyID, actor, "deal:"+field, nonEmpty(logged))
+		return s.Log(tx, org, c.ID, c.CompanyID, actor, "deal:"+field, nonEmpty(logged))
 	}
 }
 
 // RemoveDeal takes back a deal that was started by mistake. One that ran its course is
 // marked won or lost instead, and the conversation's own can't be removed.
 func (s *dealStore) RemoveDeal(org, id int64, actor string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		d, c, err := s.otherDeal(tx, org, id)
 		if err != nil {
 			return err
@@ -221,6 +221,6 @@ func (s *dealStore) RemoveDeal(org, id int64, actor string) error {
 		if err := tx.Delete(&d).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, c.ID, c.CompanyID, actor, "deal:remove", &d.Kind)
+		return s.Log(tx, org, c.ID, c.CompanyID, actor, "deal:remove", &d.Kind)
 	})
 }

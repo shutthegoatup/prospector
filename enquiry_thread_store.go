@@ -11,7 +11,7 @@ import (
 
 // EnquiryThread is what has been said in answering one enquiry, oldest first.
 func (s *enquiryStore) EnquiryThread(org, enquiry int64) ([]EnquiryMessage, error) {
-	if err := s.in(org).Where("id = ?", enquiry).First(&Enquiry{}).Error; err != nil {
+	if err := s.InOrg(org).Where("id = ?", enquiry).First(&Enquiry{}).Error; err != nil {
 		return nil, missing(err, "no enquiry %d", enquiry)
 	}
 	threads, err := s.EnquiryThreads(org, []int64{enquiry})
@@ -27,7 +27,7 @@ func (s *enquiryStore) EnquiryThreads(org int64, enquiries []int64) (map[int64][
 		return out, nil
 	}
 	var all []EnquiryMessage
-	if err := s.in(org).Where("enquiry_id in ?", enquiries).Where(inThread).Order("id").Find(&all).Error; err != nil {
+	if err := s.InOrg(org).Where("enquiry_id in ?", enquiries).Where(inThread).Order("id").Find(&all).Error; err != nil {
 		return nil, err
 	}
 	for _, m := range all {
@@ -45,7 +45,7 @@ func (s *enquiryStore) StartReply(o *Org, enquiry int64, text, actor string) (*E
 	}
 	var m *EnquiryMessage
 	var to string
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := hold(tx, &Enquiry{}, o.ID, enquiry); err != nil {
 			return err
 		}
@@ -95,7 +95,7 @@ func (s *enquiryStore) StartReply(o *Org, enquiry int64, text, actor string) (*E
 // enquiry waits on them, with an owner if it had none. One that didn't is forgotten,
 // and the enquiry stays as it was.
 func (s *enquiryStore) SettleReply(org int64, m *EnquiryMessage, sent bool, actor string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		if !sent {
 			return tx.Where("org_id = ? and id = ? and sent_at is null", org, m.ID).Delete(&EnquiryMessage{}).Error
 		}
@@ -130,7 +130,7 @@ func (s *enquiryStore) logEnquiry(tx *gorm.DB, e Enquiry, actor, action string) 
 	if e.ContactID != nil {
 		contact = *e.ContactID
 	}
-	return s.log(tx, e.OrgID, contact, e.CompanyID, actor, action, nil)
+	return s.Log(tx, e.OrgID, contact, e.CompanyID, actor, action, nil)
 }
 
 // HearEnquiry records what they said back, pasted in by whoever read it. Nothing is
@@ -141,7 +141,7 @@ func (s *enquiryStore) HearEnquiry(org, enquiry int64, text, actor string) (*Enq
 		return nil, err
 	}
 	var m *EnquiryMessage
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
 		var e Enquiry
 		if err := tx.Where("org_id = ? and id = ?", org, enquiry).First(&e).Error; err != nil {
 			return missing(err, "no enquiry %d", enquiry)

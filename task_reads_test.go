@@ -69,10 +69,10 @@ func TestTheSpecsTaskReadsSayEverythingTheStoreDoes(t *testing.T) {
 
 	// A person reading the task claims nothing, and isn't anyone's agent.
 	var claims int64
-	s.db.Model(&RequestClaim{}).Count(&claims)
+	s.DB.Model(&RequestClaim{}).Count(&claims)
 	code, body = call(t, ada, "GET", one, "", nil)
 	var after int64
-	s.db.Model(&RequestClaim{}).Count(&after)
+	s.DB.Model(&RequestClaim{}).Count(&after)
 	if code != http.StatusOK || strings.Contains(body, `"claimed_request"`) || strings.Contains(body, `"yours"`) || after != claims {
 		t.Fatalf("a person reading the task: %d, claims %d then %d: %s", code, claims, after, body)
 	}

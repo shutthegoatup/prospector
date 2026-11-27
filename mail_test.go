@@ -83,7 +83,7 @@ var mailTestKey = strings.Repeat("ab", 32)
 func mailSite(t *testing.T, configure func(*App)) (*Store, *httptest.Server, *http.Client, *outbox) {
 	t.Helper()
 	s := tempStore(t)
-	s.keys = mustKeys(t, "1:"+mailTestKey)
+	s.Keyring = mustKeys(t, "1:"+mailTestKey)
 	o := mustOrg(t, s, "alpha")
 	u := must(s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery"))
 	if err := s.AddMember(o.ID, u.ID, "owner", u.Name); err != nil {
@@ -181,7 +181,7 @@ func TestPasswordReset(t *testing.T) {
 
 	// The token is stored hashed.
 	var stored PasswordToken
-	if err := s.db.First(&stored).Error; err != nil || strings.Contains(link, stored.TokenHash) {
+	if err := s.DB.First(&stored).Error; err != nil || strings.Contains(link, stored.TokenHash) {
 		t.Fatalf("stored token: %+v %v", stored, err)
 	}
 
@@ -238,7 +238,7 @@ func TestResetLinksEnd(t *testing.T) {
 	u := must(s.UserByEmail("ada@example.com"))
 
 	expired := must(s.ResetToken(u.ID))
-	if err := s.db.Model(&PasswordToken{}).Where("user_id = ?", u.ID).Update("expires_at", "2001-01-01").Error; err != nil {
+	if err := s.DB.Model(&PasswordToken{}).Where("user_id = ?", u.ID).Update("expires_at", "2001-01-01").Error; err != nil {
 		t.Fatal(err)
 	}
 	if code, _ := call(t, http.DefaultClient, "GET", srv.URL+"/reset/"+expired, "", nil); code != http.StatusGone {
@@ -333,7 +333,7 @@ func TestInvitationByEmail(t *testing.T) {
 		t.Fatalf("adding Alan again at once: %d %s", code, body)
 	}
 	box.take(t, 0)
-	if err := s.db.Model(&PasswordToken{}).Where("user_id = ?", alan.ID).Update("created_at", time.Now().Add(-2*resetGap)).Error; err != nil {
+	if err := s.DB.Model(&PasswordToken{}).Where("user_id = ?", alan.ID).Update("created_at", time.Now().Add(-2*resetGap)).Error; err != nil {
 		t.Fatal(err)
 	}
 	code, body = call(t, ada, "POST", srv.URL+"/o/alpha/api/v1/members", "application/json", map[string]string{"email": "alan@example.com"})
@@ -348,11 +348,11 @@ func TestInvitationByEmail(t *testing.T) {
 	}
 
 	// Arriving through a provider ends the invitation with the first password.
-	if err := s.db.Transaction(func(tx *gorm.DB) error { return claim(tx, alan) }); err != nil {
+	if err := s.DB.Transaction(func(tx *gorm.DB) error { return claim(tx, alan) }); err != nil {
 		t.Fatal(err)
 	}
 	var left int64
-	if s.db.Model(&PasswordToken{}).Where("user_id = ?", alan.ID).Count(&left); left != 0 {
+	if s.DB.Model(&PasswordToken{}).Where("user_id = ?", alan.ID).Count(&left); left != 0 {
 		t.Error("an invitation outlived the account's sign-in through a provider")
 	}
 
@@ -463,7 +463,7 @@ func TestOrganisationMailServer(t *testing.T) {
 
 func TestMailPasswordNeedsAKey(t *testing.T) {
 	t.Parallel()
-	s, srv, ada, _ := mailSite(t, func(a *App) { a.s.keys = nil })
+	s, srv, ada, _ := mailSite(t, func(a *App) { a.s.Keyring = nil })
 	code, body := call(t, ada, "PUT", srv.URL+"/o/alpha/api/v1/mail-server", "application/json",
 		map[string]any{"host": "smtp.alpha.example", "port": 587, "username": "u", "password": "s3cret-smtp-pass", "sender": "a@alpha.example"})
 	if code != http.StatusBadRequest || !strings.Contains(body, "no secret key") {
@@ -484,7 +484,7 @@ func TestAnotherOrganisationsMailServerNeverCarriesAnExistingAccountsLink(t *tes
 	}
 	box.take(t, 1)
 	grace := must(s.UserByEmail("grace@example.com"))
-	if err := s.db.Model(&PasswordToken{}).Where("user_id = ?", grace.ID).Update("created_at", time.Now().Add(-2*resetGap)).Error; err != nil {
+	if err := s.DB.Model(&PasswordToken{}).Where("user_id = ?", grace.ID).Update("created_at", time.Now().Add(-2*resetGap)).Error; err != nil {
 		t.Fatal(err)
 	}
 
@@ -521,7 +521,7 @@ func TestAResetGivesAProviderOnlyAccountAPassword(t *testing.T) {
 	t.Parallel()
 	s, srv, _, box := mailSite(t, nil)
 	dan := must(s.CreateUser("dan@example.com", "Dan Okafor", "a first password"))
-	if err := s.db.Model(&User{}).Where("id = ?", dan.ID).Update("password_hash", unusableHash()).Error; err != nil {
+	if err := s.DB.Model(&User{}).Where("id = ?", dan.ID).Update("password_hash", unusableHash()).Error; err != nil {
 		t.Fatal(err)
 	}
 	askReset(t, srv, "dan@example.com")
@@ -549,7 +549,7 @@ func TestAMailPasswordFollowsAKeyChange(t *testing.T) {
 	under1 := must(s.OrgMail(o.ID)).Password
 
 	newKey := strings.Repeat("cd", 32)
-	s.keys = mustKeys(t, "2:"+newKey+",1:"+mailTestKey)
+	s.Keyring = mustKeys(t, "2:"+newKey+",1:"+mailTestKey)
 	if moved, err := s.Reseal(); err != nil || moved != 1 {
 		t.Fatalf("resealing: %d %v", moved, err)
 	}
@@ -558,11 +558,11 @@ func TestAMailPasswordFollowsAKeyChange(t *testing.T) {
 		t.Fatal("the mail password wasn't moved to the new key")
 	}
 	// The old key retired, the password still opens.
-	s.keys = mustKeys(t, "2:"+newKey)
+	s.Keyring = mustKeys(t, "2:"+newKey)
 	if via, err := (&App{s: s}).mailFor(o.ID); err != nil || via.Password != "s3cret-smtp-pass" {
 		t.Fatalf("after the old key is removed: %+v %v", via, err)
 	}
-	s.keys = nil
+	s.Keyring = nil
 	if _, err := (&App{s: s}).mailFor(o.ID); !errors.Is(err, errNoKeys) {
 		t.Fatalf("a server with no key read a sealed mail password: %v", err)
 	}

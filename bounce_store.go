@@ -13,17 +13,17 @@ import (
 func (s *outreachStore) NewBounceHook(org int64) (string, error) {
 	secret := randomToken(32)
 	row := BounceHook{OrgID: org, SecretHash: hashToken(secret), CreatedAt: time.Now()}
-	err := s.db.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "org_id"}}, DoUpdates: clause.AssignmentColumns([]string{"secret_hash", "created_at"})}).Create(&row).Error
+	err := s.DB.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "org_id"}}, DoUpdates: clause.AssignmentColumns([]string{"secret_hash", "created_at"})}).Create(&row).Error
 	return secret, err
 }
 
 func (s *outreachStore) DropBounceHook(org int64) error {
-	return s.db.Delete(&BounceHook{}, "org_id = ?", org).Error
+	return s.DB.Delete(&BounceHook{}, "org_id = ?", org).Error
 }
 
 func (s *outreachStore) HasBounceHook(org int64) bool {
 	var n int64
-	return s.db.Model(&BounceHook{}).Where("org_id = ?", org).Count(&n).Error == nil && n > 0
+	return s.DB.Model(&BounceHook{}).Where("org_id = ?", org).Count(&n).Error == nil && n > 0
 }
 
 // BounceHookOrg is the organisation a webhook's sign-in is for: its slug and secret.
@@ -33,7 +33,7 @@ func (s *outreachStore) BounceHookOrg(slug, secret string) (*Org, bool) {
 		return nil, false
 	}
 	var h BounceHook
-	if found := s.db.Where("org_id = ?", o.ID).Limit(1).Find(&h); found.Error != nil || found.RowsAffected == 0 {
+	if found := s.DB.Where("org_id = ?", o.ID).Limit(1).Find(&h); found.Error != nil || found.RowsAffected == 0 {
 		return nil, false
 	}
 	return o, subtle.ConstantTimeCompare([]byte(hashToken(secret)), []byte(h.SecretHash)) == 1
@@ -43,7 +43,7 @@ func (s *outreachStore) BounceHookOrg(slug, secret string) (*Org, bool) {
 // had, and says so on the last mail that went to it; a complaint is about a mail that
 // arrived, which stays sent.
 func (s *outreachStore) MailFailed(org int64, addr, reason, said string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		if _, err := s.suppression.suppress(tx, org, addr, reason, bounceBy); err != nil {
 			return err
 		}

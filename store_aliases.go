@@ -94,3 +94,23 @@ var linkedinPath = store.LinkedinPath
 var mustDay = store.MustDay
 var parseDay = store.ParseDay
 var validStage = store.ValidStage
+
+const sealing = store.Sealing
+
+type Actor = store.Actor
+type SSO = store.SSO
+type core = store.Core
+type idpSpec = store.IdpSpec
+type keyring = store.Keyring
+type mailDNS = store.MailDNS
+type purpose = store.Purpose
+type secretKey = store.SecretKey
+
+var emailDomain = store.EmailDomain
+var errNoKeys = store.ErrNoKeys
+var errUnknownKey = store.ErrUnknownKey
+var hashToken = store.HashToken
+var lookupVersion = store.LookupVersion
+var mac = store.Mac
+var sealed = store.Sealed
+var sealedVersion = store.SealedVersion

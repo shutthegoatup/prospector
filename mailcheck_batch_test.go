@@ -20,14 +20,14 @@ func TestARoundOfMailChecksReadsOnPastTheFirstBatch(t *testing.T) {
 		people[i] = Contact{OrgID: o.ID, Key: fmt.Sprint("person-", i), File: "x.md", Email: str(fmt.Sprint("p", i, "@larkmoor.example"))}
 	}
 	people[1000].Email = str("late@windrush.example")
-	if err := s.db.CreateInBatches(people, 500).Error; err != nil {
+	if err := s.DB.CreateInBatches(people, 500).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := s.db.Create(&MailDomain{Domain: "larkmoor.example", TakesMail: true, CheckedAt: time.Now()}).Error; err != nil {
+	if err := s.DB.Create(&MailDomain{Domain: "larkmoor.example", TakesMail: true, CheckedAt: time.Now()}).Error; err != nil {
 		t.Fatal(err)
 	}
 	dns := &fakeDNS{}
-	s.dns = dns
+	s.DNS = dns
 	s.CheckSomeMail(context.Background(), 1)
 	asked := strings.Join(dns.asked, " ")
 	if !strings.Contains(asked, "windrush.example") {

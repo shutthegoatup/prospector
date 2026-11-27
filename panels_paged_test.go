@@ -20,14 +20,14 @@ func TestACompanysHistoryAndNotesHavePages(t *testing.T) {
 		events = append(events, Event{OrgID: o.ID, CompanyID: &co.ID, User: "Nia", Action: action, Value: str(fmt.Sprint("2020-01-", 10+i%10)),
 			At: time.Date(2020, 1, 1, 0, i, 0, 0, time.UTC)})
 	}
-	if err := s.db.CreateInBatches(events, 50).Error; err != nil {
+	if err := s.DB.CreateInBatches(events, 50).Error; err != nil {
 		t.Fatal(err)
 	}
 	notes := make([]TaskNote, companyNotesPageSize+3)
 	for i := range notes {
 		notes[i] = TaskNote{OrgID: o.ID, CompanyID: co.ID, Actor: "agent:scout", Kind: "next", Text: fmt.Sprint("Left note ", i, ".")}
 	}
-	if err := s.db.CreateInBatches(notes, 50).Error; err != nil {
+	if err := s.DB.CreateInBatches(notes, 50).Error; err != nil {
 		t.Fatal(err)
 	}
 
@@ -76,7 +76,7 @@ func TestAgentActivityHasPages(t *testing.T) {
 		events[i] = Event{OrgID: o.ID, User: "agent:scout", Action: "add:fact", Value: str(fmt.Sprint("fact number ", i, ".")),
 			At: time.Date(2020, 1, 1, 0, i, 0, 0, time.UTC)}
 	}
-	if err := s.db.CreateInBatches(events, 50).Error; err != nil {
+	if err := s.DB.CreateInBatches(events, 50).Error; err != nil {
 		t.Fatal(err)
 	}
 	first, pg := s.AgentActivity(o.ID, 1)
@@ -106,7 +106,7 @@ func TestAgentActivityPagesThroughEventsAtTheSameMoment(t *testing.T) {
 		events = append(events, Event{OrgID: o.ID, User: "agent:scout", Action: "add:fact", Value: str(fmt.Sprint("fact ", i)), At: at.Add(time.Duration(i/3) * time.Minute)})
 	}
 	events = append(events, Event{OrgID: o.ID, User: "Ada Lovelace", Action: "note", Value: str("by hand"), At: at})
-	if err := s.db.Create(&events).Error; err != nil {
+	if err := s.DB.Create(&events).Error; err != nil {
 		t.Fatal(err)
 	}
 	pages := apiPages(t, client, srv.URL+"/o/alpha/api/v1/agent-activity?limit=2")

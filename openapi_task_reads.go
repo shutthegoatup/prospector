@@ -124,7 +124,7 @@ func (s apiServer) ListTaskNotes(ctx context.Context, in api.ListTaskNotesReques
 	out.Body.Items, out.Body.NextCursor = []api.TaskNoteOut{}, next
 	for _, n := range notes {
 		out.Body.Items = append(out.Body.Items, api.TaskNoteOut{Id: n.ID, Kind: n.Kind, Text: n.Text, Actor: n.Actor, At: n.CreatedAt,
-			Company: n.Company, CompanyId: n.CompanyID, ByYou: who.did(Event{User: n.Actor, KeyID: n.KeyID})})
+			Company: n.Company, CompanyId: n.CompanyID, ByYou: who.Did(Event{User: n.Actor, KeyID: n.KeyID})})
 	}
 	return out, nil
 }

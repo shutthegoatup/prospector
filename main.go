@@ -184,7 +184,7 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("open %s: %w", redact(dsn), err)
 	}
-	s.dns = net.DefaultResolver
+	s.DNS = net.DefaultResolver
 	switch cmd {
 	case "serve":
 		if err := webBuilt(assetFS); err != nil {
@@ -212,7 +212,7 @@ func run(args []string) error {
 		}
 		// Only the server uses the keys, so a mistyped one doesn't stop the other
 		// commands: `sso off` and `user password` are how a locked-out host is put right.
-		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
+		if s.Keyring, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
 			return err
 		}
 		s.ResealAtStart()
@@ -309,7 +309,7 @@ func run(args []string) error {
 			return fmt.Errorf("usage: prospector key add <org> <name> <scope>…")
 		}
 		// So a key made here is stored the way the server stores one.
-		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
+		if s.Keyring, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
 			return err
 		}
 		o, err := s.OrgBySlug(rest[1])

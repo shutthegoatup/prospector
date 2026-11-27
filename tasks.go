@@ -330,7 +330,7 @@ func brief(v TaskView, who Actor) TaskBrief {
 		b.Open = append(b.Open, asked(r, who))
 	}
 	if v.Last != nil {
-		b.LastBy, b.LastAt, b.LastDid, b.LastYou = v.Last.User, &v.Last.At, v.Last.Action, who.did(*v.Last)
+		b.LastBy, b.LastAt, b.LastDid, b.LastYou = v.Last.User, &v.Last.At, v.Last.Action, who.Did(*v.Last)
 	}
 	return b
 }

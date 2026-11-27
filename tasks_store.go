@@ -54,7 +54,7 @@ func (s *researchStore) CreateTaskWanting(org, offering int64, want int, title, 
 		title = strings.TrimSpace(string(r[:59])) + "…"
 	}
 	t := Task{OrgID: org, Title: title, CreatedBy: by, OfferingID: offering, Want: want}
-	return &t, s.db.Transaction(func(tx *gorm.DB) error {
+	return &t, s.DB.Transaction(func(tx *gorm.DB) error {
 		if offering != 0 {
 			if _, err := heldOffering(tx, org, offering); err != nil {
 				return err
@@ -66,7 +66,7 @@ func (s *researchStore) CreateTaskWanting(org, offering int64, want int, title, 
 		if err := tx.Create(&TaskRequest{OrgID: org, TaskID: t.ID, Text: brief, AskedBy: by, AskedAt: time.Now()}).Error; err != nil {
 			return err
 		}
-		return s.logAs(tx, org, 0, nil, Actor{Name: by, Task: t.ID}, "task:new", nil)
+		return s.LogAs(tx, org, 0, nil, Actor{Name: by, Task: t.ID}, "task:new", nil)
 	})
 }
 
@@ -75,7 +75,7 @@ func (s *researchStore) OnTask(org int64, who Actor, task int64) (Actor, error) 
 	if task == 0 {
 		return who, nil
 	}
-	t, err := openTask(s.db, org, task)
+	t, err := openTask(s.DB, org, task)
 	if err != nil {
 		return who, err
 	}
@@ -88,7 +88,7 @@ func (s *researchStore) OnTask(org int64, who Actor, task int64) (Actor, error) 
 		return who, err
 	}
 	who.Task, who.Offering = task, t.OfferingID
-	return who, s.renewClaims(s.db, org, task, who, time.Now())
+	return who, s.renewClaims(s.DB, org, task, who, time.Now())
 }
 
 // matched records that something already here answers a task. Without it a company
@@ -107,7 +107,7 @@ func (s *researchStore) matched(tx *gorm.DB, org int64, who Actor, contact int64
 	if err := q.Count(&n).Error; err != nil || n > 0 {
 		return err
 	}
-	return s.logAs(tx, org, contact, company, who, "task:match", nil)
+	return s.LogAs(tx, org, contact, company, who, "task:match", nil)
 }
 
 func (s *researchStore) AskTask(org, task int64, text, by string) (*TaskRequest, error) {
@@ -116,21 +116,21 @@ func (s *researchStore) AskTask(org, task int64, text, by string) (*TaskRequest,
 		return nil, err
 	}
 	r := &TaskRequest{OrgID: org, TaskID: task, Text: text, AskedBy: by, AskedAt: time.Now()}
-	return r, s.db.Transaction(func(tx *gorm.DB) error {
+	return r, s.DB.Transaction(func(tx *gorm.DB) error {
 		if _, err := openTask(tx, org, task); err != nil {
 			return err
 		}
 		if err := tx.Create(r).Error; err != nil {
 			return err
 		}
-		return s.logAs(tx, org, 0, nil, Actor{Name: by, Task: task}, "task:ask", nil)
+		return s.LogAs(tx, org, 0, nil, Actor{Name: by, Task: task}, "task:ask", nil)
 	})
 }
 
 // TaskByID and RequestByID are one task, or one request, of the organisation's.
 func (s *researchStore) TaskByID(org, id int64) (*Task, error) {
 	var t Task
-	if err := s.db.Where("org_id = ? and id = ?", org, id).First(&t).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and id = ?", org, id).First(&t).Error; err != nil {
 		return nil, missing(err, "no task %d in this organisation", id)
 	}
 	return &t, nil
@@ -138,14 +138,14 @@ func (s *researchStore) TaskByID(org, id int64) (*Task, error) {
 
 func (s *researchStore) RequestByID(org, id int64) (*TaskRequest, error) {
 	var r TaskRequest
-	if err := s.db.Where("org_id = ? and id = ?", org, id).First(&r).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and id = ?", org, id).First(&r).Error; err != nil {
 		return nil, missing(err, "no request %d in this organisation", id)
 	}
 	return &r, nil
 }
 
 func (s *researchStore) setRequestDone(org, request int64, done bool, who Actor) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var r TaskRequest
 		if err := tx.Where("org_id = ? and id = ?", org, request).First(&r).Error; err != nil {
 			return missing(err, "no request %d in this organisation", request)
@@ -174,7 +174,7 @@ func (s *researchStore) setRequestDone(org, request int64, done bool, who Actor)
 			return err
 		}
 		who.Task = r.TaskID
-		return s.logAs(tx, org, 0, nil, who, action, nil)
+		return s.LogAs(tx, org, 0, nil, who, action, nil)
 	})
 }
 
@@ -183,7 +183,7 @@ func (s *researchStore) SetRequestDone(org, request int64, done bool, by string)
 }
 
 func (s *researchStore) SetTaskClosed(org, task int64, closed bool, by string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var t Task
 		if err := tx.Where("org_id = ? and id = ?", org, task).First(&t).Error; err != nil {
 			return missing(err, "no task %d in this organisation", task)
@@ -209,12 +209,12 @@ func (s *researchStore) SetTaskClosed(org, task int64, closed bool, by string) e
 		if err := tx.Model(&t).Update("closed_at", at).Error; err != nil {
 			return err
 		}
-		return s.logAs(tx, org, 0, nil, Actor{Name: by, Task: task}, action, nil)
+		return s.LogAs(tx, org, 0, nil, Actor{Name: by, Task: task}, action, nil)
 	})
 }
 
 func (s *researchStore) DeleteNote(org, id int64) error {
-	res := s.in(org).Where("id = ?", id).Delete(&TaskNote{})
+	res := s.InOrg(org).Where("id = ?", id).Delete(&TaskNote{})
 	if res.Error == nil && res.RowsAffected == 0 {
 		return noSuch("no note %d", id)
 	}
@@ -224,7 +224,7 @@ func (s *researchStore) DeleteNote(org, id int64) error {
 // TaskNotesPage is one page of the notes agents left on a task, newest first, each
 // with the name of the company it is about.
 func (s *researchStore) TaskNotesPage(org, task int64, page int) ([]NoteView, Page, error) {
-	theirs := func() *gorm.DB { return s.in(org).Model(&TaskNote{}).Where("task_id = ?", task) }
+	theirs := func() *gorm.DB { return s.InOrg(org).Model(&TaskNote{}).Where("task_id = ?", task) }
 	var total int64
 	if err := theirs().Count(&total).Error; err != nil {
 		return nil, Page{}, err
@@ -244,7 +244,7 @@ func (s *researchStore) TaskNotes(org, task int64, page paging.Page) ([]NoteView
 	if err != nil {
 		return nil, "", err
 	}
-	q := s.in(org).Where("task_id = ?", task).Order("id desc").Limit(page.Size() + 1)
+	q := s.InOrg(org).Where("task_id = ?", task).Order("id desc").Limit(page.Size() + 1)
 	if at[0] > 0 {
 		q = q.Where("id < ?", at[0])
 	}
@@ -271,7 +271,7 @@ func (s *researchStore) noteViews(org int64, notes []TaskNote) ([]NoteView, erro
 	}
 	if len(names) > 0 {
 		var companies []Company
-		if err := s.in(org).Where("id in ?", slices.Collect(maps.Keys(names))).Find(&companies).Error; err != nil {
+		if err := s.InOrg(org).Where("id in ?", slices.Collect(maps.Keys(names))).Find(&companies).Error; err != nil {
 			return nil, err
 		}
 		for _, c := range companies {
@@ -287,7 +287,7 @@ func (s *researchStore) noteViews(org int64, notes []TaskNote) ([]NoteView, erro
 
 // CompanyNotesPage is one page of the notes agents left about a company, newest first.
 func (s *researchStore) CompanyNotesPage(org, company int64, page int) ([]TaskNote, Page, error) {
-	theirs := func() *gorm.DB { return s.in(org).Model(&TaskNote{}).Where("company_id = ?", company) }
+	theirs := func() *gorm.DB { return s.InOrg(org).Model(&TaskNote{}).Where("company_id = ?", company) }
 	var total int64
 	if err := theirs().Count(&total).Error; err != nil {
 		return nil, Page{}, err
@@ -303,7 +303,7 @@ func (s *researchStore) CompanyNotesPage(org, company int64, page int) ([]TaskNo
 // next is zero when there are no more.
 func (s *researchStore) Runs(org int64, before time.Time, limit int) (runs []Run, titles map[int64]string, next time.Time) {
 	agents := func() *gorm.DB {
-		q := s.in(org).Model(&Event{}).Where(`"user" like 'agent:%'`)
+		q := s.InOrg(org).Model(&Event{}).Where(`"user" like 'agent:%'`)
 		if !before.IsZero() {
 			q = q.Where("at < ?", before)
 		}
@@ -327,7 +327,7 @@ func (s *researchStore) Runs(org int64, before time.Time, limit int) (runs []Run
 				continue
 			}
 			var first Event
-			_ = logged(s.in(org).Where(`key_id = ? and "user" = ? and at >= ?`, r.KeyID, r.Actor, before).Order("at, id").Limit(1).Find(&first))
+			_ = logged(s.InOrg(org).Where(`key_id = ? and "user" = ? and at >= ?`, r.KeyID, r.Actor, before).Order("at, id").Limit(1).Find(&first))
 			cut[key] = first.At
 		}
 		runs = slices.DeleteFunc(runs, func(r Run) bool {
@@ -380,7 +380,7 @@ func (s *researchStore) Runs(org int64, before time.Time, limit int) (runs []Run
 	titles = map[int64]string{}
 	if len(ids) > 0 {
 		var tasks []Task
-		_ = logged(s.in(org).Where("id in ?", ids).Find(&tasks))
+		_ = logged(s.InOrg(org).Where("id in ?", ids).Find(&tasks))
 		for _, t := range tasks {
 			titles[t.ID] = t.Title
 		}
@@ -545,18 +545,18 @@ func (s *researchStore) taskViews(tx *gorm.DB, org int64, tasks []Task, now time
 
 // TaskCounts is how many of an organisation's tasks are open, and how many it has.
 func (s *researchStore) TaskCounts(org int64) (open, all int64, err error) {
-	if err := s.in(org).Model(&Task{}).Where("closed_at is null").Count(&open).Error; err != nil {
+	if err := s.InOrg(org).Model(&Task{}).Where("closed_at is null").Count(&open).Error; err != nil {
 		return 0, 0, err
 	}
-	return open, all, s.in(org).Model(&Task{}).Count(&all).Error
+	return open, all, s.InOrg(org).Model(&Task{}).Count(&all).Error
 }
 
 func (s *researchStore) Task(org, id int64, now time.Time) (*TaskView, error) {
 	var t Task
-	if err := s.in(org).First(&t, id).Error; err != nil {
+	if err := s.InOrg(org).First(&t, id).Error; err != nil {
 		return nil, missing(err, "no task %d in this organisation", id)
 	}
-	views, err := s.taskViews(s.db, org, []Task{t}, now)
+	views, err := s.taskViews(s.DB, org, []Task{t}, now)
 	if err != nil {
 		return nil, err
 	}
@@ -566,7 +566,7 @@ func (s *researchStore) Task(org, id int64, now time.Time) (*TaskView, error) {
 // Tasks lists one page of an organisation's tasks, open ones first, newest first.
 func (s *researchStore) Tasks(org int64, closed bool, page int, now time.Time) ([]TaskView, Page, error) {
 	matching := func() *gorm.DB {
-		q := s.in(org).Model(&Task{})
+		q := s.InOrg(org).Model(&Task{})
 		if !closed {
 			q = q.Where("closed_at is null")
 		}
@@ -581,7 +581,7 @@ func (s *researchStore) Tasks(org int64, closed bool, page int, now time.Time) (
 	if err := matching().Order("closed_at is not null, id desc").Limit(pg.Size).Offset(pg.offset()).Find(&tasks).Error; err != nil {
 		return nil, Page{}, err
 	}
-	out, err := s.taskViews(s.db, org, tasks, now)
+	out, err := s.taskViews(s.DB, org, tasks, now)
 	if err != nil {
 		return nil, Page{}, err
 	}
@@ -613,7 +613,7 @@ func (s *researchStore) TaskBriefsFor(org int64, who Actor, closed bool, offerin
 	if err != nil {
 		return nil, "", err
 	}
-	q := s.in(org).Limit(page.Size() + 1)
+	q := s.InOrg(org).Limit(page.Size() + 1)
 	if offering != nil {
 		q = q.Where("offering_id = ?", *offering)
 	}
@@ -647,7 +647,7 @@ func (s *researchStore) TaskBriefsFor(org int64, who Actor, closed bool, offerin
 			next = paging.Cursor(0, last.ID)
 		}
 	}
-	views, err := s.taskViews(s.db, org, tasks, time.Now())
+	views, err := s.taskViews(s.DB, org, tasks, time.Now())
 	if err != nil {
 		return nil, "", err
 	}
@@ -706,7 +706,7 @@ func (s *researchStore) agentTaskPage(org int64, who Actor, id int64, page pagin
 	}
 	// The task's view holds only its latest notes, so a page of them is read here: all
 	// of them can then be reached.
-	notesFrom := s.in(org).Where("task_id = ?", id).Order("id desc").Limit(page.Size() + 1)
+	notesFrom := s.InOrg(org).Where("task_id = ?", id).Order("id desc").Limit(page.Size() + 1)
 	if at[2] > 0 {
 		notesFrom = notesFrom.Where("id < ?", at[2])
 	}
@@ -723,7 +723,7 @@ func (s *researchStore) agentTaskPage(org int64, who Actor, id int64, page pagin
 	}
 	if len(about) > 0 {
 		var companies []Company
-		if err := s.in(org).Where("id in ?", slices.Collect(maps.Keys(about))).Find(&companies).Error; err != nil {
+		if err := s.InOrg(org).Where("id in ?", slices.Collect(maps.Keys(about))).Find(&companies).Error; err != nil {
 			return nil, err
 		}
 		for _, c := range companies {
@@ -732,7 +732,7 @@ func (s *researchStore) agentTaskPage(org int64, who Actor, id int64, page pagin
 	}
 	for _, n := range notes {
 		out.Notes = append(out.Notes, NoteOut{ID: n.ID, Kind: n.Kind, Text: n.Text, Actor: n.Actor, At: n.CreatedAt, Company: about[n.CompanyID],
-			About: n.CompanyID, ByYou: who.did(Event{User: n.Actor, KeyID: n.KeyID})})
+			About: n.CompanyID, ByYou: who.Did(Event{User: n.Actor, KeyID: n.KeyID})})
 	}
 	// The counts in the brief are of everything found; only the lists are a page.
 	out.Companies, at[0] = paging.AfterID(out.Companies, func(c TaskCompany) int64 { return c.ID }, at[0], page.Size())
@@ -752,7 +752,7 @@ func (s *researchStore) agentTaskPage(org int64, who Actor, id int64, page pagin
 	// One pickup a run: an agent re-reading the task as it works isn't news. Written
 	// apart from the reads above, so two agents on one task don't trip each other.
 	var mine Event
-	err = s.in(org).Where(`task_id = ? and "user" = ? and key_id = ?`, id, who.Name, who.KeyID).Order("at desc, id desc").First(&mine).Error
+	err = s.InOrg(org).Where(`task_id = ? and "user" = ? and key_id = ?`, id, who.Name, who.KeyID).Order("at desc, id desc").First(&mine).Error
 	if err == nil && now.Sub(mine.At) < runGap {
 		return &out, nil
 	}
@@ -760,7 +760,7 @@ func (s *researchStore) agentTaskPage(org int64, who Actor, id int64, page pagin
 		return nil, err
 	}
 	who.Task = id
-	return &out, s.logAs(s.db, org, 0, nil, who, "task:pickup", nil)
+	return &out, s.LogAs(s.DB, org, 0, nil, who, "task:pickup", nil)
 }
 
 func (s *researchStore) AgentNote(org int64, who Actor, in NoteIn) (*TaskNote, error) {
@@ -786,11 +786,11 @@ func (s *researchStore) AgentNote(org int64, who Actor, in NoteIn) (*TaskNote, e
 		}
 		n.CompanyID, company = c.ID, &c.ID
 	}
-	return &n, s.db.Transaction(func(tx *gorm.DB) error {
+	return &n, s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&n).Error; err != nil {
 			return err
 		}
-		return s.logAs(tx, org, 0, company, who, "note:"+in.Kind, nil)
+		return s.LogAs(tx, org, 0, company, who, "note:"+in.Kind, nil)
 	})
 }
 
@@ -802,7 +802,7 @@ func (s *researchStore) AgentFinish(org int64, who Actor, in FinishIn) error {
 // own claim is renewed. One statement, so of two agents claiming at once only one wins,
 // and a request finished since it was read isn't taken.
 func (s *researchStore) claim(org, task, request int64, who Actor, now time.Time) (bool, error) {
-	res := s.db.Exec(`insert into request_claims (request_id, org_id, task_id, holder, actor, claimed_at, expires_at)
+	res := s.DB.Exec(`insert into request_claims (request_id, org_id, task_id, holder, actor, claimed_at, expires_at)
 		select ?, ?, ?, ?, ?, ?, ?
 		where exists (select 1 from task_requests where id = ? and org_id = ? and task_id = ? and done_at is null)
 		on conflict (request_id) do update set holder = excluded.holder, actor = excluded.actor, expires_at = excluded.expires_at,
@@ -848,12 +848,12 @@ func (s *researchStore) claimNext(v *TaskView, who Actor, now time.Time) (int64,
 
 func (s *researchStore) Offerings(org int64) ([]Offering, error) {
 	var out []Offering
-	return out, s.in(org).Order("lower(name), id").Find(&out).Error
+	return out, s.InOrg(org).Order("lower(name), id").Find(&out).Error
 }
 
 func (s *researchStore) Offering(org, id int64) (*Offering, error) {
 	var o Offering
-	if err := s.in(org).Where("id = ?", id).First(&o).Error; err != nil {
+	if err := s.InOrg(org).Where("id = ?", id).First(&o).Error; err != nil {
 		return nil, missing(err, "no offering %d", id)
 	}
 	return &o, nil
@@ -872,7 +872,7 @@ func (s *researchStore) AddOffering(org int64, o Offering, actor string) (*Offer
 		return nil, err
 	}
 	o.ID, o.OrgID, o.UpdatedBy = 0, org, actor
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := holdOrg(tx, org); err != nil {
 			return err
 		}
@@ -882,7 +882,7 @@ func (s *researchStore) AddOffering(org int64, o Offering, actor string) (*Offer
 		if err := tx.Create(&o).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, 0, nil, actor, "offering:added", &o.Name)
+		return s.Log(tx, org, 0, nil, actor, "offering:added", &o.Name)
 	})
 	return &o, err
 }
@@ -890,7 +890,7 @@ func (s *researchStore) AddOffering(org int64, o Offering, actor string) (*Offer
 // ChangeOffering applies change to the offering as it is now, and saves it.
 func (s *researchStore) ChangeOffering(org, id int64, change func(*Offering), actor string) (*Offering, error) {
 	var o *Offering
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := holdOrg(tx, org); err != nil {
 			return err
 		}
@@ -919,7 +919,7 @@ func (s *researchStore) ChangeOffering(org, id int64, change func(*Offering), ac
 		if err := tx.Model(o).Select("name", "look_for", "pitch", "note_template", "has_roles", "updated_by", "updated_at").Updates(o).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, 0, nil, actor, "offering:changed", &o.Name)
+		return s.Log(tx, org, 0, nil, actor, "offering:changed", &o.Name)
 	})
 	return o, err
 }
@@ -928,7 +928,7 @@ func (s *researchStore) ChangeOffering(org, id int64, change func(*Offering), ac
 // what was decided. People being reached for it are then reached for the organisation's
 // own, and companies found only for it come up in the organisation's own review.
 func (s *researchStore) RemoveOffering(org, id int64, actor string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		// Companies are held before the offering, as everywhere; holding the organisation
 		// keeps any more from being found for it meanwhile.
 		if err := holdOrg(tx, org); err != nil {
@@ -960,7 +960,7 @@ func (s *researchStore) RemoveOffering(org, id int64, actor string) error {
 		if err := tx.Delete(o).Error; err != nil {
 			return err
 		}
-		return s.log(tx, org, 0, nil, actor, "offering:removed", &o.Name)
+		return s.Log(tx, org, 0, nil, actor, "offering:removed", &o.Name)
 	})
 }
 
@@ -976,7 +976,7 @@ func (s *researchStore) JudgeCompany(org, offering, company int64, stage, fit, r
 	if stage != CompanyQualified && stage != CompanyRejected && stage != CompanyReview {
 		return fmt.Errorf("unknown stage %q", stage)
 	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		o, err := heldOffering(tx, org, offering)
 		if err != nil {
 			return err
@@ -1010,14 +1010,14 @@ func (s *researchStore) JudgeCompany(org, offering, company int64, stage, fit, r
 		if v.Reason != "" {
 			said += ": " + v.Reason
 		}
-		return s.log(tx, org, 0, &company, actor, "verdict:"+stage, &said)
+		return s.Log(tx, org, 0, &company, actor, "verdict:"+stage, &said)
 	})
 }
 
 // ToReview is how many companies wait for review, counting each offering's queue.
 func (s *researchStore) ToReview(org int64) int {
 	var n int64
-	_ = logged(s.in(org).Model(&Verdict{}).Where("stage = ?", CompanyReview).Count(&n))
+	_ = logged(s.InOrg(org).Model(&Verdict{}).Where("stage = ?", CompanyReview).Count(&n))
 	return s.prospecting.ResearchCount(org, "review") + int(n)
 }
 
@@ -1029,7 +1029,7 @@ func (s *researchStore) WithVerdicts(org, offering int64, rows []ResearchRow) er
 		ids[i] = r.ID
 	}
 	var verdicts []Verdict
-	if err := s.in(org).Where("offering_id = ? and company_id in ?", offering, ids).Find(&verdicts).Error; err != nil {
+	if err := s.InOrg(org).Where("offering_id = ? and company_id in ?", offering, ids).Find(&verdicts).Error; err != nil {
 		return err
 	}
 	by := map[int64]Verdict{}
@@ -1051,13 +1051,13 @@ func (s *researchStore) WithVerdicts(org, offering int64, rows []ResearchRow) er
 
 func (s *researchStore) standing(org, company int64) ([]OfferingStanding, error) {
 	var out []OfferingStanding
-	return out, s.db.Model(&Verdict{}).Select("offerings.name as offering, verdicts.stage, verdicts.reason").
+	return out, s.DB.Model(&Verdict{}).Select("offerings.name as offering, verdicts.stage, verdicts.reason").
 		Joins("join offerings on offerings.id = verdicts.offering_id and offerings.org_id = verdicts.org_id").
 		Where("verdicts.org_id = ? and verdicts.company_id = ?", org, company).Order("lower(offerings.name)").Scan(&out).Error
 }
 
 func (s *researchStore) verdictRows(org int64) *gorm.DB {
-	return s.db.Model(&Verdict{}).Select("verdicts.*, companies.name as company").
+	return s.DB.Model(&Verdict{}).Select("verdicts.*, companies.name as company").
 		Joins("join companies on companies.id = verdicts.company_id and companies.org_id = verdicts.org_id").
 		Joins("join offerings on offerings.id = verdicts.offering_id and offerings.org_id = verdicts.org_id").
 		Where("verdicts.org_id = ?", org)
@@ -1066,7 +1066,7 @@ func (s *researchStore) verdictRows(org int64) *gorm.DB {
 // Verdicts are where a company stands for each offering it has been judged for.
 func (s *researchStore) Verdicts(org, company int64) ([]VerdictRow, error) {
 	var n int64
-	if err := s.in(org).Model(&Company{}).Where("id = ?", company).Count(&n).Error; err != nil {
+	if err := s.InOrg(org).Model(&Company{}).Where("id = ?", company).Count(&n).Error; err != nil {
 		return nil, err
 	}
 	if n == 0 {
@@ -1119,7 +1119,7 @@ func (s *researchStore) addRole(tx *gorm.DB, org int64, o *Offering, company int
 	if err := tx.Create(&r).Error; err != nil {
 		return nil, false, err
 	}
-	if err := s.logAs(tx, org, 0, &company, who, "add:role", str(o.Name+": "+r.Title)); err != nil {
+	if err := s.LogAs(tx, org, 0, &company, who, "add:role", str(o.Name+": "+r.Title)); err != nil {
 		return nil, false, err
 	}
 	return &r, false, s.followRoles(tx, org, o, company, who.Name)
@@ -1163,7 +1163,7 @@ func (s *researchStore) followRoles(tx *gorm.DB, org int64, o *Offering, company
 	if reason != "" {
 		said += ": " + reason
 	}
-	return s.log(tx, org, 0, &company, actor, "verdict:"+want, &said)
+	return s.Log(tx, org, 0, &company, actor, "verdict:"+want, &said)
 }
 
 // AddRole is a person adding a role they found to a company, for an offering with roles.
@@ -1172,7 +1172,7 @@ func (s *researchStore) AddRole(org, offering, company int64, in RoleIn, actor s
 		return nil, err
 	}
 	var r *Role
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := hold(tx, &Company{}, org, company); err != nil {
 			return err
 		}
@@ -1211,7 +1211,7 @@ func (s *researchStore) JudgeRole(org, id int64, stage, reason, actor string) (*
 	}
 	reason = strings.TrimSpace(reason)
 	var r Role
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&r).Error; err != nil {
 			return missing(err, "no role %d", id)
 		}
@@ -1239,7 +1239,7 @@ func (s *researchStore) JudgeRole(org, id int64, stage, reason, actor string) (*
 		if reason != "" {
 			said += ": " + reason
 		}
-		if err := s.log(tx, org, 0, &r.CompanyID, actor, "role:"+stage, &said); err != nil {
+		if err := s.Log(tx, org, 0, &r.CompanyID, actor, "role:"+stage, &said); err != nil {
 			return err
 		}
 		return s.followRoles(tx, org, o, r.CompanyID, actor)
@@ -1249,10 +1249,10 @@ func (s *researchStore) JudgeRole(org, id int64, stage, reason, actor string) (*
 
 // Roles are a company's roles for every offering, or for one when offering is set.
 func (s *researchStore) Roles(org, company int64, offering *int64) ([]Role, error) {
-	if _, err := s.companyIn(s.db, org, company); err != nil {
+	if _, err := s.companyIn(s.DB, org, company); err != nil {
 		return nil, err
 	}
-	q := s.in(org).Where("company_id = ?", company)
+	q := s.InOrg(org).Where("company_id = ?", company)
 	if offering != nil {
 		q = q.Where("offering_id = ?", *offering)
 	}
@@ -1267,7 +1267,7 @@ func (s *researchStore) RolesAt(org, offering int64, companies []int64) (map[int
 		return out, nil
 	}
 	var rows []Role
-	if err := s.in(org).Where("offering_id = ? and company_id in ?", offering, companies).Order("id").Find(&rows).Error; err != nil {
+	if err := s.InOrg(org).Where("offering_id = ? and company_id in ?", offering, companies).Order("id").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	for _, r := range rows {
@@ -1294,7 +1294,7 @@ func (s *researchStore) AgentAddRole(org int64, who Actor, in AddRoleIn) (*AddRo
 		return nil, err
 	}
 	var out AddRoleOut
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := hold(tx, &Company{}, org, c.ID); err != nil {
 			return err
 		}
@@ -1325,7 +1325,7 @@ func (s *researchStore) AgentAddRole(org int64, who Actor, in AddRoleIn) (*AddRo
 
 func (s *researchStore) roleBriefs(org, company int64) ([]RoleBrief, error) {
 	var out []RoleBrief
-	return out, s.db.Model(&Role{}).Select("roles.id, offerings.name as offering, roles.title, roles.url, roles.details, roles.stage, roles.reason").
+	return out, s.DB.Model(&Role{}).Select("roles.id, offerings.name as offering, roles.title, roles.url, roles.details, roles.stage, roles.reason").
 		Joins("join offerings on offerings.id = roles.offering_id and offerings.org_id = roles.org_id").
 		Where("roles.org_id = ? and roles.company_id = ?", org, company).Order("lower(offerings.name), roles.id").Scan(&out).Error
 }
@@ -1344,7 +1344,7 @@ func (s *researchStore) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (
 		}
 	}
 	var out AddCompanyOut
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := holdOrg(tx, org); err != nil {
 			return err
 		}
@@ -1405,7 +1405,7 @@ func (s *researchStore) AgentAddCompany(org int64, who Actor, in AddCompanyIn) (
 		if !created {
 			action = "add:facts"
 		}
-		return s.logAs(tx, org, 0, &c.ID, who, action, str(fmt.Sprintf("%s, %d facts", c.Name, added)))
+		return s.LogAs(tx, org, 0, &c.ID, who, action, str(fmt.Sprintf("%s, %d facts", c.Name, added)))
 	})
 	return &out, err
 }
@@ -1423,7 +1423,7 @@ func (s *researchStore) AgentAddFact(org int64, who Actor, in AddFactIn) (*AddFa
 		return nil, err
 	}
 	var out AddFactOut
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := hold(tx, &Company{}, org, c.ID); err != nil {
 			return err
 		}
@@ -1441,7 +1441,7 @@ func (s *researchStore) AgentAddFact(org int64, who Actor, in AddFactIn) (*AddFa
 		if had {
 			return s.matched(tx, org, who, 0, &c.ID)
 		}
-		return s.logAs(tx, org, 0, &c.ID, who, "add:fact", str(f.Field))
+		return s.LogAs(tx, org, 0, &c.ID, who, "add:fact", str(f.Field))
 	})
 	return &out, err
 }
@@ -1474,7 +1474,7 @@ func (s *researchStore) AgentAddContact(o *Org, who Actor, in AddContactIn) (*Ad
 	if err != nil {
 		return nil, err
 	}
-	if err := erased(s.db, o.ID, in.Name, c.Name, in.Email, in.Linkedin); err != nil {
+	if err := erased(s.DB, o.ID, in.Name, c.Name, in.Email, in.Linkedin); err != nil {
 		if errors.Is(err, errErased) {
 			s.prospecting.withheld(o.ID, who, withheldErased)
 		}
@@ -1486,7 +1486,7 @@ func (s *researchStore) AgentAddContact(o *Org, who Actor, in AddContactIn) (*Ad
 	}
 	first := firstField(in.Name)
 	var out AddContactOut
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
 		// The organisation too: a contact's key is one of a kind across it.
 		if err := holdOrg(tx, o.ID); err != nil {
 			return err
@@ -1521,7 +1521,7 @@ func (s *researchStore) AgentAddContact(o *Org, who Actor, in AddContactIn) (*Ad
 			return err
 		}
 		out = AddContactOut{ID: contact.ID, Status: contact.Status}
-		return s.logAs(tx, o.ID, contact.ID, &c.ID, who, "add:contact", nil)
+		return s.LogAs(tx, o.ID, contact.ID, &c.ID, who, "add:contact", nil)
 	})
 	return &out, err
 }
@@ -1541,7 +1541,7 @@ func (s *researchStore) AgentDraft(org int64, who Actor, in DraftIn) error {
 	if in.Kind == "note" && len([]rune(in.Text)) > 300 {
 		return errors.New("LinkedIn notes are 300 characters at most")
 	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		// A person's edit made meanwhile is then either seen below or lands on top of this.
 		if err := hold(tx, &Contact{}, org, in.ContactID); err != nil {
 			return err
@@ -1570,7 +1570,7 @@ func (s *researchStore) AgentDraft(org int64, who Actor, in DraftIn) error {
 		if err := tx.Model(&c).Updates(updates).Error; err != nil {
 			return err
 		}
-		return s.logAs(tx, org, c.ID, c.CompanyID, who, "draft:"+in.Kind, nil)
+		return s.LogAs(tx, org, c.ID, c.CompanyID, who, "draft:"+in.Kind, nil)
 	})
 }
 
@@ -1579,14 +1579,14 @@ func (s *researchStore) lastAgents(org int64, who Actor, companies []int64) (map
 	if len(companies) == 0 {
 		return out, nil
 	}
-	latest := s.db.Model(&Event{}).Select("max(id)").
+	latest := s.DB.Model(&Event{}).Select("max(id)").
 		Where(`org_id = ? and company_id in ? and "user" like 'agent:%'`, org, companies).Group("company_id")
 	var events []Event
-	if err := s.in(org).Where("id in (?)", latest).Find(&events).Error; err != nil {
+	if err := s.InOrg(org).Where("id in (?)", latest).Find(&events).Error; err != nil {
 		return nil, err
 	}
 	for _, e := range events {
-		out[*e.CompanyID] = &LastAgent{Actor: e.User, At: e.At, ByYou: who.did(e)}
+		out[*e.CompanyID] = &LastAgent{Actor: e.User, At: e.At, ByYou: who.Did(e)}
 	}
 	return out, nil
 }
@@ -1605,7 +1605,7 @@ func (s *researchStore) AgentSearch(org int64, who Actor, q string, page paging.
 	size, more := page.Size(), false
 	var companies []Company
 	cond, args := s.prospecting.companyMatch(q)
-	if err := s.in(org).Where("id > ?", at[0]).Where(cond, args...).Order("id").Limit(size + 1).Find(&companies).Error; err != nil {
+	if err := s.InOrg(org).Where("id > ?", at[0]).Where(cond, args...).Order("id").Limit(size + 1).Find(&companies).Error; err != nil {
 		return nil, "", err
 	}
 	if at[0] = paging.RanOut; len(companies) > size {
@@ -1626,7 +1626,7 @@ func (s *researchStore) AgentSearch(org int64, who Actor, q string, page paging.
 	}
 	var people []Contact
 	cond, args = s.prospecting.contactMatch(q, true)
-	if err := s.in(org).Where("id > ? and key not like 'org:%'", at[1]).Where(cond, args...).Order("id").Limit(size + 1).Find(&people).Error; err != nil {
+	if err := s.InOrg(org).Where("id > ? and key not like 'org:%'", at[1]).Where(cond, args...).Order("id").Limit(size + 1).Find(&people).Error; err != nil {
 		return nil, "", err
 	}
 	if at[1] = paging.RanOut; len(people) > size {
@@ -1699,7 +1699,7 @@ func (s *researchStore) AgentCompany(org int64, who Actor, ref string, page pagi
 
 	// Newest first, and only as many as a page and one more are read.
 	before := func(id int64) *gorm.DB {
-		q := s.in(org).Where("company_id = ?", c.ID).Order("id desc")
+		q := s.InOrg(org).Where("company_id = ?", c.ID).Order("id desc")
 		if id > 0 {
 			q = q.Where("id < ?", id)
 		}
@@ -1713,7 +1713,7 @@ func (s *researchStore) AgentCompany(org int64, who Actor, ref string, page pagi
 	for _, e := range events {
 		// Only what erasure would keep: an event's value can hold a note or someone's details.
 		out.History = append(out.History, Happened{At: e.At, Actor: e.User, Action: e.Action, Value: deref(keptValue(e)),
-			Person: names[e.ContactID], ByYou: who.did(e)})
+			Person: names[e.ContactID], ByYou: who.Did(e)})
 	}
 	var notes []TaskNote
 	if err := before(at[3]).Limit(notesSize + 1).Find(&notes).Error; err != nil {
@@ -1722,7 +1722,7 @@ func (s *researchStore) AgentCompany(org int64, who Actor, ref string, page pagi
 	notes, at[3] = paging.BeforeID(notes, func(n TaskNote) int64 { return n.ID }, 0, notesSize)
 	for _, n := range notes {
 		out.Notes = append(out.Notes, NoteOut{ID: n.ID, Kind: n.Kind, Text: n.Text, Actor: n.Actor, At: n.CreatedAt,
-			ByYou: who.did(Event{User: n.Actor, KeyID: n.KeyID})})
+			ByYou: who.Did(Event{User: n.Actor, KeyID: n.KeyID})})
 	}
 	if at[0] != paging.RanOut || at[1] != paging.RanOut || at[2] != paging.NoneBefore || at[3] != paging.NoneBefore {
 		out.NextCursor = paging.Cursor(at...)
@@ -1773,7 +1773,7 @@ func (s *researchStore) AgentScores(org int64) []AgentScore {
 		FoundBy, Stage string
 		N              int
 	}
-	_ = logged(s.db.Raw(`select found_by, stage, count(*) as n from companies
+	_ = logged(s.DB.Raw(`select found_by, stage, count(*) as n from companies
 		where org_id = ? and found_by like 'agent:%' group by found_by, stage`, org).Scan(&companies))
 	for _, r := range companies {
 		a := get(r.FoundBy)
@@ -1789,7 +1789,7 @@ func (s *researchStore) AgentScores(org int64) []AgentScore {
 		Actor                     string
 		Contacts, Picked, Replied int
 	}
-	_ = logged(s.db.Raw(`select e."user" as actor, count(*) as contacts,
+	_ = logged(s.DB.Raw(`select e."user" as actor, count(*) as contacts,
 		sum(case when exists (select 1 from events p where p.org_id = e.org_id and p.contact_id = e.contact_id and p.action = 'pick') then 1 else 0 end) as picked,
 		sum(case when c.replied is not null then 1 else 0 end) as replied
 		from events e join contacts c on c.id = e.contact_id
@@ -1824,7 +1824,7 @@ func (s *researchStore) AgentMarks(org int64, ids []int64) map[int64]map[string]
 		return out
 	}
 	var events []Event
-	_ = logged(s.in(org).Where("contact_id in ? and action like 'mark:%'", ids).Order("at, id").Find(&events))
+	_ = logged(s.InOrg(org).Where("contact_id in ? and action like 'mark:%'", ids).Order("at, id").Find(&events))
 	for _, e := range events {
 		step := strings.TrimPrefix(e.Action, "mark:")
 		if out[e.ContactID] == nil {

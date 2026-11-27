@@ -21,7 +21,7 @@ type enquiryStore struct {
 
 func (s *enquiryStore) EnquiryByID(org, id int64) (*Enquiry, error) {
 	var e Enquiry
-	if err := s.in(org).Where("id = ?", id).First(&e).Error; err != nil {
+	if err := s.InOrg(org).Where("id = ?", id).First(&e).Error; err != nil {
 		return nil, missing(err, "no enquiry %d", id)
 	}
 	return &e, nil
@@ -34,7 +34,7 @@ func (s *enquiryStore) SetEnquiry(org, id int64, field, value, actor string) err
 
 // SetEnquiryFields makes several of those changes or none.
 func (s *enquiryStore) SetEnquiryFields(org, id int64, changes []Change, actor string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		for _, c := range changes {
 			if err := s.setEnquiry(tx, org, id, c.Field, strings.TrimSpace(c.Value), actor); err != nil {
 				return err
@@ -86,7 +86,7 @@ func (s *enquiryStore) setEnquiry(tx *gorm.DB, org, id int64, field, value, acto
 		if e.ContactID != nil {
 			contact = *e.ContactID
 		}
-		return s.log(tx, org, contact, e.CompanyID, actor, "enquiry:"+field, nonEmpty(logged))
+		return s.Log(tx, org, contact, e.CompanyID, actor, "enquiry:"+field, nonEmpty(logged))
 	}
 }
 
@@ -104,7 +104,7 @@ func (s *enquiryStore) AddEnquiry(org int64, via string, in EnquiryIn) (*Enquiry
 	if at, err := mail.ParseAddress(e.Email); err != nil || at.Address != e.Email || !emailRe.MatchString(e.Email) || strings.ContainsAny(e.Email, " \t\r\n") {
 		return nil, errEnquiryEmail
 	}
-	return &e, s.db.Transaction(func(tx *gorm.DB) error {
+	return &e, s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := holdOrg(tx, org); err != nil {
 			return err
 		}
@@ -138,13 +138,13 @@ func (s *enquiryStore) AddEnquiry(org int64, via string, in EnquiryIn) (*Enquiry
 		if e.ContactID != nil {
 			contact = *e.ContactID
 		}
-		return s.log(tx, org, contact, e.CompanyID, via, "enquiry", str(kindLabel(e.Kind)))
+		return s.Log(tx, org, contact, e.CompanyID, via, "enquiry", str(kindLabel(e.Kind)))
 	})
 }
 
 // DeleteEnquiry removes one for good: spam, or a person asking for what they sent to go.
 func (s *enquiryStore) DeleteEnquiry(org, id int64) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
 		res := tx.Where("org_id = ? and id = ?", org, id).Delete(&Enquiry{})
 		if res.Error == nil && res.RowsAffected == 0 {
 			return noSuch("no enquiry %d", id)
@@ -169,7 +169,7 @@ func (s *enquiryStore) Enquiries(org int64, f EnquiryFilter, page int) ([]Enquir
 }
 
 func (s *enquiryStore) enquiriesMatching(org int64, f EnquiryFilter) *gorm.DB {
-	q := s.in(org).Model(&Enquiry{}).Where("spam = ?", f.Spam)
+	q := s.InOrg(org).Model(&Enquiry{}).Where("spam = ?", f.Spam)
 	if f.Kind != "" {
 		q = q.Where("kind = ?", f.Kind)
 	}
@@ -209,7 +209,7 @@ func (s *enquiryStore) EnquiryCounts(org int64) map[string]int {
 		Spam        bool
 		N           int
 	}
-	_ = logged(s.in(org).Model(&Enquiry{}).Select("kind, state, spam, count(*) as n").Group("kind, state, spam").Scan(&rows))
+	_ = logged(s.InOrg(org).Model(&Enquiry{}).Select("kind, state, spam, count(*) as n").Group("kind, state, spam").Scan(&rows))
 	out := map[string]int{}
 	for _, r := range rows {
 		if r.Spam {
@@ -238,14 +238,14 @@ func (s *enquiryStore) AroundEnquiries(org int64, rows []Enquiry) (enquiriesArou
 	}
 	if len(ids) > 0 {
 		var companies []Company
-		_ = logged(s.in(org).Where("id in ?", ids).Find(&companies))
+		_ = logged(s.InOrg(org).Where("id in ?", ids).Find(&companies))
 		for _, c := range companies {
 			out.Companies[c.ID] = c.Name
 		}
 	}
 	if len(senders) > 0 {
 		var on []int64
-		if err := s.in(org).Model(&Contact{}).Where("id in ?", senders).Where(inConversation).Pluck("id", &on).Error; err != nil {
+		if err := s.InOrg(org).Model(&Contact{}).Where("id in ?", senders).Where(inConversation).Pluck("id", &on).Error; err != nil {
 			return out, err
 		}
 		for _, id := range on {
@@ -263,7 +263,7 @@ func (s *enquiryStore) AroundEnquiries(org int64, rows []Enquiry) (enquiriesArou
 // that adding anyone by hand goes through.
 func (s *enquiryStore) ConverseEnquiry(o *Org, id int64, actor string) (*Contact, error) {
 	var e Enquiry
-	if err := s.in(o.ID).Where("id = ?", id).First(&e).Error; err != nil {
+	if err := s.InOrg(o.ID).Where("id = ?", id).First(&e).Error; err != nil {
 		return nil, missing(err, "no enquiry %d", id)
 	}
 	if e.Spam {
@@ -271,13 +271,13 @@ func (s *enquiryStore) ConverseEnquiry(o *Org, id int64, actor string) (*Contact
 	}
 	var c Contact
 	if e.ContactID != nil {
-		if err := s.in(o.ID).Where("id = ?", *e.ContactID).First(&c).Error; err != nil {
+		if err := s.InOrg(o.ID).Where("id = ?", *e.ContactID).First(&c).Error; err != nil {
 			return nil, missing(err, "no contact %d", *e.ContactID)
 		}
 	} else {
 		// Whoever holds that address now: they may have been added since this arrived,
 		// by hand or from another of their enquiries.
-		found := s.in(o.ID).Where("lower(email) = ? and key not like 'org:%'", e.Email).Order("id").Limit(1).Find(&c)
+		found := s.InOrg(o.ID).Where("lower(email) = ? and key not like 'org:%'", e.Email).Order("id").Limit(1).Find(&c)
 		if found.Error != nil {
 			return nil, found.Error
 		}
@@ -293,7 +293,7 @@ func (s *enquiryStore) ConverseEnquiry(o *Org, id int64, actor string) (*Contact
 			c = *added
 		}
 		// Matched now, so their export and erasure take this enquiry with them.
-		if err := s.in(o.ID).Model(&Enquiry{}).Where("id = ?", e.ID).
+		if err := s.InOrg(o.ID).Model(&Enquiry{}).Where("id = ?", e.ID).
 			Updates(map[string]any{"contact_id": c.ID, "company_id": c.CompanyID}).Error; err != nil {
 			return nil, err
 		}
@@ -326,7 +326,7 @@ func (s *enquiryStore) ConverseEnquiry(o *Org, id int64, actor string) (*Contact
 func (s *enquiryStore) enquiryCompany(org int64, e Enquiry) (string, error) {
 	if e.CompanyID != nil {
 		var co Company
-		if err := s.in(org).Where("id = ?", *e.CompanyID).First(&co).Error; err != nil {
+		if err := s.InOrg(org).Where("id = ?", *e.CompanyID).First(&co).Error; err != nil {
 			return "", missing(err, "no company %d", *e.CompanyID)
 		}
 		return co.Name, nil
@@ -336,7 +336,7 @@ func (s *enquiryStore) enquiryCompany(org int64, e Enquiry) (string, error) {
 		return "", nil
 	}
 	var held int64
-	if err := s.in(org).Model(&Company{}).Where("lower(name) = ?", strings.ToLower(typed)).Count(&held).Error; err != nil {
+	if err := s.InOrg(org).Model(&Company{}).Where("lower(name) = ?", strings.ToLower(typed)).Count(&held).Error; err != nil {
 		return "", err
 	}
 	if held > 0 {

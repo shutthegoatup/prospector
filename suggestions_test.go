@@ -31,7 +31,7 @@ func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
 	person := func() Contact {
 		t.Helper()
 		var c Contact
-		if err := s.in(o.ID).First(&c, hannah.ID).Error; err != nil {
+		if err := s.InOrg(o.ID).First(&c, hannah.ID).Error; err != nil {
 			t.Fatal(err)
 		}
 		return c
@@ -93,13 +93,13 @@ func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
 		t.Fatalf("a dismissed number or an accepted email was raised again: %+v", after)
 	}
 	var n int64
-	s.db.Model(&Suggestion{}).Where("org_id = ?", o.ID).Count(&n)
+	s.DB.Model(&Suggestion{}).Where("org_id = ?", o.ID).Count(&n)
 	if n != 2 {
 		t.Fatalf("want the two suggestions, got %d rows", n)
 	}
 
 	var events []Event
-	s.in(o.ID).Where("contact_id = ?", hannah.ID).Order("id").Find(&events)
+	s.InOrg(o.ID).Where("contact_id = ?", hannah.ID).Order("id").Find(&events)
 	var did []string
 	for _, e := range events {
 		did = append(did, e.Action)
@@ -130,7 +130,7 @@ func TestASuggestionCantGetPastTheNeverContactListOrAnErasure(t *testing.T) {
 		t.Fatalf("want her email waiting: %+v", got)
 	}
 	var sg Suggestion
-	if err := s.db.Where("contact_id = ?", hannah.ID).First(&sg).Error; err != nil {
+	if err := s.DB.Where("contact_id = ?", hannah.ID).First(&sg).Error; err != nil {
 		t.Fatal(err)
 	}
 	o.Settings.NeverContact = "larkmoor.example"
@@ -140,7 +140,7 @@ func TestASuggestionCantGetPastTheNeverContactListOrAnErasure(t *testing.T) {
 	if err := s.DecideSuggestion(o.ID, sg.ID, SuggestionAccepted, "ada"); err == nil {
 		t.Fatal("accepting put an address on the never-contact list onto a person")
 	}
-	if err := s.db.First(&sg, sg.ID).Error; err != nil || sg.Decision != "" {
+	if err := s.DB.First(&sg, sg.ID).Error; err != nil || sg.Decision != "" {
 		t.Fatalf("a refused accept should leave the suggestion waiting: %+v %v", sg, err)
 	}
 	if _, err := s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Jonas Weber", Email: "jonas@larkmoor.example", SourceURL: in.SourceURL}); err == nil {
@@ -151,7 +151,7 @@ func TestASuggestionCantGetPastTheNeverContactListOrAnErasure(t *testing.T) {
 		t.Fatal(err)
 	}
 	var left []Suggestion
-	s.db.Find(&left)
+	s.DB.Find(&left)
 	if len(left) != 0 {
 		t.Fatalf("erasing her left what was suggested for her: %+v", left)
 	}
@@ -202,7 +202,7 @@ func TestDetailsSentUnderAnotherNameAreNobodys(t *testing.T) {
 	mixed := must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Email: "jonas@larkmoor.example",
 		Linkedin: profile, Phone: "+44 20 7946 0000", SourceURL: team}))
 	var n int64
-	s.db.Model(&Suggestion{}).Count(&n)
+	s.DB.Model(&Suggestion{}).Count(&n)
 	if !mixed.Existed || mixed.ID != jonas.ID || len(mixed.Suggested) != 0 || n != 0 {
 		t.Fatalf("details sent under another name were filed for the person the address matched: %+v, %d rows", mixed, n)
 	}
@@ -212,12 +212,12 @@ func TestDetailsSentUnderAnotherNameAreNobodys(t *testing.T) {
 		t.Fatalf("want her number and profile waiting: %+v", got)
 	}
 	var waiting []Suggestion
-	s.db.Where("contact_id = ?", hannah.ID).Order("id").Find(&waiting)
+	s.DB.Where("contact_id = ?", hannah.ID).Order("id").Find(&waiting)
 	if err := s.DecideSuggestion(o.ID, waiting[0].ID, SuggestionAccepted, "ada"); err != nil {
 		t.Fatal(err)
 	}
 	var c Contact
-	s.in(o.ID).First(&c, hannah.ID)
+	s.InOrg(o.ID).First(&c, hannah.ID)
 	if deref(c.Phone) != "+44 20 7946 0000" || deref(c.Tz) == "" {
 		t.Fatalf("an accepted number should bring its time zone, as a typed one does: %q %q", deref(c.Phone), deref(c.Tz))
 	}
@@ -263,21 +263,21 @@ func TestErasingSomeoneCoversWhatWasSuggestedForThem(t *testing.T) {
 	in.Email = "hannah.pryce@larkmoor.example"
 	must(s.AgentAddContact(o, scout, in))
 	var waiting []Suggestion
-	s.db.Where("contact_id = ?", hannah.ID).Order("id").Find(&waiting)
+	s.DB.Where("contact_id = ?", hannah.ID).Order("id").Find(&waiting)
 	if len(waiting) != 3 || waiting[0].Value != "not.hers@larkmoor.example" {
 		t.Fatalf("want two addresses and a profile waiting: %+v", waiting)
 	}
 	if err := s.DecideSuggestion(o.ID, waiting[0].ID, SuggestionDismissed, "ada"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.db.Create(&Enquiry{OrgID: o.ID, Name: "H", Email: "hannah.pryce@larkmoor.example", Message: "Could you send pricing?"}).Error; err != nil {
+	if err := s.DB.Create(&Enquiry{OrgID: o.ID, Name: "H", Email: "hannah.pryce@larkmoor.example", Message: "Could you send pricing?"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := s.ErasePerson(o.ID, hannah.ID, "ada"); err != nil {
 		t.Fatal(err)
 	}
 	var enquiries int64
-	s.db.Model(&Enquiry{}).Count(&enquiries)
+	s.DB.Model(&Enquiry{}).Count(&enquiries)
 	if enquiries != 0 {
 		t.Fatal("what she wrote from an address suggested for her outlived her erasure")
 	}
@@ -310,7 +310,7 @@ func TestARestoreDropsSuggestionsForPeopleItDrops(t *testing.T) {
 		t.Fatal(err)
 	}
 	var n int64
-	s.db.Model(&Suggestion{}).Count(&n)
+	s.DB.Model(&Suggestion{}).Count(&n)
 	if n != 0 {
 		t.Fatalf("%d suggestions wait for someone the restore removed", n)
 	}
@@ -351,7 +351,7 @@ func TestAnAgentsGuessesDontPileUpOnOnePerson(t *testing.T) {
 	in.Email, in.Phone = "", strings.Repeat("7", maxDetail+1)
 	must(s.AgentAddContact(o, scout, in))
 	var waiting int64
-	if s.db.Model(&Suggestion{}).Where("contact_id = ?", hannah.ID).Count(&waiting); waiting != maxWaiting {
+	if s.DB.Model(&Suggestion{}).Where("contact_id = ?", hannah.ID).Count(&waiting); waiting != maxWaiting {
 		t.Fatalf("want %d addresses waiting and no overlong number, got %d rows", maxWaiting, waiting)
 	}
 
@@ -365,7 +365,7 @@ func TestAnAgentsGuessesDontPileUpOnOnePerson(t *testing.T) {
 		}
 		if guess != "hpryce" {
 			var sg Suggestion
-			s.db.Where("contact_id = ? and value = ?", hannah.ID, guess+"@larkmoor.example").First(&sg)
+			s.DB.Where("contact_id = ? and value = ?", hannah.ID, guess+"@larkmoor.example").First(&sg)
 			if err := s.DecideSuggestion(o.ID, sg.ID, SuggestionDismissed, "ada"); err != nil {
 				t.Fatal(err)
 			}
@@ -388,14 +388,14 @@ func TestARestoreDoesntHandASuggestionToWhoeverGotTheId(t *testing.T) {
 	must(s.AgentAddContact(o, scout, in))
 	snapshot := must(s.SnapshotText(o.ID))
 	count := func() (n int64) {
-		s.db.Model(&Suggestion{}).Count(&n)
+		s.DB.Model(&Suggestion{}).Count(&n)
 		return n
 	}
 	if _, err := s.Restore(o.ID, snapshot); err != nil || count() != 1 {
 		t.Fatalf("a restore that brings the same person back keeps what waits for her: %d %v", count(), err)
 	}
 	// The id is somebody else now; the snapshot gives it back to Hannah.
-	if err := s.db.Model(&Contact{}).Where("id = ?", hannah.ID).Update("key", "somebody-else").Error; err != nil {
+	if err := s.DB.Model(&Contact{}).Where("id = ?", hannah.ID).Update("key", "somebody-else").Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Restore(o.ID, snapshot); err != nil || count() != 0 {

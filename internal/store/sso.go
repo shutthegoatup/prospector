@@ -47,3 +47,33 @@ const ChallengeLabel = "_prospector-challenge"
 func (u *User) HasPassword() bool {
 	return u.PasswordHash != "" && !strings.HasPrefix(u.PasswordHash, "!")
 }
+
+type SSO struct {
+	SSOConnection
+	Domains []SSODomain
+}
+
+func (c *SSO) On() bool { return c.Issuer != "" }
+
+func EmailDomain(email string) string {
+	_, domain, _ := strings.Cut(strings.ToLower(strings.TrimSpace(email)), "@")
+	return domain
+}
+
+// Proves is whether the organisation's sign-in may speak for an address: only one at
+// a domain it has shown is its own, matched whole.
+func (c *SSO) Proves(email string) bool {
+	domain := EmailDomain(email)
+	for _, d := range c.Domains {
+		if d.VerifiedAt != nil && d.Domain == domain && domain != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// IdpSpec opens the connection's client secret, which the database holds sealed.
+func (k *Keyring) IdpSpec(c *SSO) (IdpSpec, error) {
+	secret, err := k.Open(c.ClientSecret)
+	return IdpSpec{Issuer: c.Issuer, ClientID: c.ClientID, Secret: secret}, err
+}

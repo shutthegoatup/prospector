@@ -23,11 +23,11 @@ func TestExportOrg(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	do(s.db.Model(&Org{}).Where("id = ?", other.ID).Update("name", "Betamax Holdings").Error)
+	do(s.DB.Model(&Org{}).Where("id = ?", other.ID).Update("name", "Betamax Holdings").Error)
 	hannah := must(s.FindOne(o.ID, "Hannah"))
 	do(s.Update(o.ID, hannah.ID, "phone", "+44 20 7946 0000", "ada"))
-	do(s.db.Create(&Fact{OrgID: o.ID, CompanyID: *hannah.CompanyID, ContactID: &hannah.ID, Field: "role", Value: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}).Error)
-	do(s.db.Create(&[]Enquiry{
+	do(s.DB.Create(&Fact{OrgID: o.ID, CompanyID: *hannah.CompanyID, ContactID: &hannah.ID, Field: "role", Value: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}).Error)
+	do(s.DB.Create(&[]Enquiry{
 		{OrgID: o.ID, Name: "Hannah Pryce", Email: hannahEmail, Message: "Could you send pricing?"},
 		{OrgID: other.ID, Name: "Hannah Pryce", Email: hannahEmail, Message: "A note to the other organisation"},
 	}).Error)
@@ -40,7 +40,7 @@ func TestExportOrg(t *testing.T) {
 	outsider := must(s.CreateUser("carol@example.com", "Carol Outsider", "correct horse battery"))
 	do(s.AddMember(other.ID, outsider.ID, "owner", outsider.Name))
 	do(s.SaveSSO(&SSOConnection{OrgID: o.ID, Issuer: "https://id.larkmoor.example", ClientID: "prospector-client", ClientSecret: "s3cret-client-value"}, "ada"))
-	do(s.db.Create(&SSODomain{OrgID: o.ID, Domain: "alpha.example", Token: "dns-proof-token"}).Error)
+	do(s.DB.Create(&SSODomain{OrgID: o.ID, Domain: "alpha.example", Token: "dns-proof-token"}).Error)
 	do(s.SaveOrgMail(&OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "mailer", Password: "sealed-mail-password", Sender: "Alpha <hello@alpha.example>"}))
 	do(s.SaveOrgMail(&OrgMail{OrgID: other.ID, Host: "smtp.beta.example", Port: 587, Sender: "beta@beta.example"}))
 
@@ -87,10 +87,10 @@ func TestExportOrg(t *testing.T) {
 		t.Fatalf("organisation and members: %+v %+v", out.Organisation, out.Members)
 	}
 	var contacts, companies, events, facts int64
-	s.in(o.ID).Model(&Contact{}).Count(&contacts)
-	s.in(o.ID).Model(&Fact{}).Count(&facts)
-	s.in(o.ID).Model(&Company{}).Count(&companies)
-	s.in(o.ID).Model(&Event{}).Count(&events)
+	s.InOrg(o.ID).Model(&Contact{}).Count(&contacts)
+	s.InOrg(o.ID).Model(&Fact{}).Count(&facts)
+	s.InOrg(o.ID).Model(&Company{}).Count(&companies)
+	s.InOrg(o.ID).Model(&Event{}).Count(&events)
 	if contacts == 0 || int64(len(out.Contacts)) != contacts || int64(len(out.Companies)) != companies || int64(len(out.History)) != events {
 		t.Fatalf("%d of %d contacts, %d of %d companies, %d of %d history lines", len(out.Contacts), contacts, len(out.Companies), companies, len(out.History), events)
 	}
@@ -111,15 +111,15 @@ func TestExportOrg(t *testing.T) {
 	}
 
 	var keys []APIKey
-	do(s.db.Find(&keys).Error)
+	do(s.DB.Find(&keys).Error)
 	var sessions []Session
-	do(s.db.Find(&sessions).Error)
+	do(s.DB.Find(&sessions).Error)
 	var conn SSOConnection
-	do(s.db.Where("org_id = ?", o.ID).First(&conn).Error)
+	do(s.DB.Where("org_id = ?", o.ID).First(&conn).Error)
 	var users []User
-	do(s.db.Find(&users).Error)
+	do(s.DB.Find(&users).Error)
 	var erasures []Erasure
-	do(s.in(o.ID).Find(&erasures).Error)
+	do(s.InOrg(o.ID).Find(&erasures).Error)
 	secrets := []string{key, theirKey, "s3cret-client-value", conn.ClientSecret, "dns-proof-token", "correct horse battery", "sealed-mail-password"}
 	for _, k := range keys {
 		secrets = append(secrets, k.Hash, k.Prefix)
@@ -148,7 +148,7 @@ func TestExportOrg(t *testing.T) {
 	}
 
 	var noted []Event
-	do(s.in(o.ID).Where("action = ?", "export:org").Find(&noted).Error)
+	do(s.InOrg(o.ID).Where("action = ?", "export:org").Find(&noted).Error)
 	if len(noted) != 1 || noted[0].User == "" || noted[0].Value != nil {
 		t.Fatalf("one export should be on the record, by name: %+v", noted)
 	}

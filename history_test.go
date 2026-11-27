@@ -38,7 +38,7 @@ func TestHistoryKeepsNoPersonalDetails(t *testing.T) {
 	must(s.AgentAddContact(o, Actor{Name: "agent:scout", KeyID: 1}, AddContactIn{Company: strconv.FormatInt(*hannah.CompanyID, 10), Name: "Jonas Lindqvist", Title: "CMO", SourceURL: "https://larkmoor.example/team"}))
 
 	var events []Event
-	do(s.in(o.ID).Find(&events).Error)
+	do(s.InOrg(o.ID).Find(&events).Error)
 	said := map[string]string{}
 	for _, e := range events {
 		v := strings.ToLower(deref(e.Value))

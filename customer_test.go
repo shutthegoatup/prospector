@@ -49,7 +49,7 @@ func as(t *testing.T, c *http.Client, method, u string) (*http.Response, string)
 // ageCustomerLinks makes every link look as if it was mailed long enough ago for another to go.
 func ageCustomerLinks(t *testing.T, s *Store) {
 	t.Helper()
-	if err := s.db.Model(&CustomerLink{}).Where("1 = 1").Update("created_at", time.Now().Add(-2*customerLinkGap)).Error; err != nil {
+	if err := s.DB.Model(&CustomerLink{}).Where("1 = 1").Update("created_at", time.Now().Add(-2*customerLinkGap)).Error; err != nil {
 		t.Fatal(err)
 	}
 }
@@ -207,7 +207,7 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 	}
 	var left int64
 	for _, table := range []any{&CustomerGrant{}, &CustomerLink{}, &CustomerSession{}} {
-		if err := s.db.Model(table).Where("org_id = ?", o.ID).Count(&left).Error; err != nil || left != 0 {
+		if err := s.DB.Model(table).Where("org_id = ?", o.ID).Count(&left).Error; err != nil || left != 0 {
 			t.Errorf("removing the onboarding left %d rows of %T (%v)", left, table, err)
 		}
 	}
@@ -241,7 +241,7 @@ func TestErasingAPersonClosesTheirPage(t *testing.T) {
 		t.Error("an erased person's browser still has their page")
 	}
 	var left int64
-	if err := s.db.Model(&CustomerGrant{}).Where("org_id = ?", o.ID).Count(&left).Error; err != nil || left != 0 {
+	if err := s.DB.Model(&CustomerGrant{}).Where("org_id = ?", o.ID).Count(&left).Error; err != nil || left != 0 {
 		t.Errorf("erasing them left %d records of their access (%v)", left, err)
 	}
 }
@@ -261,27 +261,27 @@ func TestACustomersLinkAndBrowserRunOut(t *testing.T) {
 		t.Fatalf("inviting: %d %s", code, body)
 	}
 	link := srv.URL + customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1]
-	if err := s.db.Model(&CustomerLink{}).Where("1 = 1").Update("expires_at", time.Now().Add(-time.Minute)).Error; err != nil {
+	if err := s.DB.Model(&CustomerLink{}).Where("1 = 1").Update("expires_at", time.Now().Add(-time.Minute)).Error; err != nil {
 		t.Fatal(err)
 	}
 	outsider := newMailClient()
 	if _, page := as(t, outsider, "POST", link); served(t, page).State != "again" || strings.Contains(page, "product files") {
 		t.Errorf("a link past its seven days: %.200s", page)
 	}
-	if err := s.db.Model(&CustomerLink{}).Where("1 = 1").Update("expires_at", time.Now().Add(time.Hour)).Error; err != nil {
+	if err := s.DB.Model(&CustomerLink{}).Where("1 = 1").Update("expires_at", time.Now().Add(time.Hour)).Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, page := as(t, outsider, "POST", link); !strings.Contains(page, "Send your product files") {
 		t.Fatalf("opening the page: %.200s", page)
 	}
-	if err := s.db.Model(&CustomerSession{}).Where("1 = 1").Update("expires_at", time.Now().Add(-time.Minute)).Error; err != nil {
+	if err := s.DB.Model(&CustomerSession{}).Where("1 = 1").Update("expires_at", time.Now().Add(-time.Minute)).Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, page := as(t, outsider, "GET", srv.URL+"/c"); served(t, page).State != "none" {
 		t.Error("a browser past its thirty days still has the page")
 	}
 	// Leaving closes it in that browser.
-	if err := s.db.Model(&CustomerSession{}).Where("1 = 1").Update("expires_at", time.Now().Add(time.Hour)).Error; err != nil {
+	if err := s.DB.Model(&CustomerSession{}).Where("1 = 1").Update("expires_at", time.Now().Add(time.Hour)).Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, page := as(t, outsider, "GET", srv.URL+"/c"); !strings.Contains(page, "Send your product files") {
@@ -291,7 +291,7 @@ func TestACustomersLinkAndBrowserRunOut(t *testing.T) {
 		t.Errorf("after closing the page in this browser: %.200s", page)
 	}
 	var sessions int64
-	if err := s.db.Model(&CustomerSession{}).Count(&sessions).Error; err != nil || sessions != 0 {
+	if err := s.DB.Model(&CustomerSession{}).Count(&sessions).Error; err != nil || sessions != 0 {
 		t.Errorf("closing the page left %d browsers on record (%v)", sessions, err)
 	}
 }
@@ -346,7 +346,7 @@ func TestACustomersPageClosesWhenTheyNoLongerQualify(t *testing.T) {
 	}
 	set := func(column string, value any) {
 		t.Helper()
-		if err := s.db.Model(&Contact{}).Where("id = ?", hannah.ID).Update(column, value).Error; err != nil {
+		if err := s.DB.Model(&Contact{}).Where("id = ?", hannah.ID).Update(column, value).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -416,7 +416,7 @@ func TestACustomersPageClosesWhenTheyNoLongerQualify(t *testing.T) {
 	// A restore that gives them another id takes their page with them, and one that
 	// leaves them out closes it.
 	var kept Contact
-	if err := s.db.First(&kept, hannah.ID).Error; err != nil {
+	if err := s.DB.First(&kept, hannah.ID).Error; err != nil {
 		t.Fatal(err)
 	}
 	kept.ID = hannah.ID + 500
@@ -503,7 +503,7 @@ func TestACustomerMarksTheirOwnSteps(t *testing.T) {
 		t.Errorf("the members' page does not say the customer marked it: %v", doneBy)
 	}
 	var entry Event
-	if err := s.db.Where("org_id = ? and action = ?", o.ID, "onboard:done").Last(&entry).Error; err != nil || entry.ContactID != hannah.ID || entry.User != customerActor || deref(entry.Value) != "Send your product files" {
+	if err := s.DB.Where("org_id = ? and action = ?", o.ID, "onboard:done").Last(&entry).Error; err != nil || entry.ContactID != hannah.ID || entry.User != customerActor || deref(entry.Value) != "Send your product files" {
 		t.Errorf("the history entry: %+v (%v)", entry, err)
 	}
 
@@ -575,7 +575,7 @@ func TestACustomersMarksKeepTheHistoryHonest(t *testing.T) {
 	events := func() int64 {
 		t.Helper()
 		var n int64
-		if err := s.db.Model(&Event{}).Where("org_id = ?", o.ID).Count(&n).Error; err != nil {
+		if err := s.DB.Model(&Event{}).Where("org_id = ?", o.ID).Count(&n).Error; err != nil {
 			t.Fatal(err)
 		}
 		return n
@@ -620,7 +620,7 @@ func TestACustomersMarksKeepTheHistoryHonest(t *testing.T) {
 		t.Fatal(err)
 	}
 	var theirs int64
-	if err := s.db.Model(&Event{}).Where("org_id = ? and contact_id = ?", o.ID, hannah.ID).Count(&theirs).Error; err != nil || theirs != 0 || !done() {
+	if err := s.DB.Model(&Event{}).Where("org_id = ? and contact_id = ?", o.ID, hannah.ID).Count(&theirs).Error; err != nil || theirs != 0 || !done() {
 		t.Errorf("after erasing them: %d entries still theirs (%v), done %v", theirs, err, done())
 	}
 }
@@ -672,7 +672,7 @@ func TestTakingBackAMarkRemovesOnlyThatMarksEntry(t *testing.T) {
 	entries := func() []Event {
 		t.Helper()
 		var out []Event
-		if err := s.db.Where("org_id = ? and action = ?", o.ID, "onboard:done").Order("id").Find(&out).Error; err != nil {
+		if err := s.DB.Where("org_id = ? and action = ?", o.ID, "onboard:done").Order("id").Find(&out).Error; err != nil {
 			t.Fatal(err)
 		}
 		return out
@@ -729,13 +729,13 @@ func TestTakingBackAMarkFromBeforeEntriesWereKeptLeavesTheEntry(t *testing.T) {
 	as(t, c, "POST", srv.URL+customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1])
 	st := must(s.Onboardings(o.ID, 0, today()))[0].Steps[0]
 	as(t, c, "POST", srv.URL+"/c/steps/"+itoa(st.ID)+"/done")
-	if err := s.db.Model(&OnboardingStep{}).Where("id = ?", st.ID).Update("done_entry", 0).Error; err != nil {
+	if err := s.DB.Model(&OnboardingStep{}).Where("id = ?", st.ID).Update("done_entry", 0).Error; err != nil {
 		t.Fatal(err)
 	}
 
 	as(t, c, "POST", srv.URL+"/c/steps/"+itoa(st.ID)+"/undone")
 	var n int64
-	if err := s.db.Model(&Event{}).Where("org_id = ? and action = ?", o.ID, "onboard:done").Count(&n).Error; err != nil || n != 1 {
+	if err := s.DB.Model(&Event{}).Where("org_id = ? and action = ?", o.ID, "onboard:done").Count(&n).Error; err != nil || n != 1 {
 		t.Errorf("after taking back an old mark: %d entries (%v)", n, err)
 	}
 	if got := must(s.Onboardings(o.ID, 0, today()))[0].Steps[0]; got.DoneOn != nil {

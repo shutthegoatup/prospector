@@ -44,9 +44,9 @@ func TestErasePerson(t *testing.T) {
 	do(s.Update(o.ID, hannah.ID, "call_notes", "prefers mornings, has a dog called Biscuit", "ada"))
 	do(s.AgentMark(o.ID, Actor{Name: "agent:scout"}, MarkIn{ContactID: hannah.ID, Step: "replied", Date: "2020-01-02", Note: "she wrote back from her own gmail"}))
 	do(s.Update(o.ID, hannah.ID, "stage", "meeting", "ada"))
-	do(s.db.Create(&Fact{OrgID: o.ID, CompanyID: *hannah.CompanyID, ContactID: &hannah.ID, Field: "role", Value: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}).Error)
+	do(s.DB.Create(&Fact{OrgID: o.ID, CompanyID: *hannah.CompanyID, ContactID: &hannah.ID, Field: "role", Value: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}).Error)
 	var placeholder Contact
-	do(s.in(o.ID).Where("key like 'org:%'").First(&placeholder).Error)
+	do(s.InOrg(o.ID).Where("key like 'org:%'").First(&placeholder).Error)
 
 	jar, _ := cookiejar.New(nil)
 	bob := &http.Client{Jar: jar}
@@ -81,20 +81,20 @@ func TestErasePerson(t *testing.T) {
 	gone := func(when string) {
 		t.Helper()
 		var n int64
-		s.in(o.ID).Model(&Contact{}).Where("id = ? or lower(email) = ? or person like 'Hannah%'", hannah.ID, hannahEmail).Count(&n)
+		s.InOrg(o.ID).Model(&Contact{}).Where("id = ? or lower(email) = ? or person like 'Hannah%'", hannah.ID, hannahEmail).Count(&n)
 		if n != 0 {
 			t.Fatalf("%s: Hannah is in the contacts", when)
 		}
 	}
 	gone("after erasing")
 	var facts, attached int64
-	s.in(o.ID).Model(&Fact{}).Where("contact_id = ?", hannah.ID).Count(&facts)
-	s.in(o.ID).Model(&Event{}).Where("contact_id = ?", hannah.ID).Count(&attached)
+	s.InOrg(o.ID).Model(&Fact{}).Where("contact_id = ?", hannah.ID).Count(&facts)
+	s.InOrg(o.ID).Model(&Event{}).Where("contact_id = ?", hannah.ID).Count(&attached)
 	if facts != 0 || attached != 0 {
 		t.Fatalf("%d facts and %d events still point at her", facts, attached)
 	}
 	var events []Event
-	do(s.in(o.ID).Find(&events).Error)
+	do(s.InOrg(o.ID).Find(&events).Error)
 	kept := map[string]string{}
 	for _, e := range events {
 		v := strings.ToLower(deref(e.Value))
@@ -150,10 +150,10 @@ func TestErasePerson(t *testing.T) {
 		t.Fatalf("restore: %d, %v", n, err)
 	}
 	var twin Contact
-	if err := s.in(o.ID).First(&twin, namesake.ID).Error; err != nil {
+	if err := s.InOrg(o.ID).First(&twin, namesake.ID).Error; err != nil {
 		t.Fatal("a restore dropped someone at another company who shares her name")
 	}
-	do(s.db.Delete(&twin).Error)
+	do(s.DB.Delete(&twin).Error)
 	jonas := must(s.FindOne(o.ID, "Jonas"))
 	if err := s.Update(o.ID, jonas.ID, "email", hannahEmail, "ada"); !errors.Is(err, errErased) {
 		t.Fatalf("her address was put on someone else: %v", err)
@@ -167,7 +167,7 @@ func TestErasePerson(t *testing.T) {
 
 	fresh := must(s.QuickAddPerson(o, QuickAdd{Name: "Nia Okafor", Company: "Larkmoor"}, "ada"))
 	var inherited int64
-	s.in(o.ID).Model(&Event{}).Where("contact_id = ? and action <> ?", fresh.ID, "add:person").Count(&inherited)
+	s.InOrg(o.ID).Model(&Event{}).Where("contact_id = ? and action <> ?", fresh.ID, "add:person").Count(&inherited)
 	if inherited != 0 {
 		t.Fatalf("the next person added inherited %d lines of history", inherited)
 	}
