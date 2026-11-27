@@ -214,6 +214,10 @@ export function Landing() {
             <Feature tone="coral" title="Enquiries answered">
               Site forms and your product's sign-ups arrive open, to be given an owner. Reply by email from the card, and paste their answer into the thread.
             </Feature>
+            <Feature tone="violet" title="Agreements signed and sealed">
+              Upload the contract, place each signer's fields and send it. They sign from an emailed link with a code and their typed name; members sign signed
+              in. The signed copy is sealed with your own key, with a certificate of who signed, how and when.
+            </Feature>
             <Feature tone="gold" title="Campaigns to people you know">
               Write once to everyone in conversation or at a current customer, never to cold prospects. It goes through your own mail server with your postal
               address and a one-click unsubscribe, and nobody is mailed twice. A service notice, such as a price change, reaches customers who unsubscribed from
@@ -288,6 +292,10 @@ export function Landing() {
                   <li>
                     Send a campaign to everyone in conversation or at a customer, through your own mail server, each with an unsubscribe link
                     <code>campaigns:send</code>
+                  </li>
+                  <li>
+                    Send an agreement for signature through your own mail server, and withdraw it; never sign one, which only a signed-in member can
+                    <code>agreements:send</code>
                   </li>
                 </ul>
               </div>

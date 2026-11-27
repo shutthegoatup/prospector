@@ -38,6 +38,9 @@ var opArea = map[string]string{
 	"CreateCampaign": areaSales, "ChangeCampaign": areaSales, "RemoveCampaign": areaSales,
 	"SendCampaign": areaSales, "CancelCampaign": areaSales, "ResumeCampaign": areaSales,
 	"CreateAgreement": areaSales, "ChangeAgreement": areaSales, "RemoveAgreement": areaSales, "PutAgreementDocument": areaSales,
+	"SendAgreement": areaSales, "VoidAgreement": areaSales, "ResendAgreementLink": areaSales,
+	// Signing your own place is yours, whatever your areas: the operation checks it is yours.
+	"SignAgreementAsMember": "", "DeclineAgreementAsMember": "",
 	"AddAgreementRecipient": areaSales, "ChangeAgreementRecipient": areaSales, "RemoveAgreementRecipient": areaSales, "PutAgreementFields": areaSales,
 	"EnrichContact": areaSales,
 	"CreateAgent":   "", "UpdateAgent": "", "DeleteAgent": "", "CreateKey": "", "ChangeKey": "", "RevokeKey": "", "DeleteEnquiry": "", "ChangeSettings": "", "SaveEnricher": "", "DeleteEnricher": "",

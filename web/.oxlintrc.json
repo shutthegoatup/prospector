@@ -23,5 +23,5 @@
     "jsx-a11y/label-has-associated-control": ["error", { "controlComponents": ["Input", "Textarea", "Checkbox", "Field", "Choice"], "depth": 4 }],
     "jsx-a11y/prefer-tag-over-role": "off"
   },
-  "ignorePatterns": ["src/api.d.ts", "src/components/ui/**", "site-build/**"]
+  "ignorePatterns": ["src/api.d.ts", "src/signer-api.d.ts", "src/components/ui/**", "site-build/**"]
 }

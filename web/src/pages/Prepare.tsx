@@ -1,5 +1,5 @@
 import { type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import type { components } from "@/api";
 import { $api, fetchClient } from "@/client";
 import { ActionButton, Eyebrow, Failed, Meta, PageHead, useRefresh, Whose } from "@/components/app";
@@ -47,7 +47,7 @@ export function PreparePage() {
   const saving = useRef(Promise.resolve());
 
   useEffect(() => {
-    if (stored.data) setFields(stored.data.items.map(({ recipient_id, page, kind, x, y, w, h }) => ({ recipient_id, page, kind, x, y, w, h })));
+    if (stored.data) setFields(stored.data.items.map(({ recipient_id, page, kind, x, y, w, h, label }) => ({ recipient_id, page, kind, x, y, w, h, label })));
   }, [stored.data]);
 
   const a = agreement.data;
@@ -94,10 +94,12 @@ export function PreparePage() {
   if (!a) return <Loading busy>{head}</Loading>;
   const known = recipients.data !== undefined || Boolean(recipients.error);
   const signed = new Set((fields ?? []).filter((f) => f.kind === "signature").map((f) => f.recipient_id));
+  const asks = (fields ?? []).map((f, n) => ({ f, n })).filter(({ f }) => f.kind === "text" || f.kind === "tick");
   const missing = [
     ...(a.file_hash ? [] : ["Upload the PDF."]),
     ...(signers.length === 0 ? ["Add someone to sign it."] : []),
     ...signers.filter((s) => !signed.has(s.id)).map((s) => `Place a signature for ${s.name}.`),
+    ...asks.filter(({ f }) => !f.label?.trim()).map(({ f }) => `Say what the ${f.kind === "text" ? "text field" : "tick box"} on page ${f.page} is for.`),
   ];
 
   return (
@@ -204,12 +206,29 @@ export function PreparePage() {
               <Meta>People need one email address and can't be on the never-contact list. Nobody is emailed yet.</Meta>
             </section>
           )}
-          <section className="flex flex-col gap-1.5 panel p-3.5">
-            <Eyebrow>Before it can be sent</Eyebrow>
-            {known && fields && missing.length === 0 && <p className="font-mono text-xs text-[var(--ok)]">✓ Every signer has a signature field.</p>}
-            {known && fields && missing.map((m) => <Meta key={m}>· {m}</Meta>)}
-            <Meta>Sending it for signature comes in the next release. Until then nothing here leaves Prospector.</Meta>
-          </section>
+          {edit && asks.length > 0 && fields && (
+            <section className="flex flex-col gap-2 panel p-3.5">
+              <Eyebrow>What the signer fills in</Eyebrow>
+              {asks.map(({ f, n }) => (
+                <label key={n} className="flex flex-col gap-1 text-sm">
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {f.kind === "text" ? "Text" : "Tick box"} · page {f.page} · {signers.find((s) => s.id === f.recipient_id)?.name}
+                  </span>
+                  <input
+                    defaultValue={f.label ?? ""}
+                    maxLength={80}
+                    placeholder={f.kind === "text" ? "e.g. Job title" : "e.g. I accept the terms"}
+                    onBlur={(e) => {
+                      const value = e.currentTarget.value.trim();
+                      if (value !== (f.label ?? "")) save(fields.map((g, m) => (m === n ? { ...g, label: value } : g)));
+                    }}
+                    className={field}
+                  />
+                </label>
+              ))}
+            </section>
+          )}
+          {a.status === "draft" ? <Send a={a} missing={missing} ready={known && fields !== null} edit={edit} /> : <Sent a={a} />}
         </div>
         <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-3">
           {known && edit && signers.length > 0 && (
@@ -249,6 +268,85 @@ export function PreparePage() {
         </div>
       </div>
     </>
+  );
+}
+
+type Overview = components["schemas"]["AgreementOverview"];
+
+// Send is the panel a draft goes out from: what it still lacks, then the mail to its signers.
+function Send({ a, missing, ready, edit }: { a: Overview; missing: string[]; ready: boolean; edit: boolean }) {
+  const { org } = useSession();
+  const navigate = useNavigate();
+  const send = $api.useMutation("post", "/o/{org}/api/v1/agreements/{id}/send", {
+    onSuccess: () => navigate({ to: "/o/$org/companies/$id", params: { org, id: a.company_id } }),
+  });
+  const [subject, setSubject] = useState(`Please sign: ${a.name}`);
+  const [message, setMessage] = useState("");
+  const [days, setDays] = useState(14);
+  const blocked = !ready || missing.length > 0 || a.cant_send !== "";
+  return (
+    <section className="flex flex-col gap-2 panel p-3.5">
+      <Eyebrow>Send</Eyebrow>
+      {ready && missing.length === 0 && <p className="font-mono text-xs text-[var(--ok)]">✓ Everything is placed.</p>}
+      {ready && missing.map((m) => <Meta key={m}>· {m}</Meta>)}
+      {a.cant_send && <p className="font-mono text-xs text-[var(--stop)]">{a.cant_send}</p>}
+      {edit && (
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            send.mutate({ params: { path: { org, id: a.id } }, body: { subject, message, days } });
+          }}
+        >
+          <label className="flex flex-col gap-1">
+            <Eyebrow>Subject</Eyebrow>
+            <input value={subject} maxLength={200} onChange={(e) => setSubject(e.currentTarget.value)} className={field} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <Eyebrow>Message</Eyebrow>
+            <textarea
+              value={message}
+              maxLength={2000}
+              onChange={(e) => setMessage(e.currentTarget.value)}
+              className="rounded-lg border border-input bg-muted p-2 text-sm"
+              style={{ minHeight: 96 }}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <Eyebrow>Open for</Eyebrow>
+            <select value={days} onChange={(e) => setDays(Number(e.currentTarget.value))} className={field}>
+              {[7, 14, 30, 60].map((d) => (
+                <option key={d} value={d}>
+                  {d} days
+                </option>
+              ))}
+            </select>
+          </label>
+          <ActionButton type="submit" disabled={blocked || send.isPending}>
+            Send for signature
+          </ActionButton>
+          <Failed errors={[send.error]} />
+        </form>
+      )}
+      <Meta>
+        Once sent, the PDF and fields are frozen. Each signer outside the organisation gets a link; to sign they enter a code we email them and type their name.
+        Members sign signed in. You can withdraw it until the last one signs.
+      </Meta>
+    </section>
+  );
+}
+
+// Sent is where an agreement that went out stands, in place of the Send panel.
+function Sent({ a }: { a: Overview }) {
+  return (
+    <section className="flex flex-col gap-1.5 panel p-3.5">
+      <Eyebrow>Sent</Eyebrow>
+      <Meta>
+        {a.status} · sent by {a.sent_by}
+        {a.expires_at ? ` · open until ${new Date(a.expires_at).toLocaleDateString()}` : ""}
+      </Meta>
+      <Meta>It can't be changed now. Where each signer stands is on the company's page.</Meta>
+    </section>
   );
 }
 

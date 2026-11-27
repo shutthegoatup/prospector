@@ -28,6 +28,7 @@ const pages = {
   Prepare: () => import("@/pages/Prepare"),
   Research: () => import("@/pages/Research"),
   Settings: () => import("@/pages/Settings"),
+  Sign: () => import("@/pages/Sign"),
   SignIn: () => import("@/pages/SignIn"),
   Subscriptions: () => import("@/pages/Subscriptions"),
   Task: () => import("@/pages/Task"),
@@ -77,6 +78,13 @@ const prepare = createRoute({
   errorComponent: NotFound,
   component: page("Prepare", "PreparePage"),
 });
+const sign = createRoute({
+  getParentRoute: () => org,
+  path: "agreements/$id/sign",
+  params: idParams,
+  errorComponent: NotFound,
+  component: page("Sign", "SignPage"),
+});
 const add = createRoute({ getParentRoute: () => org, path: "add", validateSearch: addSearch, component: page("Add", "AddPage") });
 
 // Signing in, outside any organisation and its sidebar.
@@ -110,6 +118,7 @@ const routeTree = root.addChildren([
     companies,
     company,
     prepare,
+    sign,
     settings,
     agents,
     add,

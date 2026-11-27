@@ -304,6 +304,26 @@ func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 		}
 		// A reply that never left isn't part of what was said.
 		out.EnquiryThread = slices.DeleteFunc(out.EnquiryThread, func(m EnquiryMessage) bool { return m.Ours && m.SentAt == nil })
+		// Someone erased stays on the agreements they were sent, as their record, but
+		// nothing that identifies them leaves in an export.
+		erased := map[int64]bool{}
+		for i, r := range out.Recipients {
+			if r.Erased {
+				erased[r.ID] = true
+				out.Recipients[i].SentName, out.Recipients[i].SentEmail, out.Recipients[i].TypedName, out.Recipients[i].DeclineReason = "someone erased", "", "", ""
+			}
+		}
+		for i, e := range out.Events {
+			if e.RecipientID != nil && erased[*e.RecipientID] {
+				out.Events[i].Detail, out.Events[i].Actor, out.Events[i].IP, out.Events[i].UserAgent = "(someone erased)", "someone erased", "", ""
+			}
+		}
+		// What they filled in carries their name and their answers.
+		for i, f := range out.Fields {
+			if erased[f.RecipientID] {
+				out.Fields[i].Value = ""
+			}
+		}
 		var events []Event
 		if err := mine().Find(&events).Error; err != nil {
 			return err

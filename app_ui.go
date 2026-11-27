@@ -18,10 +18,29 @@ func (a *App) appRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /o/{org}/companies/{id}", a.member(a.shell))
 	mux.HandleFunc("GET /o/{org}/tasks/{id}", a.member(a.shell))
 	// An agreement's PDF is drawn with pdf.js, which needs WebAssembly for some images.
-	mux.HandleFunc("GET /o/{org}/agreements/{id}/prepare", a.member(func(w http.ResponseWriter, r *http.Request) {
+	for _, page := range []string{"prepare", "sign"} {
+		mux.HandleFunc("GET /o/{org}/agreements/{id}/"+page, a.member(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Security-Policy", pdfPolicy)
+			a.shell(w, r)
+		}))
+	}
+	// The signer's page, from a mailed link: no sign-in, none of the members' app. The
+	// link's token is in the address, so it is never sent on as a referrer, and the page
+	// isn't for search engines.
+	signPage := func(w http.ResponseWriter, r *http.Request) {
+		b, err := signHTML()
+		if err != nil {
+			fail(w, err, http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Security-Policy", pdfPolicy)
-		a.shell(w, r)
-	}))
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+		w.Header().Set("content-type", "text/html; charset=utf-8")
+		_, _ = w.Write(b)
+	}
+	mux.HandleFunc("GET /s/{$}", signPage)
+	mux.HandleFunc("GET /s/{token}", signPage)
 	// Where the React pages lived while the sidebar was still the server's; bookmarklets
 	// already dragged to a bar still open the add form there.
 	mux.HandleFunc("GET /o/{org}/app/{page...}", a.member(func(w http.ResponseWriter, r *http.Request) {
@@ -35,6 +54,9 @@ func (a *App) appRoutes(mux *http.ServeMux) {
 
 // shellHTML is the page Vite builds from web/index.html.
 var shellHTML = builtPage("index.html", nil)
+
+// signHTML is the signer's page, built by Vite from web/sign.html.
+var signHTML = builtPage("sign.html", nil)
 
 // writeShell answers with the app's shell carrying page: what the server already decided
 // a page shows, for the pages with no API to ask (an error, the start of a first

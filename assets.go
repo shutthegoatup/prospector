@@ -60,7 +60,7 @@ func assetHandler() http.Handler {
 		// Embedded files carry no date to revalidate against, so anything not cached
 		// for good is fetched again on every page. A font that changes gets a new name, and
 		// so does each of the app's chunks, named for its content when it is built.
-		if strings.HasPrefix(r.URL.Path, "fonts/") || strings.HasPrefix(r.URL.Path, "app/chunks/") || strings.HasPrefix(r.URL.Path, "app/main-") || r.URL.Query().Get("v") == assetVersion {
+		if strings.HasPrefix(r.URL.Path, "fonts/") || strings.HasPrefix(r.URL.Path, "app/chunks/") || strings.HasPrefix(r.URL.Path, "app/main-") || strings.HasPrefix(r.URL.Path, "app/sign-") || r.URL.Query().Get("v") == assetVersion {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		} else {
 			w.Header().Set("Cache-Control", "no-cache")

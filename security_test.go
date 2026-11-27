@@ -692,7 +692,8 @@ func TestContentPolicy(t *testing.T) {
 		"/o/alpha/conversations", "/o/alpha/companies", "/o/alpha/companies/" + strconv.FormatInt(company.ID, 10),
 		"/o/alpha/add", "/o/alpha/add?popup=1&name=Hannah", "/o/alpha/settings", "/o/alpha/agents", "/o/alpha/enquiries", "/o/alpha/subscriptions", "/o/alpha/onboarding", "/o/alpha/campaigns", "/c", "/u/never-made",
 		"/o/alpha/tasks", "/o/alpha/tasks?closed=1", "/o/alpha/tasks/" + strconv.FormatInt(task.ID, 10),
-		"/o/alpha/agreements/" + strconv.FormatInt(must(s.AddAgreement(o.ID, company.ID, "Service agreement", "test")).ID, 10) + "/prepare"}
+		"/o/alpha/agreements/" + strconv.FormatInt(must(s.AddAgreement(o.ID, company.ID, "Service agreement", "test")).ID, 10) + "/prepare",
+		"/o/alpha/agreements/1/sign", "/s/", "/s/a-link-that-opens-nothing"}
 	for _, p := range appPages {
 		pages = append(pages, "/o/alpha/"+p)
 	}

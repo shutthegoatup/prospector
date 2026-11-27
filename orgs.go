@@ -334,6 +334,9 @@ func (s *Store) RemoveMember(org, user int64, actor string) (*User, error) {
 		if err := tx.Delete(&m).Error; err != nil {
 			return err
 		}
+		if err := withdrawForLeaver(tx, org, user, actor); err != nil {
+			return err
+		}
 		if err := dropRecipients(tx, tx.Where("org_id = ? and user_id = ?", org, user)); err != nil {
 			return err
 		}
@@ -474,7 +477,7 @@ func (s *Store) Logout(token string) error {
 	return s.db.Where("token_hash in ?", s.keys.lookups(sessions, token)).Delete(&Session{}).Error
 }
 
-// Scopes an API key can carry. None can change members or keys or reach another org; only enquiries:reply, customers:invite and campaigns:send send mail, and only import skips review.
+// Scopes an API key can carry. None can change members or keys or reach another org; only enquiries:reply, customers:invite, campaigns:send and agreements:send send mail, and only import skips review.
 var Scopes = []struct{ Name, What string }{
 	{"read", "search companies and people, read what's due and the tasks people wrote, read deals, subscriptions, onboardings and enquiries with what was said in answering them, and read the organisation's settings, its never-contact list and agent guidance included, and what it sells with where each company stands for each"},
 	{"research:write", "add companies, facts and suggested contacts (they wait in Research), and leave notes on tasks"},
@@ -490,6 +493,7 @@ var Scopes = []struct{ Name, What string }{
 	{"campaigns:write", "write campaigns, see who they would go to, and keep the list of addresses marketing mail never goes to"},
 	{"campaigns:send", "send a campaign to everyone in conversation or at a customer, through your own mail server, and cancel or resume one"},
 	{"agreements:write", "start agreements for companies, upload their documents, and set out who signs them and where; nothing is sent"},
+	{"agreements:send", "send agreements for signature through your own mail server, email a signer their link again, and withdraw one out for signature; never sign one"},
 	{"customers:invite", "email a customer a link to their onboarding steps, through your mail server, and withdraw it"},
 	{"contacts:write", "add people straight to outreach and change their details and where their conversation stands"},
 	{"research:review", "qualify and reject companies, for the organisation or for one thing it sells, pick suggested people for outreach and accept or dismiss details agents found: the review a person otherwise does"},

@@ -1572,6 +1572,178 @@ export interface paths {
         patch: operations["changeAgreementRecipient"];
         trace?: never;
     };
+    "/o/{org}/api/v1/agreements/{id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a draft for signature
+         * @description Freezes who it goes to and where each signs, and emails the first signer (or every
+         *     signer, when they sign in any order) a link, through the organisation's own mail
+         *     server. Refused while anything is missing, anyone on it can't be mailed (the
+         *     never-contact list), any name couldn't be drawn on the sealed copy, or a dry run of
+         *     sealing fails. Signers outside the organisation sign with an emailed code and their
+         *     typed name; members sign signed in.
+         */
+        post: operations["sendAgreement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/agreements/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw an agreement out for signature
+         * @description Nobody can sign it after, and the signers already sent it are emailed that it was withdrawn. Refused once everyone has signed.
+         */
+        post: operations["voidAgreement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/agreements/{id}/recipients/{recipient}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+                recipient: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Email a signer whose turn it is their link again
+         * @description Five minutes apart at most.
+         */
+        post: operations["resendAgreementLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/agreements/{id}/sign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign your own place on an agreement, signed in
+         * @description Only the member the place is for, when it's their turn; never another member, an owner
+         *     included, and never an API key, whatever its scopes.
+         */
+        post: operations["signAgreementAsMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/agreements/{id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline your own place on an agreement, signed in */
+        post: operations["declineAgreementAsMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/agreements/{id}/sealed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Download the signed and sealed copy
+         * @description The PDF with every signer's fields filled in and its certificate as the last page, sealed with the organisation's key. Checked against its SHA-256 as it is read.
+         */
+        get: operations["getSealedAgreement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/agreements/{id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What happened to an agreement once it went out, in order
+         * @description Each event carries the hash of the one before it, so a change after the fact shows; the list is checked as it is read.
+         */
+        get: operations["listAgreementEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/agreements/{id}/fields": {
         parameters: {
             query?: never;
@@ -4145,10 +4317,30 @@ export interface components {
             company_id: number;
             name: string;
             /**
-             * @description Every agreement is a draft until sending arrives.
+             * @description draft until it is sent; sent while it is out for signature; sealing once everyone has
+             *     signed, for the moment it takes to seal; completed once sealed. declined, voided
+             *     (withdrawn) and expired (its time ran out) are where it ended unsigned.
              * @enum {string}
              */
-            status: "draft";
+            status: "draft" | "sent" | "sealing" | "completed" | "declined" | "voided" | "expired";
+            /** Format: date-time */
+            sent_at?: string | null;
+            sent_by: string;
+            /**
+             * Format: date-time
+             * @description Until when it can be signed.
+             */
+            expires_at?: string | null;
+            /** @description The subject its signers' mail went with. */
+            subject: string;
+            /** @description What the sender wrote to its signers. */
+            message: string;
+            /** @description The sealed copy's SHA-256, once completed. */
+            sealed_hash: string;
+            /** @description Why the last try at sealing it failed, while it waits to be sealed; empty otherwise. */
+            seal_problem?: string;
+            /** Format: date-time */
+            completed_at?: string | null;
             /** @description Empty until a document is uploaded. */
             file_name: string;
             /**
@@ -4176,6 +4368,19 @@ export interface components {
             company: string;
             /** @description Why the document can't be read to place fields on it; empty when it can. */
             problem: string;
+            /** @description What the draft still lacks before it can be sent. */
+            missing: string[];
+            /** @description Why this server can't send it for this organisation (its own mail server, its public address); empty when it can. */
+            cant_send: string;
+            /** @description Whether it's the signed-in member's turn to sign it. */
+            my_turn: boolean;
+            /**
+             * Format: int64
+             * @description The signed-in member's own place on it as a signer; 0 for none.
+             */
+            my_recipient: number;
+            /** @description What signing agrees to, word for word, as the certificate prints it. */
+            consent: string;
             /** @description People at the company who could still be added, by contact id. */
             people: components["schemas"]["Invitable"][];
             /** @description Members who could still be added, by user id. */
@@ -4197,10 +4402,20 @@ export interface components {
              * @description A member's user id.
              */
             member_id?: number | null;
-            /** @description As they are named now; sending will freeze it. */
+            /** @description As they are named now; once sent, as it was sent. */
             name: string;
-            /** @description Where it will go; sending will freeze it. */
+            /** @description Where it will go; once sent, where it went. */
             email: string;
+            /**
+             * @description Once sent, where a signer stands; empty for a draft and for someone who gets a copy.
+             * @enum {string}
+             */
+            status?: "" | "waiting" | "due" | "signed" | "declined";
+            /** Format: date-time */
+            signed_at?: string | null;
+            decline_reason?: string;
+            /** @description Why the last mail to them hasn't gone, while it is being tried again or after it gave up; empty when it went. */
+            mail_problem?: string;
             created_by: string;
             /** Format: date-time */
             created_at: string;
@@ -4220,11 +4435,37 @@ export interface components {
             y: number;
             w: number;
             h: number;
+            /** @description What a text field or tick box asks of the signer; needed for those before sending. */
+            label?: string;
         };
         AgreementField: components["schemas"]["AgreementFieldIn"] & {
             /** Format: int64 */
             id: number;
             round: number;
+            /** @description What the signer filled in, once signed. */
+            value: string;
+        };
+        AgreementEvent: {
+            /** Format: int64 */
+            id: number;
+            /** Format: date-time */
+            at: string;
+            kind: string;
+            actor: string;
+            /** Format: int64 */
+            recipient_id?: number | null;
+            detail: string;
+            /** @description This event's SHA-256, over it and the hash of the one before. */
+            hash: string;
+        };
+        SignByMember: {
+            typed_name: string;
+            consent: boolean;
+            values?: {
+                /** Format: int64 */
+                field: number;
+                value: string;
+            }[];
         };
         Session: {
             user: components["schemas"]["SessionUser"];
@@ -7655,6 +7896,263 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgreementRecipient"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    sendAgreement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The mail's subject; "Please sign: <name>" if empty. */
+                    subject?: string;
+                    /** @description A note to the signers, in their mail and on the page once they've given the code. */
+                    message?: string;
+                    /** @description How many days it can be signed for; 14 if left out. */
+                    days?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description The agreement, sent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Agreement"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    voidAgreement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The agreement, withdrawn. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Agreement"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    resendAgreementLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+                recipient: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    signAgreementAsMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignByMember"];
+            };
+        };
+        responses: {
+            /** @description The agreement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Agreement"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    declineAgreementAsMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The agreement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Agreement"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    getSealedAgreement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sealed PDF. */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    listAgreementEvents: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Oldest first. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AgreementEvent"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
                 };
             };
             400: components["responses"]["BadRequest"];
