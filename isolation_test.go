@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -404,17 +405,7 @@ var saysNothingBack = map[string]bool{
 
 func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {
 	t.Parallel()
-	s := tempStore(t)
-	first := seedFirst(t, s)
-	before := holdings(t, s, first.ID)
-	for _, table := range orgTables(t, s) {
-		if before[table] == "" {
-			t.Fatalf("the first organisation has nothing in %s, so nothing there could be reached", table)
-		}
-	}
-	second := mustOrg(t, s, "beta")
-
-	store := reflect.TypeOf(s)
+	store := reflect.TypeOf(&Store{})
 	var methods []reflect.Method
 	for i := range store.NumMethod() {
 		m := store.Method(i)
@@ -427,6 +418,25 @@ func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {
 		}
 		methods = append(methods, m)
 	}
+	for i := range isolationShares {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
+			tryMethodsAsAnotherOrganisation(t, share(methods, i))
+		})
+	}
+}
+
+// tryMethodsAsAnotherOrganisation tries the methods on a database of its own.
+func tryMethodsAsAnotherOrganisation(t *testing.T, methods []reflect.Method) {
+	s := tempStore(t)
+	first := seedFirst(t, s)
+	before := holdings(t, s, first.ID)
+	for _, table := range orgTables(t, s) {
+		if before[table] == "" {
+			t.Fatalf("the first organisation has nothing in %s, so nothing there could be reached", table)
+		}
+	}
+	second := mustOrg(t, s, "beta")
 
 	for _, m := range methods {
 		calls, falls := 0, 0
