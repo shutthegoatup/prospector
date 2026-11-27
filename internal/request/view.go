@@ -1,9 +1,6 @@
 package request
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -40,19 +37,4 @@ func (v Voice) Signed() string {
 		return ""
 	}
 	return "\n\n" + v.Signature
-}
-
-func Plural(n int, word string) string {
-	if n == 1 {
-		return "1 " + word
-	}
-	switch {
-	case word == "person":
-		word = "people"
-	case strings.HasSuffix(word, "y") && !strings.ContainsAny(word[len(word)-2:len(word)-1], "aeiou"):
-		word = word[:len(word)-1] + "ies"
-	default:
-		word += "s"
-	}
-	return fmt.Sprintf("%d %s", n, word)
 }

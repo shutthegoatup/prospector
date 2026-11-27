@@ -1,4 +1,8 @@
 {
+  "+5rSoX": {
+    "defaultMessage": "For you in every organisation: the app, mail sent to you, and the server's messages.",
+    "description": "Under the heading of the settings page's Your language section"
+  },
   "+650eH": {
     "defaultMessage": "Outreach is sales work, so here you read it.",
     "description": "On the Today page, to a member without sales work: why they can read it but not act"
@@ -10,6 +14,10 @@
   "+BZXGt": {
     "defaultMessage": "Older →",
     "description": "Button to the next page of the research page's list"
+  },
+  "+OCmsc": {
+    "defaultMessage": "Server",
+    "description": "Label of the mail server's host name"
   },
   "+PizFY": {
     "defaultMessage": "{count}{n, plural, one {thing due} other {things due}}, best first: next steps, calls where it's office hours, messages, emails, follow-ups, then LinkedIn adds.",
@@ -39,13 +47,33 @@
     "defaultMessage": "Back to Prospector",
     "description": "Button on an error page, back to the app"
   },
+  "+rrVn7": {
+    "defaultMessage": "member",
+    "description": "In the list of roles for a new member: a member"
+  },
+  "+s4tcJ": {
+    "defaultMessage": "Only email incorporated companies (UK PECR)",
+    "description": "Checkbox: email only incorporated companies, as the UK's Privacy and Electronic Communications Regulations allow"
+  },
   "+xZN/W": {
     "defaultMessage": "Place for {name}:",
     "description": "Before the buttons for the kinds of field to place on an agreement. {name} is the signer they are for"
   },
+  "/44NV6": {
+    "defaultMessage": "An owner makes keys.",
+    "description": "In place of the form for a new API key, for a member who isn't an owner"
+  },
   "/7/ivi": {
     "defaultMessage": "Date signed",
     "description": "A kind of field placed on an agreement's page: the date it is signed"
+  },
+  "/IPV1J": {
+    "defaultMessage": "Older →",
+    "description": "Button to agents' older work"
+  },
+  "/SqyDK": {
+    "defaultMessage": "Connection note",
+    "description": "Label of the template for the note sent with a LinkedIn connection request"
   },
   "/SrQDl": {
     "defaultMessage": "This page is open for {email} in this browser.",
@@ -55,6 +83,10 @@
     "defaultMessage": "Start a draft above, then see who it would go to.",
     "description": "Hint when an organisation has no campaigns"
   },
+  "/bDFuM": {
+    "defaultMessage": "Delete {name}? Its runs stop and its key is revoked; what it found stays.",
+    "description": "Asked before deleting an agent. {name} is the agent's name"
+  },
   "/jQEvP": {
     "defaultMessage": "Kind",
     "description": "Label of the choice of a deal's kind: new business, renewal or expansion"
@@ -63,9 +95,17 @@
     "defaultMessage": "Touches",
     "description": "Small heading over how many times the company's people have been contacted"
   },
+  "/njgd9": {
+    "defaultMessage": "Revoke",
+    "description": "Button revoking an API key"
+  },
   "/rdoJK": {
     "defaultMessage": "Showing the first {shown} of {total}. Clear some, or filter by step above.",
     "description": "Under the Today page's list when only some of what is due is shown"
+  },
+  "/vLmGD": {
+    "defaultMessage": "This organisation's own mail server. Invitations to new members leave through it; without one, a new member's first password is shown to you instead.",
+    "description": "Under the heading of the Outgoing mail section, when neither the organisation nor the site can send mail"
   },
   "/xCPC3": {
     "defaultMessage": "{n} left out",
@@ -79,9 +119,17 @@
     "defaultMessage": "Connect an agent",
     "description": "Button on the research page to the page for setting up agents"
   },
+  "04CRgW": {
+    "defaultMessage": "One per line: a domain, an email address or a LinkedIn profile link. Applied to everything people and agents add, and to who comes up for outreach on Today.",
+    "description": "Under the organisation's never-contact list on the settings page. Today is the name of a page"
+  },
   "06TjCf": {
     "defaultMessage": "From your steps",
     "description": "Over the button that starts an onboarding from the organisation's own steps"
+  },
+  "09m07+": {
+    "defaultMessage": "This organisation's own mail server. Invitations to new members leave through it.",
+    "description": "Under the heading of the Outgoing mail section, when the organisation has a mail server"
   },
   "0BmVcB": {
     "defaultMessage": "Move renewals and other deals on",
@@ -99,6 +147,10 @@
     "defaultMessage": "This page opens from a link in an email. If yours has stopped working, open it again and ask for a new one, or ask whoever is setting you up.",
     "description": "On /c opened without a link: how to get to a customer's page"
   },
+  "0JAmOt": {
+    "defaultMessage": "Marketing mail never goes to these addresses. Someone who unsubscribes by the link in a mail lands here and stays: only they can undo it. Your never-contact list and anyone erased are kept out as well.",
+    "description": "Under the heading of the Not to be mailed section"
+  },
   "0LnApv": {
     "defaultMessage": "Add to {org}",
     "description": "Heading of the bookmarklet's window, and the button that adds the person. {org} is the organisation's name"
@@ -111,6 +163,10 @@
     "defaultMessage": "Leave empty to use your template: {template}",
     "description": "Placeholder of the empty connection note: the organisation's template follows"
   },
+  "0V2j1C": {
+    "defaultMessage": "Register this with your provider as the place to send people back.",
+    "description": "Under the redirect URI"
+  },
   "0Yl05V": {
     "defaultMessage": "suggested",
     "description": "A person's stage: suggested by an agent, not yet accepted"
@@ -122,6 +178,10 @@
   "0o1xO4": {
     "defaultMessage": "Use your organisation's single sign-on",
     "description": "Button to sign in through an organisation's own provider"
+  },
+  "0sf5ei": {
+    "defaultMessage": "LinkedIn message if accepted, else email",
+    "description": "Second step of the outreach sequence"
   },
   "10Hi0u": {
     "defaultMessage": "Sign-up",
@@ -138,6 +198,14 @@
   "1FV3pz": {
     "defaultMessage": "That didn't go through. Check your connection and try again.",
     "description": "When signing in, or the like, failed with nothing from the server to say why"
+  },
+  "1Fq8UA": {
+    "defaultMessage": "Setup",
+    "description": "On an agent's card, for an owner: opens its settings"
+  },
+  "1IerLu": {
+    "defaultMessage": "bounced {date}",
+    "description": "Beside an address not to be mailed: when mail to it bounced. {date} is the day"
   },
   "1M9Rh5": {
     "defaultMessage": "No organisation here uses single sign-on for that address. Sign in with your password instead.",
@@ -171,9 +239,17 @@
     "defaultMessage": "Nothing named yet",
     "description": "When the organisation has named nothing to look for in a company"
   },
+  "1ddbfD": {
+    "defaultMessage": "key saved · a limit of 0: it isn't asked",
+    "description": "On a data vendor's card when it may be asked no times a month"
+  },
   "1gF6jj": {
     "defaultMessage": "The pages appear here.",
     "description": "Where an agreement's pages are drawn, while they load"
+  },
+  "1h3EMF": {
+    "defaultMessage": "For <b>{name}</b> only",
+    "description": "Beside the settings page's heading: whose settings they are. {name} is the organisation's name"
   },
   "1nOXrK": {
     "defaultMessage": "Loading…",
@@ -183,9 +259,17 @@
     "defaultMessage": "Reload to try again.",
     "description": "Under the heading when an organisation fails to load and the server gave no reason"
   },
+  "20GPXH": {
+    "defaultMessage": "The tasks couldn't be read. Reload to try again.",
+    "description": "When the list of tasks failed to load"
+  },
   "22ESKg": {
     "defaultMessage": "Every request, note and run",
     "description": "Link to a search's own page"
+  },
+  "28uPqG": {
+    "defaultMessage": "The call script's pitch line for people reached for it. Empty uses the organisation's.",
+    "description": "Under an offering's pitch line"
   },
   "2CydC5": {
     "defaultMessage": "Add someone with + Add person, or let an agent suggest people.",
@@ -207,6 +291,10 @@
     "defaultMessage": "There's no such page here.",
     "description": "Under the 'Not found' heading"
   },
+  "2PojBj": {
+    "defaultMessage": "Members at your domains must sign in this way",
+    "description": "Checkbox to require single sign-on"
+  },
   "2SyN4n": {
     "defaultMessage": "Value",
     "description": "Label of the field for what a deal is worth"
@@ -223,13 +311,29 @@
     "defaultMessage": "signs",
     "description": "Choice when adding someone to an agreement: they sign it"
   },
+  "2kHGa0": {
+    "defaultMessage": "No such task",
+    "description": "Heading when a task's page is opened for a task that isn't there"
+  },
   "2p7s9N": {
     "defaultMessage": "No campaigns yet",
     "description": "Title when an organisation has no campaigns"
   },
+  "2pt7cw": {
+    "defaultMessage": "Nothing suggested yet.",
+    "description": "In place of agents' scores when no agent has suggested anything"
+  },
   "2qC45m": {
     "defaultMessage": "Send LinkedIn messages",
     "description": "In the Do now panel, beside a count of LinkedIn messages to send"
+  },
+  "2skwfE": {
+    "defaultMessage": "For your sign-in across every organisation. Changing it signs out your other sessions.",
+    "description": "Under the heading of the settings page's Your password section"
+  },
+  "2x46wj": {
+    "defaultMessage": "Ask for more",
+    "description": "Label of the box for asking a task's agents for more"
   },
   "2zl7VT": {
     "defaultMessage": "Nothing recorded. Once they are a customer, record what they are on.",
@@ -251,9 +355,25 @@
     "defaultMessage": "Feature request",
     "description": "What an enquiry is about: asking for a feature. A filter and a label on each enquiry"
   },
+  "3CZtXe": {
+    "defaultMessage": "Set {variable} to this app's address first: it is where the provider sends people back.",
+    "description": "In the Single sign-on section when the server doesn't know its own address. {variable} is the setting's name"
+  },
   "3S7eks": {
     "defaultMessage": "Delete this enquiry from {email} for good?",
     "description": "Asked before deleting an enquiry. {email} is the enquirer's address"
+  },
+  "3Y2DHq": {
+    "defaultMessage": "member · reads only",
+    "description": "A member's role in the team list: a member with no area of work"
+  },
+  "3batB0": {
+    "defaultMessage": "Tasks for agents are sales work, so here you read it.",
+    "description": "On the tasks page, to a member who doesn't do sales: why they can only read it"
+  },
+  "3bcpLQ": {
+    "defaultMessage": "Leave {org}? You lose access to it.",
+    "description": "Asked before a member removes themselves. {org} is the organisation's name"
   },
   "3hSmdD": {
     "defaultMessage": "Search companies, people, notes",
@@ -270,6 +390,22 @@
   "3qEhNr": {
     "defaultMessage": "What it says, as plain text. Your postal address is added at the foot, and for marketing an unsubscribe link.",
     "description": "Placeholder in the empty box for a campaign mail's text"
+  },
+  "3v16yg": {
+    "defaultMessage": "Each stretch of an agent's changes. An agent that is only reading doesn't show.",
+    "description": "Under the heading of a task's section of agents' work so far"
+  },
+  "3zNZWr": {
+    "defaultMessage": "What you look for",
+    "description": "Label of the list of what agents check a company for"
+  },
+  "46dQ9t": {
+    "defaultMessage": "This server has no secret key, so it can't keep an API key: whoever runs it needs to set {variable} first.",
+    "description": "To an owner when the server can't keep API keys. {variable} is the name of a setting, PROSPECTOR_SECRET_KEYS"
+  },
+  "473+QS": {
+    "defaultMessage": "None: wait however long it takes",
+    "description": "The choice of no agent to fall back to"
   },
   "4KnQ8O": {
     "defaultMessage": "<b>{kind}</b><muted> with {person}</muted>",
@@ -315,6 +451,10 @@
     "defaultMessage": "Put back",
     "description": "Button to put a rejected company back up for review"
   },
+  "4u7AaJ": {
+    "defaultMessage": "Change",
+    "description": "On a data vendor's card, for an owner: opens its settings"
+  },
   "4vytQM": {
     "defaultMessage": "Signs",
     "description": "Button making someone who gets a copy of an agreement one of its signers"
@@ -343,6 +483,10 @@
     "defaultMessage": "Junk",
     "description": "Button to rule a company out for one offering"
   },
+  "5WFbSP": {
+    "defaultMessage": "Never contact",
+    "description": "Label of the organisation's list of who is never to be contacted"
+  },
   "5YGxNE": {
     "defaultMessage": "History",
     "description": "Small heading over what has happened with the company"
@@ -354,6 +498,22 @@
   "5c9azL": {
     "defaultMessage": "Won",
     "description": "A conversation's stage: won"
+  },
+  "5czU92": {
+    "defaultMessage": "{prospector} runs it",
+    "description": "Tag on an agent's card, and the choice to add one: an agent the product runs itself. {prospector} is the product's name, Prospector"
+  },
+  "5fEbck": {
+    "defaultMessage": "Follow-up email",
+    "description": "Third step of the outreach sequence"
+  },
+  "5iNVjr": {
+    "defaultMessage": "Endpoint",
+    "description": "Label of the address an agent sends its requests to"
+  },
+  "5iPRKh": {
+    "defaultMessage": "Email domain",
+    "description": "What a screen reader calls the field to add a domain to single sign-on"
   },
   "5jhLCi": {
     "defaultMessage": "Not being onboarded.",
@@ -379,13 +539,25 @@
     "defaultMessage": "Sign in with a password instead",
     "description": "Link from single sign-on back to signing in with a password"
   },
+  "69eqzS": {
+    "defaultMessage": "{who} is on it until {until}",
+    "description": "Under a request on a task, after what was found: who has taken it on. {who} is them, usually an agent; {until} a time of day"
+  },
   "6Dz4/z": {
     "defaultMessage": "That company isn't here.",
     "description": "Heading of a company's page when there is no such company"
   },
+  "6H+N3d": {
+    "defaultMessage": "Add and check",
+    "description": "Button adding an agent and checking it can run"
+  },
   "6K2Fti": {
     "defaultMessage": "“{reason}” {who}, {when}",
     "description": "Beside a company's verdict for an offering. {reason} is why, {who} who decided, {when} the date and time"
+  },
+  "6LR++K": {
+    "defaultMessage": "Delete",
+    "description": "Button to delete an agent's note on a task"
   },
   "6LtUo/": {
     "defaultMessage": "Reload to try again.",
@@ -407,6 +579,10 @@
     "defaultMessage": "proposal",
     "description": "A person's stage: a proposal is with them"
   },
+  "6YZVi4": {
+    "defaultMessage": "How each agent is doing",
+    "description": "Heading of each agent's record of what people did with its suggestions"
+  },
   "6dTQKZ": {
     "defaultMessage": "{n} cancelled",
     "description": "Count of a campaign's mails cancelled, in the line under its name"
@@ -418,6 +594,22 @@
   "6gGSHy": {
     "defaultMessage": "Renewal under way in Conversations",
     "description": "Link to the renewal deal of a subscription on the deals board"
+  },
+  "6q5dsX": {
+    "defaultMessage": "Heads of procurement at UK kitchen makers with their own showrooms. About twenty, with the page that shows each one's role.",
+    "description": "Example brief in the empty box for a new task"
+  },
+  "6rNwfw": {
+    "defaultMessage": "Next →",
+    "description": "Button to the next page of agents' activity"
+  },
+  "6rim9G": {
+    "defaultMessage": "key saved · {used} of {limit, plural, one {# lookup} other {# lookups}} used in {month} (UTC)",
+    "description": "On a data vendor's card: how many of this month's lookups are used. {month} is the month's name"
+  },
+  "738jqv": {
+    "defaultMessage": "verified",
+    "description": "Tag beside a domain proved to be the organisation's"
   },
   "74idfF": {
     "defaultMessage": "in place of {current}",
@@ -439,6 +631,10 @@
     "defaultMessage": "This organisation couldn't be opened",
     "description": "Heading of the page shown when an organisation fails to load"
   },
+  "7aLALl": {
+    "defaultMessage": "Let people at your company's email domains sign in through your own provider: {providers} or anything else that speaks {oidc}.",
+    "description": "Under the heading of the Single sign-on section. {providers} names some providers, {oidc} the standard"
+  },
   "7b0Vu/": {
     "defaultMessage": "late, was due {on}",
     "description": "An onboarding step past its due date. {on} is a date"
@@ -446,6 +642,10 @@
   "7fXu3t": {
     "defaultMessage": "Flags",
     "description": "Heading of what the research flagged to look at"
+  },
+  "7hSKJy": {
+    "defaultMessage": "Name",
+    "description": "Label of a name field on the settings page (the organisation's, an offering's or a new member's)"
   },
   "7tglVP": {
     "defaultMessage": "What kind of mail",
@@ -459,13 +659,29 @@
     "defaultMessage": "Every qualified company has a contact",
     "description": "Heading on the research page when no qualified company lacks a contact"
   },
+  "8/sx8x": {
+    "defaultMessage": "Thinking",
+    "description": "Label of the setting for whether an agent thinks before answering"
+  },
   "83KaBa": {
     "defaultMessage": "Create",
     "description": "Button to create the first organisation"
   },
+  "85X/7s": {
+    "defaultMessage": "As above, one per line. Agents on a task for this offering check these in place of the organisation's own.",
+    "description": "Under an offering's list of what agents look for"
+  },
   "8Ijl1I": {
     "defaultMessage": "suggested",
     "description": "A person an agent suggested, for a member who can't pick them"
+  },
+  "8OWYeB": {
+    "defaultMessage": "Add",
+    "description": "Button on the settings page to add what was entered (an offering, an address, a member)"
+  },
+  "8QeuLs": {
+    "defaultMessage": "Find twenty more, in Scotland this time.",
+    "description": "Example in the empty box for asking a task's agents for more"
   },
   "8UaEj7": {
     "defaultMessage": "LinkedIn profile",
@@ -474,6 +690,14 @@
   "8UoIiK": {
     "defaultMessage": "Answering enquiries is support work, so here you read it.",
     "description": "On the Enquiries page, to a member without support work: why they can read it but not act"
+  },
+  "8VnVDl": {
+    "defaultMessage": "Ask {vendor} sooner",
+    "description": "What a screen reader calls the button moving a data vendor up the list. {vendor} is its name"
+  },
+  "8Zt7LO": {
+    "defaultMessage": "Make {email} a member? They stop being able to change settings, keys and the team.",
+    "description": "Asked before making an owner a member. {email} is theirs"
   },
   "8a6W7E": {
     "defaultMessage": "Keys: {o} open profile and copy the note · {a} added · {s} skip",
@@ -490,6 +714,18 @@
   "8inZFI": {
     "defaultMessage": "Start an onboarding",
     "description": "Line that opens the form to start an onboarding"
+  },
+  "8nC0vG": {
+    "defaultMessage": "For OpenAI-compatible, the address its /models and /chat/completions are under, such as https://api.openai.com/v1. For Anthropic, leave it empty for Anthropic's own.",
+    "description": "Under the field for an agent's endpoint. /models, /chat/completions and the address are kept as they are"
+  },
+  "8sYn7A": {
+    "defaultMessage": "Recent agent work",
+    "description": "Heading of the stretches of changes agents made"
+  },
+  "8wALzm": {
+    "defaultMessage": "used {when} · key {prefix}… · made by {who}",
+    "description": "On an API key's card. {when} is when it was last used, {prefix} the start of the key, {who} the member who made it"
   },
   "94B7zC": {
     "defaultMessage": "Would go to {people}; {leftOut} left out",
@@ -523,6 +759,10 @@
     "defaultMessage": "source ↗",
     "description": "Link to the web page a fact or suggestion came from"
   },
+  "9fpcTu": {
+    "defaultMessage": "not verified",
+    "description": "Tag beside a domain not yet proved to be the organisation's"
+  },
   "9hzC6X": {
     "defaultMessage": "Cancel the rest",
     "description": "Button stopping a campaign's mails not yet sent"
@@ -530,6 +770,10 @@
   "9viMdO": {
     "defaultMessage": "{first}, {second}",
     "description": "Two notes under a suggested detail, such as 'a guess' and 'in place of …'"
+  },
+  "9y7E+h": {
+    "defaultMessage": "name",
+    "description": "Placeholder in the field for a new member's name"
   },
   "ADTSld": {
     "defaultMessage": "· {title}",
@@ -539,6 +783,10 @@
     "defaultMessage": "Drag one onto a page, or click it to put it on the page in view. Drag a field to move it, its corner to size it.",
     "description": "Under the buttons for the kinds of field to place on an agreement's pages"
   },
+  "AIRKlG": {
+    "defaultMessage": "Shared by everyone in this organisation.",
+    "description": "Under the heading of the Organisation section, for an owner"
+  },
   "AJlMQH": {
     "defaultMessage": "No one yet.",
     "description": "When no one at a company has been added"
@@ -547,6 +795,14 @@
     "defaultMessage": "Qualify",
     "description": "Button to mark a company as worth pursuing"
   },
+  "ATkIdV": {
+    "defaultMessage": "An MCP server, such as a gateway's federated /mcp. It's sent the endpoint's key only when it's on the same address.",
+    "description": "Under the field for the MCP server an agent gets its tools from"
+  },
+  "AU7RdN": {
+    "defaultMessage": "{n, plural, one {# day} other {# days}} without a reply",
+    "description": "In the outreach sequence: when the follow-up email comes. {n} is the days set in the Organisation section"
+  },
   "AjPv3Q": {
     "defaultMessage": "Start the renewal deal",
     "description": "Button to start a deal to renew a subscription"
@@ -554,6 +810,10 @@
   "Ak+wss": {
     "defaultMessage": "Main",
     "description": "What a screen reader calls the sidebar's list of pages"
+  },
+  "Av0sf/": {
+    "defaultMessage": "No mail server of this organisation's own.",
+    "description": "After saving the Outgoing mail section with the server cleared"
   },
   "B/3qsk": {
     "defaultMessage": "live since {on}",
@@ -575,6 +835,14 @@
     "defaultMessage": "That didn't work. Reload and try again.",
     "description": "Shown when a change failed and the server said nothing about why"
   },
+  "BBjN4Z": {
+    "defaultMessage": "Never shown again. Changing the server or username needs it entered again.",
+    "description": "Under the mail server's password field"
+  },
+  "BEgIPa": {
+    "defaultMessage": "Take off",
+    "description": "Button to take an address off the list not to be mailed"
+  },
   "BEgYdK": {
     "defaultMessage": "Nobody has been invited yet.",
     "description": "When no customer has been invited to their page"
@@ -591,17 +859,37 @@
     "defaultMessage": "Then",
     "description": "Label of what happens when a subscription's term ends"
   },
+  "BjVmO+": {
+    "defaultMessage": "Nothing yet.",
+    "description": "In a task's section of what was found, when nothing has been"
+  },
   "BlhaQR": {
     "defaultMessage": "Subscriptions",
     "description": "Sidebar: the page of customers' subscriptions"
+  },
+  "BqxUi/": {
+    "defaultMessage": "Email after",
+    "description": "Label of the number of days before emailing someone who hasn't accepted on LinkedIn"
   },
   "BsG9Is": {
     "defaultMessage": "Undo",
     "description": "Button to undo ruling a company out for one offering"
   },
+  "BvukbC": {
+    "defaultMessage": "{turns, plural, one {# turn} other {# turns}} · {calls, plural, one {# tool call} other {# tool calls}} · {added, plural, one {# thing} other {# things}} added",
+    "description": "What an agent's run on a task did: its turns with the model, its tool calls and how many things it added"
+  },
+  "C6/+rt": {
+    "defaultMessage": "Your own offering",
+    "description": "In the field picking which offering a new task is for: the organisation's own"
+  },
   "C7e7R8": {
     "defaultMessage": "Add someone from LinkedIn, or check Research for companies waiting on you.",
     "description": "Hint when the Today page has nothing to do; Research is the name of a page"
+  },
+  "CA5NWe": {
+    "defaultMessage": "owner",
+    "description": "In the list of roles for a new member: an owner"
   },
   "CBHS4N": {
     "defaultMessage": "no date",
@@ -627,6 +915,10 @@
     "defaultMessage": "A link opens the page once, in one browser. We can send a fresh one to the address this one was sent to.",
     "description": "Why a customer's link stopped working, and what can be done"
   },
+  "CYhB9h": {
+    "defaultMessage": "can't run: no key, endpoint or model",
+    "description": "In the key to the agent cards' colours: an agent that can't run"
+  },
   "CgAAU4": {
     "defaultMessage": "← First",
     "description": "Button back to the first page of a list"
@@ -639,6 +931,10 @@
     "defaultMessage": "Dismiss",
     "description": "Button to turn down a suggested detail for a person"
   },
+  "CsCbwg": {
+    "defaultMessage": "A secret is kept sealed, so none can be saved until whoever runs this server sets {variable} ({command} makes one). Everything else here can still be changed.",
+    "description": "Under the client secret field when the server has no key to seal it with. {variable} is the setting's name, {command} the command that makes a key"
+  },
   "Ct7x4z": {
     "defaultMessage": "Open a company and record what they are on.",
     "description": "Under 'No subscriptions yet'"
@@ -647,9 +943,17 @@
     "defaultMessage": "{n, plural, one {# step} other {# steps}} due today",
     "description": "How many of an onboarding's steps are due today"
   },
+  "DAGA0t": {
+    "defaultMessage": "Mark done",
+    "description": "Button to mark a request on a task done"
+  },
   "DGGnaQ": {
     "defaultMessage": "Accept",
     "description": "Button to accept a suggested detail for a person"
+  },
+  "DJYPVl": {
+    "defaultMessage": "When research can't find someone's email, mobile or LinkedIn profile, you, and agents whose key has {scope}, can ask these, top first, on your own account with each. What they find waits in Research for a person to accept.",
+    "description": "Under the heading of data vendors. {scope} is the name of a key's scope, enrich:spend; Research is the name of a page"
   },
   "DLHvp2": {
     "defaultMessage": "Spam",
@@ -683,6 +987,14 @@
     "defaultMessage": "Filter by step",
     "description": "What a screen reader calls the row of filters by step on the Today page"
   },
+  "DcBTm9": {
+    "defaultMessage": "Choose…",
+    "description": "The empty choice of data vendor to add"
+  },
+  "DsU/HG": {
+    "defaultMessage": "What people did with each agent's suggestions. Use one key per outside agent to compare them.",
+    "description": "Under the heading of how each agent is doing"
+  },
   "DtEQxO": {
     "defaultMessage": "Open a company and start one.",
     "description": "Under 'Nobody is being onboarded'"
@@ -699,17 +1011,41 @@
     "defaultMessage": "Notice given on",
     "description": "Label of the date notice to end was given"
   },
+  "E83dus": {
+    "defaultMessage": "Stop {agent}",
+    "description": "Button to stop an agent's run on a task. {agent} is its name"
+  },
   "E9oEyL": {
     "defaultMessage": "Send follow-ups",
     "description": "In the Do now panel, beside a count of follow-ups to send"
+  },
+  "EDfFch": {
+    "defaultMessage": "{brand}'s agents",
+    "description": "Heading of a task's section of the agents the app runs itself. {brand} is the app's name, Prospector"
+  },
+  "EDoHbY": {
+    "defaultMessage": "saved: leave empty to keep it",
+    "description": "Placeholder in the mail server's password field when one is already saved"
   },
   "EIULF9": {
     "defaultMessage": "Added",
     "description": "Button marking someone added on LinkedIn"
   },
+  "ELEaYp": {
+    "defaultMessage": "Add a TXT record named {record} with the value {token}, then verify.",
+    "description": "Under a domain not yet verified for single sign-on. {record} is the DNS record's name and {token} its value"
+  },
+  "ERWuf3": {
+    "defaultMessage": "Anthropic reaches Claude through Anthropic's own API with its official SDK; OpenAI-compatible is ChatGPT, OpenRouter, a gateway of your own, or a model you run yourself behind llama.cpp or vLLM.",
+    "description": "Under the choice of an agent's kind. Anthropic, Claude, OpenAI, ChatGPT, OpenRouter, llama.cpp and vLLM are names of companies and products"
+  },
   "EYmnLm": {
     "defaultMessage": "Add",
     "description": "Button adding someone to an agreement"
+  },
+  "EcWDyr": {
+    "defaultMessage": "New key name",
+    "description": "Label of the name of a new API key"
   },
   "Eccjcs": {
     "defaultMessage": "For",
@@ -727,6 +1063,26 @@
     "defaultMessage": "e.g. 14,000",
     "description": "Example in the field for a subscription's price"
   },
+  "EsfgKc": {
+    "defaultMessage": "Download everything",
+    "description": "Button to download everything the organisation holds as one file"
+  },
+  "EtAwvM": {
+    "defaultMessage": "Every contact goes through these steps; the waits come from above.",
+    "description": "Under the heading of the Sequence section; the waits are the day counts set in the Organisation section"
+  },
+  "Eu88wV": {
+    "defaultMessage": "saved: leave empty to keep it",
+    "description": "In the empty field for an API key when one is already saved"
+  },
+  "Ewp4ZD": {
+    "defaultMessage": "Your browser's ({language})",
+    "description": "In the list of languages, when none is chosen: the choice to use the browser's languages. {language} is the one they came to, named in itself"
+  },
+  "F/wbYX": {
+    "defaultMessage": "{prospector}'s agents",
+    "description": "What a screen reader calls the counts of the product's own agents by state. {prospector} is the product's name, Prospector"
+  },
   "F2Pytr": {
     "defaultMessage": "Twenty more, in Scotland this time.",
     "description": "Example in the box for asking a search for more"
@@ -734,6 +1090,14 @@
   "F6XpbN": {
     "defaultMessage": "{name} (left)",
     "description": "The owner choice for a deal whose owner is no longer a member. {name} is theirs"
+  },
+  "FBJjUi": {
+    "defaultMessage": "Save scopes",
+    "description": "Button saving what an API key may do"
+  },
+  "FD+/u9": {
+    "defaultMessage": "Every agent in one list: those {prospector} runs and those that connect with a key. The colour behind each card is its state.",
+    "description": "Under the heading of every agent. {prospector} is the product's name, Prospector"
   },
   "FQQ+lf": {
     "defaultMessage": "Someone in your organisation",
@@ -743,9 +1107,17 @@
     "defaultMessage": "Call",
     "description": "Top of a card on the Today page: a call to make"
   },
+  "FfPs3R": {
+    "defaultMessage": "<b>{agent}</b> · {state}",
+    "description": "An agent's run on a task. {agent} is its name; {state} where its run is, such as Working, with a model, or finished with why it stopped"
+  },
   "Fj4Bnp": {
     "defaultMessage": "+ Add person",
     "description": "Button on the research page to add a person by hand"
+  },
+  "FlkLbK": {
+    "defaultMessage": "Save and check",
+    "description": "Button saving an agent's settings and checking it can run"
   },
   "Fnd5y4": {
     "defaultMessage": "Delete this note?",
@@ -755,13 +1127,33 @@
     "defaultMessage": "The enquiries couldn't be read. Reload to try again.",
     "description": "When the list of enquiries failed to load"
   },
+  "FukJLV": {
+    "defaultMessage": "Short name (optional)",
+    "description": "Label of the field giving a new task a short name"
+  },
   "GAdsC7": {
     "defaultMessage": "Drag this to your bookmarks bar. On someone's LinkedIn profile, click it: this form opens filled in with their name, role and company.",
     "description": "How to use the bookmarklet"
   },
+  "GF7hr+": {
+    "defaultMessage": "Asked",
+    "description": "Heading of a task's section of what has been asked of its agents"
+  },
+  "GGhAaz": {
+    "defaultMessage": "Client secret",
+    "description": "Label of the client secret the provider gave for single sign-on"
+  },
+  "GMAXIB": {
+    "defaultMessage": "Saved ✓",
+    "description": "On the settings page beside a Save button once what was entered is saved"
+  },
   "GSfBhn": {
     "defaultMessage": "All segments",
     "description": "The segment filter's choice of every segment"
+  },
+  "GYHhwE": {
+    "defaultMessage": "Data vendors",
+    "description": "Heading of the enrichment vendors asked for a person's contact details"
   },
   "GaTn8A": {
     "defaultMessage": "{brand} keeps the PDF as uploaded, with its SHA-256, and doesn't read what it says. It is not for deeds, or anything that must be witnessed or notarised. You can set out who signs it and where; sending it for signature comes later.",
@@ -787,13 +1179,41 @@
     "defaultMessage": "Download",
     "description": "Link to download an agreement's PDF"
   },
+  "H+qZnw": {
+    "defaultMessage": "With closed",
+    "description": "Filter on the tasks page: open tasks and closed ones too"
+  },
   "H46vQV": {
     "defaultMessage": "{facts, plural, one {# other fact} other {# other facts}} · {people, plural, one {# person} other {# people}}",
     "description": "Summary of a company's card that opens to show its facts and people"
   },
+  "H4Cm3s": {
+    "defaultMessage": "Only an owner adds, changes or removes a vendor.",
+    "description": "Under the data vendors, for a member who isn't an owner"
+  },
+  "H7VkNM": {
+    "defaultMessage": "Organisation",
+    "description": "Heading of the settings page's section of the organisation's settings"
+  },
   "H7f6JZ": {
     "defaultMessage": "Deals are sales work, so here you read it.",
     "description": "On the conversations page, to someone not in sales: why they can read the deals but not change them"
+  },
+  "HCSvrN": {
+    "defaultMessage": "Connects with a key",
+    "description": "Tag on the card of the organisation's own agent, which connects with an API key"
+  },
+  "HEFVLy": {
+    "defaultMessage": "Require it",
+    "description": "Label of the setting that makes single sign-on the only way in"
+  },
+  "HLs2rn": {
+    "defaultMessage": "Work the task here, each with the model and tools set on the Agents page, each on its own request. What they find waits in Research.",
+    "description": "Under the heading of a task's section of the app's own agents. Agents and Research are the pages of those names"
+  },
+  "HNgMyX": {
+    "defaultMessage": "None yet.",
+    "description": "When no agent has changed anything for a task"
   },
   "HPuNNE": {
     "defaultMessage": "It reads only the profile's title and headline, when you click. Nothing runs on LinkedIn by itself.",
@@ -814,6 +1234,14 @@
   "HYsRxB": {
     "defaultMessage": "Email",
     "description": "Label of a person's email address"
+  },
+  "Hb6Gx/": {
+    "defaultMessage": "New people",
+    "description": "Label of the setting for people who sign in through single sign-on before being added"
+  },
+  "HgOAJ9": {
+    "defaultMessage": "Redirect URI",
+    "description": "Label of the address the provider sends people back to"
   },
   "HkI9B7": {
     "defaultMessage": "You won't get these again",
@@ -843,6 +1271,14 @@
     "defaultMessage": "Sent.",
     "description": "After a customer's link was mailed"
   },
+  "I/YwtY": {
+    "defaultMessage": "One per line. A form on these sites can POST an enquiry as JSON to {intake} and it shows under Enquiries. Leave empty to accept none.",
+    "description": "Under the list of enquiry form sites. {intake} is the address forms send to; Enquiries is the name of a page"
+  },
+  "I4318I": {
+    "defaultMessage": "{by} · {at} · done, says {who}",
+    "description": "Under a request on a task that is done. {by} is who asked; {at} when; {who} who said it was done"
+  },
   "I6brYQ": {
     "defaultMessage": "Nothing here",
     "description": "Heading on the research page when no company was rejected"
@@ -851,17 +1287,45 @@
     "defaultMessage": "None.",
     "description": "When there are no agents' notes"
   },
+  "ITXTKL": {
+    "defaultMessage": "Create task",
+    "description": "Button to create a new task"
+  },
   "IgLv+t": {
     "defaultMessage": "To review",
     "description": "Filter on the research page: companies waiting to be qualified or rejected"
+  },
+  "IhvJqO": {
+    "defaultMessage": "Your browser's",
+    "description": "In the list of languages: the choice to use the browser's languages, when another is chosen"
   },
   "IlooCq": {
     "defaultMessage": "Older →",
     "description": "Button on to the next page of a list, of older things"
   },
+  "IoBZJU": {
+    "defaultMessage": "Allowed tools",
+    "description": "Label of the tools an agent may use"
+  },
   "ItNsS4": {
     "defaultMessage": "Page {n}",
     "description": "Between the buttons of a long list whose length isn't known: which page this is"
+  },
+  "ItO9Ju": {
+    "defaultMessage": "Add a vendor",
+    "description": "Heading of the form adding a data vendor"
+  },
+  "IxCGjS": {
+    "defaultMessage": "Falls back to",
+    "description": "Label on an agent's card of the agent that takes over its task when it can't go on"
+  },
+  "J5zEd+": {
+    "defaultMessage": "Remove {domain}? People at it can no longer use single sign-on here.",
+    "description": "Asked before removing a domain from single sign-on. {domain} is the domain"
+  },
+  "JBdCBL": {
+    "defaultMessage": "None yet.",
+    "description": "In place of agents' recent work or activity when there is none"
   },
   "JF4NIn": {
     "defaultMessage": "Update",
@@ -875,6 +1339,10 @@
     "defaultMessage": "Company",
     "description": "Label of the field for a person's company"
   },
+  "JJUxhB": {
+    "defaultMessage": "← Latest",
+    "description": "Button back to agents' latest work"
+  },
   "JLb18k": {
     "defaultMessage": "e.g. the Leith site",
     "description": "Example in the field naming what an onboarding is for"
@@ -882,6 +1350,10 @@
   "JM2kvo": {
     "defaultMessage": "Everyone who replied, until it's won or lost. Each needs a next step with a date; ones without, or due today, also show on Today. Give one a value and each stage shows what it is worth. A renewal or an expansion with someone already here is a deal of its own, started from their card.",
     "description": "Under the conversations page's title, saying what the board is. Today is the name of another page"
+  },
+  "JMroJ4": {
+    "defaultMessage": "Remove {name}? Where companies stand for it is forgotten, though their history keeps it, and people reached for it are then reached for the organisation's own.",
+    "description": "Asked before removing an offering. {name} is its name"
   },
   "JODtyS": {
     "defaultMessage": "Companies",
@@ -899,9 +1371,21 @@
     "defaultMessage": "Ask for more",
     "description": "Label of the box for asking a search for more"
   },
+  "JZ4bFJ": {
+    "defaultMessage": "Save",
+    "description": "Button on the settings page to save a section's fields"
+  },
+  "JZ9UqU": {
+    "defaultMessage": "Outgoing mail",
+    "description": "Heading of the settings page's section for the organisation's mail server"
+  },
   "JZP4gH": {
     "defaultMessage": "Next",
     "description": "Kind of an agent's note: what to do next"
+  },
+  "JahRcu": {
+    "defaultMessage": "Who works here",
+    "description": "Heading of the list of every agent, built in or connecting with a key"
   },
   "Jbmq9x": {
     "defaultMessage": "Companies",
@@ -918,6 +1402,18 @@
   "JqNSxB": {
     "defaultMessage": "{vendor} checked it: valid",
     "description": "An enrichment vendor checked the email address it found. {vendor} is its name"
+  },
+  "Jr2hO2": {
+    "defaultMessage": "Remove {email} from {org}? They lose access to it; their account and what they added stay, and so do any API keys they made.",
+    "description": "Asked before removing a member. {email} is theirs, {org} the organisation's name"
+  },
+  "Jv5Qka": {
+    "defaultMessage": "None.",
+    "description": "When a task has no agents' notes"
+  },
+  "Jvx1by": {
+    "defaultMessage": "whenever a number is known, in office hours",
+    "description": "In the outreach sequence: when the call after the follow-up email comes"
   },
   "K2NMhm": {
     "defaultMessage": "suggested {field, select, linkedin {{linkedin} profile} phone {phone number} other {{field}}}",
@@ -942,6 +1438,10 @@
   "KHhvY5": {
     "defaultMessage": "Sign in this order",
     "description": "Checkbox: the signers sign one after another, in the order listed"
+  },
+  "KWZmkc": {
+    "defaultMessage": "Recent agent activity",
+    "description": "Heading of the log of what agents did"
   },
   "KetojS": {
     "defaultMessage": "Nobody yet",
@@ -975,9 +1475,33 @@
     "defaultMessage": "Start onboarding",
     "description": "Button on a won deal's card to begin onboarding the company"
   },
+  "LN41oo": {
+    "defaultMessage": "No agent has picked this up yet",
+    "description": "On a task, when no agent has worked on it"
+  },
+  "LSGLou": {
+    "defaultMessage": "Changed by {who}",
+    "description": "Under an offering: who last changed it. {who} is a member or an agent"
+  },
+  "LSRtIo": {
+    "defaultMessage": "Lookups a month",
+    "description": "Label of how many times a new data vendor may be asked a month"
+  },
   "LTWfbQ": {
     "defaultMessage": "Check your email",
     "description": "Heading after asking for a fresh link"
+  },
+  "LUBDah": {
+    "defaultMessage": "Writes need a source URL, and go through this organisation's never-contact list.",
+    "description": "Under the heading of the tools agents get"
+  },
+  "Lams6/": {
+    "defaultMessage": "For OpenAI-compatible only. A thinking model you run yourself, such as Qwen, can be too slow to think before every tool call.",
+    "description": "Under the setting for an agent's thinking; Qwen is a model's name"
+  },
+  "LfTUPr": {
+    "defaultMessage": "0 stops it being asked.",
+    "description": "Under the most times a data vendor may be asked a month"
   },
   "LgfOmL": {
     "defaultMessage": "Onboarding under way",
@@ -991,9 +1515,21 @@
     "defaultMessage": "· drafted by {who}",
     "description": "After the step on a card, when someone wrote the text. {who} is a member or an agent"
   },
+  "Lqpmzy": {
+    "defaultMessage": "Issuer",
+    "description": "Label of the single sign-on provider's issuer address"
+  },
+  "LrAR8w": {
+    "defaultMessage": "Details",
+    "description": "On an agent's or data vendor's card, for a member who isn't an owner: opens more about it"
+  },
   "Ls0JRD": {
     "defaultMessage": "There is nothing for you to do at the moment.",
     "description": "On a customer's onboarding page with no steps of theirs"
+  },
+  "M16a9r": {
+    "defaultMessage": "Model",
+    "description": "Label of an agent's model, on its card and in its settings"
   },
   "M2H8VT": {
     "defaultMessage": "{stage, select, replied {Replied} meeting {Meeting} proposal {Proposal} won {Won} lost {Lost} other {{stage}}}",
@@ -1007,6 +1543,14 @@
     "defaultMessage": "Upload the PDF",
     "description": "Label of the file field to upload an agreement's PDF"
   },
+  "MIObum": {
+    "defaultMessage": "Saved.",
+    "description": "Beside the save button once a data vendor's settings are saved"
+  },
+  "MKASt/": {
+    "defaultMessage": "Scopes",
+    "description": "Label of what a new API key may do"
+  },
   "MNh7Fx": {
     "defaultMessage": "Copied ✓",
     "description": "A copy button's label once it has copied the text"
@@ -1014,6 +1558,10 @@
   "MQ49SY": {
     "defaultMessage": "Days' notice",
     "description": "Label of how many days' notice a subscription needs"
+  },
+  "MQw84a": {
+    "defaultMessage": "key saved · all {limit} used in {month}: skipped until {next}",
+    "description": "On a data vendor's card when this month's lookups are used up. {limit} is how many it may make, {month} the month's name, {next} the first day of next month, such as 1 Dec"
   },
   "MZV8ni": {
     "defaultMessage": "ended",
@@ -1023,9 +1571,25 @@
     "defaultMessage": "Sign in",
     "description": "Title of the sign-in page, and its button"
   },
+  "Mkbdfc": {
+    "defaultMessage": "Paste this into an agent connected to this organisation. Clients that show prompts as commands also have it as {command}.",
+    "description": "Under the heading of a task's section with its prompt. {command} is the prompt's name as a command, work_task"
+  },
   "MkdeMg": {
     "defaultMessage": "Message",
     "description": "What a screen reader calls the box with a LinkedIn message to edit"
+  },
+  "MmY8lM": {
+    "defaultMessage": "{prospector}'s own agents, and keys for yours, are set up on <link>Agents</link>.",
+    "description": "In the settings page's Agents section. {prospector} is the product's name; the link goes to the agents page"
+  },
+  "MnCw5g": {
+    "defaultMessage": "Anthropic's own API",
+    "description": "Where an agent's requests go when it has no endpoint of its own; Anthropic is a company's name"
+  },
+  "MpQv4v": {
+    "defaultMessage": "Mail {address} again?",
+    "description": "Asked before taking an address off the list not to be mailed. {address} is the address"
   },
   "My4lQ/": {
     "defaultMessage": "Left out · {n}",
@@ -1055,6 +1619,10 @@
     "defaultMessage": "just now",
     "description": "Less than a minute ago"
   },
+  "NKZA6e": {
+    "defaultMessage": "{vendor} is told each person's name, their company's domain and any {linkedin} profile you hold.",
+    "description": "Under a data vendor's settings: what it is sent about a person. {vendor} is its name, Prospeo; {linkedin} is LinkedIn"
+  },
   "NLrJ+d": {
     "defaultMessage": "{stage, select, research {research} outreach {outreach} replied {replied} meeting {meeting} proposal {proposal} won {won} lost {lost} rejected {rejected} other {{stage}}}",
     "description": "Where a company stands in the pipeline: research, outreach, replied, meeting, proposal, won, lost or rejected. Shown in small capitals"
@@ -1071,6 +1639,10 @@
     "defaultMessage": "Name what you look for",
     "description": "Link to settings, for an owner, when nothing is named to look for in a company"
   },
+  "NqTzWu": {
+    "defaultMessage": "A SearXNG instance you run: free, open-source search, with json among its search.formats. The agent searches through it, and reads pages itself, with no paid search service.",
+    "description": "Under the field for an agent's search. SearXNG is a product's name; json and search.formats are its settings, kept as they are"
+  },
   "NwGjP1": {
     "defaultMessage": "Nobody yet.",
     "description": "Under Signers when nobody signs the agreement yet"
@@ -1079,6 +1651,10 @@
     "defaultMessage": "Faster: from LinkedIn itself",
     "description": "Heading of the panel about the bookmarklet"
   },
+  "O3gk5w": {
+    "defaultMessage": "Each stretch of an agent's changes, and the task it was for. An agent that is only reading doesn't show.",
+    "description": "Under the heading of recent agent work"
+  },
   "O3zy1f": {
     "defaultMessage": "{per, select, year {{figure} a year} month {{figure} a month} other {{figure} a {per}}}",
     "description": "A subscription's price. {figure} is the amount with its currency, {per} the period (year or month)"
@@ -1086,6 +1662,14 @@
   "OFMRAO": {
     "defaultMessage": "{name} · {email}",
     "description": "A person to choose to add to an agreement. {name} is their name, {email} their email address"
+  },
+  "OGVI+1": {
+    "defaultMessage": "Language for customers",
+    "description": "Label of the list of languages for the organisation's customers"
+  },
+  "OHmves": {
+    "defaultMessage": "Change scopes",
+    "description": "On an API key's card, for an owner: opens what the key may do"
   },
   "OLWuEw": {
     "defaultMessage": "This link isn't one we sent. Use the link in the mail itself.",
@@ -1111,6 +1695,10 @@
     "defaultMessage": "Role",
     "description": "Label of the field for a person's job title"
   },
+  "OVlUCm": {
+    "defaultMessage": "Copied ✓",
+    "description": "Button to copy a task's prompt, once it has been copied"
+  },
   "OYVII4": {
     "defaultMessage": "{name} unchecked",
     "description": "Tag for something the organisation looks for that no one has checked yet. {name} is what it is"
@@ -1126,6 +1714,14 @@
   "OdIgb0": {
     "defaultMessage": "Before it can be sent",
     "description": "Heading of the list of what an agreement needs before it can be sent"
+  },
+  "Ol3f5y": {
+    "defaultMessage": "{tool} for agents",
+    "description": "Under the data vendors: the tool agents ask them with. {tool} is the tool's name, enrich_contact"
+  },
+  "Omlvk6": {
+    "defaultMessage": "careers_page: a careers or jobs page on their site ats: the applicant tracking system they use",
+    "description": "Example in the empty list of what agents look for: one per line, a key name, a colon and what counts. Keep the key names (careers_page, ats) as they are"
   },
   "OnlYXy": {
     "defaultMessage": "An owner writes the onboarding steps under Settings; then one can be started here.",
@@ -1151,6 +1747,18 @@
     "defaultMessage": "Remove this deal",
     "description": "Button on a renewal or expansion's card to remove it"
   },
+  "PV/TDS": {
+    "defaultMessage": "{kind, select, skipped {Skipped} dead_end {Dead end} next {Next} other {{other}}}",
+    "description": "What kind of note an agent left on a task. {other} is the kind as the server names it, for one not listed"
+  },
+  "PXPfYy": {
+    "defaultMessage": "One per line, a name and what counts; put {must} after the name of anything a company is no fit without. Agents answer each yes, no or unknown with a source, and Research ranks a search's companies by them.",
+    "description": "Under the list of what agents look for. {must} is the mark typed after a name, written as it is typed; Research is the name of a page"
+  },
+  "PY2dfR": {
+    "defaultMessage": "No tasks yet",
+    "description": "Heading on the tasks page when there are none"
+  },
   "PYDd6K": {
     "defaultMessage": "Meeting",
     "description": "A conversation's stage: a meeting is booked or held"
@@ -1166,6 +1774,10 @@
   "PgG+wU": {
     "defaultMessage": "To answer",
     "description": "Where answering an enquiry stands: not answered yet. A filter, a choice and a label on each enquiry"
+  },
+  "Pgo+4m": {
+    "defaultMessage": "Agents research, add and draft for {org}. Some {prospector} runs itself; others are your own and connect with a key, which works for this organisation only. What any of them adds waits in Research for a person; agents can draft, but only people send.",
+    "description": "Top of the agents page. {org} is the organisation's name, {prospector} the product's name, Prospector; Research is the name of a page"
   },
   "PiieMg": {
     "defaultMessage": "Rejected",
@@ -1187,6 +1799,10 @@
     "defaultMessage": "no commitment, {per, select, month {a month} other {a year}} at a time",
     "description": "A subscription's term when it isn't committed for any months"
   },
+  "PnIxmn": {
+    "defaultMessage": "Asked.",
+    "description": "Said once a request for more has been sent to a task's agents"
+  },
   "PoLBvs": {
     "defaultMessage": "Contacts whose email is a pattern guess show up here.",
     "description": "On the research page when no contact's email is a guess"
@@ -1198,6 +1814,14 @@
   "PuNA1u": {
     "defaultMessage": "Choose your own password",
     "description": "Title of the page a new member sees first, to replace the password they were given"
+  },
+  "PvjeZn": {
+    "defaultMessage": "Page {n} of {pages}",
+    "description": "Between the buttons moving through pages of agents' activity"
+  },
+  "Q/VoDU": {
+    "defaultMessage": "{days} days without a {linkedIn} accept",
+    "description": "Beside the field for how many days to wait for a LinkedIn connection request to be accepted before emailing. {days} is that field; {linkedIn} is the network's name"
   },
   "Q0Em+a": {
     "defaultMessage": "By",
@@ -1219,6 +1843,10 @@
     "defaultMessage": "left out: {reason}",
     "description": "Beside someone a draft campaign would not go to. {reason} is the server's reason, such as no email address"
   },
+  "QIaU9I": {
+    "defaultMessage": "Everything this organisation holds here, in one file: companies, people, facts, enquiries, history, settings and who has access. It holds no passwords, keys or sign-on secrets.",
+    "description": "In the Your data section, above the button to download it"
+  },
   "QIll+I": {
     "defaultMessage": "Sending it for signature comes in the next release. Until then nothing here leaves {brand}.",
     "description": "Under the list of what an agreement needs before it can be sent. {brand} is the product's name, Prospector"
@@ -1239,9 +1867,17 @@
     "defaultMessage": "{n} / {max} chars",
     "description": "Beside a LinkedIn connection note: how many characters it has of the most LinkedIn allows"
   },
+  "QYp1Gi": {
+    "defaultMessage": "Working, with {model}",
+    "description": "An agent's run on a task, going. {model} is the model's name"
+  },
   "QdYH9f": {
     "defaultMessage": "Move {name} up",
     "description": "What a screen reader calls the button moving a signer up the order. {name} is the signer's name"
+  },
+  "QdkVc6": {
+    "defaultMessage": "Add",
+    "description": "Button adding a data vendor"
   },
   "QfMDej": {
     "defaultMessage": "What they're on",
@@ -1251,6 +1887,10 @@
     "defaultMessage": "Continue to {org}",
     "description": "Button to an organisation's own sign-in. {org} is its name"
   },
+  "QvJCFf": {
+    "defaultMessage": "{vendor} charges a credit only when it finds an address.",
+    "description": "Under a data vendor's settings: what it charges. {vendor} is its name, Hunter"
+  },
   "QwNVvH": {
     "defaultMessage": "Fit {grade}",
     "description": "Choice of the grade to qualify a company at. {grade} is A, B or C"
@@ -1258,6 +1898,18 @@
   "QwzLyU": {
     "defaultMessage": "Name",
     "description": "A kind of field placed on an agreement's page: where the signer's name goes"
+  },
+  "QzOhFx": {
+    "defaultMessage": "{claudeCode} or any MCP client, with a key that has only the scopes it needs. No key can mark anything sent or reach another organisation, and only one with {scope} can change settings.",
+    "description": "Under the choice to add the organisation's own agent. {claudeCode} is a product's name, Claude Code; {scope} is the name of a key's scope, settings:write"
+  },
+  "R4Ycdt": {
+    "defaultMessage": "marked a mail as spam {date}",
+    "description": "Beside an address not to be mailed: when its owner marked a mail as spam. {date} is the day"
+  },
+  "R6X9sc": {
+    "defaultMessage": "Make {email} an owner of {org}? They can change settings, keys and the team, export and erase.",
+    "description": "Asked before making a member an owner. {email} is theirs, {org} the organisation's name"
   },
   "RHiXhj": {
     "defaultMessage": "Onboarding is support work, so here you read it.",
@@ -1279,13 +1931,29 @@
     "defaultMessage": "← Companies",
     "description": "Link from a company's page back to the list of companies"
   },
+  "RRstyD": {
+    "defaultMessage": "Open",
+    "description": "Filter on the tasks page: only tasks still open"
+  },
+  "RWF+3h": {
+    "defaultMessage": "Customers' pages, unsubscribe pages, and mail to customers and new members, for anyone who hasn't chosen.",
+    "description": "Under the list of languages for customers: what it is used for"
+  },
   "RYVKBb": {
     "defaultMessage": "What each customer is on, and until when. The one that needs someone soonest comes first: a day to cancel by, a renewal or an end. Record one from a company's page. {prospector} notes what was agreed and when it's due; it takes no payment and sends no invoice.",
     "description": "What the subscriptions page is, under its title. {prospector} is the app's name"
   },
+  "RjwDNP": {
+    "defaultMessage": "Close this task? Agents stop seeing it; what was found stays.",
+    "description": "Asked before closing a task"
+  },
   "RtYccE": {
     "defaultMessage": "Erase {whom, select, row {everyone on this row ({several})} other {{name}}}? Their details, drafts and notes are deleted for good, along with agents' notes about this company and its tasks, and they can't be added again. Facts about the company, and the briefs and requests on tasks, that mention them aren't found for you, and nor are your own lead files: take them out there too.",
     "description": "Asked before erasing a person. {whom} is row when the row stands for several people, {several} the names it stands for, {name} the person's name otherwise"
+  },
+  "S03xMe": {
+    "defaultMessage": "this organisation",
+    "description": "Stands in for the organisation's name in the settings page's questions before removing a member, when the name hasn't loaded"
   },
   "S3a3KE": {
     "defaultMessage": "LinkedIn profile",
@@ -1299,6 +1967,10 @@
     "defaultMessage": "Answering",
     "description": "Small heading on an enquiry, before where answering it stands and who has it"
   },
+  "SD8+Tu": {
+    "defaultMessage": "What it is called on the task page and in the record.",
+    "description": "Under the field for an agent's name"
+  },
   "SNTPLC": {
     "defaultMessage": "Next step",
     "description": "Top of a card on the Today page: a conversation needing a next step"
@@ -1307,9 +1979,17 @@
     "defaultMessage": "Export",
     "description": "Button to download everything held about a person"
   },
+  "SSIErc": {
+    "defaultMessage": "Ask {vendor} later",
+    "description": "What a screen reader calls the button moving a data vendor down the list. {vendor} is its name"
+  },
   "SUlfGp": {
     "defaultMessage": "a month",
     "description": "Choice of the period a subscription's price is for"
+  },
+  "SXjjXI": {
+    "defaultMessage": "+{n} more",
+    "description": "At the end of an offering's summary of what agents look for: how many more aren't listed"
   },
   "SaS5to": {
     "defaultMessage": "Name",
@@ -1318,6 +1998,10 @@
   "SfIQnz": {
     "defaultMessage": "Email this reply",
     "description": "Button emailing a reply to an enquiry"
+  },
+  "Sg9anX": {
+    "defaultMessage": "Send me a test email",
+    "description": "Button to send the member a test email through the mail server"
   },
   "SiTJ6W": {
     "defaultMessage": "Pick",
@@ -1330,6 +2014,14 @@
   "SmcTbd": {
     "defaultMessage": "Dismiss",
     "description": "Button to dismiss a detail found for a person"
+  },
+  "Sqp77K": {
+    "defaultMessage": "thinking off",
+    "description": "Tag on an agent's card: it answers without thinking first"
+  },
+  "T1eJzT": {
+    "defaultMessage": "Your provider's {oidc} issuer. Empty turns single sign-on off.",
+    "description": "Under the single sign-on issuer field. {oidc} is the standard's name"
   },
   "T5fiHW": {
     "defaultMessage": "Facts",
@@ -1355,6 +2047,10 @@
     "defaultMessage": "now {current}",
     "description": "What a person's detail is now, beside a new one found for it"
   },
+  "TQjxn6": {
+    "defaultMessage": "Nobody yet.",
+    "description": "In the Not to be mailed section when no address is in it"
+  },
   "TTEOSE": {
     "defaultMessage": "Existing customer",
     "description": "Why a company a search came to was left out: it is a customer"
@@ -1367,6 +2063,10 @@
     "defaultMessage": "Expected to close",
     "description": "Label of the field for the date a deal is expected to close"
   },
+  "TYXrTP": {
+    "defaultMessage": "email",
+    "description": "Placeholder in the field for a new member's email address"
+  },
   "TZFIp7": {
     "defaultMessage": "To start a renewal deal, someone at this company needs to be on the Conversations board first.",
     "description": "Why a renewal deal can't be started yet"
@@ -1374,6 +2074,10 @@
   "TcCW6A": {
     "defaultMessage": "A marketing mail written once, for everyone in conversation or everyone at a company that is a customer now. Never for prospects who haven't replied: that stays one person writing to one person. Anyone on the list not to be mailed, on the never-contact list or erased is left out, and each draft shows who that leaves. It goes through your own mail server a few dozen a minute, each with your postal address and a link to unsubscribe, and nobody is mailed twice.",
     "description": "Introduction at the top of the Campaigns page"
+  },
+  "TcJWxF": {
+    "defaultMessage": "Close task",
+    "description": "Button to close a task"
   },
   "TfEvtW": {
     "defaultMessage": "Password saved. Sign in with it.",
@@ -1399,6 +2103,14 @@
     "defaultMessage": "e.g. Spring price list",
     "description": "Example in the empty box for a new campaign's name"
   },
+  "U+hYJs": {
+    "defaultMessage": "It currently keeps {total, plural, one {# person} other {# people}} already here out of the queue: {shown}{more, plural, =0 {} one { and # more} other { and # more}}.",
+    "description": "After the hint under the never-contact list. {total} is how many people it keeps out of outreach, {shown} a list of some of their names or addresses, {more} how many of them aren't listed"
+  },
+  "U40Ry9": {
+    "defaultMessage": "From",
+    "description": "Label of the address the organisation's mail is sent from"
+  },
   "U4zyRn": {
     "defaultMessage": "Notice to end, days",
     "description": "Label of how many days' notice ending a subscription takes"
@@ -1406,6 +2118,10 @@
   "U9jxGD": {
     "defaultMessage": "{n} unknown",
     "description": "Count of a campaign's mails whose fate is unknown, in the line under its name"
+  },
+  "UAg9Qt": {
+    "defaultMessage": "Keys are sealed under the server's key and never shown again. A new vendor goes to the bottom of the list.",
+    "description": "Under the form adding a data vendor"
   },
   "UAooGb": {
     "defaultMessage": "Or",
@@ -1419,6 +2135,10 @@
     "defaultMessage": "At the end of the term",
     "description": "Label of what happens when a subscription's term ends"
   },
+  "UI3KYo": {
+    "defaultMessage": "Delete",
+    "description": "Button deleting an agent"
+  },
   "UJC7aR": {
     "defaultMessage": "Prepare for signing",
     "description": "Button to set out who signs an agreement and where"
@@ -1427,9 +2147,21 @@
     "defaultMessage": "a guess",
     "description": "Under a suggested email address that was worked out rather than checked"
   },
+  "UTdde7": {
+    "defaultMessage": "Remove {vendor}",
+    "description": "Button removing a data vendor. {vendor} is its name"
+  },
   "UaJIIV": {
     "defaultMessage": "not met",
     "description": "A company's criterion is not met"
+  },
+  "Uc4WCj": {
+    "defaultMessage": "{days} days without a reply",
+    "description": "Beside the field for how many days to wait for a reply before following up. {days} is that field"
+  },
+  "UepY9r": {
+    "defaultMessage": "It may be in another organisation, or the link is wrong.",
+    "description": "When a task's page is opened for a task that isn't there: why"
   },
   "UkToXa": {
     "defaultMessage": "Continue",
@@ -1439,13 +2171,25 @@
     "defaultMessage": "Junked",
     "description": "A company's verdict for an offering: ruled out"
   },
+  "UtYZXR": {
+    "defaultMessage": "Team",
+    "description": "Heading of the settings page's section of the organisation's members"
+  },
   "UuJ//c": {
     "defaultMessage": "Everyone at a customer",
     "description": "Whom a campaign goes to: everyone at a company that is a customer"
   },
+  "Uw3mGa": {
+    "defaultMessage": "The endpoint lists {n, plural, one {# model} other {# models}}; a router model that picks one per request works too.",
+    "description": "Under the field for an agent's model, once its endpoint's models are known"
+  },
   "UxaOfn": {
     "defaultMessage": "Password you were given",
     "description": "Label of the field for the password a new member was given"
+  },
+  "V2aK35": {
+    "defaultMessage": "Tools agents get",
+    "description": "Heading of the list of tools an agent connecting to the product can call"
   },
   "V5m+z7": {
     "defaultMessage": "closes {date}",
@@ -1470,6 +2214,10 @@
   "Vjg0KF": {
     "defaultMessage": "{n} sent",
     "description": "Count of a campaign's mails sent, in the line under its name"
+  },
+  "VjgnON": {
+    "defaultMessage": "Reload to try again.",
+    "description": "Under the heading when a task failed to load"
   },
   "Vk7CpX": {
     "defaultMessage": "Sidebar",
@@ -1539,6 +2287,10 @@
     "defaultMessage": "What it says",
     "description": "What a screen reader calls the box with a campaign mail's text"
   },
+  "WexFNb": {
+    "defaultMessage": "Add domain",
+    "description": "Button to add a domain to single sign-on"
+  },
   "WfNo1q": {
     "defaultMessage": "Other ways to sign in",
     "description": "What a screen reader calls the list of other ways to sign in"
@@ -1551,6 +2303,14 @@
     "defaultMessage": "If that address has an account, a link is on its way. It lasts an hour.",
     "description": "After asking for a reset link; it says the same whether or not the address has an account"
   },
+  "WhA6gv": {
+    "defaultMessage": "Everything above is {org}'s own offering. Add another when you sell something else to companies you already know: each one is reviewed for on its own, with its own look-for fields, pitch and note, while facts and people are shared.",
+    "description": "Under the heading of the What you sell section. {org} is the organisation's name"
+  },
+  "WjhXAJ": {
+    "defaultMessage": "support",
+    "description": "An area of work a member can be given: support"
+  },
   "WkxVFJ": {
     "defaultMessage": "Other",
     "description": "What an enquiry is about: anything else. A filter and a label on each enquiry"
@@ -1558,6 +2318,10 @@
   "WnjdPv": {
     "defaultMessage": "No details to check",
     "description": "Heading on the research page when no found detail waits to be accepted"
+  },
+  "WpORzw": {
+    "defaultMessage": "Agent guidance",
+    "description": "Label of the organisation's own guidance for agents"
   },
   "WqroO0": {
     "defaultMessage": "Notes",
@@ -1583,9 +2347,17 @@
     "defaultMessage": "a year",
     "description": "A price's period: per year"
   },
+  "XTJdw6": {
+    "defaultMessage": "enquiries and their replies, subscriptions and onboarding",
+    "description": "Tooltip on the support area of work: what it covers"
+  },
   "XUzj4e": {
     "defaultMessage": "{vendor} ({left} of {limit} left)",
     "description": "A vendor a lookup would go to. {vendor} is its name; {left} the lookups left this month of {limit}"
+  },
+  "XVpLSg": {
+    "defaultMessage": "runs, missing something",
+    "description": "In the key to the agent cards' colours: an agent that runs but lacks something"
   },
   "XbHScK": {
     "defaultMessage": "Follow-up",
@@ -1599,6 +2371,10 @@
     "defaultMessage": "Ended early on",
     "description": "Label of the date a subscription ended before its term"
   },
+  "XiVUuZ": {
+    "defaultMessage": "Email",
+    "description": "What a screen reader calls the field for a new member's email address"
+  },
   "Xm3zph": {
     "defaultMessage": "{done} of {total, plural, one {# of your steps is} other {# of your steps are}} done. Mark each one when you have done it.",
     "description": "How many of a customer's own onboarding steps are done"
@@ -1606,6 +2382,10 @@
   "XxgWDg": {
     "defaultMessage": "Send to",
     "description": "Label of the choice of whom at a company to send to"
+  },
+  "Xxl9hq": {
+    "defaultMessage": "The agent uses only the tools ticked here. {linkedin}'s terms forbid automated access, logged-in browsers included: prefer search and fetch tools to browser and captcha ones.",
+    "description": "Under the tools an agent may use. {linkedin} is LinkedIn"
   },
   "XzzEGx": {
     "defaultMessage": "Subject",
@@ -1623,6 +2403,18 @@
     "defaultMessage": "Next step",
     "description": "Label of the field for the next step in a conversation"
   },
+  "Y3YflR": {
+    "defaultMessage": "Address not to mail",
+    "description": "What a screen reader calls the field to add an address not to be mailed"
+  },
+  "Y5Hmk9": {
+    "defaultMessage": "{start}, {mins} min",
+    "description": "When a stretch of an agent's work began and how long it went on. {start} is a date and time; {mins} the minutes"
+  },
+  "Y5XwNY": {
+    "defaultMessage": "unsubscribed {date}",
+    "description": "Beside an address not to be mailed: when its owner unsubscribed. {date} is the day"
+  },
   "Y86spi": {
     "defaultMessage": "{kind, select, new {New business} renewal {Renewal} expansion {Expansion} other {{kind}}}",
     "description": "The kind of a deal: new business, a renewal or an expansion"
@@ -1635,13 +2427,29 @@
     "defaultMessage": "No subject yet",
     "description": "In place of a draft campaign's subject when it has none"
   },
+  "YPPYUG": {
+    "defaultMessage": "never used · key {prefix}… · made by {who}",
+    "description": "On an API key's card. {prefix} is the start of the key, {who} the member who made it"
+  },
   "YQSb3c": {
     "defaultMessage": "Signers",
     "description": "Heading of the people who sign an agreement"
   },
+  "YRZuQR": {
+    "defaultMessage": "Agents get its look-for fields, and what they find waits in its review.",
+    "description": "Under the field picking which offering a new task is for: what picking one does"
+  },
+  "YSzd1j": {
+    "defaultMessage": "What they skipped or couldn't find, in their words. Not checked by anyone.",
+    "description": "Under the heading of a task's section of agents' notes"
+  },
   "YYWBQh": {
     "defaultMessage": "Demo",
     "description": "What an enquiry is about: asking for a demo. A filter and a label on each enquiry"
+  },
+  "YalWPe": {
+    "defaultMessage": "Kind",
+    "description": "Label of the choice of what kind of endpoint an agent reaches"
   },
   "YhpmCA": {
     "defaultMessage": "No companies match",
@@ -1667,6 +2475,10 @@
     "defaultMessage": "Answer enquiries",
     "description": "In the Do now panel, beside a count of unanswered enquiries"
   },
+  "Z8qXFm": {
+    "defaultMessage": "Only {org}'s own.",
+    "description": "In the What you sell section when the organisation sells nothing but its own offering. {org} is its name"
+  },
   "ZQ5Y/A": {
     "defaultMessage": "No date",
     "description": "In place of a next step's date when it has none"
@@ -1675,17 +2487,37 @@
     "defaultMessage": "Saved ✓",
     "description": "After a reply was sent or an answer recorded"
   },
+  "Zj/wNE": {
+    "defaultMessage": "{n} can't run",
+    "description": "Count of the product's own agents that can't run"
+  },
+  "Zon+75": {
+    "defaultMessage": "Enquiry form sites",
+    "description": "Label of the list of websites whose forms may send enquiries"
+  },
   "Zxy8BI": {
     "defaultMessage": "Renewal with",
     "description": "Small heading before choosing who a renewal deal is with"
+  },
+  "a/FGNc": {
+    "defaultMessage": "When its endpoint stays limited or away this long, the agent hands its task to the one chosen here, which carries on from the task's notes.",
+    "description": "Under the setting for an agent's fallback"
   },
   "a/lXfh": {
     "defaultMessage": "Qualified already",
     "description": "Why a company a search came to was left out: it was qualified already"
   },
+  "a0FDXz": {
+    "defaultMessage": "Waiting for the model endpoint's limit, until {until}",
+    "description": "An agent's run on a task, held by its model's rate limit. {until} is a date and time"
+  },
   "a1XYeP": {
     "defaultMessage": "None yet.",
     "description": "When no one at a company has been found"
+  },
+  "aMRUY/": {
+    "defaultMessage": "What you do",
+    "description": "Label of the pitch line used in call scripts"
   },
   "aPrUFD": {
     "defaultMessage": "email",
@@ -1707,6 +2539,10 @@
     "defaultMessage": "{worth} a year at today's prices",
     "description": "Beside the title: what every subscription comes to in a year. {worth} is an amount of money"
   },
+  "aspFMC": {
+    "defaultMessage": "Agents can read the brief and everyone's requests. Don't put anything in them you wouldn't put in a note to a colleague.",
+    "description": "Under the form for a new task: a warning that agents read what is written"
+  },
   "auv4T1": {
     "defaultMessage": "Agents & API",
     "description": "Sidebar: the page of AI agents and API keys"
@@ -1718,6 +2554,14 @@
   "b7VNor": {
     "defaultMessage": "Marketing mail from this sender won't go to the address this link was sent to. Mail about something you already have with them, such as a change to your contract, can still reach you.",
     "description": "After unsubscribing: what stops, and what can still come"
+  },
+  "bFkWVL": {
+    "defaultMessage": "Asked at most {n, plural, one {# time} other {# times}} a month. Changed by {who}, {when}.",
+    "description": "On a data vendor's card, for a member who isn't an owner. {who} is who last changed it, {when} the date and time"
+  },
+  "bJx9Nc": {
+    "defaultMessage": "{n, plural, one {# fresh start} other {# fresh starts}}",
+    "description": "After what an agent's run did: how many times it started afresh with a clean context"
   },
   "bOriAy": {
     "defaultMessage": "Nothing due here",
@@ -1759,6 +2603,10 @@
     "defaultMessage": "organisation",
     "description": "Under the organisation's name in the switcher at the top of the sidebar"
   },
+  "bv+kEI": {
+    "defaultMessage": "Fallback",
+    "description": "Label of the agent that takes over a task when this one can't go on"
+  },
   "bxJXBH": {
     "defaultMessage": "Email me a link",
     "description": "Button to send a password reset link"
@@ -1766,6 +2614,18 @@
   "c//kQy": {
     "defaultMessage": "ending",
     "description": "A subscription's status: ends when its term does"
+  },
+  "c2Y0by": {
+    "defaultMessage": "Reaches {where}. Only an owner changes its setup.",
+    "description": "On an agent's card, for a member who isn't an owner. {where} is the address it sends requests to, or Anthropic's own API"
+  },
+  "cB+Ak2": {
+    "defaultMessage": "LinkedIn connection request",
+    "description": "First step of the outreach sequence"
+  },
+  "cBzW8J": {
+    "defaultMessage": "Off: answer without thinking first",
+    "description": "Beside the box that turns an agent's thinking off"
   },
   "cEBHnw": {
     "defaultMessage": "{status, select, draft {draft} other {{status}}} · by {who}",
@@ -1775,13 +2635,29 @@
     "defaultMessage": "What they said back, pasted from your mail. Nothing is sent.",
     "description": "Placeholder of the field recording an enquirer's answer"
   },
+  "cHTUQq": {
+    "defaultMessage": "carried on after {n, plural, one {# restart} other {# restarts}}",
+    "description": "After what an agent's run did: how many times it carried on after the server restarted"
+  },
   "cL1i3L": {
     "defaultMessage": "Skipped",
     "description": "Kind of an agent's note: something it chose not to do"
   },
+  "cM8+sS": {
+    "defaultMessage": "Your browser's languages are used until you choose one.",
+    "description": "Under the list of languages on the settings page"
+  },
   "cS1f1R": {
     "defaultMessage": "lost",
     "description": "A person's stage: the deal is lost"
+  },
+  "cS2ej5": {
+    "defaultMessage": "one the endpoint lists",
+    "description": "In the empty field for an agent's model"
+  },
+  "cUBBoe": {
+    "defaultMessage": "Run {agent}",
+    "description": "Button to set an agent going on a task. {agent} is its name"
   },
   "cVVVDW": {
     "defaultMessage": "New password",
@@ -1819,6 +2695,10 @@
     "defaultMessage": "Add someone",
     "description": "Link to add a person at a company"
   },
+  "d4OLaK": {
+    "defaultMessage": "Anyone at your domains becomes a member when they first sign in",
+    "description": "Checkbox to let anyone at the organisation's domains join by single sign-on"
+  },
   "d68oa4": {
     "defaultMessage": "That didn't go through. Check your connection and try again.",
     "description": "When creating an organisation failed with nothing from the server to say why"
@@ -1831,9 +2711,17 @@
     "defaultMessage": "For {email}. 10 characters or more.",
     "description": "On the page a reset link opens: whose password it is, and how long it must be"
   },
+  "dMA4Dr": {
+    "defaultMessage": "{n} ready",
+    "description": "Count of the product's own agents that are ready to run"
+  },
   "dMepNA": {
     "defaultMessage": "agent · {name}",
     "description": "Who did something, when it was one of the organisation's AI agents"
+  },
+  "dVtPYu": {
+    "defaultMessage": "Username",
+    "description": "Label of the mail server's username"
   },
   "dXt4Ta": {
     "defaultMessage": "Kind of deal",
@@ -1850,6 +2738,10 @@
   "deTA2z": {
     "defaultMessage": "Details · {n, plural, one {# source} other {# sources}}",
     "description": "Opens a card's contact details and the pages its research drew on"
+  },
+  "dfoqri": {
+    "defaultMessage": "Pages",
+    "description": "What a screen reader calls the buttons moving through pages of agents' activity"
   },
   "djs9DB": {
     "defaultMessage": "{found} of about {want} found",
@@ -1871,6 +2763,10 @@
     "defaultMessage": "Nothing recorded yet.",
     "description": "When a company has no history"
   },
+  "e3uNMz": {
+    "defaultMessage": "For",
+    "description": "Label of the field picking which offering a new task is for"
+  },
   "e8uBxQ": {
     "defaultMessage": "Withdraw {name}'s access? Their page closes in every browser at once.",
     "description": "Asked before withdrawing a customer's access to their page"
@@ -1887,6 +2783,10 @@
     "defaultMessage": "notice given",
     "description": "A subscription's status: the customer has given notice to end it"
   },
+  "eQ0Zc+": {
+    "defaultMessage": "Kept. Type a new one to replace it",
+    "description": "Placeholder in the client secret field when one is already saved"
+  },
   "eRNQKX": {
     "defaultMessage": "Forgot your password?",
     "description": "Link from the sign-in page to reset a password"
@@ -1895,9 +2795,21 @@
     "defaultMessage": "We'll email you a link to choose a new one.",
     "description": "On the page to ask for a password reset link"
   },
+  "efMHa5": {
+    "defaultMessage": "research, outreach, deals and tasks for agents",
+    "description": "Tooltip on the sales area of work: what it covers"
+  },
+  "egip4r": {
+    "defaultMessage": "Signature",
+    "description": "Label of the field for the member's email signature"
+  },
   "ehKP45": {
     "defaultMessage": "{n} skipped",
     "description": "Count of a campaign's mails skipped, in the line under its name"
+  },
+  "enFDdr": {
+    "defaultMessage": "last change {when}",
+    "description": "In a stretch of an agent's work still going: when it last changed something. {when} is how long ago, such as 5 min ago"
   },
   "epZJG2": {
     "defaultMessage": "Never contact, kept on file",
@@ -1919,13 +2831,25 @@
     "defaultMessage": "Skip to content",
     "description": "A link, first for the keyboard, past the sidebar to the page"
   },
+  "f4Q2nK": {
+    "defaultMessage": "no key saved: it isn't asked",
+    "description": "On a data vendor's card when it has no API key"
+  },
   "fAYYkN": {
     "defaultMessage": "touches",
     "description": "Under a count in the Last 7 days panel: notes, messages, emails and calls made"
   },
+  "fBbtX5": {
+    "defaultMessage": "nothing to look for yet",
+    "description": "In an offering's summary when it has nothing for agents to look for"
+  },
   "fGmy+l": {
     "defaultMessage": "Find",
     "description": "Button to start a search"
+  },
+  "fHJIkM": {
+    "defaultMessage": "sales",
+    "description": "An area of work a member can be given: sales"
   },
   "fTUmeI": {
     "defaultMessage": "Your reply to {email}. Only what you write here is sent; their answer comes to your own mailbox.",
@@ -1935,6 +2859,10 @@
     "defaultMessage": "Onboarding",
     "description": "Small heading over a company's onboardings"
   },
+  "fjaFow": {
+    "defaultMessage": "Edit",
+    "description": "Beside an offering's summary, to open it for an owner to edit"
+  },
   "fsVQKi": {
     "defaultMessage": "must",
     "description": "Beside a criterion a company has to meet"
@@ -1942,6 +2870,10 @@
   "fzP2kj": {
     "defaultMessage": "Say who you're looking for and an agent goes to find them. What agents, jobs and imports find waits here: nothing reaches outreach until someone qualifies it and picks a contact. Every fact keeps the link it came from.",
     "description": "Paragraph under the research page's heading saying what the page is for"
+  },
+  "g1rSyq": {
+    "defaultMessage": "added by {who} {date}",
+    "description": "Beside an address not to be mailed: who added it and when. {who} is a member or an agent, {date} the day"
   },
   "g2DMOw": {
     "defaultMessage": "can open it",
@@ -1951,6 +2883,10 @@
     "defaultMessage": "Adding people is sales work. An owner can add sales to you on the Team list in Settings.",
     "description": "On the add person page, for a member who doesn't do sales"
   },
+  "gAprNj": {
+    "defaultMessage": "Single sign-on",
+    "description": "Heading of the settings page's section for the organisation's single sign-on"
+  },
   "gCBhX9": {
     "defaultMessage": "Subscriptions",
     "description": "Small heading over a company's subscriptions"
@@ -1959,9 +2895,21 @@
     "defaultMessage": "When it's right",
     "description": "Over the button that records a subscription"
   },
+  "gHMa/n": {
+    "defaultMessage": "MCP endpoint",
+    "description": "Label of the address an MCP client connects to; MCP is the Model Context Protocol"
+  },
   "gHQcsa": {
     "defaultMessage": "Stop {agent}",
     "description": "Button to stop an agent's run on a search. {agent} is its name"
+  },
+  "gKQAzy": {
+    "defaultMessage": "Write what you want found. An agent picks it up, and what it finds waits in Research for you. Anyone can ask for more later, and a different agent can carry on from what is already here.",
+    "description": "Paragraph under the tasks page's heading saying what tasks are for. Research is the page of that name"
+  },
+  "gMApmK": {
+    "defaultMessage": "{stage, select, review {review} qualified {qualified} rejected {rejected} other {{stage}}}",
+    "description": "Where a company found for a task stands: waiting for review, qualified or rejected. Shown small, in lower case"
   },
   "gMzis5": {
     "defaultMessage": "Today",
@@ -1979,6 +2927,22 @@
     "defaultMessage": "None yet. Start one, then upload the contract as a PDF.",
     "description": "When a company has no agreements"
   },
+  "gV/1o5": {
+    "defaultMessage": "The call script's pitch line. {company} is filled in.",
+    "description": "Under the pitch line. {company} is the placeholder it can hold, written as it is typed"
+  },
+  "gYJYKx": {
+    "defaultMessage": "Work so far",
+    "description": "Heading of a task's section of the stretches of changes agents made"
+  },
+  "gbVUXI": {
+    "defaultMessage": "Your sign-in",
+    "description": "Heading of the settings page's section for a member who signs in only through a provider"
+  },
+  "gd4kEc": {
+    "defaultMessage": "← Previous",
+    "description": "Button to the previous page of agents' activity"
+  },
   "ggJSEV": {
     "defaultMessage": "{page} · Prospector",
     "description": "The browser tab's title on a page outside any organisation, such as signing in"
@@ -1994,6 +2958,10 @@
   "gsLlgl": {
     "defaultMessage": "Getting you set up",
     "description": "Heading of a customer's onboarding page"
+  },
+  "h+YFUf": {
+    "defaultMessage": "Write a brief and hand it to your agent with the prompt on its page.",
+    "description": "On the tasks page when there are none: how to start one"
   },
   "h3ZwsO": {
     "defaultMessage": "Onboarding",
@@ -2019,13 +2987,45 @@
     "defaultMessage": "The steps between a signature and a live customer. Each onboarding is a copy of your steps, made the day it starts, so changing them in Settings later leaves the ones running as they are. Start one from a company's page. Ones running late come first.",
     "description": "What the onboarding page is, under its title"
   },
+  "hGXKjJ": {
+    "defaultMessage": "Your own agent connects",
+    "description": "The choice to add the organisation's own agent, which connects with a key"
+  },
   "hMigST": {
     "defaultMessage": "{org} · your onboarding",
     "description": "Browser tab title of a customer's onboarding page. {org} is who is setting them up"
   },
+  "hZL+hX": {
+    "defaultMessage": "Tools",
+    "description": "Label of the tools an agent uses, on its card and in its settings"
+  },
+  "haFNx+": {
+    "defaultMessage": "ir35: outside IR35, or not stated open_roles (must): a contract role open now",
+    "description": "Example in an offering's empty list of what agents look for: one per line, a key name, a colon and what counts. Keep the key names (ir35, open_roles) and (must) as they are"
+  },
+  "hdYGED": {
+    "defaultMessage": "SMTP over TLS, on port 587, 465, 2525 or 25. Clear the server to stop using it.",
+    "description": "Under the mail server's host and port"
+  },
   "heKwYR": {
     "defaultMessage": "Price",
     "description": "Label of a subscription's price"
+  },
+  "hiTB5H": {
+    "defaultMessage": "What should be found?",
+    "description": "Label of the box where a new task's brief is written"
+  },
+  "hldmdb": {
+    "defaultMessage": "Make member",
+    "description": "Button to make an owner a member"
+  },
+  "hrbyYj": {
+    "defaultMessage": "Currency",
+    "description": "Label of the currency deals are valued in"
+  },
+  "hrfaXz": {
+    "defaultMessage": "Agents",
+    "description": "Heading of the settings page's section pointing to the agents page"
   },
   "hrqAIq": {
     "defaultMessage": "ending",
@@ -2038,6 +3038,10 @@
   "i9Qbxx": {
     "defaultMessage": "To invite anyone, an owner sets a mail server in Settings and the server needs its public address (PROSPECTOR_URL).",
     "description": "Why nobody can be invited: mail isn't set up"
+  },
+  "i9tD0N": {
+    "defaultMessage": "No agents yet.",
+    "description": "On the agents page when there are no agents"
   },
   "iCmTO/": {
     "defaultMessage": "Settings",
@@ -2067,9 +3071,25 @@
     "defaultMessage": "Work email",
     "description": "Label of the email field on the single sign-on page"
   },
+  "iYWqCK": {
+    "defaultMessage": "Client ID",
+    "description": "Label of the client ID the provider gave for single sign-on"
+  },
+  "iz5wxg": {
+    "defaultMessage": "Name",
+    "description": "Label of an agent's name in its settings"
+  },
+  "j4Facc": {
+    "defaultMessage": "Contract roles",
+    "description": "Example in the empty name field of a new offering"
+  },
   "j8PtH5": {
     "defaultMessage": "Not interested",
     "description": "Button marking that the person called was not interested"
+  },
+  "j941lb": {
+    "defaultMessage": "{status, select, finished {finished} stopped {stopped} failed {failed} other {{status}}}: {reason}",
+    "description": "How an agent's run on a task ended: finished, stopped or failed. {reason} is why it stopped, in the run's own words"
   },
   "j9HJpA": {
     "defaultMessage": "{day} · {time}",
@@ -2082,6 +3102,10 @@
   "jKRBkE": {
     "defaultMessage": "starts {on}",
     "description": "When a scheduled subscription starts. {on} is a date"
+  },
+  "jQT5bj": {
+    "defaultMessage": "Only an owner can change these.",
+    "description": "Under the heading of the Organisation section, for a member who isn't an owner"
   },
   "jRA7LR": {
     "defaultMessage": "Nobody at this company has an email address here to send a link to.",
@@ -2107,9 +3131,25 @@
     "defaultMessage": "Who the renewal is with",
     "description": "What a screen reader calls the choice of who a renewal deal is with"
   },
+  "jbdgLM": {
+    "defaultMessage": "Follow up after",
+    "description": "Label of the number of days before following up an email with no reply"
+  },
+  "jfr19z": {
+    "defaultMessage": "owner",
+    "description": "A member's role in the team list: an owner of the organisation"
+  },
+  "jizAtl": {
+    "defaultMessage": "An OpenAI-compatible endpoint or Anthropic, a model and a key. It works the tasks you hand it, with search and the tools you allow.",
+    "description": "Under the choice to add an agent the product runs itself. OpenAI and Anthropic are companies' names"
+  },
   "jkBdoO": {
     "defaultMessage": "Onboarded",
     "description": "Link on a won deal's card when the company's onboarding is done"
+  },
+  "jnMAw2": {
+    "defaultMessage": "API key",
+    "description": "Label of the field for an API key, an agent's or a data vendor's"
   },
   "jtASEY": {
     "defaultMessage": "Nothing to show here",
@@ -2126,6 +3166,14 @@
   "k4na53": {
     "defaultMessage": "Your own",
     "description": "In the research page's row of offerings: the organisation's own, when its name hasn't loaded"
+  },
+  "kBWQrG": {
+    "defaultMessage": "{told} {costs} You are bound by its terms for what it returns, and it may keep what it finds in your account with it.",
+    "description": "Under a data vendor's settings. {told} is a sentence on what it is sent about a person, {costs} one on what it charges"
+  },
+  "kHdpMy": {
+    "defaultMessage": "Delete this note?",
+    "description": "Asked before deleting an agent's note on a task"
   },
   "kJ/AVh": {
     "defaultMessage": "Stage",
@@ -2151,6 +3199,10 @@
     "defaultMessage": "They sign in this order.",
     "description": "Under Signers, read only: they sign one after another, in the order listed"
   },
+  "l8EYoK": {
+    "defaultMessage": "What agents added for this task, or matched to it. Companies and people wait in Research until someone qualifies or picks them.",
+    "description": "Under the heading of a task's section of what was found. Research is the page of that name"
+  },
   "lA8Isj": {
     "defaultMessage": "Subscriptions are support work, so here you read it.",
     "description": "For a member who doesn't do support work, on the subscriptions page"
@@ -2162,6 +3214,10 @@
   "lXwsoK": {
     "defaultMessage": "Erased on request",
     "description": "In the panel of what a search left out: people refused as erased at their request"
+  },
+  "lY9vNW": {
+    "defaultMessage": "What a new customer goes through, one step a line, in order. Start a line with {them} or {us} for who does it ({us} when left out), and end it with a number of days after the start when it is due. A customer counts as live once every step is done. Changing these leaves onboardings already running as they are.",
+    "description": "Under the list of onboarding steps. {them} (the customer) and {us} (the organisation) are written as they are typed"
   },
   "la6HzQ": {
     "defaultMessage": "Password",
@@ -2187,9 +3243,25 @@
     "defaultMessage": "Review again",
     "description": "Button to put a company rejected before back up for review"
   },
+  "lrK2QX": {
+    "defaultMessage": "Saving fetches the endpoint's list to choose from.",
+    "description": "Under the field for an agent's model before its endpoint's models are known"
+  },
+  "lzZnZc": {
+    "defaultMessage": "{vendor} charges a credit for an email and ten for a mobile, only when it finds one, and nothing to look up the same person again within 90 days. Each lookup keeps only the detail it was for.",
+    "description": "Under a data vendor's settings: what it charges. {vendor} is its name, Prospeo"
+  },
+  "m3WkmC": {
+    "defaultMessage": "For {offering}",
+    "description": "Tag on a task saying which offering it is for. {offering} is its name"
+  },
   "m7FgGD": {
     "defaultMessage": "{n, plural, one {# person} other {# people}}",
     "description": "How many a draft campaign would go to, shown after Would go to"
+  },
+  "m7o3OQ": {
+    "defaultMessage": "Vendor",
+    "description": "Label of the choice of data vendor to add"
   },
   "mAMWFh": {
     "defaultMessage": "Remove the draft {name} and its document?",
@@ -2198,6 +3270,18 @@
   "mEwBdB": {
     "defaultMessage": "Open conversation",
     "description": "Why a company a search came to was left out: a conversation with it is open"
+  },
+  "mExZKp": {
+    "defaultMessage": "{changes, plural, one {# change} other {# changes}} at {companies, plural, one {# company} other {# companies}}{people, plural, =0 {} one {, # person suggested} other {, # people suggested}}{drafts, plural, =0 {} one {, # draft} other {, # drafts}}",
+    "description": "What a stretch of an agent's work on a task did: its changes, at how many companies, and the people it suggested and drafts it wrote, if any"
+  },
+  "mGQucr": {
+    "defaultMessage": "domains, emails or LinkedIn links, one per line",
+    "description": "Placeholder in the empty never-contact list"
+  },
+  "mXf2h4": {
+    "defaultMessage": "Port",
+    "description": "What a screen reader calls the mail server's port field"
   },
   "mfLMho": {
     "defaultMessage": "Set next steps",
@@ -2227,9 +3311,17 @@
     "defaultMessage": "{agent} · {state}",
     "description": "An agent running on a search. {agent} is its name; {state} where its run is, such as running"
   },
+  "nOR7Iw": {
+    "defaultMessage": "{call} asks",
+    "description": "Under the data vendors: the API call that asks them. {call} is the call, POST contacts/{id}/enrich"
+  },
   "nOfqx2": {
     "defaultMessage": "not found",
     "description": "An agent looked for a company's criterion and didn't find it"
+  },
+  "nVpam5": {
+    "defaultMessage": "Reopen",
+    "description": "Button to mark a request on a task as not done after all"
   },
   "nXFGEy": {
     "defaultMessage": "Qualified",
@@ -2238,6 +3330,14 @@
   "nYBbXx": {
     "defaultMessage": "<b>{agent}</b> · {state}",
     "description": "An agent's run on a search. {agent} is its name; {state} where its run is, such as finished"
+  },
+  "nhv3JJ": {
+    "defaultMessage": "Add an agent",
+    "description": "Heading of the ways to add an agent"
+  },
+  "nlb6lk": {
+    "defaultMessage": "Your password",
+    "description": "Heading of the settings page's section to change the member's password"
   },
   "no4k0a": {
     "defaultMessage": "{kind} for {name}",
@@ -2251,6 +3351,14 @@
     "defaultMessage": "Email them a link",
     "description": "Button mailing a customer the link to their page"
   },
+  "nu9rv/": {
+    "defaultMessage": "Make owner",
+    "description": "Button to make a member an owner"
+  },
+  "nvR3+z": {
+    "defaultMessage": "Every vendor {prospector} can ask is added.",
+    "description": "In place of the form adding a data vendor when all are added. {prospector} is the product's name, Prospector"
+  },
   "nzC5dc": {
     "defaultMessage": "Send emails",
     "description": "In the Do now panel, beside a count of emails to send"
@@ -2258,6 +3366,10 @@
   "nzO1rC": {
     "defaultMessage": "not contacted",
     "description": "A person's stage: no one has contacted them yet"
+  },
+  "o8wiUL": {
+    "defaultMessage": "Claude, ChatGPT, the gateway…",
+    "description": "Examples in the empty field for an agent's name; Claude and ChatGPT are products' names"
   },
   "oDszhZ": {
     "defaultMessage": "inferred",
@@ -2267,9 +3379,25 @@
     "defaultMessage": "{name} · {file} · {n, plural, one {# page} other {# pages}}",
     "description": "Under the title of the page preparing an agreement. {name} is the agreement's name, {file} its PDF's file name, {n} its number of pages"
   },
+  "oR0KaM": {
+    "defaultMessage": "Create key",
+    "description": "Button making a new API key"
+  },
+  "oS/mDq": {
+    "defaultMessage": "What you sell",
+    "description": "Heading of the settings page's section of the organisation's offerings"
+  },
+  "or6Zzo": {
+    "defaultMessage": "Password",
+    "description": "Label of the mail server's password"
+  },
   "ovjeHu": {
     "defaultMessage": "e.g. 14,000",
     "description": "Example price shown in an empty price field"
+  },
+  "owGgv8": {
+    "defaultMessage": "Reopen task",
+    "description": "Button to reopen a closed task"
   },
   "oyGplP": {
     "defaultMessage": "Your own",
@@ -2278,6 +3406,14 @@
   "p3QEcq": {
     "defaultMessage": "Nothing to review",
     "description": "Heading on the research page when nothing is waiting to be reviewed"
+  },
+  "p5zbja": {
+    "defaultMessage": "{them} Name a project lead, 2 days {them} Send your product files, 7 days {us} Kick-off call, 10 days {us} Go live, 30 days",
+    "description": "Example in the empty list of onboarding steps: one step a line, who does it ({them} the customer, {us} the organisation, written as they are typed), the step, and the days after the start it is due"
+  },
+  "p6NCUa": {
+    "defaultMessage": "{first} {company} {org} are filled in. {linkedIn} allows 300 characters.",
+    "description": "Under the connection note template. {first}, {company} and {org} are the placeholders a note can hold, written as they are typed; {linkedIn} is the network's name"
   },
   "p98CtA": {
     "defaultMessage": "← Previous",
@@ -2291,9 +3427,25 @@
     "defaultMessage": "in outreach",
     "description": "A person's stage: being contacted"
   },
+  "pJqWwT": {
+    "defaultMessage": "Single sign-on only ever speaks for addresses at a verified domain, matched whole: example.com doesn't cover mail.example.com.",
+    "description": "Under the list of single sign-on domains"
+  },
   "pKfcaJ": {
     "defaultMessage": "{n, plural, one {# person} other {# people}}",
     "description": "How many people are known at a company, in its row on the companies page"
+  },
+  "pM75YV": {
+    "defaultMessage": "The newest are shown. The API lists them all.",
+    "description": "Under the list not to be mailed when there are more than it shows"
+  },
+  "pV6gaG": {
+    "defaultMessage": "{why} · {bounced}",
+    "description": "Beside an address not to be mailed: why it is there, then when mail to it bounced"
+  },
+  "pYIaR/": {
+    "defaultMessage": "Hand it to your agent",
+    "description": "Heading of a task's section with the prompt to paste into an agent"
   },
   "pZxxbI": {
     "defaultMessage": "Looking for",
@@ -2302,6 +3454,14 @@
   "peu3qk": {
     "defaultMessage": "✓ Every signer has a signature field.",
     "description": "When an agreement has all it needs before it can be sent"
+  },
+  "phA2AA": {
+    "defaultMessage": "Call",
+    "description": "Last step of the outreach sequence: a phone call"
+  },
+  "pilWFF": {
+    "defaultMessage": "the key from your account with them",
+    "description": "In the empty field for a data vendor's API key"
   },
   "plpp7+": {
     "defaultMessage": "Campaigns",
@@ -2323,6 +3483,14 @@
     "defaultMessage": "Head of Marketing",
     "description": "Example job title shown in the empty role field"
   },
+  "qFJpSH": {
+    "defaultMessage": "on accept, or after {n, plural, one {# day} other {# days}}",
+    "description": "In the outreach sequence: when the step after a LinkedIn connection request comes. {n} is the days set in the Organisation section"
+  },
+  "qJav4K": {
+    "defaultMessage": "{agent} <muted>after</muted> {minutes} <muted>minutes</muted>",
+    "description": "The setting for an agent's fallback. {agent} is the choice of agent to hand over to, {minutes} the field for how many minutes to wait first"
+  },
   "qMSVO6": {
     "defaultMessage": "Remove",
     "description": "Button taking someone off an agreement"
@@ -2334,6 +3502,10 @@
   "qitIYd": {
     "defaultMessage": "Done",
     "description": "Button marking an onboarding step done"
+  },
+  "qoAxkM": {
+    "defaultMessage": "Ask",
+    "description": "Button sending a request for more to a task's agents"
   },
   "qzUXSB": {
     "defaultMessage": "+ Add person",
@@ -2359,9 +3531,21 @@
     "defaultMessage": "{kind, select, skipped {skipped} dead_end {dead end} next {next} other {{other}}}",
     "description": "What kind of note an agent left on a search. {other} is the kind as the server names it, for one not listed"
   },
+  "rO0a+B": {
+    "defaultMessage": "Agents' notes",
+    "description": "Heading of a task's section of the notes its agents left"
+  },
+  "rTk8xe": {
+    "defaultMessage": "ready",
+    "description": "In the key to the agent cards' colours: an agent that is ready"
+  },
   "rW3MyB": {
     "defaultMessage": "Mark done",
     "description": "Button for a customer to mark one of their steps done"
+  },
+  "rZnhyL": {
+    "defaultMessage": "Verify",
+    "description": "Button to check a domain's TXT record"
   },
   "ra3/v2": {
     "defaultMessage": "Never contact",
@@ -2370,6 +3554,14 @@
   "rgzXkp": {
     "defaultMessage": "{done} of {total} · started {on}",
     "description": "How many of an onboarding's steps are done, and when it started. {on} is a date"
+  },
+  "rj/2HQ": {
+    "defaultMessage": "Who you sell to, who's off-limits, how to judge fit",
+    "description": "Placeholder in the empty agent guidance field"
+  },
+  "rpIoVR": {
+    "defaultMessage": "Lookups a month, at most",
+    "description": "Label of the most times a data vendor may be asked a month"
   },
   "rtXs/J": {
     "defaultMessage": "refused {n}×",
@@ -2391,6 +3583,22 @@
     "defaultMessage": "Company",
     "description": "What a screen reader calls a company's page while it loads"
   },
+  "sFgaZZ": {
+    "defaultMessage": "Alpha Ltd 1 Example Street Leith EH6 1AA",
+    "description": "Example in the empty postal address field: an invented company's address, on three lines"
+  },
+  "sJ95xa": {
+    "defaultMessage": "Your language",
+    "description": "Heading of the settings page's section for the member's own language"
+  },
+  "sLEPn0": {
+    "defaultMessage": "Your data",
+    "description": "Heading of the settings page's section to export the organisation's data"
+  },
+  "sLQ/yo": {
+    "defaultMessage": "Role",
+    "description": "What a screen reader calls the list of roles for a new member"
+  },
   "sMvOY0": {
     "defaultMessage": "No subscriptions yet",
     "description": "When no subscription has been recorded"
@@ -2398,6 +3606,10 @@
   "sOH1iG": {
     "defaultMessage": "they said · recorded by {by} · {at}",
     "description": "Above an enquirer's answer in the thread. {by} is the member who recorded it, {at} the date and time"
+  },
+  "sTSLFC": {
+    "defaultMessage": "New",
+    "description": "Label of the field for the member's new password"
   },
   "scH4Dg": {
     "defaultMessage": "{n, plural, one {# company} other {# companies}}",
@@ -2415,9 +3627,17 @@
     "defaultMessage": "{said, select, done {done {on}} late {was due {on}} other {due {on}}}",
     "description": "Beside a customer's step: when it was done, or when it was or is due. {on} is a date"
   },
+  "srxgTh": {
+    "defaultMessage": "Sent to every agent when it connects, after the built-in task guidance, and returned by the guidance tool.",
+    "description": "Under the agent guidance field"
+  },
   "ssENcA": {
     "defaultMessage": "search {n}",
     "description": "Stands for a search's title while it loads. {n} is its number"
+  },
+  "sydTE9": {
+    "defaultMessage": "+ Add an offering",
+    "description": "Button to start adding an offering"
   },
   "t3TOt+": {
     "defaultMessage": "Asked.",
@@ -2427,17 +3647,33 @@
     "defaultMessage": "{name} · {email}",
     "description": "Someone who can be invited, in the list to choose from"
   },
+  "t9BUfG": {
+    "defaultMessage": "Found",
+    "description": "Heading of a task's section of the companies and people found for it"
+  },
   "tAkbqW": {
     "defaultMessage": "Sales",
     "description": "What an enquiry is about: buying. A filter and a label on each enquiry"
+  },
+  "tFxWT0": {
+    "defaultMessage": "{by} · {at} · {since, select, first {found so far} other {added since}}: {found}",
+    "description": "Under a request on a task. {by} is who asked; {at} when; {since} says whether it is the task's first request, so what was found counts from the start; {found} how many companies and people, such as 3 companies, 5 people"
   },
   "tIzXly": {
     "defaultMessage": "Save password",
     "description": "Button to save a new password"
   },
+  "tKLNtr": {
+    "defaultMessage": "none picked",
+    "description": "On an agent's card in place of its model when none is chosen"
+  },
   "tNR2Cj": {
     "defaultMessage": "This link has been used or has run out",
     "description": "Heading when a customer's link no longer opens their page"
+  },
+  "tRWcdn": {
+    "defaultMessage": "Copy prompt",
+    "description": "Button to copy a task's prompt"
   },
   "tXCGGp": {
     "defaultMessage": "All",
@@ -2451,6 +3687,14 @@
     "defaultMessage": "ended",
     "description": "A subscription's status: it has ended"
   },
+  "tck50S": {
+    "defaultMessage": "Settings",
+    "description": "Title and heading of the settings page"
+  },
+  "thSICP": {
+    "defaultMessage": "Your voice",
+    "description": "Heading of the settings page's section for the member's caller name and signature"
+  },
   "tm5UAO": {
     "defaultMessage": "Email",
     "description": "Label of the email address field"
@@ -2463,25 +3707,53 @@
     "defaultMessage": "What people sent through your sites' forms and your products, newest first. The words are theirs, exactly as sent. Each new one waits to be answered: give it an owner, and say when you're waiting on them or it's closed. Reply from here and it is emailed to them; their answer comes to your own mailbox, and you record it here.",
     "description": "Under the title of the Enquiries page: what it shows and how it is used"
   },
+  "tt+6T2": {
+    "defaultMessage": "You sign in through a provider, so there is no password here to change. Whoever runs this server can give you one.",
+    "description": "Under the heading of the Your sign-in section, for a member with no password"
+  },
   "ttK/9z": {
     "defaultMessage": "e.g. send renewal terms",
     "description": "Placeholder of a renewal or expansion's next step field: an example step"
+  },
+  "tzSPbm": {
+    "defaultMessage": "{vendor} is told each person's name and their company's domain.",
+    "description": "Under a data vendor's settings: what it is sent about a person. {vendor} is its name, Hunter"
   },
   "u+8kmh": {
     "defaultMessage": "Find my organisation",
     "description": "Button to look up which organisation's single sign-on covers an address"
   },
+  "u1umDV": {
+    "defaultMessage": "Minutes",
+    "description": "What a screen reader calls the field for how many minutes to wait before falling back"
+  },
   "uFqR/b": {
     "defaultMessage": "asks {vendors} in {month}",
     "description": "Under the buttons to look up a person's details: who they ask. {vendors} are vendors joined with or; {month} the month"
+  },
+  "uHGc+K": {
+    "defaultMessage": "Postal address",
+    "description": "Label of the organisation's postal address"
   },
   "uHTjF9": {
     "defaultMessage": "Time zone",
     "description": "Label of a person's time zone"
   },
+  "uJLSGT": {
+    "defaultMessage": "For people picked for it. Empty uses the organisation's. {first} {company} {org} are filled in.",
+    "description": "Under an offering's connection note. {first}, {company} and {org} are the placeholders a note can hold, written as they are typed"
+  },
+  "uKaloo": {
+    "defaultMessage": "member · {areas}",
+    "description": "A member's role in the team list, with the areas of work they have (such as sales, support)"
+  },
   "uNYUoZ": {
     "defaultMessage": "Remove",
     "description": "Button to remove a draft agreement"
+  },
+  "uXvX1U": {
+    "defaultMessage": "Never an owner. Someone you remove here joins again while your provider still lets them in: remove them there too.",
+    "description": "Under the checkbox to let people join by single sign-on"
   },
   "ufF1TC": {
     "defaultMessage": "By",
@@ -2499,17 +3771,37 @@
     "defaultMessage": "Best fit first: no must missed, then most met, then fewest left unknown.",
     "description": "On the research page: the order the companies of a search are listed in. A must is a criterion a company has to meet"
   },
+  "utQjdQ": {
+    "defaultMessage": "Language",
+    "description": "Label of the list of languages the member can choose"
+  },
+  "uwv0/U": {
+    "defaultMessage": "{who} · {did, select, pickup {picked it up} other {last change}} {when}",
+    "description": "On a task: the agent that last worked on it, and when. {who} is the agent; {did} says whether it only picked the task up; {when} is how long ago, such as 5 min ago, or a date"
+  },
   "uzH+V4": {
     "defaultMessage": "Next →",
     "description": "Button on to the next page of a list"
+  },
+  "uzd8gu": {
+    "defaultMessage": "Search",
+    "description": "Label of the search an agent uses, on its card and in its settings"
   },
   "uzmeyM": {
     "defaultMessage": "Add someone",
     "description": "Heading of the forms adding a signer or someone to get a copy"
   },
+  "v3fBNO": {
+    "defaultMessage": "The task couldn't be read.",
+    "description": "Heading when a task failed to load"
+  },
   "v7TFRo": {
     "defaultMessage": "Name of the campaign",
     "description": "What a screen reader calls the box for a new campaign's name"
+  },
+  "v8Bnc5": {
+    "defaultMessage": "Cold email",
+    "description": "Label of the setting for which companies may be emailed cold"
   },
   "v8v3AO": {
     "defaultMessage": "Already here when this search came to them, or on a domain the never-contact list covers: kept, never up for review.",
@@ -2519,6 +3811,10 @@
     "defaultMessage": "Lost",
     "description": "A conversation's stage: lost"
   },
+  "vEZYzf": {
+    "defaultMessage": "picked up, nothing added yet",
+    "description": "In a stretch of an agent's work on a task, when it changed nothing"
+  },
   "vFbjH0": {
     "defaultMessage": "{page} · {org} · Prospector",
     "description": "The browser tab's title: the page, then the organisation it is in"
@@ -2526,6 +3822,14 @@
   "vHcjmH": {
     "defaultMessage": "Selling",
     "description": "Label of the research page's row of offerings to pick whose queue is shown, and what a screen reader calls it"
+  },
+  "vLQORx": {
+    "defaultMessage": "This organisation's own mail server. Invitations to new members leave through it; without one, they come from this site's address.",
+    "description": "Under the heading of the Outgoing mail section, when the organisation has none but the site can send mail"
+  },
+  "vQy8ku": {
+    "defaultMessage": "Where you can be written to. It goes at the foot of every campaign, as the law on marketing mail expects, and a campaign can't be sent without it.",
+    "description": "Under the postal address field"
   },
   "vRiRx4": {
     "defaultMessage": "Conversations",
@@ -2547,6 +3851,10 @@
     "defaultMessage": "Withdraw",
     "description": "Button withdrawing a customer's access to their page"
   },
+  "vpHsZz": {
+    "defaultMessage": "Stop being an owner of {org}? Only another owner can make you one again.",
+    "description": "Asked before an owner makes themselves a member. {org} is the organisation's name"
+  },
   "vq2NQX": {
     "defaultMessage": "source ↗",
     "description": "Link to the page a fact came from"
@@ -2567,6 +3875,10 @@
     "defaultMessage": "meeting",
     "description": "A person's stage: a meeting is arranged"
   },
+  "wLHbPM": {
+    "defaultMessage": "No vendors yet.",
+    "description": "In place of data vendors when there are none"
+  },
   "wRJhmv": {
     "defaultMessage": "{months, plural, one {# month} other {# months}}, then {after}",
     "description": "A subscription's term: how many months it is committed for, then what happens"
@@ -2574,6 +3886,18 @@
   "waRVnL": {
     "defaultMessage": "Messages",
     "description": "Filter on the Today page: LinkedIn messages to send"
+  },
+  "wcdSOw": {
+    "defaultMessage": "{n} missing something",
+    "description": "Count of the product's own agents that run but lack something"
+  },
+  "wdfcXc": {
+    "defaultMessage": "Sequence",
+    "description": "Heading of the settings page's section showing the steps every contact goes through"
+  },
+  "wfUDAH": {
+    "defaultMessage": "Never shown again. Changing the endpoint needs it entered again.",
+    "description": "Under the field for an agent's API key"
   },
   "whdKVO": {
     "defaultMessage": "member · {work, select, none {reads only} sales {sales} support {support} other {sales, support}}",
@@ -2595,6 +3919,14 @@
     "defaultMessage": "Closed",
     "description": "Where answering an enquiry stands: done with. A choice and a label on each enquiry"
   },
+  "x0NHB+": {
+    "defaultMessage": "Save",
+    "description": "Button saving a data vendor's settings"
+  },
+  "x9OsPh": {
+    "defaultMessage": "Current",
+    "description": "Label of the field for the member's current password"
+  },
   "xA8Bif": {
     "defaultMessage": "{step} · overdue since {date}",
     "description": "On a deal's card: its next step, past the day it was due. {step} is what the member wrote; {date} is a day, such as 5 Mar"
@@ -2602,6 +3934,10 @@
   "xAPIJu": {
     "defaultMessage": "To reply from here an owner sets a mail server in Settings. Until then, answer from your own mail.",
     "description": "Under an enquiry, in place of the reply field, when no mail server is set; Settings is the name of a page"
+  },
+  "xDZiTw": {
+    "defaultMessage": "{status, select, working {Being worked on} done {Done} closed {Closed} other {Waiting for an agent}}",
+    "description": "Where a task stands: an agent is working on it, it is done, closed, or waiting for an agent to pick it up"
   },
   "xGB6d2": {
     "defaultMessage": "Replace the PDF",
@@ -2627,9 +3963,17 @@
     "defaultMessage": "email is a guess",
     "description": "A person's email address was worked out from the company's pattern"
   },
+  "xayQrS": {
+    "defaultMessage": "Colour",
+    "description": "Label of the organisation's colour picker"
+  },
   "xfJnWy": {
     "defaultMessage": "Phone",
     "description": "Label of a person's phone number"
+  },
+  "xfLdqu": {
+    "defaultMessage": "Revoke {name}? Agents using it stop working.",
+    "description": "Asked before revoking an API key. {name} is the key's name"
   },
   "xfzi4R": {
     "defaultMessage": "e.g. 14,000",
@@ -2643,6 +3987,26 @@
     "defaultMessage": "Make calls now",
     "description": "In the Do now panel, beside a count of calls where it is office hours"
   },
+  "xrOVGR": {
+    "defaultMessage": "Owners can still use a password, so a broken provider can be put right. API keys are not affected.",
+    "description": "Under the checkbox to require single sign-on"
+  },
+  "xyEyxi": {
+    "defaultMessage": "Cancel",
+    "description": "Button on the settings page to stop adding an offering"
+  },
+  "xz+PoA": {
+    "defaultMessage": "Your domains",
+    "description": "Heading of the list of email domains single sign-on covers"
+  },
+  "y2Lucp": {
+    "defaultMessage": "{companies, plural, one {# company} other {# companies}}, {people, plural, one {# person} other {# people}}",
+    "description": "How many companies and people agents found for a task"
+  },
+  "y3bGFr": {
+    "defaultMessage": "The three-letter code deals are valued in, such as GBP, EUR or USD. Changing it leaves the deals you already valued as they are.",
+    "description": "Under the currency field"
+  },
   "y4K/LS": {
     "defaultMessage": "Call script",
     "description": "Opens what to say on a call"
@@ -2651,9 +4015,17 @@
     "defaultMessage": "scheduled",
     "description": "A subscription's status: not started yet"
   },
+  "yA+4cV": {
+    "defaultMessage": "Tasks",
+    "description": "Title and heading of the page listing tasks for agents"
+  },
   "yAIlAK": {
     "defaultMessage": "The queue couldn't be read. Reload to try again.",
     "description": "When the research page's list of companies failed to load"
+  },
+  "yDfRQA": {
+    "defaultMessage": "Not to be mailed",
+    "description": "Heading of the settings page's section of addresses marketing mail never goes to"
   },
   "yJOtz6": {
     "defaultMessage": "Follow-ups",
@@ -2663,9 +4035,17 @@
     "defaultMessage": "Take {name} off, with their fields?",
     "description": "Asked before taking a signer off an agreement. {name} is the signer's name"
   },
+  "ySGBRg": {
+    "defaultMessage": "Change",
+    "description": "Button to change the member's password"
+  },
   "yWoXW0": {
     "defaultMessage": "Nobody. Everyone who signs gets one anyway.",
     "description": "Under Gets a copy when nobody only gets a copy"
+  },
+  "yYDIWz": {
+    "defaultMessage": "Onboarding steps",
+    "description": "Label of the list of steps a new customer goes through"
   },
   "yZSQsb": {
     "defaultMessage": "Our note",
@@ -2682,6 +4062,10 @@
   "yla9ZH": {
     "defaultMessage": "Paused: {reason}",
     "description": "A campaign's state when sending stopped by itself. {reason} is the server's reason"
+  },
+  "ynGBDI": {
+    "defaultMessage": "Remove",
+    "description": "Button on the settings page to remove an offering, a domain or a member"
   },
   "yxe9Ac": {
     "defaultMessage": "Continue with {provider}",
@@ -2707,6 +4091,10 @@
     "defaultMessage": "Saved ✓",
     "description": "Once the fields placed on an agreement are saved"
   },
+  "zD1vHd": {
+    "defaultMessage": "Agents & API",
+    "description": "Title of the page of agents, their API keys and data vendors"
+  },
   "zFcu5E": {
     "defaultMessage": "Upload the PDF.",
     "description": "In the list of what an agreement needs before it can be sent"
@@ -2731,6 +4119,10 @@
     "defaultMessage": "{name} not found",
     "description": "Tag for something the organisation looks for that research couldn't find out. {name} is what it is"
   },
+  "zW089N": {
+    "defaultMessage": "Can",
+    "description": "On an API key's card, before the scopes it has"
+  },
   "zaqdVr": {
     "defaultMessage": "Copy",
     "description": "Button copying an email or follow-up, signed, to paste elsewhere"
@@ -2739,8 +4131,24 @@
     "defaultMessage": "Heads of procurement at UK kitchen makers with their own showrooms. About twenty, with the page that shows each one's role.",
     "description": "Example in the box where a search is described"
   },
+  "zdJWTU": {
+    "defaultMessage": "finds {detail}",
+    "description": "Tag on a data vendor's card. {detail} is what it finds: email, mobile or LinkedIn profile"
+  },
+  "zdoQyq": {
+    "defaultMessage": "Yours in this organisation: used in call scripts and added to copied emails.",
+    "description": "Under the heading of the settings page's Your voice section"
+  },
   "zec65k": {
     "defaultMessage": "All",
     "description": "Filter on the Enquiries page showing every enquiry"
+  },
+  "zrp8FV": {
+    "defaultMessage": "Caller name",
+    "description": "Label of the field for the name the member gives in call scripts"
+  },
+  "ztNs+d": {
+    "defaultMessage": "Runs",
+    "description": "What a screen reader calls the buttons moving through agents' recent work"
   }
 }

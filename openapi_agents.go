@@ -24,11 +24,12 @@ func (s apiServer) GetConnect(ctx context.Context, _ api.GetConnectRequestObject
 	base := s.a.baseURL(ctx.Value(requestKey{}).(*http.Request)) + q.Base()
 	out := api.GetConnect200JSONResponse{BaseUrl: base, McpUrl: base + "mcp", CanKeepKeys: s.a.s.Keyring != nil,
 		Scopes: []api.Scope{}, Tools: []api.AgentToolScope{}, Kinds: []api.AgentKindLabel{}}
+	lang := request.LanguageFrom(ctx)
 	for _, sc := range Scopes {
-		out.Scopes = append(out.Scopes, api.Scope{Name: sc.Name, What: sc.What})
+		out.Scopes = append(out.Scopes, api.Scope{Name: sc.Name, What: sc.What.In(lang)})
 	}
 	for _, t := range mcpTools {
-		out.Tools = append(out.Tools, api.AgentToolScope{Name: t.Name, Scope: t.Scope, What: t.What})
+		out.Tools = append(out.Tools, api.AgentToolScope{Name: t.Name, Scope: t.Scope, What: t.What.In(lang)})
 	}
 	for _, k := range AgentKinds {
 		out.Kinds = append(out.Kinds, api.AgentKindLabel{Kind: api.AgentKind(k.Key), Label: k.Label})
@@ -114,7 +115,7 @@ func (s apiServer) ListAgentScores(ctx context.Context, in api.ListAgentScoresRe
 	out.Body.Items, out.Body.NextCursor = []api.AgentScore{}, next
 	for _, sc := range scores {
 		out.Body.Items = append(out.Body.Items, api.AgentScore{Agent: sc.Agent, Companies: sc.Companies, Qualified: sc.Qualified, Rejected: sc.Rejected,
-			Contacts: sc.Contacts, Picked: sc.Picked, Replied: sc.Replied, Text: scoreText(sc)})
+			Contacts: sc.Contacts, Picked: sc.Picked, Replied: sc.Replied, Text: scoreText(sc).In(request.LanguageFrom(ctx))})
 	}
 	return out, nil
 }
@@ -144,7 +145,7 @@ func (s apiServer) ListAgentWork(ctx context.Context, in api.ListAgentWorkReques
 	out.Body.Items, out.Body.NextCursor = []api.AgentWork{}, next
 	for _, r := range runs {
 		w := api.AgentWork{Actor: r.Actor, Start: r.Start, End: r.End, Going: r.Going(now), Changes: r.Changes, Companies: r.Companies,
-			People: r.People, Drafts: r.Drafts, Tasks: []api.TaskTitle{}, Text: runText(r, now)}
+			People: r.People, Drafts: r.Drafts, Tasks: []api.TaskTitle{}, Text: runText(r, now).In(request.LanguageFrom(ctx))}
 		for _, id := range r.Tasks {
 			w.Tasks = append(w.Tasks, api.TaskTitle{Id: id, Title: titles[id]})
 		}
@@ -181,76 +182,84 @@ func refuseKeys(w http.ResponseWriter, r *http.Request) {
 	writeProblem(w, r, http.StatusForbidden, say.New("no key can make, change or revoke a key: an owner does that, signed in"))
 }
 
-var mcpTools = []struct{ Name, Scope, What string }{
-	{"guidance", "read", "how to research and draft for this organisation"},
-	{"search", "read", "companies and people by name, domain, email or notes, and which agent was last there"},
-	{"get_company", "read", "details, facts with sources, people, and who did what"},
-	{"list_due", "read", "what's on Today, and whether its text is written"},
-	{"list_tasks", "read", "open tasks people wrote, and whether an agent is on each"},
-	{"get_task", "read", "a task's brief, requests, what is found and agents' notes; keeps an open request for a key that can add research"},
-	{"task_note", "research:write", "what was skipped or not found, for whoever comes next"},
-	{"finish_request", "research:write", "say a request on a task is done"},
-	{"add_company", "research:write", "lands in Research to review, with facts"},
-	{"add_fact", "research:write", "field, value and source URL"},
-	{"add_role", "research:write", "a role open at a company, for an offering with roles; one junked before is refused"},
-	{"add_contact", "research:write", "a suggested person, who waits until someone picks them; new details for someone already here wait to be accepted"},
-	{"enrich_contact", "enrich:spend", "ask the organisation's paid vendors for a detail someone lacks; what is found waits to be accepted"},
-	{"draft_message", "drafts:write", "note, message, email or follow-up, marked as the agent's"},
-	{"mark", "outcomes:write", "record an outcome, shown as the agent's with its note"},
+var mcpTools = []struct {
+	Name, Scope string
+	What        *say.Text
+}{
+	{"guidance", "read", say.New("how to research and draft for this organisation")},
+	{"search", "read", say.New("companies and people by name, domain, email or notes, and which agent was last there")},
+	{"get_company", "read", say.New("details, facts with sources, people, and who did what")},
+	{"list_due", "read", say.New("what's on Today, and whether its text is written")},
+	{"list_tasks", "read", say.New("open tasks people wrote, and whether an agent is on each")},
+	{"get_task", "read", say.New("a task's brief, requests, what is found and agents' notes; keeps an open request for a key that can add research")},
+	{"task_note", "research:write", say.New("what was skipped or not found, for whoever comes next")},
+	{"finish_request", "research:write", say.New("say a request on a task is done")},
+	{"add_company", "research:write", say.New("lands in Research to review, with facts")},
+	{"add_fact", "research:write", say.New("field, value and source URL")},
+	{"add_role", "research:write", say.New("a role open at a company, for an offering with roles; one junked before is refused")},
+	{"add_contact", "research:write", say.New("a suggested person, who waits until someone picks them; new details for someone already here wait to be accepted")},
+	{"enrich_contact", "enrich:spend", say.New("ask the organisation's paid vendors for a detail someone lacks; what is found waits to be accepted")},
+	{"draft_message", "drafts:write", say.New("note, message, email or follow-up, marked as the agent's")},
+	{"mark", "outcomes:write", say.New("record an outcome, shown as the agent's with its note")},
 }
 
-func scoreText(sc AgentScore) string {
-	var parts []string
+func scoreText(sc AgentScore) say.Sayer {
+	var parts []say.Sayer
 	if sc.Companies > 0 {
-		parts = append(parts, fmt.Sprintf("Companies: %d suggested, %d qualified (%s), %d rejected", sc.Companies, sc.Qualified, percent(sc.Qualified, sc.Companies), sc.Rejected))
+		parts = append(parts, say.Errorf("Companies: %d suggested, %d qualified (%s), %d rejected", sc.Companies, sc.Qualified, percent(sc.Qualified, sc.Companies), sc.Rejected))
 	}
 	if sc.Contacts > 0 {
-		parts = append(parts, fmt.Sprintf("Contacts: %d suggested, %d picked (%s), %d replied", sc.Contacts, sc.Picked, percent(sc.Picked, sc.Contacts), sc.Replied))
+		parts = append(parts, say.Errorf("Contacts: %d suggested, %d picked (%s), %d replied", sc.Contacts, sc.Picked, percent(sc.Picked, sc.Contacts), sc.Replied))
 	}
-	return strings.Join(parts, " · ")
+	return joinSaid(parts)
+}
+
+// joinSaid is parts one after another, a dot between each.
+func joinSaid(parts []say.Sayer) say.Sayer {
+	if len(parts) == 0 {
+		return say.Nothing
+	}
+	out := parts[0]
+	for _, p := range parts[1:] {
+		out = say.Errorf("%s · %s", out, p)
+	}
+	return out
 }
 
 func percent(n, of int) string {
 	return fmt.Sprintf("%d%%", n*100/of)
 }
 
-func runText(r Run, now time.Time) string {
-	span := r.Start.Format("2 Jan 15:04")
+func runText(r Run, now time.Time) say.Sayer {
+	span := at(r.Start)
 	if mins := int(r.End.Sub(r.Start).Minutes()); mins > 0 {
-		span += fmt.Sprintf(", %d min", mins)
+		span = say.Errorf("%s, %d min", span, mins)
 	}
 	if r.Going(now) {
-		span += " · last change " + ago(r.End, now)
+		span = say.Errorf("%s · last change %s", span, ago(r.End, now))
 	}
 	if r.Changes == 0 {
-		return span + " · picked up, nothing added yet"
+		return say.Errorf("%s · picked up, nothing added yet", span)
 	}
-	return span + " · " + joinNonEmpty(", ", plural(r.Changes, "change")+" at "+plural(r.Companies, "company"),
-		suggested(r.People), countOrNone(r.Drafts, "draft"))
+	done := say.Errorf("%s at %s", say.Errorf("%d changes", r.Changes), say.Errorf("%d companies", r.Companies))
+	if r.People > 0 {
+		done = say.Errorf("%s, %s", done, say.Errorf("%d people suggested", r.People))
+	}
+	if r.Drafts > 0 {
+		done = say.Errorf("%s, %s", done, say.Errorf("%d drafts", r.Drafts))
+	}
+	return say.Errorf("%s · %s", span, done)
 }
 
-func suggested(n int) string {
-	if n == 0 {
-		return ""
-	}
-	return plural(n, "person") + " suggested"
-}
-
-func countOrNone(n int, word string) string {
-	if n == 0 {
-		return ""
-	}
-	return plural(n, word)
-}
-func ago(t, now time.Time) string {
+func ago(t, now time.Time) say.Sayer {
 	d := now.Sub(t)
 	switch {
 	case d < time.Minute:
-		return "just now"
+		return say.New("just now")
 	case d < time.Hour:
-		return fmt.Sprintf("%d min ago", int(d.Minutes()))
+		return say.Errorf("%d min ago", int(d.Minutes()))
 	case d < 24*time.Hour:
-		return plural(int(d.Hours()), "hour") + " ago"
+		return say.Errorf("%d hours ago", int(d.Hours()))
 	}
-	return t.Format("2 Jan 2006")
+	return onDate(t)
 }
