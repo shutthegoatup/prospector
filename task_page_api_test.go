@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // The tasks page lists closed tasks after the open ones when asked, and counts both, as
@@ -27,7 +29,7 @@ func TestTheTaskListTakesClosedTasksAfterTheOpenOnes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	must(s.AgentTask(o.ID, Actor{Name: "agent:scout", KeyID: k.ID}, ids[3], PageIn{}))
+	must(s.AgentTask(o.ID, Actor{Name: "agent:scout", KeyID: k.ID}, ids[3], paging.Page{}))
 
 	type list struct {
 		Items []struct {

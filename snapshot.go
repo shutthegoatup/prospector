@@ -31,11 +31,6 @@ var snapshotExtraColumns = snapshotColumns[21:]
 // suggested into someone a person picked.
 var laterColumns = []string{"status", "title", "email_status", "stage", "next_step", "next_date", "lost_reason", "draft_by", "offering_id"}
 
-// later points at laterColumns' fields, in that order.
-func (c *Contact) later() []any {
-	return []any{&c.Status, &c.Title, &c.EmailStatus, &c.Stage, &c.NextStep, &c.NextDate, &c.LostReason, &c.DraftBy, &c.OfferingID}
-}
-
 func laterValue(field any) *string {
 	switch p := field.(type) {
 	case **string:
@@ -66,22 +61,10 @@ func sqlQuote(p *string) string {
 	return "'" + strings.ReplaceAll(*p, "'", "''") + "'"
 }
 
-func (c *Contact) values() []*string {
-	return []*string{nil, &c.Key, &c.File, c.Section, c.Fit, c.Maker, c.Person, c.First, c.Linkedin, c.Email,
-		c.Note, c.Subject, c.Body, c.Followup, c.Flags, c.LinkedinAdded, c.EmailSent, c.FollowupSent,
-		c.Replied, c.Declined, c.Hold, c.Sources, c.Phone, c.Called, c.CallNotes, c.Tz, c.SendTo, c.Accepted, c.Message}
-}
-
-func (c *Contact) fields() []**string {
-	return []**string{nil, nil, nil, &c.Section, &c.Fit, &c.Maker, &c.Person, &c.First, &c.Linkedin, &c.Email,
-		&c.Note, &c.Subject, &c.Body, &c.Followup, &c.Flags, &c.LinkedinAdded, &c.EmailSent, &c.FollowupSent,
-		&c.Replied, &c.Declined, &c.Hold, &c.Sources, &c.Phone, &c.Called, &c.CallNotes, &c.Tz, &c.SendTo, &c.Accepted, &c.Message}
-}
-
 // SnapshotText is the sorted text snapshot the Python tracker wrote, so the committed history carries on.
 func (s *Store) SnapshotText(org int64) (string, error) {
 	var rows []Contact
-	if err := s.in(org).Find(&rows).Error; err != nil {
+	if err := s.InOrg(org).Find(&rows).Error; err != nil {
 		return "", err
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].Key < rows[j].Key })
@@ -92,8 +75,8 @@ func (s *Store) SnapshotText(org int64) (string, error) {
 	}
 	cols := strings.Join(snapshotColumns, ", ")
 	for _, r := range rows {
-		vals := r.values()
-		for _, f := range r.later() {
+		vals := r.Values()
+		for _, f := range r.Later() {
 			vals = append(vals, laterValue(f))
 		}
 		out := make([]string, len(vals))
@@ -182,7 +165,7 @@ func parseInsert(text string, named map[string]bool) (*Contact, string, error) {
 		return nil, "", fmt.Errorf("%d values for %d columns", len(vals), len(cols))
 	}
 	c := Contact{}
-	f, later := c.fields(), c.later()
+	f, later := c.Fields(), c.Later()
 	for i, name := range cols {
 		if at := slices.Index(laterColumns, name); at >= 0 {
 			named[name] = true
@@ -245,7 +228,7 @@ func (s *Store) ImportLegacy(org int64, path string) (int, error) {
 	rows := make([]Contact, len(records))
 	for i, rec := range records {
 		c := &rows[i]
-		f := c.fields()
+		f := c.Fields()
 		for col, v := range rec {
 			idx, known := byName[col]
 			if !known || v == nil {
@@ -278,7 +261,7 @@ func (s *Store) ImportLegacy(org int64, path string) (int, error) {
 // laterColumns the rows' source doesn't hold: someone already here under the same key
 // keeps what they have in those, since the source says nothing about them.
 func (s *Store) replaceContacts(org int64, rows []Contact, absent []string) (int, error) {
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		kept := rows[:0]
 		for _, r := range rows {
 			err := erased(tx, org, displayName(r), deref(r.Maker), deref(r.Email), deref(r.Linkedin))
@@ -308,7 +291,7 @@ func (s *Store) replaceContacts(org int64, rows []Contact, absent []string) (int
 		}
 		for i := range rows {
 			if was := have[rows[i].Key]; was != nil {
-				from, to := was.later(), rows[i].later()
+				from, to := was.Later(), rows[i].Later()
 				for _, name := range absent {
 					at := slices.Index(laterColumns, name)
 					setLater(to[at], laterValue(from[at]))

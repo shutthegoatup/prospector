@@ -24,7 +24,7 @@ func TestRecentRunsHavePages(t *testing.T) {
 				At: start.Add(time.Duration(i)*time.Hour + time.Duration(j)*time.Minute)})
 		}
 	}
-	if err := s.db.CreateInBatches(events, 50).Error; err != nil {
+	if err := s.DB.CreateInBatches(events, 50).Error; err != nil {
 		t.Fatal(err)
 	}
 
@@ -60,7 +60,7 @@ func TestRecentRunsHavePages(t *testing.T) {
 		e.At = long.At.Add(time.Duration(j) * 10 * time.Minute)
 		more = append(more, e)
 	}
-	if err := s.db.CreateInBatches(more, 50).Error; err != nil {
+	if err := s.DB.CreateInBatches(more, 50).Error; err != nil {
 		t.Fatal(err)
 	}
 	first, _, next := s.Runs(o.ID, time.Time{}, 1)
@@ -109,7 +109,7 @@ func TestARunCutShortByWhatIsReadWaitsForTheNextPage(t *testing.T) {
 	if len(events) <= runsRead {
 		t.Fatalf("the test needs more than %d events", runsRead)
 	}
-	if err := s.db.CreateInBatches(events, 200).Error; err != nil {
+	if err := s.DB.CreateInBatches(events, 200).Error; err != nil {
 		t.Fatal(err)
 	}
 	seen, before, pages := 0, time.Time{}, 0

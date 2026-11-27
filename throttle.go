@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/hmac"
 	"strings"
 	"sync"
 	"time"
@@ -136,21 +135,6 @@ func newDeviceToken(u *User) string {
 
 func deviceMAC(u *User, nonce string) string {
 	return mac([]byte(u.PasswordHash), "device\x00"+nonce)
-}
-
-// KnownDevice reports whether token was issued to this email's account, and if so
-// the name its attempts are counted under: the email and the device together, so
-// guesses made elsewhere don't hold this browser up, and its own are still slowed.
-func (s *Store) KnownDevice(email, token string) (who string, ok bool) {
-	nonce, signature, found := strings.Cut(token, ".")
-	if !found || len(token) > 200 {
-		return "", false
-	}
-	u, err := s.UserByEmail(email)
-	if err != nil || !hmac.Equal([]byte(signature), []byte(deviceMAC(u, nonce))) {
-		return "", false
-	}
-	return signInBucket(u.Email) + "\x00" + nonce, true
 }
 
 // The guard counts under names that say what is being guessed at, so the sign-in

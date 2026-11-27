@@ -258,7 +258,7 @@ func (s apiServer) ssoOut(org int64) (api.SSO, error) {
 		return api.SSO{}, err
 	}
 	out := api.SSO{Issuer: c.Issuer, ClientId: c.ClientID, HasClientSecret: c.ClientSecret != "", Required: c.Required, AutoJoin: c.AutoJoin,
-		Sealing: s.a.s.keys != nil}
+		Sealing: s.a.s.Keyring != nil}
 	if s.a.base != "" {
 		out.RedirectUri = s.a.callbackURL()
 	}

@@ -170,7 +170,7 @@ func TestAnAgreementThatWentOutKeepsWhoItWentTo(t *testing.T) {
 	must(s.PutAgreementFields(o.ID, a.ID, []AgreementField{{RecipientID: h.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.1, W: 0.3, H: 0.05}}))
 	draft := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Still a draft", "Ada Lovelace"))
 	must(s.AddRecipient(o, draft.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
-	if err := s.db.Model(&Agreement{}).Where("id = ?", a.ID).Update("status", "sent").Error; err != nil {
+	if err := s.DB.Model(&Agreement{}).Where("id = ?", a.ID).Update("status", "sent").Error; err != nil {
 		t.Fatal(err)
 	}
 
@@ -181,14 +181,14 @@ func TestAnAgreementThatWentOutKeepsWhoItWentTo(t *testing.T) {
 		t.Fatal(err)
 	}
 	var rows []AgreementRecipient
-	if err := s.db.Where("agreement_id = ?", a.ID).Order("id").Find(&rows).Error; err != nil {
+	if err := s.DB.Where("agreement_id = ?", a.ID).Order("id").Find(&rows).Error; err != nil {
 		t.Fatal(err)
 	}
 	if len(rows) != 2 || rows[0].ID != h.ID || rows[0].ContactID != nil || rows[1].ID != g.ID || rows[1].UserID != nil {
 		t.Errorf("who a sent agreement went to, after erasing and removing them: %+v", rows)
 	}
 	var fields int64
-	if err := s.db.Model(&AgreementField{}).Where("agreement_id = ?", a.ID).Count(&fields).Error; err != nil || fields != 1 {
+	if err := s.DB.Model(&AgreementField{}).Where("agreement_id = ?", a.ID).Count(&fields).Error; err != nil || fields != 1 {
 		t.Errorf("the sent agreement's fields: %d (%v)", fields, err)
 	}
 	if left := must(s.AgreementRecipients(o.ID, draft.ID)); len(left) != 0 {
@@ -258,7 +258,7 @@ func TestAnAgreementsRecipientsGoWithWhoTheyStandFor(t *testing.T) {
 		t.Fatal(err)
 	}
 	var n int64
-	if err := s.db.Model(&AgreementRecipient{}).Count(&n).Error; err != nil || n != 0 {
+	if err := s.DB.Model(&AgreementRecipient{}).Count(&n).Error; err != nil || n != 0 {
 		t.Errorf("removing the draft left %d recipients (%v)", n, err)
 	}
 }
@@ -499,13 +499,13 @@ func TestAgreementsSavedBeforePagesWereCountedArePrepared(t *testing.T) {
 	legacy := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Old agreement", "Ada Lovelace"))
 	scrap := []byte("%PDF-1.7 only its first bytes were ever checked")
 	sum := sha256.Sum256(scrap)
-	if err := s.db.Create(&AgreementFile{AgreementID: legacy.ID, OrgID: o.ID, Data: scrap}).Error; err != nil {
+	if err := s.DB.Create(&AgreementFile{AgreementID: legacy.ID, OrgID: o.ID, Data: scrap}).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := s.db.Model(&Agreement{}).Where("id = ?", legacy.ID).Updates(map[string]any{"file_name": "old.pdf", "file_hash": hex.EncodeToString(sum[:])}).Error; err != nil {
+	if err := s.DB.Model(&Agreement{}).Where("id = ?", legacy.ID).Updates(map[string]any{"file_name": "old.pdf", "file_hash": hex.EncodeToString(sum[:])}).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := s.db.Model(&Agreement{}).Where("org_id = ?", o.ID).Update("page_count", 0).Error; err != nil {
+	if err := s.DB.Model(&Agreement{}).Where("org_id = ?", o.ID).Update("page_count", 0).Error; err != nil {
 		t.Fatal(err)
 	}
 

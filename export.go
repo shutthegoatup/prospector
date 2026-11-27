@@ -37,7 +37,7 @@ type ExportEvent struct {
 
 func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error) {
 	out := &PersonExport{ExportedAt: time.Now().UTC(), Facts: []Fact{}, Enquiries: []Enquiry{}, Suggested: []Suggestion{}, Deals: []Deal{}, Access: []CustomerGrant{}, Agreements: []AgreementRecipient{}, History: []ExportEvent{}}
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		c := &out.Person
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(c).Error; err != nil {
 			return missing(err, "no contact %d", id)
@@ -112,7 +112,7 @@ func (s *Store) ExportPerson(org, id int64, actor string) (*PersonExport, error)
 		for _, e := range events {
 			out.History = append(out.History, ExportEvent{At: e.At, By: e.User, Action: e.Action, Value: deref(e.Value)})
 		}
-		return s.log(tx, org, id, c.CompanyID, actor, "export", nil)
+		return s.Log(tx, org, id, c.CompanyID, actor, "export", nil)
 	})
 	if err != nil {
 		return nil, err
@@ -237,8 +237,8 @@ type ExportRecord struct {
 
 func (s *Store) ExportOrg(org int64, actor string) (*OrgExport, error) {
 	out := &OrgExport{ExportedAt: time.Now().UTC(), Members: []ExportMember{}, Keys: []ExportKey{}, History: []ExportRecord{}}
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := s.log(tx, org, 0, nil, actor, "export:org", nil); err != nil {
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
+		if err := s.Log(tx, org, 0, nil, actor, "export:org", nil); err != nil {
 			return err
 		}
 		var o Org

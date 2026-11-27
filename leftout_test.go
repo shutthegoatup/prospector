@@ -170,7 +170,7 @@ func TestASearchCountsThePeopleItWasRefused(t *testing.T) {
 		t.Fatal("Theo is on the never-contact list")
 	}
 	var events int64
-	s.db.Model(&Event{}).Where("org_id = ? and action = ?", o.ID, actionWithheld).Count(&events)
+	s.DB.Model(&Event{}).Where("org_id = ? and action = ?", o.ID, actionWithheld).Count(&events)
 	if events != 0 {
 		t.Fatalf("a refusal outside a search was counted: %d", events)
 	}
@@ -190,7 +190,7 @@ func TestASearchCountsThePeopleItWasRefused(t *testing.T) {
 	}
 
 	var counted []Event
-	s.db.Where("org_id = ? and action = ?", o.ID, actionWithheld).Find(&counted)
+	s.DB.Where("org_id = ? and action = ?", o.ID, actionWithheld).Find(&counted)
 	for _, e := range counted {
 		if e.ContactID != 0 || e.CompanyID != nil || e.Value == nil || (*e.Value != withheldNeverContact && *e.Value != withheldErased) {
 			t.Errorf("a refusal kept more than why: %+v", e)

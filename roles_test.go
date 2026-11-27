@@ -163,11 +163,11 @@ func TestChangingAKeysScopes(t *testing.T) {
 	if code, _ := scopes(ada, theirs.ID, "read", "research:write"); code != http.StatusBadRequest {
 		t.Fatalf("another organisation's key was changed: %d", code)
 	}
-	if s.db.First(theirs, theirs.ID); theirs.Scopes != "read" {
+	if s.DB.First(theirs, theirs.ID); theirs.Scopes != "read" {
 		t.Fatalf("another organisation's key now has %q", theirs.Scopes)
 	}
 	builtin := &APIKey{OrgID: o.ID, Name: "agent", Prefix: builtinPrefix, Hash: "builtin:test", Scopes: "read research:write"}
-	s.db.Create(builtin)
+	s.DB.Create(builtin)
 	if code, body := scopes(ada, builtin.ID, "read"); code != http.StatusBadRequest || !strings.Contains(body, "own agents") {
 		t.Fatalf("a built-in agent's key was changed here: %d %s", code, body)
 	}

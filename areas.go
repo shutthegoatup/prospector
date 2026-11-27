@@ -1,16 +1,12 @@
 package main
 
 import (
-	"errors"
-	"fmt"
-	"slices"
 	"strings"
 )
 
 const (
 	areaSales   = "sales"
 	areaSupport = "support"
-	areaAny     = "any"
 )
 
 // Areas split a team's work. Everyone reads everything; changing something takes
@@ -47,16 +43,6 @@ var opArea = map[string]string{
 	"GetSSO": "", "SaveSSO": "", "ListSSODomains": "", "AddSSODomain": "", "RemoveSSODomain": "", "VerifySSODomain": "", "ExportOrg": "",
 }
 
-func (m *Membership) Works(area string) bool {
-	if m == nil {
-		return false
-	}
-	if area == areaAny {
-		return m.Role == "owner" || strings.TrimSpace(m.Areas) != ""
-	}
-	return area == "" || m.Role == "owner" || slices.Contains(strings.Fields(m.Areas), area)
-}
-
 // landing is the page someone starts on: Today is outreach, so someone who works only
 // in support starts on what is theirs to answer.
 func landing(m *Membership) string {
@@ -73,25 +59,6 @@ func areaRefusal(area string) string {
 	return "that's " + area + " work, which you don't do here: an owner can add " + area + " to you on the Team list in Settings"
 }
 
-// SetAreas says what someone works on. None leaves them reading only.
-func (s *Store) SetAreas(org, user int64, areas []string) error {
-	for _, ar := range areas {
-		if ar != areaSales && ar != areaSupport {
-			return fmt.Errorf("unknown area %q", ar)
-		}
-	}
-	var keep []string
-	for _, ar := range Areas {
-		if slices.Contains(areas, ar.Name) {
-			keep = append(keep, ar.Name)
-		}
-	}
-	res := s.db.Model(&Membership{}).Where("org_id = ? and user_id = ?", org, user).Update("areas", strings.Join(keep, " "))
-	if res.Error == nil && res.RowsAffected == 0 {
-		return errors.New("that person isn't in this organisation")
-	}
-	return res.Error
-}
 func memberWork(m Membership) string {
 	if m.Role == "owner" {
 		return "owner"

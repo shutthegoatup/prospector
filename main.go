@@ -53,6 +53,8 @@ import (
 	"strings"
 	"time"
 	_ "time/tzdata"
+
+	"github.com/shutthegoatup/prospector/internal/mailer"
 )
 
 // version is set at release time by -ldflags "-X main.version=…".
@@ -182,7 +184,7 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("open %s: %w", redact(dsn), err)
 	}
-	s.dns = net.DefaultResolver
+	s.DNS = net.DefaultResolver
 	switch cmd {
 	case "serve":
 		if err := webBuilt(assetFS); err != nil {
@@ -204,13 +206,13 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		via, err := mailFromEnv(os.Getenv)
+		via, err := mailer.FromEnv(os.Getenv)
 		if err != nil {
 			return err
 		}
 		// Only the server uses the keys, so a mistyped one doesn't stop the other
 		// commands: `sso off` and `user password` are how a locked-out host is put right.
-		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
+		if s.Keyring, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
 			return err
 		}
 		s.ResealAtStart()
@@ -232,14 +234,14 @@ func run(args []string) error {
 		if arg(rest, 0, "") != "test" || len(rest) < 2 {
 			return fmt.Errorf("usage: prospector mail test <address>")
 		}
-		via, err := mailFromEnv(os.Getenv)
+		via, err := mailer.FromEnv(os.Getenv)
 		if err != nil {
 			return err
 		}
 		if via == nil {
 			return fmt.Errorf("set SMTP_ADDR and MAIL_FROM first")
 		}
-		err = smtpSend(context.Background(), *via, Message{To: rest[1], Subject: "Prospector can send mail",
+		err = mailer.Send(context.Background(), *via, mailer.Message{To: rest[1], Subject: "Prospector can send mail",
 			Body: "This is the test from `prospector mail test`.\n\nIt was sent through " + via.Host + " as " + via.From + ".\n"})
 		if err != nil {
 			return err
@@ -307,7 +309,7 @@ func run(args []string) error {
 			return fmt.Errorf("usage: prospector key add <org> <name> <scope>…")
 		}
 		// So a key made here is stored the way the server stores one.
-		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
+		if s.Keyring, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
 			return err
 		}
 		o, err := s.OrgBySlug(rest[1])

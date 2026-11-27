@@ -17,6 +17,8 @@ import (
 	"github.com/glebarez/sqlite"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func mustOrg(t *testing.T, s *Store, slug string) *Org {
@@ -85,7 +87,7 @@ func TestSnapshotRoundTrip(t *testing.T) {
 	}
 	s, o = s2, o2
 	var linked int64
-	s.in(o.ID).Model(&Contact{}).Where("company_id is not null").Count(&linked)
+	s.InOrg(o.ID).Model(&Contact{}).Where("company_id is not null").Count(&linked)
 	if linked == 0 {
 		t.Fatal("restore linked no contacts to companies")
 	}
@@ -118,7 +120,7 @@ func TestImportLegacy(t *testing.T) {
 		t.Fatalf("imported %d: %v", n, err)
 	}
 	var c Contact
-	s.in(o.ID).First(&c, 7)
+	s.InOrg(o.ID).First(&c, 7)
 	if c.Key != "Ada Lovelace" || deref(c.Accepted) != "2026-11-22" || c.CompanyID == nil {
 		t.Fatalf("legacy row not carried over: %+v", c)
 	}
@@ -143,7 +145,7 @@ func TestImportKeepsRecordedDates(t *testing.T) {
 		t.Fatal(err)
 	}
 	var after Contact
-	s.db.First(&after, c.ID)
+	s.DB.First(&after, c.ID)
 	if deref(after.EmailSent) != "2026-01-02" || after.CompanyID == nil {
 		t.Fatalf("re-import lost email_sent or the company link: %+v", after)
 	}
@@ -166,7 +168,7 @@ func TestOrganisationsAreIsolated(t *testing.T) {
 	if err := s.Update(b.ID, ca.ID, "email", "x@y.z", "test"); err == nil {
 		t.Fatal("org beta edited org alpha's contact")
 	}
-	if hits, _, _ := s.AgentSearch(b.ID, Actor{}, "analytical", PageIn{}); len(hits) != 2 {
+	if hits, _, _ := s.AgentSearch(b.ID, Actor{}, "analytical", paging.Page{}); len(hits) != 2 {
 		t.Fatalf("beta's search should see only its own company and person, got %+v", hits)
 	}
 	for _, h := range mustSearch(t, s, b.ID, "ada") {
@@ -177,7 +179,7 @@ func TestOrganisationsAreIsolated(t *testing.T) {
 }
 
 func mustSearch(t *testing.T, s *Store, org int64, q string) []SearchHit {
-	hits, _, err := s.AgentSearch(org, Actor{}, q, PageIn{})
+	hits, _, err := s.AgentSearch(org, Actor{}, q, paging.Page{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -440,7 +442,7 @@ func TestMCP(t *testing.T) {
 		t.Fatalf("a fact sent twice should say it existed: %v %+v", err, res)
 	}
 	var keyed int64
-	if s.in(o.ID).Model(&Event{}).Where("key_id > 0").Count(&keyed); keyed != 1 {
+	if s.InOrg(o.ID).Model(&Event{}).Where("key_id > 0").Count(&keyed); keyed != 1 {
 		t.Fatalf("want the one change recorded against its key, got %d events", keyed)
 	}
 	res, err = session.CallTool(ctx, &mcp.CallToolParams{Name: "get_company", Arguments: map[string]any{"company": "Larkmoor Yachts"}})
@@ -502,7 +504,7 @@ func TestAgentMarks(t *testing.T) {
 		t.Fatalf("agent marks should keep the agent's decline and drop the accept Ada re-marked: %v", got)
 	}
 	var h []HistoryItem
-	for _, it := range must(firstOf(s.History(o.ID, must(s.AgentCompany(o.ID, Actor{}, "Larkmoor Yachts", PageIn{})).Company.ID, 1))) {
+	for _, it := range must(firstOf(s.History(o.ID, must(s.AgentCompany(o.ID, Actor{}, "Larkmoor Yachts", paging.Page{})).Company.ID, 1))) {
 		if it.Action == "mark:declined" {
 			h = append(h, it)
 		}

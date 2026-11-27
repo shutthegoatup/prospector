@@ -36,7 +36,7 @@ func TestAgentToolsDontPassDatabaseErrorsOn(t *testing.T) {
 	if got := said("add_fact", map[string]any{"company": "Nobody Ltd", "field": "configurator", "value": "x", "source_url": "https://nobody.example"}); !strings.Contains(got, "Nobody Ltd") {
 		t.Errorf("an agent naming a company that isn't here is told: %s", got)
 	}
-	s.db.Callback().Query().Before("gorm:query").Register("lost", func(tx *gorm.DB) {
+	s.DB.Callback().Query().Before("gorm:query").Register("lost", func(tx *gorm.DB) {
 		if tx.Statement.Table == "companies" || tx.Statement.Table == "contacts" || tx.Statement.Table == "tasks" {
 			tx.AddError(&pgconn.PgError{Code: "08006", Message: "connection to db.internal:5432 lost"})
 		}
@@ -56,12 +56,12 @@ func TestALostRaceForAnAddressReadsAsTaken(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	mustOrg(t, s, "alpha")
-	clash := s.db.Create(&Org{Slug: "alpha", Name: "Alpha", Color: "#56c5f4"}).Error
+	clash := s.DB.Create(&Org{Slug: "alpha", Name: "Alpha", Color: "#56c5f4"}).Error
 	if !unstorable(clash) {
 		t.Fatalf("the index on an organisation's slug answered: %v", clash)
 	}
 	// The look-up finds /o/beta free, and the index then answers as it just did.
-	s.db.Callback().Create().Before("gorm:create").Register("beaten", func(tx *gorm.DB) {
+	s.DB.Callback().Create().Before("gorm:create").Register("beaten", func(tx *gorm.DB) {
 		if tx.Statement.Table == "orgs" {
 			tx.AddError(clash)
 		}
@@ -77,7 +77,7 @@ func TestNoRawDatabaseErrorsGoOut(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	mustOrg(t, s, "alpha")
-	clash := s.db.Create(&Org{Slug: "alpha", Name: "Alpha", Color: "#56c5f4"}).Error
+	clash := s.DB.Create(&Org{Slug: "alpha", Name: "Alpha", Color: "#56c5f4"}).Error
 	if clash == nil {
 		t.Fatal("a second organisation took a slug already in use")
 	}
@@ -108,7 +108,7 @@ func TestNoRawDatabaseErrorsGoOut(t *testing.T) {
 
 	// The sign-in page says as little when the right password can't be given a session.
 	app, _, down, _ := signedIn(t)
-	app.db.Callback().Create().Before("gorm:create").Register("no-sessions", func(tx *gorm.DB) {
+	app.DB.Callback().Create().Before("gorm:create").Register("no-sessions", func(tx *gorm.DB) {
 		if tx.Statement.Table == "sessions" {
 			tx.AddError(&pgconn.PgError{Code: "08006", Message: "connection to db.internal:5432 lost"})
 		}
@@ -185,7 +185,7 @@ func TestAnAPIErrorSaysWhoseFaultItIs(t *testing.T) {
 	}
 
 	// The database failing is the server's fault, and its own words stay in the log.
-	if err := s.db.Migrator().DropTable(&Fact{}); err != nil {
+	if err := s.DB.Migrator().DropTable(&Fact{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, p := ask(writer, "POST", "companies", `{"name":"Larkmoor"}`); p.Status != 0 {
@@ -233,14 +233,14 @@ func TestALostConnectionIsTheServersFailure(t *testing.T) {
 		return &net.OpError{Op: "read", Net: "tcp", Addr: &net.TCPAddr{IP: net.IPv4(10, 0, 0, 9), Port: 5432}, Err: errors.New("connection reset by peer")}
 	}
 	down := false
-	s.db.Callback().Query().Before("gorm:query").Register("lost-midway", func(tx *gorm.DB) {
+	s.DB.Callback().Query().Before("gorm:query").Register("lost-midway", func(tx *gorm.DB) {
 		if down && tx.Statement.Table == "conversations" || down && tx.Statement.Table == "contacts" {
 			tx.AddError(lostMidway())
 		}
 	})
 	var none []Contact
 	down = true
-	err := s.db.Find(&none).Error
+	err := s.DB.Find(&none).Error
 	if code, text := telling("test", fmt.Errorf("saving it: %w", err), http.StatusBadRequest); code != http.StatusInternalServerError || text != sayOurs {
 		t.Errorf("a statement whose connection was lost, answered as a 400: %d %q", code, text)
 	}
@@ -255,7 +255,7 @@ func TestALostConnectionIsTheServersFailure(t *testing.T) {
 		t.Errorf("the conversations page's read whose connection was lost: %d, showing the database's address or not the server's failure: %s", code, body)
 	}
 	down = false
-	if err := s.db.Find(&none).Error; err != nil {
+	if err := s.DB.Find(&none).Error; err != nil {
 		t.Errorf("the next statement after a lost connection: %v", err)
 	}
 }
@@ -269,12 +269,12 @@ func TestAnOutageDoesNotReadAsThePersonsMistake(t *testing.T) {
 	// own error, addresses and all, which nothing tells from any other.
 	lost := &net.OpError{Op: "read", Net: "tcp", Addr: &net.TCPAddr{IP: net.IPv4(10, 0, 0, 9), Port: 5432}, Err: errors.New("connection reset by peer")}
 	down, domainsDown := false, false
-	s.db.Callback().Query().Before("gorm:query").Register("no-users", func(tx *gorm.DB) {
+	s.DB.Callback().Query().Before("gorm:query").Register("no-users", func(tx *gorm.DB) {
 		if down && tx.Statement.Table == "users" {
 			tx.AddError(lost)
 		}
 	})
-	s.db.Callback().Create().Before("gorm:create").Register("no-domains", func(tx *gorm.DB) {
+	s.DB.Callback().Create().Before("gorm:create").Register("no-domains", func(tx *gorm.DB) {
 		if domainsDown && tx.Statement.Table == "sso_domains" {
 			tx.AddError(lost)
 		}

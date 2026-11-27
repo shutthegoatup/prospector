@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // postmark posts one webhook record as Postmark does, signed in with a slug and secret.
@@ -36,7 +38,7 @@ func complaint(email string) map[string]any {
 
 func reasons(t *testing.T, s *Store, org int64) map[string]string {
 	t.Helper()
-	rows, _, err := s.Suppressions(org, PageIn{})
+	rows, _, err := s.Suppressions(org, paging.Page{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +116,7 @@ func TestPostmarkBouncesAndComplaintsStopEveryCampaign(t *testing.T) {
 
 	// Neither gets a service notice, which still reaches someone who only unsubscribed.
 	var hannah Contact
-	if err := s.db.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.AddSubscription(o.ID, SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"); err != nil {
@@ -128,7 +130,7 @@ func TestPostmarkBouncesAndComplaintsStopEveryCampaign(t *testing.T) {
 
 	// A bounce can be taken off, as when the address was mended; a complaint can't.
 	ids := map[string]int64{}
-	rows, _, _ := s.Suppressions(o.ID, PageIn{})
+	rows, _, _ := s.Suppressions(o.ID, paging.Page{})
 	for _, r := range rows {
 		ids[r.Address] = r.ID
 	}
@@ -155,7 +157,7 @@ func TestABounceIsKeptBesideWhyTheyAreOnTheList(t *testing.T) {
 	s, o, _, _ := signedIn(t)
 	unsubscribe := func(addr string) {
 		t.Helper()
-		if _, err := s.suppress(s.db, o.ID, addr, SuppressUnsubscribed, ""); err != nil {
+		if _, err := s.suppress(s.DB, o.ID, addr, SuppressUnsubscribed, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -187,7 +189,7 @@ func TestABounceIsKeptBesideWhyTheyAreOnTheList(t *testing.T) {
 	if !maps.Equal(got, want) {
 		t.Errorf("the list:\n got %v\nwant %v", got, want)
 	}
-	g := must(s.gate(s.db, o))
+	g := must(s.gate(s.DB, o))
 	for _, addr := range []string{"first@larkmoor.example", "then@larkmoor.example", "added@larkmoor.example"} {
 		if err := g.whyFor(KindService, addr, ""); err != errBounced {
 			t.Errorf("a service notice to %s, which bounced: %v", addr, err)

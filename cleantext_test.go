@@ -2,35 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"strings"
 	"testing"
-	"testing/iotest"
 )
 
-func TestNULEscapesAreDroppedFromJSON(t *testing.T) {
-	t.Parallel()
-	for in, want := range map[string]string{
-		`{"name":"Acme\u0000 Boats"}`:      `{"name":"Acme Boats"}`,
-		`{"name":"\u0000\u0000"}`:          `{"name":""}`,
-		`{"path":"C:\\u0000"}`:             `{"path":"C:\\u0000"}`,
-		`{"note":"say \"\u0000\" \u00e9"}`: `{"note":"say \"\" \u00e9"}`,
-		`{"name":"Acme\u0001"}`:            `{"name":"Acme\u0001"}`,
-		`{"cut":"\u00`:                     `{"cut":"\u00`,
-		`{"a":"x\\","b":"\u0000y"}`:        `{"a":"x\\","b":"y"}`,
-	} {
-		// One byte at a time, so every escape is split across reads somewhere.
-		r := &withoutNUL{src: io.NopCloser(iotest.OneByteReader(strings.NewReader(in)))}
-		got, err := io.ReadAll(r)
-		if err != nil || string(got) != want {
-			t.Errorf("%s: %s, %v; want %s", in, got, err, want)
-		}
-	}
-}
-
 // Postgres won't keep a NUL or bytes that aren't UTF-8, so neither reaches it: what a
-// person sends is kept without them, on both databases alike.
+// person sends is kept without them.
 func TestTextArrivesWithoutWhatPostgresWontKeep(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
@@ -60,7 +38,7 @@ func TestTextArrivesWithoutWhatPostgresWontKeep(t *testing.T) {
 	}
 	res.Body.Close()
 	var named int64
-	s.in(o.ID).Model(&Company{}).Where("name = ?", "Quay Marine").Count(&named)
+	s.InOrg(o.ID).Model(&Company{}).Where("name = ?", "Quay Marine").Count(&named)
 	if res.StatusCode >= 300 || named != 1 {
 		t.Errorf("a key holder's company with a NUL, sent as application/x-json: %d, kept as named %d", res.StatusCode, named)
 	}

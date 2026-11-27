@@ -33,7 +33,7 @@ func together(t *testing.T, n int, do func(i int) error) {
 func count(t *testing.T, s *Store, model any, where string, args ...any) int64 {
 	t.Helper()
 	var n int64
-	if err := s.db.Model(model).Where(where, args...).Count(&n).Error; err != nil {
+	if err := s.DB.Model(model).Where(where, args...).Count(&n).Error; err != nil {
 		t.Fatal(err)
 	}
 	return n
@@ -68,12 +68,12 @@ func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
 	}
 
 	var before Company
-	if err := s.in(o.ID).Where("lower(name) = ?", "larkmoor").First(&before).Error; err != nil {
+	if err := s.InOrg(o.ID).Where("lower(name) = ?", "larkmoor").First(&before).Error; err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
 		var after Company
-		if s.db.First(&after, before.ID); !after.UpdatedAt.Equal(before.UpdatedAt) {
+		if s.DB.First(&after, before.ID); !after.UpdatedAt.Equal(before.UpdatedAt) {
 			t.Errorf("adding to a company counted as changing it: updated %v, was %v", after.UpdatedAt, before.UpdatedAt)
 		}
 	}()
@@ -107,22 +107,22 @@ func TestTheDatabaseKeepsACompanyNameToOneSpelling(t *testing.T) {
 	// It drops the index, so on a database no other test will borrow.
 	s := ownStore(t)
 	o := mustOrg(t, s, "alpha")
-	if err := s.db.Create(&Company{OrgID: o.ID, Name: "Larkmoor", Stage: CompanyReview}).Error; err != nil {
+	if err := s.DB.Create(&Company{OrgID: o.ID, Name: "Larkmoor", Stage: CompanyReview}).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := s.db.Create(&Company{OrgID: o.ID, Name: "LARKMOOR", Stage: CompanyReview}).Error; err == nil {
+	if err := s.DB.Create(&Company{OrgID: o.ID, Name: "LARKMOOR", Stage: CompanyReview}).Error; err == nil {
 		t.Fatal("a second company with the same name in other capitals was stored")
 	}
 	other := mustOrg(t, s, "beta")
-	if err := s.db.Create(&Company{OrgID: other.ID, Name: "LARKMOOR", Stage: CompanyReview}).Error; err != nil {
+	if err := s.DB.Create(&Company{OrgID: other.ID, Name: "LARKMOOR", Stage: CompanyReview}).Error; err != nil {
 		t.Fatalf("another organisation's company of the same name: %v", err)
 	}
 
 	// A database from before the index, which already holds two spellings of one name.
-	if err := s.db.Exec("drop index idx_companies_org_name_folded").Error; err != nil {
+	if err := s.DB.Exec("drop index idx_companies_org_name_folded").Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := s.db.Create(&Company{OrgID: o.ID, Name: "LARKMOOR", Stage: CompanyReview}).Error; err != nil {
+	if err := s.DB.Create(&Company{OrgID: o.ID, Name: "LARKMOOR", Stage: CompanyReview}).Error; err != nil {
 		t.Fatal(err)
 	}
 	s.oneNameWhateverItsCapitals()
@@ -166,7 +166,7 @@ func TestAnAgentDraftingDuringAnEditLeavesThePersonsWords(t *testing.T) {
 			return nil
 		})
 		var got Contact
-		if err := s.db.First(&got, p.ID).Error; err != nil {
+		if err := s.DB.First(&got, p.ID).Error; err != nil {
 			t.Fatal(err)
 		}
 		if deref(got.Body) != "Nia's own words" {

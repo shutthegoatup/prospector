@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"time"
 
 	"gorm.io/gorm"
@@ -24,41 +23,6 @@ const (
 	withheldNeverContact = "never_contact"
 	withheldErased       = "erased"
 )
-
-// heldWhenFound records how a known company stood when a task first came to it, so the
-// task can say it wasn't a new find. What happens to it afterwards doesn't change that.
-func (s *Store) heldWhenFound(tx *gorm.DB, org int64, who Actor, c *Company, stage string) error {
-	if who.Task == 0 || stage == CompanyReview {
-		return nil
-	}
-	var before int64
-	if err := tx.Model(&Event{}).Where("org_id = ? and task_id = ? and company_id = ? and action not like 'note:%'", org, who.Task, c.ID).
-		Count(&before).Error; err != nil || before > 0 {
-		return err
-	}
-	why, err := heldAs(tx, org, c, stage)
-	if err != nil {
-		return err
-	}
-	return s.logAs(tx, org, 0, &c.ID, who, actionHeld, &why)
-}
-
-// heldWhenReached is heldWhenFound for a company an agent reaches through a fact or a
-// person rather than by adding it, judged by the task's offering as add_company is.
-func (s *Store) heldWhenReached(tx *gorm.DB, org int64, who Actor, c *Company) error {
-	if who.Task == 0 {
-		return nil
-	}
-	stage := c.Stage
-	if who.Offering != 0 {
-		stages, err := offeringStages(tx, org, who.Offering, []int64{c.ID})
-		if err != nil {
-			return err
-		}
-		stage = stages[c.ID]
-	}
-	return s.heldWhenFound(tx, org, who, c, stage)
-}
 
 // heldAs is why a company that isn't up for review isn't new: a verdict against it
 // first, then whether it is a customer or in a conversation, else it is qualified.
@@ -87,16 +51,4 @@ func heldAs(tx *gorm.DB, org int64, c *Company, stage string) (string, error) {
 		return heldOpenDeal, nil
 	}
 	return heldQualified, nil
-}
-
-// withheld counts a person refused for a task. Only the reason is kept: the event
-// outlives an erasure and goes out in exports, so nothing in it may say who it was.
-// The refusal stands whether or not this is written.
-func (s *Store) withheld(org int64, who Actor, why string) {
-	if who.Task == 0 {
-		return
-	}
-	if err := s.logAs(s.db, org, 0, nil, who, actionWithheld, &why); err != nil {
-		log.Printf("counting a refusal for task %d: %v", who.Task, err)
-	}
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func dueNames(t *testing.T, s *Store, o *Org) map[string]bool {
@@ -65,10 +66,10 @@ func TestACompanyIsJudgedForEachOfferingOnItsOwn(t *testing.T) {
 	// Agents read a company's history to learn what a person rejected, so a verdict for
 	// one offering mustn't look like the company's own.
 	var own int64
-	if err := s.in(o.ID).Model(&Event{}).Where("company_id = ? and action like 'company:%'", company).Count(&own).Error; err != nil || own != 0 {
+	if err := s.InOrg(o.ID).Model(&Event{}).Where("company_id = ? and action like 'company:%'", company).Count(&own).Error; err != nil || own != 0 {
 		t.Fatalf("a verdict for an offering was logged as the company's own: %d %v", own, err)
 	}
-	detail := must(s.AgentCompany(o.ID, Actor{Name: "agent:robot"}, "Northwind Payments", PageIn{}))
+	detail := must(s.AgentCompany(o.ID, Actor{Name: "agent:robot"}, "Northwind Payments", paging.Page{}))
 	raw, _ := json.Marshal(detail)
 	if said := string(raw); strings.Contains(said, `"company:rejected"`) || !strings.Contains(said, `"verdict:rejected"`) {
 		t.Fatalf("what an agent is told about the company: %s", said)
@@ -136,7 +137,7 @@ func TestACompanyIsJudgedForEachOfferingOnItsOwn(t *testing.T) {
 func companyRow(t *testing.T, s *Store, org, id int64) Company {
 	t.Helper()
 	var c Company
-	if err := s.in(org).Where("id = ?", id).First(&c).Error; err != nil {
+	if err := s.InOrg(org).Where("id = ?", id).First(&c).Error; err != nil {
 		t.Fatal(err)
 	}
 	return c

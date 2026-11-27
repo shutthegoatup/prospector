@@ -17,170 +17,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// Identity links an account to who a provider says somebody is. The issuer and its
-// subject are the link; an email address only ever makes the first one.
-type Identity struct {
-	ID        int64  `gorm:"primaryKey"`
-	UserID    int64  `gorm:"index;not null"`
-	Provider  string `gorm:"uniqueIndex:idx_identity;not null"`
-	Subject   string `gorm:"uniqueIndex:idx_identity;not null"`
-	CreatedAt time.Time
-}
-
-// SSOConnection is an organisation's own sign-in: its OpenID Connect provider.
-type SSOConnection struct {
-	OrgID    int64  `gorm:"primaryKey;autoIncrement:false"`
-	Issuer   string `gorm:"not null;default:''"`
-	ClientID string
-	// ClientSecret is sealed (see keyring.seal); Store.spec opens it.
-	ClientSecret string
-	// Required turns a password away from members at the organisation's domains.
-	Required bool `gorm:"not null;default:false"`
-	// AutoJoin makes a member of anyone at those domains the first time they sign in.
-	AutoJoin  bool `gorm:"not null;default:false"`
-	UpdatedAt time.Time
-}
-
-// SSODomain is an email domain an organisation says is its own, believed once the
-// token is found in the domain's DNS.
-type SSODomain struct {
-	ID         int64  `gorm:"primaryKey"`
-	OrgID      int64  `gorm:"uniqueIndex:idx_sso_domain;not null"`
-	Domain     string `gorm:"uniqueIndex:idx_sso_domain;not null"`
-	Token      string
-	VerifiedAt *time.Time
-}
-
-func (d SSODomain) Record() string { return challengeLabel + "." + d.Domain }
-
 const (
-	challengeLabel = "_prospector-challenge"
-	maxSSODomains  = 20
+	maxSSODomains = 20
 )
 
 var googleIssuer = "https://accounts.google.com"
-
-type SSO struct {
-	SSOConnection
-	Domains []SSODomain
-}
-
-func (c *SSO) On() bool { return c.Issuer != "" }
-
-func emailDomain(email string) string {
-	_, domain, _ := strings.Cut(strings.ToLower(strings.TrimSpace(email)), "@")
-	return domain
-}
-
-// Proves is whether the organisation's sign-in may speak for an address: only one at
-// a domain it has shown is its own, matched whole.
-func (c *SSO) Proves(email string) bool {
-	domain := emailDomain(email)
-	for _, d := range c.Domains {
-		if d.VerifiedAt != nil && d.Domain == domain && domain != "" {
-			return true
-		}
-	}
-	return false
-}
-
-// idpSpec opens the connection's client secret, which the database holds sealed.
-func (k *keyring) idpSpec(c *SSO) (idpSpec, error) {
-	secret, err := k.open(c.ClientSecret)
-	return idpSpec{Issuer: c.Issuer, ClientID: c.ClientID, Secret: secret}, err
-}
-
-func (s *Store) SSO(org int64) (*SSO, error) {
-	c := &SSO{}
-	if err := s.db.Where("org_id = ?", org).Limit(1).Find(&c.SSOConnection).Error; err != nil {
-		return nil, err
-	}
-	c.OrgID = org
-	return c, s.in(org).Order("domain").Find(&c.Domains).Error
-}
-
-// SaveSSO keeps the connection; an empty issuer turns the organisation's sign-in off.
-func (s *Store) SaveSSO(c *SSOConnection, actor string) error {
-	// Sealed here, whoever is saving, so nothing a key could seal is written in clear.
-	if c.ClientSecret != "" && !sealed(c.ClientSecret) && s.keys != nil {
-		stored, err := s.keys.seal(c.ClientSecret)
-		if err != nil {
-			return err
-		}
-		c.ClientSecret = stored
-	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("org_id = ?", c.OrgID).Delete(&SSOConnection{}).Error; err != nil {
-			return err
-		}
-		what := "off"
-		if c.Issuer != "" {
-			// Select, so that a false isn't left to the column's default.
-			if err := tx.Select("*").Create(c).Error; err != nil {
-				return err
-			}
-			what = fmt.Sprintf("%s, required: %t, joining: %t", c.Issuer, c.Required, c.AutoJoin)
-		}
-		return s.log(tx, c.OrgID, 0, nil, actor, "sso:change", &what)
-	})
-}
-
-// RequiresSSO is one read, as most organisations require nothing.
-func (s *Store) RequiresSSO(org int64) (bool, error) {
-	var c SSOConnection
-	err := s.in(org).Limit(1).Find(&c).Error
-	return c.Required, err
-}
-
-func (s *Store) AddSSODomain(org int64, domain string) (*SSODomain, error) {
-	var n int64
-	if err := s.in(org).Model(&SSODomain{}).Count(&n).Error; err != nil {
-		return nil, err
-	}
-	if n >= maxSSODomains {
-		return nil, fmt.Errorf("an organisation can have %d domains", maxSSODomains)
-	}
-	d := &SSODomain{OrgID: org, Domain: domain, Token: randomToken(20)}
-	if err := s.db.Create(d).Error; err != nil {
-		if breaksRule(err) {
-			err = conflict(domain + " is already listed")
-		}
-		return nil, err
-	}
-	return d, nil
-}
-
-func (s *Store) SSODomain(org int64, domain string) (*SSODomain, error) {
-	var d SSODomain
-	if err := s.in(org).Where("domain = ?", domain).First(&d).Error; err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
-		return nil, errors.New("that domain isn't listed")
-	}
-	return &d, nil
-}
-
-func (s *Store) VerifySSODomain(org, id int64, at time.Time) error {
-	return s.in(org).Model(&SSODomain{}).Where("id = ?", id).Update("verified_at", &at).Error
-}
-
-func (s *Store) RemoveSSODomain(org int64, domain string) error {
-	return s.in(org).Where("domain = ?", domain).Delete(&SSODomain{}).Error
-}
-
-// SSOOrgsFor is the organisations whose own sign-in speaks for an email domain.
-func (s *Store) SSOOrgsFor(domain string) ([]Org, error) {
-	var out []Org
-	if domain == "" {
-		return nil, nil
-	}
-	err := s.db.Table("orgs").Select("orgs.*").
-		Joins("join sso_domains on sso_domains.org_id = orgs.id and sso_domains.verified_at is not null").
-		Joins("join sso_connections on sso_connections.org_id = orgs.id and sso_connections.issuer <> ''").
-		Where("sso_domains.domain = ?", domain).Order("orgs.name").Scan(&out).Error
-	return out, err
-}
 
 var (
 	errNoAccount = errors.New("there's no account here for that address: ask whoever runs your organisation to add you")
@@ -190,11 +31,6 @@ var (
 )
 
 func unusableHash() string { return "!" + randomToken(32) }
-
-// HasPassword is false for an account that only ever signs in through a provider.
-func (u *User) HasPassword() bool {
-	return u.PasswordHash != "" && !strings.HasPrefix(u.PasswordHash, "!")
-}
 
 // resolve finds whose sign-in a provider's answer is. A link made before wins; an
 // address makes a new one only when byEmail says the provider may speak for it.
@@ -240,58 +76,6 @@ func claim(tx *gorm.DB, u *User) error {
 		return err
 	}
 	return tx.Where("user_id = ?", u.ID).Delete(&Session{}).Error
-}
-
-// SocialUser is the account a social sign-in belongs to. It never makes one.
-func (s *Store) SocialUser(who *outsider) (*User, error) {
-	var u *User
-	err := s.db.Transaction(func(tx *gorm.DB) (err error) {
-		if u, err = resolve(tx, who, who.Email, who.Vouched, nil); err != nil {
-			return err
-		}
-		return claim(tx, u)
-	})
-	return u, err
-}
-
-// SSOUser is the member an organisation's own sign-in has let in, made a member on
-// the way if the organisation lets people join. Nobody becomes an owner like this.
-func (s *Store) SSOUser(org *Org, c *SSO, who *outsider, email string) (*User, error) {
-	var u *User
-	err := s.db.Transaction(func(tx *gorm.DB) (err error) {
-		var create func() (*User, error)
-		if c.AutoJoin {
-			create = func() (*User, error) {
-				name := who.Name
-				if name == "" {
-					name, _, _ = strings.Cut(email, "@")
-				}
-				made := &User{Email: email, Name: name, PasswordHash: unusableHash()}
-				return made, tx.Create(made).Error
-			}
-		}
-		if u, err = resolve(tx, who, email, c.Proves(email), create); err != nil {
-			return err
-		}
-		if !c.Proves(u.Email) {
-			return errElsewhere
-		}
-		if err := claim(tx, u); err != nil {
-			return err
-		}
-		var n int64
-		if err := tx.Model(&Membership{}).Where("org_id = ? and user_id = ?", org.ID, u.ID).Count(&n).Error; err != nil || n > 0 {
-			return err
-		}
-		if !c.AutoJoin {
-			return errNotMember
-		}
-		if err := tx.Create(&Membership{OrgID: org.ID, UserID: u.ID, Role: "member", CallerName: u.Name}).Error; err != nil {
-			return err
-		}
-		return s.log(tx, org.ID, 0, nil, "sso", "member:join", &u.Email)
-	})
-	return u, err
 }
 
 // socialWay is a sign-in the whole deployment offers, registered once by whoever runs it.
@@ -397,7 +181,7 @@ func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 		a.signInProblem(w, r, query.Get("next"), http.StatusBadRequest, "That organisation has no single sign-on for that address.")
 		return
 	}
-	spec, err := a.s.keys.idpSpec(sso)
+	spec, err := a.s.Keyring.IdpSpec(sso)
 	if err != nil {
 		log.Printf("single sign-on for %s: %v", org.Slug, err)
 		a.signInProblem(w, r, query.Get("next"), http.StatusServiceUnavailable, unopenable(org))
@@ -486,7 +270,7 @@ func (a *App) finishSSO(w http.ResponseWriter, r *http.Request, att attempt, ref
 		refuse(errors.Join(err, errors.New("the organisation's single sign-on is off")))
 		return
 	}
-	spec, err := a.s.keys.idpSpec(sso)
+	spec, err := a.s.Keyring.IdpSpec(sso)
 	if err != nil {
 		log.Printf("single sign-on for %s: %v", org.Slug, err)
 		a.signInProblem(w, r, att.Next, http.StatusServiceUnavailable, unopenable(org))
@@ -601,12 +385,12 @@ func (a *App) saveSSO(ctx context.Context, q *Req, in ssoIn) error {
 	}
 	secret := strings.TrimSpace(in.Secret)
 	switch {
-	case secret != "" && a.s.keys == nil:
+	case secret != "" && a.s.Keyring == nil:
 		return fmt.Errorf("a client secret is kept sealed, and %w", errNoKeys)
 	case secret != "":
 		// Sealed here, where it is known to have been typed: one that happens to look
 		// sealed already would otherwise be stored as it came.
-		if c.ClientSecret, err = a.s.keys.seal(secret); err != nil {
+		if c.ClientSecret, err = a.s.Keyring.Seal(secret); err != nil {
 			return err
 		}
 	// The kept secret belongs to the provider and client it was typed for, and goes to
@@ -615,7 +399,7 @@ func (a *App) saveSSO(ctx context.Context, q *Req, in ssoIn) error {
 	case c.Issuer == sso.Issuer && c.ClientID == sso.ClientID:
 		c.ClientSecret = sso.ClientSecret
 		// But nobody is made to depend on a sign-in that can't work.
-		if _, oerr := a.s.keys.open(c.ClientSecret); oerr != nil && ((c.Required && !sso.Required) || (c.AutoJoin && !sso.AutoJoin)) {
+		if _, oerr := a.s.Keyring.Open(c.ClientSecret); oerr != nil && ((c.Required && !sso.Required) || (c.AutoJoin && !sso.AutoJoin)) {
 			return errors.New("this server can't open the kept client secret, so single sign-on isn't working here: type the secret again before requiring it or letting people join")
 		}
 	}
@@ -717,7 +501,7 @@ func agentCommand(s *Store, rest []string) error {
 		if len(rest) < 5 {
 			return usage
 		}
-		if s.keys, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
+		if s.Keyring, err = parseKeys(os.Getenv("PROSPECTOR_SECRET_KEYS")); err != nil {
 			return err
 		}
 		in := AgentSettingsIn{Name: rest[2], Kind: os.Getenv("PROSPECTOR_AGENT_KIND"), BaseURL: rest[3], Model: rest[4],

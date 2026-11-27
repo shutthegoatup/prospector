@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // person adds someone at a company with an address, in conversation unless cold.
@@ -69,7 +71,7 @@ func TestACampaignGoesOnlyToPeopleWithARelationship(t *testing.T) {
 	}
 
 	// Two people sharing an address get one mail.
-	listed, _, err := s.Suppressions(o.ID, PageIn{})
+	listed, _, err := s.Suppressions(o.ID, paging.Page{})
 	if err != nil || len(listed) != 1 {
 		t.Fatalf("the list: %+v (%v)", listed, err)
 	}
@@ -84,7 +86,7 @@ func TestACampaignGoesOnlyToPeopleWithARelationship(t *testing.T) {
 	// Customers: everyone at a company with a subscription that hasn't ended, whether or
 	// not they are in conversation; nobody at one whose subscription has.
 	var hannah Contact
-	if err := s.db.First(&hannah, people[0].ContactID).Error; err != nil {
+	if err := s.DB.First(&hannah, people[0].ContactID).Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.AddSubscription(o.ID, SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"); err != nil {
@@ -174,7 +176,7 @@ func TestCampaignDraftsAreKeptByMembersAndKeys(t *testing.T) {
 	}
 
 	// One that isn't a draft any more is kept as it went.
-	if err := s.db.Model(&Campaign{}).Where("id = ?", c.ID).Update("status", "sent").Error; err != nil {
+	if err := s.DB.Model(&Campaign{}).Where("id = ?", c.ID).Update("status", "sent").Error; err != nil {
 		t.Fatal(err)
 	}
 	if code, _ := asKey(t, "PATCH", one, writer, map[string]any{"name": "Changed after"}); code != http.StatusBadRequest {
@@ -183,7 +185,7 @@ func TestCampaignDraftsAreKeptByMembersAndKeys(t *testing.T) {
 	if code, _ := asKey(t, "DELETE", one, writer, nil); code != http.StatusBadRequest {
 		t.Errorf("removing one that went: %d", code)
 	}
-	if err := s.db.Model(&Campaign{}).Where("id = ?", c.ID).Update("status", CampaignDraft).Error; err != nil {
+	if err := s.DB.Model(&Campaign{}).Where("id = ?", c.ID).Update("status", CampaignDraft).Error; err != nil {
 		t.Fatal(err)
 	}
 

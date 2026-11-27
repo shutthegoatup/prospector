@@ -104,7 +104,7 @@ func enrich(t *testing.T, client *http.Client, api string, id int64, fields ...s
 func atCompany(t *testing.T, s *Store, o *Org, name, company, domain string) *Contact {
 	t.Helper()
 	c := person(t, s, o, name, company, "", false)
-	if err := s.db.Model(&Company{}).Where("id = ?", *c.CompanyID).Update("domain", domain).Error; err != nil {
+	if err := s.DB.Model(&Company{}).Where("id = ?", *c.CompanyID).Update("domain", domain).Error; err != nil {
 		t.Fatal(err)
 	}
 	return c
@@ -120,7 +120,7 @@ func TestAVendorsKeyIsSealedAndNeverShown(t *testing.T) {
 		t.Fatalf("saving: %d %s", code, body)
 	}
 	var e Enricher
-	s.db.Where("org_id = ?", o.ID).First(&e)
+	s.DB.Where("org_id = ?", o.ID).First(&e)
 	if e.APIKey == hunterTestKey || !sealed(e.APIKey) {
 		t.Errorf("the key is kept in clear: %q", e.APIKey)
 	}
@@ -154,7 +154,7 @@ func TestAVendorsFindWaitsForAPersonMarkedWithTheVendor(t *testing.T) {
 		t.Fatalf("asking: %d %+v", code, out)
 	}
 	var sg Suggestion
-	s.db.Where("contact_id = ?", hannah.ID).First(&sg)
+	s.DB.Where("contact_id = ?", hannah.ID).First(&sg)
 	if sg.Value != "hannah.pryce@larkmoor.example" || sg.Vendor != "hunter" || sg.EmailStatus != "verified" || sg.SourceURL != "" || sg.By != "Ada Lovelace" {
 		t.Errorf("the suggestion: %+v", sg)
 	}
@@ -162,7 +162,7 @@ func TestAVendorsFindWaitsForAPersonMarkedWithTheVendor(t *testing.T) {
 		t.Errorf("the find was filled in before anyone accepted it: %q", got)
 	}
 	var events []Event
-	s.db.Where("contact_id = ? and action = ?", hannah.ID, "enrich:email").Find(&events)
+	s.DB.Where("contact_id = ? and action = ?", hannah.ID, "enrich:email").Find(&events)
 	if len(events) != 1 || deref(events[0].Value) != "hunter: found" {
 		t.Errorf("the history: %+v", events)
 	}
@@ -174,7 +174,7 @@ func TestAVendorsFindWaitsForAPersonMarkedWithTheVendor(t *testing.T) {
 		t.Errorf("%d lookups counted and %d made, want 1", used, f.calls())
 	}
 	// Long enough after, it is.
-	s.db.Model(&Event{}).Where("contact_id = ? and action = ?", hannah.ID, "enrich:email").Update("at", time.Now().Add(-enrichAgain-time.Hour))
+	s.DB.Model(&Event{}).Where("contact_id = ? and action = ?", hannah.ID, "enrich:email").Update("at", time.Now().Add(-enrichAgain-time.Hour))
 	if _, out := enrich(t, client, api, hannah.ID, "email"); out.Results[0].Outcome != "has" || f.calls() != 2 {
 		t.Errorf("asked a month later: %+v after %d calls", out, f.calls())
 	}
@@ -206,7 +206,7 @@ func TestAVendorIsAskedNoMoreThanItsMonthAllows(t *testing.T) {
 		t.Errorf("past the limit: %+v after %d calls", out, f.calls())
 	}
 	var events []Event
-	s.db.Where("contact_id = ? and action = ?", a.ID, "enrich:email").Find(&events)
+	s.DB.Where("contact_id = ? and action = ?", a.ID, "enrich:email").Find(&events)
 	if len(events) != 1 || deref(events[0].Value) != "hunter: none found" {
 		t.Errorf("a miss in the history: %+v", events)
 	}
@@ -245,12 +245,12 @@ func TestNobodyTheOrganisationMustntContactIsLookedUp(t *testing.T) {
 		t.Errorf("a find on the list: %+v", out)
 	}
 	var n int64
-	if s.db.Model(&Suggestion{}).Count(&n); n != 0 {
+	if s.DB.Model(&Suggestion{}).Count(&n); n != 0 {
 		t.Errorf("%d suggestions kept from finds that may not be", n)
 	}
 
 	// Research says who can't be looked up, so it offers no lookup the server would refuse.
-	s.db.Model(&Company{}).Where("org_id = ?", o.ID).Update("stage", CompanyReview)
+	s.DB.Model(&Company{}).Where("org_id = ?", o.ID).Update("stage", CompanyReview)
 	code, body := call(t, client, "GET", api+"/research?filter=review", "", nil)
 	var list struct {
 		Items []struct {
@@ -301,7 +301,7 @@ func TestOnlyAKeyGivenTheScopeSpendsOnVendors(t *testing.T) {
 func reread(t *testing.T, s *Store, id int64) *Contact {
 	t.Helper()
 	var c Contact
-	if err := s.db.First(&c, id).Error; err != nil {
+	if err := s.DB.First(&c, id).Error; err != nil {
 		t.Fatal(err)
 	}
 	return &c
@@ -344,7 +344,7 @@ func TestAnAgentWithTheScopeCanEnrichThroughMCP(t *testing.T) {
 		t.Fatalf("calling: %v %+v", err, res)
 	}
 	var sg Suggestion
-	if s.db.Where("contact_id = ?", c.ID).First(&sg); sg.Vendor != "hunter" || sg.By != "agent:enricher" {
+	if s.DB.Where("contact_id = ?", c.ID).First(&sg); sg.Vendor != "hunter" || sg.By != "agent:enricher" {
 		t.Errorf("the suggestion: %+v", sg)
 	}
 }
@@ -352,7 +352,7 @@ func TestAnAgentWithTheScopeCanEnrichThroughMCP(t *testing.T) {
 func TestResearchSaysWhatVendorsFoundAndWhenTheyCanBeAskedAgain(t *testing.T) {
 	t.Parallel()
 	s, o, api, client, f := enrichSignedIn(t)
-	s.dns = &fakeDNS{mx: map[string][]*net.MX{"larkmoor.example": {{Host: "mx.larkmoor.example."}}}}
+	s.DNS = &fakeDNS{mx: map[string][]*net.MX{"larkmoor.example": {{Host: "mx.larkmoor.example."}}}}
 	hannah := atCompany(t, s, o, "Hannah Pryce", "Larkmoor Yachts", "larkmoor.example")
 	ola := person(t, s, o, "Ola Brandt", "Larkmoor Yachts", "", false)
 	tove := person(t, s, o, "Tove Lind", "Larkmoor Yachts", "", false)
@@ -414,7 +414,7 @@ func TestResearchSaysWhatVendorsFoundAndWhenTheyCanBeAskedAgain(t *testing.T) {
 	}
 
 	// Once the 30 days are up, the lookup is no longer listed.
-	s.db.Model(&Event{}).Where("contact_id = ?", ola.ID).Update("at", time.Now().Add(-enrichAgain-time.Hour))
+	s.DB.Model(&Event{}).Where("contact_id = ?", ola.ID).Update("at", time.Now().Add(-enrichAgain-time.Hour))
 	if _, body := call(t, client, "GET", api+"/research?filter=details", "", nil); strings.Contains(body, `"outcome":"none"`) {
 		t.Errorf("an old lookup is still listed: %s", body)
 	}

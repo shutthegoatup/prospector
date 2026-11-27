@@ -19,6 +19,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/cleantext"
+	"github.com/shutthegoatup/prospector/internal/mailer"
 )
 
 // dummyHash keeps a wrong email as slow as a wrong password.
@@ -44,9 +46,9 @@ type App struct {
 	// securityContact is security.txt's Contact; empty serves no security.txt.
 	securityContact string
 	// mail is the app's own server, for password resets and invitations; nil is none.
-	mail *MailServer
+	mail *mailer.Server
 	// send and later stand in for SMTP and for a goroutine in tests.
-	send  sendFunc
+	send  mailer.SendFunc
 	later func(func())
 	// sending counts the mail still on its way out, which stopping waits for.
 	sending sync.WaitGroup
@@ -118,8 +120,9 @@ type Req struct {
 	Member  *Membership
 	Orgs    []OrgMembership
 	Key     *APIKey
-	// due is worked out once a request, for the page and the navigation both.
-	due map[string][]Contact
+	// due and convs are worked out once a request, for the page and the navigation both.
+	due   map[string][]Contact
+	convs map[string][]Contact
 }
 
 type reqKey struct{}
@@ -149,7 +152,7 @@ func (q *Req) Voice() Voice {
 	if caller == "" {
 		caller = q.User.Name
 	}
-	return Voice{Caller: caller, Org: q.Org.Name, Pitch: q.Org.Settings.withDefaults().Pitch, Signature: q.Member.Signature}
+	return Voice{Caller: caller, Org: q.Org.Name, Pitch: q.Org.Settings.WithDefaults().Pitch, Signature: q.Member.Signature}
 }
 
 func (q *Req) Owner() bool { return q.Member != nil && q.Member.Role == "owner" }
@@ -377,7 +380,7 @@ func (a *App) Routes() http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a.setDeadlines(w, r)
-		if !cleanRequest(r) {
+		if !cleantext.Request(r) {
 			refuseAs(w, r, http.StatusNotFound, "404 page not found")
 			return
 		}
@@ -539,7 +542,7 @@ func (a *App) frontIntake(r *http.Request) (intake, origin string) {
 	}
 	origin = browserOrigin(a.baseURL(r))
 	org, err := a.s.OrgBySlug(a.frontOrg)
-	if err != nil || !org.Settings.takesEnquiriesFrom(origin) {
+	if err != nil || !org.Settings.TakesEnquiriesFrom(origin) {
 		return "", ""
 	}
 	return "/o/" + org.Slug + "/intake", origin

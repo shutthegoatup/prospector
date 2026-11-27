@@ -161,7 +161,7 @@ func TestAnOwnerSetsUpTheAgent(t *testing.T) {
 	if !c.Ready() || c.Model != "router/auto" || strings.Join(c.AllowedTools(), " ") != "fetch_fetch" {
 		t.Fatalf("only a tool on offer can be allowed: %+v %v", c, c.AllowedTools())
 	}
-	if key, err := s.keys.open(c.APIKey); err != nil || key != agentTestKey {
+	if key, err := s.Keyring.Open(c.APIKey); err != nil || key != agentTestKey {
 		t.Fatalf("the kept key: %v", err)
 	}
 
@@ -241,7 +241,7 @@ func TestAnOrganisationHasSeveralAgents(t *testing.T) {
 		t.Fatalf("renaming: %d %s", code, body)
 	}
 	var renamed APIKey
-	s.db.First(&renamed, key.ID)
+	s.DB.First(&renamed, key.ID)
 	if renamed.Name != "Claude Opus (built in)" {
 		t.Fatalf("its key's name: %q", renamed.Name)
 	}
@@ -267,7 +267,7 @@ func TestAnOrganisationHasSeveralAgents(t *testing.T) {
 	if _, err := s.AgentByID(o.ID, claude.ID); err == nil {
 		t.Fatal("a deleted agent is still there")
 	}
-	s.db.First(&renamed, key.ID)
+	s.DB.First(&renamed, key.ID)
 	if renamed.RevokedAt == nil {
 		t.Fatal("a deleted agent's key wasn't revoked")
 	}
@@ -343,7 +343,7 @@ func TestOnlyOwnersSetUpTheAgentAndOnlyWithASecretKey(t *testing.T) {
 	}
 
 	a := &App{s: s, agentClient: fake.srv.Client()}
-	s.keys = nil
+	s.Keyring = nil
 	if _, err := a.saveAgent(context.Background(), o.ID, AgentSettingsIn{Name: "Prospector", BaseURL: fake.srv.URL + "/v1", APIKey: agentTestKey}, "ada"); err == nil || !strings.Contains(err.Error(), "PROSPECTOR_SECRET_KEYS") {
 		t.Fatalf("a server with no secret key took an API key: %v", err)
 	}
@@ -370,12 +370,12 @@ func TestAnAgentKeyMovesToANewSecretKey(t *testing.T) {
 	if _, err := a.saveAgent(context.Background(), o.ID, AgentSettingsIn{Name: "Prospector", BaseURL: fake.srv.URL + "/v1", APIKey: agentTestKey, Model: "router/auto"}, "ada"); err != nil {
 		t.Fatal(err)
 	}
-	s.keys = mustKeys(t, "2:"+strings.Repeat("cd", 32)+",1:"+mailTestKey)
+	s.Keyring = mustKeys(t, "2:"+strings.Repeat("cd", 32)+",1:"+mailTestKey)
 	if moved, err := s.Reseal(); err != nil || moved != 1 {
 		t.Fatalf("resealing: %d %v", moved, err)
 	}
 	c := must(s.AgentNamed(o.ID, "Prospector"))
-	if key, err := s.keys.open(c.APIKey); err != nil || key != agentTestKey || sealedVersion(c.APIKey) != 2 {
+	if key, err := s.Keyring.Open(c.APIKey); err != nil || key != agentTestKey || sealedVersion(c.APIKey) != 2 {
 		t.Fatalf("the agent's key didn't move to the new secret key: %v", err)
 	}
 }
@@ -415,9 +415,9 @@ func TestEveryGoingRunIsOnTheTaskPage(t *testing.T) {
 	r := newRunSetup(t, fake)
 	now := time.Now()
 	old := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, Status: RunWaiting, StartedAt: now.Add(-48 * time.Hour)}
-	r.s.db.Create(&old)
+	r.s.DB.Create(&old)
 	for i := range 12 {
-		r.s.db.Create(&AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, Status: RunFinished, StartedAt: now.Add(time.Duration(i) * time.Minute)})
+		r.s.DB.Create(&AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, Status: RunFinished, StartedAt: now.Add(time.Duration(i) * time.Minute)})
 	}
 	runs := must(r.s.AgentRuns(r.o.ID, r.task.ID, 10))
 	if len(runs) != 11 || runs[0].ID != old.ID {

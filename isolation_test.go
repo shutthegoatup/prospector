@@ -39,6 +39,9 @@ var acrossOrganisations = map[string]bool{
 	// The server's own sweeps, over every organisation; what they find is then handled
 	// by methods that take its organisation.
 	"LapsedRuns": true, "CampaignsSending": true, "FreeStaleMail": true, "Users": true,
+	// The core's own: what the areas' queries are written with, not queries of their own.
+	// TestOnlyTheStoreTouchesTheDatabase keeps them inside the store.
+	"InOrg": true, "Log": true, "LogAs": true,
 }
 
 // theirs marks what the first organisation holds, so it shows if it turns up elsewhere.
@@ -170,11 +173,11 @@ func everyWay(s *Store, undo bool, m reflect.Method, org *Org, do func(said stri
 			in := &intruder{org: org, word: word, spoken: slices.Clone(spoken), yes: yes}
 			on := s
 			if undo {
-				on = &Store{db: s.db.Begin(), keys: s.keys}
+				on = s.through(s.DB.Begin())
 			}
 			said, fell := in.call(on, m)
 			if undo {
-				on.db.Rollback()
+				on.DB.Rollback()
 			}
 			if do(said, fell) {
 				return true
@@ -213,7 +216,7 @@ func holdings(t *testing.T, s *Store, org int64) map[string]string {
 			continue
 		}
 		var rows []map[string]any
-		if err := s.db.Table(sch.Table).Where("org_id = ?", org).Order(sch.PrioritizedPrimaryField.DBName).Find(&rows).Error; err != nil {
+		if err := s.DB.Table(sch.Table).Where("org_id = ?", org).Order(sch.PrioritizedPrimaryField.DBName).Find(&rows).Error; err != nil {
 			t.Fatal(err)
 		}
 		if len(rows) > 0 {
@@ -262,10 +265,10 @@ func seedFirst(t *testing.T, s *Store) *Org {
 		func() error { return s.Mark(first.ID, 1, "replied", "2020-01-02", "Owner One") },
 		func() error {
 			// Made directly: an owner has to be a member's name, which wouldn't carry the mark.
-			return s.db.Create(&Deal{OrgID: first.ID, ContactID: 1, Kind: DealNew, Owner: theirs + " owner"}).Error
+			return s.DB.Create(&Deal{OrgID: first.ID, ContactID: 1, Kind: DealNew, Owner: theirs + " owner"}).Error
 		},
 		func() error {
-			return s.db.Create(&Deal{OrgID: first.ID, ContactID: 1, Seq: 1, Kind: "renewal", Stage: "replied", Owner: theirs + " owner"}).Error
+			return s.DB.Create(&Deal{OrgID: first.ID, ContactID: 1, Seq: 1, Kind: "renewal", Stage: "replied", Owner: theirs + " owner"}).Error
 		},
 		func() error {
 			_, err := s.AddSubscription(first.ID, SubscriptionIn{Company: 1, Name: theirs + " plan", Amount: "100", Start: "2020-01-02", TermMonths: 12}, "Owner One")
@@ -301,7 +304,7 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			if _, _, err := s.sealKey(first); err != nil {
 				return err
 			}
-			return s.db.Transaction(func(tx *gorm.DB) error {
+			return s.DB.Transaction(func(tx *gorm.DB) error {
 				_, err := recordAgreementEvent(tx, AgreementEvent{OrgID: first.ID, AgreementID: a.ID, Round: 1, Kind: EventSent, Actor: "Owner One", Detail: theirs + " sent", IP: "203.0.113.9"})
 				return err
 			})
@@ -350,11 +353,11 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			default:
 				continue
 			}
-			if err := f.Set(s.db.Statement.Context, row, v); err != nil {
+			if err := f.Set(s.DB.Statement.Context, row, v); err != nil {
 				t.Fatal(err)
 			}
 		}
-		if err := s.db.Create(row.Interface()).Error; err != nil {
+		if err := s.DB.Create(row.Interface()).Error; err != nil {
 			t.Fatalf("a row for the first organisation in %s: %v", sch.Table, err)
 		}
 	}
@@ -381,7 +384,9 @@ var saysNothingBack = map[string]bool{
 	// Recipients and fields come back as ids, places and kinds; who they are is AgreementRecipients'.
 	"AddRecipient": true, "ChangeRecipient": true, "TrySeal": true, "RemoveRecipient": true, "PutAgreementFields": true, "AgreementFields": true, "Readiness": true,
 	"ErasePerson": true, "Import": true, "ImportLegacy": true, "Restore": true,
-	"ResearchCount": true, "ResearchCounts": true, "EnquiryCounts": true, "Week": true, "AgentMarks": true, "Touches": true,
+	"ResearchCount": true, "ResearchCounts": true,
+	// A cursor of 1 is a place before every event; AgentEvents reads the same rows from the start.
+	"AgentEventsBefore": true, "EnquiryCounts": true, "Week": true, "AgentMarks": true, "Touches": true,
 	"AddEnquiry": true, "AgentNote": true, "CreateKey": true, "CreateTask": true, "CreateTaskFor": true, "CreateTaskWanting": true, "QuickAddPerson": true,
 	// FindOne answers only when one person matches, and Find makes its query. NeverContactCovers reads the organisation it is handed.
 	"FindOne": true, "NeverContactCovers": true,

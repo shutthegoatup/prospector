@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func TestSafeNext(t *testing.T) {
@@ -259,7 +261,7 @@ func TestNeverContactCatchesMistakes(t *testing.T) {
 		t.Fatalf("an import with a never-contact address went through: %v", err)
 	}
 	var kept Contact
-	s.in(o.ID).Where("key = ?", p.Drafts[0].Key).First(&kept)
+	s.InOrg(o.ID).Where("key = ?", p.Drafts[0].Key).First(&kept)
 	if deref(kept.Note) == "changed" {
 		t.Fatal("a refused import still wrote")
 	}
@@ -512,7 +514,7 @@ func TestRemoveMember(t *testing.T) {
 		t.Fatal("an empty role was accepted")
 	}
 	var removals int64
-	s.in(o.ID).Model(&Event{}).Where("action = ?", "member:remove").Count(&removals)
+	s.InOrg(o.ID).Model(&Event{}).Where("action = ?", "member:remove").Count(&removals)
 	if removals != 2 {
 		t.Fatalf("%d removals in the history, want 2", removals)
 	}
@@ -594,11 +596,11 @@ func TestNeverContactLeavesTheQueue(t *testing.T) {
 		t.Fatalf("a listed person who replied left Conversations: %s", body)
 	}
 	var back Contact
-	do(s.in(o.ID).First(&back, c.ID).Error)
-	do(s.db.Model(&back).Updates(map[string]any{"replied": nil, "stage": ""}).Error)
+	do(s.InOrg(o.ID).First(&back, c.ID).Error)
+	do(s.DB.Model(&back).Updates(map[string]any{"replied": nil, "stage": ""}).Error)
 	fresh, err := s.OrgByID(o.ID)
 	do(err)
-	due, err := s.AgentDue(fresh, PageIn{Limit: pageMost})
+	due, err := s.AgentDue(fresh, paging.Page{Limit: paging.Most})
 	do(err)
 	for _, item := range due.Items {
 		if item.ContactID == c.ID {
@@ -645,7 +647,7 @@ func TestNeverContactEntries(t *testing.T) {
 		{"other.example, larkmoor.example", email, "", true},
 		{"", email, profile, false},
 	} {
-		got := OrgSettings{NeverContact: c.entry}.listed(c.email, c.link) != nil
+		got := OrgSettings{NeverContact: c.entry}.Listed(c.email, c.link) != nil
 		if got != c.listed {
 			t.Errorf("entry %q against %q %q: listed = %v, want %v", c.entry, c.email, c.link, got, c.listed)
 		}
@@ -662,7 +664,7 @@ func TestContentPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	var company Company
-	if err := s.in(o.ID).First(&company).Error; err != nil {
+	if err := s.InOrg(o.ID).First(&company).Error; err != nil {
 		t.Fatal(err)
 	}
 	// A task with work and a note on it, so those parts of the pages are rendered.
@@ -714,7 +716,7 @@ func TestContentPolicy(t *testing.T) {
 	for _, page := range pages {
 		check(page, "<title>")
 	}
-	if err := s.db.Model(&User{}).Where("email = ?", "ada@example.com").Update("must_change_password", true).Error; err != nil {
+	if err := s.DB.Model(&User{}).Where("email = ?", "ada@example.com").Update("must_change_password", true).Error; err != nil {
 		t.Fatal(err)
 	}
 	check("/password", `<div id="app"></div>`)
@@ -741,7 +743,7 @@ func TestOrgIsCreatedWithItsOwner(t *testing.T) {
 
 	// The owner's row can't be written (one is already there for the id the next
 	// organisation will get), so the organisation must not be left behind either.
-	if err := s.db.Create(&Membership{OrgID: gamma.ID + 1, UserID: ada.ID, Role: "member"}).Error; err != nil {
+	if err := s.DB.Create(&Membership{OrgID: gamma.ID + 1, UserID: ada.ID, Role: "member"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	if o, err := s.CreateOrgWithOwner("delta", "Delta", ada); err == nil {

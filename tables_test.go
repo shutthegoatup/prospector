@@ -11,7 +11,7 @@ import (
 
 func tableOf(t *testing.T, s *Store, model any) *schema.Schema {
 	t.Helper()
-	stmt := &gorm.Statement{DB: s.db}
+	stmt := &gorm.Statement{DB: s.DB}
 	if err := stmt.Parse(model); err != nil {
 		t.Fatal(err)
 	}
@@ -123,11 +123,11 @@ func pointingAt(t *testing.T, s *Store, org, contact int64) func() map[string]in
 		tables = append(tables, sch)
 		row := reflect.New(sch.ModelType)
 		for name, v := range map[string]int64{"org_id": org, "contact_id": contact} {
-			if err := sch.LookUpField(name).Set(s.db.Statement.Context, row, v); err != nil {
+			if err := sch.LookUpField(name).Set(s.DB.Statement.Context, row, v); err != nil {
 				t.Fatal(err)
 			}
 		}
-		if err := s.db.Create(row.Interface()).Error; err != nil {
+		if err := s.DB.Create(row.Interface()).Error; err != nil {
 			t.Fatalf("%s: %v", sch.Table, err)
 		}
 	}
@@ -136,7 +136,7 @@ func pointingAt(t *testing.T, s *Store, org, contact int64) func() map[string]in
 		for _, sch := range tables {
 			var n int64
 			// Under the id negated too, where a restore parks rows while it renumbers people.
-			if err := s.db.Table(sch.Table).Where("org_id = ? and contact_id in ?", org, []int64{contact, -contact}).Count(&n).Error; err != nil {
+			if err := s.DB.Table(sch.Table).Where("org_id = ? and contact_id in ?", org, []int64{contact, -contact}).Count(&n).Error; err != nil {
 				t.Fatal(err)
 			}
 			if n > 0 {

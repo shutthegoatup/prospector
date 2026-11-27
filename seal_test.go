@@ -25,7 +25,7 @@ func TestAnAgreementsEventsShowAnyChangeAfterTheFact(t *testing.T) {
 	o := mustOrg(t, s, "alpha")
 	add := func(kind, detail string) {
 		t.Helper()
-		if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := s.DB.Transaction(func(tx *gorm.DB) error {
 			_, err := recordAgreementEvent(tx, AgreementEvent{OrgID: o.ID, AgreementID: 7, Round: 1, Kind: kind, Actor: "Ada Lovelace", Detail: detail, IP: "203.0.113.5"})
 			return err
 		}); err != nil {
@@ -43,7 +43,7 @@ func TestAnAgreementsEventsShowAnyChangeAfterTheFact(t *testing.T) {
 	// Two writers adding after the same event can't both succeed.
 	fork := events[2]
 	fork.ID, fork.Kind = 0, EventDeclined
-	if err := s.db.Create(&fork).Error; err == nil {
+	if err := s.DB.Create(&fork).Error; err == nil {
 		t.Error("a second event after the same one was kept")
 	}
 
@@ -58,7 +58,7 @@ func TestAnAgreementsEventsShowAnyChangeAfterTheFact(t *testing.T) {
 			return tx.Model(&AgreementEvent{}).Where("id = ?", events[2].ID).Update("at", events[2].At.Add(-time.Hour)).Error
 		},
 	} {
-		err := s.db.Transaction(func(tx *gorm.DB) error {
+		err := s.DB.Transaction(func(tx *gorm.DB) error {
 			if err := change(tx); err != nil {
 				return err
 			}
@@ -93,7 +93,7 @@ func TestAnOrganisationsSealingKeyIsMadeOnceAndKeptSealed(t *testing.T) {
 		t.Errorf("the certificate: %s, %v", cert.Subject, cert.UnknownExtKeyUsage)
 	}
 	var stored SealKey
-	if err := s.db.First(&stored, "org_id = ?", o.ID).Error; err != nil || !sealed(stored.Key) {
+	if err := s.DB.First(&stored, "org_id = ?", o.ID).Error; err != nil || !sealed(stored.Key) {
 		t.Errorf("the private key is stored as %.12q (%v)", stored.Key, err)
 	}
 	other := mustOrg(t, s, "beta")
@@ -102,16 +102,16 @@ func TestAnOrganisationsSealingKeyIsMadeOnceAndKeptSealed(t *testing.T) {
 	}
 
 	// Moved onto a new server key, it still opens, and is the same key.
-	s.keys = mustKeys(t, "2:"+newKey+",1:"+testKey)
+	s.Keyring = mustKeys(t, "2:"+newKey+",1:"+testKey)
 	if moved, err := s.Reseal(); err != nil || moved < 1 {
 		t.Fatalf("resealing: %d moved (%v)", moved, err)
 	}
-	s.keys = mustKeys(t, "2:"+newKey)
+	s.Keyring = mustKeys(t, "2:"+newKey)
 	if after, _ := must2(s.sealKey(o)); !after.Equal(key) {
 		t.Error("the key changed when the server's key did")
 	}
 
-	s.keys = nil
+	s.Keyring = nil
 	if _, _, err := s.sealKey(mustOrg(t, s, "gamma")); !errors.Is(err, errNoKeys) {
 		t.Errorf("making a key without a server secret to keep it under: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestADraftCanBeFilledInAndSealedBeforeItIsSent(t *testing.T) {
 		t.Fatalf("a dry run of sealing: %v", err)
 	}
 	var made []AgreementEvent
-	if err := s.db.Find(&made).Error; err != nil || len(made) != 0 {
+	if err := s.DB.Find(&made).Error; err != nil || len(made) != 0 {
 		t.Errorf("a dry run left %d events (%v)", len(made), err)
 	}
 

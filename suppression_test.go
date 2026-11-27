@@ -10,12 +10,14 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // link makes an unsubscribe link for an address, as a marketing mail will.
 func link(t *testing.T, s *Store, org int64, address string) string {
 	t.Helper()
-	token, err := s.unsubscribeLink(s.db, org, address)
+	token, err := s.unsubscribeLink(s.DB, org, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +32,7 @@ func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
 	stranger := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	listed := func(org int64) int {
 		t.Helper()
-		rows, _, err := s.Suppressions(org, PageIn{})
+		rows, _, err := s.Suppressions(org, paging.Page{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -67,7 +69,7 @@ func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("a one-click unsubscribe answered %d", res.StatusCode)
 	}
-	rows, _, _ := s.Suppressions(o.ID, PageIn{})
+	rows, _, _ := s.Suppressions(o.ID, paging.Page{})
 	if len(rows) != 1 || rows[0].Address != "hannah@larkmoor.example" || rows[0].Reason != SuppressUnsubscribed {
 		t.Fatalf("after unsubscribing: %+v", rows)
 	}
@@ -96,10 +98,10 @@ func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
 	}
 
 	// Marketing mail can't go to them now, whatever the case of the address.
-	if err := s.marketable(s.db, o, "HANNAH@larkmoor.example", ""); err != errSuppressed {
+	if err := s.marketable(s.DB, o, "HANNAH@larkmoor.example", ""); err != errSuppressed {
 		t.Errorf("an unsubscribed address is marketable: %v", err)
 	}
-	if err := s.marketable(s.db, other, "hannah@larkmoor.example", ""); err != nil {
+	if err := s.marketable(s.DB, other, "hannah@larkmoor.example", ""); err != nil {
 		t.Errorf("the address is held against another organisation: %v", err)
 	}
 }
@@ -213,11 +215,11 @@ func TestErasureAndNeverContactKeepAnAddressUnmailed(t *testing.T) {
 	}
 	var left int64
 	for _, table := range []any{&Suppression{}, &UnsubscribeLink{}} {
-		if err := s.db.Model(table).Where("address = ?", "hannah@larkmoor.example").Count(&left).Error; err != nil || left != 0 {
+		if err := s.DB.Model(table).Where("address = ?", "hannah@larkmoor.example").Count(&left).Error; err != nil || left != 0 {
 			t.Errorf("erasing her left %d rows of %T with her address (%v)", left, table, err)
 		}
 	}
-	if err := s.marketable(s.db, o, "hannah@larkmoor.example", ""); err != errErased {
+	if err := s.marketable(s.DB, o, "hannah@larkmoor.example", ""); err != errErased {
 		t.Errorf("an erased address is marketable: %v", err)
 	}
 
@@ -225,10 +227,10 @@ func TestErasureAndNeverContactKeepAnAddressUnmailed(t *testing.T) {
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.marketable(s.db, o, "sven@nordkap.example", ""); err == nil {
+	if err := s.marketable(s.DB, o, "sven@nordkap.example", ""); err == nil {
 		t.Error("an address on the never-contact list is marketable")
 	}
-	if err := s.marketable(s.db, o, "tom@larkmoor.example", ""); err != nil {
+	if err := s.marketable(s.DB, o, "tom@larkmoor.example", ""); err != nil {
 		t.Errorf("an address nothing holds against is not marketable: %v", err)
 	}
 }
@@ -237,7 +239,7 @@ func TestAMarketingMailCarriesItsOneClickHeaders(t *testing.T) {
 	t.Parallel()
 	from, to := &mail.Address{Address: "news@alpha.example"}, &mail.Address{Address: "hannah@larkmoor.example"}
 	wire := func(unsubscribe string) string {
-		return string(compose(from, to, Message{Subject: "News", Body: "Hello", Unsubscribe: unsubscribe}, time.Now()))
+		return string(mailer.Compose(from, to, mailer.Message{Subject: "News", Body: "Hello", Unsubscribe: unsubscribe}, time.Now()))
 	}
 	got := wire("https://prospector.example/u/abc123")
 	if !strings.Contains(got, "\r\nList-Unsubscribe: <https://prospector.example/u/abc123>\r\n") || !strings.Contains(got, "\r\nList-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n") {
@@ -269,7 +271,7 @@ func TestTheListHoldsAtItsEdges(t *testing.T) {
 
 	// A member takes an address off just as the person unsubscribes: theirs stays.
 	added := must(s.Suppress(o.ID, "tom@larkmoor.example", "Ada Lovelace"))
-	if err := s.db.Model(&Suppression{}).Where("id = ?", added.ID).Update("reason", SuppressUnsubscribed).Error; err != nil {
+	if err := s.DB.Model(&Suppression{}).Where("id = ?", added.ID).Update("reason", SuppressUnsubscribed).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Unsuppress(o.ID, added.ID, "Ada Lovelace"); err == nil {
@@ -284,13 +286,13 @@ func TestTheListHoldsAtItsEdges(t *testing.T) {
 	if err := s.UnsubscribeByToken(token); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.marketable(s.db, o, "sven@nordkap.example", ""); err != errSuppressed {
+	if err := s.marketable(s.DB, o, "sven@nordkap.example", ""); err != errSuppressed {
 		t.Errorf("an unsubscribe after the row was taken off was lost: %v", err)
 	}
 
 	// Erasure and the person's export count the addresses erasure does.
 	jo := must(s.QuickAddPerson(o, QuickAdd{Name: "Jo Marsh", Company: "Larkmoor Yachts", Email: "jo@larkmoor.example."}, "Ada Lovelace"))
-	if err := s.db.Create(&Suggestion{OrgID: o.ID, ContactID: jo.ID, Field: "email", Value: "jo.marsh@larkmoor.example", SourceURL: "https://larkmoor.example/team"}).Error; err != nil {
+	if err := s.DB.Create(&Suggestion{OrgID: o.ID, ContactID: jo.ID, Field: "email", Value: "jo.marsh@larkmoor.example", SourceURL: "https://larkmoor.example/team"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	for _, address := range []string{"jo@larkmoor.example", "jo.marsh@larkmoor.example"} {
@@ -305,13 +307,13 @@ func TestTheListHoldsAtItsEdges(t *testing.T) {
 		t.Fatal(err)
 	}
 	var left int64
-	if err := s.db.Model(&Suppression{}).Where("address like ?", "jo%").Count(&left).Error; err != nil || left != 0 {
+	if err := s.DB.Model(&Suppression{}).Where("address like ?", "jo%").Count(&left).Error; err != nil || left != 0 {
 		t.Errorf("erasing her left %d of her addresses on the list (%v)", left, err)
 	}
 
 	from, to := &mail.Address{Address: "news@alpha.example"}, &mail.Address{Address: "hannah@larkmoor.example"}
 	for _, odd := range []string{"https://prospector.example/u/a\tb", "https://prospector.example/u/a\x00b", "https://prospector.example/u/é"} {
-		if wire := string(compose(from, to, Message{Subject: "News", Body: "Hello", Unsubscribe: odd}, time.Now())); strings.Contains(wire, "List-Unsubscribe") {
+		if wire := string(mailer.Compose(from, to, mailer.Message{Subject: "News", Body: "Hello", Unsubscribe: odd}, time.Now())); strings.Contains(wire, "List-Unsubscribe") {
 			t.Errorf("an unsubscribe link of %q made it into a header", odd)
 		}
 	}

@@ -15,7 +15,7 @@ func TestOnboardingStepsAreReadALineEach(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []StepPlan{{"Name a project lead", StepTheirs, 2}, {"Send your product files", StepTheirs, 7}, {"Kick-off call", StepOurs, 10}, {"Go live", StepOurs, -1}}
+	want := []StepPlan{{Name: "Name a project lead", Who: StepTheirs, Days: 2}, {Name: "Send your product files", Who: StepTheirs, Days: 7}, {Name: "Kick-off call", Who: StepOurs, Days: 10}, {Name: "Go live", Who: StepOurs, Days: -1}}
 	if len(plan) != len(want) {
 		t.Fatalf("read %d steps, want %d: %+v", len(plan), len(want), plan)
 	}
@@ -26,7 +26,7 @@ func TestOnboardingStepsAreReadALineEach(t *testing.T) {
 	}
 	// A colon in a step's own name isn't who does it, and a number in it isn't its days.
 	odd, err := OrgSettings{OnboardingSteps: "Call them: agree 3 sites\nTHEM : Sign, 0 day"}.Onboarding()
-	if err != nil || len(odd) != 2 || odd[0] != (StepPlan{"Call them: agree 3 sites", StepOurs, -1}) || odd[1] != (StepPlan{"Sign", StepTheirs, 0}) {
+	if err != nil || len(odd) != 2 || odd[0] != (StepPlan{Name: "Call them: agree 3 sites", Who: StepOurs, Days: -1}) || odd[1] != (StepPlan{Name: "Sign", Who: StepTheirs, Days: 0}) {
 		t.Errorf("odd lines read as %+v (%v)", odd, err)
 	}
 	for why, text := range map[string]string{"no name": "them:, 3 days", "three years": "Go live, 1000 days", "too many": strings.Repeat("Step\n", 41)} {
@@ -112,7 +112,7 @@ func TestACustomerIsOnboardedStepByStep(t *testing.T) {
 	}
 
 	var said []Event
-	if err := s.db.Where("org_id = ? and company_id = ? and action like ?", o.ID, company, "onboard:%").Order("id").Find(&said).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and company_id = ? and action like ?", o.ID, company, "onboard:%").Order("id").Find(&said).Error; err != nil {
 		t.Fatal(err)
 	}
 	if len(said) != 8 || said[0].Action != "onboard:start" || deref(said[0].Value) != "2026-11-02" || deref(said[1].Value) != "Name a project lead" ||
@@ -159,7 +159,7 @@ func TestACustomerIsOnboardedStepByStep(t *testing.T) {
 		t.Fatal(err)
 	}
 	var steps int64
-	if err := s.db.Model(&OnboardingStep{}).Where("org_id = ?", o.ID).Count(&steps).Error; err != nil || steps != 4 {
+	if err := s.DB.Model(&OnboardingStep{}).Where("org_id = ?", o.ID).Count(&steps).Error; err != nil || steps != 4 {
 		t.Errorf("removing an onboarding left %d steps, want the other one's four (%v)", steps, err)
 	}
 }
@@ -363,7 +363,7 @@ func TestARobotWorksOnboardingAsItsScopesAllow(t *testing.T) {
 	// With no start given, steps are dated from today.
 	if code, body := asKey(t, "POST", base+"onboardings", writer, map[string]any{"company": *hannah.CompanyID, "name": "Second site"}); code != http.StatusCreated || !strings.Contains(body, `"start":"`+today()+`"`) {
 		t.Errorf("starting an onboarding with no start: %d %s", code, body)
-	} else if err := s.db.Where("name = ?", "Second site").Delete(&Onboarding{}).Error; err != nil {
+	} else if err := s.DB.Where("name = ?", "Second site").Delete(&Onboarding{}).Error; err != nil {
 		t.Fatal(err)
 	}
 	// Mailing a customer is a scope of its own.

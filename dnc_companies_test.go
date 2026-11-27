@@ -16,7 +16,7 @@ func TestTheNeverContactListCoversACompanyByItsDomain(t *testing.T) {
 		"nordkap.example": true, "shop.nordkap.example": true, "https://www.nordkap.example/": true, "halvard.example": true,
 		"larkmoor.example": false, "notnordkap.example": false, "": false, "linkedin.com": false,
 	} {
-		if got := set.coversCompany(domain); got != want {
+		if got := set.CoversCompany(domain); got != want {
 			t.Errorf("%q: covered %v, want %v", domain, got, want)
 		}
 	}

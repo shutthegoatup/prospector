@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func verdictFor(t *testing.T, s *Store, org, offering, company int64) Verdict {
 	t.Helper()
 	var v Verdict
-	if err := s.in(org).Where("offering_id = ? and company_id = ?", offering, company).First(&v).Error; err != nil {
+	if err := s.InOrg(org).Where("offering_id = ? and company_id = ?", offering, company).First(&v).Error; err != nil {
 		t.Fatal(err)
 	}
 	return v
@@ -79,7 +80,7 @@ func TestEachRoleAtACompanyIsPursuedOrJunkedOnItsOwn(t *testing.T) {
 	}
 
 	// The agent is told what was junked, and can't bring it back.
-	detail := must(s.AgentCompany(o.ID, scout, "Northwind Payments", PageIn{}))
+	detail := must(s.AgentCompany(o.ID, scout, "Northwind Payments", paging.Page{}))
 	if len(detail.Roles) != 2 || detail.Roles[1].Stage != RoleJunked || detail.Roles[1].Reason != "Inside IR35 after all" {
 		t.Fatalf("get_company should list the roles with the junked one's reason: %+v", detail.Roles)
 	}
@@ -137,7 +138,7 @@ func TestANewRoleAtACompanyRuledOutIsANewFindForTheTask(t *testing.T) {
 	}
 
 	next := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find more contract roles", "Ada"))
-	brief := must(s.AgentTask(o.ID, Actor{Name: "agent:scout", ReadOnly: true}, next.ID, PageIn{}))
+	brief := must(s.AgentTask(o.ID, Actor{Name: "agent:scout", ReadOnly: true}, next.ID, paging.Page{}))
 	if brief.Offering == nil || !brief.Offering.HasRoles || !strings.Contains(brief.Offering.Guidance, "add_role") ||
 		strings.Contains(brief.Offering.Guidance, "skip one rejected") {
 		t.Fatalf("an agent on a task for an offering with roles should be told to add each role: %+v", brief.Offering)

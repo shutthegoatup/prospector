@@ -180,7 +180,7 @@ func TestAFirstPasswordIsChangedThroughTheAPI(t *testing.T) {
 	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	grace := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
-	if err := s.db.Model(grace).Update("must_change_password", true).Error; err != nil {
+	if err := s.DB.Model(grace).Update("must_change_password", true).Error; err != nil {
 		t.Fatal(err)
 	}
 	b := freshBrowser()

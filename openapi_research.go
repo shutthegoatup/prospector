@@ -18,7 +18,7 @@ func (s apiServer) AddPerson(ctx context.Context, in api.AddPersonRequestObject)
 	}
 	where := "is in the LinkedIn queue"
 	if b.Added {
-		where = "is marked added; their email comes up in " + plural(q.Org.Settings.withDefaults().EmailAfterDays, "day")
+		where = "is marked added; their email comes up in " + plural(q.Org.Settings.WithDefaults().EmailAfterDays, "day")
 	}
 	return api.AddPerson201JSONResponse{Id: c.ID, Name: displayName(*c), Message: displayName(*c) + " " + where + "."}, nil
 }

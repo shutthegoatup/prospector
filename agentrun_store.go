@@ -3,30 +3,32 @@ package main
 import (
 	"fmt"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 var runGoing = []string{RunWorking, RunWaiting}
 
-func (s *Store) TaskOpen(org, task int64) error {
-	_, err := openTask(s.db, org, task)
+func (s *agentStore) TaskOpen(org, task int64) error {
+	_, err := openTask(s.DB, org, task)
 	return err
 }
 
 // RunsOn counts the runs of one agent working or waiting on a task.
-func (s *Store) RunsOn(org, task, agent int64) (int64, error) {
+func (s *agentStore) RunsOn(org, task, agent int64) (int64, error) {
 	var n int64
-	return n, s.in(org).Model(&AgentRun{}).Where("task_id = ? and agent_id = ? and status in ?", task, agent, runGoing).Count(&n).Error
+	return n, s.InOrg(org).Model(&AgentRun{}).Where("task_id = ? and agent_id = ? and status in ?", task, agent, runGoing).Count(&n).Error
 }
 
 // AddRun fails if the agent already has a run going on the task, which an index keeps.
-func (s *Store) AddRun(org int64, run AgentRun) (*AgentRun, error) {
+func (s *agentStore) AddRun(org int64, run AgentRun) (*AgentRun, error) {
 	run.ID, run.OrgID = 0, org
-	return &run, s.db.Create(&run).Error
+	return &run, s.DB.Create(&run).Error
 }
 
-func (s *Store) RunByID(org, id int64) (*AgentRun, error) {
+func (s *agentStore) RunByID(org, id int64) (*AgentRun, error) {
 	var run AgentRun
-	if err := s.in(org).First(&run, id).Error; err != nil {
+	if err := s.InOrg(org).First(&run, id).Error; err != nil {
 		return nil, missing(err, "no run %d in this organisation", id)
 	}
 	return &run, nil
@@ -34,8 +36,8 @@ func (s *Store) RunByID(org, id int64) (*AgentRun, error) {
 
 // AskRunStop reports whether the run was still going; one that has ended is as
 // stopped as it will get.
-func (s *Store) AskRunStop(org, id int64) (going bool, err error) {
-	res := s.in(org).Model(&AgentRun{}).Where("id = ? and status in ?", id, runGoing).Update("stop_asked", true)
+func (s *agentStore) AskRunStop(org, id int64) (going bool, err error) {
+	res := s.InOrg(org).Model(&AgentRun{}).Where("id = ? and status in ?", id, runGoing).Update("stop_asked", true)
 	if res.Error != nil || res.RowsAffected > 0 {
 		return res.RowsAffected > 0, res.Error
 	}
@@ -47,62 +49,114 @@ func (s *Store) AskRunStop(org, id int64) (going bool, err error) {
 // in one statement, so of two servers only one ever drives a run.
 
 // RenewRun reports false once a person has stopped the run or another server took it.
-func (s *Store) RenewRun(org, id int64, owner string, until time.Time) (bool, error) {
-	res := s.in(org).Model(&AgentRun{}).Where("id = ? and owner = ? and stop_asked = ? and status in ?", id, owner, false, runGoing).
+func (s *agentStore) RenewRun(org, id int64, owner string, until time.Time) (bool, error) {
+	res := s.InOrg(org).Model(&AgentRun{}).Where("id = ? and owner = ? and stop_asked = ? and status in ?", id, owner, false, runGoing).
 		Update("lease_until", until.UnixMilli())
 	return res.RowsAffected > 0, res.Error
 }
 
 // HoldRun renews the lease as RenewRun does, and keeps the run's status and counts.
-func (s *Store) HoldRun(org int64, run AgentRun, status string, waitUntil *time.Time, until time.Time) (bool, error) {
-	res := s.in(org).Model(&AgentRun{}).Where("id = ? and owner = ? and stop_asked = ? and status in ?", run.ID, run.Owner, false, runGoing).
+func (s *agentStore) HoldRun(org int64, run AgentRun, status string, waitUntil *time.Time, until time.Time) (bool, error) {
+	res := s.InOrg(org).Model(&AgentRun{}).Where("id = ? and owner = ? and stop_asked = ? and status in ?", run.ID, run.Owner, false, runGoing).
 		Updates(map[string]any{"lease_until": until.UnixMilli(), "status": status, "wait_until": waitUntil,
 			"turns": run.Turns, "episodes": run.Episodes, "tool_calls": run.ToolCalls, "added": run.Added,
 			"tokens_in": run.TokensIn, "tokens_out": run.TokensOut, "request_id": run.RequestID})
 	return res.RowsAffected == 1, res.Error
 }
 
-func (s *Store) EndRun(org int64, run AgentRun, status, reason string, at time.Time) error {
-	return s.in(org).Model(&AgentRun{}).Where("id = ? and owner = ?", run.ID, run.Owner).
+func (s *agentStore) EndRun(org int64, run AgentRun, status, reason string, at time.Time) error {
+	return s.InOrg(org).Model(&AgentRun{}).Where("id = ? and owner = ?", run.ID, run.Owner).
 		Updates(map[string]any{"status": status, "stop_reason": reason, "ended_at": &at, "lease_until": 0, "wait_until": nil,
 			"turns": run.Turns, "episodes": run.Episodes, "tool_calls": run.ToolCalls, "added": run.Added,
 			"tokens_in": run.TokensIn, "tokens_out": run.TokensOut, "request_id": run.RequestID}).Error
 }
 
 // LapsedRuns are those, in every organisation, whose server stopped renewing them.
-func (s *Store) LapsedRuns(now time.Time) ([]AgentRun, error) {
+func (s *agentStore) LapsedRuns(now time.Time) ([]AgentRun, error) {
 	var lapsed []AgentRun
-	return lapsed, s.db.Where("status in ? and lease_until < ?", runGoing, now.UnixMilli()).Find(&lapsed).Error
+	return lapsed, s.DB.Where("status in ? and lease_until < ?", runGoing, now.UnixMilli()).Find(&lapsed).Error
 }
 
 // A lapsed run is ended or taken over only if its lease is still the one that lapsed,
 // so of two servers sweeping, one does it.
 
-func (s *Store) StopLapsedRun(org, id, lease int64, at time.Time) error {
-	return s.in(org).Model(&AgentRun{}).Where("id = ? and lease_until = ?", id, lease).
+func (s *agentStore) StopLapsedRun(org, id, lease int64, at time.Time) error {
+	return s.InOrg(org).Model(&AgentRun{}).Where("id = ? and lease_until = ?", id, lease).
 		Updates(map[string]any{"status": RunStopped, "stop_reason": "stopped by a person", "ended_at": &at, "lease_until": 0}).Error
 }
 
-func (s *Store) TakeOverRun(org, id, lease int64, owner string, until time.Time, resumes int) (bool, error) {
-	res := s.in(org).Model(&AgentRun{}).Where("id = ? and lease_until = ?", id, lease).
+func (s *agentStore) TakeOverRun(org, id, lease int64, owner string, until time.Time, resumes int) (bool, error) {
+	res := s.InOrg(org).Model(&AgentRun{}).Where("id = ? and lease_until = ?", id, lease).
 		Updates(map[string]any{"owner": owner, "lease_until": until.UnixMilli(), "resumes": resumes, "status": RunWorking})
 	return res.RowsAffected > 0, res.Error
 }
 
 // DropKeyClaims lets go of the requests a key holds on a task, under any session.
-func (s *Store) DropKeyClaims(org, task, key int64) error {
+func (s *agentStore) DropKeyClaims(org, task, key int64) error {
 	mine := fmt.Sprintf("key:%d", key)
-	return s.in(org).Where("task_id = ? and (holder = ? or holder like ?)", task, mine, mine+" %").Delete(&RequestClaim{}).Error
+	return s.InOrg(org).Where("task_id = ? and (holder = ? or holder like ?)", task, mine, mine+" %").Delete(&RequestClaim{}).Error
 }
 
-func (s *Store) KeyRevoked(org, id int64) (bool, error) {
+func (s *agentStore) KeyRevoked(org, id int64) (bool, error) {
 	var revoked int64
-	err := s.in(org).Model(&APIKey{}).Where("id = ? and revoked_at is not null", id).Count(&revoked).Error
+	err := s.InOrg(org).Model(&APIKey{}).Where("id = ? and revoked_at is not null", id).Count(&revoked).Error
 	return revoked > 0, err
 }
 
-func (s *Store) RequestDone(org, id int64) (bool, error) {
+func (s *agentStore) RequestDone(org, id int64) (bool, error) {
 	var r TaskRequest
-	err := s.in(org).Where("id = ?", id).Limit(1).Find(&r).Error
+	err := s.InOrg(org).Where("id = ?", id).Limit(1).Find(&r).Error
 	return r.DoneAt != nil, err
+}
+
+// AgentKey is the agent as an API key that no request can present: its hash is
+// nothing a secret could be looked up as. One revoked is replaced, so a deleted
+// agent's runs stop while a new one called the same starts clean.
+func (s *agentStore) AgentKey(org int64, c *Agent) (*APIKey, error) {
+	var k APIKey
+	if c.KeyID != 0 {
+		if err := s.InOrg(org).Where("id = ?", c.KeyID).Limit(1).Find(&k).Error; err != nil {
+			return nil, err
+		}
+		if k.ID != 0 && k.RevokedAt == nil {
+			return &k, nil
+		}
+	}
+	k = APIKey{OrgID: org, Name: builtinKeyName(c.Name), Prefix: builtinPrefix, Hash: "builtin:" + randomToken(24),
+		Scopes: "read research:write", CreatedBy: "prospector"}
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&k).Error; err != nil {
+			return err
+		}
+		res := tx.Model(&Agent{}).Where("org_id = ? and id = ?", org, c.ID).Update("key_id", k.ID)
+		if res.Error == nil && res.RowsAffected == 0 {
+			return fmt.Errorf("no agent %d in this organisation", c.ID)
+		}
+		return res.Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	c.KeyID = k.ID
+	return &k, nil
+}
+
+// AgentRuns are a task's runs, newest first: every one going, however old, so each
+// can be stopped, and the latest that ended, up to limit.
+// AgentRuns is a task's runs still going, then the latest limit that ended; every one
+// that ended when limit is 0.
+func (s *agentStore) AgentRuns(org, task int64, limit int) ([]AgentRun, error) {
+	going := []string{RunWorking, RunWaiting}
+	var out, ended []AgentRun
+	if err := s.DB.Where("org_id = ? and task_id = ? and status in ?", org, task, going).Order("id desc").Find(&out).Error; err != nil {
+		return nil, err
+	}
+	q := s.DB.Where("org_id = ? and task_id = ? and status not in ?", org, task, going).Order("id desc")
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	if err := q.Find(&ended).Error; err != nil {
+		return nil, err
+	}
+	return append(out, ended...), nil
 }

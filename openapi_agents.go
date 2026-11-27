@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // The Agents page's reads and the keys an owner makes for outside agents.
@@ -20,7 +21,7 @@ var keyless = map[string]bool{"CreateKey": true, "ChangeKey": true, "RevokeKey":
 func (s apiServer) GetConnect(ctx context.Context, _ api.GetConnectRequestObject) (api.GetConnectResponseObject, error) {
 	q := reqFrom(ctx)
 	base := s.a.baseURL(ctx.Value(requestKey{}).(*http.Request)) + q.Base()
-	out := api.GetConnect200JSONResponse{BaseUrl: base, McpUrl: base + "mcp", CanKeepKeys: s.a.s.keys != nil,
+	out := api.GetConnect200JSONResponse{BaseUrl: base, McpUrl: base + "mcp", CanKeepKeys: s.a.s.Keyring != nil,
 		Scopes: []api.Scope{}, Tools: []api.AgentToolScope{}, Kinds: []api.AgentKindLabel{}}
 	for _, sc := range Scopes {
 		out.Scopes = append(out.Scopes, api.Scope{Name: sc.Name, What: sc.What})
@@ -124,7 +125,7 @@ func (s apiServer) ListAgentWork(ctx context.Context, in api.ListAgentWorkReques
 	if err != nil {
 		return nil, err
 	}
-	at, err := page.at(1)
+	at, err := page.At(1)
 	if err != nil {
 		return nil, err
 	}
@@ -132,10 +133,10 @@ func (s apiServer) ListAgentWork(ctx context.Context, in api.ListAgentWorkReques
 	if at[0] > 0 {
 		before = time.Unix(0, at[0])
 	}
-	runs, titles, older := s.a.s.Runs(reqFrom(ctx).Org.ID, before, page.size())
+	runs, titles, older := s.a.s.Runs(reqFrom(ctx).Org.ID, before, page.Size())
 	var next string
 	if !older.IsZero() {
-		next = cursorOf(older.UnixNano())
+		next = paging.Cursor(older.UnixNano())
 	}
 	now := time.Now()
 	out := api.ListAgentWork200JSONResponse{Headers: api.ListAgentWork200ResponseHeaders{Link: nextLink(ctx, next)}}
@@ -156,14 +157,14 @@ func (s apiServer) ListAgentActivity(ctx context.Context, in api.ListAgentActivi
 	if err != nil {
 		return nil, err
 	}
-	at, err := page.at(1)
+	at, err := page.At(2)
 	if err != nil {
 		return nil, err
 	}
-	events, total := s.a.s.AgentEvents(reqFrom(ctx).Org.ID, int(at[0]), page.size())
+	events, nextAt, nextID, total := s.a.s.AgentEventsBefore(reqFrom(ctx).Org.ID, at[0], at[1], page.Size())
 	var next string
-	if end := int(at[0]) + len(events); end < total {
-		next = cursorOf(int64(end))
+	if nextAt > 0 {
+		next = paging.Cursor(nextAt, nextID)
 	}
 	out := api.ListAgentActivity200JSONResponse{Headers: api.ListAgentActivity200ResponseHeaders{Link: nextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor, out.Body.Total = []api.AgentEvent{}, next, total

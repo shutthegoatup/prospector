@@ -18,50 +18,16 @@ import (
 	"sync"
 	"time"
 
-	"gorm.io/gorm"
-
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/shutthegoatup/prospector/internal/cleantext"
 )
 
-// AgentRun is one go of Prospector's own agent at a task. It keeps counts, never what
-// was said: the task and what its events point at are the record, as for any agent.
-type AgentRun struct {
-	ID        int64  `gorm:"primaryKey"`
-	OrgID     int64  `gorm:"index;not null"`
-	TaskID    int64  `gorm:"index;not null"`
-	AgentID   int64  `gorm:"index;not null;default:0"`
-	AgentName string `gorm:"not null;default:''"`
-	RequestID int64  `gorm:"not null;default:0"`
-	StartedBy string `gorm:"not null"`
-	Model     string `gorm:"not null"`
-	Status    string `gorm:"index;not null"`
-	StopAsked bool   `gorm:"not null;default:false"`
-	// Owner is the server process driving the run; LeaseUntil (Unix ms) is how long it
-	// may before another takes over, which is how a run outlives a restart.
-	Owner      string `gorm:"not null;default:''"`
-	LeaseUntil int64  `gorm:"not null;default:0"`
-	StartedAt  time.Time
-	EndedAt    *time.Time
-	WaitUntil  *time.Time
-	Turns      int    `gorm:"not null;default:0"`
-	Episodes   int    `gorm:"not null;default:0"`
-	ToolCalls  int    `gorm:"not null;default:0"`
-	Added      int    `gorm:"not null;default:0"`
-	Resumes    int    `gorm:"not null;default:0"`
-	TokensIn   int64  `gorm:"not null;default:0"`
-	TokensOut  int64  `gorm:"not null;default:0"`
-	StopReason string `gorm:"not null;default:''"`
-}
-
 const (
-	RunWorking  = "running"
-	RunWaiting  = "waiting"
 	RunFinished = "finished"
 	RunStopped  = "stopped"
 	RunFailed   = "failed"
 )
-
-func (r AgentRun) Going() bool { return r.Status == RunWorking || r.Status == RunWaiting }
 
 var (
 	runLease = 3 * time.Minute
@@ -123,58 +89,6 @@ func runCap(setting string) int {
 // builtinKeyName is an agent's name as its key carries it into the record, marked so
 // it isn't taken for a key someone made for an agent of their own.
 func builtinKeyName(agent string) string { return agent + " (built in)" }
-
-// AgentKey is the agent as an API key that no request can present: its hash is
-// nothing a secret could be looked up as. One revoked is replaced, so a deleted
-// agent's runs stop while a new one called the same starts clean.
-func (s *Store) AgentKey(org int64, c *Agent) (*APIKey, error) {
-	var k APIKey
-	if c.KeyID != 0 {
-		if err := s.in(org).Where("id = ?", c.KeyID).Limit(1).Find(&k).Error; err != nil {
-			return nil, err
-		}
-		if k.ID != 0 && k.RevokedAt == nil {
-			return &k, nil
-		}
-	}
-	k = APIKey{OrgID: org, Name: builtinKeyName(c.Name), Prefix: builtinPrefix, Hash: "builtin:" + randomToken(24),
-		Scopes: "read research:write", CreatedBy: "prospector"}
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&k).Error; err != nil {
-			return err
-		}
-		res := tx.Model(&Agent{}).Where("org_id = ? and id = ?", org, c.ID).Update("key_id", k.ID)
-		if res.Error == nil && res.RowsAffected == 0 {
-			return fmt.Errorf("no agent %d in this organisation", c.ID)
-		}
-		return res.Error
-	})
-	if err != nil {
-		return nil, err
-	}
-	c.KeyID = k.ID
-	return &k, nil
-}
-
-// AgentRuns are a task's runs, newest first: every one going, however old, so each
-// can be stopped, and the latest that ended, up to limit.
-// AgentRuns is a task's runs still going, then the latest limit that ended; every one
-// that ended when limit is 0.
-func (s *Store) AgentRuns(org, task int64, limit int) ([]AgentRun, error) {
-	going := []string{RunWorking, RunWaiting}
-	var out, ended []AgentRun
-	if err := s.db.Where("org_id = ? and task_id = ? and status in ?", org, task, going).Order("id desc").Find(&out).Error; err != nil {
-		return nil, err
-	}
-	q := s.db.Where("org_id = ? and task_id = ? and status not in ?", org, task, going).Order("id desc")
-	if limit > 0 {
-		q = q.Limit(limit)
-	}
-	if err := q.Find(&ended).Error; err != nil {
-		return nil, err
-	}
-	return append(out, ended...), nil
-}
 
 // StartRun sets the organisation's agent going on a task.
 func (a *App) StartRun(org, task, agent int64, by string) (*AgentRun, error) {
@@ -340,7 +254,7 @@ func (a *App) drive(ctx context.Context, run *AgentRun) (string, string) {
 	if err != nil || !cfg.Ready() {
 		return RunFailed, "the agent is no longer set up: see the Agents page"
 	}
-	key, err := a.s.keys.open(cfg.APIKey)
+	key, err := a.s.Keyring.Open(cfg.APIKey)
 	if err != nil {
 		return RunFailed, "the endpoint's key can't be read: an owner enters it again on the Agents page"
 	}
@@ -475,7 +389,7 @@ func (a *App) connectTools(ctx context.Context, run *AgentRun, own *mcp.ClientSe
 		var ext *mcp.ClientSession
 		var err error
 		if cfg.ToolsURL != "" && len(cfg.AllowedTools()) > 0 {
-			ext, err = a.toolSession(connecting, cfg.ToolsURL, cfg.toolsKey(key))
+			ext, err = a.toolSession(connecting, cfg.ToolsURL, cfg.ToolsKey(key))
 			if err != nil {
 				err = fmt.Errorf("couldn't connect to the tools: %w", err)
 			}
@@ -716,7 +630,7 @@ func (t *turnState) requestDone() bool {
 func (t *turnState) call(ctx context.Context, name, rawArgs string) (string, error) {
 	args := map[string]any{}
 	if strings.TrimSpace(rawArgs) != "" {
-		clean, _ := dropNULEscapes([]byte(rawArgs), true)
+		clean, _ := cleantext.DropNULEscapes([]byte(rawArgs), true)
 		if err := json.Unmarshal(clean, &args); err != nil {
 			return "", fmt.Errorf("the arguments for %s weren't a JSON object", name)
 		}

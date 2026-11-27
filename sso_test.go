@@ -280,7 +280,7 @@ func mustUser(t *testing.T, s *Store, o *Org, email, name, role string) *User {
 func identities(t *testing.T, s *Store) int64 {
 	t.Helper()
 	var n int64
-	if err := s.db.Model(&Identity{}).Count(&n).Error; err != nil {
+	if err := s.DB.Model(&Identity{}).Count(&n).Error; err != nil {
 		t.Fatal(err)
 	}
 	return n
@@ -570,7 +570,7 @@ func TestOrganisationSingleSignOn(t *testing.T) {
 	}
 
 	// A linked subject whose account has since moved off the organisation's domains isn't its to vouch for.
-	if err := s.db.Model(&User{}).Where("id = ?", bob.ID).Update("email", "bob@elsewhere.example").Error; err != nil {
+	if err := s.DB.Model(&User{}).Where("id = ?", bob.ID).Update("email", "bob@elsewhere.example").Error; err != nil {
 		t.Fatal(err)
 	}
 	if code, body, _ := newBrowser(t, srv.URL).through(okta, start); code != http.StatusForbidden || !strings.Contains(body, "isn't at this organisation") {
@@ -659,7 +659,7 @@ func TestRequiredSingleSignOn(t *testing.T) {
 		t.Fatalf("a password after `sso off`: %d", code)
 	}
 	sso, _ := s.SSO(alpha.ID)
-	if spec, err := s.keys.idpSpec(sso); err != nil || !sso.On() || spec.Secret != "secret" {
+	if spec, err := s.Keyring.IdpSpec(sso); err != nil || !sso.On() || spec.Secret != "secret" {
 		t.Fatal("`sso off` lost the connection itself")
 	}
 }
@@ -828,7 +828,7 @@ func TestSingleSignOnSettings(t *testing.T) {
 		t.Fatalf("saving without the secret: %d %s", code, body)
 	}
 	sso, _ = s.SSO(alpha.ID)
-	if spec, err := s.keys.idpSpec(sso); err != nil || spec.Secret != "s3cret-value" || sso.Required {
+	if spec, err := s.Keyring.IdpSpec(sso); err != nil || spec.Secret != "s3cret-value" || sso.Required {
 		t.Fatalf("after saving again: %+v %v", sso.SSOConnection, err)
 	}
 	// The database holds it sealed: a compact JWE naming the key's version and nothing else.
@@ -858,7 +858,7 @@ func TestSingleSignOnSettings(t *testing.T) {
 		t.Fatalf("Settings doesn't show the redirect URI to register, or that the secret is kept: %s", page)
 	}
 	var events []Event
-	s.in(alpha.ID).Where("action = ?", "sso:change").Find(&events)
+	s.InOrg(alpha.ID).Where("action = ?", "sso:change").Find(&events)
 	if len(events) != 2 || events[0].User != "Ada Lovelace" {
 		t.Fatalf("changes to the connection in the history: %+v", events)
 	}
@@ -948,15 +948,15 @@ func TestGoogleWorkspaceMustHoldTheAddress(t *testing.T) {
 func TestSingleSignOnIsAskedAgainAfterADay(t *testing.T) {
 	t.Parallel()
 	sess := &Session{Limited: true}
-	sess.prove(3, time.Now().Add(-proofLife-time.Minute))
-	sess.prove(7, time.Now().Add(-time.Hour))
+	sess.Prove(3, time.Now().Add(-proofLife-time.Minute))
+	sess.Prove(7, time.Now().Add(-time.Hour))
 	if sess.Proves(3) || sess.Opens(3) {
 		t.Fatal("going through the provider more than a day ago still counts")
 	}
 	if !sess.Proves(7) || !sess.Opens(7) {
 		t.Fatal("going through the provider an hour ago doesn't count")
 	}
-	sess.prove(3, time.Now())
+	sess.Prove(3, time.Now())
 	if !sess.Proves(3) || !sess.Proves(7) {
 		t.Fatalf("going through it again: %q", sess.SSOOrgs)
 	}
@@ -965,7 +965,7 @@ func TestSingleSignOnIsAskedAgainAfterADay(t *testing.T) {
 func TestAnAccountWithNoPasswordIsRefusedAsSlowlyAsAnyOther(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
-	if err := s.db.Create(&User{Email: "dan@example.com", Name: "Dan Okafor", PasswordHash: unusableHash()}).Error; err != nil {
+	if err := s.DB.Create(&User{Email: "dan@example.com", Name: "Dan Okafor", PasswordHash: unusableHash()}).Error; err != nil {
 		t.Fatal(err)
 	}
 	timed := func(email string) time.Duration {
@@ -975,8 +975,14 @@ func TestAnAccountWithNoPasswordIsRefusedAsSlowlyAsAnyOther(t *testing.T) {
 		}
 		return time.Since(start)
 	}
-	// Otherwise the time taken says which addresses sign in through a provider.
-	if unknown, none := timed("nobody@example.com"), timed("dan@example.com"); none < unknown/4 {
+	// Otherwise the time taken says which addresses sign in through a provider. The
+	// fastest of several tries each, taken in turn, so a pause on a busy machine during
+	// one of them isn't taken for a difference.
+	unknown, none := time.Hour, time.Hour
+	for range 7 {
+		unknown, none = min(unknown, timed("nobody@example.com")), min(none, timed("dan@example.com"))
+	}
+	if none < unknown/4 {
 		t.Fatalf("an account with no password was refused in %v, an unknown address in %v", none, unknown)
 	}
 }

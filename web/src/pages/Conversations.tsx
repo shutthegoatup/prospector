@@ -46,10 +46,13 @@ function money(amount: number, currency: string) {
 function worth(cards: Card[]) {
   const sums = new Map<string, number>();
   for (const c of cards) if (c.amount !== 0) sums.set(c.currency, (sums.get(c.currency) ?? 0) + c.amount);
-  return [...sums]
-    .map(([currency, sum]) => money(sum, currency))
-    .sort()
-    .join(" + ");
+  return (
+    [...sums]
+      .map(([currency, sum]) => money(sum, currency))
+      // oxlint-disable-next-line unicorn/no-array-sort -- the array map just made, which nothing else holds; toSorted needs ES2023
+      .sort()
+      .join(" + ")
+  );
 }
 
 function kindLabel(kind: string) {

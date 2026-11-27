@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // Every list in the spec comes a page at a time, the same way: a list operation added
@@ -82,10 +83,10 @@ func TestAListLeftWholeComesOutAPageAtATime(t *testing.T) {
 	if page, next, err := listPage(all, 0, ""); err != nil || len(page) != 5 || next != "" {
 		t.Fatalf("a list that fits the usual page: %v %q %v", page, next, err)
 	}
-	if _, _, err := listPage(all, 2, "nonsense"); err != errCursor {
+	if _, _, err := listPage(all, 2, "nonsense"); err != paging.ErrCursor {
 		t.Fatalf("a made-up cursor: %v", err)
 	}
-	if page, next, _ := listPage(all, 2, cursorOf(99)); len(page) != 0 || next != "" {
+	if page, next, _ := listPage(all, 2, paging.Cursor(99)); len(page) != 0 || next != "" {
 		t.Fatalf("a cursor past the end: %v %q", page, next)
 	}
 }
@@ -102,10 +103,10 @@ func TestTheAPIsListsWalkToTheirEnd(t *testing.T) {
 	}
 	task := must(s.CreateTask(o.ID, "", "Find makers of garden rooms", "Nia"))
 	for i := range 5 {
-		if err := s.db.Create(&Agent{OrgID: o.ID, Name: fmt.Sprint("Agent ", i), Kind: kindOpenAI, Models: "[]", Tools: "[]", Allowed: "[]"}).Error; err != nil {
+		if err := s.DB.Create(&Agent{OrgID: o.ID, Name: fmt.Sprint("Agent ", i), Kind: kindOpenAI, Models: "[]", Tools: "[]", Allowed: "[]"}).Error; err != nil {
 			t.Fatal(err)
 		}
-		if err := s.db.Create(&AgentRun{OrgID: o.ID, TaskID: task.ID, Status: "done", StartedBy: "Nia"}).Error; err != nil {
+		if err := s.DB.Create(&AgentRun{OrgID: o.ID, TaskID: task.ID, Status: "done", StartedBy: "Nia"}).Error; err != nil {
 			t.Fatal(err)
 		}
 		must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: fmt.Sprint("Sender ", i), Email: fmt.Sprintf("sender%d@larkmoor.example", i), Message: "Could you show us?"}))

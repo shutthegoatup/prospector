@@ -8,8 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
+	"github.com/shutthegoatup/prospector/internal/mailer"
 )
 
 const (
@@ -20,120 +19,10 @@ const (
 	resetGap = 5 * time.Minute
 )
 
-// PasswordToken lets whoever holds its link choose the account's password, once.
-type PasswordToken struct {
-	ID        int64  `gorm:"primaryKey"`
-	TokenHash string `gorm:"uniqueIndex;not null"`
-	UserID    int64  `gorm:"index;not null"`
-	Invite    bool   `gorm:"not null;default:false"`
-	ExpiresAt time.Time
-	CreatedAt time.Time
-}
-
-// OrgMail is an organisation's own mail server. Password is sealed, never plain.
-type OrgMail struct {
-	OrgID     int64 `gorm:"primaryKey;autoIncrement:false"`
-	Host      string
-	Port      int
-	Username  string
-	Password  string
-	Sender    string
-	UpdatedAt time.Time
-}
-
 var (
 	errTooSoon = errors.New("a reset link was sent to this account a moment ago")
 	errBadLink = errors.New("this link has expired or has been used: ask for a new one")
 )
-
-func (s *Store) newPasswordToken(user int64, invite bool) (string, error) {
-	life := resetLife
-	if invite {
-		life = inviteLife
-	}
-	token := randomToken(32)
-	return token, s.db.Create(&PasswordToken{TokenHash: hashToken(token), UserID: user, Invite: invite, ExpiresAt: time.Now().Add(life)}).Error
-}
-
-// ResetToken refuses a second one inside resetGap. It counts from the table, so a
-// restart doesn't reset the wait.
-func (s *Store) ResetToken(user int64) (string, error) {
-	var recent int64
-	if err := s.db.Model(&PasswordToken{}).Where("user_id = ? and invite = ? and created_at > ?", user, false, time.Now().Add(-resetGap)).Count(&recent).Error; err != nil {
-		return "", err
-	}
-	if recent > 0 {
-		return "", errTooSoon
-	}
-	_ = logged(s.db.Where("expires_at < ?", time.Now()).Delete(&PasswordToken{}))
-	return s.newPasswordToken(user, false)
-}
-
-// InviteToken replaces any earlier invitation, and refuses a second inside resetGap, so
-// adding someone over and over can't fill their inbox.
-func (s *Store) InviteToken(user int64) (string, error) {
-	var recent int64
-	if err := s.db.Model(&PasswordToken{}).Where("user_id = ? and invite = ? and created_at > ?", user, true, time.Now().Add(-resetGap)).Count(&recent).Error; err != nil {
-		return "", err
-	}
-	if recent > 0 {
-		return "", errTooSoon
-	}
-	if err := s.DropInvites(user); err != nil {
-		return "", err
-	}
-	return s.newPasswordToken(user, true)
-}
-
-func (s *Store) DropInvites(user int64) error {
-	return s.db.Where("user_id = ? and invite = ?", user, true).Delete(&PasswordToken{}).Error
-}
-
-func (s *Store) PasswordTokenUser(token string) (*User, error) {
-	var t PasswordToken
-	if err := s.db.Where("token_hash = ? and expires_at > ?", hashToken(token), time.Now()).First(&t).Error; err != nil {
-		return nil, errBadLink
-	}
-	var u User
-	return &u, s.db.First(&u, t.UserID).Error
-}
-
-// RedeemPasswordToken sets the password and signs the account out everywhere. The
-// token is spent first, inside the transaction, so two requests can't both use it.
-func (s *Store) RedeemPasswordToken(token, password string) error {
-	u, err := s.PasswordTokenUser(token)
-	if err != nil {
-		return err
-	}
-	if len(password) < 10 {
-		return errors.New("passwords need at least 10 characters")
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), passwordCost)
-	if err != nil {
-		return err
-	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		spent := tx.Where("token_hash = ? and expires_at > ?", hashToken(token), time.Now()).Delete(&PasswordToken{})
-		if spent.Error != nil {
-			return spent.Error
-		}
-		if spent.RowsAffected != 1 {
-			return errBadLink
-		}
-		return s.savePasswordIn(tx, u.ID, string(hash), "")
-	})
-}
-
-func (s *Store) OrgMail(org int64) (*OrgMail, error) {
-	var m OrgMail
-	return &m, s.db.First(&m, "org_id = ?", org).Error
-}
-
-func (s *Store) SaveOrgMail(m *OrgMail) error { return s.db.Save(m).Error }
-
-func (s *Store) DeleteOrgMail(org int64) error {
-	return s.db.Delete(&OrgMail{}, "org_id = ?", org).Error
-}
 
 // mailSlots bounds the sends running at once; a request past that is dropped rather
 // than queued, so a flood of them can't pile up.
@@ -161,22 +50,22 @@ func (a *App) background(f func()) {
 // PROSPECTOR_URL, because a link is never built from what a request claims its host is.
 func (a *App) mailOn() bool { return a.mail != nil && a.base != "" }
 
-func (a *App) deliver(ctx context.Context, via MailServer, m Message) error {
+func (a *App) deliver(ctx context.Context, via mailer.Server, m mailer.Message) error {
 	if a.send != nil {
 		return a.send(ctx, via, m)
 	}
-	return smtpSend(ctx, via, m)
+	return mailer.Send(ctx, via, m)
 }
 
 // mailFor is the organisation's own server when it has one, else the app's, else nil.
-func (a *App) mailFor(org int64) (*MailServer, error) {
+func (a *App) mailFor(org int64) (*mailer.Server, error) {
 	m, err := a.s.OrgMail(org)
 	if err != nil {
 		return a.mail, nil
 	}
-	via := &MailServer{Host: m.Host, Port: m.Port, Username: m.Username, From: m.Sender}
+	via := &mailer.Server{Host: m.Host, Port: m.Port, Username: m.Username, From: m.Sender}
 	if m.Password != "" {
-		if via.Password, err = a.s.keys.open(m.Password); err != nil {
+		if via.Password, err = a.s.Keyring.Open(m.Password); err != nil {
 			return nil, fmt.Errorf("this organisation's mail password can't be read: %w", err)
 		}
 	}
@@ -195,7 +84,7 @@ func (a *App) sendReset(email string) {
 		}
 		return
 	}
-	err = a.deliver(context.Background(), *a.mail, Message{To: u.Email, Subject: "Reset your Prospector password",
+	err = a.deliver(context.Background(), *a.mail, mailer.Message{To: u.Email, Subject: "Reset your Prospector password",
 		Body: "Someone asked to reset the password for this address at " + a.base + ".\n\n" +
 			"Choose a new one here, within the hour:\n" + a.base + "/reset/" + token + "\n\n" +
 			"If that wasn't you, ignore this email: your password stays as it is.\n"})
@@ -225,7 +114,7 @@ func (a *App) invite(ctx context.Context, q *Req, u *User, created bool) (bool, 
 	if err != nil {
 		return false, err
 	}
-	err = a.deliver(ctx, *via, Message{To: u.Email, Subject: q.Actor() + " added you to " + q.Org.Name + " on Prospector",
+	err = a.deliver(ctx, *via, mailer.Message{To: u.Email, Subject: q.Actor() + " added you to " + q.Org.Name + " on Prospector",
 		Body: q.Actor() + " added you to " + q.Org.Name + " on Prospector, at " + a.base + ".\n\n" +
 			"Choose your password here, within 7 days:\n" + a.base + "/reset/" + token + "\n\n" +
 			"Then sign in with " + u.Email + ".\n"})
@@ -270,9 +159,9 @@ func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 		return true, a.s.DeleteOrgMail(org)
 	}
 	m := &OrgMail{OrgID: org, Host: in.Host, Port: in.Port, Username: strings.TrimSpace(in.Username), Sender: strings.TrimSpace(in.Sender)}
-	err = (MailServer{Host: m.Host, Port: m.Port, From: m.Sender}).check()
+	err = (mailer.Server{Host: m.Host, Port: m.Port, From: m.Sender}).Check()
 	// Only the operator may name this machine, where any port and no TLS are allowed.
-	if err == nil && loopback(m.Host) {
+	if err == nil && mailer.Loopback(m.Host) {
 		err = errors.New("an organisation's mail server can't be this machine")
 	}
 	if err != nil {
@@ -282,10 +171,10 @@ func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 	if old, err := a.s.OrgMail(org); err == nil && in.Password == "" && old.Host == m.Host && old.Username == m.Username {
 		m.Password = old.Password
 	} else if in.Password != "" {
-		if a.s.keys == nil {
+		if a.s.Keyring == nil {
 			return false, errors.New("this server has no secret key, so it can't keep a mail password safely: ask whoever runs it")
 		}
-		if m.Password, err = a.s.keys.seal(in.Password); err != nil {
+		if m.Password, err = a.s.Keyring.Seal(in.Password); err != nil {
 			return false, err
 		}
 	}
@@ -300,7 +189,7 @@ func (a *App) testMail(ctx context.Context, q *Req) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	err = a.deliver(ctx, *via, Message{To: q.User.Email, Subject: "Prospector can send mail for " + q.Org.Name,
+	err = a.deliver(ctx, *via, mailer.Message{To: q.User.Email, Subject: "Prospector can send mail for " + q.Org.Name,
 		Body: "This is the test " + q.Actor() + " asked for in Settings.\n\nIt was sent through " + via.Host + " as " + via.From + ".\n"})
 	if err != nil {
 		return "", notSent{err}

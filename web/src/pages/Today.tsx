@@ -39,8 +39,9 @@ const pageSize = 60;
 const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+const two = (n: number) => String(n).padStart(2, "0");
+
 function clock(d: Date) {
-  const two = (n: number) => String(n).padStart(2, "0");
   return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} · ${two(d.getHours())}:${two(d.getMinutes())}`;
 }
 
@@ -120,8 +121,8 @@ export function TodayPage() {
   const todo: Todo[] = [];
   const add = (label: string, count: number, link: LinkTo) => count > 0 && todo.push({ label, count, link });
   const step =
-    (step: Step): LinkTo =>
-    (p) => <Link to="/o/$org/today" params={{ org }} search={{ step }} {...p} />;
+    (which: Step): LinkTo =>
+    (p) => <Link to="/o/$org/today" params={{ org }} search={{ step: which }} {...p} />;
   const page =
     (to: "/o/$org/conversations" | "/o/$org/subscriptions" | "/o/$org/onboarding" | "/o/$org/research"): LinkTo =>
     (p) => <Link to={to} params={{ org }} {...p} />;

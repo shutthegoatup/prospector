@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
@@ -29,7 +31,7 @@ func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
 	if got.Claimed != 0 || got.Requests[0].HeldBy != "agent:scout" || got.Requests[0].Yours || got.Requests[0].Until == nil {
 		t.Fatalf("the second agent should see the brief is the first's: %+v", got)
 	}
-	if list := must(firstOf(s.AgentTasks(o.ID, second, PageIn{}))); list[0].Status != TaskWorking || list[0].Open[0].HeldBy != "agent:scout" {
+	if list := must(firstOf(s.AgentTasks(o.ID, second, paging.Page{}))); list[0].Status != TaskWorking || list[0].Open[0].HeldBy != "agent:scout" {
 		t.Fatalf("list_tasks should say who holds the brief: %+v", list[0])
 	}
 
@@ -63,7 +65,7 @@ func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
 		t.Fatalf("a read-only key was kept a request: %+v", got.Requests[2])
 	}
 	var claims []RequestClaim
-	s.db.Where("org_id = ?", o.ID).Order("request_id").Find(&claims)
+	s.DB.Where("org_id = ?", o.ID).Order("request_id").Find(&claims)
 	if len(claims) != 1 || claims[0].RequestID != brief {
 		t.Fatalf("finishing a request should end its claim, and reading take none: %+v", claims)
 	}
@@ -80,13 +82,13 @@ func TestAClaimLapsesUnlessTheHolderKeepsAdding(t *testing.T) {
 
 	expires := func() time.Time {
 		var c RequestClaim
-		if err := s.db.First(&c, "request_id = ?", brief).Error; err != nil {
+		if err := s.DB.First(&c, "request_id = ?", brief).Error; err != nil {
 			t.Fatal(err)
 		}
 		return time.UnixMilli(c.ExpiresAt)
 	}
 	// Ten minutes in, the holder adds a company for the task, which keeps the claim.
-	if err := s.db.Model(&RequestClaim{}).Where("request_id = ?", brief).Update("expires_at", time.Now().Add(5*time.Minute).UnixMilli()).Error; err != nil {
+	if err := s.DB.Model(&RequestClaim{}).Where("request_id = ?", brief).Update("expires_at", time.Now().Add(5*time.Minute).UnixMilli()).Error; err != nil {
 		t.Fatal(err)
 	}
 	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Task: task.ID, Name: "Larkmoor Yachts"}))
@@ -146,7 +148,7 @@ func TestOnlyOneOfManyAgentsWinsARequest(t *testing.T) {
 		t.Fatalf("%d agents claimed the same request at once", winners)
 	}
 	var n int64
-	if s.db.Model(&RequestClaim{}).Count(&n); n != 1 {
+	if s.DB.Model(&RequestClaim{}).Count(&n); n != 1 {
 		t.Fatalf("%d claim rows", n)
 	}
 }
@@ -215,7 +217,7 @@ func TestAClaimIsntTakenOnAFinishedRequestOrShownOnAClosedTask(t *testing.T) {
 		t.Fatalf("a finished request was claimed: %d", got)
 	}
 	var n int64
-	if s.db.Model(&RequestClaim{}).Count(&n); n != 0 {
+	if s.DB.Model(&RequestClaim{}).Count(&n); n != 0 {
 		t.Fatalf("%d claims on a finished request", n)
 	}
 

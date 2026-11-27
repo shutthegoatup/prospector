@@ -69,7 +69,7 @@ func TestRepeatedAgentWorkAddsNothing(t *testing.T) {
 	}
 
 	var events []Event
-	s.in(o.ID).Order("id").Find(&events)
+	s.InOrg(o.ID).Order("id").Find(&events)
 	var did []string
 	for _, e := range events {
 		did = append(did, e.Action)
@@ -104,7 +104,7 @@ func TestASharedSiteNamesNoCompany(t *testing.T) {
 	if err != nil || second.Existed {
 		t.Fatalf("add company: %+v %v", second, err)
 	}
-	if err := s.in(o.ID).Model(&Company{}).Where("id = ?", second.ID).Update("domain", "brandtech.example").Error; err != nil {
+	if err := s.InOrg(o.ID).Model(&Company{}).Where("id = ?", second.ID).Update("domain", "brandtech.example").Error; err != nil {
 		t.Fatal(err)
 	}
 	if again := add("larkmoor yachts"); again.ID != first.ID {
@@ -162,7 +162,7 @@ func TestAgentsLeaveAPersonsWordsAlone(t *testing.T) {
 	}
 	note := func() string {
 		var row Contact
-		s.in(o.ID).First(&row, c.ID)
+		s.InOrg(o.ID).First(&row, c.ID)
 		return deref(row.Note)
 	}
 	draft := func(who Actor, kind, text string) error {

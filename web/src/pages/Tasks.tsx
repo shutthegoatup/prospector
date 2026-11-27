@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
@@ -9,6 +9,7 @@ import { Bar, Placeholders, placeholders, Text } from "@/components/app/skeleton
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { actor, ago, plural } from "@/lib/format";
+import { useKeyedState } from "@/lib/keyed";
 import { useOfferings } from "@/lib/offerings";
 import { useSession } from "@/session";
 
@@ -49,8 +50,8 @@ export function taskFound(companies: number, people: number) {
 export function TasksPage() {
   const { org, sales } = useSession();
   const { closed = false } = useSearch({ from: "/o/$org/tasks" });
-  const [cursor, setCursor] = useState<string | undefined>();
-  useEffect(() => setCursor(undefined), [closed]);
+  // Open and closed tasks are two lists, each with its own cursor.
+  const [cursor, setCursor] = useKeyedState<string | undefined>([closed], () => undefined);
   const tasks = $api.useQuery(
     "get",
     "/o/{org}/api/v1/tasks",

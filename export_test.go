@@ -31,15 +31,15 @@ func TestExportPerson(t *testing.T) {
 	do(s.Update(o.ID, hannah.ID, "call_notes", "prefers mornings, has a dog called Biscuit", "ada"))
 	do(s.AgentMark(o.ID, Actor{Name: "agent:scout"}, MarkIn{ContactID: hannah.ID, Step: "replied", Date: "2020-01-02", Note: "she wrote back from her own gmail"}))
 	do(s.Update(o.ID, hannah.ID, "stage", "meeting", "ada"))
-	do(s.db.Create(&Fact{OrgID: o.ID, CompanyID: *hannah.CompanyID, ContactID: &hannah.ID, Field: "role", Value: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}).Error)
-	do(s.db.Create(&[]Enquiry{
+	do(s.DB.Create(&Fact{OrgID: o.ID, CompanyID: *hannah.CompanyID, ContactID: &hannah.ID, Field: "role", Value: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}).Error)
+	do(s.DB.Create(&[]Enquiry{
 		{OrgID: o.ID, Name: "Hannah Pryce", Email: hannahEmail, Message: "Could you send pricing?", ContactID: &hannah.ID},
 		{OrgID: o.ID, Name: "H. Pryce", Email: hannahEmail, Message: "Following up on pricing"},
 		{OrgID: o.ID, Name: "Nia Okafor", Email: "nia.okafor@larkmoor.example", Message: "Please ring the front desk", ContactID: &colleague.ID},
 		{OrgID: other.ID, Name: "Hannah Pryce", Email: hannahEmail, Message: "A note to the other organisation"},
 	}).Error)
 	var placeholder Contact
-	do(s.in(o.ID).Where("key like 'org:%'").First(&placeholder).Error)
+	do(s.InOrg(o.ID).Where("key like 'org:%'").First(&placeholder).Error)
 	theirs := must(s.FindOne(other.ID, "Hannah"))
 
 	jar, _ := cookiejar.New(nil)
@@ -78,7 +78,7 @@ func TestExportPerson(t *testing.T) {
 		}
 	}
 	var early int64
-	s.in(o.ID).Model(&Event{}).Where("action = ?", "export").Count(&early)
+	s.InOrg(o.ID).Model(&Event{}).Where("action = ?", "export").Count(&early)
 	if early != 0 {
 		t.Fatalf("%d refused exports were written into the history", early)
 	}
@@ -127,7 +127,7 @@ func TestExportPerson(t *testing.T) {
 	}
 
 	var noted []Event
-	do(s.in(o.ID).Where("action = ?", "export").Find(&noted).Error)
+	do(s.InOrg(o.ID).Where("action = ?", "export").Find(&noted).Error)
 	if len(noted) != 1 || noted[0].ContactID != hannah.ID || noted[0].Value != nil || noted[0].User == "" {
 		t.Fatalf("the history should note one export of her, by name and with no details: %+v", noted)
 	}
@@ -136,7 +136,7 @@ func TestExportPerson(t *testing.T) {
 	}
 
 	row := Contact{OrgID: o.ID, Key: "pair", File: "test", Person: str("Jonas Weber, CMO; Ines Duarte, Head of Digital")}
-	do(s.db.Create(&row).Error)
+	do(s.DB.Create(&row).Error)
 	both := must(s.ExportPerson(o.ID, row.ID, "ada"))
 	if both.Note == "" {
 		t.Fatal("a row naming two people was exported as if it were one person's")

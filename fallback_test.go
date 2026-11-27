@@ -35,7 +35,7 @@ func TestAWaitingAgentHandsItsTaskToItsFallback(t *testing.T) {
 		t.Fatalf("a run facing an hour's wait should hand over at once: %+v, waited %v", run, r.sleeps)
 	}
 	var next AgentRun
-	if err := r.s.db.Where("task_id = ? and agent_id = ?", r.task.ID, claudeID).First(&next).Error; err != nil {
+	if err := r.s.DB.Where("task_id = ? and agent_id = ?", r.task.ID, claudeID).First(&next).Error; err != nil {
 		t.Fatalf("the fallback should have been started: %v", err)
 	}
 	if next = r.finished(t, next.ID); next.Status != RunFinished || next.StopReason != "the request is done" || next.StartedBy != "Prospector (fallback)" {

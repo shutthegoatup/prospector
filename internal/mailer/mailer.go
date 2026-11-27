@@ -1,8 +1,9 @@
-package main
+package mailer
 
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -18,9 +19,9 @@ import (
 	"time"
 )
 
-// MailServer is an SMTP submission service and the address mail leaves from. Every
+// Server is an SMTP submission service and the address mail leaves from. Every
 // provider worth using offers SMTP, so it is the one transport.
-type MailServer struct {
+type Server struct {
 	Host     string
 	Port     int
 	Username string
@@ -37,16 +38,16 @@ type Message struct {
 	Unsubscribe string
 }
 
-// sendFunc is how mail leaves; tests put a recorder in its place.
-type sendFunc func(ctx context.Context, via MailServer, m Message) error
+// SendFunc is how mail leaves; tests put a recorder in its place.
+type SendFunc func(ctx context.Context, via Server, m Message) error
 
-const sendLimit = 30 * time.Second
+const SendLimit = 30 * time.Second
 
 // mailPorts are the only ones a server anywhere but this machine may be reached on,
 // so a mail setting can't be pointed at some other service beside the app.
 var mailPorts = map[int]bool{25: true, 465: true, 587: true, 2525: true}
 
-func loopback(host string) bool {
+func Loopback(host string) bool {
 	if host == "localhost" {
 		return true
 	}
@@ -54,11 +55,11 @@ func loopback(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-func (m MailServer) check() error {
+func (m Server) Check() error {
 	if strings.TrimSpace(m.Host) == "" || strings.ContainsAny(m.Host, " /@\r\n") {
 		return fmt.Errorf("%q isn't a mail server's name", m.Host)
 	}
-	if m.Port < 1 || m.Port > 65535 || (!loopback(m.Host) && !mailPorts[m.Port]) {
+	if m.Port < 1 || m.Port > 65535 || (!Loopback(m.Host) && !mailPorts[m.Port]) {
 		return fmt.Errorf("mail servers listen on 587, 465, 2525 or 25, not %d", m.Port)
 	}
 	if strings.ContainsAny(m.From, "\r\n") {
@@ -70,8 +71,8 @@ func (m MailServer) check() error {
 	return nil
 }
 
-// mailFromEnv reads the app's own server: SMTP_ADDR with MAIL_FROM, or neither.
-func mailFromEnv(env func(string) string) (*MailServer, error) {
+// FromEnv reads the app's own server: SMTP_ADDR with MAIL_FROM, or neither.
+func FromEnv(env func(string) string) (*Server, error) {
 	addr, from := strings.TrimSpace(env("SMTP_ADDR")), strings.TrimSpace(env("MAIL_FROM"))
 	if addr == "" && from == "" {
 		return nil, nil
@@ -84,35 +85,35 @@ func mailFromEnv(env func(string) string) (*MailServer, error) {
 		return nil, fmt.Errorf("SMTP_ADDR should look like smtp.example.com:587, not %q", addr)
 	}
 	n, _ := strconv.Atoi(port)
-	m := &MailServer{Host: host, Port: n, Username: env("SMTP_USERNAME"), Password: env("SMTP_PASSWORD"), From: from}
-	return m, m.check()
+	m := &Server{Host: host, Port: n, Username: env("SMTP_USERNAME"), Password: env("SMTP_PASSWORD"), From: from}
+	return m, m.Check()
 }
 
 var (
-	// errUnsent is a failure before the message was handed over: it certainly didn't go,
+	// ErrUnsent is a failure before the message was handed over: it certainly didn't go,
 	// and can be tried again.
-	errUnsent = errors.New("not sent")
-	// errRefusedRecipient is the server refusing the one address: nothing went, and
+	ErrUnsent = errors.New("not sent")
+	// ErrRefusedRecipient is the server refusing the one address: nothing went, and
 	// trying again won't change that.
-	errRefusedRecipient = errors.New("the mail server refused the address")
+	ErrRefusedRecipient = errors.New("the mail server refused the address")
 )
 
-func unsent(err error) error { return fmt.Errorf("%w: %w", errUnsent, err) }
+func unsent(err error) error { return fmt.Errorf("%w: %w", ErrUnsent, err) }
 
-// smtpSend never sends a password or a message in the clear, except to this machine:
+// Send never sends a password or a message in the clear, except to this machine:
 // net/smtp's own SendMail only uses TLS when offered, and waits forever. A failure
-// before the message is handed over wraps errUnsent, or errRefusedRecipient; any other
+// before the message is handed over wraps ErrUnsent, or ErrRefusedRecipient; any other
 // leaves it unknown whether the mail went.
-func smtpSend(ctx context.Context, via MailServer, m Message) error {
-	if err := via.check(); err != nil {
+func Send(ctx context.Context, via Server, m Message) error {
+	if err := via.Check(); err != nil {
 		return unsent(err)
 	}
 	from, _ := mail.ParseAddress(via.From)
 	to, err := mail.ParseAddress(m.To)
 	if err != nil || strings.ContainsAny(m.To, "\r\n") {
-		return fmt.Errorf("%w: %q isn't an email address", errRefusedRecipient, m.To)
+		return fmt.Errorf("%w: %q isn't an email address", ErrRefusedRecipient, m.To)
 	}
-	ctx, cancel := context.WithTimeout(ctx, sendLimit)
+	ctx, cancel := context.WithTimeout(ctx, SendLimit)
 	defer cancel()
 	addr := net.JoinHostPort(via.Host, strconv.Itoa(via.Port))
 	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", addr)
@@ -123,12 +124,12 @@ func smtpSend(ctx context.Context, via MailServer, m Message) error {
 	deadline, _ := ctx.Deadline()
 	_ = conn.SetDeadline(deadline)
 	secure := &tls.Config{ServerName: via.Host, MinVersion: tls.VersionTLS12}
-	return submit(conn, via, from, to, m, secure, !loopback(via.Host))
+	return submit(conn, via, from, to, m, secure, !Loopback(via.Host))
 }
 
 // submit holds the conversation with a server already reached. Port 465 is TLS from
 // the first byte; any other port must offer STARTTLS when needTLS.
-func submit(conn net.Conn, via MailServer, from, to *mail.Address, m Message, secure *tls.Config, needTLS bool) error {
+func submit(conn net.Conn, via Server, from, to *mail.Address, m Message, secure *tls.Config, needTLS bool) error {
 	addr := net.JoinHostPort(via.Host, strconv.Itoa(via.Port))
 	if via.Port == 465 {
 		conn = tls.Client(conn, secure)
@@ -157,20 +158,21 @@ func submit(conn net.Conn, via MailServer, from, to *mail.Address, m Message, se
 		return unsent(fmt.Errorf("%s refused mail from %s: %w", addr, from.Address, err))
 	}
 	if err := c.Rcpt(to.Address); err != nil {
-		// A 4xx is "not now" (a rate limit, greylisting): it can be tried again. Only a
-		// 5xx is the address refused for good.
+		// Only a 5xx is the address refused for good. A 4xx is "not now" (a rate limit,
+		// greylisting), and a line that dropped or timed out said nothing of the address:
+		// either way nothing went, and it can be tried again.
 		var reply *textproto.Error
-		if errors.As(err, &reply) && reply.Code >= 400 && reply.Code < 500 {
-			return unsent(fmt.Errorf("%s put off mail to %s: %w", addr, to.Address, err))
+		if errors.As(err, &reply) && reply.Code >= 500 {
+			return fmt.Errorf("%w: %s refused mail to %s: %w", ErrRefusedRecipient, addr, to.Address, err)
 		}
-		return fmt.Errorf("%w: %s refused mail to %s: %w", errRefusedRecipient, addr, to.Address, err)
+		return unsent(fmt.Errorf("%s didn't take mail to %s: %w", addr, to.Address, err))
 	}
 	// Refused before any of the message is written, it didn't go.
 	w, err := c.Data()
 	if err != nil {
 		return unsent(err)
 	}
-	if _, err := w.Write(compose(from, to, m, time.Now())); err != nil {
+	if _, err := w.Write(Compose(from, to, m, time.Now())); err != nil {
 		return err
 	}
 	if err := w.Close(); err != nil {
@@ -182,7 +184,7 @@ func submit(conn net.Conn, via MailServer, from, to *mail.Address, m Message, se
 	return nil
 }
 
-func compose(from, to *mail.Address, m Message, now time.Time) []byte {
+func Compose(from, to *mail.Address, m Message, now time.Time) []byte {
 	var b bytes.Buffer
 	_, domain, _ := strings.Cut(from.Address, "@")
 	subject := strings.Join(strings.Fields(m.Subject), " ")
@@ -196,7 +198,7 @@ func compose(from, to *mail.Address, m Message, now time.Time) []byte {
 	if u, err := url.Parse(m.Unsubscribe); err == nil && u.Scheme == "https" && printableASCII(m.Unsubscribe) && !strings.ContainsAny(m.Unsubscribe, "<> ,") {
 		fmt.Fprintf(&b, "List-Unsubscribe: <%s>\r\nList-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n", m.Unsubscribe)
 	}
-	fmt.Fprintf(&b, "Date: %s\r\nMessage-ID: <%s@%s>\r\n", now.Format(time.RFC1123Z), randomToken(16), domain)
+	fmt.Fprintf(&b, "Date: %s\r\nMessage-ID: <%s@%s>\r\n", now.Format(time.RFC1123Z), rand.Text(), domain)
 	b.WriteString("MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n")
 	body := quotedprintable.NewWriter(&b)
 	body.Write([]byte(strings.ReplaceAll(strings.ReplaceAll(m.Body, "\r\n", "\n"), "\n", "\r\n")))

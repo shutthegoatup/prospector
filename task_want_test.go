@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // Find asks for about so many companies: the searches list shows how far it has got
@@ -44,7 +45,7 @@ func TestASearchAsksForAboutSoManyCompanies(t *testing.T) {
 		t.Errorf("the search should be 2 of about 3, 1 to review: %s", list)
 	}
 
-	brief := must(s.AgentTask(o.ID, scout, made.Id, PageIn{}))
+	brief := must(s.AgentTask(o.ID, scout, made.Id, paging.Page{}))
 	if brief.Want != 3 || brief.Review != 1 {
 		t.Errorf("an agent should be told the number and what waits: want %d, to review %d", brief.Want, brief.Review)
 	}
@@ -55,7 +56,7 @@ func TestASearchAsksForAboutSoManyCompanies(t *testing.T) {
 	if code != http.StatusCreated || json.Unmarshal([]byte(body), &plain) != nil || plain.Want != 0 {
 		t.Fatalf("a search with no number: %d %s", code, body)
 	}
-	if out, _ := json.Marshal(must(s.AgentTask(o.ID, scout, plain.Id, PageIn{})).TaskBrief); strings.Contains(string(out), `"want"`) {
+	if out, _ := json.Marshal(must(s.AgentTask(o.ID, scout, plain.Id, paging.Page{})).TaskBrief); strings.Contains(string(out), `"want"`) {
 		t.Errorf("an agent is given a number nobody asked for: %s", out)
 	}
 }

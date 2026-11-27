@@ -4,6 +4,7 @@ import type { components } from "@/api";
 import { $api, fetchClient } from "@/client";
 import { ActionButton, Eyebrow, Failed, Meta, PageHead, useRefresh, Whose } from "@/components/app";
 import { Bar, Loading, Placeholders, Text } from "@/components/app/skeleton";
+import { useKeyedState } from "@/lib/keyed";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/session";
 
@@ -40,15 +41,14 @@ export function PreparePage() {
   const change = $api.useMutation("patch", "/o/{org}/api/v1/agreements/{id}/recipients/{recipient}", { onSuccess: refresh });
   const remove = $api.useMutation("delete", "/o/{org}/api/v1/agreements/{id}/recipients/{recipient}", { onSuccess: refresh });
   const order = $api.useMutation("patch", "/o/{org}/api/v1/agreements/{id}", { onSuccess: refresh });
-  const [fields, setFields] = useState<Field[] | null>(null);
+  // The fields as edited, from what was last fetched: a fresh fetch starts them again.
+  const [fields, setFields] = useKeyedState<Field[] | null>([stored.data], () =>
+    stored.data ? stored.data.items.map(({ recipient_id, page, kind, x, y, w, h }) => ({ recipient_id, page, kind, x, y, w, h })) : null,
+  );
   const [picked, setPicked] = useState<number | null>(null);
   const [saved, setSaved] = useState("");
   const [saveError, setSaveError] = useState<{ detail?: string } | null>(null);
   const saving = useRef(Promise.resolve());
-
-  useEffect(() => {
-    if (stored.data) setFields(stored.data.items.map(({ recipient_id, page, kind, x, y, w, h }) => ({ recipient_id, page, kind, x, y, w, h })));
-  }, [stored.data]);
 
   const a = agreement.data;
   const all = recipients.data?.items ?? [];
@@ -412,6 +412,7 @@ function Pages({
     return () => {
       gone = true;
     };
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- hash is the document's: a new upload is drawn again, though only org and id are read
   }, [org, id, hash]);
 
   if (problem) return <Meta>{problem}</Meta>;
@@ -472,8 +473,8 @@ function Canvas({ sheet }: { sheet: Sheet }) {
 
 // FieldBox is one field over its page: dragged to move, by its corner to size, saved on release.
 function FieldBox({ f, signer, edit, onMove, onRemove }: { f: Field; signer?: Signer; edit: boolean; onMove: (f: Field) => void; onRemove: () => void }) {
-  const [live, setLive] = useState(f);
-  useEffect(() => setLive(f), [f]);
+  // Where it is while dragged, from where it was saved: the saved field coming back starts it again.
+  const [live, setLive] = useKeyedState([f], () => f);
   const colour = signer?.colour ?? "#b3a78e";
   const start = (e: ReactPointerEvent<HTMLElement>, sizing: boolean) => {
     if (!edit) return;

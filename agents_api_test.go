@@ -105,7 +105,7 @@ func TestWhatAgentsDidIsInTheAPI(t *testing.T) {
 	for i := range 24 {
 		events = append(events, Event{OrgID: o.ID, User: "agent:scout", Action: "add:fact", Value: new("employees: 40"), At: start.Add(time.Duration(i) * time.Second)})
 	}
-	if err := s.db.Create(&events).Error; err != nil {
+	if err := s.DB.Create(&events).Error; err != nil {
 		t.Fatal(err)
 	}
 	var seen []api.AgentEvent

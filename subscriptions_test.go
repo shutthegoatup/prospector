@@ -49,29 +49,29 @@ func TestWhereASubscriptionStands(t *testing.T) {
 		on   string
 		want Standing
 	}{
-		{"first term, too late to stop at its end", yearly, "2026-11-25", Standing{SubActive, "2027-01-11", "2027-11-13", "2028-01-11", ""}},
-		{"its last day", yearly, "2027-01-11", Standing{SubActive, "2027-01-11", "2027-11-13", "2028-01-11", ""}},
-		{"the last day to cancel", yearly, "2026-11-13", Standing{SubActive, "2027-01-11", "2026-11-13", "2027-01-11", ""}},
-		{"renewed once", yearly, "2027-01-12", Standing{SubActive, "2028-01-11", "2027-11-13", "2028-01-11", ""}},
-		{"renewed several times", yearly, "2030-06-01", Standing{SubActive, "2031-01-11", "2030-11-13", "2031-01-11", ""}},
-		{"not started", yearly, "2025-12-01", Standing{SubScheduled, "2027-01-11", "2026-11-13", "2027-01-11", ""}},
-		{"notice in time", withNotice("2026-11-13"), "2026-11-25", Standing{SubNotice, "2027-01-11", "", "", "2027-01-11"}},
-		{"notice in time, after its end", withNotice("2026-11-13"), "2027-01-12", Standing{SubEnded, "2028-01-11", "", "", "2027-01-11"}},
-		{"notice a day late runs another term", withNotice("2026-11-14"), "2026-11-25", Standing{SubNotice, "2027-01-11", "", "", "2028-01-11"}},
-		{"ended early, before the day", endedEarly, "2026-06-01", Standing{SubEnding, "2027-01-11", "", "", "2026-06-30"}},
-		{"ended early, on the day", endedEarly, "2026-06-30", Standing{SubEnding, "2027-01-11", "", "", "2026-06-30"}},
-		{"ended early, after", endedEarly, "2026-07-01", Standing{SubEnded, "2027-01-11", "", "", "2026-06-30"}},
-		{"monthly from the 31st, in February", monthly, "2026-02-10", Standing{SubActive, "2026-02-27", "2026-02-27", "2026-02-27", ""}},
-		{"monthly from the 31st, back on the 31st", monthly, "2026-03-31", Standing{SubActive, "2026-04-29", "2026-04-29", "2026-04-29", ""}},
-		{"notice longer than the term", longNotice, "2026-01-10", Standing{SubActive, "2026-01-31", "2026-01-31", "2026-04-30", ""}},
-		{"notice longer than the term, months on", longNotice, "2026-11-25", Standing{SubActive, "2026-11-30", "2026-12-01", "2027-02-28", ""}},
-		{"notice longer than the term, given", longNoticeGiven, "2026-01-10", Standing{SubNotice, "2026-01-31", "", "", "2026-04-30"}},
-		{"from 29 February", leap, "2027-06-01", Standing{SubActive, "2028-02-28", "2028-01-30", "2028-02-28", ""}},
-		{"from 29 February, in the next leap year", leap, "2028-02-29", Standing{SubActive, "2029-02-27", "2029-01-29", "2029-02-27", ""}},
-		{"a fixed term", fixed, "2026-06-01", Standing{SubActive, "2027-12-31", "", "", "2027-12-31"}},
-		{"a fixed term, over", fixed, "2028-01-01", Standing{SubEnded, "2027-12-31", "", "", "2027-12-31"}},
-		{"committed then rolling, in the commitment", rolling, "2026-03-01", Standing{SubActive, "2026-06-30", "2026-06-01", "2026-06-30", ""}},
-		{"committed then rolling, after it", rolling, "2026-07-15", Standing{SubActive, "2026-07-31", "2026-08-02", "2026-08-31", ""}},
+		{"first term, too late to stop at its end", yearly, "2026-11-25", Standing{Status: SubActive, TermEnd: "2027-01-11", CancelBy: "2027-11-13", Out: "2028-01-11", Ends: ""}},
+		{"its last day", yearly, "2027-01-11", Standing{Status: SubActive, TermEnd: "2027-01-11", CancelBy: "2027-11-13", Out: "2028-01-11", Ends: ""}},
+		{"the last day to cancel", yearly, "2026-11-13", Standing{Status: SubActive, TermEnd: "2027-01-11", CancelBy: "2026-11-13", Out: "2027-01-11", Ends: ""}},
+		{"renewed once", yearly, "2027-01-12", Standing{Status: SubActive, TermEnd: "2028-01-11", CancelBy: "2027-11-13", Out: "2028-01-11", Ends: ""}},
+		{"renewed several times", yearly, "2030-06-01", Standing{Status: SubActive, TermEnd: "2031-01-11", CancelBy: "2030-11-13", Out: "2031-01-11", Ends: ""}},
+		{"not started", yearly, "2025-12-01", Standing{Status: SubScheduled, TermEnd: "2027-01-11", CancelBy: "2026-11-13", Out: "2027-01-11", Ends: ""}},
+		{"notice in time", withNotice("2026-11-13"), "2026-11-25", Standing{Status: SubNotice, TermEnd: "2027-01-11", CancelBy: "", Out: "", Ends: "2027-01-11"}},
+		{"notice in time, after its end", withNotice("2026-11-13"), "2027-01-12", Standing{Status: SubEnded, TermEnd: "2028-01-11", CancelBy: "", Out: "", Ends: "2027-01-11"}},
+		{"notice a day late runs another term", withNotice("2026-11-14"), "2026-11-25", Standing{Status: SubNotice, TermEnd: "2027-01-11", CancelBy: "", Out: "", Ends: "2028-01-11"}},
+		{"ended early, before the day", endedEarly, "2026-06-01", Standing{Status: SubEnding, TermEnd: "2027-01-11", CancelBy: "", Out: "", Ends: "2026-06-30"}},
+		{"ended early, on the day", endedEarly, "2026-06-30", Standing{Status: SubEnding, TermEnd: "2027-01-11", CancelBy: "", Out: "", Ends: "2026-06-30"}},
+		{"ended early, after", endedEarly, "2026-07-01", Standing{Status: SubEnded, TermEnd: "2027-01-11", CancelBy: "", Out: "", Ends: "2026-06-30"}},
+		{"monthly from the 31st, in February", monthly, "2026-02-10", Standing{Status: SubActive, TermEnd: "2026-02-27", CancelBy: "2026-02-27", Out: "2026-02-27", Ends: ""}},
+		{"monthly from the 31st, back on the 31st", monthly, "2026-03-31", Standing{Status: SubActive, TermEnd: "2026-04-29", CancelBy: "2026-04-29", Out: "2026-04-29", Ends: ""}},
+		{"notice longer than the term", longNotice, "2026-01-10", Standing{Status: SubActive, TermEnd: "2026-01-31", CancelBy: "2026-01-31", Out: "2026-04-30", Ends: ""}},
+		{"notice longer than the term, months on", longNotice, "2026-11-25", Standing{Status: SubActive, TermEnd: "2026-11-30", CancelBy: "2026-12-01", Out: "2027-02-28", Ends: ""}},
+		{"notice longer than the term, given", longNoticeGiven, "2026-01-10", Standing{Status: SubNotice, TermEnd: "2026-01-31", CancelBy: "", Out: "", Ends: "2026-04-30"}},
+		{"from 29 February", leap, "2027-06-01", Standing{Status: SubActive, TermEnd: "2028-02-28", CancelBy: "2028-01-30", Out: "2028-02-28", Ends: ""}},
+		{"from 29 February, in the next leap year", leap, "2028-02-29", Standing{Status: SubActive, TermEnd: "2029-02-27", CancelBy: "2029-01-29", Out: "2029-02-27", Ends: ""}},
+		{"a fixed term", fixed, "2026-06-01", Standing{Status: SubActive, TermEnd: "2027-12-31", CancelBy: "", Out: "", Ends: "2027-12-31"}},
+		{"a fixed term, over", fixed, "2028-01-01", Standing{Status: SubEnded, TermEnd: "2027-12-31", CancelBy: "", Out: "", Ends: "2027-12-31"}},
+		{"committed then rolling, in the commitment", rolling, "2026-03-01", Standing{Status: SubActive, TermEnd: "2026-06-30", CancelBy: "2026-06-01", Out: "2026-06-30", Ends: ""}},
+		{"committed then rolling, after it", rolling, "2026-07-15", Standing{Status: SubActive, TermEnd: "2026-07-31", CancelBy: "2026-08-02", Out: "2026-08-31", Ends: ""}},
 		{"no start date", Subscription{}, "2026-01-01", Standing{Status: SubScheduled}},
 	} {
 		if got := c.sub.On(c.on); got != c.want {
@@ -157,7 +157,7 @@ func TestASubscriptionIsRecordedAgainstACompany(t *testing.T) {
 
 	// The history says what was agreed and when, never the name or the price.
 	var said []Event
-	if err := s.db.Where("org_id = ? and company_id = ? and action like ?", o.ID, company, "sub:%").Order("id").Find(&said).Error; err != nil {
+	if err := s.DB.Where("org_id = ? and company_id = ? and action like ?", o.ID, company, "sub:%").Order("id").Find(&said).Error; err != nil {
 		t.Fatal(err)
 	}
 	if len(said) != 6 || deref(said[0].Value) != "2026-01-12" || said[2].Value != nil || said[3].Value != nil || deref(said[5].Value) != "2026-11-25" || said[0].ContactID != 0 {
@@ -310,7 +310,7 @@ func TestTodayPointsAtSubscriptionsComingDue(t *testing.T) {
 		{Standing{Status: SubEnded, TermEnd: on(-5), Ends: on(-5)}, false},
 		{Standing{Status: SubScheduled, TermEnd: on(400), CancelBy: on(370), Out: on(400)}, false},
 	} {
-		if got := c.st.within(today()); got != c.want {
+		if got := c.st.Within(today()); got != c.want {
 			t.Errorf("%+v counts as soon: %v, want %v", c.st, got, c.want)
 		}
 	}
@@ -341,7 +341,7 @@ func TestTodayPointsAtSubscriptionsComingDue(t *testing.T) {
 		{Subscription{Start: "2026-01-01", Per: PerYear, TermMonths: 6, Then: ThenRolls}, "2026-07-01", 12},
 		{Subscription{Start: "2026-01-01", Per: PerMonth, TermMonths: 6, Then: ThenRenews}, "2027-03-01", 6},
 	} {
-		if got := c.sub.monthsNow(c.on); got != c.want {
+		if got := c.sub.MonthsNow(c.on); got != c.want {
 			t.Errorf("%+v on %s is in a term of %d months, want %d", c.sub, c.on, got, c.want)
 		}
 	}

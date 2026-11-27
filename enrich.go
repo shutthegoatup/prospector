@@ -10,33 +10,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
-
-// Enricher is a data vendor an organisation pays, under its own key, to find a detail
-// its people and agents couldn't. Vendors are asked in Position order, each no more
-// than MonthlyLimit times a calendar month.
-type Enricher struct {
-	ID    int64  `gorm:"primaryKey"`
-	OrgID int64  `gorm:"uniqueIndex:idx_enrichers_org_kind;not null"`
-	Kind  string `gorm:"uniqueIndex:idx_enrichers_org_kind;not null"`
-	// APIKey is sealed under the server's key, never kept or shown in clear.
-	APIKey       string `gorm:"not null;default:''"`
-	Position     int    `gorm:"not null;default:0"`
-	MonthlyLimit int    `gorm:"not null;default:0"`
-	UpdatedBy    string `gorm:"not null;default:''"`
-	UpdatedAt    time.Time
-}
-
-// EnrichUsage counts the lookups asked of one vendor in one month, so the limit holds
-// across servers and restarts.
-type EnrichUsage struct {
-	ID    int64  `gorm:"primaryKey"`
-	OrgID int64  `gorm:"uniqueIndex:idx_enrich_usage;not null"`
-	Kind  string `gorm:"uniqueIndex:idx_enrich_usage;not null"`
-	Month string `gorm:"uniqueIndex:idx_enrich_usage;not null"`
-	Calls int    `gorm:"not null;default:0"`
-}
 
 // enrichPerson is what a vendor is told about someone: no more than it needs to find them.
 type enrichPerson struct {
@@ -72,71 +46,11 @@ const (
 	maxMonthlyLimit = 100_000
 )
 
-func (s *Store) Enrichers(org int64) ([]Enricher, error) {
-	var out []Enricher
-	return out, s.db.Where("org_id = ?", org).Order("position, id").Find(&out).Error
-}
-
 type EnricherIn struct {
 	Kind         string
 	APIKey       string
 	Position     int
 	MonthlyLimit int
-}
-
-// SaveEnricher adds a vendor, or changes the one of that kind. An empty key keeps
-// the saved one.
-func (s *Store) SaveEnricher(org int64, in EnricherIn, by string) (*Enricher, error) {
-	kind := strings.ToLower(strings.TrimSpace(in.Kind))
-	if vendors[kind] == nil {
-		return nil, fmt.Errorf("unknown vendor %q: one of %s", in.Kind, strings.Join(vendorKinds(), ", "))
-	}
-	if in.MonthlyLimit < 0 || in.MonthlyLimit > maxMonthlyLimit {
-		return nil, fmt.Errorf("monthly_limit is from 0 to %d", maxMonthlyLimit)
-	}
-	var e Enricher
-	if err := s.db.Where("org_id = ? and kind = ?", org, kind).Limit(1).Find(&e).Error; err != nil {
-		return nil, err
-	}
-	key := strings.TrimSpace(in.APIKey)
-	if key == "" && e.APIKey == "" {
-		return nil, errors.New("api_key is needed: the vendor's key for your account")
-	}
-	if key != "" {
-		sealedKey, err := s.keys.seal(key)
-		if err != nil {
-			return nil, err
-		}
-		e.APIKey = sealedKey
-	}
-	e.OrgID, e.Kind, e.Position, e.MonthlyLimit, e.UpdatedBy, e.UpdatedAt = org, kind, in.Position, in.MonthlyLimit, by, time.Now()
-	return &e, s.db.Save(&e).Error
-}
-
-func (s *Store) DeleteEnricher(org, id int64) error {
-	res := s.db.Where("org_id = ? and id = ?", org, id).Delete(&Enricher{})
-	if res.Error == nil && res.RowsAffected == 0 {
-		return noSuch("no vendor %d in this organisation", id)
-	}
-	return res.Error
-}
-
-func (s *Store) EnricherUsed(org int64, kind string, now time.Time) int {
-	var u EnrichUsage
-	_ = logged(s.db.Where("org_id = ? and kind = ? and month = ?", org, kind, now.UTC().Format("2006-01")).Limit(1).Find(&u))
-	return u.Calls
-}
-
-// Spend takes one lookup of a vendor's month, unless its limit is reached. One
-// statement, so two lookups at once can't both take the last.
-func (s *Store) Spend(org int64, e Enricher, now time.Time) (bool, error) {
-	month := now.UTC().Format("2006-01")
-	if err := s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&EnrichUsage{OrgID: org, Kind: e.Kind, Month: month}).Error; err != nil {
-		return false, err
-	}
-	res := s.db.Model(&EnrichUsage{}).Where("org_id = ? and kind = ? and month = ? and calls < ?", org, e.Kind, month, e.MonthlyLimit).
-		Update("calls", gorm.Expr("calls + 1"))
-	return res.RowsAffected == 1, res.Error
 }
 
 // EnrichAsked is what came of asking for one field.
@@ -151,23 +65,6 @@ type EnrichIn struct {
 	ContactID int64    `json:"contact_id"`
 	Fields    []string `json:"fields" jsonschema:"which of email, phone and linkedin to look for"`
 	Task      int64    `json:"task,omitempty" jsonschema:"the id of the task this is for, if any"`
-}
-
-// unlookable says why nothing about someone may be sent to a vendor, or "" if it may:
-// they declined, or they or their company's domain is on the never-contact list.
-func (set OrgSettings) unlookable(c Contact, domain string) string {
-	if c.Declined != nil {
-		return "they declined: nothing about them is looked up"
-	}
-	if err := set.listed(deref(c.Email), deref(c.Linkedin)); err != nil {
-		return err.Error()
-	}
-	if domain != "" {
-		if err := set.listed("someone@"+domain, ""); err != nil {
-			return err.Error()
-		}
-	}
-	return ""
 }
 
 // Enrich asks the organisation's vendors, in its order, for the details someone lacks.
@@ -198,7 +95,7 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 		}
 	}
 	domain := strings.ToLower(strings.TrimSpace(co.Domain))
-	if why := o.Settings.unlookable(c, domain); why != "" {
+	if why := o.Settings.Unlookable(c, domain); why != "" {
 		return nil, conflict(why)
 	}
 	person := enrichPerson{Name: displayName(c), Domain: domain, Company: co.Name, Linkedin: deref(c.Linkedin)}
@@ -247,7 +144,7 @@ func (a *App) enrichField(ctx context.Context, o *Org, who Actor, c Contact, p e
 			continue
 		}
 		tried = true
-		key, err := s.keys.open(e.APIKey)
+		key, err := s.Keyring.Open(e.APIKey)
 		if err != nil {
 			asked = EnrichAsked{Field: field, Vendor: e.Kind, Outcome: "failed", Detail: err.Error()}
 			continue
@@ -311,40 +208,6 @@ func (a *App) keepFind(o *Org, who Actor, c Contact, field, kind, value, status 
 	return asked
 }
 
-// KeepFind suggests what a vendor found for a person, and reports whether it was new.
-func (s *Store) KeepFind(org int64, who Actor, contact int64, field, kind, value, status string) (made bool, err error) {
-	return made, s.db.Transaction(func(tx *gorm.DB) error {
-		if err := hold(tx, &Contact{}, org, contact); err != nil {
-			return err
-		}
-		var c Contact
-		if err := tx.Where("org_id = ? and id = ?", org, contact).First(&c).Error; err != nil {
-			return missing(err, "no contact %d in this organisation", contact)
-		}
-		if made, err = s.suggestOne(tx, who, c, field, value, status, "", kind); err != nil {
-			return err
-		}
-		return s.logAs(tx, org, c.ID, c.CompanyID, who, "enrich:"+field, str(kind+": "+lookupFound))
-	})
-}
-
-// Erased says so if an address or a profile belongs to someone erased on request.
-func (s *Store) Erased(org int64, email, link string) error {
-	return erased(s.db, org, "", "", email, link)
-}
-
-// AskedLately is when a vendor was last asked for this field of this person, if it
-// was recently enough that asking again would only spend a lookup.
-func (s *Store) AskedLately(org, contact int64, field, kind string) *time.Time {
-	var e Event
-	res := s.db.Where("org_id = ? and contact_id = ? and action = ? and value like ? and at > ?", org, contact, "enrich:"+field, kind+":%", time.Now().Add(-enrichAgain)).
-		Order("at desc").Limit(1).Find(&e)
-	if logged(res) != nil || res.RowsAffected == 0 {
-		return nil
-	}
-	return &e.At
-}
-
 const (
 	lookupFound   = "found"
 	lookupNone    = "none found"
@@ -357,44 +220,8 @@ type Lookup struct {
 	At                     time.Time
 }
 
-// lookupsOf are each vendor's latest lookup per detail for these people, within the
-// time a vendor isn't asked again, newest first.
-func (s *Store) lookupsOf(org int64, people []int64) (map[int64][]Lookup, error) {
-	out := map[int64][]Lookup{}
-	if len(people) == 0 {
-		return out, nil
-	}
-	var events []Event
-	if err := s.db.Where("org_id = ? and contact_id in ? and action like 'enrich:%' and at > ?", org, people, time.Now().Add(-enrichAgain)).
-		Order("at desc, id desc").Find(&events).Error; err != nil {
-		return nil, err
-	}
-	seen := map[string]bool{}
-	for _, e := range events {
-		kind, said, ok := strings.Cut(deref(e.Value), ": ")
-		if !ok {
-			continue
-		}
-		field := strings.TrimPrefix(e.Action, "enrich:")
-		if k := fmt.Sprint(e.ContactID, field, kind); !seen[k] {
-			seen[k] = true
-			out[e.ContactID] = append(out[e.ContactID], Lookup{Field: field, Vendor: kind, Outcome: said, At: e.At})
-		}
-	}
-	return out, nil
-}
-
 func (a *App) logEnrich(org int64, who Actor, c Contact, field, value string) {
 	noted(a.s.LogEnrich(org, who, c.ID, field, value))
-}
-
-// LogEnrich records a lookup that kept nothing, so the same one isn't paid for again soon.
-func (s *Store) LogEnrich(org int64, who Actor, contact int64, field, value string) error {
-	c, err := s.ContactByID(org, contact)
-	if err != nil {
-		return err
-	}
-	return s.logAs(s.db, org, c.ID, c.CompanyID, who, "enrich:"+field, &value)
 }
 
 func (a *App) vendorHTTP() *http.Client {
