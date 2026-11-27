@@ -1,4 +1,4 @@
-package main
+package tz
 
 import (
 	"testing"
@@ -29,7 +29,7 @@ func sameClock(t *testing.T, a, b string) bool {
 	return true
 }
 
-func TestGuessTZ(t *testing.T) {
+func TestGuess(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct{ phone, maker, want string }{
 		{"+44 20 7946 0000", "", "Europe/London"},
@@ -42,9 +42,12 @@ func TestGuessTZ(t *testing.T) {
 		{"", "Nordic Saunas (FI/PL)", "Europe/Helsinki"},
 		{"", "Nobody", ""},
 	} {
-		got := deref(GuessTZ(c.phone, c.maker))
+		got := ""
+		if zone := Guess(c.phone, c.maker); zone != nil {
+			got = *zone
+		}
 		if !sameClock(t, got, c.want) {
-			t.Errorf("GuessTZ(%q, %q) = %q, want %q", c.phone, c.maker, got, c.want)
+			t.Errorf("Guess(%q, %q) = %q, want %q", c.phone, c.maker, got, c.want)
 		}
 	}
 }

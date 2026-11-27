@@ -1,4 +1,4 @@
-package main
+package cleantext
 
 import (
 	"io"
@@ -11,7 +11,7 @@ import (
 // Postgres won't keep a NUL in text, nor bytes that aren't UTF-8. No one means to send
 // either, so they are taken out of what arrives before anything reads it.
 
-func cleanText(s string) string {
+func Text(s string) string {
 	if strings.IndexByte(s, 0) < 0 && isUTF8(s) {
 		return s
 	}
@@ -20,30 +20,30 @@ func cleanText(s string) string {
 
 func isUTF8(s string) bool { return strings.ToValidUTF8(s, "") == s }
 
-func cleanValues(v url.Values) {
+func values(v url.Values) {
 	for k, vs := range v {
 		for i := range vs {
-			vs[i] = cleanText(vs[i])
+			vs[i] = Text(vs[i])
 		}
-		if c := cleanText(k); c != k {
+		if c := Text(k); c != k {
 			delete(v, k)
 			v[c] = append(v[c], vs...)
 		}
 	}
 }
 
-// cleanRequest cleans the query, and any body but a form's as it is read: the JSON
+// Request cleans the query, and any body but a form's as it is read: the JSON
 // decoders read a body whatever it says it is. A JSON decoder already turns bytes that
 // aren't UTF-8 into U+FFFD, and a NUL can only reach it written as \u0000. A form is
 // left to parseForm, since each handler bounds its own. A path holding either names
 // nothing here, so it is refused.
-func cleanRequest(r *http.Request) (ok bool) {
-	if cleanText(r.URL.Path) != r.URL.Path {
+func Request(r *http.Request) (ok bool) {
+	if Text(r.URL.Path) != r.URL.Path {
 		return false
 	}
 	if q := r.URL.Query(); r.URL.RawQuery != "" {
 		before := q.Encode()
-		cleanValues(q)
+		values(q)
 		if after := q.Encode(); after != before {
 			r.URL.RawQuery = after
 		}
@@ -77,14 +77,14 @@ func (w *withoutNUL) Read(p []byte) (int, error) {
 		n, err := w.src.Read(w.scratch[:])
 		w.held = append(w.held, w.scratch[:n]...)
 		w.err = err
-		w.ready, w.held = dropNULEscapes(w.held, err != nil)
+		w.ready, w.held = DropNULEscapes(w.held, err != nil)
 	}
 	n := copy(p, w.ready)
 	w.ready = w.ready[n:]
 	return n, nil
 }
 
-func dropNULEscapes(b []byte, last bool) (out, rest []byte) {
+func DropNULEscapes(b []byte, last bool) (out, rest []byte) {
 	out = make([]byte, 0, len(b))
 	for i := 0; i < len(b); {
 		if b[i] != '\\' {

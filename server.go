@@ -19,6 +19,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/cleantext"
 )
 
 // dummyHash keeps a wrong email as slow as a wrong password.
@@ -377,7 +378,7 @@ func (a *App) Routes() http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a.setDeadlines(w, r)
-		if !cleanRequest(r) {
+		if !cleantext.Request(r) {
 			refuseAs(w, r, http.StatusNotFound, "404 page not found")
 			return
 		}

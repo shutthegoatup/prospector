@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/tz"
 )
 
 // Agent operations: the REST API and the MCP server both call these, with the
@@ -359,7 +361,7 @@ func (s *Store) AgentAddContact(o *Org, who Actor, in AddContactIn) (*AddContact
 			Person: &person, First: &first, Maker: &c.Name, CompanyID: &c.ID, Title: strings.TrimSpace(in.Title),
 			Email: nonEmpty(strings.TrimSpace(in.Email)), EmailStatus: in.EmailStatus, Linkedin: nonEmpty(strings.TrimSpace(in.Linkedin)),
 			Phone: nonEmpty(strings.TrimSpace(in.Phone)), Sources: str(strings.TrimSpace(in.SourceURL)), Status: ContactSuggested, OfferingID: who.Offering}
-		contact.Tz = GuessTZ(in.Phone, "("+c.Country+")")
+		contact.Tz = tz.Guess(in.Phone, "("+c.Country+")")
 		if err := tx.Create(&contact).Error; err != nil {
 			return err
 		}

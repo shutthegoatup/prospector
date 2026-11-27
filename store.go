@@ -10,6 +10,8 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/shutthegoatup/prospector/internal/tz"
 )
 
 type User struct {
@@ -500,7 +502,7 @@ func (s *Store) set(tx *gorm.DB, org, id int64, field, value, actor string) erro
 		return err
 	}
 	if field == "phone" {
-		if err := tx.Model(&c).Update("tz", GuessTZ(value, deref(c.Maker))).Error; err != nil {
+		if err := tx.Model(&c).Update("tz", tz.Guess(value, deref(c.Maker))).Error; err != nil {
 			return err
 		}
 	}
