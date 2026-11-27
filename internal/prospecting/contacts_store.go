@@ -133,6 +133,11 @@ func (s *ProspectingStore) set(tx *gorm.DB, org, id int64, field, value, actor s
 			return err
 		}
 	}
+	if field == "next_date" && value != "" {
+		if _, err := time.Parse(time.DateOnly, value); err != nil {
+			return say.Errorf("%q isn't a date", value)
+		}
+	}
 	if field == "email" || field == "linkedin" {
 		var o store.Org
 		if err := tx.First(&o, org).Error; err != nil {
