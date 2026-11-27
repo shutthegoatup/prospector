@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	AgreementDraft = "draft"
+
 	// agreementFileLimit is the largest document taken: a contract, not a scan of a box file.
 	agreementFileLimit = 10 << 20
 )

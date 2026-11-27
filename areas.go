@@ -4,18 +4,6 @@ import (
 	"strings"
 )
 
-const (
-	areaSales   = "sales"
-	areaSupport = "support"
-)
-
-// Areas split a team's work. Everyone reads everything; changing something takes
-// its area, and an owner has every area.
-var Areas = []struct{ Name, What string }{
-	{areaSales, "research, outreach, deals and tasks for agents"},
-	{areaSupport, "enquiries and their replies, subscriptions and onboarding"},
-}
-
 // opArea is the area whose people may make each API write. Keys go by their scopes
 // alone. Putting an enquiry's sender on the board hands them from support to sales, and
 // starting a won customer's onboarding hands them back, so either may; "" is anyone, for

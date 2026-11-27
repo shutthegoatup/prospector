@@ -40,14 +40,6 @@ func ours(err error) bool {
 		errors.Is(err, gorm.ErrInvalidTransaction) || errors.Is(err, gorm.ErrInvalidDB)
 }
 
-// unstorable is the database turning the data down: a row that breaks one of its rules,
-// such as a name already taken, or a character Postgres won't store (classes 22 and
-// 23). Trying again with the same request can't help.
-func unstorable(err error) bool {
-	var pg *pgconn.PgError
-	return breaksRule(err) || errors.As(err, &pg) && strings.HasPrefix(pg.Code, "22")
-}
-
 const (
 	sayOurs       = "the server couldn't finish that; try again in a moment"
 	sayTaken      = "that couldn't be saved: it clashes with something already here"
