@@ -256,6 +256,7 @@ var Marks = map[string]string{"linkedin": "linkedin_added", "email": "email_sent
 // reaches every area.
 type Store struct {
 	*core
+	outreachStore
 	agreementStore
 	enquiryStore
 	prospectingStore
@@ -287,6 +288,7 @@ func newStore(c *core) *Store {
 	s.prospectingStore = prospectingStore{core: c, identity: &s.identityStore, deals: &s.dealStore}
 	s.enquiryStore = enquiryStore{core: c, prospecting: &s.prospectingStore}
 	s.agreementStore = agreementStore{core: c, prospecting: &s.prospectingStore, identity: &s.identityStore}
+	s.outreachStore = outreachStore{core: c, identity: &s.identityStore, suppression: &s.suppressionStore, subscriptions: &s.subscriptionStore}
 	return s
 }
 
