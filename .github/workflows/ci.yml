@@ -89,11 +89,12 @@ jobs:
         run: |
           psql "$PROSPECTOR_TEST_PG" -c "alter system set fsync = off" -c "alter system set synchronous_commit = off" \
             -c "alter system set full_page_writes = off" -c "select pg_reload_conf()"
+      # go vet is the lint job's (golangci's govet); run again here it is most of the build.
       - name: Test
         run: |
-          names=$(go test -list . . | grep '^Test' | sort | awk -v n=3 -v i="$SHARD" 'NR % n == i' | paste -sd'|')
+          names=$(go test -vet=off -list . . | grep '^Test' | sort | awk -v n=3 -v i="$SHARD" 'NR % n == i' | paste -sd'|')
           test -n "$names"
-          go test -count=1 -run "^($names)\$" .
+          go test -vet=off -count=1 -run "^($names)\$" .
 
   # The one check main requires: everything above passed.
   test:
