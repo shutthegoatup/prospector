@@ -163,13 +163,6 @@ func sections(text string) []mdSection {
 	return out
 }
 
-func firstField(s string) string {
-	if f := strings.Fields(s); len(f) > 0 {
-		return f[0]
-	}
-	return ""
-}
-
 func group(re *regexp.Regexp, s string) (string, bool) {
 	if m := re.FindStringSubmatch(s); m != nil {
 		return m[1], true

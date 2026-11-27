@@ -61,6 +61,6 @@ func (s *Store) migrateWith(files fs.FS, dir string) error {
 		return fmt.Errorf("migrating the database: %w", err)
 	}
 	s.oneNameWhateverItsCapitals()
-	s.indexSearch()
+	s.IndexSearch()
 	return nil
 }
