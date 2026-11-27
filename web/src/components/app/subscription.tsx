@@ -71,6 +71,8 @@ function Choice({ name, save, value, children, label }: { name: keyof Change; sa
   );
 }
 
+const box = (key: keyof Change, value: string | number) => `${key}:${value}`;
+
 export function SubscriptionUpdate({ s }: { s: Subscription }) {
   const { org } = useSession();
   const refresh = useRefresh();
@@ -93,7 +95,6 @@ export function SubscriptionUpdate({ s }: { s: Subscription }) {
   };
   // Each box is keyed on what the server holds, so one it rewrote (a price given its
   // sign, a term that now rolls) shows the rewrite after the refresh.
-  const box = (key: keyof Change, value: string | number) => `${key}:${value}`;
 
   return (
     <details className="mt-1 text-sm">

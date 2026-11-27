@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
@@ -8,6 +8,7 @@ import { Bar, Placeholders, placeholders } from "@/components/app/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { actor, dated, stamp } from "@/lib/format";
+import { useKeyedState } from "@/lib/keyed";
 import { useSession } from "@/session";
 
 type Enquiry = components["schemas"]["Enquiry"];
@@ -75,8 +76,8 @@ export function EnquiriesPage() {
   const { kind = "", state = "", spam = false } = useSearch({ from: "/o/$org/enquiries" });
   const here = { to: "/o/$org/enquiries", params: { org } } as const;
   // Each cursor is where a page after the first starts, so Previous is one pop.
-  const [cursors, setCursors] = useState<string[]>([]);
-  useEffect(() => setCursors([]), [kind, state, spam]);
+  // Another filter is another list, which starts at its first page.
+  const [cursors, setCursors] = useKeyedState<string[]>([kind, state, spam], () => []);
   const cursor = cursors[cursors.length - 1];
 
   const list = $api.useQuery(

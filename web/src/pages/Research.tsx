@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import type { components } from "@/api";
@@ -6,6 +6,7 @@ import { $api } from "@/client";
 import { ActionButton, Eyebrow, Failed, FilterChip, Meta, Meter, Pill, Section, type Tone, useRefresh, Whose } from "@/components/app";
 import { Bar, Placeholders, placeholders, Text } from "@/components/app/skeleton";
 import { actor, day, stamp } from "@/lib/format";
+import { useKeyedState } from "@/lib/keyed";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,9 +45,8 @@ export function ResearchPage() {
   const { org, sales } = useSession();
   const { f: filter = "review", task, of } = useSearch({ from: "/o/$org/research" });
   const navigate = useNavigate();
-  const [cursor, setCursor] = useState<string | undefined>();
   // A cursor is a place in one list: another filter, search or offering starts at its top.
-  useEffect(() => setCursor(undefined), [filter, task, of]);
+  const [cursor, setCursor] = useKeyedState<string | undefined>([filter, task, of], () => undefined);
 
   // A search is for one offering, so its queue is that offering's.
   const research = $api.useQuery(
@@ -880,7 +880,7 @@ function Lookups({ person: p, enrichers }: { person: Person; enrichers: Enricher
   // The vendor each detail would go to next: the first, in order, not asked lately and with lookups left.
   const next = wanted.flatMap((field) => {
     const e = enrichers.find(
-      (e) => e.fields.includes(field) && e.has_key && e.used_this_month < e.monthly_limit && !p.lookups.some((l) => l.field === field && l.vendor === e.kind),
+      (v) => v.fields.includes(field) && v.has_key && v.used_this_month < v.monthly_limit && !p.lookups.some((l) => l.field === field && l.vendor === v.kind),
     );
     return e ? [{ field, vendor: e }] : [];
   });
