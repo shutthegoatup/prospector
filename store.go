@@ -42,8 +42,8 @@ func newStore(c *core) *Store {
 		subscriptionStore: subscriptionStore{Core: c}, onboardingStore: onboardingStore{Core: c}}
 	// An area that needs another's queries holds that area, not the whole store.
 	s.prospectingStore = prospectingStore{Core: c, Identity: &s.identityStore, Sales: &s.dealStore}
-	s.enquiryStore = enquiryStore{core: c, prospecting: &s.prospectingStore}
-	s.agreementStore = agreementStore{core: c, prospecting: &s.prospectingStore, identity: &s.identityStore}
+	s.enquiryStore = enquiryStore{Core: c, Prospecting: &s.prospectingStore}
+	s.agreementStore = agreementStore{Core: c, Prospecting: &s.prospectingStore, Identity: &s.identityStore}
 	s.outreachStore = outreachStore{core: c, identity: &s.identityStore, suppression: &s.suppressionStore, subscriptions: &s.subscriptionStore}
 	s.researchStore = researchStore{core: c, prospecting: &s.prospectingStore, identity: &s.identityStore, outreach: &s.outreachStore}
 	return s
