@@ -1,11 +1,12 @@
 import type { components } from "./api.d.ts";
 
 // problemText is what to tell someone a call failed with: an API problem's detail, the
-// plain text a sign-in or same-site check answers with, or else the status.
-export function problemText(body: unknown, statusText: string, status: number): string {
+// plain text a sign-in or same-site check answers with, or else the status's text, which
+// HTTP/2 leaves empty. Empty is nothing to say, for the caller to word.
+export function problemText(body: unknown, statusText: string): string {
   if (typeof body === "string" && body.trim() !== "") return body.trim();
   if (body && typeof body === "object" && "detail" in body && typeof body.detail === "string" && body.detail !== "") return body.detail;
-  return statusText || `The server answered ${status}.`;
+  return statusText;
 }
 
 export type ProblemType = components["schemas"]["ProblemType"];

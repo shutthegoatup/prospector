@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { actor, plural, stamp } from "@/lib/format";
 import { intl } from "@/i18n";
 import { cn } from "@/lib/utils";
-import { detailNames, month, vendorCosts, vendorKinds, vendorName, vendorTold } from "@/lib/vendors";
+import { detailName, month, vendorCosts, vendorKinds, vendorName, vendorTold } from "@/lib/vendors";
 import { useSession } from "@/session";
 
 type Agent = components["schemas"]["Agent"];
@@ -938,7 +938,7 @@ function VendorCard({ vendor: e, n, up, down }: { vendor?: Enricher; n: number; 
               <Text value={e && vendorName(e.kind)} w="9ch" />
               {e?.fields.map((f) => (
                 <Tag key={f} quiet>
-                  finds {detailNames[f] ?? f}
+                  finds {detailName(f)}
                 </Tag>
               ))}
             </span>

@@ -2,7 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 import { serve, served, servedWords } from "./served.ts";
-import { base, member, org, reader } from "./world.ts";
+import { base, member, org, reader, seed } from "./world.ts";
 
 // In en-XA every word the app says is accented and bracketed, so plain letters left on a
 // page are words that never went through react-intl. A page is checked once its file is
@@ -13,13 +13,30 @@ const untranslated = new Set<string>(
 const translated = (file: string) => !untranslated.has(file);
 
 // Dates come from Intl, which has no data of its own for a pseudo-locale, so en-XA's
-// months are English: they say nothing about what react-intl was given.
-const months = Array.from({ length: 12 }, (_, i) =>
-  new Intl.DateTimeFormat("en-XA", { month: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2026, i, 1))),
-);
+// months, weekdays and AM and PM are English: they say nothing about what react-intl was given.
+const dateWords = (options: Intl.DateTimeFormatOptions, count: number, at: (i: number) => Date) =>
+  Array.from({ length: count }, (_, i) => new Intl.DateTimeFormat("en-XA", { ...options, timeZone: "UTC" }).format(at(i)));
+const months = [
+  ...dateWords({ month: "short" }, 12, (i) => new Date(Date.UTC(2026, i, 1))),
+  ...dateWords({ month: "long" }, 12, (i) => new Date(Date.UTC(2026, i, 1))),
+  ...dateWords({ weekday: "short" }, 7, (i) => new Date(Date.UTC(2026, 10, 22 + i))),
+  ...dateWords({ weekday: "long" }, 7, (i) => new Date(Date.UTC(2026, 10, 22 + i))),
+  "AM",
+  "PM",
+];
 
 // What a page may show as it is: the data the test put there, the name, and Intl's months.
-const allowed = ["Prospector", member.name, member.email, reader.name, reader.email, org.name, ...servedWords, ...months];
+const strings = (v: unknown): string[] => (typeof v === "string" ? [v, ...v.split("\n")] : v && typeof v === "object" ? Object.values(v).flatMap(strings) : []);
+// What a LinkedIn profile's address looks like, as Add's empty field shows it.
+const addresses = ["https://www.linkedin.com/in/…"];
+const allowed = ["Prospector", ...addresses, member.name, member.email, reader.name, reader.email, org.name, ...servedWords, ...months, ...strings(seed)];
+
+// The organisation's own wording (its note template, pitch and the rest, defaults
+// included) is the member's to write, so a page showing it shows data.
+async function orgWords(tab: Page) {
+  const settings = await (await tab.request.get(`/o/${org.slug}/api/v1/settings`)).json();
+  for (const w of strings(settings)) if (!allowed.includes(w)) allowed.push(w);
+}
 
 // said is everything a person sees or hears inside the first element matching scope:
 // text, screen-reader-only text included and hidden text not, the attributes read out
@@ -48,8 +65,18 @@ async function said(tab: Page, scope: string): Promise<string[]> {
 }
 
 // english are the strings in which plain letters are left once the allowed words are taken out.
-function english(strings: string[]) {
-  return strings.filter((s) => /[A-Za-z]{2,}/.test(allowed.reduce((left, w) => left.replaceAll(w, ""), s)));
+function english(seen: string[]) {
+  // Longest first, so a name isn't cut into by a shorter one inside it. filter has made a
+  // copy, and this tsconfig's lib has no toSorted.
+  // oxlint-disable-next-line unicorn/no-array-sort
+  const words = allowed.filter((w) => w.trim()).sort((a, b) => b.length - a.length);
+  // A template of the organisation's (a note, a pitch) is shown filled in: its
+  // placeholders, such as {first}, stand for whatever went in them.
+  const filled = words.filter((w) => /\{\w+\}/.test(w)).map((w) => new RegExp(w.replace(/[.*+?^$()|[\]\\]/g, "\\$&").replace(/\\?\{\w+\\?\}/g, ".*?"), "g"));
+  return seen.filter((s) => {
+    const left = words.reduce((rest, w) => rest.replaceAll(w, ""), filled.reduce((rest, t) => rest.replace(t, ""), s));
+    return /[A-Za-z]{2,}/.test(left);
+  });
 }
 
 async function inPseudo(tab: Page, scope: string) {
@@ -155,7 +182,7 @@ test.describe("signed in", () => {
   test("the sidebar while it loads", async ({ page: tab }) => {
     await tab.route(`**/o/${org.slug}/api/v1/**`, (route) => (nav(route) ? undefined : route.fallback()));
     await tab.goto(at);
-    await expect(tab.getByRole("status")).not.toHaveText("");
+    await expect(tab.getByRole("status").first()).not.toHaveText("");
     await inPseudo(tab, "body");
   });
 
@@ -185,3 +212,75 @@ test.describe("signed in, only reading", () => {
     await inPseudo(tab, "aside");
   });
 });
+
+// The pages inside an organisation, each checked in main once its file is translated:
+// loaded, as someone who only reads it, while its data loads, and when its data fails.
+// files are every file the page draws with that is still to be translated in some group.
+const appPages: { name: string; files: string[]; path: (tab: Page) => Promise<string> }[] = [
+  { name: "today", files: ["src/pages/Today.tsx"], path: async () => "today" },
+  { name: "companies", files: ["src/pages/Companies.tsx"], path: async () => "companies" },
+  {
+    name: "a company",
+    files: ["src/pages/Company.tsx", "src/components/app/subscription.tsx", "src/pages/Onboarding.tsx"],
+    path: async (tab) => `companies/${await first(tab, "companies")}`,
+  },
+  { name: "add", files: ["src/pages/Add.tsx"], path: async () => "add" },
+  { name: "the bookmarklet's window", files: ["src/pages/Add.tsx"], path: async () => "add?popup=1" },
+  { name: "research", files: ["src/pages/Research.tsx"], path: async () => "research" },
+];
+
+async function first(tab: Page, list: string) {
+  const { items } = (await (await tab.request.get(`/o/${org.slug}/api/v1/${list}`)).json()) as { items: { id: number }[] };
+  return items[0]!.id;
+}
+
+const scope = (path: string) => (path.includes("popup=1") ? "body" : "main");
+const throttled = (route: Route) =>
+  route.fulfill({ status: 429, contentType: "application/problem+json", json: { type: "/api/problems/throttled", title: "", status: 429 } });
+
+for (const { name, files, path } of appPages) {
+  test.describe(name, () => {
+    const left = files.filter((f) => !translated(f));
+    test.skip(left.length > 0, `${left.join(", ")} still to be translated`);
+
+    test.describe("as an owner", () => {
+      test.use({ storageState: "a11y/.signed-in.json" });
+
+      test("loaded", async ({ page: tab }) => {
+        await orgWords(tab);
+        const at = await path(tab);
+        await tab.goto(`/o/${org.slug}/${at}`);
+        await tab.waitForLoadState("networkidle");
+        await inPseudo(tab, scope(at));
+      });
+
+      test("while it loads", async ({ page: tab }) => {
+        const at = await path(tab);
+        await tab.route(`**/o/${org.slug}/api/v1/**`, (route) => (nav(route) ? route.fallback() : undefined));
+        await tab.goto(`/o/${org.slug}/${at}`);
+        await expect(tab.getByRole("status").first()).not.toHaveText("");
+        await inPseudo(tab, "body");
+      });
+
+      test("when its data fails", async ({ page: tab }) => {
+        const at = await path(tab);
+        await tab.route(`**/o/${org.slug}/api/v1/**`, (route) => (nav(route) ? route.fallback() : throttled(route)));
+        await tab.goto(`/o/${org.slug}/${at}`);
+        await expect(tab.getByRole("alert").first()).toBeVisible();
+        await inPseudo(tab, scope(at));
+      });
+    });
+
+    test.describe("as someone who only reads it", () => {
+      test.use({ storageState: "a11y/.reader.json" });
+
+      test("loaded", async ({ page: tab }) => {
+        await orgWords(tab);
+        const at = await path(tab);
+        await tab.goto(`/o/${org.slug}/${at}`);
+        await tab.waitForLoadState("networkidle");
+        await inPseudo(tab, scope(at));
+      });
+    });
+  });
+}
