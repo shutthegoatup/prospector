@@ -2,11 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
 // The reads an agent makes with a key: what they answer, how they page, and whom they
@@ -111,4 +114,51 @@ func TestAnAgentsReadsAnswerAsTheyAlwaysHave(t *testing.T) {
 	if res, _ := get(reader, "due?cursor=nonsense"); res.StatusCode != http.StatusBadRequest {
 		t.Errorf("what is due from a cursor that isn't one: %d", res.StatusCode)
 	}
+}
+
+// Served through the spec or not, an agent's reads say exactly what the store does,
+// which is what the MCP tools answer too: a field the spec lacked would be lost.
+func TestAnAgentsReadsSayEverythingTheStoreDoes(t *testing.T) {
+	t.Parallel()
+	s, o, srv, _ := signedIn(t)
+	secret, k, err := s.CreateKey(o.ID, "scout", []string{"read", "research:write"}, "Ada Lovelace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scout := Actor{Name: "agent:scout", KeyID: k.ID}
+	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders with a configurator.", "Ada Lovelace"))
+	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example", Task: task.ID,
+		Facts: []FactIn{{Field: "configurator", Value: "Day cruiser builder", SourceURL: "https://larkmoor.example/build"}}}))
+	must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Title: "Head of Marketing",
+		SourceURL: "https://larkmoor.example/team", Task: task.ID}))
+	must(s.AgentNote(o.ID, scout, NoteIn{Task: task.ID, Company: "Larkmoor Yachts", Kind: "next", Text: "Look at their dealer list."}))
+	lark := must(s.CompanyRef(o.ID, "Larkmoor Yachts"))
+
+	base := srv.URL + "/o/alpha/api/v1/"
+	code, body := asKey(t, "GET", base+"search?q=lark", secret, nil)
+	hits, next := must2(s.AgentSearch(o.ID, scout, "lark", paging.Page{}))
+	if code != http.StatusOK {
+		t.Fatalf("search: %d %s", code, body)
+	}
+	sameJSON(t, "a search", body, SearchOut{hits, next})
+	if !strings.Contains(body, `"last_agent"`) || !strings.Contains(body, `"by_you":true`) {
+		t.Errorf("a search should say which agent last changed the company: %s", body)
+	}
+
+	code, body = asKey(t, "GET", fmt.Sprintf("%scompanies/%d", base, lark.ID), secret, nil)
+	if code != http.StatusOK {
+		t.Fatalf("a company: %d %s", code, body)
+	}
+	sameJSON(t, "a company", body, must(s.AgentCompany(o.ID, scout, strconv.FormatInt(lark.ID, 10), paging.Page{})))
+	for _, want := range []string{`"source_url"`, `"title":"Head of Marketing"`, `"action"`, `"kind":"next"`, `"domain":"larkmoor.example"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("a company should carry %s: %s", want, body)
+		}
+	}
+
+	code, body = asKey(t, "GET", base+"due", secret, nil)
+	if code != http.StatusOK {
+		t.Fatalf("due: %d %s", code, body)
+	}
+	sameJSON(t, "what is due", body, must(s.AgentDue(o, paging.Page{})))
 }
