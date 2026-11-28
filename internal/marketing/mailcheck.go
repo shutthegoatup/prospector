@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/net/idna"
-
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -25,18 +23,6 @@ const mailTakenFor = 30 * 24 * time.Hour
 const MailRefusedFor = 7 * 24 * time.Hour
 
 const mailLookupFor = 5 * time.Second
-
-func MailDomainOf(address string) string {
-	_, after, ok := strings.CutLast(address, "@")
-	if !ok {
-		return ""
-	}
-	domain, err := idna.Lookup.ToASCII(strings.Trim(strings.ToLower(after), ". "))
-	if err != nil || !strings.Contains(domain, ".") {
-		return ""
-	}
-	return domain
-}
 
 func isNotFound(err error) bool {
 	var dns *net.DNSError

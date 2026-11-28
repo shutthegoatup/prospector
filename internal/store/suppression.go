@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/idna"
+
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -37,6 +39,23 @@ type UnsubscribeLink struct {
 }
 
 var errNotAnAddress = say.New("that isn't one email address")
+
+// EmailKey is an address as it is looked up and compared: trimmed and in lower case.
+func EmailKey(address string) string { return strings.ToLower(strings.TrimSpace(address)) }
+
+// AddressDomain is the domain an address's mail goes to, in its ASCII form, or "" when it
+// has none: after the last @, since a quoted local part may hold one too.
+func AddressDomain(address string) string {
+	_, after, ok := strings.CutLast(address, "@")
+	if !ok {
+		return ""
+	}
+	domain, err := idna.Lookup.ToASCII(strings.Trim(strings.ToLower(after), ". "))
+	if err != nil || !strings.Contains(domain, ".") {
+		return ""
+	}
+	return domain
+}
 
 func BareAddress(address string) (string, error) {
 	at, err := mail.ParseAddress(strings.TrimSpace(address))

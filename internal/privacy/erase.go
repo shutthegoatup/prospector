@@ -155,7 +155,7 @@ func forgetEvents(matching *gorm.DB) error {
 func forgetMailDomains(tx *gorm.DB, emails []string) error {
 	var domains []string
 	for _, e := range emails {
-		if d := marketing.MailDomainOf(e); d != "" {
+		if d := store.AddressDomain(e); d != "" {
 			domains = append(domains, d)
 		}
 	}

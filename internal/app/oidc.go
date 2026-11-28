@@ -260,7 +260,7 @@ func (p *idp) finish(ctx context.Context, att attempt, answer url.Values) (*iden
 			return nil, fmt.Errorf("reading who signed in: %w", err)
 		}
 	}
-	who := &identity.Outsider{Issuer: id.Issuer, Subject: id.Subject, Email: strings.ToLower(strings.TrimSpace(c.Email)),
+	who := &identity.Outsider{Issuer: id.Issuer, Subject: id.Subject, Email: store.EmailKey(c.Email),
 		Name: strings.TrimSpace(c.Name), Username: strings.ToLower(strings.TrimSpace(c.Username)), HostedBy: strings.ToLower(c.HostedBy)}
 	said := c.Verified
 	if p.tenanted != "" {

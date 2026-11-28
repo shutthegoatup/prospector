@@ -55,7 +55,7 @@ func (s *OutreachStore) NoMailDomains() map[string]bool {
 // made-up domain is turned away while the agent can still look again.
 func (s *OutreachStore) CheckMailDomains(email string) error {
 	for _, e := range store.EmailRe.FindAllString(strings.ToLower(email), -1) {
-		if domain := MailDomainOf(e); s.TakesMail(context.Background(), domain) == MailRefused {
+		if domain := store.AddressDomain(e); s.TakesMail(context.Background(), domain) == MailRefused {
 			return say.Errorf("nothing was stored: %s takes no mail, so %s can't be right. Leave email out, or find the address on a page", domain, e)
 		}
 	}
@@ -85,7 +85,7 @@ func (s *OutreachStore) CheckSomeMail(ctx context.Context, most int) {
 		var fresh []string
 		for _, r := range rows {
 			for _, e := range store.EmailRe.FindAllString(strings.ToLower(r.Email), -1) {
-				if d := MailDomainOf(e); d != "" {
+				if d := store.AddressDomain(e); d != "" {
 					domainsOf[r.ID] = append(domainsOf[r.ID], d)
 					if _, seen := asked[d]; !seen {
 						fresh = append(fresh, d)

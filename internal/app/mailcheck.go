@@ -7,7 +7,6 @@ import (
 
 	"github.com/nyaruka/phonenumbers/v2"
 
-	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -16,7 +15,7 @@ import (
 // deadAddress is the first of an email field's addresses whose domain takes no mail.
 func deadAddress(email string, noMail map[string]bool) string {
 	for _, e := range store.EmailRe.FindAllString(strings.ToLower(email), -1) {
-		if noMail[marketing.MailDomainOf(e)] {
+		if noMail[store.AddressDomain(e)] {
 			return e
 		}
 	}

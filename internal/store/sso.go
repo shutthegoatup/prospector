@@ -55,15 +55,14 @@ type SSO struct {
 
 func (c *SSO) On() bool { return c.Issuer != "" }
 
-func EmailDomain(email string) string {
-	_, domain, _ := strings.Cut(strings.ToLower(strings.TrimSpace(email)), "@")
-	return domain
-}
-
 // Proves is whether the organisation's sign-in may speak for an address: only one at
-// a domain it has shown is its own, matched whole.
+// a domain it has shown is its own, matched whole, and one that is an address at all.
 func (c *SSO) Proves(email string) bool {
-	domain := EmailDomain(email)
+	bare, err := BareAddress(email)
+	if err != nil {
+		return false
+	}
+	domain := AddressDomain(bare)
 	for _, d := range c.Domains {
 		if d.VerifiedAt != nil && d.Domain == domain && domain != "" {
 			return true

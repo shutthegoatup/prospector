@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/identity"
@@ -174,8 +173,8 @@ func (s apiServer) FindSingleSignOn(ctx context.Context, in api.FindSingleSignOn
 	if in.Body == nil {
 		return nil, say.New(`send {"email": "…"}`)
 	}
-	email := strings.ToLower(strings.TrimSpace(in.Body.Email))
-	orgs, err := s.a.s.SSOOrgsFor(store.EmailDomain(email))
+	email := store.EmailKey(in.Body.Email)
+	orgs, err := s.a.s.SSOOrgsFor(store.AddressDomain(email))
 	if err != nil {
 		return nil, err
 	}

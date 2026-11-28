@@ -30,7 +30,7 @@ func (s *IdentityStore) InviteUser(email, name, password string) (*store.User, e
 }
 
 func (s *IdentityStore) newUser(email, name, password string, mustChange bool) (*store.User, error) {
-	email = strings.ToLower(strings.TrimSpace(email))
+	email = store.EmailKey(email)
 	if !strings.Contains(email, "@") {
 		return nil, say.Errorf("%q isn't an email address", email)
 	}
@@ -97,7 +97,7 @@ func (s *IdentityStore) savePasswordIn(tx *gorm.DB, user int64, hash, keepToken 
 
 func (s *IdentityStore) UserByEmail(email string) (*store.User, error) {
 	var u store.User
-	return &u, s.DB.Where("email = ?", strings.ToLower(strings.TrimSpace(email))).First(&u).Error
+	return &u, s.DB.Where("email = ?", store.EmailKey(email)).First(&u).Error
 }
 
 // CreateOrg makes an organisation nobody belongs to yet, for the CLI to add members to.
