@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/identity"
 )
 
 // asKey calls the API with an API key, as an agent or script would.
@@ -146,7 +147,7 @@ func TestTheContractPageIsPublicAndShowsEveryOperation(t *testing.T) {
 			t.Errorf("the page lacks the %s schema", name)
 		}
 	}
-	for _, s := range Scopes {
+	for _, s := range identity.Scopes {
 		if !strings.Contains(body, "<code>"+s.Name+"</code>") {
 			t.Errorf("the page doesn't explain the %s scope", s.Name)
 		}
@@ -177,7 +178,7 @@ func TestTheSpecIsServedAndEveryOperationNamesAScopeAKeyCanHave(t *testing.T) {
 				t.Errorf("%s %s names no scope a key can be given", method, path)
 			}
 			for _, scope := range scopes {
-				if !validScope(scope) {
+				if !identity.ValidScope(scope) {
 					t.Errorf("%s %s names a scope a key can't be given: %q", method, path, scope)
 				}
 			}

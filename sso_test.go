@@ -26,6 +26,8 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/identity"
 )
 
 // fakeIdP is a working OpenID Connect provider: discovery, keys, and a token endpoint
@@ -540,13 +542,13 @@ func TestOrganisationSingleSignOn(t *testing.T) {
 	if code, _, location := b.through(okta, start); code != http.StatusSeeOther || location != "/o/alpha/today" {
 		t.Fatalf("a member signing in: %d to %q", code, location)
 	}
-	if err := s.SetAreas(alpha.ID, bob.ID, []string{areaSupport}); err != nil {
+	if err := s.SetAreas(alpha.ID, bob.ID, []string{identity.AreaSupport}); err != nil {
 		t.Fatal(err)
 	}
 	if code, _, location := b.through(okta, start); code != http.StatusSeeOther || location != "/o/alpha/enquiries" {
 		t.Fatalf("someone in support only signing in: %d to %q", code, location)
 	}
-	if err := s.SetAreas(alpha.ID, bob.ID, []string{areaSales, areaSupport}); err != nil {
+	if err := s.SetAreas(alpha.ID, bob.ID, []string{identity.AreaSales, identity.AreaSupport}); err != nil {
 		t.Fatal(err)
 	}
 	if code, body, _ := b.get("/o/alpha/api/v1/nav"); code != http.StatusOK || !strings.Contains(body, `"name":"Bob Stone"`) {
@@ -565,7 +567,7 @@ func TestOrganisationSingleSignOn(t *testing.T) {
 	if code, _ := b.post("/api/v1/orgs", map[string]string{"name": "Mine"}); code != http.StatusForbidden {
 		t.Fatalf("starting an organisation through the API on a limited session: %d", code)
 	}
-	if code, _ := b.post("/o/beta/api/v1/people", QuickAdd{Name: "Hannah Pryce"}); code != http.StatusUnauthorized {
+	if code, _ := b.post("/o/beta/api/v1/people", crm.QuickAdd{Name: "Hannah Pryce"}); code != http.StatusUnauthorized {
 		t.Fatalf("acting in another organisation on a limited session: %d", code)
 	}
 
@@ -610,7 +612,7 @@ func TestRequiredSingleSignOn(t *testing.T) {
 		t.Fatalf("the sign-on offered to a member it is required of: %+v", found)
 	}
 	location = found[0].StartUrl
-	if code, body := b.post("/o/alpha/api/v1/people", QuickAdd{Name: "Hannah Pryce"}); code != http.StatusForbidden || !strings.Contains(body, "requires its single sign-on") {
+	if code, body := b.post("/o/alpha/api/v1/people", crm.QuickAdd{Name: "Hannah Pryce"}); code != http.StatusForbidden || !strings.Contains(body, "requires its single sign-on") {
 		t.Fatalf("acting on a password session: %d %s", code, body)
 	}
 	if code, _, _ := b.get("/o/beta/today"); code != http.StatusOK {
@@ -970,7 +972,7 @@ func TestAnAccountWithNoPasswordIsRefusedAsSlowlyAsAnyOther(t *testing.T) {
 	}
 	timed := func(email string) time.Duration {
 		start := time.Now()
-		if _, _, err := s.Login(email, "a guess at it"); err != errWrongLogin {
+		if _, _, err := s.Login(email, "a guess at it"); err != identity.ErrWrongLogin {
 			t.Fatalf("signing in as %s: %v", email, err)
 		}
 		return time.Since(start)

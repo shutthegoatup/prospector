@@ -10,6 +10,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/mailer"
 	"github.com/shutthegoatup/prospector/internal/onboarding"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -62,7 +63,7 @@ func (a *App) customerRender(w http.ResponseWriter, r *http.Request, code int, v
 	for _, st := range v.Steps {
 		shown.Steps = append(shown.Steps, customerStepShown{st.ID, st.Name, st.Due, st.DoneOn, st.DoneBy == onboarding.CustomerActor})
 	}
-	writeShell(w, languageFor(r, v.Lang), code, shown, "This page needs a browser with JavaScript.\n")
+	writeShell(w, request.LanguageFor(r, v.Lang), code, shown, "This page needs a browser with JavaScript.\n")
 }
 
 // customerShown is CustomerView as the page gets it. A step says only whether the

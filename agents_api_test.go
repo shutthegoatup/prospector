@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/identity"
 )
 
 // The React Agents page draws each card from the API, so the API says what the card says.
@@ -70,7 +71,7 @@ func TestTheAPISaysWhatEachAgentsCardSays(t *testing.T) {
 	if err := json.Unmarshal([]byte(body), &connect); err != nil {
 		t.Fatal(err)
 	}
-	if connect.BaseUrl != testSite+"/o/alpha/" || connect.McpUrl != connect.BaseUrl+"mcp" || !connect.CanKeepKeys || len(connect.Scopes) != len(Scopes) ||
+	if connect.BaseUrl != testSite+"/o/alpha/" || connect.McpUrl != connect.BaseUrl+"mcp" || !connect.CanKeepKeys || len(connect.Scopes) != len(identity.Scopes) ||
 		len(connect.Tools) != len(mcpTools) || len(connect.Kinds) != len(AgentKinds) {
 		t.Errorf("how to connect: %s", body)
 	}

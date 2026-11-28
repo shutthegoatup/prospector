@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
@@ -16,13 +19,13 @@ func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
 	other := mustOrg(t, s, "beta")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
 	team := "https://larkmoor.example/team"
-	co := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example"}))
-	hannah := must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce",
+	co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example"}))
+	hannah := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce",
 		Linkedin: "https://www.linkedin.com/in/hannah-pryce/", Phone: "+44 20 7946 0000", SourceURL: team}))
 	if hannah.Suggested != nil {
 		t.Fatalf("someone new has nothing waiting: %+v", hannah)
 	}
-	found := AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Email: "hannah.pryce@larkmoor.example", EmailStatus: "guess",
+	found := prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Email: "hannah.pryce@larkmoor.example", EmailStatus: "guess",
 		Phone: "+44 (0)20 7946 0111", Linkedin: "https://uk.linkedin.com/in/hannah-pryce?trk=x", SourceURL: "https://larkmoor.example/contact"}
 	got := must(s.AgentAddContact(o, second, found))
 	if !got.Existed || got.ID != hannah.ID || strings.Join(got.Suggested, " ") != "email phone" {
@@ -66,16 +69,16 @@ func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
 	decide := func(id int64, decision string) (int, string) {
 		return call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/suggestions/"+strconv.FormatInt(id, 10), "application/json", map[string]any{"decision": decision})
 	}
-	if err := s.DecideSuggestion(other.ID, pending[0].ID, SuggestionAccepted, "mallory"); err == nil {
+	if err := s.DecideSuggestion(other.ID, pending[0].ID, prospecting.SuggestionAccepted, "mallory"); err == nil {
 		t.Fatal("another organisation settled this one's suggestion")
 	}
-	if code, body := decide(pending[0].ID, SuggestionAccepted); code != http.StatusNoContent {
+	if code, body := decide(pending[0].ID, prospecting.SuggestionAccepted); code != http.StatusNoContent {
 		t.Fatalf("accept: %d %s", code, body)
 	}
-	if code, body := decide(pending[1].ID, SuggestionDismissed); code != http.StatusNoContent {
+	if code, body := decide(pending[1].ID, prospecting.SuggestionDismissed); code != http.StatusNoContent {
 		t.Fatalf("dismiss: %d %s", code, body)
 	}
-	if code, _ := decide(pending[0].ID, SuggestionDismissed); code != http.StatusConflict {
+	if code, _ := decide(pending[0].ID, prospecting.SuggestionDismissed); code != http.StatusConflict {
 		t.Fatalf("a settled suggestion was settled again: %d", code)
 	}
 	if c := person(); deref(c.Email) != "hannah.pryce@larkmoor.example" || c.EmailStatus != "guess" || deref(c.Phone) != "+44 20 7946 0000" {
@@ -120,10 +123,10 @@ func TestASuggestionCantGetPastTheNeverContactListOrAnErasure(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
-	in := AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	in := prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	hannah := must(s.AgentAddContact(o, scout, in))
-	must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Jonas Weber", SourceURL: in.SourceURL}))
+	must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Jonas Weber", SourceURL: in.SourceURL}))
 
 	in.Email = "hannah.pryce@larkmoor.example"
 	if got := must(s.AgentAddContact(o, scout, in)); len(got.Suggested) != 1 {
@@ -137,13 +140,13 @@ func TestASuggestionCantGetPastTheNeverContactListOrAnErasure(t *testing.T) {
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DecideSuggestion(o.ID, sg.ID, SuggestionAccepted, "ada"); err == nil {
+	if err := s.DecideSuggestion(o.ID, sg.ID, prospecting.SuggestionAccepted, "ada"); err == nil {
 		t.Fatal("accepting put an address on the never-contact list onto a person")
 	}
 	if err := s.DB.First(&sg, sg.ID).Error; err != nil || sg.Decision != "" {
 		t.Fatalf("a refused accept should leave the suggestion waiting: %+v %v", sg, err)
 	}
-	if _, err := s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Jonas Weber", Email: "jonas@larkmoor.example", SourceURL: in.SourceURL}); err == nil {
+	if _, err := s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Jonas Weber", Email: "jonas@larkmoor.example", SourceURL: in.SourceURL}); err == nil {
 		t.Fatal("an address on the never-contact list was taken as a suggestion")
 	}
 
@@ -160,7 +163,7 @@ func TestASuggestionCantGetPastTheNeverContactListOrAnErasure(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Under a colleague's name, her erased address still can't come back.
-	if _, err := s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Jonas Weber", Email: in.Email, SourceURL: in.SourceURL}); err == nil {
+	if _, err := s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Jonas Weber", Email: in.Email, SourceURL: in.SourceURL}); err == nil {
 		t.Fatal("an erased person's address was taken as a suggestion for someone else")
 	}
 }
@@ -170,8 +173,8 @@ func TestSuggestionsAreInBothExports(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
-	in := AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	in := prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	hannah := must(s.AgentAddContact(o, scout, in))
 	in.Phone = "+44 20 7946 0000"
 	must(s.AgentAddContact(o, scout, in))
@@ -193,13 +196,13 @@ func TestDetailsSentUnderAnotherNameAreNobodys(t *testing.T) {
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	team := "https://larkmoor.example/team"
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
-	jonas := must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Jonas Weber", Email: "jonas@larkmoor.example", SourceURL: team}))
-	hannah := must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: team}))
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
+	jonas := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Jonas Weber", Email: "jonas@larkmoor.example", SourceURL: team}))
+	hannah := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: team}))
 	profile := "https://www.linkedin.com/in/hannah-pryce-example/"
 
 	// Jonas's address under Hannah's name matches Jonas; her profile and number aren't his.
-	mixed := must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Email: "jonas@larkmoor.example",
+	mixed := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Email: "jonas@larkmoor.example",
 		Linkedin: profile, Phone: "+44 20 7946 0000", SourceURL: team}))
 	var n int64
 	s.DB.Model(&Suggestion{}).Count(&n)
@@ -207,13 +210,13 @@ func TestDetailsSentUnderAnotherNameAreNobodys(t *testing.T) {
 		t.Fatalf("details sent under another name were filed for the person the address matched: %+v, %d rows", mixed, n)
 	}
 
-	got := must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Linkedin: profile, Phone: "+44 20 7946 0000", SourceURL: team}))
+	got := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Linkedin: profile, Phone: "+44 20 7946 0000", SourceURL: team}))
 	if got.ID != hannah.ID || strings.Join(got.Suggested, " ") != "phone linkedin" {
 		t.Fatalf("want her number and profile waiting: %+v", got)
 	}
 	var waiting []Suggestion
 	s.DB.Where("contact_id = ?", hannah.ID).Order("id").Find(&waiting)
-	if err := s.DecideSuggestion(o.ID, waiting[0].ID, SuggestionAccepted, "ada"); err != nil {
+	if err := s.DecideSuggestion(o.ID, waiting[0].ID, prospecting.SuggestionAccepted, "ada"); err != nil {
 		t.Fatal(err)
 	}
 	var c Contact
@@ -237,8 +240,8 @@ func TestOneOfSeveralAddressesIsAlreadyHeld(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
-	in := AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	in := prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	hannah := must(s.AgentAddContact(o, scout, in))
 	if err := s.Update(o.ID, hannah.ID, "email", "Hannah@larkmoor.example, h.pryce@larkmoor.example", "ada"); err != nil {
 		t.Fatal(err)
@@ -255,8 +258,8 @@ func TestErasingSomeoneCoversWhatWasSuggestedForThem(t *testing.T) {
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	team := "https://larkmoor.example/team"
-	in := AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: team}
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	in := prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: team}
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	hannah := must(s.AgentAddContact(o, scout, in))
 	in.Email, in.Linkedin = "not.hers@larkmoor.example", "https://www.linkedin.com/in/hannah-pryce-example/"
 	must(s.AgentAddContact(o, scout, in))
@@ -267,7 +270,7 @@ func TestErasingSomeoneCoversWhatWasSuggestedForThem(t *testing.T) {
 	if len(waiting) != 3 || waiting[0].Value != "not.hers@larkmoor.example" {
 		t.Fatalf("want two addresses and a profile waiting: %+v", waiting)
 	}
-	if err := s.DecideSuggestion(o.ID, waiting[0].ID, SuggestionDismissed, "ada"); err != nil {
+	if err := s.DecideSuggestion(o.ID, waiting[0].ID, prospecting.SuggestionDismissed, "ada"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.DB.Create(&Enquiry{OrgID: o.ID, Name: "H", Email: "hannah.pryce@larkmoor.example", Message: "Could you send pricing?"}).Error; err != nil {
@@ -282,7 +285,7 @@ func TestErasingSomeoneCoversWhatWasSuggestedForThem(t *testing.T) {
 		t.Fatal("what she wrote from an address suggested for her outlived her erasure")
 	}
 	add := func(name, email, link string) error {
-		_, err := s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: name, Email: email, Linkedin: link, SourceURL: team})
+		_, err := s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: name, Email: email, Linkedin: link, SourceURL: team})
 		return err
 	}
 	if err := add("H. P.", "", "https://www.linkedin.com/in/hannah-pryce-example/"); err == nil {
@@ -298,10 +301,10 @@ func TestARestoreDropsSuggestionsForPeopleItDrops(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
-	in := AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	in := prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	// A restore refuses a file with nobody in it, so someone else is there throughout.
-	must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Jonas Lindqvist", SourceURL: "https://larkmoor.example/team"}))
+	must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Jonas Lindqvist", SourceURL: "https://larkmoor.example/team"}))
 	before := must(s.SnapshotText(o.ID))
 	must(s.AgentAddContact(o, scout, in))
 	in.Phone = "+44 20 7946 0000"
@@ -322,10 +325,10 @@ func TestADetailFoundForATaskWaitsAndCountsTowardsTheTask(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
-	hannah := must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}))
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
+	hannah := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}))
 	task := must(s.CreateTask(o.ID, "Phones", "Find phone numbers for the people at Larkmoor.", "Ada Lovelace"))
-	got := must(s.AgentAddContact(o, scout, AddContactIn{Task: task.ID, Company: "Larkmoor Yachts", Name: "Hannah Pryce",
+	got := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Task: task.ID, Company: "Larkmoor Yachts", Name: "Hannah Pryce",
 		Phone: "+44 20 7946 0000", SourceURL: "https://larkmoor.example/contact"}))
 	if !got.Existed || strings.Join(got.Suggested, " ") != "phone" {
 		t.Fatalf("the number should wait as a suggestion: %+v", got)
@@ -341,18 +344,18 @@ func TestAnAgentsGuessesDontPileUpOnOnePerson(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
-	in := AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
-	co := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	in := prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
+	co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	hannah := must(s.AgentAddContact(o, scout, in))
 	for _, guess := range []string{"hannah", "h.pryce", "hpryce", "hannah.pryce", "pryce.h"} {
 		in.Email = guess + "@larkmoor.example"
 		must(s.AgentAddContact(o, scout, in))
 	}
-	in.Email, in.Phone = "", strings.Repeat("7", maxDetail+1)
+	in.Email, in.Phone = "", strings.Repeat("7", prospecting.MaxDetail+1)
 	must(s.AgentAddContact(o, scout, in))
 	var waiting int64
-	if s.DB.Model(&Suggestion{}).Where("contact_id = ?", hannah.ID).Count(&waiting); waiting != maxWaiting {
-		t.Fatalf("want %d addresses waiting and no overlong number, got %d rows", maxWaiting, waiting)
+	if s.DB.Model(&Suggestion{}).Where("contact_id = ?", hannah.ID).Count(&waiting); waiting != prospecting.MaxWaiting {
+		t.Fatalf("want %d addresses waiting and no overlong number, got %d rows", prospecting.MaxWaiting, waiting)
 	}
 
 	// Typed in by a person meanwhile, a suggestion leaves nothing to check.
@@ -366,7 +369,7 @@ func TestAnAgentsGuessesDontPileUpOnOnePerson(t *testing.T) {
 		if guess != "hpryce" {
 			var sg Suggestion
 			s.DB.Where("contact_id = ? and value = ?", hannah.ID, guess+"@larkmoor.example").First(&sg)
-			if err := s.DecideSuggestion(o.ID, sg.ID, SuggestionDismissed, "ada"); err != nil {
+			if err := s.DecideSuggestion(o.ID, sg.ID, prospecting.SuggestionDismissed, "ada"); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -381,8 +384,8 @@ func TestARestoreDoesntHandASuggestionToWhoeverGotTheId(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
-	in := AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	in := prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	hannah := must(s.AgentAddContact(o, scout, in))
 	in.Phone = "+44 20 7946 0000"
 	must(s.AgentAddContact(o, scout, in))

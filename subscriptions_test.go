@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/sales"
 )
 
@@ -353,8 +354,8 @@ func TestARenewalDealIsStartedFromASubscription(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	hannah := repliedPerson(t, s, o, "Hannah Pryce")
-	quiet := must(s.QuickAddPerson(o, QuickAdd{Name: "Tom Ellery", Company: "Larkmoor Yachts"}, "Ada Lovelace"))
-	elsewhere := must(s.QuickAddPerson(o, QuickAdd{Name: "Sven Dahl", Company: "Nordkap Boats"}, "Ada Lovelace"))
+	quiet := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Tom Ellery", Company: "Larkmoor Yachts"}, "Ada Lovelace"))
+	elsewhere := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Sven Dahl", Company: "Nordkap Boats"}, "Ada Lovelace"))
 	if err := s.Mark(o.ID, elsewhere.ID, "replied", today(), "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
@@ -446,7 +447,7 @@ func TestARobotWorksSubscriptionsAsItsScopesAllow(t *testing.T) {
 		return secret
 	}
 	reader, writer, stranger := key(o.ID, "read"), key(o.ID, "customers:write"), key(other.ID, "read", "customers:write")
-	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	subs := srv.URL + "/o/alpha/api/v1/subscriptions"
 	plan := map[string]any{"company": *hannah.CompanyID, "name": "Standard plan", "amount": "14,000", "start": "2026-01-12", "term_months": 12, "notice_days": 60}
 

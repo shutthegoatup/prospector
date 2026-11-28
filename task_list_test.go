@@ -9,6 +9,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 // queries counts the reads a store makes while do runs.
@@ -31,17 +33,17 @@ func TestTheTaskListTakesNoMoreQueriesForMoreTasks(t *testing.T) {
 	work := func(i int) {
 		task := must(s.CreateTask(o.ID, "", fmt.Sprint("Find makers of garden rooms, part ", i), "Nia"))
 		must(s.AgentTask(o.ID, scout, task.ID, paging.Page{}))
-		co := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: fmt.Sprint("Larkmoor ", i), Task: task.ID}))
-		must(s.AgentAddContact(o, scout, AddContactIn{Company: co.Name, Name: fmt.Sprintf("Ada V%cle", rune(0x61+i)),
+		co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: fmt.Sprint("Larkmoor ", i), Task: task.ID}))
+		must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: co.Name, Name: fmt.Sprintf("Ada V%cle", rune(0x61+i)),
 			SourceURL: "https://larkmoor.example/team", Task: task.ID}))
-		must(s.AgentNote(o.ID, second, NoteIn{Task: task.ID, Company: "Larkmoor 0", Kind: "skipped", Text: "No team page"}))
+		must(s.AgentNote(o.ID, second, research.NoteIn{Task: task.ID, Company: "Larkmoor 0", Kind: "skipped", Text: "No team page"}))
 		if _, err := s.AskTask(o.ID, task.ID, "And their head of digital", "Nia"); err != nil {
 			t.Fatal(err)
 		}
 	}
 	work(0)
 	now := time.Now()
-	var one, many []TaskView
+	var one, many []research.TaskView
 	forOne := queries(t, s, func() { one = must(firstOf(s.Tasks(o.ID, true, 1, now))) })
 	for i := 1; i < 12; i++ {
 		work(i)

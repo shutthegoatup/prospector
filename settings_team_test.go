@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
@@ -108,7 +110,7 @@ func TestTheTeamThroughTheAPI(t *testing.T) {
 	}
 }
 
-func fmtMembers(ms []Member) string {
+func fmtMembers(ms []identity.Member) string {
 	var out []string
 	for _, m := range ms {
 		out = append(out, m.Email)
@@ -381,7 +383,7 @@ func TestWhoTheNeverContactListHoldsBackThroughTheAPI(t *testing.T) {
 	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	for _, name := range []string{"Hannah Pryce", "Ivo Marsh"} {
-		must(s.QuickAddPerson(o, QuickAdd{Name: name, Company: "Larkmoor Yachts", Email: strings.ToLower(strings.Fields(name)[0]) + "@larkmoor.example"}, "Ada Lovelace"))
+		must(s.QuickAddPerson(o, crm.QuickAdd{Name: name, Company: "Larkmoor Yachts", Email: strings.ToLower(strings.Fields(name)[0]) + "@larkmoor.example"}, "Ada Lovelace"))
 
 	}
 	url := srv.URL + "/o/alpha/api/v1/never-contact/covers"

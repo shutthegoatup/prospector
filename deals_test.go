@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 func repliedPerson(t *testing.T, s *Store, o *Org, name string) *Contact {
 	t.Helper()
-	c := must(s.QuickAddPerson(o, QuickAdd{Name: name, Company: "Larkmoor Yachts"}, "Ada Lovelace"))
+	c := must(s.QuickAddPerson(o, crm.QuickAdd{Name: name, Company: "Larkmoor Yachts"}, "Ada Lovelace"))
 	if err := s.Mark(o.ID, c.ID, "replied", time.Now().Format("2006-01-02"), "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +60,7 @@ func TestADealIsValuedOnceSomeoneReplies(t *testing.T) {
 	if err := s.AddMember(o.ID, u.ID, "owner", u.Name); err != nil {
 		t.Fatal(err)
 	}
-	quiet := must(s.QuickAddPerson(o, QuickAdd{Name: "Sven Dahl", Company: "Nordkap Boats"}, u.Name))
+	quiet := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Sven Dahl", Company: "Nordkap Boats"}, u.Name))
 	if err := s.Update(o.ID, quiet.ID, "deal_amount", "7500", u.Name); err == nil {
 		t.Error("someone who hasn't replied was given a deal")
 	}
@@ -265,7 +266,7 @@ func TestAnotherDealWithSomeoneInConversation(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	quiet := must(s.QuickAddPerson(o, QuickAdd{Name: "Sven Dahl", Company: "Nordkap Boats"}, "Ada Lovelace"))
+	quiet := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Sven Dahl", Company: "Nordkap Boats"}, "Ada Lovelace"))
 	if _, err := s.StartDeal(o.ID, quiet.ID, "renewal", "Ada Lovelace"); err == nil {
 		t.Error("a renewal was started with someone who hasn't replied")
 	}

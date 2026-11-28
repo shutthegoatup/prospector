@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
 )
 
 func seedCompanies(t *testing.T, s *Store, org int64, n int, stage, segment string) []Company {
@@ -35,10 +36,10 @@ func seedContact(t *testing.T, s *Store, c Contact) Contact {
 func TestCompaniesArePaged(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
-	seedCompanies(t, s, o.ID, 620, CompanyQualified, "Yachts & boats")
+	seedCompanies(t, s, o.ID, 620, prospecting.CompanyQualified, "Yachts & boats")
 
 	rows, pg, err := s.Companies(o.ID, "", "", "", 1)
-	if err != nil || len(rows) != companiesPageSize || pg.Total != 620 || rows[0].Name != "Maker 001" {
+	if err != nil || len(rows) != crm.CompaniesPageSize || pg.Total != 620 || rows[0].Name != "Maker 001" {
 		t.Fatalf("first page: %d rows, %+v, %v", len(rows), pg, err)
 	}
 	rows, pg, _ = s.Companies(o.ID, "", "", "", pg.Pages())
@@ -105,9 +106,9 @@ func TestPipelineInSQL(t *testing.T) {
 		"Lost one, one live": "outreach", "Declined unreached": "research", "Declined after a touch": "outreach",
 		"Declined after a reply": "outreach", "Declined, one in talks": "proposal"}
 	for name, list := range people {
-		c := Company{OrgID: o.ID, Name: name, Stage: CompanyQualified}
+		c := Company{OrgID: o.ID, Name: name, Stage: prospecting.CompanyQualified}
 		if strings.HasPrefix(name, "Turned down") {
-			c.Stage = CompanyRejected
+			c.Stage = prospecting.CompanyRejected
 		}
 		if err := s.DB.Create(&c).Error; err != nil {
 			t.Fatal(err)
@@ -126,9 +127,9 @@ func TestPipelineInSQL(t *testing.T) {
 	}
 	for _, r := range rows {
 		listed, _ := s.People(o.ID, r.ID)
-		if r.Pipeline != want[r.Name] || r.Pipeline != pipeline(r.Company, listed) || r.People != len(people[r.Name]) {
+		if r.Pipeline != want[r.Name] || r.Pipeline != prospecting.Pipeline(r.Company, listed) || r.People != len(people[r.Name]) {
 			t.Errorf("%s: list says %s with %d people, its own page says %s, want %s with %d",
-				r.Name, r.Pipeline, r.People, pipeline(r.Company, listed), want[r.Name], len(people[r.Name]))
+				r.Name, r.Pipeline, r.People, prospecting.Pipeline(r.Company, listed), want[r.Name], len(people[r.Name]))
 		}
 	}
 	for _, stage := range crm.PipelineStages {
@@ -158,7 +159,7 @@ func TestStageFilterPagesInSQL(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	// Every tenth company is in outreach, so the filter's matches are spread far past one page.
-	for i, c := range seedCompanies(t, s, o.ID, 700, CompanyQualified, "") {
+	for i, c := range seedCompanies(t, s, o.ID, 700, prospecting.CompanyQualified, "") {
 		if i%10 == 9 {
 			seedContact(t, s, Contact{OrgID: o.ID, CompanyID: &c.ID, Key: c.Name, LinkedinAdded: str("2026-01-05")})
 		}
@@ -175,7 +176,7 @@ func TestStageFilterPagesInSQL(t *testing.T) {
 func TestResearchIsPaged(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
-	seeded := seedCompanies(t, s, o.ID, 230, CompanyReview, "")
+	seeded := seedCompanies(t, s, o.ID, 230, prospecting.CompanyReview, "")
 	for _, i := range []int{0, 229} {
 		c := seeded[i]
 		for _, field := range []string{"platform", "team_page"} {
@@ -193,7 +194,7 @@ func TestResearchIsPaged(t *testing.T) {
 	}
 	// Newest first, so the first company seeded is the last row of the last page.
 	rows, pg, err := s.Research(o.ID, "review", 1)
-	if err != nil || len(rows) != researchPageSize || pg.Pages() != 8 || rows[0].Name != "Maker 230" {
+	if err != nil || len(rows) != prospecting.ResearchPageSize || pg.Pages() != 8 || rows[0].Name != "Maker 230" {
 		t.Fatalf("first page: %d rows, %+v, %v", len(rows), pg, err)
 	}
 	if len(rows[0].Facts) != 2 || rows[0].Facts[0].Value != "Maker 230" || len(rows[0].People) != 1 || len(rows[1].Facts) != 0 {
@@ -222,7 +223,7 @@ func TestResearchIsPaged(t *testing.T) {
 	}
 }
 
-func names(rows []CompanyListRow) string {
+func names(rows []crm.CompanyListRow) string {
 	var out []string
 	for _, r := range rows {
 		out = append(out, r.Name)
@@ -235,7 +236,7 @@ func TestSearch(t *testing.T) {
 	s := tempStore(t)
 	a, b := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
 	add := func(o *Org, c Company, people ...Contact) Company {
-		c.OrgID, c.Stage = o.ID, CompanyQualified
+		c.OrgID, c.Stage = o.ID, prospecting.CompanyQualified
 		if err := s.DB.Create(&c).Error; err != nil {
 			t.Fatal(err)
 		}
@@ -317,7 +318,7 @@ func TestSearchIndexIsBuiltForExistingRows(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	if _, err := s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "test"); err != nil {
+	if _, err := s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "test"); err != nil {
 		t.Fatal(err)
 	}
 	indexes := []string{"idx_companies_search", "idx_contacts_person_search", "idx_contacts_search"}
@@ -326,7 +327,7 @@ func TestSearchIndexIsBuiltForExistingRows(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := s.QuickAddPerson(o, QuickAdd{Name: "Imogen Vale", Company: "Windrush Marine"}, "test"); err != nil {
+	if _, err := s.QuickAddPerson(o, crm.QuickAdd{Name: "Imogen Vale", Company: "Windrush Marine"}, "test"); err != nil {
 		t.Fatal(err)
 	}
 	s.IndexSearch()

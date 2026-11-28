@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 // researchQueue is what the Research page lists, read as it reads it.
@@ -49,7 +51,7 @@ func TestEachCriterionIsMetNotMetOrNotFound(t *testing.T) {
 	o := mustOrg(t, s, "alpha")
 	o.Settings.LookFor = criteriaLookFor
 	bot := Actor{Name: "agent:bot"}
-	out, err := s.AgentAddCompany(o.ID, bot, AddCompanyIn{Name: "Tidewater Skiffs", Domain: "tidewater.example", Facts: []FactIn{
+	out, err := s.AgentAddCompany(o.ID, bot, research.AddCompanyIn{Name: "Tidewater Skiffs", Domain: "tidewater.example", Facts: []research.FactIn{
 		{Field: "configurator", Value: "Choose your hull colour on every model page", SourceURL: "https://tidewater.example/models"},
 		{Field: "payments", Value: "Order through a dealer; no online payment", SourceURL: "https://tidewater.example/buy", Answer: "no"},
 		{Field: "crm", Value: "Looked at 6 pages and 2 job adverts", Answer: "unknown"},
@@ -57,55 +59,55 @@ func TestEachCriterionIsMetNotMetOrNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := assetsFound(o.Settings, must(s.Facts(o.ID, out.ID)))
-	if found[0].State != assetMet || found[1].State != assetNotMet || found[2].State != assetNotFound {
+	found := prospecting.AssetsFound(o.Settings, must(s.Facts(o.ID, out.ID)))
+	if found[0].State != prospecting.AssetMet || found[1].State != prospecting.AssetNotMet || found[2].State != prospecting.AssetNotFound {
 		t.Fatalf("the answers: %+v", found)
 	}
-	if got := fitOf(found).Text(); got != "1 of 3 · 1 not found" {
+	if got := prospecting.FitOf(found).Text(); got != "1 of 3 · 1 not found" {
 		t.Fatalf("the fit: %q", got)
 	}
 
 	// A later answer stands for the criterion: the agent found the CRM after all.
-	if _, err := s.AgentAddFact(o.ID, bot, AddFactIn{Company: "Tidewater Skiffs", FactIn: FactIn{Field: "crm",
+	if _, err := s.AgentAddFact(o.ID, bot, research.AddFactIn{Company: "Tidewater Skiffs", FactIn: research.FactIn{Field: "crm",
 		Value: "An advert asks for experience with a named CRM", SourceURL: "https://jobs.example/tidewater/42", Inferred: true}}); err != nil {
 		t.Fatal(err)
 	}
-	found = assetsFound(o.Settings, must(s.Facts(o.ID, out.ID)))
-	if found[2].State != assetMet || !found[2].Fact.Inferred {
+	found = prospecting.AssetsFound(o.Settings, must(s.Facts(o.ID, out.ID)))
+	if found[2].State != prospecting.AssetMet || !found[2].Fact.Inferred {
 		t.Fatalf("the newer answer should stand, marked inferred: %+v", found[2])
 	}
-	if others := otherFacts(o.Settings, must(s.Facts(o.ID, out.ID))); len(others) != 1 || others[0].Answer != answerUnknown {
+	if others := research.OtherFacts(o.Settings, must(s.Facts(o.ID, out.ID))); len(others) != 1 || others[0].Answer != prospecting.AnswerUnknown {
 		t.Fatalf("the answer it replaced should still be kept among the other facts: %+v", others)
 	}
 
 	// Said again after a different answer, an earlier answer stands once more.
-	payments := func(f FactIn) string {
+	payments := func(f research.FactIn) string {
 		t.Helper()
-		if _, err := s.AgentAddFact(o.ID, bot, AddFactIn{Company: "Tidewater Skiffs", FactIn: f}); err != nil {
+		if _, err := s.AgentAddFact(o.ID, bot, research.AddFactIn{Company: "Tidewater Skiffs", FactIn: f}); err != nil {
 			t.Fatal(err)
 		}
-		return assetsFound(o.Settings, must(s.Facts(o.ID, out.ID)))[1].State
+		return prospecting.AssetsFound(o.Settings, must(s.Facts(o.ID, out.ID)))[1].State
 	}
-	paid := FactIn{Field: "payments", Value: "Card deposit at checkout", SourceURL: "https://tidewater.example/checkout"}
-	if payments(paid) != assetMet {
+	paid := research.FactIn{Field: "payments", Value: "Card deposit at checkout", SourceURL: "https://tidewater.example/checkout"}
+	if payments(paid) != prospecting.AssetMet {
 		t.Fatal("a yes after a no should stand")
 	}
-	if payments(FactIn{Field: "Payments", Value: "Order through a dealer; no online payment", SourceURL: "https://tidewater.example/buy", Answer: "no"}) != assetNotMet {
+	if payments(research.FactIn{Field: "Payments", Value: "Order through a dealer; no online payment", SourceURL: "https://tidewater.example/buy", Answer: "no"}) != prospecting.AssetNotMet {
 		t.Fatal("the no, said again after a yes, should stand again")
 	}
-	if payments(paid) != assetMet {
+	if payments(paid) != prospecting.AssetMet {
 		t.Fatal("the yes, said again word for word after a no, should stand again")
 	}
-	if payments(paid) != assetMet || len(must(s.Facts(o.ID, out.ID))) != 7 {
+	if payments(paid) != prospecting.AssetMet || len(must(s.Facts(o.ID, out.ID))) != 7 {
 		t.Fatalf("the latest answer repeated should add nothing: %d facts", len(must(s.Facts(o.ID, out.ID))))
 	}
 
-	for _, bad := range []FactIn{
+	for _, bad := range []research.FactIn{
 		{Field: "payments", Value: "No online payment", Answer: "no"},
 		{Field: "payments", Value: "Maybe", SourceURL: "https://tidewater.example", Answer: "perhaps"},
 		{Field: "crm", Value: "Looked", SourceURL: "javascript:alert(1)", Answer: "unknown"},
 	} {
-		if _, err := s.AgentAddFact(o.ID, bot, AddFactIn{Company: "Tidewater Skiffs", FactIn: bad}); err == nil {
+		if _, err := s.AgentAddFact(o.ID, bot, research.AddFactIn{Company: "Tidewater Skiffs", FactIn: bad}); err == nil {
 			t.Errorf("accepted %+v", bad)
 		}
 	}
@@ -125,22 +127,22 @@ func TestASearchRanksItsCompaniesByFit(t *testing.T) {
 	}
 	task := must(s.CreateTask(o.ID, "Makers", "Boat makers with a configurator.", "Ada Lovelace"))
 	bot := Actor{Name: "agent:bot"}
-	yes := func(field, site string) FactIn {
-		return FactIn{Field: field, Value: "Has " + field, SourceURL: "https://" + site + "/" + field}
+	yes := func(field, site string) research.FactIn {
+		return research.FactIn{Field: field, Value: "Has " + field, SourceURL: "https://" + site + "/" + field}
 	}
-	no := func(field, site string) FactIn {
-		return FactIn{Field: field, Value: "No " + field, SourceURL: "https://" + site + "/" + field, Answer: "no"}
+	no := func(field, site string) research.FactIn {
+		return research.FactIn{Field: field, Value: "No " + field, SourceURL: "https://" + site + "/" + field, Answer: "no"}
 	}
 	// Added best fit first, so newest first would show them the other way round.
 	for _, c := range []struct {
 		name  string
-		facts []FactIn
+		facts []research.FactIn
 	}{
-		{"Corran Craft", []FactIn{yes("configurator", "corran.example"), yes("payments", "corran.example")}},
-		{"Brine Boats", []FactIn{yes("configurator", "brine.example")}},
-		{"Anchor Works", []FactIn{no("configurator", "anchor.example"), yes("payments", "anchor.example"), yes("crm", "anchor.example")}},
+		{"Corran Craft", []research.FactIn{yes("configurator", "corran.example"), yes("payments", "corran.example")}},
+		{"Brine Boats", []research.FactIn{yes("configurator", "brine.example")}},
+		{"Anchor Works", []research.FactIn{no("configurator", "anchor.example"), yes("payments", "anchor.example"), yes("crm", "anchor.example")}},
 	} {
-		if _, err := s.AgentAddCompany(o.ID, bot, AddCompanyIn{Name: c.name, Domain: strings.ToLower(strings.Fields(c.name)[0]) + ".example",
+		if _, err := s.AgentAddCompany(o.ID, bot, research.AddCompanyIn{Name: c.name, Domain: strings.ToLower(strings.Fields(c.name)[0]) + ".example",
 			Facts: c.facts, Task: task.ID}); err != nil {
 			t.Fatal(err)
 		}

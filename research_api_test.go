@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 func TestARobotAddsPeopleAndReviewsResearchAsItsScopesAllow(t *testing.T) {
@@ -68,9 +70,9 @@ func TestARobotAddsPeopleAndReviewsResearchAsItsScopesAllow(t *testing.T) {
 	}
 
 	// An agent's research waits for review, which its own key can't give.
-	co := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Corvane Marine",
-		Facts: []FactIn{{Field: "configurator", Value: "Tender builder", SourceURL: "https://corvane.example/build"}}}))
-	suggested := must(s.AgentAddContact(o, scout, AddContactIn{Company: "Corvane Marine", Name: "Tom Ellery", SourceURL: "https://corvane.example/team"}))
+	co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Corvane Marine",
+		Facts: []research.FactIn{{Field: "configurator", Value: "Tender builder", SourceURL: "https://corvane.example/build"}}}))
+	suggested := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Corvane Marine", Name: "Tom Ellery", SourceURL: "https://corvane.example/team"}))
 	company := fmt.Sprintf("%scompanies/%d", base, co.ID)
 	if code, body := asKey(t, "PATCH", company, scoutKey, map[string]any{"stage": "qualified"}); code != http.StatusForbidden || !strings.Contains(body, "research:review") {
 		t.Fatalf("an agent qualifying its own find: %d %s", code, body)
@@ -78,7 +80,7 @@ func TestARobotAddsPeopleAndReviewsResearchAsItsScopesAllow(t *testing.T) {
 	if code, body := asKey(t, "PATCH", company, reviewer, map[string]any{"stage": "qualified", "fit": "Builds to order"}); code != http.StatusNoContent {
 		t.Fatalf("a reviewer qualifying a company: %d %s", code, body)
 	}
-	if got := row[Company](t, s, o.ID, co.ID); got.Stage != CompanyQualified || got.Fit != "Builds to order" {
+	if got := row[Company](t, s, o.ID, co.ID); got.Stage != prospecting.CompanyQualified || got.Fit != "Builds to order" {
 		t.Fatalf("the company: %+v", got)
 	}
 	if code, _ := asKey(t, "PATCH", company, reviewer, map[string]any{"stage": "maybe"}); code != http.StatusBadRequest {
@@ -92,7 +94,7 @@ func TestARobotAddsPeopleAndReviewsResearchAsItsScopesAllow(t *testing.T) {
 	}
 
 	// A detail found for someone already stored waits to be accepted.
-	must(s.AgentAddContact(o, scout, AddContactIn{Company: "Corvane Marine", Name: "Tom Ellery", Email: "tom@corvane.example", SourceURL: "https://corvane.example/team"}))
+	must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Corvane Marine", Name: "Tom Ellery", Email: "tom@corvane.example", SourceURL: "https://corvane.example/team"}))
 	var pending []Suggestion
 	if err := s.DB.Where("org_id = ? and contact_id = ? and decision = ''", o.ID, suggested.ID).Find(&pending).Error; err != nil {
 		t.Fatal(err)

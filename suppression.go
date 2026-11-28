@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"net/http"
+
+	"github.com/shutthegoatup/prospector/internal/request"
 )
 
 // UnsubscribeView is everything the page at an unsubscribe link shows: nothing about
@@ -63,5 +65,5 @@ func (a *App) unsubscribe(w http.ResponseWriter, r *http.Request) {
 func (a *App) unsubscribeRender(w http.ResponseWriter, r *http.Request, v UnsubscribeView) {
 	customerHeaders(w)
 	v.Page = "unsubscribe"
-	writeShell(w, languageFor(r, v.lang), http.StatusOK, v, "This page needs a browser with JavaScript.\n")
+	writeShell(w, request.LanguageFor(r, v.lang), http.StatusOK, v, "This page needs a browser with JavaScript.\n")
 }

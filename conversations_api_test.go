@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/onboarding"
 )
 
@@ -28,7 +30,7 @@ func TestTheBoardIsReadThroughTheAPI(t *testing.T) {
 	renewal := must(s.StartDeal(o.ID, hannah.ID, "renewal", "Ada Lovelace"))
 	must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: day}, "Ada Lovelace"))
 
-	ines := must(s.QuickAddPerson(o, QuickAdd{Name: "Ines Moreau", Company: "Belair Kitchens"}, "Ada Lovelace"))
+	ines := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Ines Moreau", Company: "Belair Kitchens"}, "Ada Lovelace"))
 	if err := s.Mark(o.ID, ines.ID, "replied", day, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +150,7 @@ func TestTheBoardsWritesAreRefusedOutsideTheirArea(t *testing.T) {
 		{"DELETE", "deals/" + itoa(renewal.ID), nil},
 	}
 	support := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
-	if err := s.SetAreas(o.ID, support.ID, []string{areaSupport}); err != nil {
+	if err := s.SetAreas(o.ID, support.ID, []string{identity.AreaSupport}); err != nil {
 		t.Fatal(err)
 	}
 	asSupport := signInAs(t, srv, "grace@example.com", "correct horse battery")

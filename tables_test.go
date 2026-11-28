@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/privacy"
 )
 
@@ -154,7 +155,7 @@ func TestWhateverPointsAtAPersonGoesWhenTheyDo(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	add := func(name string) *Contact {
-		return must(s.QuickAddPerson(o, QuickAdd{Name: name, Company: "Larkmoor"}, "Nia"))
+		return must(s.QuickAddPerson(o, crm.QuickAdd{Name: name, Company: "Larkmoor"}, "Nia"))
 	}
 
 	erased := add("Ada Vale")

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
@@ -174,11 +175,11 @@ func TestFrontOrgIsMadeOnce(t *testing.T) {
 	if err := s.EnsureFrontOrg(address + ":443"); err != nil {
 		t.Fatal(err)
 	}
-	o, err := s.OrgBySlug(frontOrgSlug)
+	o, err := s.OrgBySlug(identity.FrontOrgSlug)
 	if err != nil || o.Settings.EnquirySites != address {
 		t.Fatalf("the front organisation: %+v, %v", o, err)
 	}
-	srv := httptest.NewServer((&App{s: s, frontOrg: frontOrgSlug, base: address}).Routes())
+	srv := httptest.NewServer((&App{s: s, frontOrg: identity.FrontOrgSlug, base: address}).Routes())
 	t.Cleanup(srv.Close)
 	if _, body := call(t, &http.Client{}, "GET", srv.URL+"/", "", nil); !strings.Contains(body, `&quot;intake&quot;:&quot;/o/prospector/intake&quot;,&quot;origin&quot;:&quot;`+address+`&quot;`) {
 		t.Error("a server told its address starts without the front page's form")
@@ -189,7 +190,7 @@ func TestFrontOrgIsMadeOnce(t *testing.T) {
 	if err := s.EnsureFrontOrg(address); err != nil {
 		t.Fatal(err)
 	}
-	if o, _ := s.OrgBySlug(frontOrgSlug); o.Settings.EnquirySites != "" {
+	if o, _ := s.OrgBySlug(identity.FrontOrgSlug); o.Settings.EnquirySites != "" {
 		t.Errorf("a restart listed %q again", o.Settings.EnquirySites)
 	}
 	var orgs int64
@@ -202,7 +203,7 @@ func TestFrontOrgIsMadeOnce(t *testing.T) {
 	if err := bare.EnsureFrontOrg(""); err != nil {
 		t.Fatal(err)
 	}
-	if o, err := bare.OrgBySlug(frontOrgSlug); err != nil || o.Settings.EnquirySites != "" {
+	if o, err := bare.OrgBySlug(identity.FrontOrgSlug); err != nil || o.Settings.EnquirySites != "" {
 		t.Errorf("without an address: %+v, %v", o, err)
 	}
 }
@@ -221,7 +222,7 @@ func TestTheServerSaysWhyTheFrontPageHasNoForm(t *testing.T) {
 		"no address but sites listed":  {"", address, ""},
 	} {
 		s := tempStore(t)
-		o := mustOrg(t, s, frontOrgSlug)
+		o := mustOrg(t, s, identity.FrontOrgSlug)
 		takeEnquiriesFrom(t, s, o, c.sites)
 		why := s.FrontFormOff(c.base)
 		if c.want == "" && why != "" || c.want != "" && (!strings.Contains(why, c.want) || !strings.Contains(why, "member add prospector")) {
@@ -262,7 +263,7 @@ func TestTheFrontPageTellsTheTruthAboutKeys(t *testing.T) {
 		t.Fatalf("the front page names only %d scopes", len(named))
 	}
 	for _, m := range named {
-		if !validScope(m[1]) {
+		if !identity.ValidScope(m[1]) {
 			t.Errorf("the front page names a scope that does not exist: %s", m[1])
 		}
 	}

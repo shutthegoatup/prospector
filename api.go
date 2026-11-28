@@ -12,6 +12,9 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 // apiRoutes holds the one route the spec doesn't: MCP, a protocol of its own.
@@ -33,8 +36,8 @@ type ok struct {
 }
 
 type tasksOut struct {
-	Tasks      []TaskBrief `json:"tasks"`
-	NextCursor string      `json:"next_cursor,omitempty" jsonschema:"set when there are more open tasks than are listed: pass it as cursor for the rest"`
+	Tasks      []research.TaskBrief `json:"tasks"`
+	NextCursor string               `json:"next_cursor,omitempty" jsonschema:"set when there are more open tasks than are listed: pass it as cursor for the rest"`
 }
 
 type taskRef struct {
@@ -55,7 +58,7 @@ type builtMCP struct {
 // mcpServer is built once per API key, with only the tools its scopes allow. The
 // key is checked again on every request, so revoking it cuts off its sessions, and
 // a session answers only to the key that opened it.
-func (a *App) mcpServer(q *Req) *mcp.Server {
+func (a *App) mcpServer(q *request.Req) *mcp.Server {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if b, found := a.mcp[q.Key.ID]; found && b.scopes == q.Key.Scopes {
@@ -88,12 +91,12 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 			func(_ context.Context, req *mcp.CallToolRequest, in struct {
 				Company string `json:"company" jsonschema:"company id or exact name"`
 				paging.Page
-			}) (*mcp.CallToolResult, *CompanyDetail, error) {
+			}) (*mcp.CallToolResult, *research.CompanyDetail, error) {
 				c, err := a.s.AgentCompany(org.ID, sessionOf(req), in.Company, in.Page)
 				return nil, c, err
 			})
 		addTool(s, &mcp.Tool{Name: "list_due", Description: "What is due on Today, and whether its text is written yet, a page at a time."},
-			func(_ context.Context, req *mcp.CallToolRequest, in paging.Page) (*mcp.CallToolResult, *DueOut, error) {
+			func(_ context.Context, req *mcp.CallToolRequest, in paging.Page) (*mcp.CallToolResult, *research.DueOut, error) {
 				o, err := current()
 				if err != nil {
 					return nil, nil, err
@@ -107,7 +110,7 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 				return nil, tasksOut{tasks, next}, err
 			})
 		addTool(s, &mcp.Tool{Name: "get_task", Description: "Everything needed to carry a task on: the brief in the person's words, what has been asked since, the companies and people already found, and the notes other agents left. Read it before working a task; people see that you picked it up. With a key that can add research, it also keeps an open request for you (claimed_request): work that one. If other agents hold every open request, leave the task to them."},
-			func(_ context.Context, req *mcp.CallToolRequest, in taskRef) (*mcp.CallToolResult, *TaskOut, error) {
+			func(_ context.Context, req *mcp.CallToolRequest, in taskRef) (*mcp.CallToolResult, *research.TaskOut, error) {
 				out, err := a.s.AgentTask(org.ID, sessionOf(req), in.ID, in.Page)
 				return nil, out, err
 			})
@@ -121,37 +124,37 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 					return nil, errors.New(text.Error())
 				}
 				return &mcp.GetPromptResult{Description: t.Title, Messages: []*mcp.PromptMessage{
-					{Role: "user", Content: &mcp.TextContent{Text: taskPrompt(org, t.Task)}}}}, nil
+					{Role: "user", Content: &mcp.TextContent{Text: research.TaskPrompt(org, t.Task)}}}}, nil
 			})
 	}
 	if k.Has("research:write") {
 		addTool(s, &mcp.Tool{Name: "task_note", Description: "Leave a short working note on a task or a company for whoever comes next: what you skipped and why, where you found nothing, or what you would do next. Not a fact, and not for naming people."},
-			func(_ context.Context, req *mcp.CallToolRequest, in NoteIn) (*mcp.CallToolResult, ok, error) {
+			func(_ context.Context, req *mcp.CallToolRequest, in research.NoteIn) (*mcp.CallToolResult, ok, error) {
 				_, err := a.s.AgentNote(org.ID, sessionOf(req), in)
 				return nil, ok{err == nil}, err
 			})
 		addTool(s, &mcp.Tool{Name: "finish_request", Description: "Say that an open request on a task is done. A person can reopen it."},
-			func(_ context.Context, req *mcp.CallToolRequest, in FinishIn) (*mcp.CallToolResult, ok, error) {
+			func(_ context.Context, req *mcp.CallToolRequest, in research.FinishIn) (*mcp.CallToolResult, ok, error) {
 				err := a.s.AgentFinish(org.ID, sessionOf(req), in)
 				return nil, ok{err == nil}, err
 			})
 		addTool(s, &mcp.Tool{Name: "add_company", Description: "Add a company to Research for a person to review, with facts and their sources. If its name or domain is already known, the facts it lacks are added to that company."},
-			func(_ context.Context, req *mcp.CallToolRequest, in AddCompanyIn) (*mcp.CallToolResult, *AddCompanyOut, error) {
+			func(_ context.Context, req *mcp.CallToolRequest, in research.AddCompanyIn) (*mcp.CallToolResult, *research.AddCompanyOut, error) {
 				out, err := a.s.AgentAddCompany(org.ID, sessionOf(req), in)
 				return nil, out, err
 			})
 		addTool(s, &mcp.Tool{Name: "add_fact", Description: "Add one fact about a company, with the page that shows it. A fact the company already has from that page isn't added twice."},
-			func(_ context.Context, req *mcp.CallToolRequest, in AddFactIn) (*mcp.CallToolResult, factAdded, error) {
+			func(_ context.Context, req *mcp.CallToolRequest, in research.AddFactIn) (*mcp.CallToolResult, factAdded, error) {
 				out, err := a.s.AgentAddFact(org.ID, sessionOf(req), in)
 				return nil, factAdded{OK: err == nil, Existed: err == nil && out.Existed}, err
 			})
 		addTool(s, &mcp.Tool{Name: "add_role", Description: "Add a role open at a company, such as a contract, for a task whose offering has roles. Add the company first. A person pursues or junks each role; one junked before is refused with why, so don't add it again."},
-			func(_ context.Context, req *mcp.CallToolRequest, in AddRoleIn) (*mcp.CallToolResult, *AddRoleOut, error) {
+			func(_ context.Context, req *mcp.CallToolRequest, in research.AddRoleIn) (*mcp.CallToolResult, *research.AddRoleOut, error) {
 				out, err := a.s.AgentAddRole(org.ID, sessionOf(req), in)
 				return nil, out, err
 			})
 		addTool(s, &mcp.Tool{Name: "add_contact", Description: "Suggest a person at a company. They wait in Research until a person picks them. Someone already at the company comes back as existed: an email, phone or profile you send that they lack isn't filled in, it waits for a person to accept and is listed in suggested. Never scrape LinkedIn; use links found by search."},
-			func(_ context.Context, req *mcp.CallToolRequest, in AddContactIn) (*mcp.CallToolResult, *AddContactOut, error) {
+			func(_ context.Context, req *mcp.CallToolRequest, in prospecting.AddContactIn) (*mcp.CallToolResult, *research.AddContactOut, error) {
 				o, err := current()
 				if err != nil {
 					return nil, nil, err
@@ -173,14 +176,14 @@ func (a *App) mcpServer(q *Req) *mcp.Server {
 	}
 	if k.Has("drafts:write") {
 		addTool(s, &mcp.Tool{Name: "draft_message", Description: "Write the LinkedIn note (300 characters at most), LinkedIn message, email or follow-up for a contact. It shows as written by an agent; a person edits and sends it. Text a person has edited, or that has already gone out, is refused."},
-			func(_ context.Context, req *mcp.CallToolRequest, in DraftIn) (*mcp.CallToolResult, ok, error) {
+			func(_ context.Context, req *mcp.CallToolRequest, in research.DraftIn) (*mcp.CallToolResult, ok, error) {
 				err := a.s.AgentDraft(org.ID, sessionOf(req), in)
 				return nil, ok{err == nil}, err
 			})
 	}
 	if k.Has("outcomes:write") {
 		addTool(s, &mcp.Tool{Name: "mark", Description: "Record an outcome for a contact in outreach: LinkedIn request sent, accepted, email or follow-up sent, called, replied, declined or on hold. It shows as yours, with your note."},
-			func(_ context.Context, req *mcp.CallToolRequest, in MarkIn) (*mcp.CallToolResult, ok, error) {
+			func(_ context.Context, req *mcp.CallToolRequest, in research.MarkIn) (*mcp.CallToolResult, ok, error) {
 				err := a.s.AgentMark(org.ID, sessionOf(req), in)
 				return nil, ok{err == nil}, err
 			})

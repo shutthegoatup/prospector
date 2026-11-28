@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
@@ -70,7 +72,7 @@ func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
 		t.Fatalf("a one-click unsubscribe answered %d", res.StatusCode)
 	}
 	rows, _, _ := s.Suppressions(o.ID, paging.Page{})
-	if len(rows) != 1 || rows[0].Address != "hannah@larkmoor.example" || rows[0].Reason != SuppressUnsubscribed {
+	if len(rows) != 1 || rows[0].Address != "hannah@larkmoor.example" || rows[0].Reason != marketing.SuppressUnsubscribed {
 		t.Fatalf("after unsubscribing: %+v", rows)
 	}
 	if listed(other.ID) != 0 {
@@ -98,7 +100,7 @@ func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
 	}
 
 	// Marketing mail can't go to them now, whatever the case of the address.
-	if err := s.Marketable(s.DB, o, "HANNAH@larkmoor.example", ""); err != errSuppressed {
+	if err := s.Marketable(s.DB, o, "HANNAH@larkmoor.example", ""); err != marketing.ErrSuppressed {
 		t.Errorf("an unsubscribed address is marketable: %v", err)
 	}
 	if err := s.Marketable(s.DB, other, "hannah@larkmoor.example", ""); err != nil {
@@ -200,7 +202,7 @@ func TestTheListIsKeptByMembersAndKeys(t *testing.T) {
 func TestErasureAndNeverContactKeepAnAddressUnmailed(t *testing.T) {
 	t.Parallel()
 	s, o, _, _ := signedIn(t)
-	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	if err := s.UnsubscribeByToken(strings.TrimPrefix(link(t, s, o.ID, "hannah@larkmoor.example"), "/u/")); err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +273,7 @@ func TestTheListHoldsAtItsEdges(t *testing.T) {
 
 	// A member takes an address off just as the person unsubscribes: theirs stays.
 	added := must(s.Suppress(o.ID, "tom@larkmoor.example", "Ada Lovelace"))
-	if err := s.DB.Model(&Suppression{}).Where("id = ?", added.ID).Update("reason", SuppressUnsubscribed).Error; err != nil {
+	if err := s.DB.Model(&Suppression{}).Where("id = ?", added.ID).Update("reason", marketing.SuppressUnsubscribed).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Unsuppress(o.ID, added.ID, "Ada Lovelace"); err == nil {
@@ -286,12 +288,12 @@ func TestTheListHoldsAtItsEdges(t *testing.T) {
 	if err := s.UnsubscribeByToken(token); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Marketable(s.DB, o, "sven@nordkap.example", ""); err != errSuppressed {
+	if err := s.Marketable(s.DB, o, "sven@nordkap.example", ""); err != marketing.ErrSuppressed {
 		t.Errorf("an unsubscribe after the row was taken off was lost: %v", err)
 	}
 
 	// Erasure and the person's export count the addresses erasure does.
-	jo := must(s.QuickAddPerson(o, QuickAdd{Name: "Jo Marsh", Company: "Larkmoor Yachts", Email: "jo@larkmoor.example."}, "Ada Lovelace"))
+	jo := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Jo Marsh", Company: "Larkmoor Yachts", Email: "jo@larkmoor.example."}, "Ada Lovelace"))
 	if err := s.DB.Create(&Suggestion{OrgID: o.ID, ContactID: jo.ID, Field: "email", Value: "jo.marsh@larkmoor.example", SourceURL: "https://larkmoor.example/team"}).Error; err != nil {
 		t.Fatal(err)
 	}

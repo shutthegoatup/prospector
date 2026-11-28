@@ -3,6 +3,8 @@ package main
 import (
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 // Runs are worked out from events, so a page of them ends where a run does, and a run
@@ -28,7 +30,7 @@ func TestRecentRunsHavePages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var all []Run
+	var all []research.Run
 	before, pages := time.Time{}, 0
 	for {
 		runs, _, next := s.Runs(o.ID, before, 7)
@@ -106,8 +108,8 @@ func TestARunCutShortByWhatIsReadWaitsForTheNextPage(t *testing.T) {
 				At: start.Add(time.Duration(i)*2*time.Hour + time.Duration(j)*time.Minute)})
 		}
 	}
-	if len(events) <= runsRead {
-		t.Fatalf("the test needs more than %d events", runsRead)
+	if len(events) <= research.RunsRead {
+		t.Fatalf("the test needs more than %d events", research.RunsRead)
 	}
 	if err := s.DB.CreateInBatches(events, 200).Error; err != nil {
 		t.Fatal(err)
@@ -132,4 +134,6 @@ func TestARunCutShortByWhatIsReadWaitsForTheNextPage(t *testing.T) {
 }
 
 // runsOnly keeps the runs of a page, for must.
-func runsOnly(runs []Run, _ map[int64]string, _ time.Time) ([]Run, error) { return runs, nil }
+func runsOnly(runs []research.Run, _ map[int64]string, _ time.Time) ([]research.Run, error) {
+	return runs, nil
+}

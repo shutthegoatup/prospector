@@ -23,8 +23,11 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 func TestSafeNext(t *testing.T) {
@@ -524,7 +527,7 @@ func TestRemoveMember(t *testing.T) {
 func TestNeverContactLeavesTheQueue(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
-	c, err := s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah.pryce@larkmoor.example",
+	c, err := s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah.pryce@larkmoor.example",
 		Linkedin: "https://www.linkedin.com/in/hannah-pryce"}, "test")
 	if err != nil {
 		t.Fatal(err)
@@ -671,8 +674,8 @@ func TestContentPolicy(t *testing.T) {
 	// A task with work and a note on it, so those parts of the pages are rendered.
 	task := must(s.CreateTask(o.ID, "", `Makers with a "configurator" <script>alert(1)</script>`, "Ada Lovelace"))
 	bot := Actor{Name: "agent:bot", KeyID: 1}
-	must(s.AgentAddCompany(o.ID, bot, AddCompanyIn{Name: company.Name, Task: task.ID}))
-	must(s.AgentNote(o.ID, bot, NoteIn{Task: task.ID, Company: company.Name, Kind: "skipped", Text: `No builder, only a <img src=x onerror=alert(1)> brochure.`}))
+	must(s.AgentAddCompany(o.ID, bot, research.AddCompanyIn{Name: company.Name, Task: task.ID}))
+	must(s.AgentNote(o.ID, bot, research.NoteIn{Task: task.ID, Company: company.Name, Kind: "skipped", Text: `No builder, only a <img src=x onerror=alert(1)> brochure.`}))
 	res, err := http.Get(srv.URL + "/login")
 	if err != nil {
 		t.Fatal(err)
@@ -760,7 +763,7 @@ func TestOrgIsCreatedWithItsOwner(t *testing.T) {
 	}
 	for _, name := range []string{"Prospector", "gamma boats"} {
 		code, body := call(t, client, "POST", srv.URL+"/api/v1/orgs", "application/json", map[string]string{"name": name})
-		if code != http.StatusConflict || !strings.Contains(body, "already has the address /o/"+slugify(name)) || regexp.MustCompile(`(?i)unique|constraint|duplicate`).MatchString(body) {
+		if code != http.StatusConflict || !strings.Contains(body, "already has the address /o/"+identity.Slugify(name)) || regexp.MustCompile(`(?i)unique|constraint|duplicate`).MatchString(body) {
 			t.Errorf("a second organisation named %q: %d %s", name, code, body)
 		}
 	}
@@ -804,17 +807,17 @@ func TestHistoryNamesPeopleInFull(t *testing.T) {
 		{"cli", "sly@example.com", "sly@example.com"},
 		{"import", "sly@example.com", "sly@example.com"},
 	} {
-		if got := (&Req{User: &User{Name: c.name, Email: c.email}}).Actor(); got != c.want {
+		if got := (&request.Req{User: &User{Name: c.name, Email: c.email}}).Actor(); got != c.want {
 			t.Errorf("a person named %q is recorded as %q, want %q", c.name, got, c.want)
 		}
 	}
-	if got := (&Req{User: &User{Name: "Sam Reed"}, Key: &APIKey{Name: "claude"}}).Actor(); got != "agent:claude" {
+	if got := (&request.Req{User: &User{Name: "Sam Reed"}, Key: &APIKey{Name: "claude"}}).Actor(); got != "agent:claude" {
 		t.Errorf("a key is recorded as %q", got)
 	}
 
 	s, o, srv, client := signedIn(t)
 	code, _ := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/people", "application/json",
-		QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Linkedin: "https://www.linkedin.com/in/hannah-pryce"})
+		crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Linkedin: "https://www.linkedin.com/in/hannah-pryce"})
 	if code != http.StatusCreated {
 		t.Fatalf("quick add: %d", code)
 	}
@@ -867,7 +870,7 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 			t.Fatalf("%s is open before the first password is changed", path)
 		}
 	}
-	if code, _ := call(t, bob, "POST", srv.URL+"/o/alpha/api/v1/people", "application/json", QuickAdd{Name: "Hannah Pryce"}); code != http.StatusForbidden {
+	if code, _ := call(t, bob, "POST", srv.URL+"/o/alpha/api/v1/people", "application/json", crm.QuickAdd{Name: "Hannah Pryce"}); code != http.StatusForbidden {
 		t.Fatalf("an action before the first password is changed: %d", code)
 	}
 	if code, _ := call(t, bob, "POST", srv.URL+"/api/v1/orgs", "application/json", map[string]string{"name": "Mine"}); code != http.StatusForbidden {

@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 type researchPage struct {
@@ -48,18 +51,18 @@ func TestTheResearchQueueIsInTheAPI(t *testing.T) {
 	}
 	task := must(s.CreateTask(o.ID, "Makers", "Boat makers with a configurator.", "Ada Lovelace"))
 	bot := Actor{Name: "agent:bot"}
-	fact := func(field, site, answer string) FactIn {
-		return FactIn{Field: field, Value: answer + " " + field, SourceURL: "https://" + site + "/" + field, Answer: answer}
+	fact := func(field, site, answer string) research.FactIn {
+		return research.FactIn{Field: field, Value: answer + " " + field, SourceURL: "https://" + site + "/" + field, Answer: answer}
 	}
 	for _, c := range []struct {
 		name  string
-		facts []FactIn
+		facts []research.FactIn
 	}{
-		{"Corran Craft", []FactIn{fact("configurator", "corran.example", "yes"), fact("payments", "corran.example", "yes")}},
-		{"Brine Boats", []FactIn{fact("configurator", "brine.example", "yes")}},
-		{"Anchor Works", []FactIn{fact("configurator", "anchor.example", "no"), fact("payments", "anchor.example", "yes")}},
+		{"Corran Craft", []research.FactIn{fact("configurator", "corran.example", "yes"), fact("payments", "corran.example", "yes")}},
+		{"Brine Boats", []research.FactIn{fact("configurator", "brine.example", "yes")}},
+		{"Anchor Works", []research.FactIn{fact("configurator", "anchor.example", "no"), fact("payments", "anchor.example", "yes")}},
 	} {
-		if _, err := s.AgentAddCompany(o.ID, bot, AddCompanyIn{Name: c.name, Domain: strings.ToLower(strings.Fields(c.name)[0]) + ".example",
+		if _, err := s.AgentAddCompany(o.ID, bot, research.AddCompanyIn{Name: c.name, Domain: strings.ToLower(strings.Fields(c.name)[0]) + ".example",
 			Facts: c.facts, Task: task.ID}); err != nil {
 			t.Fatal(err)
 		}
@@ -88,8 +91,8 @@ func TestTheResearchQueueIsInTheAPI(t *testing.T) {
 		t.Fatalf("the API should rank as the page does: %s", got)
 	}
 	corran := ranked.Items[0]
-	if corran.Fit.Text != "2 of 3 · 1 unchecked" || !corran.Criteria[0].Must || corran.Criteria[0].State != assetMet ||
-		corran.Criteria[2].State != assetUnchecked || corran.Criteria[2].At != nil || corran.Criteria[0].At == nil {
+	if corran.Fit.Text != "2 of 3 · 1 unchecked" || !corran.Criteria[0].Must || corran.Criteria[0].State != prospecting.AssetMet ||
+		corran.Criteria[2].State != prospecting.AssetUnchecked || corran.Criteria[2].At != nil || corran.Criteria[0].At == nil {
 		t.Fatalf("each company's answers and fit: %+v", corran)
 	}
 	if ranked.Items[2].Fit.MustsMissed != 1 {
@@ -103,11 +106,11 @@ func TestTheResearchQueueIsInTheAPI(t *testing.T) {
 	}
 
 	// What else the page shows of a company: its other facts and its people, with what waits.
-	if _, err := s.AgentAddFact(o.ID, bot, AddFactIn{Company: "Corran Craft", FactIn: FactIn{Field: "team_page",
+	if _, err := s.AgentAddFact(o.ID, bot, research.AddFactIn{Company: "Corran Craft", FactIn: research.FactIn{Field: "team_page",
 		Value: "Lists the sales team", SourceURL: "https://corran.example/team"}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AgentAddContact(o, bot, AddContactIn{Company: "Corran Craft", Name: "Mairi Corran", Title: "Head of sales",
+	if _, err := s.AgentAddContact(o, bot, prospecting.AddContactIn{Company: "Corran Craft", Name: "Mairi Corran", Title: "Head of sales",
 		SourceURL: "https://corran.example/team"}); err != nil {
 		t.Fatal(err)
 	}

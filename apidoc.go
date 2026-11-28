@@ -10,6 +10,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/identity"
 )
 
 // The page at /api is the API's contract, drawn from api/openapi.yaml as people read
@@ -68,7 +69,7 @@ func apiDocOf(spec *openapi3.T) APIDoc {
 	for _, p := range strings.Split(strings.TrimSpace(spec.Info.Description), "\n\n") {
 		doc.Intro = append(doc.Intro, strings.Join(strings.Fields(p), " "))
 	}
-	for _, s := range Scopes {
+	for _, s := range identity.Scopes {
 		doc.Scopes = append(doc.Scopes, APIScope{Name: s.Name, What: s.What.Error(), Owner: ownersOnly(s.Name)})
 	}
 	groups := map[string]*APIGroup{}

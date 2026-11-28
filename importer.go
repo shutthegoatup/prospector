@@ -10,6 +10,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/signing"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // Draft is one contact parsed from leads/outreach/*.md. Parsing runs wherever the repo
@@ -180,7 +181,7 @@ func parseSectioned(name, text, ownDomain string) []Draft {
 			row.maker = strings.TrimSpace(parts[1])
 		}
 		for _, r := range rows {
-			if strings.Contains(parent, strings.TrimRight(firstField(r.maker), ".")) && strings.Contains(r.person, first) {
+			if strings.Contains(parent, strings.TrimRight(store.FirstField(r.maker), ".")) && strings.Contains(r.person, first) {
 				row = r
 				break
 			}
@@ -241,7 +242,7 @@ func parseNumbered(name, text, ownDomain string) []Draft {
 	maker := strings.TrimSpace(strings.SplitN(makerHeadRe.ReplaceAllString(strings.SplitN(text, "\n", 2)[0], ""), " · ", 2)[0])
 	emailPart := section(text, "Email")
 	words := append(strings.Fields(person), strings.Fields(maker)[:min(1, len(strings.Fields(maker)))]...)
-	d := Draft{File: name, Section: maker, Maker: maker, Person: person, First: firstField(person),
+	d := Draft{File: name, Section: maker, Maker: maker, Person: person, First: store.FirstField(person),
 		Linkedin: "https://www.linkedin.com/search/results/people/?keywords=" + strings.Join(words, "%20"),
 		Note:     spaced(note)}
 	d.Subject, _ = group(subjectRe, emailPart)

@@ -7,7 +7,9 @@ import (
 	"log"
 	"strings"
 
+	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -71,7 +73,7 @@ func (a *App) sendReset(email, lang string) {
 	}
 	token, err := a.s.ResetToken(u.ID)
 	if err != nil {
-		if !errors.Is(err, errTooSoon) {
+		if !errors.Is(err, identity.ErrTooSoon) {
 			log.Print("password reset: ", err)
 		}
 		return
@@ -91,7 +93,7 @@ func (a *App) sendReset(email, lang string) {
 // The organisation's own server carries it only for an account this request created.
 // Whoever runs that server reads the link, and for an account that was already here
 // the link would hand them someone else's account.
-func (a *App) invite(ctx context.Context, q *Req, u *User, created bool) (bool, error) {
+func (a *App) invite(ctx context.Context, q *request.Req, u *User, created bool) (bool, error) {
 	via, err := a.mail, error(nil)
 	if created {
 		via, err = a.MailFor(q.Org.ID)
@@ -178,7 +180,7 @@ func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 	return false, a.s.SaveOrgMail(m)
 }
 
-func (a *App) testMail(ctx context.Context, q *Req) (string, error) {
+func (a *App) testMail(ctx context.Context, q *request.Req) (string, error) {
 	via, err := a.MailFor(q.Org.ID)
 	if err == nil && via == nil {
 		err = say.New("there is no mail server to test: save one first")
@@ -187,7 +189,7 @@ func (a *App) testMail(ctx context.Context, q *Req) (string, error) {
 		return "", err
 	}
 	// It goes to whoever asked for it, so it is in the language they asked in.
-	lang := languageOf(requestFrom(ctx))
+	lang := request.LanguageOf(requestFrom(ctx))
 	err = a.deliver(ctx, *via, mailer.Message{To: q.User.Email, Subject: say.Errorf("Prospector can send mail for %s", q.Org.Name).In(lang),
 		Body: say.Errorf("This is the test %s asked for in Settings.\n\nIt was sent through %s as %s.\n", q.Actor(), via.Host, via.From).In(lang)})
 	if err != nil {

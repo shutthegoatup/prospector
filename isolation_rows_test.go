@@ -6,8 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
 )
 
 // TestRunsAndMailsStayInTheirOrganisation tries, as another organisation, the methods
@@ -45,12 +47,12 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 	}
 	claim := RequestClaim{RequestID: request.ID, OrgID: first.ID, TaskID: task.ID, Holder: fmt.Sprintf("key:%d", key.ID), Actor: "scout", ClaimedAt: now.UnixMilli()}
 	domain := must(s.AddSSODomain(first.ID, "alpha.example"))
-	campaign := Campaign{OrgID: first.ID, Name: "Spring", Status: CampaignSending}
+	campaign := Campaign{OrgID: first.ID, Name: "Spring", Status: marketing.CampaignSending}
 	if err := s.DB.Create(&campaign).Error; err != nil {
 		t.Fatal(err)
 	}
-	queued := CampaignRecipient{OrgID: first.ID, CampaignID: campaign.ID, Address: "ann@alpha.example", Status: MailQueued}
-	sent := CampaignRecipient{OrgID: first.ID, CampaignID: campaign.ID, Address: "bob@alpha.example", Status: MailSent, SentAt: &now}
+	queued := CampaignRecipient{OrgID: first.ID, CampaignID: campaign.ID, Address: "ann@alpha.example", Status: marketing.MailQueued}
+	sent := CampaignRecipient{OrgID: first.ID, CampaignID: campaign.ID, Address: "bob@alpha.example", Status: marketing.MailSent, SentAt: &now}
 	note := TaskNote{OrgID: first.ID, TaskID: task.ID, CompanyID: 7, Actor: "scout", Kind: "skipped", Text: "not for us"}
 	for _, row := range []any{&claim, &queued, &sent, &note} {
 		if err := s.DB.Create(row).Error; err != nil {
@@ -59,7 +61,7 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 	}
 	ann := person(t, s, first, "Ann Alpha", "Alpha Works", "ann@alpha.example", false)
 	company := Company{ID: *ann.CompanyID}
-	if err := s.DB.Model(&company).Update("stage", CompanyReview).Error; err != nil {
+	if err := s.DB.Model(&company).Update("stage", prospecting.CompanyReview).Error; err != nil {
 		t.Fatal(err)
 	}
 	enquiry := Enquiry{OrgID: first.ID, Name: "Ann Alpha", Email: "ann@alpha.example", CompanyID: ann.CompanyID, ContactID: &ann.ID}
@@ -132,7 +134,7 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 		{"AgentNameTaken", false, func(s *Store, org int64) any { return answer(s.AgentNameTaken(org, agent.Name, 0)) }},
 		{"SkipMail", changes, func(s *Store, org int64) any { return s.SkipMail(org, queued.ID, "skipped") }},
 		{"ClaimMail", false, func(s *Store, org int64) any { return answer(s.ClaimMail(org, queued.ID, queued.Address)) }},
-		{"SettleMail", changes, func(s *Store, org int64) any { return s.SettleMail(org, sent.ID, MailUnknown, "unknown") }},
+		{"SettleMail", changes, func(s *Store, org int64) any { return s.SettleMail(org, sent.ID, marketing.MailUnknown, "unknown") }},
 		{"CampaignWent", changes, func(s *Store, org int64) any { return s.CampaignWent(org, campaign.ID) }},
 		{"PauseCampaign", changes, func(s *Store, org int64) any { return s.PauseCampaign(org, campaign.ID, "paused") }},
 		{"FinishIfDone", changes, func(s *Store, org int64) any { return s.FinishIfDone(org, campaign.ID) }},
@@ -166,7 +168,9 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 			return err
 		}},
 		{"SettleReply", changes, func(s *Store, org int64) any { return s.SettleReply(org, &reply, true, "Owner One") }},
-		{"MailFailed", changes, func(s *Store, org int64) any { return s.MailFailed(org, sent.Address, SuppressBounced, "gone") }},
+		{"MailFailed", changes, func(s *Store, org int64) any {
+			return s.MailFailed(org, sent.Address, marketing.SuppressBounced, "gone")
+		}},
 		{"CustomerSteps", 0, func(s *Store, org int64) any { return len(must(s.CustomerSteps(org, customer))) }},
 		{"CustomerSetStep", changes, func(s *Store, org int64) any { return s.CustomerSetStep(org, customer, step.ID, true) }},
 		{"RedeemCustomerLink", changes, func(s *Store, org int64) any { return answer(s.RedeemCustomerLink(org, customer, link)) }},

@@ -15,6 +15,9 @@ import (
 	"github.com/pdfcpu/pdfcpu/pkg/api"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/signing"
 )
 
@@ -23,8 +26,8 @@ import (
 func preparing(t *testing.T) (s *Store, o *Org, base string, member *http.Client, a *Agreement, hannah, theo *Contact) {
 	t.Helper()
 	s, o, srv, member := signedIn(t)
-	hannah = must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
-	theo = must(s.QuickAddPerson(o, QuickAdd{Name: "Theo Marsh", Company: "Larkmoor Yachts", Email: "theo@larkmoor.example"}, "Ada Lovelace"))
+	hannah = must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	theo = must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Theo Marsh", Company: "Larkmoor Yachts", Email: "theo@larkmoor.example"}, "Ada Lovelace"))
 	a = must(s.AddAgreement(o.ID, *hannah.CompanyID, "Service agreement", "Ada Lovelace"))
 	base = srv.URL + "/o/alpha/api/v1/agreements/" + itoa(a.ID)
 	if code, body, _ := upload(t, member, base+"/document?name=service.pdf", "", "application/pdf", testPDF(2, "")); code != http.StatusOK {
@@ -52,8 +55,8 @@ func TestAnAgreementsSignersAreItsCompanysPeopleOrItsMembers(t *testing.T) {
 		t.Errorf("a new draft with its document: %d pages, round %d, in order %v", got.PageCount, got.Round, got.InOrder)
 	}
 
-	elsewhere := must(s.QuickAddPerson(o, QuickAdd{Name: "Rhys Doyle", Company: "Ferncliff Marine", Email: "rhys@ferncliff.example"}, "Ada Lovelace"))
-	noAddress := must(s.QuickAddPerson(o, QuickAdd{Name: "Mo Lind", Company: "Larkmoor Yachts"}, "Ada Lovelace"))
+	elsewhere := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Rhys Doyle", Company: "Ferncliff Marine", Email: "rhys@ferncliff.example"}, "Ada Lovelace"))
+	noAddress := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Mo Lind", Company: "Larkmoor Yachts"}, "Ada Lovelace"))
 	for why, body := range map[string]map[string]any{
 		"someone at another company":          {"role": "signer", "contact": elsewhere.ID},
 		"someone with no address":             {"role": "signer", "contact": noAddress.ID},
@@ -89,7 +92,7 @@ func TestAnAgreementsSignersAreItsCompanysPeopleOrItsMembers(t *testing.T) {
 	if list := items[signing.Party](t, body); list[0].Name != "Ada Lovelace" || list[1].Name != "Hannah Pryce" {
 		t.Errorf("the order after moving: %+v", list)
 	}
-	ines := must(s.QuickAddPerson(o, QuickAdd{Name: "Ines Ward", Company: "Larkmoor Yachts", Email: "ines@larkmoor.example"}, "Ada Lovelace"))
+	ines := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Ines Ward", Company: "Larkmoor Yachts", Email: "ines@larkmoor.example"}, "Ada Lovelace"))
 	o.Settings.NeverContact = "ines@larkmoor.example"
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
@@ -209,10 +212,10 @@ func TestAnOperationWithoutAKeyScopeRefusesKeys(t *testing.T) {
 		return nil, nil
 	}, "SomethingForPeopleOnly")
 	var all []string
-	for _, sc := range Scopes {
+	for _, sc := range identity.Scopes {
 		all = append(all, sc.Name)
 	}
-	ctx := context.WithValue(context.Background(), reqKey{}, &Req{Key: &APIKey{Scopes: strings.Join(all, " ")}})
+	ctx := context.WithValue(context.Background(), request.ReqKey{}, &request.Req{Key: &APIKey{Scopes: strings.Join(all, " ")}})
 	w := httptest.NewRecorder()
 	if _, err := handler(ctx, w, httptest.NewRequest("POST", "/", nil), nil); err != nil {
 		t.Fatal(err)
@@ -495,7 +498,7 @@ func TestAgreementsSavedBeforePagesWereCountedArePrepared(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	readable := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Service agreement", "Ada Lovelace"))
 	must(s.PutAgreementFile(o.ID, readable.ID, "service.pdf", testPDF(2, ""), "Ada Lovelace"))
 	legacy := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Old agreement", "Ada Lovelace"))

@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/identity"
 )
 
 func TestSomeoneInSupportOnlyStartsOnEnquiries(t *testing.T) {
@@ -25,9 +27,9 @@ func TestSomeoneInSupportOnlyStartsOnEnquiries(t *testing.T) {
 		areas []string
 		want  string
 	}{
-		{"grace@example.com", []string{areaSupport}, "/o/alpha/enquiries"},
-		{"alan@example.com", []string{areaSales}, "/o/alpha/today"},
-		{"barbara@example.com", []string{areaSales, areaSupport}, "/o/alpha/today"},
+		{"grace@example.com", []string{identity.AreaSupport}, "/o/alpha/enquiries"},
+		{"alan@example.com", []string{identity.AreaSales}, "/o/alpha/today"},
+		{"barbara@example.com", []string{identity.AreaSales, identity.AreaSupport}, "/o/alpha/today"},
 		{"carol@example.com", nil, "/o/alpha/today"},
 	} {
 		u := mustUser(t, s, o, who.email, who.email, "member")

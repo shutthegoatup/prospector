@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/crm"
 )
 
 // The writes an agent makes with a key: every field it sends lands, the answer says what
@@ -83,7 +85,7 @@ func TestAnAgentsWritesAnswerAsTheyAlwaysHave(t *testing.T) {
 		t.Errorf("a person's fields didn't all land: %+v", hannah)
 	}
 
-	ines := must(s.QuickAddPerson(o, QuickAdd{Name: "Ines Moreau", Company: "Belair Kitchens"}, "Ada Lovelace"))
+	ines := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Ines Moreau", Company: "Belair Kitchens"}, "Ada Lovelace"))
 	code, body = post(writer, "drafts", "application/json", `{"contact_id":`+jsonInt(ines.ID)+`,"kind":"email","subject":"Your kitchens","text":"Hello Ines."}`)
 	if code != http.StatusOK || strings.TrimSpace(body) != `{"ok":true}` {
 		t.Fatalf("drafting: %d %s", code, body)

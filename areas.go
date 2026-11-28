@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 
+	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -11,22 +12,22 @@ import (
 // starting a won customer's onboarding hands them back, so either may; "" is anyone, for
 // the owners-only operations, which are held already.
 var opArea = map[string]string{
-	"ChangeEnquiry": areaSupport, "ReplyToEnquiry": areaSupport, "RecordEnquiryAnswer": areaSupport,
-	"AddSubscription": areaSupport, "ChangeSubscription": areaSupport, "RemoveSubscription": areaSupport, "StartRenewal": areaSupport,
-	"StartOnboarding": areaAny, "RemoveOnboarding": areaSupport, "ChangeOnboardingStep": areaSupport,
-	"InviteCustomer": areaSupport, "WithdrawCustomerInvite": areaSupport,
-	"StartDeal": areaSales, "ChangeDeal": areaSales, "RemoveDeal": areaSales, "ChangeOwnDeal": areaSales,
-	"StartRun": areaSales, "StopRun": areaSales,
-	"CreateTask": areaSales, "ChangeTask": areaSales, "AskTask": areaSales, "ChangeTaskRequest": areaSales,
-	"AgentAddCompany": areaSales, "AgentAddFact": areaSales, "AgentAddContact": areaSales, "AgentDraft": areaSales, "AgentAddEnquiry": areaSupport, "AgentImport": areaAny, "AgentSnapshot": areaAny,
-	"AddPerson": areaSales, "ChangeContact": areaSales, "MarkOutcome": areaSales, "PickContact": areaSales, "ReviewCompany": areaSales, "AddRole": areaSales, "JudgeRole": areaSales, "DecideSuggestion": areaSales,
-	"AddNote": areaSales, "FinishRequest": areaSales, "DeleteNote": areaSales,
-	"ConverseEnquiry": areaAny, "AddSuppression": areaAny, "RemoveSuppression": areaSales,
-	"CreateCampaign": areaSales, "ChangeCampaign": areaSales, "RemoveCampaign": areaSales,
-	"SendCampaign": areaSales, "CancelCampaign": areaSales, "ResumeCampaign": areaSales,
-	"CreateAgreement": areaSales, "ChangeAgreement": areaSales, "RemoveAgreement": areaSales, "PutAgreementDocument": areaSales,
-	"AddAgreementRecipient": areaSales, "ChangeAgreementRecipient": areaSales, "RemoveAgreementRecipient": areaSales, "PutAgreementFields": areaSales,
-	"EnrichContact": areaSales,
+	"ChangeEnquiry": identity.AreaSupport, "ReplyToEnquiry": identity.AreaSupport, "RecordEnquiryAnswer": identity.AreaSupport,
+	"AddSubscription": identity.AreaSupport, "ChangeSubscription": identity.AreaSupport, "RemoveSubscription": identity.AreaSupport, "StartRenewal": identity.AreaSupport,
+	"StartOnboarding": areaAny, "RemoveOnboarding": identity.AreaSupport, "ChangeOnboardingStep": identity.AreaSupport,
+	"InviteCustomer": identity.AreaSupport, "WithdrawCustomerInvite": identity.AreaSupport,
+	"StartDeal": identity.AreaSales, "ChangeDeal": identity.AreaSales, "RemoveDeal": identity.AreaSales, "ChangeOwnDeal": identity.AreaSales,
+	"StartRun": identity.AreaSales, "StopRun": identity.AreaSales,
+	"CreateTask": identity.AreaSales, "ChangeTask": identity.AreaSales, "AskTask": identity.AreaSales, "ChangeTaskRequest": identity.AreaSales,
+	"AgentAddCompany": identity.AreaSales, "AgentAddFact": identity.AreaSales, "AgentAddContact": identity.AreaSales, "AgentDraft": identity.AreaSales, "AgentAddEnquiry": identity.AreaSupport, "AgentImport": areaAny, "AgentSnapshot": areaAny,
+	"AddPerson": identity.AreaSales, "ChangeContact": identity.AreaSales, "MarkOutcome": identity.AreaSales, "PickContact": identity.AreaSales, "ReviewCompany": identity.AreaSales, "AddRole": identity.AreaSales, "JudgeRole": identity.AreaSales, "DecideSuggestion": identity.AreaSales,
+	"AddNote": identity.AreaSales, "FinishRequest": identity.AreaSales, "DeleteNote": identity.AreaSales,
+	"ConverseEnquiry": areaAny, "AddSuppression": areaAny, "RemoveSuppression": identity.AreaSales,
+	"CreateCampaign": identity.AreaSales, "ChangeCampaign": identity.AreaSales, "RemoveCampaign": identity.AreaSales,
+	"SendCampaign": identity.AreaSales, "CancelCampaign": identity.AreaSales, "ResumeCampaign": identity.AreaSales,
+	"CreateAgreement": identity.AreaSales, "ChangeAgreement": identity.AreaSales, "RemoveAgreement": identity.AreaSales, "PutAgreementDocument": identity.AreaSales,
+	"AddAgreementRecipient": identity.AreaSales, "ChangeAgreementRecipient": identity.AreaSales, "RemoveAgreementRecipient": identity.AreaSales, "PutAgreementFields": identity.AreaSales,
+	"EnrichContact": identity.AreaSales,
 	"CreateAgent":   "", "UpdateAgent": "", "DeleteAgent": "", "CreateKey": "", "ChangeKey": "", "RevokeKey": "", "DeleteEnquiry": "", "ChangeSettings": "", "SaveEnricher": "", "DeleteEnricher": "",
 	"ExportPerson": "", "ErasePerson": "",
 	"AddOffering": "", "ChangeOffering": "", "RemoveOffering": "",
@@ -37,7 +38,7 @@ var opArea = map[string]string{
 // landing is the page someone starts on: Today is outreach, so someone who works only
 // in support starts on what is theirs to answer.
 func landing(m *Membership) string {
-	if !m.Works(areaSales) && m.Works(areaSupport) {
+	if !m.Works(identity.AreaSales) && m.Works(identity.AreaSupport) {
 		return "enquiries"
 	}
 	return "today"

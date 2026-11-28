@@ -18,7 +18,9 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/cleantext"
+	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -105,7 +107,7 @@ func streaming(next http.Handler) http.HandlerFunc {
 	}
 }
 
-func reqOf(r *http.Request) *Req { return r.Context().Value(reqKey{}).(*Req) }
+func reqOf(r *http.Request) *request.Req { return r.Context().Value(request.ReqKey{}).(*request.Req) }
 
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("content-type", "application/json")
@@ -118,7 +120,7 @@ func writeJSON(w http.ResponseWriter, v any) {
 // problemPage makes a page of.
 func fail(w http.ResponseWriter, r *http.Request, err error, code int) {
 	code, text := telling("a browser's request", err, code)
-	http.Error(w, text.In(languageOf(r)), code)
+	http.Error(w, text.In(request.LanguageOf(r)), code)
 }
 
 func (a *App) secure(r *http.Request) bool {
@@ -161,7 +163,7 @@ func (a *App) setSession(w http.ResponseWriter, r *http.Request, token string) {
 
 func (a *App) sessionCookie(r *http.Request, token string) *http.Cookie {
 	return &http.Cookie{Name: sessionCookie, Value: token, Path: "/", HttpOnly: true, Secure: a.secure(r),
-		SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(sessionLife)}
+		SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(identity.SessionLife)}
 }
 
 // member resolves the signed-in user and, for /o/{org}/ routes, their membership.
@@ -171,7 +173,7 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 		refuse := func(status int, kind api.ProblemType, text *say.Text, to string) {
 			switch {
 			case forAPI(r):
-				writeTyped(w, r, status, kind, text)
+				request.WriteTyped(w, r, status, kind, text)
 			case r.Method == http.MethodGet:
 				http.Redirect(w, r, to, http.StatusSeeOther)
 			default:
@@ -191,7 +193,7 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 			refuse(http.StatusForbidden, api.ProblemTypeMustChangePassword, say.New("choose your own password first"), "/password")
 			return
 		}
-		q := &Req{User: u, Session: sess}
+		q := &request.Req{User: u, Session: sess}
 		orgs, _ := a.s.OrgsFor(u.ID)
 		for _, o := range orgs {
 			if sess.Opens(o.ID) {
@@ -223,7 +225,7 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 		if forAPI(r) && !a.limited(w, r, userBucket(u), memberRate) {
 			return
 		}
-		next(w, r.WithContext(context.WithValue(r.Context(), reqKey{}, q)))
+		next(w, r.WithContext(context.WithValue(r.Context(), request.ReqKey{}, q)))
 	}
 }
 
@@ -242,7 +244,7 @@ func (a *App) agent(scope string, next http.HandlerFunc) http.HandlerFunc {
 		}
 		org, err := a.s.OrgBySlug(r.PathValue("org"))
 		if err != nil || org.ID != k.OrgID {
-			writeProblem(w, r, http.StatusForbidden, say.New("this key belongs to another organisation"))
+			request.WriteProblem(w, r, http.StatusForbidden, say.New("this key belongs to another organisation"))
 			return
 		}
 		if scope != "" && !k.Has(scope) {
@@ -252,7 +254,7 @@ func (a *App) agent(scope string, next http.HandlerFunc) http.HandlerFunc {
 		if !a.limited(w, r, keyBucket(k), keyRate) {
 			return
 		}
-		next(w, r.WithContext(context.WithValue(r.Context(), reqKey{}, &Req{Org: org, Key: k})))
+		next(w, r.WithContext(context.WithValue(r.Context(), request.ReqKey{}, &request.Req{Org: org, Key: k})))
 	}
 }
 
@@ -373,7 +375,7 @@ func (a *App) signInRoutes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("GET /reset/{token}", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := a.s.PasswordTokenUser(r.PathValue("token")); err != nil {
-			fail(w, r, errBadLink, http.StatusGone)
+			fail(w, r, identity.ErrBadLink, http.StatusGone)
 			return
 		}
 		a.shell(w, r)
@@ -416,7 +418,7 @@ func (a *App) passwordSignIn(r *http.Request, email, password string) (token str
 	case <-r.Context().Done():
 		return "", nil, nil, 0, r.Context().Err()
 	}
-	who, known := signInBucket(email), false
+	who, known := identity.SignInBucket(email), false
 	// A browser can hold two: one from when the cookie was kept to /login, which a
 	// password change since has made worthless, and the one that took its place.
 	for _, c := range r.CookiesNamed(deviceCookie) {
@@ -430,7 +432,7 @@ func (a *App) passwordSignIn(r *http.Request, email, password string) (token str
 	}
 	token, u, err = a.s.Login(email, password)
 	// A failure that isn't a wrong password (the database, say) doesn't count against anyone.
-	if err == nil || errors.Is(err, errWrongLogin) {
+	if err == nil || errors.Is(err, identity.ErrWrongLogin) {
 		a.logins.record(who, err == nil)
 	}
 	if err != nil {
@@ -476,7 +478,7 @@ func (a *App) frontIntake(r *http.Request) (intake, origin string) {
 	if a.frontOrg == "" {
 		return "", ""
 	}
-	origin = browserOrigin(a.baseURL(r))
+	origin = identity.BrowserOrigin(a.baseURL(r))
 	org, err := a.s.OrgBySlug(a.frontOrg)
 	if err != nil || !org.Settings.TakesEnquiriesFrom(origin) {
 		return "", ""
@@ -496,7 +498,7 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login/sso?"+url.Values{"email": {q.User.Email}}.Encode(), http.StatusSeeOther)
 		return
 	}
-	writeShell(w, languageOf(r), http.StatusOK, map[string]string{"page": "start"}, "Start an organisation at /api/v1/orgs.\n")
+	writeShell(w, request.LanguageOf(r), http.StatusOK, map[string]string{"page": "start"}, "Start an organisation at /api/v1/orgs.\n")
 }
 
 const passwordChanged = "Password changed. Your other sessions are signed out."
@@ -521,7 +523,7 @@ func (a *App) passwordChange(r *http.Request, u *User, current, next string) (de
 		return nil, int(held.Seconds()) + 1, nil
 	}
 	err = a.s.ChangePassword(u, current, next, keep)
-	if err == nil || errors.Is(err, errWrongCurrent) {
+	if err == nil || errors.Is(err, identity.ErrWrongCurrent) {
 		a.logins.record(changeBucket(u), err == nil)
 	}
 	if err != nil {

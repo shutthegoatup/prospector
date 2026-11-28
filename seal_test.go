@@ -18,6 +18,7 @@ import (
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/signing"
 )
 
@@ -124,7 +125,7 @@ func TestAPDFTakenAtUploadCanBeSealed(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	a := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Form", "Ada Lovelace"))
 	must(s.PutAgreementFile(o.ID, a.ID, "form.pdf", buildPDF("1.3", 2, "", "/Annots [<< /Type /Annot /Subtype /Caret /Rect [10 10 20 20] >>] "), "Ada Lovelace"))
 	r := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
@@ -140,8 +141,8 @@ func sealedDraft(t *testing.T) (*Store, *Org, *Agreement) {
 	t.Helper()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	hannah := must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
-	zoe := must(s.QuickAddPerson(o, QuickAdd{Name: "Zoë Łukasiewicz-Øster", Company: "Larkmoor Yachts", Email: "zoe@larkmoor.example"}, "Ada Lovelace"))
+	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
+	zoe := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Zoë Łukasiewicz-Øster", Company: "Larkmoor Yachts", Email: "zoe@larkmoor.example"}, "Ada Lovelace"))
 	a := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Service agreement", "Ada Lovelace"))
 	must(s.PutAgreementFile(o.ID, a.ID, "service.pdf", buildPDF("1.7", 3, "", "/Rotate 90 "), "Ada Lovelace"))
 	h := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
@@ -168,7 +169,7 @@ func TestADraftCanBeFilledInAndSealedBeforeItIsSent(t *testing.T) {
 	}
 
 	// A name the fonts can't draw is found before anything goes out.
-	han := must(s.QuickAddPerson(o, QuickAdd{Name: "王小明", Company: "Larkmoor Yachts", Email: "wang@larkmoor.example"}, "Ada Lovelace"))
+	han := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "王小明", Company: "Larkmoor Yachts", Email: "wang@larkmoor.example"}, "Ada Lovelace"))
 	must(s.AddRecipient(o, a.ID, signing.RecipientCopy, &han.ID, nil, "Ada Lovelace"))
 	if err := s.TrySeal(o, a.ID); err == nil || !strings.Contains(err.Error(), "can't show") {
 		t.Errorf("a dry run with a name the fonts can't draw: %v", err)

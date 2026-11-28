@@ -12,7 +12,10 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/onboarding"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/sales"
 	"github.com/shutthegoatup/prospector/internal/signing"
 	"github.com/shutthegoatup/prospector/internal/tickets"
@@ -245,24 +248,24 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			return err
 		},
 		func() error {
-			_, err := s.AgentAddCompany(first.ID, scout, AddCompanyIn{Name: theirs + " " + findable, Domain: theirDomain, Segment: theirs, Why: theirs,
-				Facts: []FactIn{{Field: "press", Value: theirs + " won", SourceURL: "https://" + theirDomain + "/news"}}})
+			_, err := s.AgentAddCompany(first.ID, scout, research.AddCompanyIn{Name: theirs + " " + findable, Domain: theirDomain, Segment: theirs, Why: theirs,
+				Facts: []research.FactIn{{Field: "press", Value: theirs + " won", SourceURL: "https://" + theirDomain + "/news"}}})
 			return err
 		},
 		func() error {
-			_, err := s.AgentAddContact(first, scout, AddContactIn{Company: "1", Name: theirs + " " + findable, Title: "Head of Digital",
+			_, err := s.AgentAddContact(first, scout, prospecting.AddContactIn{Company: "1", Name: theirs + " " + findable, Title: "Head of Digital",
 				Email: theirEmail, SourceURL: "https://" + theirDomain + "/team"})
 			return err
 		},
 		func() error { return s.PickContact(first.ID, first, 1, "Owner One") },
 		func() error {
-			_, err := s.AgentAddContact(first, scout, AddContactIn{Company: "1", Name: theirs + " " + findable, Phone: "+44 20 7946 0000",
+			_, err := s.AgentAddContact(first, scout, prospecting.AddContactIn{Company: "1", Name: theirs + " " + findable, Phone: "+44 20 7946 0000",
 				SourceURL: "https://" + theirDomain + "/team"})
 			return err
 		},
 		func() error {
 			// Someone still due, so the queues have one of theirs in them.
-			_, err := s.QuickAddPerson(first, QuickAdd{Name: theirs + " Due", Company: theirs + " " + findable, Note: theirs + " hello"}, "Owner One")
+			_, err := s.QuickAddPerson(first, crm.QuickAdd{Name: theirs + " Due", Company: theirs + " " + findable, Note: theirs + " hello"}, "Owner One")
 			return err
 		},
 		func() error { return s.Mark(first.ID, 1, "replied", "2020-01-02", "Owner One") },
@@ -317,7 +320,7 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			return err
 		},
 		func() error {
-			_, err := s.AgentNote(first.ID, scout, NoteIn{Task: 1, Company: "1", Kind: "skipped", Text: theirs + " note"})
+			_, err := s.AgentNote(first.ID, scout, research.NoteIn{Task: 1, Company: "1", Kind: "skipped", Text: theirs + " note"})
 			return err
 		},
 		func() error {
@@ -326,7 +329,7 @@ func seedFirst(t *testing.T, s *Store) *Org {
 		},
 		func() error {
 			// One still waiting in Research, which the first is no longer.
-			_, err := s.AgentAddCompany(first.ID, scout, AddCompanyIn{Name: theirs + " waiting", Why: theirs})
+			_, err := s.AgentAddCompany(first.ID, scout, research.AddCompanyIn{Name: theirs + " waiting", Why: theirs})
 			return err
 		},
 	}

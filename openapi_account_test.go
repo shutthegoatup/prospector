@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/identity"
 )
 
 // asBrowser calls the API as the React app does: JSON, with whatever cookies it holds.
@@ -58,7 +59,7 @@ func TestSigningInAndOutThroughTheAPI(t *testing.T) {
 	}
 	for _, wrong := range []api.SignIn{{Email: "ada@example.com", Password: "wrong"}, {Email: "nobody@example.com", Password: "wrong"}} {
 		res := asBrowser(t, b, "POST", session, wrong)
-		if p := problemOf(t, res); res.StatusCode != http.StatusUnauthorized || p.Type != api.ProblemTypeWrongLogin || p.Detail != errWrongLogin.Error() {
+		if p := problemOf(t, res); res.StatusCode != http.StatusUnauthorized || p.Type != api.ProblemTypeWrongLogin || p.Detail != identity.ErrWrongLogin.Error() {
 			t.Fatalf("signing in as %s with the wrong password: %s %+v", wrong.Email, res.Status, p)
 		}
 	}

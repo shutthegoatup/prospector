@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -170,11 +171,11 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 // so an erasure or a cancel that lands first leaves nothing to send. It reports whether
 // the round should go on: not once the mail server can't be reached, nor once the
 // campaign stops.
-func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *mailer.Server, gate *mailGate, customers map[int64]bool, r CampaignRecipient) bool {
+func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *mailer.Server, gate *marketing.MailGate, customers map[int64]bool, r CampaignRecipient) bool {
 	skip := func(reason string) bool { return noted(a.s.SkipMail(o.ID, r.ID, reason)) }
 	settle := func(status, reason string) bool { return noted(a.s.SettleMail(o.ID, r.ID, status, reason)) }
 	// Stopped since the round began: this one stays with the rest.
-	if now, err := a.s.Campaign(o.ID, c.ID); !noted(err) || now.Status != CampaignSending {
+	if now, err := a.s.Campaign(o.ID, c.ID); !noted(err) || now.Status != marketing.CampaignSending {
 		return false
 	}
 	// Checked again as it goes: someone may have unsubscribed since it was sent.
@@ -203,7 +204,7 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *mailer.Serve
 		return skip("no longer one email address")
 	}
 	if why := gate.WhyFor(c.Kind, r.Address, link); why != nil {
-		because, known := leftOutBecause(why)
+		because, known := marketing.LeftOutBecause(why)
 		if !known {
 			log.Printf("campaign %d: checking a mail: %v", c.ID, why)
 			return false
@@ -236,25 +237,25 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *mailer.Serve
 	switch {
 	case sendErr == nil:
 		noted(a.s.CampaignWent(o.ID, c.ID))
-		return settle(MailSent, "")
+		return settle(marketing.MailSent, "")
 	case errors.Is(sendErr, mailer.ErrRefusedRecipient):
 		// One refused address is that address; several in a row is the server refusing
 		// the campaign, which pauses it before the whole list is used up.
 		a.s.DropUnsubscribeLink(token)
 		log.Printf("campaign %d: %v", c.ID, sendErr)
-		settled := settle(MailFailed, "the mail server refused this address")
+		settled := settle(marketing.MailFailed, "the mail server refused this address")
 		return a.failedToSend(c) && settled
 	case errors.Is(sendErr, mailer.ErrUnsent):
 		// Nothing went, so it waits for the next round, and the round stops: the server
 		// is likely to refuse the next one too.
 		a.s.DropUnsubscribeLink(token)
 		log.Printf("campaign %d: %v", c.ID, sendErr)
-		settle(MailQueued, "")
+		settle(marketing.MailQueued, "")
 		a.failedToSend(c)
 		return false
 	default:
 		log.Printf("campaign %d: %v", c.ID, sendErr)
-		settled := settle(MailUnknown, "the mail server didn't confirm it while it was being sent, so it may have gone")
+		settled := settle(marketing.MailUnknown, "the mail server didn't confirm it while it was being sent, so it may have gone")
 		return a.failedToSend(c) && settled
 	}
 }

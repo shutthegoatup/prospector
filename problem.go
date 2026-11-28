@@ -7,6 +7,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -25,7 +26,7 @@ func forAPI(r *http.Request) bool {
 // browser is shown as a page.
 func refuseAs(w http.ResponseWriter, r *http.Request, status int, text string) {
 	if forAPI(r) {
-		writeProblem(w, r, status, say.New(text))
+		request.WriteProblem(w, r, status, say.New(text))
 		return
 	}
 	http.Error(w, text, status)
@@ -80,8 +81,8 @@ func (p *problemPage) finish() {
 		return
 	}
 	p.Header().Del("Content-Length")
-	title, message := problemText(languageOf(p.r), p.code, p.text.String())
-	writeShell(p.ResponseWriter, languageOf(p.r), p.code, problemShown{"problem", p.code, title, message, "/"}, title+": "+message+"\n")
+	title, message := problemText(request.LanguageOf(p.r), p.code, p.text.String())
+	writeShell(p.ResponseWriter, request.LanguageOf(p.r), p.code, problemShown{"problem", p.code, title, message, "/"}, title+": "+message+"\n")
 }
 
 type problemShown struct {

@@ -6,6 +6,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
@@ -54,7 +57,7 @@ func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
 
 	together(t, atOnce, func(i int) error {
 		name := []string{"Larkmoor", "LARKMOOR", "larkmoor"}[i%3]
-		_, err := s.AgentAddCompany(o.ID, scout(i), AddCompanyIn{Name: name})
+		_, err := s.AgentAddCompany(o.ID, scout(i), research.AddCompanyIn{Name: name})
 		return err
 	})
 	if n := count(t, s, &Company{}, "org_id = ?", o.ID); n != 1 {
@@ -62,7 +65,7 @@ func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
 	}
 
 	together(t, atOnce, func(i int) error {
-		_, err := s.AgentAddCompany(o.ID, scout(i), AddCompanyIn{Name: fmt.Sprintf("Fenwick Rooms %d", i), Domain: "fenwick.example"})
+		_, err := s.AgentAddCompany(o.ID, scout(i), research.AddCompanyIn{Name: fmt.Sprintf("Fenwick Rooms %d", i), Domain: "fenwick.example"})
 		return err
 	})
 	if n := count(t, s, &Company{}, "org_id = ? and domain = ?", o.ID, "fenwick.example"); n != 1 {
@@ -81,8 +84,8 @@ func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
 	}()
 
 	together(t, atOnce, func(i int) error {
-		_, err := s.AgentAddFact(o.ID, scout(i), AddFactIn{Company: "Larkmoor", Task: task.ID,
-			FactIn: FactIn{Field: "press", Value: "Opened a second workshop", SourceURL: "https://larkmoor.example/news"}})
+		_, err := s.AgentAddFact(o.ID, scout(i), research.AddFactIn{Company: "Larkmoor", Task: task.ID,
+			FactIn: research.FactIn{Field: "press", Value: "Opened a second workshop", SourceURL: "https://larkmoor.example/news"}})
 		return err
 	})
 	if n := count(t, s, &Fact{}, "org_id = ?", o.ID); n != 1 {
@@ -90,7 +93,7 @@ func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
 	}
 
 	together(t, atOnce, func(i int) error {
-		_, err := s.AgentAddContact(o, scout(i), AddContactIn{Company: "Larkmoor", Name: "Ada Vale", Title: "Head of Digital",
+		_, err := s.AgentAddContact(o, scout(i), prospecting.AddContactIn{Company: "Larkmoor", Name: "Ada Vale", Title: "Head of Digital",
 			Email: "ada.vale@larkmoor.example", SourceURL: "https://larkmoor.example/team", Task: task.ID})
 		return err
 	})
@@ -109,14 +112,14 @@ func TestTheDatabaseKeepsACompanyNameToOneSpelling(t *testing.T) {
 	// It drops the index, so on a database no other test will borrow.
 	s := ownStore(t)
 	o := mustOrg(t, s, "alpha")
-	if err := s.DB.Create(&Company{OrgID: o.ID, Name: "Larkmoor", Stage: CompanyReview}).Error; err != nil {
+	if err := s.DB.Create(&Company{OrgID: o.ID, Name: "Larkmoor", Stage: prospecting.CompanyReview}).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DB.Create(&Company{OrgID: o.ID, Name: "LARKMOOR", Stage: CompanyReview}).Error; err == nil {
+	if err := s.DB.Create(&Company{OrgID: o.ID, Name: "LARKMOOR", Stage: prospecting.CompanyReview}).Error; err == nil {
 		t.Fatal("a second company with the same name in other capitals was stored")
 	}
 	other := mustOrg(t, s, "beta")
-	if err := s.DB.Create(&Company{OrgID: other.ID, Name: "LARKMOOR", Stage: CompanyReview}).Error; err != nil {
+	if err := s.DB.Create(&Company{OrgID: other.ID, Name: "LARKMOOR", Stage: prospecting.CompanyReview}).Error; err != nil {
 		t.Fatalf("another organisation's company of the same name: %v", err)
 	}
 
@@ -124,11 +127,11 @@ func TestTheDatabaseKeepsACompanyNameToOneSpelling(t *testing.T) {
 	if err := s.DB.Exec("drop index idx_companies_org_name_folded").Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DB.Create(&Company{OrgID: o.ID, Name: "LARKMOOR", Stage: CompanyReview}).Error; err != nil {
+	if err := s.DB.Create(&Company{OrgID: o.ID, Name: "LARKMOOR", Stage: prospecting.CompanyReview}).Error; err != nil {
 		t.Fatal(err)
 	}
 	s.oneNameWhateverItsCapitals()
-	got := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, AddCompanyIn{Name: "larkmoor"}))
+	got := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "larkmoor"}))
 	if !got.Existed || count(t, s, &Company{}, "org_id = ?", o.ID) != 2 {
 		t.Fatalf("with the index unbuilt, the look-up should still find the company: %+v", got)
 	}
@@ -155,13 +158,13 @@ func TestAnAgentDraftingDuringAnEditLeavesThePersonsWords(t *testing.T) {
 	o := mustOrg(t, s, "alpha")
 	agent := Actor{Name: "agent:scout", KeyID: 1}
 	for round := range 20 {
-		p := must(s.QuickAddPerson(o, QuickAdd{Name: fmt.Sprintf("Person %d", round), Company: "Larkmoor"}, "Nia"))
+		p := must(s.QuickAddPerson(o, crm.QuickAdd{Name: fmt.Sprintf("Person %d", round), Company: "Larkmoor"}, "Nia"))
 		together(t, 2, func(i int) error {
 			if i == 0 {
 				return s.Update(o.ID, p.ID, "body", "Nia's own words", "Nia")
 			}
 			// Refused when the edit got there first, which is as it should be.
-			err := s.AgentDraft(o.ID, agent, DraftIn{ContactID: p.ID, Kind: "email", Text: "The agent's draft"})
+			err := s.AgentDraft(o.ID, agent, research.DraftIn{ContactID: p.ID, Kind: "email", Text: "The agent's draft"})
 			if err != nil && !strings.Contains(err.Error(), "edited this text") {
 				return err
 			}

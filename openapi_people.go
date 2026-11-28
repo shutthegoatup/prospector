@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/request"
 )
 
 type siteKey struct{}
@@ -26,5 +27,5 @@ func (s apiServer) DraftPerson(ctx context.Context, in api.DraftPersonRequestObj
 	}
 	site, _ := ctx.Value(siteKey{}).(string)
 	return api.DraftPerson200JSONResponse{Linkedin: strings.SplitN(p.Url, "?", 2)[0], Name: name, Title: role, Company: company,
-		Bookmarklet: bookmarklet(site, reqFrom(ctx), "add")}, nil
+		Bookmarklet: bookmarklet(site, request.ReqFrom(ctx), "add")}, nil
 }

@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
 )
 
 func dueNames(t *testing.T, s *Store, o *Org) map[string]bool {
@@ -34,7 +36,7 @@ func TestACompanyIsJudgedForEachOfferingOnItsOwn(t *testing.T) {
 	owner, reviewer, reader := key("settings:write"), key("research:review"), key("read")
 	base := srv.URL + "/o/alpha/api/v1"
 
-	priya := must(s.QuickAddPerson(o, QuickAdd{Name: "Priya Shah", Company: "Northwind Payments"}, "Ada"))
+	priya := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Priya Shah", Company: "Northwind Payments"}, "Ada"))
 	company := *priya.CompanyID
 
 	code, body := asKey(t, "POST", base+"/offerings", owner, map[string]any{"name": "Interim CTO", "look_for": "trigger: a CTO leaving"})
@@ -57,7 +59,7 @@ func TestACompanyIsJudgedForEachOfferingOnItsOwn(t *testing.T) {
 		t.Fatalf("rejecting for an offering: %d %s", code, body)
 	}
 	c := companyRow(t, s, o.ID, company)
-	if c.Stage == CompanyRejected {
+	if c.Stage == prospecting.CompanyRejected {
 		t.Fatal("rejecting for one offering rejected the company for the organisation's own")
 	}
 	if !dueNames(t, s, o)["Priya"] {
@@ -93,14 +95,14 @@ func TestACompanyIsJudgedForEachOfferingOnItsOwn(t *testing.T) {
 	if _, body := asKey(t, "GET", base+"/offerings/"+itoa(cto.Id)+"/verdicts?stage=rejected", reader, nil); strings.Contains(body, "Northwind") {
 		t.Fatalf("a company put back is still listed as rejected: %s", body)
 	}
-	if v := must(s.Verdicts(o.ID, company)); len(v) != 1 || v[0].Stage != CompanyReview || v[0].Reason != "" {
+	if v := must(s.Verdicts(o.ID, company)); len(v) != 1 || v[0].Stage != prospecting.CompanyReview || v[0].Reason != "" {
 		t.Fatalf("putting it back should clear the reason: %+v", v)
 	}
 
 	if code, body := asKey(t, "PATCH", review, reviewer, map[string]any{"stage": "rejected", "reason": "why"}); code != http.StatusBadRequest {
 		t.Fatalf("a reason for the organisation's own offering: %d %s", code, body)
 	}
-	if code, _ := asKey(t, "PATCH", review, reviewer, map[string]any{"stage": "qualified"}); code != http.StatusNoContent || companyRow(t, s, o.ID, company).Stage != CompanyQualified {
+	if code, _ := asKey(t, "PATCH", review, reviewer, map[string]any{"stage": "qualified"}); code != http.StatusNoContent || companyRow(t, s, o.ID, company).Stage != prospecting.CompanyQualified {
 		t.Fatal("reviewing without an offering should still set the company's stage")
 	}
 

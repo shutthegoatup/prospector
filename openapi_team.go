@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
@@ -25,10 +27,10 @@ var requestFrom = request.RequestFrom
 
 // someone is the signed-in person asking: an API key is no one, so what is a person's
 // own is refused to it.
-func someone(ctx context.Context) (*Req, error) {
-	q := reqFrom(ctx)
+func someone(ctx context.Context) (*request.Req, error) {
+	q := request.ReqFrom(ctx)
 	if q.Key != nil || q.User == nil || q.Member == nil {
-		return nil, refused{Text: say.New("an API key is no one's: this is for a signed-in member")}
+		return nil, request.Refused{Text: say.New("an API key is no one's: this is for a signed-in member")}
 	}
 	return q, nil
 }
@@ -65,8 +67,8 @@ func (s apiServer) ChangeMe(ctx context.Context, in api.ChangeMeRequestObject) (
 		u.Language = *lang
 	}
 	if in.Body.CallerName != nil || in.Body.Signature != nil {
-		put(&m.CallerName, in.Body.CallerName)
-		put(&m.Signature, in.Body.Signature)
+		request.Put(&m.CallerName, in.Body.CallerName)
+		request.Put(&m.Signature, in.Body.Signature)
 		if err := s.a.s.SaveVoice(q.Org.ID, q.User.ID, m.CallerName, m.Signature); err != nil {
 			return nil, err
 		}
@@ -103,9 +105,9 @@ func (s apiServer) ChangeMyPassword(ctx context.Context, in api.ChangeMyPassword
 	return passwordChangedResponse{device}, nil
 }
 
-func memberOut(m Member) api.Member {
+func memberOut(m identity.Member) api.Member {
 	areas := []api.MemberAreas{}
-	for _, ar := range Areas {
+	for _, ar := range identity.Areas {
 		if m.Works(ar.Name) {
 			areas = append(areas, api.MemberAreas(ar.Name))
 		}
@@ -114,15 +116,15 @@ func memberOut(m Member) api.Member {
 }
 
 func (s apiServer) ListMembers(ctx context.Context, in api.ListMembersRequestObject) (api.ListMembersResponseObject, error) {
-	all, err := s.a.s.Members(reqFrom(ctx).Org.ID)
+	all, err := s.a.s.Members(request.ReqFrom(ctx).Org.ID)
 	if err != nil {
 		return nil, err
 	}
-	page, next, err := listPage(all, in.Params.Limit, in.Params.Cursor)
+	page, next, err := paging.ListPage(all, in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListMembers200JSONResponse{Headers: api.ListMembers200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out := api.ListMembers200JSONResponse{Headers: api.ListMembers200ResponseHeaders{Link: request.NextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor = []api.Member{}, next
 	for _, m := range page {
 		out.Body.Items = append(out.Body.Items, memberOut(m))
@@ -135,7 +137,7 @@ func (s apiServer) member(org, user int64) (api.Member, error) {
 	if err != nil {
 		return api.Member{}, err
 	}
-	i := slices.IndexFunc(all, func(m Member) bool { return m.UserID == user })
+	i := slices.IndexFunc(all, func(m identity.Member) bool { return m.UserID == user })
 	if i < 0 {
 		return api.Member{}, noSuch("that person isn't in this organisation")
 	}
@@ -146,7 +148,7 @@ func (s apiServer) AddMember(ctx context.Context, in api.AddMemberRequestObject)
 	if in.Body == nil {
 		return nil, say.New("say who: {\"email\": \"…\"}")
 	}
-	msg, err := s.a.addMember(ctx, reqFrom(ctx), memberIn{Email: in.Body.Email, Name: in.Body.Name, Role: string(in.Body.Role)})
+	msg, err := s.a.addMember(ctx, request.ReqFrom(ctx), memberIn{Email: in.Body.Email, Name: in.Body.Name, Role: string(in.Body.Role)})
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +159,7 @@ func (s apiServer) ChangeMember(ctx context.Context, in api.ChangeMemberRequestO
 	if in.Body == nil {
 		return nil, say.New("send what changes, such as {\"role\": \"owner\"} or {\"areas\": [\"sales\"]}")
 	}
-	org := reqFrom(ctx).Org.ID
+	org := request.ReqFrom(ctx).Org.ID
 	if _, err := s.member(org, in.User); err != nil {
 		return nil, err
 	}
@@ -183,7 +185,7 @@ func (s apiServer) ChangeMember(ctx context.Context, in api.ChangeMemberRequestO
 }
 
 func (s apiServer) RemoveMember(ctx context.Context, in api.RemoveMemberRequestObject) (api.RemoveMemberResponseObject, error) {
-	q := reqFrom(ctx)
+	q := request.ReqFrom(ctx)
 	if _, err := s.a.s.RemoveMember(q.Org.ID, in.User, q.Actor()); err != nil {
 		return nil, err
 	}
@@ -191,16 +193,16 @@ func (s apiServer) RemoveMember(ctx context.Context, in api.RemoveMemberRequestO
 }
 
 func (s apiServer) ListNeverContactCovers(ctx context.Context, in api.ListNeverContactCoversRequestObject) (api.ListNeverContactCoversResponseObject, error) {
-	o, err := s.a.s.OrgBySlug(reqFrom(ctx).Org.Slug)
+	o, err := s.a.s.OrgBySlug(request.ReqFrom(ctx).Org.Slug)
 	if err != nil {
 		return nil, err
 	}
 	all := s.a.s.NeverContactCovers(o)
-	page, next, err := listPage(all, in.Params.Limit, in.Params.Cursor)
+	page, next, err := paging.ListPage(all, in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListNeverContactCovers200JSONResponse{Headers: api.ListNeverContactCovers200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out := api.ListNeverContactCovers200JSONResponse{Headers: api.ListNeverContactCovers200ResponseHeaders{Link: request.NextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor, out.Body.Total = nonNil(page), next, len(all)
 	return out, nil
 }
@@ -216,7 +218,7 @@ func (s apiServer) mailServerOut(org int64) api.MailServer {
 }
 
 func (s apiServer) GetMailServer(ctx context.Context, _ api.GetMailServerRequestObject) (api.GetMailServerResponseObject, error) {
-	return api.GetMailServer200JSONResponse(s.mailServerOut(reqFrom(ctx).Org.ID)), nil
+	return api.GetMailServer200JSONResponse(s.mailServerOut(request.ReqFrom(ctx).Org.ID)), nil
 }
 
 func (s apiServer) MakeBounceHook(ctx context.Context, _ api.MakeBounceHookRequestObject) (api.MakeBounceHookResponseObject, error) {
@@ -224,7 +226,7 @@ func (s apiServer) MakeBounceHook(ctx context.Context, _ api.MakeBounceHookReque
 	if s.a.base == "" || err != nil || base.Scheme != "https" {
 		return nil, say.New("Postmark needs this server's public https address (PROSPECTOR_URL) to post to") //nolint:staticcheck // Postmark is a name
 	}
-	org := reqFrom(ctx).Org
+	org := request.ReqFrom(ctx).Org
 	secret, err := s.a.s.NewBounceHook(org.ID)
 	if err != nil {
 		return nil, err
@@ -235,7 +237,7 @@ func (s apiServer) MakeBounceHook(ctx context.Context, _ api.MakeBounceHookReque
 }
 
 func (s apiServer) DropBounceHook(ctx context.Context, _ api.DropBounceHookRequestObject) (api.DropBounceHookResponseObject, error) {
-	if err := s.a.s.DropBounceHook(reqFrom(ctx).Org.ID); err != nil {
+	if err := s.a.s.DropBounceHook(request.ReqFrom(ctx).Org.ID); err != nil {
 		return nil, err
 	}
 	return api.DropBounceHook204Response{}, nil
@@ -245,7 +247,7 @@ func (s apiServer) SaveMailServer(ctx context.Context, in api.SaveMailServerRequ
 	if in.Body == nil {
 		return nil, say.New("send the server: {\"host\": \"smtp.example.com\", \"port\": 587, …}, or an empty host for none")
 	}
-	org := reqFrom(ctx).Org.ID
+	org := request.ReqFrom(ctx).Org.ID
 	b := in.Body
 	if _, err := s.a.saveMail(org, mailIn{Host: b.Host, Port: b.Port, Username: b.Username, Password: b.Password, Sender: b.Sender}); err != nil {
 		return nil, err
@@ -283,7 +285,7 @@ func domainOut(d SSODomain) api.SSODomain {
 }
 
 func (s apiServer) GetSSO(ctx context.Context, _ api.GetSSORequestObject) (api.GetSSOResponseObject, error) {
-	out, err := s.ssoOut(reqFrom(ctx).Org.ID)
+	out, err := s.ssoOut(request.ReqFrom(ctx).Org.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +296,7 @@ func (s apiServer) SaveSSO(ctx context.Context, in api.SaveSSORequestObject) (ap
 	if in.Body == nil {
 		return nil, say.New("send the provider: {\"issuer\": \"https://login.example.com\", \"client_id\": \"…\", \"client_secret\": \"…\"}, or an empty issuer to turn it off")
 	}
-	q, b := reqFrom(ctx), in.Body
+	q, b := request.ReqFrom(ctx), in.Body
 	if err := s.a.saveSSO(ctx, q, ssoIn{Issuer: b.Issuer, ClientID: b.ClientId, Secret: b.ClientSecret, Required: b.Required, AutoJoin: b.AutoJoin}); err != nil {
 		return nil, err
 	}
@@ -306,15 +308,15 @@ func (s apiServer) SaveSSO(ctx context.Context, in api.SaveSSORequestObject) (ap
 }
 
 func (s apiServer) ListSSODomains(ctx context.Context, in api.ListSSODomainsRequestObject) (api.ListSSODomainsResponseObject, error) {
-	c, err := s.a.s.SSO(reqFrom(ctx).Org.ID)
+	c, err := s.a.s.SSO(request.ReqFrom(ctx).Org.ID)
 	if err != nil {
 		return nil, err
 	}
-	page, next, err := listPage(c.Domains, in.Params.Limit, in.Params.Cursor)
+	page, next, err := paging.ListPage(c.Domains, in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListSSODomains200JSONResponse{Headers: api.ListSSODomains200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out := api.ListSSODomains200JSONResponse{Headers: api.ListSSODomains200ResponseHeaders{Link: request.NextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor = []api.SSODomain{}, next
 	for _, d := range page {
 		out.Body.Items = append(out.Body.Items, domainOut(d))
@@ -326,7 +328,7 @@ func (s apiServer) AddSSODomain(ctx context.Context, in api.AddSSODomainRequestO
 	if in.Body == nil {
 		return nil, say.New("say which: {\"domain\": \"example.com\"}")
 	}
-	d, err := s.a.addSSODomain(reqFrom(ctx).Org.ID, in.Body.Domain)
+	d, err := s.a.addSSODomain(request.ReqFrom(ctx).Org.ID, in.Body.Domain)
 	if err != nil {
 		return nil, err
 	}
@@ -334,14 +336,14 @@ func (s apiServer) AddSSODomain(ctx context.Context, in api.AddSSODomainRequestO
 }
 
 func (s apiServer) RemoveSSODomain(ctx context.Context, in api.RemoveSSODomainRequestObject) (api.RemoveSSODomainResponseObject, error) {
-	if err := s.a.removeSSODomain(reqFrom(ctx).Org.ID, in.Domain); err != nil {
+	if err := s.a.removeSSODomain(request.ReqFrom(ctx).Org.ID, in.Domain); err != nil {
 		return nil, err
 	}
 	return api.RemoveSSODomain204Response{}, nil
 }
 
 func (s apiServer) VerifySSODomain(ctx context.Context, in api.VerifySSODomainRequestObject) (api.VerifySSODomainResponseObject, error) {
-	d, err := s.a.verifySSODomain(ctx, reqFrom(ctx).Org.ID, in.Domain)
+	d, err := s.a.verifySSODomain(ctx, request.ReqFrom(ctx).Org.ID, in.Domain)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +360,7 @@ func (e exportResponse) VisitExportOrgResponse(w http.ResponseWriter) error {
 }
 
 func (s apiServer) ExportOrg(ctx context.Context, _ api.ExportOrgRequestObject) (api.ExportOrgResponseObject, error) {
-	q := reqFrom(ctx)
+	q := request.ReqFrom(ctx)
 	out, err := s.a.s.ExportOrg(q.Org.ID, q.Actor())
 	if err != nil {
 		return nil, err

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/nyaruka/phonenumbers/v2"
+
+	"github.com/shutthegoatup/prospector/internal/marketing"
 )
 
 // A domain that takes mail rarely stops; one that doesn't may be set up next week.
@@ -13,7 +15,7 @@ import (
 // deadAddress is the first of an email field's addresses whose domain takes no mail.
 func deadAddress(email string, noMail map[string]bool) string {
 	for _, e := range emailRe.FindAllString(strings.ToLower(email), -1) {
-		if noMail[mailDomainOf(e)] {
+		if noMail[marketing.MailDomainOf(e)] {
 			return e
 		}
 	}

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/sales"
 )
@@ -12,7 +14,7 @@ import (
 // person adds someone at a company with an address, in conversation unless cold.
 func person(t *testing.T, s *Store, o *Org, name, company, email string, replied bool) *Contact {
 	t.Helper()
-	c := must(s.QuickAddPerson(o, QuickAdd{Name: name, Company: company, Email: email}, "Ada Lovelace"))
+	c := must(s.QuickAddPerson(o, crm.QuickAdd{Name: name, Company: company, Email: email}, "Ada Lovelace"))
 	if replied {
 		if err := s.Mark(o.ID, c.ID, "replied", today(), "Ada Lovelace"); err != nil {
 			t.Fatal(err)
@@ -21,7 +23,7 @@ func person(t *testing.T, s *Store, o *Org, name, company, email string, replied
 	return c
 }
 
-func leftOut(people []Recipient) map[string]string {
+func leftOut(people []marketing.Recipient) map[string]string {
 	out := map[string]string{}
 	for _, p := range people {
 		out[p.Name] = ""
@@ -51,7 +53,7 @@ func TestACampaignGoesOnlyToPeopleWithARelationship(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := must(s.AddCampaign(o.ID, CampaignIn{Name: "Spring price list", Subject: "Our spring prices", Body: "Hello"}, "Ada Lovelace"))
+	c := must(s.AddCampaign(o.ID, marketing.CampaignIn{Name: "Spring price list", Subject: "Our spring prices", Body: "Hello"}, "Ada Lovelace"))
 	people := must(s.Audience(o, *c))
 	got := leftOut(people)
 	for name, want := range map[string]string{
@@ -189,7 +191,7 @@ func TestCampaignDraftsAreKeptByMembersAndKeys(t *testing.T) {
 	if code, _ := asKey(t, "DELETE", one, writer, nil); code != http.StatusBadRequest {
 		t.Errorf("removing one that went: %d", code)
 	}
-	if err := s.DB.Model(&Campaign{}).Where("id = ?", c.ID).Update("status", CampaignDraft).Error; err != nil {
+	if err := s.DB.Model(&Campaign{}).Where("id = ?", c.ID).Update("status", marketing.CampaignDraft).Error; err != nil {
 		t.Fatal(err)
 	}
 
@@ -230,7 +232,7 @@ func TestThePostalAddressIsKept(t *testing.T) {
 func TestTheAudienceHoldsAtItsEdges(t *testing.T) {
 	t.Parallel()
 	s, o, srv, member := signedIn(t)
-	listedByProfile := must(s.QuickAddPerson(o, QuickAdd{Name: "Profile Listed", Company: "Larkmoor Yachts", Email: "listed@larkmoor.example", Linkedin: "https://www.linkedin.com/in/li-never"}, "Ada Lovelace"))
+	listedByProfile := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Profile Listed", Company: "Larkmoor Yachts", Email: "listed@larkmoor.example", Linkedin: "https://www.linkedin.com/in/li-never"}, "Ada Lovelace"))
 	if err := s.Mark(o.ID, listedByProfile.ID, "replied", today(), "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +240,7 @@ func TestTheAudienceHoldsAtItsEdges(t *testing.T) {
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	c := must(s.AddCampaign(o.ID, CampaignIn{Name: "Spring", Body: "Prices change.\n-- \nAda\n\n\n"}, "Ada Lovelace"))
+	c := must(s.AddCampaign(o.ID, marketing.CampaignIn{Name: "Spring", Body: "Prices change.\n-- \nAda\n\n\n"}, "Ada Lovelace"))
 	if got := leftOut(must(s.Audience(o, *c)))["Profile Listed"]; got != "on the never-contact list" {
 		t.Errorf("someone whose LinkedIn profile is on the never-contact list: left out %q", got)
 	}

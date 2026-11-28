@@ -54,7 +54,10 @@ import (
 	"time"
 	_ "time/tzdata"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/request"
 )
 
 // version is set at release time by -ldflags "-X main.version=…".
@@ -100,7 +103,7 @@ func remote(method, url string, body io.Reader) (*http.Response, error) {
 		msg, _ := io.ReadAll(res.Body)
 		res.Body.Close()
 		said := strings.TrimSpace(string(msg))
-		var p problem
+		var p request.Problem
 		if json.Unmarshal(msg, &p) == nil && p.Detail != "" {
 			said = p.Detail
 		}
@@ -223,9 +226,9 @@ func run(args []string) error {
 			fmt.Fprintf(os.Stderr, "the front page has no contact form: %s\n", why)
 		}
 		if os.Getenv("PROSPECTOR_FRONT_ORG") != "" {
-			fmt.Fprintf(os.Stderr, "PROSPECTOR_FRONT_ORG is no longer read: the front page's form sends to the %q organisation\n", frontOrgSlug)
+			fmt.Fprintf(os.Stderr, "PROSPECTOR_FRONT_ORG is no longer read: the front page's form sends to the %q organisation\n", identity.FrontOrgSlug)
 		}
-		return serve(&App{s: s, rates: rateGuard{on: true}, base: base, frontOrg: frontOrgSlug, securityContact: contact, social: social, mail: via}, arg(rest, 0, addr))
+		return serve(&App{s: s, rates: rateGuard{on: true}, base: base, frontOrg: identity.FrontOrgSlug, securityContact: contact, social: social, mail: via}, arg(rest, 0, addr))
 	case "sso":
 		return ssoCommand(s, rest)
 	case "agent":
@@ -442,7 +445,7 @@ func run(args []string) error {
 		if err := s.Mark(org.ID, c.ID, rest[1], date, "cli"); err != nil {
 			return err
 		}
-		fmt.Printf("%s @ %s: %s = %s\n", deref(c.First), deref(c.Maker), Marks[rest[1]], date)
+		fmt.Printf("%s @ %s: %s = %s\n", deref(c.First), deref(c.Maker), crm.Marks[rest[1]], date)
 	case "set":
 		if len(rest) < 3 {
 			return fmt.Errorf("usage: prospector set <name> <field> <value>")

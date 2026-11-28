@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/identity"
 )
 
 const (
@@ -20,7 +22,7 @@ const (
 	attempts purpose = "prospector: sign-in attempts"
 )
 
-var purposes = []purpose{sealing, attempts, sessions, apiKeys}
+var purposes = []purpose{sealing, attempts, identity.Sessions, identity.ApiKeys}
 
 const keySize = 32
 

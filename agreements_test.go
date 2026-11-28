@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/signing"
 )
 
@@ -79,7 +80,7 @@ func TestAnAgreementKeepsItsDocumentAsUploaded(t *testing.T) {
 		return secret
 	}
 	reader, writer, stranger := key(o.ID, "read"), key(o.ID, "agreements:write"), key(other.ID, "read", "agreements:write")
-	company := *must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace")).CompanyID
+	company := *must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace")).CompanyID
 	list := srv.URL + "/o/alpha/api/v1/agreements"
 
 	if code, body := asKey(t, "POST", list, reader, map[string]any{"company": company, "name": "Service agreement"}); code != http.StatusForbidden || !strings.Contains(body, "agreements:write") {
@@ -172,7 +173,7 @@ func TestAnAgreementKeepsItsDocumentAsUploaded(t *testing.T) {
 func TestAnAgreementIsWorkedFromItsCompanysPage(t *testing.T) {
 	t.Parallel()
 	s, o, srv, member := signedIn(t)
-	company := *must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace")).CompanyID
+	company := *must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace")).CompanyID
 	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/agreements", "application/json", map[string]any{"company": company, "name": "Service agreement"}); code != http.StatusCreated {
 		t.Fatalf("starting from the page: %d %s", code, body)
 	}
@@ -209,7 +210,7 @@ func TestAnAgreementIsWorkedFromItsCompanysPage(t *testing.T) {
 func TestADocumentIsKeptByteForByte(t *testing.T) {
 	t.Parallel()
 	s, o, srv, member := signedIn(t)
-	company := *must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace")).CompanyID
+	company := *must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace")).CompanyID
 	a := must(s.AddAgreement(o.ID, company, "API agreement", "Ada Lovelace"))
 	doc := srv.URL + "/o/alpha/api/v1/agreements/" + itoa(a.ID) + "/document"
 	quoting := testPDF(1, "(the API sends \\u0000 for a NUL) Tj")
@@ -244,7 +245,7 @@ func must2[A, B any](a A, b B, err error) (A, B) {
 func TestOnlySalesWorksAgreements(t *testing.T) {
 	t.Parallel()
 	s, o, srv, _ := signedIn(t)
-	company := *must(s.QuickAddPerson(o, QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace")).CompanyID
+	company := *must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace")).CompanyID
 	a := must(s.AddAgreement(o.ID, company, "Service agreement", "Ada Lovelace"))
 	grace := must(s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
 	if err := s.AddMember(o.ID, grace.ID, "member", "Ada Lovelace"); err != nil {

@@ -5,6 +5,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+
+	"github.com/shutthegoatup/prospector/internal/marketing"
 )
 
 // postmarkBounce is the part of Postmark's bounce and spam complaint webhooks that is used.
@@ -42,9 +44,9 @@ func (a *App) postmarkHook(w http.ResponseWriter, r *http.Request) {
 	var reason, said string
 	switch {
 	case b.RecordType == "Bounce" && b.permanent():
-		reason, said = SuppressBounced, "it bounced ("+b.Type+")"
+		reason, said = marketing.SuppressBounced, "it bounced ("+b.Type+")"
 	case b.RecordType == "SpamComplaint":
-		reason = SuppressComplained
+		reason = marketing.SuppressComplained
 	default:
 		w.WriteHeader(http.StatusNoContent)
 		return

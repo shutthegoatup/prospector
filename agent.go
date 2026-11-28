@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 // Agent operations: the REST API and the MCP server both call these, with the
@@ -16,8 +17,8 @@ type SearchIn struct {
 
 // SearchOut is what a search answers with.
 type SearchOut struct {
-	Hits       []SearchHit `json:"hits"`
-	NextCursor string      `json:"next_cursor,omitempty" jsonschema:"set when more matched than are listed: pass it as cursor for the rest before concluding a company or person isn't here"`
+	Hits       []research.SearchHit `json:"hits"`
+	NextCursor string               `json:"next_cursor,omitempty" jsonschema:"set when more matched than are listed: pass it as cursor for the rest before concluding a company or person isn't here"`
 }
 
 // agentInstructions describes each task rather than naming a model: the client
@@ -60,7 +61,7 @@ func agentInstructions(o *Org, k *APIKey) string {
 // lookForGuidance names the assets the organisation looks for, so agents record
 // each under the field the Research page checks.
 func lookForGuidance(o *Org) string {
-	return lookForList(o.Name, o.Settings.LookFor)
+	return research.LookForList(o.Name, o.Settings.LookFor)
 }
 
 type GuidanceOut struct {

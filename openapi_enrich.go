@@ -5,12 +5,15 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
 func enricherOut(s *Store, e Enricher, now time.Time) api.Enricher {
 	var fields []string
-	if v := vendors[e.Kind]; v != nil {
+	if v := prospecting.Vendors[e.Kind]; v != nil {
 		fields = v.Fields()
 	}
 	return api.Enricher{Id: e.ID, Kind: api.EnricherKind(e.Kind), Position: e.Position, MonthlyLimit: e.MonthlyLimit,
@@ -19,15 +22,15 @@ func enricherOut(s *Store, e Enricher, now time.Time) api.Enricher {
 }
 
 func (s apiServer) ListEnrichers(ctx context.Context, in api.ListEnrichersRequestObject) (api.ListEnrichersResponseObject, error) {
-	list, err := s.a.s.Enrichers(reqFrom(ctx).Org.ID)
+	list, err := s.a.s.Enrichers(request.ReqFrom(ctx).Org.ID)
 	if err != nil {
 		return nil, err
 	}
-	list, next, err := listPage(list, in.Params.Limit, in.Params.Cursor)
+	list, next, err := paging.ListPage(list, in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListEnrichers200JSONResponse{Headers: api.ListEnrichers200ResponseHeaders{Link: nextLink(ctx, next)}}
+	out := api.ListEnrichers200JSONResponse{Headers: api.ListEnrichers200ResponseHeaders{Link: request.NextLink(ctx, next)}}
 	out.Body.Items, out.Body.NextCursor = []api.Enricher{}, next
 	now := time.Now()
 	for _, e := range list {
@@ -40,8 +43,8 @@ func (s apiServer) SaveEnricher(ctx context.Context, in api.SaveEnricherRequestO
 	if in.Body == nil {
 		return nil, say.New(`send the vendor, such as {"kind": "hunter", "api_key": "…", "monthly_limit": 100}`)
 	}
-	q := reqFrom(ctx)
-	e, err := s.a.s.SaveEnricher(q.Org.ID, EnricherIn{Kind: string(in.Body.Kind), APIKey: in.Body.ApiKey,
+	q := request.ReqFrom(ctx)
+	e, err := s.a.s.SaveEnricher(q.Org.ID, prospecting.EnricherIn{Kind: string(in.Body.Kind), APIKey: in.Body.ApiKey,
 		Position: in.Body.Position, MonthlyLimit: in.Body.MonthlyLimit}, q.Actor())
 	if err != nil {
 		return nil, err
@@ -50,7 +53,7 @@ func (s apiServer) SaveEnricher(ctx context.Context, in api.SaveEnricherRequestO
 }
 
 func (s apiServer) DeleteEnricher(ctx context.Context, in api.DeleteEnricherRequestObject) (api.DeleteEnricherResponseObject, error) {
-	if err := s.a.s.DeleteEnricher(reqFrom(ctx).Org.ID, in.Id); err != nil {
+	if err := s.a.s.DeleteEnricher(request.ReqFrom(ctx).Org.ID, in.Id); err != nil {
 		return nil, err
 	}
 	return api.DeleteEnricher204Response{}, nil
@@ -60,7 +63,7 @@ func (s apiServer) EnrichContact(ctx context.Context, in api.EnrichContactReques
 	if in.Body == nil {
 		return nil, say.New(`send the fields to look for, such as {"fields": ["email"]}`)
 	}
-	q := reqFrom(ctx)
+	q := request.ReqFrom(ctx)
 	// Read afresh, so a never-contact entry added a moment ago holds.
 	o, err := s.a.s.OrgBySlug(q.Org.Slug)
 	if err != nil {

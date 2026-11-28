@@ -15,6 +15,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/request"
 )
 
 // Every answer an operation gives across the suite is held to the spec: a status it
@@ -136,7 +137,7 @@ func TestEveryProblemTypeHasItsTitle(t *testing.T) {
 	}
 	for _, e := range spec.Components.Schemas["ProblemType"].Value.Enum {
 		kind := api.ProblemType(e.(string))
-		if _, ok := problemTitles[kind]; !ok && kind != api.ProblemTypeUntyped {
+		if _, ok := request.ProblemTitles[kind]; !ok && kind != api.ProblemTypeUntyped {
 			t.Errorf("%s has no title, so it would go out as about:blank", kind)
 		}
 	}

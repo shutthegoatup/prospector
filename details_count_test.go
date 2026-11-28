@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
+)
 
 // TestTheDetailsCountIsTheDetailsList: the count is worked out without reading what
 // the list shows, so it is held to the list. A suggestion the person has since been
@@ -11,10 +16,10 @@ func TestTheDetailsCountIsTheDetailsList(t *testing.T) {
 	o := mustOrg(t, s, "alpha")
 	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
 	for _, name := range []string{"Larkmoor Yachts", "Windrush Marine", "Quay Boats"} {
-		must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: name}))
-		must(s.AgentAddContact(o, scout, AddContactIn{Company: name, Name: "Hannah " + name, Phone: "+44 20 7946 0000", SourceURL: "https://example.example/team"}))
+		must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: name}))
+		must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: name, Name: "Hannah " + name, Phone: "+44 20 7946 0000", SourceURL: "https://example.example/team"}))
 		// Another number for someone already here waits for a person to check.
-		must(s.AgentAddContact(o, second, AddContactIn{Company: name, Name: "Hannah " + name, Phone: "+44 20 7946 0111", SourceURL: "https://example.example/contact"}))
+		must(s.AgentAddContact(o, second, prospecting.AddContactIn{Company: name, Name: "Hannah " + name, Phone: "+44 20 7946 0111", SourceURL: "https://example.example/contact"}))
 	}
 	agrees := func(want int) {
 		t.Helper()

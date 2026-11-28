@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 func TestTheCompaniesListComesThroughTheAPIWithItsFilters(t *testing.T) {
@@ -16,9 +19,9 @@ func TestTheCompaniesListComesThroughTheAPIWithItsFilters(t *testing.T) {
 	other := mustOrg(t, s, "beta")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
 	repliedPerson(t, s, o, "Hannah Pryce")
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Corvane Marine", Segment: "tenders"}))
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Belair Kitchens", Segment: "kitchens"}))
-	must(s.AgentAddCompany(other.ID, scout, AddCompanyIn{Name: "Ostrava Boats", Segment: "dinghies"}))
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Corvane Marine", Segment: "tenders"}))
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Belair Kitchens", Segment: "kitchens"}))
+	must(s.AgentAddCompany(other.ID, scout, research.AddCompanyIn{Name: "Ostrava Boats", Segment: "dinghies"}))
 	base := srv.URL + "/o/alpha/api/v1/"
 	list := func(query string) api.ListCompanies200JSONResponse {
 		t.Helper()
@@ -68,10 +71,10 @@ func TestACompanysPageComesThroughTheAPI(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	scout := Actor{Name: "agent:scout", KeyID: 1}
-	co := must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example",
-		Facts: []FactIn{{Field: "configurator", Value: "Builds to order online", SourceURL: "https://larkmoor.example/build"}}}))
-	hannah := must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}))
-	must(s.AgentAddContact(o, scout, AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Email: "hannah@larkmoor.example",
+	co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example",
+		Facts: []research.FactIn{{Field: "configurator", Value: "Builds to order online", SourceURL: "https://larkmoor.example/build"}}}))
+	hannah := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}))
+	must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Email: "hannah@larkmoor.example",
 		EmailStatus: "guess", SourceURL: "https://larkmoor.example/contact"}))
 	if err := s.PickContact(o.ID, o, hannah.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
@@ -79,8 +82,8 @@ func TestACompanysPageComesThroughTheAPI(t *testing.T) {
 	if err := s.Mark(o.ID, hannah.ID, "linkedin", time.Now().Format("2006-01-02"), "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	must(s.AgentNote(o.ID, scout, NoteIn{Company: "Larkmoor Yachts", Kind: "next", Text: "Their boat show stand lists a buyer."}))
-	theirs := must(s.AgentAddCompany(other.ID, scout, AddCompanyIn{Name: "Ostrava Boats"}))
+	must(s.AgentNote(o.ID, scout, research.NoteIn{Company: "Larkmoor Yachts", Kind: "next", Text: "Their boat show stand lists a buyer."}))
+	theirs := must(s.AgentAddCompany(other.ID, scout, research.AddCompanyIn{Name: "Ostrava Boats"}))
 	base := srv.URL + "/o/alpha/api/v1/companies/"
 
 	code, body := call(t, client, "GET", base+itoa(co.ID)+"/overview", "", nil)
@@ -133,9 +136,9 @@ func TestOnlyReviewersDeleteAgentsNotes(t *testing.T) {
 	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	scout := Actor{Name: "agent:scout", KeyID: 1}
-	must(s.AgentAddCompany(o.ID, scout, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	note := func() *TaskNote {
-		return must(s.AgentNote(o.ID, scout, NoteIn{Company: "Larkmoor Yachts", Kind: "dead_end", Text: "No team page."}))
+		return must(s.AgentNote(o.ID, scout, research.NoteIn{Company: "Larkmoor Yachts", Kind: "dead_end", Text: "No team page."}))
 	}
 	grace := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
 	if err := s.SetAreas(o.ID, grace.ID, []string{"support"}); err != nil {
@@ -169,7 +172,7 @@ func TestOnlyAnOwnerExportsOrErasesAPersonThroughTheAPI(t *testing.T) {
 	s, o, srv, ada := signedIn(t)
 	other := mustOrg(t, s, "beta")
 	hannah := repliedPerson(t, s, o, "Hannah Pryce")
-	theirs := must(s.QuickAddPerson(other, QuickAdd{Name: "Tom Ellery", Company: "Corvane Marine"}, "someone"))
+	theirs := must(s.QuickAddPerson(other, crm.QuickAdd{Name: "Tom Ellery", Company: "Corvane Marine"}, "someone"))
 	mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
 	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")
 	reader, _ := must2(s.CreateKey(o.ID, "reader", []string{"read"}, "Ada Lovelace"))
@@ -213,7 +216,7 @@ func TestOnlyAnOwnerExportsOrErasesAPersonThroughTheAPI(t *testing.T) {
 func TestReadingCompaniesNeedsTheReadScope(t *testing.T) {
 	t.Parallel()
 	s, o, srv, _ := signedIn(t)
-	co := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout", KeyID: 1}, AddCompanyIn{Name: "Larkmoor Yachts"}))
+	co := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout", KeyID: 1}, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	writer, _ := must2(s.CreateKey(o.ID, "scout", []string{"research:write"}, "Ada Lovelace"))
 	base := srv.URL + "/o/alpha/api/v1/"
 	for _, path := range []string{"companies", "segments", "companies/" + itoa(co.ID) + "/overview", "companies/" + itoa(co.ID) + "/history", "companies/" + itoa(co.ID) + "/notes"} {

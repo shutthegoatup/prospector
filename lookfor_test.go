@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/research"
 )
 
 func TestLookForAssets(t *testing.T) {
@@ -36,8 +37,8 @@ func TestLookForAssets(t *testing.T) {
 		t.Fatalf("agents aren't told what to look for: %q", g)
 	}
 
-	out, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, AddCompanyIn{Name: "Brightwell Staffing", Domain: "brightwell.example",
-		Facts: []FactIn{{Field: "Careers page", Value: "Lists 14 open roles", SourceURL: "https://brightwell.example/jobs"}}})
+	out, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Brightwell Staffing", Domain: "brightwell.example",
+		Facts: []research.FactIn{{Field: "Careers page", Value: "Lists 14 open roles", SourceURL: "https://brightwell.example/jobs"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +62,7 @@ func TestOlderAgentsConfiguratorBecomesFacts(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	out, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, AddCompanyIn{Name: "Larkmoor Yachts",
+	out, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Larkmoor Yachts",
 		ConfiguratorURL: "https://larkmoor.example/build", Platform: "Kickflip", BuiltBy: "Studio Vell"})
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +71,7 @@ func TestOlderAgentsConfiguratorBecomesFacts(t *testing.T) {
 	if facts["configurator"] != "https://larkmoor.example/build" || facts["platform"] != "Kickflip" || facts["built_by"] != "Studio Vell" {
 		t.Fatalf("facts: %v", facts)
 	}
-	corvane, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, AddCompanyIn{Name: "Corvane", Platform: "Kickflip"})
+	corvane, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Corvane", Platform: "Kickflip"})
 	if err != nil {
 		t.Fatalf("an older agent's platform with no configurator link was refused: %v", err)
 	}

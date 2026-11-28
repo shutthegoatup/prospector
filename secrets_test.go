@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
+
+	"github.com/shutthegoatup/prospector/internal/identity"
 )
 
 var (
@@ -86,7 +88,7 @@ func TestTokensAreFoundByAKeyedLookup(t *testing.T) {
 			t.Fatalf("a %s is stored as %q, not under key 1", what, stored)
 		}
 	}
-	if sess.TokenHash == s.Keyring.Lookup(apiKeys, token) {
+	if sess.TokenHash == s.Keyring.Lookup(identity.ApiKeys, token) {
 		t.Fatal("sessions and API keys share a key")
 	}
 
@@ -199,7 +201,7 @@ func TestAnAgentsKeyOutlivesTheServerBeingGivenASecretKey(t *testing.T) {
 		t.Fatalf("an API key under the newer key, on a server still using the older: %v", err)
 	}
 	var sess Session
-	s.DB.Where("token_hash in ?", s.Keyring.Lookups(sessions, fresh)).First(&sess)
+	s.DB.Where("token_hash in ?", s.Keyring.Lookups(identity.Sessions, fresh)).First(&sess)
 	s.DB.First(key, key.ID)
 	if lookupVersion(sess.TokenHash) != 2 || lookupVersion(key.Hash) != 2 {
 		t.Fatalf("moved back to the older key: session %q, API key %q", sess.TokenHash, key.Hash)
