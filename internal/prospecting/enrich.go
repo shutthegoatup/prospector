@@ -2,6 +2,7 @@ package prospecting
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"slices"
 	"time"
@@ -24,16 +25,10 @@ type vendor interface {
 	Find(ctx context.Context, c *http.Client, base, key string, p EnrichPerson, field string) (VendorFind, error)
 }
 
-var Vendors = map[string]vendor{}
+// Vendors are the enrichment services an organisation can pick, by kind.
+var Vendors = map[string]vendor{"hunter": hunter{}, "prospeo": prospeo{}}
 
-func vendorKinds() []string {
-	var out []string
-	for k := range Vendors {
-		out = append(out, k)
-	}
-	slices.Sort(out)
-	return out
-}
+func vendorKinds() []string { return slices.Sorted(maps.Keys(Vendors)) }
 
 const EnrichAgain = 30 * 24 * time.Hour
 
