@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { intl } from "@/i18n";
 import { actor } from "@/lib/format";
+import { writeClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/session";
 import locales from "../../locales.json";
@@ -211,6 +212,43 @@ const m = defineMessages({
     id: "/vLmGD",
     description: "Under the heading of the Outgoing mail section, when neither the organisation nor the site can send mail",
   },
+  bounces: {
+    defaultMessage: "Bounces and spam complaints",
+    id: "eklRVU",
+    description: "Heading of the settings section that connects Postmark's reports of mail that came back",
+  },
+  bouncesOff: { defaultMessage: "Postmark isn't reporting here yet.", id: "70Htj2", description: "In the Bounces section, before Postmark is connected" },
+  bouncesOffHint: { defaultMessage: "For the Postmark server your mail goes through.", id: "ieSwqc", description: "Under the Connect Postmark button" },
+  connectPostmark: {
+    defaultMessage: "Connect Postmark",
+    id: "oWRzxG",
+    description: "Button making the address Postmark reports bounces and spam complaints to",
+  },
+  bouncesOn: {
+    defaultMessage: "Postmark reports bounces and spam complaints here.",
+    id: "NwFzBG",
+    description: "In the Bounces section, once Postmark is connected",
+  },
+  newHookAddress: { defaultMessage: "Make a new address", id: "hp9sm0", description: "Button replacing the address Postmark reports to, as when it was lost" },
+  newHookHint: {
+    defaultMessage: "A new address replaces the one Postmark has, so paste it there too.",
+    id: "R1ZNJ9",
+    description: "Under the Make a new address button",
+  },
+  stopBounces: { defaultMessage: "Stop", id: "xkH+Dm", description: "Button to stop taking bounces and spam complaints from Postmark" },
+  stopBouncesAsk: {
+    defaultMessage: "Stop taking bounces and spam complaints from Postmark? Addresses already listed stay listed.",
+    id: "iAm3Gz",
+    description: "Asked before stopping Postmark's reports",
+  },
+  hookShownOnce: {
+    defaultMessage: "The address holds its password and is shown only now. If you lose it, connect again: the old one stops working.",
+    id: "HU8Z1U",
+    description: "Under the address to paste into Postmark",
+  },
+  copyHook: { defaultMessage: "Copy", id: "JVE/Sg", description: "Button copying the address to paste into Postmark" },
+  copiedHook: { defaultMessage: "Copied ✓", id: "bj8fFc", description: "The copy button's label once it has copied the address" },
+  hookAddress: { defaultMessage: "Address for Postmark", id: "tiOCmO", description: "What a screen reader calls the address to paste into Postmark" },
   outgoingMail: { defaultMessage: "Outgoing mail", id: "JZ9UqU", description: "Heading of the settings page's section for the organisation's mail server" },
   server: { defaultMessage: "Server", id: "+OCmsc", description: "Label of the mail server's host name" },
   port: { defaultMessage: "Port", id: "mXf2h4", description: "What a screen reader calls the mail server's port field" },
@@ -497,6 +535,17 @@ const v = {
     id: "LSGLou",
     description: "Under an offering: who last changed it. {who} is a member or an agent",
   }),
+  bouncesHint: defineMessage<{ prospector: string }>({
+    defaultMessage:
+      "When mail to an address bounces for good, or someone marks it as spam, Postmark tells {prospector}, and the address goes on Not to be mailed. Soft bounces change nothing.",
+    id: "F2/5Ij",
+    description: "Under the heading of the Bounces section. {prospector} is the product's name",
+  }),
+  mailAgainBounced: defineMessage<{ address: string; date: string }>({
+    defaultMessage: "Mail {address} again? It bounced on {date}; if it still bounces, Postmark puts it back.",
+    id: "Et85CB",
+    description: "Asked before taking a bounced address off the list not to be mailed. {address} is the address, {date} when it bounced",
+  }),
   mailAgain: defineMessage<{ address: string }>({
     defaultMessage: "Mail {address} again?",
     id: "MpQv4v",
@@ -676,6 +725,7 @@ function Rest({ orgName, me, settings }: { orgName: string; me?: Me; settings?: 
     <>
       {settings && <WhatYouSell orgName={orgName} />}
       {owner && <OutgoingMail orgName={orgName} />}
+      {owner && <Bounces />}
       {owner && (
         <Section title={say(m.agents)}>
           <p className="text-sm">
@@ -1065,6 +1115,103 @@ function OutgoingMail({ orgName }: { orgName: string }) {
   );
 }
 
+// Bounces connects Postmark's webhook. Its address carries a password the server keeps
+// only hashed, so it is shown once, when it is made.
+function Bounces() {
+  const say = useIntl().formatMessage;
+  const { org } = useSession();
+  const refresh = useRefresh();
+  const mail = $api.useQuery("get", "/o/{org}/api/v1/mail-server", { params: { path: { org } } });
+  const make = $api.useMutation("post", "/o/{org}/api/v1/mail-server/bounce-hook", { onSuccess: refresh });
+  const drop = $api.useMutation("delete", "/o/{org}/api/v1/mail-server/bounce-hook", { onSuccess: refresh });
+  const [copied, setCopied] = useState(false);
+  const made = make.data && !drop.isSuccess ? make.data : undefined;
+  const on = mail.data?.has_bounce_hook;
+  const connect = () => {
+    setCopied(false);
+    drop.reset();
+    make.mutate({ params: { path: { org } }, headers: bodiless });
+  };
+  return (
+    <Section title={say(m.bounces)} hint={say(v.bouncesHint, { prospector })}>
+      {!mail.data && !mail.error && (
+        <Placeholders>
+          <p className="text-sm">
+            <Bar w="30ch" />
+          </p>
+        </Placeholders>
+      )}
+      {made && (
+        <>
+          <p className="text-sm">
+            <FormattedMessage
+              defaultMessage="Paste this address into Postmark: your server, then <b>Webhooks</b>, then <b>Add webhook</b>."
+              id="uCjplR"
+              description="Above the address to paste into Postmark. <b> marks the names of Postmark's own pages"
+              values={{ b: bold }}
+            />
+          </p>
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-input bg-muted px-3 py-2">
+            <code aria-label={say(m.hookAddress)} className="min-w-0 flex-1 break-all font-mono text-xs">
+              {made.url}
+            </code>
+            <ActionButton
+              quiet
+              size="xs"
+              onClick={() => {
+                writeClipboard(made.url);
+                setCopied(true);
+              }}
+            >
+              {copied ? say(m.copiedHook) : say(m.copyHook)}
+            </ActionButton>
+          </div>
+          <p className="text-sm">
+            <FormattedMessage
+              defaultMessage="Tick <b>Bounce</b> and <b>Spam Complaint</b>, and leave the other events off."
+              id="HiUpGg"
+              description="Which of Postmark's webhook events to turn on. <b> marks Postmark's names for them"
+              values={{ b: bold }}
+            />
+          </p>
+          <Meta>{say(m.hookShownOnce)}</Meta>
+        </>
+      )}
+      {mail.data && !made && !on && (
+        <>
+          <p className="text-sm">{say(m.bouncesOff)}</p>
+          <div>
+            <ActionButton size="sm" disabled={make.isPending} onClick={connect}>
+              {say(m.connectPostmark)}
+            </ActionButton>
+          </div>
+          <Meta>{say(m.bouncesOffHint)}</Meta>
+        </>
+      )}
+      {mail.data && !made && on && (
+        <>
+          <p className="text-sm">{say(m.bouncesOn)}</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <ActionButton quiet size="sm" disabled={make.isPending} onClick={connect}>
+              {say(m.newHookAddress)}
+            </ActionButton>
+            <ActionButton
+              quiet
+              size="sm"
+              disabled={drop.isPending}
+              onClick={() => window.confirm(say(m.stopBouncesAsk)) && drop.mutate({ params: { path: { org } } })}
+            >
+              {say(m.stopBounces)}
+            </ActionButton>
+          </div>
+          <Meta>{say(m.newHookHint)}</Meta>
+        </>
+      )}
+      <Failed errors={[mail.error, make.error, drop.error]} />
+    </Section>
+  );
+}
+
 function Step({ n, children }: { n: number; children: ReactNode }) {
   return (
     <li className="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3 py-2.5">
@@ -1275,11 +1422,15 @@ function NotToBeMailed() {
         <div>
           {rows.map((r) => (
             <SuppressionRow key={r.id} r={r}>
-              {r.reason === "added" && sales && (
+              {(r.reason === "added" || r.reason === "bounced") && sales && (
                 <ActionButton
                   quiet
                   size="xs"
-                  onClick={() => window.confirm(say(v.mailAgain, { address: r.address })) && remove.mutate({ params: { path: { org, id: r.id } } })}
+                  onClick={() =>
+                    window.confirm(
+                      r.bounced_at ? say(v.mailAgainBounced, { address: r.address, date: longDay(r.bounced_at) }) : say(v.mailAgain, { address: r.address }),
+                    ) && remove.mutate({ params: { path: { org, id: r.id } } })
+                  }
                 >
                   {say(m.takeOff)}
                 </ActionButton>

@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { actor, ago, clock, stamp } from "@/lib/format";
 import { useSession } from "@/session";
 import { TaskStatus, taskFound, taskLast } from "@/pages/Tasks";
+import { writeClipboard } from "@/lib/clipboard";
 
 type Asked = components["schemas"]["Asked"];
 type Run = components["schemas"]["Run"];
@@ -242,24 +243,6 @@ function askedMeta(say: Say, r: Asked, first: boolean) {
   const found = say(v.askedOpen, { by, at, since: first ? "first" : "later", found: taskFound(r.added_since.companies, r.added_since.people) });
   if (!r.held_by || !r.held_until) return found;
   return found + dot + say(v.held, { who: actor(r.held_by), until: clock(r.held_until) });
-}
-
-// The clipboard API exists only on HTTPS and localhost; on a plain-HTTP LAN address
-// the older execCommand copy still works inside the click.
-function writeClipboard(text: string) {
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text).catch(() => {});
-    return;
-  }
-  const area = document.createElement("textarea");
-  area.value = text;
-  area.setAttribute("readonly", "");
-  area.style.position = "fixed";
-  area.style.opacity = "0";
-  document.body.append(area);
-  area.select();
-  document.execCommand("copy");
-  area.remove();
 }
 
 export function TaskPage() {
