@@ -318,7 +318,7 @@ func (s *ResearchStore) CompanyNotesPage(org, company int64, page int) ([]store.
 // next is zero when there are no more.
 func (s *ResearchStore) Runs(org int64, before time.Time, limit int) (runs []Run, titles map[int64]string, next time.Time) {
 	agents := func() *gorm.DB {
-		q := s.InOrg(org).Model(&store.Event{}).Where(`"user" like 'agent:%'`)
+		q := s.InOrg(org).Model(&store.Event{}).Where(`"user" like ?`, store.AgentsLike)
 		if !before.IsZero() {
 			q = q.Where("at < ?", before)
 		}
@@ -480,7 +480,7 @@ func (s *ResearchStore) taskViews(tx *gorm.DB, org int64, tasks []store.Task, no
 		companySince, personSince, heldAs := map[int64]time.Time{}, map[int64]time.Time{}, map[int64]string{}
 		v.Withheld = map[string]int{}
 		for j, e := range events {
-			if strings.HasPrefix(e.User, "agent:") {
+			if store.IsAgent(e.User) {
 				v.Last = &events[j]
 			}
 			// A note about a company isn't a find: it is often why the company was passed over.
@@ -1778,7 +1778,7 @@ func (s *ResearchStore) AgentDue(o *store.Org, page paging.Page) (*DueOut, error
 func (s *ResearchStore) AgentScores(org int64) []AgentScore {
 	by := map[string]*AgentScore{}
 	get := func(actor string) *AgentScore {
-		name := strings.TrimPrefix(actor, "agent:")
+		name := store.AgentName(actor)
 		if by[name] == nil {
 			by[name] = &AgentScore{Agent: name}
 		}
@@ -1845,7 +1845,7 @@ func (s *ResearchStore) AgentMarks(org int64, ids []int64) map[int64]map[string]
 		if out[e.ContactID] == nil {
 			out[e.ContactID] = map[string]string{}
 		}
-		if strings.HasPrefix(e.User, "agent:") {
+		if store.IsAgent(e.User) {
 			out[e.ContactID][step] = e.User
 		} else {
 			delete(out[e.ContactID], step)
