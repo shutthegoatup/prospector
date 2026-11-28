@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net/url"
 	"strings"
 	"time"
 
@@ -75,7 +74,7 @@ func (a *App) Sendable(o *store.Org) error {
 	if via == nil {
 		return errCampaignMail
 	}
-	if u, err := url.Parse(a.base); a.base == "" || err != nil || u.Scheme != "https" {
+	if a.secureBase() == nil {
 		return say.New("a campaign's unsubscribe link needs this server's public https address (PROSPECTOR_URL)")
 	}
 	if strings.TrimSpace(o.Settings.PostalAddress) == "" {

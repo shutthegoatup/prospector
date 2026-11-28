@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"os/signal"
@@ -139,6 +140,23 @@ func publicURL(raw string) (string, error) {
 		return "", fmt.Errorf("PROSPECTOR_URL should look like https://prospector.example.com, not %q", raw)
 	}
 	return u.Scheme + "://" + u.Host, nil
+}
+
+// secureBase is PROSPECTOR_URL when a link to it can be handed to someone else to call:
+// https, or plain http on this host, which browsers treat as secure too, so a server run
+// for tests can make its own links. Nil when there is none.
+func (a *App) secureBase() *url.URL {
+	u, err := url.Parse(a.base)
+	if a.base == "" || err != nil {
+		return nil
+	}
+	if u.Scheme == "https" {
+		return u
+	}
+	if ip, err := netip.ParseAddr(u.Hostname()); u.Scheme == "http" && (u.Hostname() == "localhost" || err == nil && ip.IsLoopback()) {
+		return u
+	}
+	return nil
 }
 
 func (a *App) session(r *http.Request) (*store.Session, *store.User) {

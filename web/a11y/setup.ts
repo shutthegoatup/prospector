@@ -39,4 +39,12 @@ setup("an organisation with something on every page", async ({ request }) => {
   ok(await api.POST("/o/{org}/api/v1/onboardings", { params, body: { company } }));
   ok(await api.POST("/o/{org}/api/v1/agents", { params, body: seed.agent }));
   ok(await api.POST("/o/{org}/api/v1/agreements", { params, body: { company, ...seed.agreement } }));
+
+  // Postmark connected, and an address it has reported as bouncing for good.
+  const hook = ok(await api.POST("/o/{org}/api/v1/mail-server/bounce-hook", { params }));
+  const bounced = await request.post("/hooks/postmark", {
+    headers: { Authorization: `Basic ${btoa(`${hook.username}:${hook.password}`)}` },
+    data: { RecordType: "Bounce", Type: "HardBounce", Email: "ines@harbourline.example" },
+  });
+  expect(bounced.status(), await bounced.text()).toBe(204);
 });
