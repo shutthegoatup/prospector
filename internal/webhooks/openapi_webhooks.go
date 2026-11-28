@@ -34,7 +34,7 @@ func (s WebhooksAPI) ListWebhookEvents(ctx context.Context, in api.ListWebhookEv
 	}
 	out := api.ListWebhookEvents200JSONResponse{Headers: api.ListWebhookEvents200ResponseHeaders{Link: request.NextLink(ctx, next)}}
 	out.Body.Items = slicesx.Map(page, func(t store.EventType) api.WebhookEventType {
-		return api.WebhookEventType{Name: t.Name, About: t.About}
+		return api.WebhookEventType{Name: t.Name, About: t.About.In(request.LanguageFrom(ctx))}
 	})
 	out.Body.NextCursor = next
 	return out, nil

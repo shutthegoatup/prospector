@@ -40,6 +40,15 @@ setup("an organisation with something on every page", async ({ request }) => {
   ok(await api.POST("/o/{org}/api/v1/agents", { params, body: seed.agent }));
   ok(await api.POST("/o/{org}/api/v1/agreements", { params, body: { company, ...seed.agreement } }));
 
+  // An endpoint the organisation's events go to, through a key that reads.
+  const crm = ok(await api.POST("/o/{org}/api/v1/keys", { params, body: { name: "crm-sync", scopes: ["read"] } }));
+  ok(
+    await api.POST("/o/{org}/api/v1/webhooks", {
+      params,
+      body: { url: "https://hooks.harbourline.example/in", key: crm.key.id, events: ["company.added", "contact.marked"] },
+    }),
+  );
+
   // Postmark connected, and an address it has reported as bouncing for good.
   const hook = ok(await api.POST("/o/{org}/api/v1/mail-server/bounce-hook", { params }));
   const bounced = await request.post("/hooks/postmark", {

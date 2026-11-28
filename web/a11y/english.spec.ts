@@ -73,7 +73,14 @@ async function orgWords(tab: Page) {
   // scopes and an agent's tools are identifiers.
   const agents = (await get("agents")) as { items: { problem: string }[] };
   const connect = (await get("connect")) as { scopes: { name: string }[]; tools: { name: string }[] };
-  const words = [...strings(settings), ...agents.items.map((a) => a.problem), ...connect.scopes.map((x) => x.name), ...connect.tools.map((x) => x.name)];
+  const keys = (await get("keys")) as { items: { name: string }[] };
+  const words = [
+    ...strings(settings),
+    ...agents.items.map((a) => a.problem),
+    ...connect.scopes.map((x) => x.name),
+    ...connect.tools.map((x) => x.name),
+    ...keys.items.map((k) => k.name),
+  ];
   for (const w of words) if (w && !allowed.includes(w)) allowed.push(w);
 }
 
@@ -86,6 +93,8 @@ const identifiers = [
   /\b[\w-]+(?:\.[\w-]+)*\.(?:example|com)\b(?:\/\S*)?/g,
   /\b(?:GET|POST|PUT|PATCH|DELETE) \S+/g,
   /\b[a-z]+(?:[:_][a-z]+)+\b/g,
+  // A key's first characters, which tell keys apart.
+  /\bpk_\w+/g,
   /\{\w+\}/g,
   /\((?:must)\)/g,
   /\b(?:them|us):/g,

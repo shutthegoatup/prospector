@@ -12,6 +12,7 @@ import { intl } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { detailName, month, vendorCosts, vendorKinds, vendorName, vendorTold } from "@/lib/vendors";
 import { useSession } from "@/session";
+import { WebhooksSection } from "./Webhooks";
 
 type Agent = components["schemas"]["Agent"];
 type Key = components["schemas"]["APIKey"];
@@ -385,7 +386,7 @@ const downArrow = "↓";
 const muted = (c: ReactNode[]) => <span className="text-sm text-muted-foreground">{c}</span>;
 
 export function AgentsPage() {
-  const { org } = useSession();
+  const { org, owner } = useSession();
   const agents = $api.useQuery("get", "/o/{org}/api/v1/agents", { params: { path: { org }, query: { limit: 200 } } });
   const keys = $api.useQuery("get", "/o/{org}/api/v1/keys", { params: { path: { org }, query: { limit: 200 } } });
   const connect = $api.useQuery("get", "/o/{org}/api/v1/connect", { params: { path: { org } } });
@@ -415,6 +416,7 @@ export function AgentsPage() {
         <div className="flex min-w-0 flex-[3_1_560px] flex-col gap-5">
           <Roster agents={agents.data?.items} keys={keys.data?.items} connect={connect.data} errors={[agents.error, keys.error, connect.error]} />
           <DataVendors />
+          {owner && <WebhooksSection keys={keys.data?.items} />}
         </div>
         <div className="flex min-w-0 flex-[2_1_340px] flex-col gap-5">
           <Scores />
