@@ -9,14 +9,14 @@ before:
     - npm run build --prefix web
 
 builds:
-  - main: .
+  - main: ./cmd/prospector
     binary: prospector
     env:
       - CGO_ENABLED=0
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X main.version={{ .Version }}
+      - -s -w -X github.com/shutthegoatup/prospector/internal/app.version={{ .Version }}
     goos: [linux, darwin]
     goarch: [amd64, arm64]
 

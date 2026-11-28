@@ -128,16 +128,16 @@ jobs:
       # go vet is the lint job's (golangci's govet); run again here it is most of the build.
       - name: Test
         run: |
-          # The root package's Test functions are shared out, and the first shard runs the
-          # small packages under internal/ whole: tests anywhere else would never run.
-          others=$(go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vxE 'github.com/shutthegoatup/prospector(/internal/.+)?' || true)
-          if [ -n "$others" ]; then echo "tests outside the root package and internal/ aren't run here: $others"; exit 1; fi
-          if [ "$SHARD" = 0 ]; then go test -vet=off -count=1 ./internal/...; fi
-          listed=$(go test -vet=off -list . .)
+          # internal/app's Test functions are shared out, and the first shard runs the
+          # other packages under internal/ whole: tests anywhere else would never run.
+          others=$(go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vxE 'github.com/shutthegoatup/prospector/internal/.+' || true)
+          if [ -n "$others" ]; then echo "tests outside internal/ aren't run here: $others"; exit 1; fi
+          if [ "$SHARD" = 0 ]; then go test -vet=off -count=1 $(go list ./internal/... | grep -vx 'github.com/shutthegoatup/prospector/internal/app'); fi
+          listed=$(go test -vet=off -list . ./internal/app)
           if echo "$listed" | grep -Ev '^(Test|ok )'; then echo "only Test functions are run here"; exit 1; fi
           names=$(echo "$listed" | grep '^Test' | sort | awk -v n=3 -v i="$SHARD" 'NR % n == i' | paste -sd'|')
           test -n "$names"
-          go test -vet=off -count=1 -run "^($names)\$" .
+          go test -vet=off -count=1 -run "^($names)\$" ./internal/app
 
   # The one check main requires: everything above passed.
   test:

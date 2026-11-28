@@ -1,0 +1,112 @@
+package app
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
+)
+
+func TestAKeyThatCanOnlyReadDoesNotPickATaskUp(t *testing.T) {
+	t.Parallel()
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
+	reader := store.Actor{Name: "agent:reader", KeyID: 1, ReadOnly: true}
+	if got := must(s.AgentTask(o.ID, reader, task.ID, paging.Page{})); got.Brief != "Yacht builders." {
+		t.Fatalf("a read-only key should still read the task: %+v", got)
+	}
+	var events int64
+	s.InOrg(o.ID).Model(&store.Event{}).Where(`"user" = ?`, reader.Name).Count(&events)
+	if list := must(firstOf(s.AgentTasks(o.ID, reader, paging.Page{}))); events != 0 || list[0].Status != research.TaskWaiting {
+		t.Fatalf("a key that can add nothing made the task look worked on: %d events, %s", events, list[0].Status)
+	}
+}
+
+func TestOpenTasksAreListedBeforeClosedOnes(t *testing.T) {
+	t.Parallel()
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	older := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
+	newer := must(s.CreateTask(o.ID, "Kitchens", "Kitchen makers.", "Ada Lovelace"))
+	if err := s.SetTaskClosed(o.ID, newer.ID, true, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	all := must(firstOf(s.Tasks(o.ID, true, 1, time.Now())))
+	if len(all) != 2 || all[0].ID != older.ID || all[1].ID != newer.ID {
+		t.Fatalf("the open task should come first: %+v", all)
+	}
+}
+
+func TestPickingUpATaskIsRecordedOnceARun(t *testing.T) {
+	t.Parallel()
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	scout, second := store.Actor{Name: "agent:scout", KeyID: 1}, store.Actor{Name: "agent:second", KeyID: 2}
+	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
+	for range 3 {
+		must(s.AgentTask(o.ID, scout, task.ID, paging.Page{}))
+		must(s.AgentTask(o.ID, second, task.ID, paging.Page{}))
+	}
+	var pickups int64
+	s.InOrg(o.ID).Model(&store.Event{}).Where("action = ?", "task:pickup").Count(&pickups)
+	if pickups != 2 {
+		t.Fatalf("two agents reading a task in turn should each be recorded once, got %d", pickups)
+	}
+	if err := s.SetTaskClosed(o.ID, task.ID, true, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if got := must(s.AgentTask(o.ID, store.Actor{Name: "agent:third", KeyID: 3}, task.ID, paging.Page{})); got.Status != research.TaskClosed {
+		t.Fatalf("a closed task can still be read, as closed: %s", got.Status)
+	}
+	if s.InOrg(o.ID).Model(&store.Event{}).Where("action = ?", "task:pickup").Count(&pickups); pickups != 2 {
+		t.Fatal("reading a closed task was recorded as picking it up")
+	}
+	if err := s.SetTaskClosed(o.ID, task.ID, false, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if list := must(firstOf(s.AgentTasks(o.ID, scout, paging.Page{}))); len(list) != 1 || list[0].Status != research.TaskWorking {
+		t.Fatalf("a reopened task is offered to agents again: %+v", list)
+	}
+}
+
+func TestACompanyNotedOnATaskCanStillBeFoundForIt(t *testing.T) {
+	t.Parallel()
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
+	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
+	must(s.AgentNote(o.ID, scout, research.NoteIn{Task: task.ID, Company: "Larkmoor Yachts", Kind: "skipped", Text: "Looked, unsure."}))
+	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts", Task: task.ID}))
+	if found := must(s.AgentTask(o.ID, scout, task.ID, paging.Page{})).Companies; len(found) != 1 {
+		t.Fatalf("a note on the company kept it out of the task's results: %+v", found)
+	}
+}
+
+func TestErasingSomeoneWithNoCompanyTakesTheirTasksNotes(t *testing.T) {
+	t.Parallel()
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
+	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
+	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Linkedin: "https://www.linkedin.com/in/hannah-pryce", Name: "Hannah Pryce"}, "Ada Lovelace"))
+	if hannah.CompanyID != nil {
+		t.Fatal("this test needs a person filed under no company")
+	}
+	if err := s.AgentDraft(o.ID, scout, research.DraftIn{ContactID: hannah.ID, Kind: "email", Text: "Hannah, about the builder.", Task: task.ID}); err != nil {
+		t.Fatal(err)
+	}
+	must(s.AgentNote(o.ID, scout, research.NoteIn{Task: task.ID, Kind: "next", Text: "Hannah Pryce hasn't answered; try her colleague."}))
+	if err := s.ErasePerson(o.ID, hannah.ID, "Ada Lovelace"); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := json.Marshal(must(s.AgentTask(o.ID, scout, task.ID, paging.Page{}))); strings.Contains(string(b), "Pryce") {
+		t.Fatalf("an erased person is still named on a task they were part of: %s", b)
+	}
+}

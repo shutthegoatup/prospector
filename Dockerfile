@@ -13,7 +13,7 @@ RUN go mod download
 COPY . .
 COPY --from=web /src/assets/app ./assets/app
 COPY --from=web /src/assets/js ./assets/js
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /prospector .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /prospector ./cmd/prospector
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /prospector /prospector

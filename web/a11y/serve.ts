@@ -41,7 +41,7 @@ const cleanUp = () => {
 };
 
 try {
-  execFileSync("go", ["build", "-o", bin, "."], { cwd: root, stdio: "inherit" });
+  execFileSync("go", ["build", "-o", bin, "./cmd/prospector"], { cwd: root, stdio: "inherit" });
   sql(`create database ${name}`);
   env.PROSPECTOR_SECRET_KEYS = cli(["secret-key"]);
   cli(["user", "add", member.email, member.name], member.password + "\n");
