@@ -9,6 +9,8 @@ import (
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
+const taskRunsPageSize = 10
+
 func TestATasksPageHasPagesOfEachList(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
