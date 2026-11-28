@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/shutthegoatup/prospector/internal/slicesx"
+
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/paging"
@@ -126,10 +128,7 @@ func (s apiServer) ListMembers(ctx context.Context, in api.ListMembersRequestObj
 		return nil, err
 	}
 	out := api.ListMembers200JSONResponse{Headers: api.ListMembers200ResponseHeaders{Link: request.NextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor = []api.Member{}, next
-	for _, m := range page {
-		out.Body.Items = append(out.Body.Items, memberOut(m))
-	}
+	out.Body.Items, out.Body.NextCursor = slicesx.Map(page, memberOut), next
 	return out, nil
 }
 
@@ -204,7 +203,7 @@ func (s apiServer) ListNeverContactCovers(ctx context.Context, in api.ListNeverC
 		return nil, err
 	}
 	out := api.ListNeverContactCovers200JSONResponse{Headers: api.ListNeverContactCovers200ResponseHeaders{Link: request.NextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor, out.Body.Total = nonNil(page), next, len(all)
+	out.Body.Items, out.Body.NextCursor, out.Body.Total = slicesx.NonNil(page), next, len(all)
 	return out, nil
 }
 
@@ -319,10 +318,7 @@ func (s apiServer) ListSSODomains(ctx context.Context, in api.ListSSODomainsRequ
 		return nil, err
 	}
 	out := api.ListSSODomains200JSONResponse{Headers: api.ListSSODomains200ResponseHeaders{Link: request.NextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor = []api.SSODomain{}, next
-	for _, d := range page {
-		out.Body.Items = append(out.Body.Items, domainOut(d))
-	}
+	out.Body.Items, out.Body.NextCursor = slicesx.Map(page, domainOut), next
 	return out, nil
 }
 

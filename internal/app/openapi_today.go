@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/slicesx"
+
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/request"
@@ -56,7 +58,7 @@ func dueCardOut(c Card, lang string) api.DueCard {
 		DraftBy: c.DraftBy, Held: c.Held, State: api.DueCardState(c.State), Next: c.Next, People: []api.DuePerson{}, Badges: []api.DueBadge{},
 		Meta: cardMeta(c).In(lang), Text: c.Text, Copy: c.Copy, OpenUrl: profileHref(c.Contact), OpenLabel: openLabel(c.Contact).In(lang),
 		Number: c.Number, Tel: c.Tel, About: c.About, Script: []api.ScriptLine{}, Email: store.Deref(c.Email), Phone: store.Deref(c.Phone),
-		Linkedin: store.Deref(c.Linkedin), Tz: store.Deref(c.Tz), CallNotes: store.Deref(c.CallNotes), Flags: store.Deref(c.Flags), Sources: nonNil(c.SourceList),
+		Linkedin: store.Deref(c.Linkedin), Tz: store.Deref(c.Tz), CallNotes: store.Deref(c.CallNotes), Flags: store.Deref(c.Flags), Sources: slicesx.NonNil(c.SourceList),
 		Stage: c.Stage, NextStep: c.NextStep, NextDate: store.Deref(c.NextDate)}
 	if c.CompanyID != nil {
 		out.CompanyId = *c.CompanyID

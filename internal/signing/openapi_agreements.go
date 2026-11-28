@@ -8,6 +8,8 @@ import (
 	"mime"
 	"strings"
 
+	"github.com/shutthegoatup/prospector/internal/slicesx"
+
 	"github.com/shutthegoatup/prospector/api"
 
 	"github.com/shutthegoatup/prospector/internal/paging"
@@ -31,10 +33,7 @@ func (s SigningAPI) ListAgreements(ctx context.Context, in api.ListAgreementsReq
 		return nil, err
 	}
 	out := api.ListAgreements200JSONResponse{Headers: api.ListAgreements200ResponseHeaders{Link: request.NextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor = []api.Agreement{}, next
-	for _, a := range page {
-		out.Body.Items = append(out.Body.Items, AgreementOut(a))
-	}
+	out.Body.Items, out.Body.NextCursor = slicesx.Map(page, AgreementOut), next
 	return out, nil
 }
 
@@ -114,10 +113,7 @@ func (s SigningAPI) ListAgreementRecipients(ctx context.Context, in api.ListAgre
 		return nil, err
 	}
 	out := api.ListAgreementRecipients200JSONResponse{Headers: api.ListAgreementRecipients200ResponseHeaders{Link: request.NextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor = []api.AgreementRecipient{}, next
-	for _, r := range page {
-		out.Body.Items = append(out.Body.Items, recipientOut(r))
-	}
+	out.Body.Items, out.Body.NextCursor = slicesx.Map(page, recipientOut), next
 	return out, nil
 }
 
@@ -174,10 +170,7 @@ func (s SigningAPI) ListAgreementFields(ctx context.Context, in api.ListAgreemen
 		return nil, err
 	}
 	out := api.ListAgreementFields200JSONResponse{Headers: api.ListAgreementFields200ResponseHeaders{Link: request.NextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor = []api.AgreementField{}, next
-	for _, f := range page {
-		out.Body.Items = append(out.Body.Items, fieldOut(f))
-	}
+	out.Body.Items, out.Body.NextCursor = slicesx.Map(page, fieldOut), next
 	return out, nil
 }
 

@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/slicesx"
+
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
@@ -18,7 +20,7 @@ func enricherOut(s *Store, e store.Enricher, now time.Time) api.Enricher {
 		fields = v.Fields()
 	}
 	return api.Enricher{Id: e.ID, Kind: api.EnricherKind(e.Kind), Position: e.Position, MonthlyLimit: e.MonthlyLimit,
-		UsedThisMonth: s.EnricherUsed(e.OrgID, e.Kind, now), Fields: nonNil(fields), HasKey: e.APIKey != "",
+		UsedThisMonth: s.EnricherUsed(e.OrgID, e.Kind, now), Fields: slicesx.NonNil(fields), HasKey: e.APIKey != "",
 		UpdatedBy: e.UpdatedBy, UpdatedAt: e.UpdatedAt}
 }
 

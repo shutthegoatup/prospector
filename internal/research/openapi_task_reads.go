@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/slicesx"
+
 	"github.com/shutthegoatup/prospector/api"
 
 	"github.com/shutthegoatup/prospector/internal/paging"
@@ -31,9 +33,7 @@ func (s ResearchAPI) ListTasks(ctx context.Context, in api.ListTasksRequestObjec
 	if out.Body.Items, err = request.Recast[[]api.TaskBrief](tasks); err != nil {
 		return nil, err
 	}
-	if out.Body.Items == nil {
-		out.Body.Items = []api.TaskBrief{}
-	}
+	out.Body.Items = slicesx.NonNil(out.Body.Items)
 	out.Body.NextCursor = next
 	return out, nil
 }
@@ -171,8 +171,6 @@ func (s ResearchAPI) ListLeftOut(ctx context.Context, in api.ListLeftOutRequestO
 	if out.Body.Items, err = request.Recast[[]api.TaskCompany](page); err != nil {
 		return nil, err
 	}
-	if out.Body.Items == nil {
-		out.Body.Items = []api.TaskCompany{}
-	}
+	out.Body.Items = slicesx.NonNil(out.Body.Items)
 	return out, nil
 }

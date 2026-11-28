@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/shutthegoatup/prospector/internal/slicesx"
+
 	"github.com/shutthegoatup/prospector/api"
 
 	"github.com/shutthegoatup/prospector/internal/mailer"
@@ -27,10 +29,7 @@ func (s TicketsAPI) ListEnquiryMessages(ctx context.Context, in api.ListEnquiryM
 		return nil, err
 	}
 	out := api.ListEnquiryMessages200JSONResponse{Headers: api.ListEnquiryMessages200ResponseHeaders{Link: request.NextLink(ctx, next)}}
-	out.Body.Items, out.Body.NextCursor = []api.EnquiryMessage{}, next
-	for _, m := range thread {
-		out.Body.Items = append(out.Body.Items, messageOut(m))
-	}
+	out.Body.Items, out.Body.NextCursor = slicesx.Map(thread, messageOut), next
 	return out, nil
 }
 
