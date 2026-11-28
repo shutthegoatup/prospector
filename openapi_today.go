@@ -9,6 +9,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // voiceOf is who calls and signs for whoever asks. A key is nobody's, so its scripts
@@ -51,12 +52,12 @@ func cardMeta(c Card) say.Sayer {
 
 // dueCardOut is a card as the API sends it, its words in lang.
 func dueCardOut(c Card, lang string) api.DueCard {
-	out := api.DueCard{Id: c.ID, Step: api.DueCardStep(c.Step), Name: c.Name, Title: c.Title, Company: deref(c.Maker), Fit: deref(c.Fit),
+	out := api.DueCard{Id: c.ID, Step: api.DueCardStep(c.Step), Name: c.Name, Title: c.Title, Company: store.Deref(c.Maker), Fit: store.Deref(c.Fit),
 		DraftBy: c.DraftBy, Held: c.Held, State: api.DueCardState(c.State), Next: c.Next, People: []api.DuePerson{}, Badges: []api.DueBadge{},
 		Meta: cardMeta(c).In(lang), Text: c.Text, Copy: c.Copy, OpenUrl: profileHref(c.Contact), OpenLabel: openLabel(c.Contact).In(lang),
-		Number: c.Number, Tel: c.Tel, About: c.About, Script: []api.ScriptLine{}, Email: deref(c.Email), Phone: deref(c.Phone),
-		Linkedin: deref(c.Linkedin), Tz: deref(c.Tz), CallNotes: deref(c.CallNotes), Flags: deref(c.Flags), Sources: nonNil(c.SourceList),
-		Stage: c.Stage, NextStep: c.NextStep, NextDate: deref(c.NextDate)}
+		Number: c.Number, Tel: c.Tel, About: c.About, Script: []api.ScriptLine{}, Email: store.Deref(c.Email), Phone: store.Deref(c.Phone),
+		Linkedin: store.Deref(c.Linkedin), Tz: store.Deref(c.Tz), CallNotes: store.Deref(c.CallNotes), Flags: store.Deref(c.Flags), Sources: nonNil(c.SourceList),
+		Stage: c.Stage, NextStep: c.NextStep, NextDate: store.Deref(c.NextDate)}
 	if c.CompanyID != nil {
 		out.CompanyId = *c.CompanyID
 	}
@@ -135,7 +136,7 @@ var dealStages = map[string]*say.Text{
 	"replied": say.New("replied"), "meeting": say.New("meeting"), "proposal": say.New("proposal"), "won": say.New("won"), "lost": say.New("lost"),
 }
 
-func nextMeta(c Contact) say.Sayer {
+func nextMeta(c store.Contact) say.Sayer {
 	var st say.Sayer = dealStages["replied"]
 	if s, ok := dealStages[c.Stage]; ok {
 		st = s
@@ -143,9 +144,9 @@ func nextMeta(c Contact) say.Sayer {
 		st = say.New(c.Stage)
 	}
 	if c.NextStep == "" {
-		return say.Errorf("In conversation · %s · replied %s · no next step yet", st, deref(c.Replied))
+		return say.Errorf("In conversation · %s · replied %s · no next step yet", st, store.Deref(c.Replied))
 	}
-	return say.Errorf("In conversation · %s · replied %s · due %s", st, deref(c.Replied), deref(c.NextDate))
+	return say.Errorf("In conversation · %s · replied %s · due %s", st, store.Deref(c.Replied), store.Deref(c.NextDate))
 }
 
 func callMeta(c Card) say.Sayer {
@@ -168,15 +169,15 @@ func markedBy(c Card, step string) say.Sayer {
 }
 
 func acceptedMeta(c Card) say.Sayer {
-	if deref(c.Message) == "" {
-		return say.Errorf("Accepted %s%s · LinkedIn message (none written yet, so this is the email; edit it down)", deref(c.Accepted), markedBy(c, "accepted"))
+	if store.Deref(c.Message) == "" {
+		return say.Errorf("Accepted %s%s · LinkedIn message (none written yet, so this is the email; edit it down)", store.Deref(c.Accepted), markedBy(c, "accepted"))
 	}
-	return say.Errorf("Accepted %s%s · LinkedIn message", deref(c.Accepted), markedBy(c, "accepted"))
+	return say.Errorf("Accepted %s%s · LinkedIn message", store.Deref(c.Accepted), markedBy(c, "accepted"))
 }
 
 func emailMeta(c Card) say.Sayer {
 	if c.Step == "email" {
-		return say.Errorf("Subject: %s · added %s%s", deref(c.Subject), deref(c.LinkedinAdded), markedBy(c, "linkedin"))
+		return say.Errorf("Subject: %s · added %s%s", store.Deref(c.Subject), store.Deref(c.LinkedinAdded), markedBy(c, "linkedin"))
 	}
-	return say.Errorf("added %s%s", deref(c.LinkedinAdded), markedBy(c, "linkedin"))
+	return say.Errorf("added %s%s", store.Deref(c.LinkedinAdded), markedBy(c, "linkedin"))
 }

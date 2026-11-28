@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/internal/agents"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestAWaitingAgentHandsItsTaskToItsFallback(t *testing.T) {
@@ -36,7 +37,7 @@ func TestAWaitingAgentHandsItsTaskToItsFallback(t *testing.T) {
 	if run.Status != agents.RunStopped || !strings.Contains(run.StopReason, "handed the task to Claude") || len(r.sleeps) != 0 {
 		t.Fatalf("a run facing an hour's wait should hand over at once: %+v, waited %v", run, r.sleeps)
 	}
-	var next AgentRun
+	var next store.AgentRun
 	if err := r.s.DB.Where("task_id = ? and agent_id = ?", r.task.ID, claudeID).First(&next).Error; err != nil {
 		t.Fatalf("the fallback should have been started: %v", err)
 	}

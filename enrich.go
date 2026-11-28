@@ -15,6 +15,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 const (
@@ -37,7 +38,7 @@ type EnrichIn struct {
 
 // Enrich asks the organisation's vendors, in its order, for the details someone lacks.
 // What is found waits as a suggestion for a person to accept, like any agent's find.
-func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]EnrichAsked, error) {
+func (a *App) Enrich(ctx context.Context, o *store.Org, who store.Actor, in EnrichIn) ([]EnrichAsked, error) {
 	s := a.s
 	if in.Task != 0 {
 		var err error
@@ -56,7 +57,7 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 	if strings.HasPrefix(c.Key, "org:") {
 		return nil, say.New("that is a company's own row, not a person")
 	}
-	co := &Company{}
+	co := &store.Company{}
 	if c.CompanyID != nil {
 		if co, err = s.CompanyByID(o.ID, *c.CompanyID); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
@@ -64,9 +65,9 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 	}
 	domain := strings.ToLower(strings.TrimSpace(co.Domain))
 	if why := o.Settings.Unlookable(c, domain); why != "" {
-		return nil, conflict{Text: say.New(why)}
+		return nil, store.Conflict{Text: say.New(why)}
 	}
-	person := prospecting.EnrichPerson{Name: displayName(c), Domain: domain, Company: co.Name, Linkedin: deref(c.Linkedin)}
+	person := prospecting.EnrichPerson{Name: store.DisplayName(c), Domain: domain, Company: co.Name, Linkedin: store.Deref(c.Linkedin)}
 	enrichers, err := s.Enrichers(o.ID)
 	if err != nil {
 		return nil, err
@@ -86,7 +87,7 @@ func (a *App) Enrich(ctx context.Context, o *Org, who Actor, in EnrichIn) ([]Enr
 	return out, nil
 }
 
-func (a *App) enrichField(ctx context.Context, o *Org, who Actor, c Contact, p prospecting.EnrichPerson, enrichers []Enricher, field string) EnrichAsked {
+func (a *App) enrichField(ctx context.Context, o *store.Org, who store.Actor, c store.Contact, p prospecting.EnrichPerson, enrichers []store.Enricher, field string) EnrichAsked {
 	s := a.s
 	asked := EnrichAsked{Field: field, Outcome: "skipped", Detail: "no vendor here looks for " + field}
 	tried := false
@@ -144,7 +145,7 @@ func (a *App) enrichField(ctx context.Context, o *Org, who Actor, c Contact, p p
 }
 
 // keepFind stores what a vendor found as a suggestion, unless it may not be kept.
-func (a *App) keepFind(o *Org, who Actor, c Contact, field, kind, value, status string) EnrichAsked {
+func (a *App) keepFind(o *store.Org, who store.Actor, c store.Contact, field, kind, value, status string) EnrichAsked {
 	s := a.s
 	asked := EnrichAsked{Field: field, Vendor: kind, Outcome: "suggested"}
 	email, link := "", ""
@@ -176,7 +177,7 @@ func (a *App) keepFind(o *Org, who Actor, c Contact, field, kind, value, status 
 	return asked
 }
 
-func (a *App) logEnrich(org int64, who Actor, c Contact, field, value string) {
+func (a *App) logEnrich(org int64, who store.Actor, c store.Contact, field, value string) {
 	noted(a.s.LogEnrich(org, who, c.ID, field, value))
 }
 

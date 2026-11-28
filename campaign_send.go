@@ -12,6 +12,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/mailer"
 	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 const (
@@ -61,7 +62,7 @@ func (a *App) campaignMail(org int64) (*mailer.Server, error) {
 }
 
 // Sendable is why a campaign can't be sent from this server for this organisation.
-func (a *App) Sendable(o *Org) error {
+func (a *App) Sendable(o *store.Org) error {
 	via, err := a.campaignMail(o.ID)
 	if err != nil {
 		return err
@@ -109,7 +110,7 @@ func noted(err error) bool {
 	return err == nil
 }
 
-func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
+func (a *App) sendSome(ctx context.Context, c store.Campaign, now time.Time) {
 	o, err := a.s.OrgByID(c.OrgID)
 	if err != nil {
 		log.Printf("campaign %d: %v", c.ID, err)
@@ -130,7 +131,7 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 		return
 	}
 	var customers map[int64]bool
-	if c.Kind == KindService {
+	if c.Kind == store.KindService {
 		ids, err := a.s.CustomerCompanies(o.ID)
 		if err != nil {
 			log.Printf("campaign %d: %v", c.ID, err)
@@ -171,7 +172,7 @@ func (a *App) sendSome(ctx context.Context, c Campaign, now time.Time) {
 // so an erasure or a cancel that lands first leaves nothing to send. It reports whether
 // the round should go on: not once the mail server can't be reached, nor once the
 // campaign stops.
-func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *mailer.Server, gate *marketing.MailGate, customers map[int64]bool, r CampaignRecipient) bool {
+func (a *App) sendOne(ctx context.Context, o *store.Org, c store.Campaign, via *mailer.Server, gate *marketing.MailGate, customers map[int64]bool, r store.CampaignRecipient) bool {
 	skip := func(reason string) bool { return noted(a.s.SkipMail(o.ID, r.ID, reason)) }
 	settle := func(status, reason string) bool { return noted(a.s.SettleMail(o.ID, r.ID, status, reason)) }
 	// Stopped since the round began: this one stays with the rest.
@@ -180,27 +181,27 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *mailer.Serve
 	}
 	// Checked again as it goes: someone may have unsubscribed since it was sent.
 	var link string
-	var who Contact
+	var who store.Contact
 	found := false
 	if r.ContactID != nil {
 		read, err := a.s.ContactByID(o.ID, *r.ContactID)
-		var gone notFound
-		if err != nil && !errors.As(err, &gone) && c.Kind == KindService {
+		var gone store.NotFound
+		if err != nil && !errors.As(err, &gone) && c.Kind == store.KindService {
 			log.Printf("campaign %d: checking a mail: %v", c.ID, err)
 			return false
 		}
 		if err == nil {
-			who, found, link = *read, true, deref(read.Linkedin)
+			who, found, link = *read, true, store.Deref(read.Linkedin)
 		}
 	}
 	// A service notice passes the list not to be mailed only because they are a customer,
 	// so that is checked again too: a subscription may have ended since it was queued.
-	if c.Kind == KindService && (!found || who.Status == ContactSuggested || who.Declined != nil ||
+	if c.Kind == store.KindService && (!found || who.Status == store.ContactSuggested || who.Declined != nil ||
 		who.CompanyID == nil || !customers[*who.CompanyID]) {
 		return skip("no longer a customer")
 	}
 	// An address made unreadable since it was queued, as erasure does, is nobody's.
-	if _, err := bareAddress(r.Address); err != nil {
+	if _, err := store.BareAddress(r.Address); err != nil {
 		return skip("no longer one email address")
 	}
 	if why := gate.WhyFor(c.Kind, r.Address, link); why != nil {
@@ -213,7 +214,7 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *mailer.Serve
 	}
 	foot := c.Body + "\n\n-- \n" + o.Name + "\n" + strings.TrimSpace(o.Settings.PostalAddress) + "\n\n"
 	var token, unsubscribe, body string
-	if c.Kind == KindService {
+	if c.Kind == store.KindService {
 		// About what they have, so not something to unsubscribe from: the foot says why it came.
 		body = foot + "You are getting this as a customer of " + o.Name + ": it is about the service you have with them, so it reaches you even if you unsubscribed from their marketing.\n"
 	} else {
@@ -262,7 +263,7 @@ func (a *App) sendOne(ctx context.Context, o *Org, c Campaign, via *mailer.Serve
 
 // failedToSend counts a send that didn't plainly go, and pauses the campaign after
 // several in a row. It reports whether the campaign is still sending.
-func (a *App) failedToSend(c Campaign) bool {
+func (a *App) failedToSend(c store.Campaign) bool {
 	if failures, err := a.s.CampaignFailed(c.OrgID, c.ID); noted(err) && failures >= failuresToPause {
 		a.pauseCampaign(c, "the mail server couldn't be reached, refused, or didn't confirm several mails in a row")
 		return false
@@ -270,6 +271,6 @@ func (a *App) failedToSend(c Campaign) bool {
 	return true
 }
 
-func (a *App) pauseCampaign(c Campaign, why string) {
+func (a *App) pauseCampaign(c store.Campaign, why string) {
 	noted(a.s.PauseCampaign(c.OrgID, c.ID, why))
 }

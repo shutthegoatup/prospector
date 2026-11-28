@@ -14,6 +14,7 @@ import (
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/signing"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 var samplePDF = testPDF(2, "")
@@ -141,7 +142,7 @@ func TestAnAgreementKeepsItsDocumentAsUploaded(t *testing.T) {
 	}
 
 	// A document changed behind Prospector's back is not handed out.
-	if err := s.DB.Model(&AgreementFile{}).Where("agreement_id = ?", a.ID).Update("data", testPDF(2, "tampered")).Error; err != nil {
+	if err := s.DB.Model(&store.AgreementFile{}).Where("agreement_id = ?", a.ID).Update("data", testPDF(2, "tampered")).Error; err != nil {
 		t.Fatal(err)
 	}
 	if code, body := asKey(t, "GET", doc, reader, nil); code != http.StatusInternalServerError || strings.Contains(body, "tampered") {
@@ -165,7 +166,7 @@ func TestAnAgreementKeepsItsDocumentAsUploaded(t *testing.T) {
 		t.Errorf("removing: %d %s", code, body)
 	}
 	var left int64
-	if err := s.DB.Model(&AgreementFile{}).Count(&left).Error; err != nil || left != 0 {
+	if err := s.DB.Model(&store.AgreementFile{}).Count(&left).Error; err != nil || left != 0 {
 		t.Errorf("removing left %d documents (%v)", left, err)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/shutthegoatup/prospector/internal/marketing"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // postmarkBounce is the part of Postmark's bounce and spam complaint webhooks that is used.
@@ -51,7 +52,7 @@ func (a *App) postmarkHook(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	addr, err := bareAddress(b.Email)
+	addr, err := store.BareAddress(b.Email)
 	if err != nil {
 		w.WriteHeader(http.StatusNoContent)
 		return

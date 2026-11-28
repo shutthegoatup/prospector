@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // Runs are worked out from events, so a page of them ends where a run does, and a run
@@ -13,7 +14,7 @@ func TestRecentRunsHavePages(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	start := time.Now().Add(-48 * time.Hour).Truncate(time.Second)
-	var events []Event
+	var events []store.Event
 	// Thirty runs for two agents in turn, an hour apart, each of three changes a
 	// minute apart: every page boundary cuts between two agents' interleaved work.
 	for i := range 30 {
@@ -22,7 +23,7 @@ func TestRecentRunsHavePages(t *testing.T) {
 			agent, key = "agent:second", 2
 		}
 		for j := range 3 {
-			events = append(events, Event{OrgID: o.ID, User: agent, KeyID: key, Action: "add:fact",
+			events = append(events, store.Event{OrgID: o.ID, User: agent, KeyID: key, Action: "add:fact",
 				At: start.Add(time.Duration(i)*time.Hour + time.Duration(j)*time.Minute)})
 		}
 	}
@@ -55,8 +56,8 @@ func TestRecentRunsHavePages(t *testing.T) {
 	}
 
 	// A run the page before ended with began earlier: its start isn't shown as a run of its own.
-	long := Event{OrgID: o.ID, User: "agent:third", KeyID: 3, Action: "add:fact", At: start.Add(100 * time.Hour)}
-	more := []Event{long}
+	long := store.Event{OrgID: o.ID, User: "agent:third", KeyID: 3, Action: "add:fact", At: start.Add(100 * time.Hour)}
+	more := []store.Event{long}
 	for j := 1; j < 20; j++ {
 		e := long
 		e.At = long.At.Add(time.Duration(j) * 10 * time.Minute)
@@ -101,10 +102,10 @@ func TestARunCutShortByWhatIsReadWaitsForTheNextPage(t *testing.T) {
 	o := mustOrg(t, s, "alpha")
 	const runs, each = 40, 60
 	start := time.Now().Add(-200 * time.Hour).Truncate(time.Second)
-	var events []Event
+	var events []store.Event
 	for i := range runs {
 		for j := range each {
-			events = append(events, Event{OrgID: o.ID, User: "agent:scout", KeyID: 1, Action: "add:fact",
+			events = append(events, store.Event{OrgID: o.ID, User: "agent:scout", KeyID: 1, Action: "add:fact",
 				At: start.Add(time.Duration(i)*2*time.Hour + time.Duration(j)*time.Minute)})
 		}
 	}

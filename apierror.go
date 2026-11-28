@@ -21,6 +21,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/signing"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // ours reports a failure that is the server's rather than the caller's: the database,
@@ -82,13 +83,13 @@ func (e elsewhere) Unwrap() error { return e.err }
 // are logged and the caller gets ours instead. Any other answer is the handler's to
 // word, such as a 502 passing on what another server said.
 func telling(where string, err error, code int) (int, say.Sayer) {
-	var clash conflict
+	var clash store.Conflict
 	var theirs elsewhere
 	if errors.As(err, &theirs) && !fromDatabase(err) {
 		return code, wordsOf(err)
 	}
 	switch {
-	case breaksRule(err):
+	case store.BreaksRule(err):
 		log.Printf("%s: %v", where, err)
 		return http.StatusConflict, say.New(sayTaken)
 	case identity.Unstorable(err):
@@ -128,9 +129,9 @@ func addTool[In, Out any](s *mcp.Server, t *mcp.Tool, h mcp.ToolHandlerFor[In, O
 }
 
 func statusOf(err error) int {
-	var missing notFound
-	var away notSent
-	var clash conflict
+	var missing store.NotFound
+	var away store.NotSent
+	var clash store.Conflict
 	var no request.Refused
 	var theirs elsewhere
 	switch {
@@ -146,7 +147,7 @@ func statusOf(err error) int {
 		return http.StatusNotFound
 	case errors.Is(err, signing.ErrTampered):
 		return http.StatusInternalServerError
-	case errors.Is(err, errErased), errors.As(err, &clash), breaksRule(err):
+	case errors.Is(err, store.ErrErased), errors.As(err, &clash), store.BreaksRule(err):
 		return http.StatusConflict
 	case ours(err):
 		return http.StatusInternalServerError

@@ -11,14 +11,15 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
-func dueNames(t *testing.T, s *Store, o *Org) map[string]bool {
+func dueNames(t *testing.T, s *Store, o *store.Org) map[string]bool {
 	t.Helper()
 	rows := must(s.Due(o.ID, "linkedin", time.Now(), o.Settings))
 	out := map[string]bool{}
 	for _, r := range rows {
-		out[deref(r.First)] = true
+		out[store.Deref(r.First)] = true
 	}
 	return out
 }
@@ -68,10 +69,10 @@ func TestACompanyIsJudgedForEachOfferingOnItsOwn(t *testing.T) {
 	// Agents read a company's history to learn what a person rejected, so a verdict for
 	// one offering mustn't look like the company's own.
 	var own int64
-	if err := s.InOrg(o.ID).Model(&Event{}).Where("company_id = ? and action like 'company:%'", company).Count(&own).Error; err != nil || own != 0 {
+	if err := s.InOrg(o.ID).Model(&store.Event{}).Where("company_id = ? and action like 'company:%'", company).Count(&own).Error; err != nil || own != 0 {
 		t.Fatalf("a verdict for an offering was logged as the company's own: %d %v", own, err)
 	}
-	detail := must(s.AgentCompany(o.ID, Actor{Name: "agent:robot"}, "Northwind Payments", paging.Page{}))
+	detail := must(s.AgentCompany(o.ID, store.Actor{Name: "agent:robot"}, "Northwind Payments", paging.Page{}))
 	raw, _ := json.Marshal(detail)
 	if said := string(raw); strings.Contains(said, `"company:rejected"`) || !strings.Contains(said, `"verdict:rejected"`) {
 		t.Fatalf("what an agent is told about the company: %s", said)
@@ -107,7 +108,7 @@ func TestACompanyIsJudgedForEachOfferingOnItsOwn(t *testing.T) {
 	}
 
 	beta := mustOrg(t, s, "beta")
-	theirs := must(s.AddOffering(beta.ID, Offering{Name: "Theirs"}, "Grace"))
+	theirs := must(s.AddOffering(beta.ID, store.Offering{Name: "Theirs"}, "Grace"))
 	if code, body := asKey(t, "PATCH", review, reviewer, map[string]any{"stage": "rejected", "offering": theirs.ID}); code != http.StatusNotFound {
 		t.Fatalf("a verdict for another organisation's offering: %d %s", code, body)
 	}
@@ -136,9 +137,9 @@ func TestACompanyIsJudgedForEachOfferingOnItsOwn(t *testing.T) {
 	}
 }
 
-func companyRow(t *testing.T, s *Store, org, id int64) Company {
+func companyRow(t *testing.T, s *Store, org, id int64) store.Company {
 	t.Helper()
-	var c Company
+	var c store.Company
 	if err := s.InOrg(org).Where("id = ?", id).First(&c).Error; err != nil {
 		t.Fatal(err)
 	}

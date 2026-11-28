@@ -16,6 +16,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 const agentTestKey = "sk-test-0123456789abcdef"
@@ -138,7 +139,7 @@ func TestAnOwnerSetsUpTheAgent(t *testing.T) {
 		t.Fatalf("saving without a model: %d %s", code, body)
 	}
 	c := must(s.AgentNamed(o.ID, "Prospector"))
-	if c.BaseURL != fake.srv.URL+"/v1" || strings.Contains(c.APIKey, agentTestKey) || !sealed(c.APIKey) {
+	if c.BaseURL != fake.srv.URL+"/v1" || strings.Contains(c.APIKey, agentTestKey) || !store.Sealed(c.APIKey) {
 		t.Fatalf("the endpoint or its key wasn't kept as it should be: %+v", c)
 	}
 	if got := strings.Join(c.ModelList(), " "); got != "qwen/qwen-small router/auto" {
@@ -240,7 +241,7 @@ func TestAnOrganisationHasSeveralAgents(t *testing.T) {
 	if code, body := add(map[string]any{"id": claude.ID, "name": "Claude Opus", "model": "router/auto"}); code != http.StatusOK {
 		t.Fatalf("renaming: %d %s", code, body)
 	}
-	var renamed APIKey
+	var renamed store.APIKey
 	s.DB.First(&renamed, key.ID)
 	if renamed.Name != "Claude Opus (built in)" {
 		t.Fatalf("its key's name: %q", renamed.Name)
@@ -375,7 +376,7 @@ func TestAnAgentKeyMovesToANewSecretKey(t *testing.T) {
 		t.Fatalf("resealing: %d %v", moved, err)
 	}
 	c := must(s.AgentNamed(o.ID, "Prospector"))
-	if key, err := s.Keyring.Open(c.APIKey); err != nil || key != agentTestKey || sealedVersion(c.APIKey) != 2 {
+	if key, err := s.Keyring.Open(c.APIKey); err != nil || key != agentTestKey || store.SealedVersion(c.APIKey) != 2 {
 		t.Fatalf("the agent's key didn't move to the new secret key: %v", err)
 	}
 }
@@ -414,10 +415,10 @@ func TestEveryGoingRunIsOnTheTaskPage(t *testing.T) {
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	now := time.Now()
-	old := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, Status: RunWaiting, StartedAt: now.Add(-48 * time.Hour)}
+	old := store.AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, Status: store.RunWaiting, StartedAt: now.Add(-48 * time.Hour)}
 	r.s.DB.Create(&old)
 	for i := range 12 {
-		r.s.DB.Create(&AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, Status: RunFinished, StartedAt: now.Add(time.Duration(i) * time.Minute)})
+		r.s.DB.Create(&store.AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, Status: RunFinished, StartedAt: now.Add(time.Duration(i) * time.Minute)})
 	}
 	runs := must(r.s.AgentRuns(r.o.ID, r.task.ID, 10))
 	if len(runs) != 11 || runs[0].ID != old.ID {

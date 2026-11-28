@@ -23,9 +23,10 @@ import (
 	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
-func mustOrg(t *testing.T, s *Store, slug string) *Org {
+func mustOrg(t *testing.T, s *Store, slug string) *store.Org {
 	t.Helper()
 	o, err := s.CreateOrg(slug, strings.ToUpper(slug[:1])+slug[1:])
 	if err != nil {
@@ -91,7 +92,7 @@ func TestSnapshotRoundTrip(t *testing.T) {
 	}
 	s, o = s2, o2
 	var linked int64
-	s.InOrg(o.ID).Model(&Contact{}).Where("company_id is not null").Count(&linked)
+	s.InOrg(o.ID).Model(&store.Contact{}).Where("company_id is not null").Count(&linked)
 	if linked == 0 {
 		t.Fatal("restore linked no contacts to companies")
 	}
@@ -123,9 +124,9 @@ func TestImportLegacy(t *testing.T) {
 	if err != nil || n != 1 {
 		t.Fatalf("imported %d: %v", n, err)
 	}
-	var c Contact
+	var c store.Contact
 	s.InOrg(o.ID).First(&c, 7)
-	if c.Key != "Ada Lovelace" || deref(c.Accepted) != "2026-11-22" || c.CompanyID == nil {
+	if c.Key != "Ada Lovelace" || store.Deref(c.Accepted) != "2026-11-22" || c.CompanyID == nil {
 		t.Fatalf("legacy row not carried over: %+v", c)
 	}
 }
@@ -148,9 +149,9 @@ func TestImportKeepsRecordedDates(t *testing.T) {
 	if _, err := s.Import(o.ID, p); err != nil {
 		t.Fatal(err)
 	}
-	var after Contact
+	var after store.Contact
 	s.DB.First(&after, c.ID)
-	if deref(after.EmailSent) != "2026-01-02" || after.CompanyID == nil {
+	if store.Deref(after.EmailSent) != "2026-01-02" || after.CompanyID == nil {
 		t.Fatalf("re-import lost email_sent or the company link: %+v", after)
 	}
 }
@@ -166,13 +167,13 @@ func TestOrganisationsAreIsolated(t *testing.T) {
 		t.Fatalf("the same person in a second org: %v", err)
 	}
 	ca, _ := s.FindOne(a.ID, "Ada")
-	if err := s.Mark(b.ID, ca.ID, "linkedin", today(), "test"); err == nil {
+	if err := s.Mark(b.ID, ca.ID, "linkedin", store.Today(), "test"); err == nil {
 		t.Fatal("org beta marked org alpha's contact")
 	}
 	if err := s.Update(b.ID, ca.ID, "email", "x@y.z", "test"); err == nil {
 		t.Fatal("org beta edited org alpha's contact")
 	}
-	if hits, _, _ := s.AgentSearch(b.ID, Actor{}, "analytical", paging.Page{}); len(hits) != 2 {
+	if hits, _, _ := s.AgentSearch(b.ID, store.Actor{}, "analytical", paging.Page{}); len(hits) != 2 {
 		t.Fatalf("beta's search should see only its own company and person, got %+v", hits)
 	}
 	for _, h := range mustSearch(t, s, b.ID, "ada") {
@@ -183,7 +184,7 @@ func TestOrganisationsAreIsolated(t *testing.T) {
 }
 
 func mustSearch(t *testing.T, s *Store, org int64, q string) []research.SearchHit {
-	hits, _, err := s.AgentSearch(org, Actor{}, q, paging.Page{})
+	hits, _, err := s.AgentSearch(org, store.Actor{}, q, paging.Page{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,22 +199,22 @@ func TestAgentResearchToOutreach(t *testing.T) {
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Ostrel Aviation", Facts: []research.FactIn{{Field: "configurator", Value: "3D"}}}); err == nil {
+	if _, err := s.AgentAddCompany(o.ID, store.Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Ostrel Aviation", Facts: []research.FactIn{{Field: "configurator", Value: "3D"}}}); err == nil {
 		t.Fatal("a fact without a source was accepted")
 	}
-	out, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Ostrel Aviation", Country: "CH",
+	out, err := s.AgentAddCompany(o.ID, store.Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Ostrel Aviation", Country: "CH",
 		Facts: []research.FactIn{{Field: "configurator", Value: "3D", SourceURL: "https://ostrel.example/configure"}}})
 	if err != nil || out.Existed || out.Stage != prospecting.CompanyReview {
 		t.Fatalf("add company: %+v %v", out, err)
 	}
-	if _, err := s.AgentAddContact(o, Actor{Name: "agent:bot"}, prospecting.AddContactIn{Company: "Ostrel Aviation", Name: "Jonas Weber"}); err == nil {
+	if _, err := s.AgentAddContact(o, store.Actor{Name: "agent:bot"}, prospecting.AddContactIn{Company: "Ostrel Aviation", Name: "Jonas Weber"}); err == nil {
 		t.Fatal("a contact without a source was accepted")
 	}
-	if _, err := s.AgentAddContact(o, Actor{Name: "agent:bot"}, prospecting.AddContactIn{Company: "Ostrel Aviation", Name: "Max Muster", Email: "max@blocked.example", SourceURL: "https://x.example"}); err == nil {
+	if _, err := s.AgentAddContact(o, store.Actor{Name: "agent:bot"}, prospecting.AddContactIn{Company: "Ostrel Aviation", Name: "Max Muster", Email: "max@blocked.example", SourceURL: "https://x.example"}); err == nil {
 		t.Fatal("never-contact list ignored")
 	}
-	c, err := s.AgentAddContact(o, Actor{Name: "agent:bot"}, prospecting.AddContactIn{Company: "ostrel aviation", Name: "Jonas Weber", Title: "Head of Digital", SourceURL: "https://ostrel.example/team"})
-	if err != nil || c.Status != ContactSuggested {
+	c, err := s.AgentAddContact(o, store.Actor{Name: "agent:bot"}, prospecting.AddContactIn{Company: "ostrel aviation", Name: "Jonas Weber", Title: "Head of Digital", SourceURL: "https://ostrel.example/team"})
+	if err != nil || c.Status != store.ContactSuggested {
 		t.Fatalf("add contact: %+v %v", c, err)
 	}
 	if due, _ := s.Due(o.ID, "linkedin", time.Now(), o.Settings); len(due) != 0 {
@@ -226,13 +227,13 @@ func TestAgentResearchToOutreach(t *testing.T) {
 		t.Fatal(err)
 	}
 	due, _ := s.Due(o.ID, "linkedin", time.Now(), o.Settings)
-	if len(due) != 1 || !strings.Contains(deref(due[0].Note), "Jonas") {
+	if len(due) != 1 || !strings.Contains(store.Deref(due[0].Note), "Jonas") {
 		t.Fatalf("picked contact not queued with a note: %+v", due)
 	}
-	if err := s.AgentDraft(o.ID, Actor{Name: "agent:bot"}, research.DraftIn{ContactID: c.ID, Kind: "note", Text: strings.Repeat("x", 301)}); err == nil {
+	if err := s.AgentDraft(o.ID, store.Actor{Name: "agent:bot"}, research.DraftIn{ContactID: c.ID, Kind: "note", Text: strings.Repeat("x", 301)}); err == nil {
 		t.Fatal("a note over 300 characters was accepted")
 	}
-	corvane, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Corvane", Facts: []research.FactIn{{Field: "configurator", Value: "Vela builder", SourceURL: "https://corvane.example"}}})
+	corvane, err := s.AgentAddCompany(o.ID, store.Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Corvane", Facts: []research.FactIn{{Field: "configurator", Value: "Vela builder", SourceURL: "https://corvane.example"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +255,7 @@ func TestParseLinkedIn(t *testing.T) {
 }
 
 // signedIn returns a client logged in to a test server with one org.
-func signedIn(t *testing.T) (*Store, *Org, *httptest.Server, *http.Client) {
+func signedIn(t *testing.T) (*Store, *store.Org, *httptest.Server, *http.Client) {
 	t.Helper()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
@@ -348,7 +349,7 @@ func TestUI(t *testing.T) {
 	if strings.Contains(body, `"open_url":"javascript:`) {
 		t.Fatal("Today's card opens a javascript: link")
 	}
-	if _, err := s.AgentAddContact(o, Actor{Name: "agent:x"}, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Eve", Linkedin: "javascript:alert(1)", SourceURL: "https://x.example"}); err == nil {
+	if _, err := s.AgentAddContact(o, store.Actor{Name: "agent:x"}, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Eve", Linkedin: "javascript:alert(1)", SourceURL: "https://x.example"}); err == nil {
 		t.Fatal("agent stored a javascript: link")
 	}
 	if code, _ := call(t, client, "POST", base+"api/v1/marks", "application/json", map[string]any{"contact_id": c.ID, "step": "replied"}); code != http.StatusOK {
@@ -446,7 +447,7 @@ func TestMCP(t *testing.T) {
 		t.Fatalf("a fact sent twice should say it existed: %v %+v", err, res)
 	}
 	var keyed int64
-	if s.InOrg(o.ID).Model(&Event{}).Where("key_id > 0").Count(&keyed); keyed != 1 {
+	if s.InOrg(o.ID).Model(&store.Event{}).Where("key_id > 0").Count(&keyed); keyed != 1 {
 		t.Fatalf("want the one change recorded against its key, got %d events", keyed)
 	}
 	res, err = session.CallTool(ctx, &mcp.CallToolParams{Name: "get_company", Arguments: map[string]any{"company": "Larkmoor Yachts"}})
@@ -475,40 +476,40 @@ func TestAgentMarks(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	if _, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Larkmoor Yachts",
+	if _, err := s.AgentAddCompany(o.ID, store.Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Larkmoor Yachts",
 		Facts: []research.FactIn{{Field: "configurator", Value: "Day Cruiser 45", SourceURL: "https://larkmoor.example"}}}); err != nil {
 		t.Fatal(err)
 	}
-	c, err := s.AgentAddContact(o, Actor{Name: "agent:bot"}, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"})
+	c, err := s.AgentAddContact(o, store.Actor{Name: "agent:bot"}, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AgentMark(o.ID, Actor{Name: "agent:bot"}, research.MarkIn{ContactID: c.ID, Step: "declined"}); err == nil {
+	if err := s.AgentMark(o.ID, store.Actor{Name: "agent:bot"}, research.MarkIn{ContactID: c.ID, Step: "declined"}); err == nil {
 		t.Fatal("an agent marked a contact nobody has picked yet")
 	}
 	if err := s.PickContact(o.ID, o, c.ID, "ada"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AgentMark(o.ID, Actor{Name: "agent:bot"}, research.MarkIn{ContactID: c.ID, Step: "accepted", Date: "2999-01-01"}); err == nil {
+	if err := s.AgentMark(o.ID, store.Actor{Name: "agent:bot"}, research.MarkIn{ContactID: c.ID, Step: "accepted", Date: "2999-01-01"}); err == nil {
 		t.Fatal("a future date was accepted")
 	}
-	if err := s.AgentMark(o.ID, Actor{Name: "agent:bot"}, research.MarkIn{ContactID: c.ID, Step: "sent"}); err == nil {
+	if err := s.AgentMark(o.ID, store.Actor{Name: "agent:bot"}, research.MarkIn{ContactID: c.ID, Step: "sent"}); err == nil {
 		t.Fatal("an unknown step was accepted")
 	}
-	if err := s.AgentMark(o.ID, Actor{Name: "agent:bot"}, research.MarkIn{ContactID: c.ID, Step: "accepted", Note: "seen on LinkedIn"}); err != nil {
+	if err := s.AgentMark(o.ID, store.Actor{Name: "agent:bot"}, research.MarkIn{ContactID: c.ID, Step: "accepted", Note: "seen on LinkedIn"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AgentMark(o.ID, Actor{Name: "agent:bot"}, research.MarkIn{ContactID: c.ID, Step: "declined", Date: "2026-11-24", Note: "Allan says no"}); err != nil {
+	if err := s.AgentMark(o.ID, store.Actor{Name: "agent:bot"}, research.MarkIn{ContactID: c.ID, Step: "declined", Date: "2026-11-24", Note: "Allan says no"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Mark(o.ID, c.ID, "accepted", today(), "ada"); err != nil {
+	if err := s.Mark(o.ID, c.ID, "accepted", store.Today(), "ada"); err != nil {
 		t.Fatal(err)
 	}
 	if got := s.AgentMarks(o.ID, []int64{c.ID})[c.ID]; len(got) != 1 || got["declined"] != "agent:bot" {
 		t.Fatalf("agent marks should keep the agent's decline and drop the accept Ada re-marked: %v", got)
 	}
 	var h []crm.HistoryItem
-	for _, it := range must(firstOf(s.History(o.ID, must(s.AgentCompany(o.ID, Actor{}, "Larkmoor Yachts", paging.Page{})).Company.ID, 1))) {
+	for _, it := range must(firstOf(s.History(o.ID, must(s.AgentCompany(o.ID, store.Actor{}, "Larkmoor Yachts", paging.Page{})).Company.ID, 1))) {
 		if it.Action == "mark:declined" {
 			h = append(h, it)
 		}

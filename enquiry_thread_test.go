@@ -12,6 +12,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
@@ -23,9 +24,9 @@ func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
 	e := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: "Hannah\r\nBcc: victim@elsewhere.example", Email: "hannah@larkmoor.example",
 		Company: "Larkmoor Yachts", Message: "BUY CHEAP WATCHES at https://spam.example\r\nBcc: victim@elsewhere.example"}))
 	base := srv.URL + "/o/alpha/api/v1/enquiries/" + itoa(e.ID)
-	state := func() Enquiry {
+	state := func() store.Enquiry {
 		t.Helper()
-		var now Enquiry
+		var now store.Enquiry
 		if err := s.DB.First(&now, e.ID).Error; err != nil {
 			t.Fatal(err)
 		}
@@ -34,7 +35,7 @@ func TestAReplyToAnEnquiryIsEmailedAndKept(t *testing.T) {
 	rows := func() int64 {
 		t.Helper()
 		var n int64
-		if err := s.DB.Model(&EnquiryMessage{}).Count(&n).Error; err != nil {
+		if err := s.DB.Model(&store.EnquiryMessage{}).Count(&n).Error; err != nil {
 			t.Fatal(err)
 		}
 		return n
@@ -178,7 +179,7 @@ func TestWhoCanBeRepliedToAndByWhom(t *testing.T) {
 	if got := box.take(t, 1)[0]; got.To != "hannah@larkmoor.example" || got.ReplyTo != "" {
 		t.Errorf("the key's reply as mailed: %+v", got.Message)
 	}
-	var now Enquiry
+	var now store.Enquiry
 	if err := s.DB.First(&now, real.ID).Error; err != nil || now.Owner != "" || now.State != tickets.EnquiryWaiting {
 		t.Errorf("after a key's reply: %+v (%v)", now, err)
 	}
@@ -186,12 +187,12 @@ func TestWhoCanBeRepliedToAndByWhom(t *testing.T) {
 	// Not spam, not an address that isn't one, not someone on the never-contact list.
 	spam := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: "Bot", Email: "bot@spam.example", Message: "hello", Trap: "caught"}))
 	if !spam.Spam {
-		if err := s.DB.Model(&Enquiry{}).Where("id = ?", spam.ID).Update("spam", true).Error; err != nil {
+		if err := s.DB.Model(&store.Enquiry{}).Where("id = ?", spam.ID).Update("spam", true).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
 	two := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: "Two", Email: "one@larkmoor.example", Message: "hello"}))
-	if err := s.DB.Model(&Enquiry{}).Where("id = ?", two.ID).Update("email", "one@larkmoor.example, two@elsewhere.example").Error; err != nil {
+	if err := s.DB.Model(&store.Enquiry{}).Where("id = ?", two.ID).Update("email", "one@larkmoor.example, two@elsewhere.example").Error; err != nil {
 		t.Fatal(err)
 	}
 	never := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: "Rival", Email: "someone@rival.example", Message: "hello"}))
@@ -206,7 +207,7 @@ func TestWhoCanBeRepliedToAndByWhom(t *testing.T) {
 	}
 	box.take(t, 0)
 	var kept int64
-	if err := s.DB.Model(&EnquiryMessage{}).Where("enquiry_id <> ?", real.ID).Count(&kept).Error; err != nil || kept != 0 {
+	if err := s.DB.Model(&store.EnquiryMessage{}).Where("enquiry_id <> ?", real.ID).Count(&kept).Error; err != nil || kept != 0 {
 		t.Errorf("refused replies left %d rows (%v)", kept, err)
 	}
 
@@ -214,7 +215,7 @@ func TestWhoCanBeRepliedToAndByWhom(t *testing.T) {
 	if err := s.DeleteEnquiry(o.ID, real.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DB.Model(&EnquiryMessage{}).Count(&kept).Error; err != nil || kept != 0 {
+	if err := s.DB.Model(&store.EnquiryMessage{}).Count(&kept).Error; err != nil || kept != 0 {
 		t.Errorf("deleting the enquiry left %d messages (%v)", kept, err)
 	}
 }
@@ -268,7 +269,7 @@ func TestRepliesKeepToTheirLimits(t *testing.T) {
 	}
 
 	// A reply that never left is in neither export nor the thread.
-	if err := s.DB.Create(&EnquiryMessage{OrgID: o.ID, EnquiryID: e.ID, Ours: true, Text: "never left", By: "Ada Lovelace", CreatedAt: time.Now().Add(-time.Hour)}).Error; err != nil {
+	if err := s.DB.Create(&store.EnquiryMessage{OrgID: o.ID, EnquiryID: e.ID, Ours: true, Text: "never left", By: "Ada Lovelace", CreatedAt: time.Now().Add(-time.Hour)}).Error; err != nil {
 		t.Fatal(err)
 	}
 	if export := must(s.ExportOrg(o.ID, "Ada Lovelace")); len(export.EnquiryThread) != 0 {
@@ -310,10 +311,10 @@ func TestRepliesKeepToTheirLimits(t *testing.T) {
 	if err := s.ErasePerson(o.ID, bob.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DB.Create(&Enquiry{OrgID: o.ID, Kind: "other", Email: "Bob <bob@larkmoor.example>", Message: "from before addresses were checked", Via: "form", State: tickets.EnquiryOpen, CreatedAt: time.Now()}).Error; err != nil {
+	if err := s.DB.Create(&store.Enquiry{OrgID: o.ID, Kind: "other", Email: "Bob <bob@larkmoor.example>", Message: "from before addresses were checked", Via: "form", State: tickets.EnquiryOpen, CreatedAt: time.Now()}).Error; err != nil {
 		t.Fatal(err)
 	}
-	var old Enquiry
+	var old store.Enquiry
 	if err := s.DB.Where("message like ?", "from before%").First(&old).Error; err != nil {
 		t.Fatal(err)
 	}

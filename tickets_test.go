@@ -8,6 +8,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
@@ -31,7 +32,7 @@ func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
 		t.Fatalf("the enquiry wasn't matched to the person who sent it: %+v", help)
 	}
 	// One from before enquiries were tracked: nobody is asked to answer it now.
-	before := Enquiry{OrgID: o.ID, Kind: "support", Email: "old@larkmoor.example", Message: "From last year"}
+	before := store.Enquiry{OrgID: o.ID, Kind: "support", Email: "old@larkmoor.example", Message: "From last year"}
 	if err := s.DB.Create(&before).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -70,11 +71,11 @@ func TestAnEnquiryWaitsToBeAnswered(t *testing.T) {
 	}
 
 	// The history says who took it and where it stands, not what our note says.
-	var said []Event
+	var said []store.Event
 	if err := s.DB.Where("org_id = ? and action like ?", o.ID, "enquiry:%").Order("id").Find(&said).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(said) != 3 || said[0].ContactID != known.ID || deref(said[0].Value) != "Ada Lovelace" || said[1].Value != nil || deref(said[2].Value) != tickets.EnquiryWaiting {
+	if len(said) != 3 || said[0].ContactID != known.ID || store.Deref(said[0].Value) != "Ada Lovelace" || said[1].Value != nil || store.Deref(said[2].Value) != tickets.EnquiryWaiting {
 		t.Errorf("the history of answering it: %+v", said)
 	}
 
@@ -186,7 +187,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 		t.Fatalf("the board after starting a conversation: %+v", board)
 	}
 	added := board["replied"][0]
-	if deref(added.Email) != "sven@nordkap.example" || deref(added.Maker) != "Nordkap Boats" || added.CompanyID == nil || !strings.Contains(deref(added.CallNotes), "two sites") {
+	if store.Deref(added.Email) != "sven@nordkap.example" || store.Deref(added.Maker) != "Nordkap Boats" || added.CompanyID == nil || !strings.Contains(store.Deref(added.CallNotes), "two sites") {
 		t.Errorf("the person added from the enquiry: %+v", added)
 	}
 	linked, _, err := s.Enquiries(o.ID, tickets.EnquiryFilter{}, 1)
@@ -214,7 +215,7 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 		t.Fatalf("a conversation with someone already here: %d %s", code, body)
 	}
 	var people int64
-	if err := s.DB.Model(&Contact{}).Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").Count(&people).Error; err != nil || people != 1 {
+	if err := s.DB.Model(&store.Contact{}).Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").Count(&people).Error; err != nil || people != 1 {
 		t.Errorf("%d people hold that address after the conversation started (%v)", people, err)
 	}
 	if board := must(s.Conversations(o.ID)); len(board["replied"]) != 2 {
@@ -237,14 +238,14 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 	// A second enquiry from someone now on the board finds them; it doesn't add them again.
 	second := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "sales", Email: "sven@nordkap.example", Message: "And for three?"}))
 	// Force the case where it arrived before they were added, so it was matched to nobody.
-	if err := s.DB.Model(&Enquiry{}).Where("id = ?", second.ID).Update("contact_id", nil).Error; err != nil {
+	if err := s.DB.Model(&store.Enquiry{}).Where("id = ?", second.ID).Update("contact_id", nil).Error; err != nil {
 		t.Fatal(err)
 	}
 	if code, body := converse(second.ID); code != http.StatusCreated {
 		t.Fatalf("a second enquiry from the same person: %d %s", code, body)
 	}
 	var svens int64
-	if err := s.DB.Model(&Contact{}).Where("org_id = ? and email = ?", o.ID, "sven@nordkap.example").Count(&svens).Error; err != nil || svens != 1 {
+	if err := s.DB.Model(&store.Contact{}).Where("org_id = ? and email = ?", o.ID, "sven@nordkap.example").Count(&svens).Error; err != nil || svens != 1 {
 		t.Errorf("%d people hold that address after their second enquiry (%v)", svens, err)
 	}
 
@@ -255,14 +256,14 @@ func TestAnEnquiryBecomesAConversation(t *testing.T) {
 	if code, body := converse(claims.ID); code != http.StatusCreated {
 		t.Fatalf("a conversation with someone claiming a held company: %d %s", code, body)
 	}
-	var claimant Contact
+	var claimant store.Contact
 	if err := s.DB.Where("org_id = ? and email = ?", o.ID, "mallory@elsewhere.example").First(&claimant).Error; err != nil {
 		t.Fatal(err)
 	}
-	if claimant.CompanyID != nil || deref(claimant.Maker) != "" {
+	if claimant.CompanyID != nil || store.Deref(claimant.Maker) != "" {
 		t.Errorf("a stranger was attached to the company they named: %+v", claimant)
 	}
-	if name := deref(claimant.Person); len(name) > 80 || strings.Contains(name, "\n") || !strings.HasPrefix(name, "Mallory Quill") {
+	if name := store.Deref(claimant.Person); len(name) > 80 || strings.Contains(name, "\n") || !strings.HasPrefix(name, "Mallory Quill") {
 		t.Errorf("the name taken from the form: %q", name)
 	}
 

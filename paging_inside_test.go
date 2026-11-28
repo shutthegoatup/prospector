@@ -9,12 +9,13 @@ import (
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 	t.Parallel()
 	s, o, srv, _ := signedIn(t)
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	task := must(s.CreateTask(o.ID, "", "Find makers of garden rooms", "Nia"))
 	co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor", Task: task.ID}))
 	for i := range 5 {
@@ -61,7 +62,7 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 		in.Cursor = got.NextCursor
 	}
 	var events int64
-	s.InOrg(o.ID).Model(&Event{}).Where("company_id = ?", co.ID).Count(&events)
+	s.InOrg(o.ID).Model(&store.Event{}).Where("company_id = ?", co.ID).Count(&events)
 	once("facts", facts, 5)
 	once("people", people, 5)
 	once("notes", notes, 5)
@@ -107,9 +108,9 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 		t.Fatalf("a task with six companies, two a page, took %d pages", pages)
 	}
 	// More notes than the task's own page shows can all be reached.
-	extra := make([]TaskNote, research.TaskNotesShown+20)
+	extra := make([]store.TaskNote, research.TaskNotesShown+20)
 	for i := range extra {
-		extra[i] = TaskNote{OrgID: o.ID, TaskID: task.ID, Actor: "agent:scout", Kind: "next", Text: fmt.Sprint("Later note ", i)}
+		extra[i] = store.TaskNote{OrgID: o.ID, TaskID: task.ID, Actor: "agent:scout", Kind: "next", Text: fmt.Sprint("Later note ", i)}
 	}
 	if err := s.DB.CreateInBatches(extra, 60).Error; err != nil {
 		t.Fatal(err)
@@ -126,7 +127,7 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 		in.Cursor = got.NextCursor
 	}
 	once("notes on a task with many", left, research.TaskNotesShown+25)
-	if err := s.DB.Where("task_id = ? and text like ?", task.ID, "Later note%").Delete(&TaskNote{}).Error; err != nil {
+	if err := s.DB.Where("task_id = ? and text like ?", task.ID, "Later note%").Delete(&store.TaskNote{}).Error; err != nil {
 		t.Fatal(err)
 	}
 

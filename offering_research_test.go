@@ -8,6 +8,7 @@ import (
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 type offeringQueue struct {
@@ -42,9 +43,9 @@ func TestEachOfferingHasAResearchQueueOfItsOwn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	roles := must(s.AddOffering(o.ID, Offering{Name: "Contract roles", LookFor: "ir35: outside IR35 only"}, "Ada"))
+	roles := must(s.AddOffering(o.ID, store.Offering{Name: "Contract roles", LookFor: "ir35: outside IR35 only"}, "Ada"))
 	task := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find contract roles", "Ada"))
-	scout := Actor{Name: "agent:scout", KeyID: 3}
+	scout := store.Actor{Name: "agent:scout", KeyID: 3}
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Northwind Payments", Domain: "northwind.example", Task: task.ID,
 		Facts: []research.FactIn{{Field: "ir35", Answer: "yes", Value: "Outside IR35", SourceURL: "https://northwind.example/jobs/1"}}}))
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor", Domain: "larkmoor.example"}))
@@ -97,7 +98,7 @@ func TestEachOfferingHasAResearchQueueOfItsOwn(t *testing.T) {
 		t.Fatalf("asking for a task's search under another offering: %d", code)
 	}
 	beta := mustOrg(t, s, "beta")
-	other := must(s.AddOffering(beta.ID, Offering{Name: "Theirs"}, "Grace"))
+	other := must(s.AddOffering(beta.ID, store.Offering{Name: "Theirs"}, "Grace"))
 	if code, _ := queueAt(t, base+"?offering="+itoa(other.ID), secret); code != http.StatusNotFound {
 		t.Fatalf("another organisation's offering: %d", code)
 	}
@@ -128,7 +129,7 @@ func TestEachOfferingHasAResearchQueueOfItsOwn(t *testing.T) {
 	if code, body := asKey(t, "POST", pick, secret, nil); code != http.StatusNoContent {
 		t.Fatalf("picking for the offering: %d %s", code, body)
 	}
-	var got Contact
+	var got store.Contact
 	if err := s.InOrg(o.ID).Where("id = ?", priya.ID).First(&got).Error; err != nil || got.OfferingID != roles.ID {
 		t.Fatalf("someone picked for an offering should be reached for it: %d %v", got.OfferingID, err)
 	}
@@ -153,10 +154,10 @@ func TestEachOfferingHasAResearchQueueOfItsOwn(t *testing.T) {
 func TestRemovingAnOfferingBringsWhatItFoundIntoTheOrganisationsOwnReview(t *testing.T) {
 	t.Parallel()
 	s, o, srv, _ := signedIn(t)
-	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO"}, "Ada"))
+	cto := must(s.AddOffering(o.ID, store.Offering{Name: "Interim CTO"}, "Ada"))
 	task := must(s.CreateTaskFor(o.ID, cto.ID, "", "Find scale-ups", "Ada"))
-	must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Harbour Analytics", Task: task.ID}))
-	looked := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Fernhill Search", Task: task.ID}))
+	must(s.AgentAddCompany(o.ID, store.Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Harbour Analytics", Task: task.ID}))
+	looked := must(s.AgentAddCompany(o.ID, store.Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Fernhill Search", Task: task.ID}))
 	if n := s.ResearchCount(o.ID, "review"); n != 0 {
 		t.Fatalf("found for an offering, in the organisation's own review: %d", n)
 	}

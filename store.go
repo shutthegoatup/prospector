@@ -20,6 +20,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/sales"
 	"github.com/shutthegoatup/prospector/internal/signing"
+	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
@@ -27,7 +28,7 @@ import (
 // methods are the store's. They share one core, so a key or resolver set on the store
 // reaches every area.
 type Store struct {
-	*core
+	*store.Core
 	research.ResearchStore
 	privacy.PrivacyStore
 	marketing.OutreachStore
@@ -45,8 +46,8 @@ type Store struct {
 	onboarding.OnboardingStore
 }
 
-func newStore(c *core) *Store {
-	s := &Store{core: c, IdentityStore: identity.IdentityStore{Core: c}, AgentStore: agents.AgentStore{Core: c}, SsoStore: identity.SsoStore{Core: c},
+func newStore(c *store.Core) *Store {
+	s := &Store{Core: c, IdentityStore: identity.IdentityStore{Core: c}, AgentStore: agents.AgentStore{Core: c}, SsoStore: identity.SsoStore{Core: c},
 		SuppressionStore: marketing.SuppressionStore{Core: c}, CustomerStore: onboarding.CustomerStore{Core: c}, DealStore: sales.DealStore{Core: c},
 		SubscriptionStore: sales.SubscriptionStore{Core: c}, OnboardingStore: onboarding.OnboardingStore{Core: c}, PrivacyStore: privacy.PrivacyStore{Core: c}}
 	// An area that needs another's queries holds that area, not the whole store.
@@ -61,12 +62,12 @@ func newStore(c *core) *Store {
 
 // through is the same store working through db, such as a transaction.
 func (s *Store) through(db *gorm.DB) *Store {
-	return newStore(&core{DB: db, Keyring: s.Keyring, DNS: s.DNS})
+	return newStore(&store.Core{DB: db, Keyring: s.Keyring, DNS: s.DNS})
 }
 
-var models = []any{&User{}, &Org{}, &Membership{}, &Session{}, &APIKey{},
-	&Company{}, &Fact{}, &Contact{}, &Event{}, &Erasure{}, &Identity{}, &SSOConnection{}, &SSODomain{}, &Enquiry{}, &EnquiryMessage{}, &Suppression{}, &UnsubscribeLink{}, &Campaign{}, &CampaignRecipient{}, &Agreement{}, &AgreementFile{}, &AgreementRecipient{}, &AgreementField{}, &AgreementEvent{}, &SealKey{}, &Suggestion{},
-	&Task{}, &TaskRequest{}, &TaskNote{}, &RequestClaim{}, &PasswordToken{}, &OrgMail{}, &Agent{}, &AgentRun{}, &Deal{}, &Subscription{}, &Onboarding{}, &OnboardingStep{}, &CustomerGrant{}, &CustomerLink{}, &CustomerSession{}, &MailDomain{}, &Enricher{}, &EnrichUsage{}, &Offering{}, &Verdict{}, &Role{}, &BounceHook{}}
+var models = []any{&store.User{}, &store.Org{}, &store.Membership{}, &store.Session{}, &store.APIKey{},
+	&store.Company{}, &store.Fact{}, &store.Contact{}, &store.Event{}, &store.Erasure{}, &store.Identity{}, &store.SSOConnection{}, &store.SSODomain{}, &store.Enquiry{}, &store.EnquiryMessage{}, &store.Suppression{}, &store.UnsubscribeLink{}, &store.Campaign{}, &store.CampaignRecipient{}, &store.Agreement{}, &store.AgreementFile{}, &store.AgreementRecipient{}, &store.AgreementField{}, &store.AgreementEvent{}, &store.SealKey{}, &store.Suggestion{},
+	&store.Task{}, &store.TaskRequest{}, &store.TaskNote{}, &store.RequestClaim{}, &store.PasswordToken{}, &store.OrgMail{}, &store.Agent{}, &store.AgentRun{}, &store.Deal{}, &store.Subscription{}, &store.Onboarding{}, &store.OnboardingStep{}, &store.CustomerGrant{}, &store.CustomerLink{}, &store.CustomerSession{}, &store.MailDomain{}, &store.Enricher{}, &store.EnrichUsage{}, &store.Offering{}, &store.Verdict{}, &store.Role{}, &store.BounceHook{}}
 
 // Open takes a postgres:// URL and brings its schema up to date.
 func Open(dsn string) (*Store, error) {
@@ -98,7 +99,7 @@ func connect(dsn string) (*Store, error) {
 	pool.SetMaxOpenConns(20)
 	pool.SetMaxIdleConns(20)
 	pool.SetConnMaxIdleTime(5 * time.Minute)
-	return newStore(&core{DB: db}), nil
+	return newStore(&store.Core{DB: db}), nil
 }
 
 // oneNameWhateverItsCapitals backs ensureCompany's look-up with an index. Companies

@@ -9,15 +9,16 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 func TestTheTasksPageHasPages(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
-	rows := make([]Task, research.TaskPageSize+2)
+	rows := make([]store.Task, research.TaskPageSize+2)
 	for i := range rows {
-		rows[i] = Task{OrgID: o.ID, Title: fmt.Sprint("Brief number ", i), CreatedBy: "Nia"}
+		rows[i] = store.Task{OrgID: o.ID, Title: fmt.Sprint("Brief number ", i), CreatedBy: "Nia"}
 	}
 	if err := s.DB.CreateInBatches(rows, 50).Error; err != nil {
 		t.Fatal(err)
@@ -80,9 +81,9 @@ func apiPages(t *testing.T, client *http.Client, u string) []apiPage {
 func TestTheEnquiriesPageHasPages(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
-	rows := make([]Enquiry, tickets.EnquiryPageSize+1)
+	rows := make([]store.Enquiry, tickets.EnquiryPageSize+1)
 	for i := range rows {
-		rows[i] = Enquiry{OrgID: o.ID, Kind: "demo", Name: fmt.Sprint("Sender ", i), Email: fmt.Sprintf("sender%d@larkmoor.example", i),
+		rows[i] = store.Enquiry{OrgID: o.ID, Kind: "demo", Name: fmt.Sprint("Sender ", i), Email: fmt.Sprintf("sender%d@larkmoor.example", i),
 			Message: "Could you show us?", CreatedAt: time.Now().Add(time.Duration(i) * time.Second)}
 	}
 	if err := s.DB.CreateInBatches(rows, 50).Error; err != nil {

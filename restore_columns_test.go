@@ -11,6 +11,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // A column added to Contact has to be carried by the snapshot, or be named here as
@@ -20,7 +21,7 @@ func TestASnapshotCarriesEveryContactColumn(t *testing.T) {
 	s := tempStore(t)
 	rebuilt := []string{"org_id", "company_id"}
 	stmt := &gorm.Statement{DB: s.DB}
-	if err := stmt.Parse(&Contact{}); err != nil {
+	if err := stmt.Parse(&store.Contact{}); err != nil {
 		t.Fatal(err)
 	}
 	for _, f := range stmt.Schema.Fields {
@@ -28,14 +29,14 @@ func TestASnapshotCarriesEveryContactColumn(t *testing.T) {
 			t.Errorf("contacts.%s is in no snapshot, so a restore would empty it: add it to laterColumns", f.DBName)
 		}
 	}
-	if len(privacy.LaterColumns) != len((&Contact{}).Later()) {
+	if len(privacy.LaterColumns) != len((&store.Contact{}).Later()) {
 		t.Fatal("laterColumns and Contact.later() have drifted apart")
 	}
 }
 
-func suggestedAndWorked(t *testing.T, s *Store, o *Org) (suggested, worked int64) {
+func suggestedAndWorked(t *testing.T, s *Store, o *store.Org) (suggested, worked int64) {
 	t.Helper()
-	agent := Actor{Name: "agent:scout", KeyID: 1}
+	agent := store.Actor{Name: "agent:scout", KeyID: 1}
 	co := must(s.AgentAddCompany(o.ID, agent, research.AddCompanyIn{Name: "Larkmoor", Domain: "larkmoor.example"}))
 	add := func(name, email string) int64 {
 		return must(s.AgentAddContact(o, agent, prospecting.AddContactIn{Company: co.Name, Name: name, Title: "Head of Digital",
@@ -46,7 +47,7 @@ func suggestedAndWorked(t *testing.T, s *Store, o *Org) (suggested, worked int64
 		s.PickContact(o.ID, o, worked, "Nia"),
 		s.AgentDraft(o.ID, agent, research.DraftIn{ContactID: worked, Kind: "email", Subject: "Hello", Text: "A few words."}),
 		s.Mark(o.ID, worked, "replied", "2020-01-02", "Nia"),
-		s.Update(o.ID, worked, "stage", Stages[1].Key, "Nia"),
+		s.Update(o.ID, worked, "stage", store.Stages[1].Key, "Nia"),
 		s.Update(o.ID, worked, "next_step", "send the proposal", "Nia"),
 		s.Update(o.ID, worked, "next_date", "2030-01-02", "Nia"),
 		s.Update(o.ID, worked, "lost_reason", "no budget this year", "Nia"),
@@ -58,9 +59,9 @@ func suggestedAndWorked(t *testing.T, s *Store, o *Org) (suggested, worked int64
 	return suggested, worked
 }
 
-func contactsOf(t *testing.T, s *Store, org int64) []Contact {
+func contactsOf(t *testing.T, s *Store, org int64) []store.Contact {
 	t.Helper()
-	var rows []Contact
+	var rows []store.Contact
 	if err := s.InOrg(org).Order("id").Find(&rows).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +77,7 @@ func TestRestoreBringsBackEveryColumn(t *testing.T) {
 	for _, c := range before {
 		for i, f := range c.Later() {
 			// Between them the two hold something in every column: only one still waiting has a status.
-			if (c.ID == suggested) == (privacy.LaterColumns[i] == "status") && deref(privacy.LaterValue(f)) == "" {
+			if (c.ID == suggested) == (privacy.LaterColumns[i] == "status") && store.Deref(privacy.LaterValue(f)) == "" {
 				t.Fatalf("the test leaves %s empty for contact %d, so it wouldn't notice it lost", privacy.LaterColumns[i], c.ID)
 			}
 		}
@@ -92,7 +93,7 @@ func TestRestoreBringsBackEveryColumn(t *testing.T) {
 	if again := must(s.SnapshotText(o.ID)); again != snapshot {
 		t.Fatal("the snapshot of a restored snapshot differs from it")
 	}
-	if c := must(s.FindOne(o.ID, "Ada Vale")); c.Status != ContactSuggested || c.Open() {
+	if c := must(s.FindOne(o.ID, "Ada Vale")); c.Status != store.ContactSuggested || c.Open() {
 		t.Fatalf("someone an agent suggested came back as picked: status %q", c.Status)
 	}
 }
@@ -119,7 +120,7 @@ func TestAnOlderSnapshotLeavesLaterColumnsAlone(t *testing.T) {
 	}
 	for i, c := range contactsOf(t, s, o.ID) {
 		for j, f := range c.Later() {
-			if got, want := deref(privacy.LaterValue(f)), deref(privacy.LaterValue(before[i].Later()[j])); got != want {
+			if got, want := store.Deref(privacy.LaterValue(f)), store.Deref(privacy.LaterValue(before[i].Later()[j])); got != want {
 				t.Errorf("%s: %s was %q and is now %q", c.Key, privacy.LaterColumns[j], want, got)
 			}
 		}

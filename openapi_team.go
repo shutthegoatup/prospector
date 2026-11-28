@@ -13,6 +13,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // withRequest hands an operation the request it came in, for the few that need its
@@ -35,7 +36,7 @@ func someone(ctx context.Context) (*request.Req, error) {
 	return q, nil
 }
 
-func meOut(u *User, m *Membership) api.Me {
+func meOut(u *store.User, m *store.Membership) api.Me {
 	return api.Me{UserId: u.ID, Name: u.Name, Email: u.Email, Role: api.MeRole(m.Role), HasPassword: u.HasPassword(),
 		CallerName: m.CallerName, Signature: m.Signature, Language: u.Language}
 }
@@ -139,7 +140,7 @@ func (s apiServer) member(org, user int64) (api.Member, error) {
 	}
 	i := slices.IndexFunc(all, func(m identity.Member) bool { return m.UserID == user })
 	if i < 0 {
-		return api.Member{}, noSuch("that person isn't in this organisation")
+		return api.Member{}, store.NoSuch("that person isn't in this organisation")
 	}
 	return memberOut(all[i]), nil
 }
@@ -280,7 +281,7 @@ func (s apiServer) ssoOut(org int64) (api.SSO, error) {
 	return out, nil
 }
 
-func domainOut(d SSODomain) api.SSODomain {
+func domainOut(d store.SSODomain) api.SSODomain {
 	return api.SSODomain{Domain: d.Domain, Record: d.Record(), Token: d.Token, VerifiedAt: d.VerifiedAt}
 }
 

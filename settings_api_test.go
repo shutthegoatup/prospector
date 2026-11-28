@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // What the organisation looks for comes back as a list, which a change must still be
@@ -112,10 +113,10 @@ func TestOnlyWhatTakesEffectDifferentlyIsAChange(t *testing.T) {
 	url := srv.URL + "/o/alpha/api/v1/settings"
 	changes := func() []string {
 		var out []string
-		var events []Event
+		var events []store.Event
 		s.DB.Where("org_id = ? and action = ?", o.ID, "settings:change").Order("id").Find(&events)
 		for _, e := range events {
-			out = append(out, deref(e.Value))
+			out = append(out, store.Deref(e.Value))
 		}
 		return out
 	}

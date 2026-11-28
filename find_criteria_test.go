@@ -10,6 +10,7 @@ import (
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // researchQueue is what the Research page lists, read as it reads it.
@@ -42,7 +43,7 @@ const criteriaLookFor = "configurator (must): a product configurator on their si
 
 func TestEachCriterionIsMetNotMetOrNotFound(t *testing.T) {
 	t.Parallel()
-	assets := must(OrgSettings{LookFor: criteriaLookFor}.Assets())
+	assets := must(store.OrgSettings{LookFor: criteriaLookFor}.Assets())
 	if len(assets) != 3 || !assets[0].Must || assets[0].Field != "configurator" || assets[1].Must {
 		t.Fatalf("a (must) after the name marks a must: %+v", assets)
 	}
@@ -50,7 +51,7 @@ func TestEachCriterionIsMetNotMetOrNotFound(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	o.Settings.LookFor = criteriaLookFor
-	bot := Actor{Name: "agent:bot"}
+	bot := store.Actor{Name: "agent:bot"}
 	out, err := s.AgentAddCompany(o.ID, bot, research.AddCompanyIn{Name: "Tidewater Skiffs", Domain: "tidewater.example", Facts: []research.FactIn{
 		{Field: "configurator", Value: "Choose your hull colour on every model page", SourceURL: "https://tidewater.example/models"},
 		{Field: "payments", Value: "Order through a dealer; no online payment", SourceURL: "https://tidewater.example/buy", Answer: "no"},
@@ -112,7 +113,7 @@ func TestEachCriterionIsMetNotMetOrNotFound(t *testing.T) {
 		}
 	}
 
-	k := &APIKey{Scopes: "research:write"}
+	k := &store.APIKey{Scopes: "research:write"}
 	if g := agentInstructions(o, k); !strings.Contains(g, "- configurator (must): a product configurator") || !strings.Contains(g, "unknown when you looked and couldn't tell") {
 		t.Fatalf("agents aren't told to answer each criterion: %q", g)
 	}
@@ -126,7 +127,7 @@ func TestASearchRanksItsCompaniesByFit(t *testing.T) {
 		t.Fatalf("saving what we look for: %d %s", code, body)
 	}
 	task := must(s.CreateTask(o.ID, "Makers", "Boat makers with a configurator.", "Ada Lovelace"))
-	bot := Actor{Name: "agent:bot"}
+	bot := store.Actor{Name: "agent:bot"}
 	yes := func(field, site string) research.FactIn {
 		return research.FactIn{Field: field, Value: "Has " + field, SourceURL: "https://" + site + "/" + field}
 	}

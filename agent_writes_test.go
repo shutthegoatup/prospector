@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // The writes an agent makes with a key: every field it sends lands, the answer says what
@@ -81,7 +82,7 @@ func TestAnAgentsWritesAnswerAsTheyAlwaysHave(t *testing.T) {
 		t.Errorf("someone new carries suggested, which older clients never saw: %s", body)
 	}
 	hannah := must(s.ContactByID(o.ID, int64(person["id"].(float64))))
-	if deref(hannah.Email) != "hannah@larkmoor.example" || deref(hannah.Linkedin) == "" || deref(hannah.Phone) == "" || hannah.Title != "Head of Marketing" {
+	if store.Deref(hannah.Email) != "hannah@larkmoor.example" || store.Deref(hannah.Linkedin) == "" || store.Deref(hannah.Phone) == "" || hannah.Title != "Head of Marketing" {
 		t.Errorf("a person's fields didn't all land: %+v", hannah)
 	}
 
@@ -90,8 +91,8 @@ func TestAnAgentsWritesAnswerAsTheyAlwaysHave(t *testing.T) {
 	if code != http.StatusOK || strings.TrimSpace(body) != `{"ok":true}` {
 		t.Fatalf("drafting: %d %s", code, body)
 	}
-	if drafted := must(s.ContactByID(o.ID, ines.ID)); deref(drafted.Body) != "Hello Ines." || deref(drafted.Subject) != "Your kitchens" {
-		t.Errorf("a draft didn't land whole: body %q subject %q", deref(drafted.Body), deref(drafted.Subject))
+	if drafted := must(s.ContactByID(o.ID, ines.ID)); store.Deref(drafted.Body) != "Hello Ines." || store.Deref(drafted.Subject) != "Your kitchens" {
+		t.Errorf("a draft didn't land whole: body %q subject %q", store.Deref(drafted.Body), store.Deref(drafted.Subject))
 	}
 
 	code, body = post(writer, "enquiries", "application/json", `{"kind":"signup","name":"Omar Reyes","email":"omar@reef.example","company":"Reef Boats","phone":"+44 20 7946 0001","message":"Hello.","page":"/pricing","site":"app","trap":"filled"}`)

@@ -12,6 +12,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // shown is what a page the server decided hands the app, read back from its shell.
@@ -104,7 +105,7 @@ func TestACustomersPageNamesNoMember(t *testing.T) {
 	w := httptest.NewRecorder()
 	on := "2026-11-20"
 	a := &App{}
-	a.customerRender(w, httptest.NewRequest("GET", "/c", nil), http.StatusOK, CustomerView{State: "steps", Org: "Alpha", Steps: []OnboardingStep{
+	a.customerRender(w, httptest.NewRequest("GET", "/c", nil), http.StatusOK, CustomerView{State: "steps", Org: "Alpha", Steps: []store.OnboardingStep{
 		{ID: 1, Name: "Send files", DoneOn: &on, DoneBy: "Ada Lovelace"},
 		{ID: 2, Name: "Approve renders", DoneOn: &on, DoneBy: onboarding.CustomerActor},
 	}})

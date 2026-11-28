@@ -9,6 +9,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 type researchPage struct {
@@ -50,7 +51,7 @@ func TestTheResearchQueueIsInTheAPI(t *testing.T) {
 		t.Fatalf("saving what we look for: %d %s", code, body)
 	}
 	task := must(s.CreateTask(o.ID, "Makers", "Boat makers with a configurator.", "Ada Lovelace"))
-	bot := Actor{Name: "agent:bot"}
+	bot := store.Actor{Name: "agent:bot"}
 	fact := func(field, site, answer string) research.FactIn {
 		return research.FactIn{Field: field, Value: answer + " " + field, SourceURL: "https://" + site + "/" + field, Answer: answer}
 	}
@@ -119,7 +120,7 @@ func TestTheResearchQueueIsInTheAPI(t *testing.T) {
 	if len(corran.Facts) != 1 || corran.Facts[0].Field != "team_page" || corran.Facts[0].Answer != "yes" {
 		t.Fatalf("the other facts: %+v", corran.Facts)
 	}
-	if len(corran.People) != 1 || corran.People[0].Name != "Mairi Corran" || corran.People[0].Status != ContactSuggested {
+	if len(corran.People) != 1 || corran.People[0].Name != "Mairi Corran" || corran.People[0].Status != store.ContactSuggested {
 		t.Fatalf("the people: %+v", corran.People)
 	}
 

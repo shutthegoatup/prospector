@@ -10,13 +10,14 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
-func seedCompanies(t *testing.T, s *Store, org int64, n int, stage, segment string) []Company {
+func seedCompanies(t *testing.T, s *Store, org int64, n int, stage, segment string) []store.Company {
 	t.Helper()
-	rows := make([]Company, n)
+	rows := make([]store.Company, n)
 	for i := range rows {
-		rows[i] = Company{OrgID: org, Name: fmt.Sprintf("Maker %03d", i+1), Stage: stage, Segment: segment}
+		rows[i] = store.Company{OrgID: org, Name: fmt.Sprintf("Maker %03d", i+1), Stage: stage, Segment: segment}
 	}
 	if err := s.DB.CreateInBatches(&rows, 100).Error; err != nil {
 		t.Fatal(err)
@@ -24,7 +25,7 @@ func seedCompanies(t *testing.T, s *Store, org int64, n int, stage, segment stri
 	return rows
 }
 
-func seedContact(t *testing.T, s *Store, c Contact) Contact {
+func seedContact(t *testing.T, s *Store, c store.Contact) store.Contact {
 	t.Helper()
 	c.File = "test"
 	if err := s.DB.Create(&c).Error; err != nil {
@@ -79,8 +80,8 @@ func TestPipelineInSQL(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	day := str("2026-01-05")
-	people := map[string][]Contact{
+	day := store.Str("2026-01-05")
+	people := map[string][]store.Contact{
 		"Nobody yet":         nil,
 		"Untouched":          {{}},
 		"Turned down":        nil,
@@ -106,7 +107,7 @@ func TestPipelineInSQL(t *testing.T) {
 		"Lost one, one live": "outreach", "Declined unreached": "research", "Declined after a touch": "outreach",
 		"Declined after a reply": "outreach", "Declined, one in talks": "proposal"}
 	for name, list := range people {
-		c := Company{OrgID: o.ID, Name: name, Stage: prospecting.CompanyQualified}
+		c := store.Company{OrgID: o.ID, Name: name, Stage: prospecting.CompanyQualified}
 		if strings.HasPrefix(name, "Turned down") {
 			c.Stage = prospecting.CompanyRejected
 		}
@@ -118,7 +119,7 @@ func TestPipelineInSQL(t *testing.T) {
 			seedContact(t, s, p)
 		}
 		// A company-level row isn't a person, and mustn't count as one or move the stage.
-		seedContact(t, s, Contact{OrgID: o.ID, CompanyID: &c.ID, Key: "org:" + name, Replied: day, Stage: "won"})
+		seedContact(t, s, store.Contact{OrgID: o.ID, CompanyID: &c.ID, Key: "org:" + name, Replied: day, Stage: "won"})
 	}
 
 	rows, pg, err := s.Companies(o.ID, "", "", "", 1)
@@ -161,7 +162,7 @@ func TestStageFilterPagesInSQL(t *testing.T) {
 	// Every tenth company is in outreach, so the filter's matches are spread far past one page.
 	for i, c := range seedCompanies(t, s, o.ID, 700, prospecting.CompanyQualified, "") {
 		if i%10 == 9 {
-			seedContact(t, s, Contact{OrgID: o.ID, CompanyID: &c.ID, Key: c.Name, LinkedinAdded: str("2026-01-05")})
+			seedContact(t, s, store.Contact{OrgID: o.ID, CompanyID: &c.ID, Key: c.Name, LinkedinAdded: store.Str("2026-01-05")})
 		}
 	}
 	rows, pg, err := s.Companies(o.ID, "", "", "outreach", 2)
@@ -180,11 +181,11 @@ func TestResearchIsPaged(t *testing.T) {
 	for _, i := range []int{0, 229} {
 		c := seeded[i]
 		for _, field := range []string{"platform", "team_page"} {
-			if err := s.DB.Create(&Fact{OrgID: o.ID, CompanyID: c.ID, Field: field, Value: c.Name, SourceURL: "https://maker.example"}).Error; err != nil {
+			if err := s.DB.Create(&store.Fact{OrgID: o.ID, CompanyID: c.ID, Field: field, Value: c.Name, SourceURL: "https://maker.example"}).Error; err != nil {
 				t.Fatal(err)
 			}
 		}
-		seedContact(t, s, Contact{OrgID: o.ID, CompanyID: &c.ID, Key: c.Name, Person: str("Person at " + c.Name), Status: ContactSuggested})
+		seedContact(t, s, store.Contact{OrgID: o.ID, CompanyID: &c.ID, Key: c.Name, Person: store.Str("Person at " + c.Name), Status: store.ContactSuggested})
 	}
 	if n := s.ResearchCount(o.ID, "review"); n != 230 {
 		t.Fatalf("the count is the whole list, not a page of it: %d", n)
@@ -202,7 +203,7 @@ func TestResearchIsPaged(t *testing.T) {
 	}
 	rows, pg, _ = s.Research(o.ID, "review", 99)
 	last := rows[len(rows)-1]
-	if pg.N != 8 || len(rows) != 20 || last.Name != "Maker 001" || len(last.Facts) != 2 || deref(last.People[0].Person) != "Person at Maker 001" {
+	if pg.N != 8 || len(rows) != 20 || last.Name != "Maker 001" || len(last.Facts) != 2 || store.Deref(last.People[0].Person) != "Person at Maker 001" {
 		t.Fatalf("the last page, past the old 200 cap: %d rows, %+v, %+v", len(rows), pg, last)
 	}
 
@@ -235,22 +236,22 @@ func TestSearch(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	a, b := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
-	add := func(o *Org, c Company, people ...Contact) Company {
+	add := func(o *store.Org, c store.Company, people ...store.Contact) store.Company {
 		c.OrgID, c.Stage = o.ID, prospecting.CompanyQualified
 		if err := s.DB.Create(&c).Error; err != nil {
 			t.Fatal(err)
 		}
 		for _, p := range people {
-			p.OrgID, p.CompanyID, p.Key, p.Maker = o.ID, &c.ID, deref(p.Person), &c.Name
+			p.OrgID, p.CompanyID, p.Key, p.Maker = o.ID, &c.ID, store.Deref(p.Person), &c.Name
 			seedContact(t, s, p)
 		}
 		return c
 	}
-	lark := add(a, Company{Name: "Larkmoor Yachts", Domain: "larkmoor.example", Why: `Sells "made to order" hulls`},
-		Contact{Person: str("Hannah Pryce, Head of Marketing"), Email: str("hannah@larkmoor.example")})
-	add(a, Company{Name: "Fenwick Kitchens", Domain: "fenwick.example", Why: "Configurator is 100% custom_built"},
-		Contact{Person: str("Björn Ødegård"), Email: str("bjorn@fenwick.example")})
-	add(b, Company{Name: "Larkmoor Yachts", Domain: "larkmoor.example"}, Contact{Person: str("Hannah Pryce")})
+	lark := add(a, store.Company{Name: "Larkmoor Yachts", Domain: "larkmoor.example", Why: `Sells "made to order" hulls`},
+		store.Contact{Person: store.Str("Hannah Pryce, Head of Marketing"), Email: store.Str("hannah@larkmoor.example")})
+	add(a, store.Company{Name: "Fenwick Kitchens", Domain: "fenwick.example", Why: "Configurator is 100% custom_built"},
+		store.Contact{Person: store.Str("Björn Ødegård"), Email: store.Str("bjorn@fenwick.example")})
+	add(b, store.Company{Name: "Larkmoor Yachts", Domain: "larkmoor.example"}, store.Contact{Person: store.Str("Hannah Pryce")})
 
 	search := func(q string) string {
 		t.Helper()
@@ -292,7 +293,7 @@ func TestSearch(t *testing.T) {
 	}
 
 	// The index follows edits and removals made by any route.
-	if err := s.DB.Model(&Company{}).Where("id = ?", lark.ID).Updates(map[string]any{"name": "Windrush Marine"}).Error; err != nil {
+	if err := s.DB.Model(&store.Company{}).Where("id = ?", lark.ID).Updates(map[string]any{"name": "Windrush Marine"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	p, _ := s.FindOne(a.ID, "Hannah")
@@ -305,7 +306,7 @@ func TestSearch(t *testing.T) {
 	if search("larkmoor yachts") != "" || search("hannah pryce") != "" {
 		t.Error("search still finds the old names")
 	}
-	if err := s.DB.Where("org_id = ?", a.ID).Delete(&Contact{}).Error; err != nil {
+	if err := s.DB.Where("org_id = ?", a.ID).Delete(&store.Contact{}).Error; err != nil {
 		t.Fatal(err)
 	}
 	if search("imogen") != "" || len(mustSearch(t, s, a.ID, "imogen")) != 0 {

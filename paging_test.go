@@ -11,6 +11,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // firstOf drops the middle of three results, for must.
@@ -42,7 +43,7 @@ func walk[T any](t *testing.T, limit int, page func(paging.Page) ([]T, string, e
 func TestEveryListAnAgentReadsComesInPages(t *testing.T) {
 	t.Parallel()
 	s, o, srv, _ := signedIn(t)
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	for i := range 5 {
 		co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: fmt.Sprintf("Larkmoor Rooms %d", i)}))
 		must(s.QuickAddPerson(o, crm.QuickAdd{Name: fmt.Sprintf("Quillon V%cle", rune(0x61+i)), Company: co.Name}, "Nia"))

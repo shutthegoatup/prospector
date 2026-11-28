@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
@@ -25,17 +26,17 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	do(s.Update(o.ID, jonas.ID, "tz", "Europe/Berlin", "ada"))
 	before := must(s.SnapshotText(o.ID))
 
-	nia := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Nia Okafor", Company: deref(hannah.Maker), Email: "nia.okafor@larkmoor.example"}, "ada"))
+	nia := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Nia Okafor", Company: store.Deref(hannah.Maker), Email: "nia.okafor@larkmoor.example"}, "ada"))
 	do(s.Update(o.ID, nia.ID, "call_notes", "asked for a callback in spring", "ada"))
 	do(s.Mark(o.ID, nia.ID, "replied", "2020-01-02", "ada"))
-	do(s.DB.Create(&Fact{OrgID: o.ID, CompanyID: *nia.CompanyID, ContactID: &nia.ID, Field: "role", Value: "Head of Digital", SourceURL: "https://larkmoor.example/team"}).Error)
-	do(s.DB.Create(&Enquiry{OrgID: o.ID, Name: "Nia Okafor", Email: "nia.okafor@larkmoor.example", Message: "Could you call me?", ContactID: &nia.ID}).Error)
+	do(s.DB.Create(&store.Fact{OrgID: o.ID, CompanyID: *nia.CompanyID, ContactID: &nia.ID, Field: "role", Value: "Head of Digital", SourceURL: "https://larkmoor.example/team"}).Error)
+	do(s.DB.Create(&store.Enquiry{OrgID: o.ID, Name: "Nia Okafor", Email: "nia.okafor@larkmoor.example", Message: "Could you call me?", ContactID: &nia.ID}).Error)
 
 	if _, err := s.Restore(o.ID, before); err != nil {
 		t.Fatal(err)
 	}
 	history := func(id int64) map[string]bool {
-		var events []Event
+		var events []store.Event
 		do(s.InOrg(o.ID).Where("contact_id = ?", id).Find(&events).Error)
 		out := map[string]bool{}
 		for _, e := range events {
@@ -49,24 +50,24 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	if h := history(nia.ID); len(h) != 0 {
 		t.Fatalf("history is still filed under someone the restore dropped, for whoever gets her id next: %v", h)
 	}
-	var events []Event
+	var events []store.Event
 	do(s.InOrg(o.ID).Find(&events).Error)
 	replied := false
 	for _, e := range events {
-		if v := strings.ToLower(deref(e.Value)); strings.Contains(v, "callback") || strings.Contains(v, "nia") {
-			t.Errorf("the history still says %q about someone who is gone", deref(e.Value))
+		if v := strings.ToLower(store.Deref(e.Value)); strings.Contains(v, "callback") || strings.Contains(v, "nia") {
+			t.Errorf("the history still says %q about someone who is gone", store.Deref(e.Value))
 		}
-		replied = replied || (e.Action == "mark:replied" && deref(e.Value) == "2020-01-02")
+		replied = replied || (e.Action == "mark:replied" && store.Deref(e.Value) == "2020-01-02")
 	}
 	if !replied {
 		t.Fatal("the history lost that a reply happened, which the counts are built from")
 	}
 	var facts int64
-	s.InOrg(o.ID).Model(&Fact{}).Where("contact_id = ?", nia.ID).Count(&facts)
+	s.InOrg(o.ID).Model(&store.Fact{}).Where("contact_id = ?", nia.ID).Count(&facts)
 	if facts != 0 {
 		t.Fatal("a fact about someone the restore dropped is still filed under her id")
 	}
-	var enquiry Enquiry
+	var enquiry store.Enquiry
 	do(s.InOrg(o.ID).Where("email = ?", "nia.okafor@larkmoor.example").First(&enquiry).Error)
 	if enquiry.ContactID != nil || enquiry.Message == "" {
 		t.Fatalf("what she wrote to us should stay, matched to nobody: %+v", enquiry)
@@ -80,12 +81,12 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	}
 
 	// A snapshot from another host can number the same people differently.
-	do(s.DB.Create(&Suggestion{OrgID: o.ID, ContactID: hannah.ID, Field: "phone", Value: "+44 20 7946 0111", By: "agent:scout"}).Error)
+	do(s.DB.Create(&store.Suggestion{OrgID: o.ID, ContactID: hannah.ID, Field: "phone", Value: "+44 20 7946 0111", By: "agent:scout"}).Error)
 	waitsFor := func() (id int64) {
-		s.DB.Model(&Suggestion{}).Where("org_id = ?", o.ID).Limit(1).Pluck("contact_id", &id)
+		s.DB.Model(&store.Suggestion{}).Where("org_id = ?", o.ID).Limit(1).Pluck("contact_id", &id)
 		return id
 	}
-	var rows []Contact
+	var rows []store.Contact
 	do(s.InOrg(o.ID).Find(&rows).Error)
 	for i := range rows {
 		switch rows[i].ID {
@@ -114,7 +115,7 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	do(s.InOrg(o.ID).Find(&rows).Error)
 	for i := range rows {
 		if rows[i].ID == jonas.ID {
-			rows[i].Key, rows[i].Person = "omar-haddad", str("Omar Haddad")
+			rows[i].Key, rows[i].Person = "omar-haddad", store.Str("Omar Haddad")
 		}
 	}
 	if _, err := s.ReplaceContacts(o.ID, rows, nil); err != nil {

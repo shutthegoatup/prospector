@@ -13,6 +13,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/sales"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // postmark posts one webhook record as Postmark does, signed in with a slug and secret.
@@ -117,14 +118,14 @@ func TestPostmarkBouncesAndComplaintsStopEveryCampaign(t *testing.T) {
 	}
 
 	// Neither gets a service notice, which still reaches someone who only unsubscribed.
-	var hannah Contact
+	var hannah store.Contact
 	if err := s.DB.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	notice := must(s.AddCampaign(o.ID, marketing.CampaignIn{Name: "Price change", Kind: KindService, Audience: AudienceCustomers, Subject: "Your price", Body: "It changes in March."}, "Ada Lovelace"))
+	notice := must(s.AddCampaign(o.ID, marketing.CampaignIn{Name: "Price change", Kind: store.KindService, Audience: store.AudienceCustomers, Subject: "Your price", Body: "It changes in March."}, "Ada Lovelace"))
 	got := leftOut(must(s.Audience(o, *notice)))
 	if got["Hannah Pryce"] != "mail to them bounced" || got["Sven Dahl"] != "marked a mail as spam" || got["Tom Ellery"] != "" {
 		t.Errorf("a service notice's audience: %q", got)
@@ -193,11 +194,11 @@ func TestABounceIsKeptBesideWhyTheyAreOnTheList(t *testing.T) {
 	}
 	g := must(s.Gate(s.DB, o))
 	for _, addr := range []string{"first@larkmoor.example", "then@larkmoor.example", "added@larkmoor.example"} {
-		if err := g.WhyFor(KindService, addr, ""); err != marketing.ErrBounced {
+		if err := g.WhyFor(store.KindService, addr, ""); err != marketing.ErrBounced {
 			t.Errorf("a service notice to %s, which bounced: %v", addr, err)
 		}
 	}
-	if err := g.WhyFor(KindService, "spam@larkmoor.example", ""); err != marketing.ErrComplained {
+	if err := g.WhyFor(store.KindService, "spam@larkmoor.example", ""); err != marketing.ErrComplained {
 		t.Errorf("a service notice to someone who complained: %v", err)
 	}
 }

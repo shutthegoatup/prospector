@@ -14,6 +14,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // The Agents page's reads and the keys an owner makes for outside agents.
@@ -40,9 +41,9 @@ func (s apiServer) GetConnect(ctx context.Context, _ api.GetConnectRequestObject
 	return out, nil
 }
 
-func keyOut(k APIKey) api.APIKey {
+func keyOut(k store.APIKey) api.APIKey {
 	return api.APIKey{Id: k.ID, Name: k.Name, Prefix: k.Prefix, Scopes: nonNil(strings.Fields(k.Scopes)), CreatedBy: k.CreatedBy,
-		CreatedAt: k.CreatedAt, LastUsedAt: k.LastUsedAt, Builtin: k.Prefix == builtinPrefix}
+		CreatedAt: k.CreatedAt, LastUsedAt: k.LastUsedAt, Builtin: k.Prefix == store.BuiltinPrefix}
 }
 
 func (s apiServer) ListKeys(ctx context.Context, in api.ListKeysRequestObject) (api.ListKeysResponseObject, error) {
@@ -72,7 +73,7 @@ func (s apiServer) keyByID(org, id int64) (api.APIKey, error) {
 			return keyOut(k), nil
 		}
 	}
-	return api.APIKey{}, missing(nil, "no key %d in this organisation", id)
+	return api.APIKey{}, store.Missing(nil, "no key %d in this organisation", id)
 }
 
 func (s apiServer) CreateKey(ctx context.Context, in api.CreateKeyRequestObject) (api.CreateKeyResponseObject, error) {

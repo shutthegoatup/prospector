@@ -10,6 +10,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // fakeDNS answers from tables; a name missing from one is "no such host".
@@ -75,9 +76,9 @@ func TestAnAgentsAddressOnADomainThatTakesNoMailIsTurnedAway(t *testing.T) {
 	dns := &fakeDNS{mx: map[string][]*net.MX{"corvane.example": {{Host: "mx.corvane.example."}}},
 		fail: map[string]bool{"mx flaky.example": true}}
 	s.DNS = dns
-	must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Corvane Boats"}))
+	must(s.AgentAddCompany(o.ID, store.Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Corvane Boats"}))
 	add := func(name, email string) error {
-		_, err := s.AgentAddContact(o, Actor{Name: "agent:scout"}, prospecting.AddContactIn{Company: "Corvane Boats", Name: name,
+		_, err := s.AgentAddContact(o, store.Actor{Name: "agent:scout"}, prospecting.AddContactIn{Company: "Corvane Boats", Name: name,
 			Email: email, SourceURL: "https://corvane.example/team"})
 		return err
 	}
@@ -86,7 +87,7 @@ func TestAnAgentsAddressOnADomainThatTakesNoMailIsTurnedAway(t *testing.T) {
 		t.Fatalf("a made-up domain: %v", err)
 	}
 	var stored int64
-	s.DB.Model(&Contact{}).Where("person like 'Iris%'").Count(&stored)
+	s.DB.Model(&store.Contact{}).Where("person like 'Iris%'").Count(&stored)
 	if stored != 0 {
 		t.Errorf("the person was stored though their address was turned away")
 	}
@@ -97,7 +98,7 @@ func TestAnAgentsAddressOnADomainThatTakesNoMailIsTurnedAway(t *testing.T) {
 	if err := add("Oskar Lund", "oskar@flaky.example"); err != nil {
 		t.Errorf("a lookup that failed turned the address away: %v", err)
 	}
-	var kept []MailDomain
+	var kept []store.MailDomain
 	s.DB.Order("domain").Find(&kept)
 	if len(kept) != 2 || kept[0].Domain != "corvane-boats.example" || kept[0].TakesMail || kept[1].Domain != "corvane.example" || !kept[1].TakesMail {
 		t.Errorf("kept: %+v, want the two definite answers only", kept)
@@ -107,7 +108,7 @@ func TestAnAgentsAddressOnADomainThatTakesNoMailIsTurnedAway(t *testing.T) {
 	if err := add("Ada Vane", "ada@corvane-boats.example"); err == nil || len(dns.asked) != 0 {
 		t.Errorf("asked DNS again (%v) or let it in (%v)", dns.asked, err)
 	}
-	s.DB.Model(&MailDomain{}).Where("domain = ?", "corvane-boats.example").Update("checked_at", time.Now().Add(-marketing.MailRefusedFor-time.Hour))
+	s.DB.Model(&store.MailDomain{}).Where("domain = ?", "corvane-boats.example").Update("checked_at", time.Now().Add(-marketing.MailRefusedFor-time.Hour))
 	dns.mx["corvane-boats.example"] = []*net.MX{{Host: "mx.corvane-boats.example."}}
 	if err := add("Ada Vane", "ada@corvane-boats.example"); err != nil {
 		t.Errorf("a domain set up since it was last asked about: %v", err)
@@ -122,17 +123,17 @@ func TestAddressesAlreadyHereAreCheckedAFewAtATime(t *testing.T) {
 	person(t, s, o, "Sven Dahl", "Nordkap Boats", "sven@nordkap.example", true)
 	s.CheckSomeMail(context.Background(), 100)
 	var n int64
-	if s.DB.Model(&MailDomain{}).Count(&n); n != 0 {
+	if s.DB.Model(&store.MailDomain{}).Count(&n); n != 0 {
 		t.Fatalf("without a resolver %d domains were kept", n)
 	}
 	dns := &fakeDNS{}
 	s.DNS = dns
 	s.CheckSomeMail(context.Background(), 2)
-	if s.DB.Model(&MailDomain{}).Count(&n); n != 2 {
+	if s.DB.Model(&store.MailDomain{}).Count(&n); n != 2 {
 		t.Errorf("%d domains kept after a round of two", n)
 	}
 	s.CheckSomeMail(context.Background(), 2)
-	if s.DB.Model(&MailDomain{}).Count(&n); n != 3 {
+	if s.DB.Model(&store.MailDomain{}).Count(&n); n != 3 {
 		t.Errorf("%d domains kept, want each of the three once", n)
 	}
 	dns.asked = nil
@@ -145,29 +146,29 @@ func TestAddressesAlreadyHereAreCheckedAFewAtATime(t *testing.T) {
 func TestTheDaysCardWarnsOfADetailThatCantBeRight(t *testing.T) {
 	t.Parallel()
 	now := time.Now()
-	texts := func(c Contact, noMail map[string]bool) string {
+	texts := func(c store.Contact, noMail map[string]bool) string {
 		var out []string
 		for _, b := range badges(c, "Hannah", now, noMail) {
 			out = append(out, b.Text.Error())
 		}
 		return strings.Join(out, " | ")
 	}
-	got := texts(Contact{Key: "hannah", Email: str("hannah@larkmoor.example"), Phone: str("+44 1234 (switchboard)")}, map[string]bool{"larkmoor.example": true})
+	got := texts(store.Contact{Key: "hannah", Email: store.Str("hannah@larkmoor.example"), Phone: store.Str("+44 1234 (switchboard)")}, map[string]bool{"larkmoor.example": true})
 	for _, want := range []string{"larkmoor.example takes no mail", "Phone number isn't one any country uses"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("no %q in %q", want, got)
 		}
 	}
-	got = texts(Contact{Key: "hannah", Email: str("info@larkmoor.example"), Phone: str("+44 20 7946 0958")}, nil)
+	got = texts(store.Contact{Key: "hannah", Email: store.Str("info@larkmoor.example"), Phone: store.Str("+44 20 7946 0958")}, nil)
 	if !strings.Contains(got, "info@larkmoor.example is a shared inbox: ask for Hannah's own") || strings.Contains(got, "Phone number") || strings.Contains(got, "takes no mail") {
 		t.Errorf("a shared inbox and a good number: %q", got)
 	}
 	for _, good := range []string{"+44 (0)20 7946 0958", "+44 20 7946 0958 ext. 214", "+1 212 555 0123 / +1 212 555 0199"} {
-		if got := texts(Contact{Key: "hannah", Phone: str(good)}, nil); strings.Contains(got, "Phone number") {
+		if got := texts(store.Contact{Key: "hannah", Phone: store.Str(good)}, nil); strings.Contains(got, "Phone number") {
 			t.Errorf("%s: %q", good, got)
 		}
 	}
-	if got := texts(Contact{Key: "org:larkmoor", Email: str("info@larkmoor.example"), Phone: str("020 7946 0958")}, nil); strings.Contains(got, "shared inbox") || strings.Contains(got, "Phone number") {
+	if got := texts(store.Contact{Key: "org:larkmoor", Email: store.Str("info@larkmoor.example"), Phone: store.Str("020 7946 0958")}, nil); strings.Contains(got, "shared inbox") || strings.Contains(got, "Phone number") {
 		t.Errorf("a company's own inbox, or a number without a country code: %q", got)
 	}
 }
@@ -177,14 +178,14 @@ func TestACampaignLeavesOutAnAddressWhoseDomainTakesNoMail(t *testing.T) {
 	s, o, _, _ := signedIn(t)
 	person(t, s, o, "Hannah Pryce", "Larkmoor Yachts", "hannah@larkmoor.example", true)
 	person(t, s, o, "Sven Dahl", "Nordkap Boats", "sven@nordkap.example", true)
-	s.DB.Create(&MailDomain{Domain: "nordkap.example", CheckedAt: time.Now()})
+	s.DB.Create(&store.MailDomain{Domain: "nordkap.example", CheckedAt: time.Now()})
 	c := must(s.AddCampaign(o.ID, marketing.CampaignIn{Name: "Spring price list", Subject: "Our spring prices", Body: "Hello"}, "Ada Lovelace"))
 	got := leftOut(must(s.Audience(o, *c)))
 	if got["Hannah Pryce"] != "" || got["Sven Dahl"] != "its domain takes no mail" {
 		t.Errorf("left out: %+v", got)
 	}
 	// An answer gone stale no longer counts against them, and asking again replaces it.
-	s.DB.Model(&MailDomain{}).Where("domain = ?", "nordkap.example").Update("checked_at", time.Now().Add(-marketing.MailRefusedFor-time.Hour))
+	s.DB.Model(&store.MailDomain{}).Where("domain = ?", "nordkap.example").Update("checked_at", time.Now().Add(-marketing.MailRefusedFor-time.Hour))
 	if got := leftOut(must(s.Audience(o, *c))); got["Sven Dahl"] != "" {
 		t.Errorf("a stale answer left them out: %q", got["Sven Dahl"])
 	}
@@ -192,7 +193,7 @@ func TestACampaignLeavesOutAnAddressWhoseDomainTakesNoMail(t *testing.T) {
 	if s.TakesMail(context.Background(), "nordkap.example") != marketing.MailTaken {
 		t.Error("asking again didn't find the mail server")
 	}
-	var kept MailDomain
+	var kept store.MailDomain
 	if s.DB.Where("domain = ?", "nordkap.example").First(&kept); !kept.TakesMail {
 		t.Errorf("the stored answer wasn't replaced: %+v", kept)
 	}
@@ -202,13 +203,13 @@ func TestErasingSomeoneForgetsWhatWasAskedAboutTheirDomain(t *testing.T) {
 	t.Parallel()
 	s, o, _, _ := signedIn(t)
 	p := person(t, s, o, "Hannah Pryce", "Larkmoor Yachts", "hannah@pryce.example", true)
-	s.DB.Create(&MailDomain{Domain: "pryce.example", TakesMail: true, CheckedAt: time.Now()})
-	s.DB.Create(&MailDomain{Domain: "larkmoor.example", TakesMail: true, CheckedAt: time.Now()})
+	s.DB.Create(&store.MailDomain{Domain: "pryce.example", TakesMail: true, CheckedAt: time.Now()})
+	s.DB.Create(&store.MailDomain{Domain: "larkmoor.example", TakesMail: true, CheckedAt: time.Now()})
 	if err := s.ErasePerson(o.ID, p.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	var left []string
-	s.DB.Model(&MailDomain{}).Pluck("domain", &left)
+	s.DB.Model(&store.MailDomain{}).Pluck("domain", &left)
 	if len(left) != 1 || left[0] != "larkmoor.example" {
 		t.Errorf("kept after the erasure: %v", left)
 	}

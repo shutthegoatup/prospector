@@ -9,9 +9,10 @@ import (
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
-func enricherOut(s *Store, e Enricher, now time.Time) api.Enricher {
+func enricherOut(s *Store, e store.Enricher, now time.Time) api.Enricher {
 	var fields []string
 	if v := prospecting.Vendors[e.Kind]; v != nil {
 		fields = v.Fields()
@@ -69,7 +70,7 @@ func (s apiServer) EnrichContact(ctx context.Context, in api.EnrichContactReques
 	if err != nil {
 		return nil, err
 	}
-	who := Actor{Name: q.Actor()}
+	who := store.Actor{Name: q.Actor()}
 	if q.Key != nil {
 		who.KeyID = q.Key.ID
 	}

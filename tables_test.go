@@ -10,6 +10,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/privacy"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func tableOf(t *testing.T, s *Store, model any) *schema.Schema {
@@ -154,7 +155,7 @@ func TestWhateverPointsAtAPersonGoesWhenTheyDo(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	add := func(name string) *Contact {
+	add := func(name string) *store.Contact {
 		return must(s.QuickAddPerson(o, crm.QuickAdd{Name: name, Company: "Larkmoor"}, "Nia"))
 	}
 
@@ -172,7 +173,7 @@ func TestWhateverPointsAtAPersonGoesWhenTheyDo(t *testing.T) {
 
 	stays, dropped := add("Bram Osei"), add("Cleo Marsh")
 	left = pointingAt(t, s, o.ID, dropped.ID)
-	if _, err := s.ReplaceContacts(o.ID, []Contact{*stays}, nil); err != nil {
+	if _, err := s.ReplaceContacts(o.ID, []store.Contact{*stays}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if still := left(); len(still) > 0 {

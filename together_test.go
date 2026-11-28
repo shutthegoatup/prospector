@@ -9,6 +9,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
@@ -52,7 +53,9 @@ func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout := func(i int) Actor { return Actor{Name: fmt.Sprintf("agent:scout-%d", i), KeyID: int64(i + 1)} }
+	scout := func(i int) store.Actor {
+		return store.Actor{Name: fmt.Sprintf("agent:scout-%d", i), KeyID: int64(i + 1)}
+	}
 	task := must(s.CreateTask(o.ID, "", "Find makers of garden rooms", "Nia"))
 
 	together(t, atOnce, func(i int) error {
@@ -60,7 +63,7 @@ func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
 		_, err := s.AgentAddCompany(o.ID, scout(i), research.AddCompanyIn{Name: name})
 		return err
 	})
-	if n := count(t, s, &Company{}, "org_id = ?", o.ID); n != 1 {
+	if n := count(t, s, &store.Company{}, "org_id = ?", o.ID); n != 1 {
 		t.Fatalf("one company added under three spellings at once became %d", n)
 	}
 
@@ -68,16 +71,16 @@ func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
 		_, err := s.AgentAddCompany(o.ID, scout(i), research.AddCompanyIn{Name: fmt.Sprintf("Fenwick Rooms %d", i), Domain: "fenwick.example"})
 		return err
 	})
-	if n := count(t, s, &Company{}, "org_id = ? and domain = ?", o.ID, "fenwick.example"); n != 1 {
+	if n := count(t, s, &store.Company{}, "org_id = ? and domain = ?", o.ID, "fenwick.example"); n != 1 {
 		t.Fatalf("one website added under %d names at once became %d companies", atOnce, n)
 	}
 
-	var before Company
+	var before store.Company
 	if err := s.InOrg(o.ID).Where("lower(name) = ?", "larkmoor").First(&before).Error; err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		var after Company
+		var after store.Company
 		if s.DB.First(&after, before.ID); !after.UpdatedAt.Equal(before.UpdatedAt) {
 			t.Errorf("adding to a company counted as changing it: updated %v, was %v", after.UpdatedAt, before.UpdatedAt)
 		}
@@ -88,7 +91,7 @@ func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
 			FactIn: research.FactIn{Field: "press", Value: "Opened a second workshop", SourceURL: "https://larkmoor.example/news"}})
 		return err
 	})
-	if n := count(t, s, &Fact{}, "org_id = ?", o.ID); n != 1 {
+	if n := count(t, s, &store.Fact{}, "org_id = ?", o.ID); n != 1 {
 		t.Fatalf("one fact added %d times at once was stored %d times", atOnce, n)
 	}
 
@@ -97,12 +100,12 @@ func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
 			Email: "ada.vale@larkmoor.example", SourceURL: "https://larkmoor.example/team", Task: task.ID})
 		return err
 	})
-	if n := count(t, s, &Contact{}, "org_id = ? and key not like 'org:%'", o.ID); n != 1 {
+	if n := count(t, s, &store.Contact{}, "org_id = ? and key not like 'org:%'", o.ID); n != 1 {
 		t.Fatalf("one person suggested %d times at once became %d contacts", atOnce, n)
 	}
 
 	// Every agent after the first found the fact already here, which links it to the task once.
-	if n := count(t, s, &Event{}, "org_id = ? and task_id = ? and action = 'task:match' and contact_id = 0", o.ID, task.ID); n > 1 {
+	if n := count(t, s, &store.Event{}, "org_id = ? and task_id = ? and action = 'task:match' and contact_id = 0", o.ID, task.ID); n > 1 {
 		t.Fatalf("the company was linked to the task %d times", n)
 	}
 }
@@ -112,14 +115,14 @@ func TestTheDatabaseKeepsACompanyNameToOneSpelling(t *testing.T) {
 	// It drops the index, so on a database no other test will borrow.
 	s := ownStore(t)
 	o := mustOrg(t, s, "alpha")
-	if err := s.DB.Create(&Company{OrgID: o.ID, Name: "Larkmoor", Stage: prospecting.CompanyReview}).Error; err != nil {
+	if err := s.DB.Create(&store.Company{OrgID: o.ID, Name: "Larkmoor", Stage: prospecting.CompanyReview}).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DB.Create(&Company{OrgID: o.ID, Name: "LARKMOOR", Stage: prospecting.CompanyReview}).Error; err == nil {
+	if err := s.DB.Create(&store.Company{OrgID: o.ID, Name: "LARKMOOR", Stage: prospecting.CompanyReview}).Error; err == nil {
 		t.Fatal("a second company with the same name in other capitals was stored")
 	}
 	other := mustOrg(t, s, "beta")
-	if err := s.DB.Create(&Company{OrgID: other.ID, Name: "LARKMOOR", Stage: prospecting.CompanyReview}).Error; err != nil {
+	if err := s.DB.Create(&store.Company{OrgID: other.ID, Name: "LARKMOOR", Stage: prospecting.CompanyReview}).Error; err != nil {
 		t.Fatalf("another organisation's company of the same name: %v", err)
 	}
 
@@ -127,12 +130,12 @@ func TestTheDatabaseKeepsACompanyNameToOneSpelling(t *testing.T) {
 	if err := s.DB.Exec("drop index idx_companies_org_name_folded").Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DB.Create(&Company{OrgID: o.ID, Name: "LARKMOOR", Stage: prospecting.CompanyReview}).Error; err != nil {
+	if err := s.DB.Create(&store.Company{OrgID: o.ID, Name: "LARKMOOR", Stage: prospecting.CompanyReview}).Error; err != nil {
 		t.Fatal(err)
 	}
 	s.oneNameWhateverItsCapitals()
-	got := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "larkmoor"}))
-	if !got.Existed || count(t, s, &Company{}, "org_id = ?", o.ID) != 2 {
+	got := must(s.AgentAddCompany(o.ID, store.Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "larkmoor"}))
+	if !got.Existed || count(t, s, &store.Company{}, "org_id = ?", o.ID) != 2 {
 		t.Fatalf("with the index unbuilt, the look-up should still find the company: %+v", got)
 	}
 }
@@ -145,7 +148,7 @@ func TestAnEnquirySentTwiceAtOnceIsKeptOnce(t *testing.T) {
 		_, err := s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "demo", Name: "Ada Vale", Email: "ada.vale@larkmoor.example", Message: "Could you show us?"})
 		return err
 	})
-	if n := count(t, s, &Enquiry{}, "org_id = ?", o.ID); n != 1 {
+	if n := count(t, s, &store.Enquiry{}, "org_id = ?", o.ID); n != 1 {
 		t.Fatalf("a form that sent one enquiry %d times at once left %d", atOnce, n)
 	}
 }
@@ -156,7 +159,7 @@ func TestAnAgentDraftingDuringAnEditLeavesThePersonsWords(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	agent := Actor{Name: "agent:scout", KeyID: 1}
+	agent := store.Actor{Name: "agent:scout", KeyID: 1}
 	for round := range 20 {
 		p := must(s.QuickAddPerson(o, crm.QuickAdd{Name: fmt.Sprintf("Person %d", round), Company: "Larkmoor"}, "Nia"))
 		together(t, 2, func(i int) error {
@@ -170,12 +173,12 @@ func TestAnAgentDraftingDuringAnEditLeavesThePersonsWords(t *testing.T) {
 			}
 			return nil
 		})
-		var got Contact
+		var got store.Contact
 		if err := s.DB.First(&got, p.ID).Error; err != nil {
 			t.Fatal(err)
 		}
-		if deref(got.Body) != "Nia's own words" {
-			t.Fatalf("round %d: an agent's draft replaced what a person had just written: %q", round, deref(got.Body))
+		if store.Deref(got.Body) != "Nia's own words" {
+			t.Fatalf("round %d: an agent's draft replaced what a person had just written: %q", round, store.Deref(got.Body))
 		}
 	}
 }

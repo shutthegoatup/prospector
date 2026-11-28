@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // fakeWeb is a SearXNG instance and the pages its results point to.
@@ -188,7 +190,7 @@ func TestAnAgentSearchesAndReadsTheWebWithNoPaidService(t *testing.T) {
 	}
 
 	// Without an instance it can still read pages, but has no search to offer.
-	if names := toolNames(webTools(&Agent{})); names != fetchPageTool {
+	if names := toolNames(webTools(&store.Agent{})); names != fetchPageTool {
 		t.Fatalf("an agent with no search: %s", names)
 	}
 }
@@ -234,8 +236,8 @@ func TestAToolServersWebSearchIsntTakenOver(t *testing.T) {
 	}
 	ext := must(mcp.NewClient(&mcp.Implementation{Name: "test", Version: "1"}, nil).Connect(context.Background(), clientSide, nil))
 	defer ext.Close()
-	agent := &Agent{}
-	ts := &turnState{app: &App{}, run: &AgentRun{}, agent: agent, ext: ext, seen: map[string]bool{},
+	agent := &store.Agent{}
+	ts := &turnState{app: &App{}, run: &store.AgentRun{}, agent: agent, ext: ext, seen: map[string]bool{},
 		offered: map[string]bool{webSearchTool: true}, builtin: map[string]bool{}}
 	for _, d := range webTools(agent) {
 		ts.builtin[d.Function.Name] = true

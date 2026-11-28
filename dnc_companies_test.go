@@ -9,11 +9,12 @@ import (
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestTheNeverContactListCoversACompanyByItsDomain(t *testing.T) {
 	t.Parallel()
-	set := OrgSettings{NeverContact: "nordkap.example, ines@larkmoor.example\nhttps://www.linkedin.com/in/li-never, https://halvard.example/"}
+	set := store.OrgSettings{NeverContact: "nordkap.example, ines@larkmoor.example\nhttps://www.linkedin.com/in/li-never, https://halvard.example/"}
 	for domain, want := range map[string]bool{
 		"nordkap.example": true, "shop.nordkap.example": true, "https://www.nordkap.example/": true, "halvard.example": true,
 		"larkmoor.example": false, "notnordkap.example": false, "": false, "linkedin.com": false,
@@ -34,7 +35,7 @@ func TestANeverContactCompanyIsKeptButLeftOut(t *testing.T) {
 		t.Fatal(err)
 	}
 	task := must(s.CreateTask(o.ID, "", "Boat makers.", "Ada Lovelace"))
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	nordkap := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Nordkap Boats", Domain: "nordkap.example", Task: task.ID,
 		Facts: []research.FactIn{{Field: "size", Value: "60 staff", SourceURL: "https://nordkap.example/about"}}}))
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Halvard Marine", Domain: "halvard.example", Task: task.ID}))
@@ -83,8 +84,8 @@ func TestANeverContactCompanyIsKeptButLeftOut(t *testing.T) {
 func TestANeverContactCompanyIsLeftOutOfAnOfferingsSearchToo(t *testing.T) {
 	t.Parallel()
 	s, o, srv, ada := signedIn(t)
-	scout := Actor{Name: "agent:scout", KeyID: 1}
-	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO"}, "Ada"))
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
+	cto := must(s.AddOffering(o.ID, store.Offering{Name: "Interim CTO"}, "Ada"))
 	belair := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Belair Kitchens", Domain: "belair.example"}))
 	if err := s.SetCompanyStage(o.ID, belair.ID, prospecting.CompanyQualified, "", "Ada Lovelace"); err != nil {
 		t.Fatal(err)

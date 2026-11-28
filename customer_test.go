@@ -15,6 +15,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 var customerLink = regexp.MustCompile(regexp.QuoteMeta(testSite) + `(/c/[A-Za-z0-9_-]+)`)
@@ -52,7 +53,7 @@ func as(t *testing.T, c *http.Client, method, u string) (*http.Response, string)
 // ageCustomerLinks makes every link look as if it was mailed long enough ago for another to go.
 func ageCustomerLinks(t *testing.T, s *Store) {
 	t.Helper()
-	if err := s.DB.Model(&CustomerLink{}).Where("1 = 1").Update("created_at", time.Now().Add(-2*onboarding.CustomerLinkGap)).Error; err != nil {
+	if err := s.DB.Model(&store.CustomerLink{}).Where("1 = 1").Update("created_at", time.Now().Add(-2*onboarding.CustomerLinkGap)).Error; err != nil {
 		t.Fatal(err)
 	}
 }
@@ -68,7 +69,7 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	noEmail := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Tom Ellery", Company: "Larkmoor Yachts"}, "Ada Lovelace"))
 	elsewhere := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Sven Dahl", Company: "Nordkap Boats", Email: "sven@nordkap.example"}, "Ada Lovelace"))
-	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Name: "Leith site", Start: today()}, "Ada Lovelace"))
+	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Name: "Leith site", Start: store.Today()}, "Ada Lovelace"))
 	invite := func(contact int64) (int, string) {
 		return call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": contact})
 	}
@@ -166,7 +167,7 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 	}
 
 	// What a member marks shows on the customer's page.
-	row := must(s.Onboardings(o.ID, 0, today()))[0]
+	row := must(s.Onboardings(o.ID, 0, store.Today()))[0]
 	if err := s.SetOnboardingStep(o.ID, row.Steps[0].ID, "done", "yes", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +210,7 @@ func TestACustomerOpensTheirStepsFromAnEmailedLink(t *testing.T) {
 		t.Error("the page outlived its onboarding")
 	}
 	var left int64
-	for _, table := range []any{&CustomerGrant{}, &CustomerLink{}, &CustomerSession{}} {
+	for _, table := range []any{&store.CustomerGrant{}, &store.CustomerLink{}, &store.CustomerSession{}} {
 		if err := s.DB.Model(table).Where("org_id = ?", o.ID).Count(&left).Error; err != nil || left != 0 {
 			t.Errorf("removing the onboarding left %d rows of %T (%v)", left, table, err)
 		}
@@ -225,7 +226,7 @@ func TestErasingAPersonClosesTheirPage(t *testing.T) {
 		t.Fatal(err)
 	}
 	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
-	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
+	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: store.Today()}, "Ada Lovelace"))
 	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": hannah.ID}); code != http.StatusNoContent {
 		t.Fatalf("inviting: %d %s", code, body)
 	}
@@ -244,7 +245,7 @@ func TestErasingAPersonClosesTheirPage(t *testing.T) {
 		t.Error("an erased person's browser still has their page")
 	}
 	var left int64
-	if err := s.DB.Model(&CustomerGrant{}).Where("org_id = ?", o.ID).Count(&left).Error; err != nil || left != 0 {
+	if err := s.DB.Model(&store.CustomerGrant{}).Where("org_id = ?", o.ID).Count(&left).Error; err != nil || left != 0 {
 		t.Errorf("erasing them left %d records of their access (%v)", left, err)
 	}
 }
@@ -259,32 +260,32 @@ func TestACustomersLinkAndBrowserRunOut(t *testing.T) {
 		t.Fatal(err)
 	}
 	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
-	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
+	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: store.Today()}, "Ada Lovelace"))
 	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": hannah.ID}); code != http.StatusNoContent {
 		t.Fatalf("inviting: %d %s", code, body)
 	}
 	link := srv.URL + customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1]
-	if err := s.DB.Model(&CustomerLink{}).Where("1 = 1").Update("expires_at", time.Now().Add(-time.Minute)).Error; err != nil {
+	if err := s.DB.Model(&store.CustomerLink{}).Where("1 = 1").Update("expires_at", time.Now().Add(-time.Minute)).Error; err != nil {
 		t.Fatal(err)
 	}
 	outsider := newMailClient()
 	if _, page := as(t, outsider, "POST", link); served(t, page).State != "again" || strings.Contains(page, "product files") {
 		t.Errorf("a link past its seven days: %.200s", page)
 	}
-	if err := s.DB.Model(&CustomerLink{}).Where("1 = 1").Update("expires_at", time.Now().Add(time.Hour)).Error; err != nil {
+	if err := s.DB.Model(&store.CustomerLink{}).Where("1 = 1").Update("expires_at", time.Now().Add(time.Hour)).Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, page := as(t, outsider, "POST", link); !strings.Contains(page, "Send your product files") {
 		t.Fatalf("opening the page: %.200s", page)
 	}
-	if err := s.DB.Model(&CustomerSession{}).Where("1 = 1").Update("expires_at", time.Now().Add(-time.Minute)).Error; err != nil {
+	if err := s.DB.Model(&store.CustomerSession{}).Where("1 = 1").Update("expires_at", time.Now().Add(-time.Minute)).Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, page := as(t, outsider, "GET", srv.URL+"/c"); served(t, page).State != "none" {
 		t.Error("a browser past its thirty days still has the page")
 	}
 	// Leaving closes it in that browser.
-	if err := s.DB.Model(&CustomerSession{}).Where("1 = 1").Update("expires_at", time.Now().Add(time.Hour)).Error; err != nil {
+	if err := s.DB.Model(&store.CustomerSession{}).Where("1 = 1").Update("expires_at", time.Now().Add(time.Hour)).Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, page := as(t, outsider, "GET", srv.URL+"/c"); !strings.Contains(page, "Send your product files") {
@@ -294,7 +295,7 @@ func TestACustomersLinkAndBrowserRunOut(t *testing.T) {
 		t.Errorf("after closing the page in this browser: %.200s", page)
 	}
 	var sessions int64
-	if err := s.DB.Model(&CustomerSession{}).Count(&sessions).Error; err != nil || sessions != 0 {
+	if err := s.DB.Model(&store.CustomerSession{}).Count(&sessions).Error; err != nil || sessions != 0 {
 		t.Errorf("closing the page left %d browsers on record (%v)", sessions, err)
 	}
 }
@@ -309,7 +310,7 @@ func TestNobodyIsInvitedWithoutMail(t *testing.T) {
 		t.Fatal(err)
 	}
 	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
-	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
+	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: store.Today()}, "Ada Lovelace"))
 	code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": hannah.ID})
 	if code < 300 || !strings.Contains(body, "mail isn't set up") {
 		t.Errorf("inviting with no mail server: %d %s", code, body)
@@ -334,7 +335,7 @@ func TestACustomersPageClosesWhenTheyNoLongerQualify(t *testing.T) {
 	}
 	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	other := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Sven Dahl", Company: "Nordkap Boats", Email: "sven@nordkap.example"}, "Ada Lovelace"))
-	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
+	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: store.Today()}, "Ada Lovelace"))
 	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": hannah.ID}); code != http.StatusNoContent {
 		t.Fatalf("inviting: %d %s", code, body)
 	}
@@ -349,7 +350,7 @@ func TestACustomersPageClosesWhenTheyNoLongerQualify(t *testing.T) {
 	}
 	set := func(column string, value any) {
 		t.Helper()
-		if err := s.DB.Model(&Contact{}).Where("id = ?", hannah.ID).Update(column, value).Error; err != nil {
+		if err := s.DB.Model(&store.Contact{}).Where("id = ?", hannah.ID).Update(column, value).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -418,20 +419,20 @@ func TestACustomersPageClosesWhenTheyNoLongerQualify(t *testing.T) {
 
 	// A restore that gives them another id takes their page with them, and one that
 	// leaves them out closes it.
-	var kept Contact
+	var kept store.Contact
 	if err := s.DB.First(&kept, hannah.ID).Error; err != nil {
 		t.Fatal(err)
 	}
 	kept.ID = hannah.ID + 500
-	if _, err := s.ReplaceContacts(o.ID, []Contact{kept}, nil); err != nil {
+	if _, err := s.ReplaceContacts(o.ID, []store.Contact{kept}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if grants := must(s.CustomerInvites(o.ID))[ob.ID]; len(grants) != 1 || grants[0].ContactID != kept.ID || !open() {
 		t.Errorf("after a restore that renumbered them: %+v, page open %v", grants, open())
 	}
 	someone := "Someone Else"
-	stranger := Contact{ID: kept.ID + 1, Key: "someone else", File: "restore", Person: &someone}
-	if _, err := s.ReplaceContacts(o.ID, []Contact{stranger}, nil); err != nil {
+	stranger := store.Contact{ID: kept.ID + 1, Key: "someone else", File: "restore", Person: &someone}
+	if _, err := s.ReplaceContacts(o.ID, []store.Contact{stranger}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if grants := must(s.CustomerInvites(o.ID)); len(grants) != 0 || open() {
@@ -451,8 +452,8 @@ func TestACustomerMarksTheirOwnSteps(t *testing.T) {
 	}
 	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	sven := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Sven Dahl", Company: "Nordkap Boats", Email: "sven@nordkap.example"}, "Ada Lovelace"))
-	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
-	other := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *sven.CompanyID, Start: today()}, "Ada Lovelace"))
+	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: store.Today()}, "Ada Lovelace"))
+	other := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *sven.CompanyID, Start: store.Today()}, "Ada Lovelace"))
 	browser := func(onboarding, contact int64) *http.Client {
 		t.Helper()
 		ageCustomerLinks(t, s)
@@ -464,9 +465,9 @@ func TestACustomerMarksTheirOwnSteps(t *testing.T) {
 		return c
 	}
 	theirs, svens := browser(ob.ID, hannah.ID), browser(other.ID, sven.ID)
-	steps := func(onboarding int64) []OnboardingStep {
+	steps := func(onboarding int64) []store.OnboardingStep {
 		t.Helper()
-		for _, row := range must(s.Onboardings(o.ID, 0, today())) {
+		for _, row := range must(s.Onboardings(o.ID, 0, store.Today())) {
 			if row.ID == onboarding {
 				return row.Steps
 			}
@@ -505,8 +506,8 @@ func TestACustomerMarksTheirOwnSteps(t *testing.T) {
 	if len(doneBy) != 1 || doneBy[0] != onboarding.CustomerActor {
 		t.Errorf("the members' page does not say the customer marked it: %v", doneBy)
 	}
-	var entry Event
-	if err := s.DB.Where("org_id = ? and action = ?", o.ID, "onboard:done").Last(&entry).Error; err != nil || entry.ContactID != hannah.ID || entry.User != onboarding.CustomerActor || deref(entry.Value) != "Send your product files" {
+	var entry store.Event
+	if err := s.DB.Where("org_id = ? and action = ?", o.ID, "onboard:done").Last(&entry).Error; err != nil || entry.ContactID != hannah.ID || entry.User != onboarding.CustomerActor || store.Deref(entry.Value) != "Send your product files" {
 		t.Errorf("the history entry: %+v (%v)", entry, err)
 	}
 
@@ -550,7 +551,7 @@ func TestACustomerMarksTheirOwnSteps(t *testing.T) {
 		t.Error("a step was marked after access was withdrawn")
 	}
 	// A member cannot pass themselves off as the customer by taking the name.
-	if name := (&request.Req{User: &User{Name: onboarding.CustomerActor, Email: "ada@alpha.example"}}).Actor(); name == onboarding.CustomerActor {
+	if name := (&request.Req{User: &store.User{Name: onboarding.CustomerActor, Email: "ada@alpha.example"}}).Actor(); name == onboarding.CustomerActor {
 		t.Error("a member named as the customer acts under that name")
 	}
 }
@@ -567,25 +568,25 @@ func TestACustomersMarksKeepTheHistoryHonest(t *testing.T) {
 		t.Fatal(err)
 	}
 	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
-	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
+	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: store.Today()}, "Ada Lovelace"))
 	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": hannah.ID}); code != http.StatusNoContent {
 		t.Fatalf("inviting: %d %s", code, body)
 	}
 	outsider := newMailClient()
 	as(t, outsider, "POST", srv.URL+customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1])
-	row := must(s.Onboardings(o.ID, 0, today()))[0]
+	row := must(s.Onboardings(o.ID, 0, store.Today()))[0]
 	files, credit := row.Steps[0], row.Steps[1]
 	events := func() int64 {
 		t.Helper()
 		var n int64
-		if err := s.DB.Model(&Event{}).Where("org_id = ?", o.ID).Count(&n).Error; err != nil {
+		if err := s.DB.Model(&store.Event{}).Where("org_id = ?", o.ID).Count(&n).Error; err != nil {
 			t.Fatal(err)
 		}
 		return n
 	}
 	done := func() bool {
 		t.Helper()
-		return must(s.Onboardings(o.ID, 0, today()))[0].Steps[0].DoneOn != nil
+		return must(s.Onboardings(o.ID, 0, store.Today()))[0].Steps[0].DoneOn != nil
 	}
 	before := events()
 	press := srv.URL + "/c/steps/" + itoa(files.ID)
@@ -623,7 +624,7 @@ func TestACustomersMarksKeepTheHistoryHonest(t *testing.T) {
 		t.Fatal(err)
 	}
 	var theirs int64
-	if err := s.DB.Model(&Event{}).Where("org_id = ? and contact_id = ?", o.ID, hannah.ID).Count(&theirs).Error; err != nil || theirs != 0 || !done() {
+	if err := s.DB.Model(&store.Event{}).Where("org_id = ? and contact_id = ?", o.ID, hannah.ID).Count(&theirs).Error; err != nil || theirs != 0 || !done() {
 		t.Errorf("after erasing them: %d entries still theirs (%v), done %v", theirs, err, done())
 	}
 }
@@ -643,7 +644,7 @@ func TestTakingBackAMarkRemovesOnlyThatMarksEntry(t *testing.T) {
 	}
 	// Onboardings at one company are made from the same steps, so their names repeat.
 	start := func() int64 {
-		return must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace")).ID
+		return must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: store.Today()}, "Ada Lovelace")).ID
 	}
 	browser := func(onboarding, contact int64) *http.Client {
 		t.Helper()
@@ -655,15 +656,15 @@ func TestTakingBackAMarkRemovesOnlyThatMarksEntry(t *testing.T) {
 		as(t, c, "POST", srv.URL+customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1])
 		return c
 	}
-	step := func(onboarding int64) OnboardingStep {
+	step := func(onboarding int64) store.OnboardingStep {
 		t.Helper()
-		for _, row := range must(s.Onboardings(o.ID, 0, today())) {
+		for _, row := range must(s.Onboardings(o.ID, 0, store.Today())) {
 			if row.ID == onboarding {
 				return row.Steps[0]
 			}
 		}
 		t.Fatal("no such onboarding")
-		return OnboardingStep{}
+		return store.OnboardingStep{}
 	}
 	press := func(c *http.Client, onboarding int64, what string) {
 		t.Helper()
@@ -672,9 +673,9 @@ func TestTakingBackAMarkRemovesOnlyThatMarksEntry(t *testing.T) {
 			t.Fatalf("pressing %s left the step done %v", what, done)
 		}
 	}
-	entries := func() []Event {
+	entries := func() []store.Event {
 		t.Helper()
-		var out []Event
+		var out []store.Event
 		if err := s.DB.Where("org_id = ? and action = ?", o.ID, "onboard:done").Order("id").Find(&out).Error; err != nil {
 			t.Fatal(err)
 		}
@@ -724,24 +725,24 @@ func TestTakingBackAMarkFromBeforeEntriesWereKeptLeavesTheEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
-	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: today()}, "Ada Lovelace"))
+	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Start: store.Today()}, "Ada Lovelace"))
 	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": hannah.ID}); code != http.StatusNoContent {
 		t.Fatalf("inviting: %d %s", code, body)
 	}
 	c := newMailClient()
 	as(t, c, "POST", srv.URL+customerLink.FindStringSubmatch(box.take(t, 1)[0].Body)[1])
-	st := must(s.Onboardings(o.ID, 0, today()))[0].Steps[0]
+	st := must(s.Onboardings(o.ID, 0, store.Today()))[0].Steps[0]
 	as(t, c, "POST", srv.URL+"/c/steps/"+itoa(st.ID)+"/done")
-	if err := s.DB.Model(&OnboardingStep{}).Where("id = ?", st.ID).Update("done_entry", 0).Error; err != nil {
+	if err := s.DB.Model(&store.OnboardingStep{}).Where("id = ?", st.ID).Update("done_entry", 0).Error; err != nil {
 		t.Fatal(err)
 	}
 
 	as(t, c, "POST", srv.URL+"/c/steps/"+itoa(st.ID)+"/undone")
 	var n int64
-	if err := s.DB.Model(&Event{}).Where("org_id = ? and action = ?", o.ID, "onboard:done").Count(&n).Error; err != nil || n != 1 {
+	if err := s.DB.Model(&store.Event{}).Where("org_id = ? and action = ?", o.ID, "onboard:done").Count(&n).Error; err != nil || n != 1 {
 		t.Errorf("after taking back an old mark: %d entries (%v)", n, err)
 	}
-	if got := must(s.Onboardings(o.ID, 0, today()))[0].Steps[0]; got.DoneOn != nil {
+	if got := must(s.Onboardings(o.ID, 0, store.Today()))[0].Steps[0]; got.DoneOn != nil {
 		t.Errorf("the old mark wasn't taken back: %+v", got)
 	}
 }

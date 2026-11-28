@@ -11,6 +11,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 type todayPage struct {
@@ -56,7 +57,7 @@ func TestTodaysQueueIsInTheAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	added := time.Now().AddDate(0, 0, -10).Format("2006-01-02")
-	if err := s.AgentMark(o.ID, Actor{Name: "agent:scout"}, research.MarkIn{ContactID: tobias.ID, Step: "linkedin", Date: added}); err != nil {
+	if err := s.AgentMark(o.ID, store.Actor{Name: "agent:scout"}, research.MarkIn{ContactID: tobias.ID, Step: "linkedin", Date: added}); err != nil {
 		t.Fatal(err)
 	}
 	iris := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Iris Vane", Company: "Corvane Boats"}, "Ada Lovelace"))
@@ -127,7 +128,7 @@ func TestTodaysQueueIsInTheAPI(t *testing.T) {
 			t.Fatal("a marked add is still due")
 		}
 	}
-	var e Event
+	var e store.Event
 	if err := s.DB.Where("contact_id = ? and action = ?", hannah.ID, "mark:linkedin").First(&e).Error; err != nil || e.User != "Ada Lovelace" || e.KeyID != 0 {
 		t.Fatalf("the mark's event: %+v %v", e, err)
 	}
@@ -177,13 +178,13 @@ func TestMarkingIsRefusedToWhoeverMayNot(t *testing.T) {
 	if code, body := asKey(t, "POST", marks, writer, map[string]any{"contact_id": c.ID, "step": "linkedin", "date": day, "note": "Ada said she sent it"}); code != http.StatusOK {
 		t.Fatalf("a key marking: %d %s", code, body)
 	}
-	var e Event
-	if err := s.DB.Where("contact_id = ? and action = ?", c.ID, "mark:linkedin").First(&e).Error; err != nil || e.User != "agent:scout" || e.KeyID != k.ID || deref(e.Value) != day+" · Ada said she sent it" {
+	var e store.Event
+	if err := s.DB.Where("contact_id = ? and action = ?", c.ID, "mark:linkedin").First(&e).Error; err != nil || e.User != "agent:scout" || e.KeyID != k.ID || store.Deref(e.Value) != day+" · Ada said she sent it" {
 		t.Fatalf("a key's mark should be the agent's, with its date and note: %+v %v", e, err)
 	}
 }
 
-func apiKey(t *testing.T, s *Store, o *Org, name string, scopes ...string) (string, *APIKey) {
+func apiKey(t *testing.T, s *Store, o *store.Org, name string, scopes ...string) (string, *store.APIKey) {
 	t.Helper()
 	secret, k, err := s.CreateKey(o.ID, name, scopes, "test")
 	if err != nil {

@@ -10,10 +10,11 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
-func repliedPerson(t *testing.T, s *Store, o *Org, name string) *Contact {
+func repliedPerson(t *testing.T, s *Store, o *store.Org, name string) *store.Contact {
 	t.Helper()
 	c := must(s.QuickAddPerson(o, crm.QuickAdd{Name: name, Company: "Larkmoor Yachts"}, "Ada Lovelace"))
 	if err := s.Mark(o.ID, c.ID, "replied", time.Now().Format("2006-01-02"), "Ada Lovelace"); err != nil {
@@ -25,20 +26,20 @@ func repliedPerson(t *testing.T, s *Store, o *Org, name string) *Contact {
 func TestMoneyIsReadAndWritten(t *testing.T) {
 	t.Parallel()
 	for text, want := range map[string]int64{"14,000": 1400000, "£14000.5": 1400050, "14 000.50": 1400050, "": 0, ".5": 50, "0": 0} {
-		if got, err := parseMoney(text); err != nil || got != want {
+		if got, err := store.ParseMoney(text); err != nil || got != want {
 			t.Errorf("%q read as %d (%v), want %d", text, got, err, want)
 		}
 	}
 	for _, currency := range []string{"GBP", "EUR", "USD", "CHF", "SEK"} {
 		for _, amount := range []int64{1, 99, 1400000, 140050, 100000000} {
-			shown := formatMoney(amount, currency)
-			if got, err := parseMoney(shown); err != nil || got != amount {
+			shown := store.FormatMoney(amount, currency)
+			if got, err := store.ParseMoney(shown); err != nil || got != amount {
 				t.Errorf("%q, as a card shows it, reads back as %d (%v), want %d", shown, got, err, amount)
 			}
 		}
 	}
 	for _, text := range []string{"-5", "a lot", "1.234", ".", "1e9", "12345678901234", "CHFS 5"} {
-		if got, err := parseMoney(text); err == nil {
+		if got, err := store.ParseMoney(text); err == nil {
 			t.Errorf("%q was read as %d", text, got)
 		}
 	}
@@ -46,7 +47,7 @@ func TestMoneyIsReadAndWritten(t *testing.T) {
 		amount   int64
 		currency string
 	}{"£14,000": {1400000, "GBP"}, "€1,400.50": {140050, "EUR"}, "CHF 999": {99900, "CHF"}, "$1,000,000": {100000000, "USD"}} {
-		if got := formatMoney(in.amount, in.currency); got != want {
+		if got := store.FormatMoney(in.amount, in.currency); got != want {
 			t.Errorf("%d %s written as %q, want %q", in.amount, in.currency, got, want)
 		}
 	}
@@ -81,17 +82,17 @@ func TestADealIsValuedOnceSomeoneReplies(t *testing.T) {
 		}
 	}
 	d, ok := must(s.Deals(o.ID))[c.ID]
-	if !ok || d.Amount != 1400050 || d.Currency != "GBP" || deref(d.CloseDate) != "2026-12-12" || d.Kind != "renewal" || d.Owner != "Ada Lovelace" {
+	if !ok || d.Amount != 1400050 || d.Currency != "GBP" || store.Deref(d.CloseDate) != "2026-12-12" || d.Kind != "renewal" || d.Owner != "Ada Lovelace" {
 		t.Fatalf("the deal holds %+v", d)
 	}
 	if got := d.Value(); got != "£14,000.50" {
 		t.Errorf("the deal's value reads %q", got)
 	}
-	var said []Event
+	var said []store.Event
 	if err := s.DB.Where("org_id = ? and contact_id = ? and action = ?", o.ID, c.ID, "deal:amount").Find(&said).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(said) != 1 || deref(said[0].Value) != "£14,000.50" || said[0].User != "Ada Lovelace" {
+	if len(said) != 1 || store.Deref(said[0].Value) != "£14,000.50" || said[0].User != "Ada Lovelace" {
 		t.Errorf("the history of the value: %+v", said)
 	}
 
@@ -132,7 +133,7 @@ func TestADealIsInBothExportsAndGoesWithItsPerson(t *testing.T) {
 	if deals := must(s.Deals(o.ID)); len(deals) != 0 {
 		t.Errorf("erasing the person left their deal: %+v", deals)
 	}
-	var said []Event
+	var said []store.Event
 	if err := s.DB.Where("org_id = ? and action = ?", o.ID, "deal:amount").Find(&said).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +147,7 @@ func TestADealKeepsItsCurrencyWhenTheSettingChanges(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	c := repliedPerson(t, s, o, "Hannah Pryce")
-	set := func(value string) Deal {
+	set := func(value string) store.Deal {
 		t.Helper()
 		if err := s.Update(o.ID, c.ID, "deal_amount", value, "Ada Lovelace"); err != nil {
 			t.Fatal(err)
@@ -165,7 +166,7 @@ func TestADealKeepsItsCurrencyWhenTheSettingChanges(t *testing.T) {
 	if d := set("9,000"); d.Value() != "€9,000" {
 		t.Errorf("a deal cleared and valued afresh reads %q, not the new currency", d.Value())
 	}
-	var cleared []Event
+	var cleared []store.Event
 	if err := s.DB.Where("org_id = ? and action = ? and value is null", o.ID, "deal:amount").Find(&cleared).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -179,17 +180,17 @@ func TestADealFollowsItsPersonThroughARestore(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	stays, goes := repliedPerson(t, s, o, "Hannah Pryce"), repliedPerson(t, s, o, "Tom Ellery")
-	for _, c := range []*Contact{stays, goes} {
+	for _, c := range []*store.Contact{stays, goes} {
 		if err := s.Update(o.ID, c.ID, "deal_amount", "20000", "Ada Lovelace"); err != nil {
 			t.Fatal(err)
 		}
 	}
-	var renumbered Contact
+	var renumbered store.Contact
 	if err := s.DB.First(&renumbered, stays.ID).Error; err != nil {
 		t.Fatal(err)
 	}
 	renumbered.ID = goes.ID + 50
-	if _, err := s.ReplaceContacts(o.ID, []Contact{renumbered}, nil); err != nil {
+	if _, err := s.ReplaceContacts(o.ID, []store.Contact{renumbered}, nil); err != nil {
 		t.Fatal(err)
 	}
 	deals := must(s.Deals(o.ID))
@@ -302,17 +303,17 @@ func TestAnotherDealWithSomeoneInConversation(t *testing.T) {
 	}
 
 	board := must(s.OtherDeals(o.ID))
-	if at := board["proposal"]; len(at) != 1 || at[0].ID != renewal.ID || at[0].Value() != "£9,500" || at[0].NextStep != "Send renewal terms" || displayName(at[0].With) != "Hannah Pryce" {
+	if at := board["proposal"]; len(at) != 1 || at[0].ID != renewal.ID || at[0].Value() != "£9,500" || at[0].NextStep != "Send renewal terms" || store.DisplayName(at[0].With) != "Hannah Pryce" {
 		t.Errorf("the renewal on the board: %+v", board)
 	}
 	if at := board["replied"]; len(at) != 1 || at[0].ID != expansion.ID || !at[0].NeedsNextStep("2026-11-25") {
 		t.Errorf("the expansion on the board: %+v", board)
 	}
-	var said []Event
+	var said []store.Event
 	if err := s.DB.Where("org_id = ? and contact_id = ? and action like ?", o.ID, c.ID, "deal:%").Order("id").Find(&said).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(said) != 7 || said[0].Action != "deal:start" || deref(said[0].Value) != "renewal" || said[4].Action != "deal:next_step" || said[4].Value != nil {
+	if len(said) != 7 || said[0].Action != "deal:start" || store.Deref(said[0].Value) != "renewal" || said[4].Action != "deal:next_step" || said[4].Value != nil {
 		t.Errorf("the history of the two deals: %+v", said)
 	}
 
@@ -363,7 +364,7 @@ func TestAnotherDealWithSomeoneInConversation(t *testing.T) {
 		t.Fatal(err)
 	}
 	var left int64
-	if err := s.DB.Model(&Deal{}).Where("org_id = ?", o.ID).Count(&left).Error; err != nil || left != 0 {
+	if err := s.DB.Model(&store.Deal{}).Where("org_id = ?", o.ID).Count(&left).Error; err != nil || left != 0 {
 		t.Errorf("erasing the person left %d of their deals (%v)", left, err)
 	}
 }
@@ -375,7 +376,7 @@ func TestARenewalIsStartedAndWorkedFromTheBoard(t *testing.T) {
 	if code, body := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/deals", "application/json", map[string]any{"contact": c.ID, "kind": "renewal"}); code != http.StatusCreated {
 		t.Fatalf("starting a renewal: %d %s", code, body)
 	}
-	var renewal Deal
+	var renewal store.Deal
 	if err := s.DB.Where("org_id = ? and seq > 0", o.ID).First(&renewal).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -499,7 +500,7 @@ func TestARobotWorksDealsAndEnquiriesAsItsScopesAllow(t *testing.T) {
 	if code != http.StatusCreated || !strings.Contains(body, `"seq":1`) || !strings.Contains(body, `"kind":"renewal"`) {
 		t.Fatalf("starting another deal: %d %s", code, body)
 	}
-	var second Deal
+	var second store.Deal
 	if err := s.DB.Where("org_id = ? and seq = 1", o.ID).First(&second).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -534,7 +535,7 @@ func TestARobotWorksDealsAndEnquiriesAsItsScopesAllow(t *testing.T) {
 		t.Errorf("starting a deal with no kind: %d %s", code, body)
 	}
 	gone := repliedPerson(t, s, o, "Tom Ellery")
-	if err := s.Mark(o.ID, gone.ID, "declined", today(), "Ada Lovelace"); err != nil {
+	if err := s.Mark(o.ID, gone.ID, "declined", store.Today(), "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	if code, body := asKey(t, "PATCH", base+"contacts/"+itoa(gone.ID)+"/deal", worker, map[string]any{"amount": "5,000"}); code != http.StatusOK || !strings.Contains(body, `"value":"£5,000"`) {

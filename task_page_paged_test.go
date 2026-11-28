@@ -6,31 +6,32 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestATasksPageHasPagesOfEachList(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	task := must(s.CreateTask(o.ID, "", "Find makers of garden rooms", "Nia"))
-	co := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Larkmoor"}))
-	notes := make([]TaskNote, research.TaskNotesPageSize+5)
+	co := must(s.AgentAddCompany(o.ID, store.Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Larkmoor"}))
+	notes := make([]store.TaskNote, research.TaskNotesPageSize+5)
 	for i := range notes {
-		notes[i] = TaskNote{OrgID: o.ID, TaskID: task.ID, CompanyID: co.ID, Actor: "agent:scout", Kind: "next", Text: fmt.Sprint("Left note ", i, ".")}
+		notes[i] = store.TaskNote{OrgID: o.ID, TaskID: task.ID, CompanyID: co.ID, Actor: "agent:scout", Kind: "next", Text: fmt.Sprint("Left note ", i, ".")}
 	}
 	if err := s.DB.CreateInBatches(notes, 50).Error; err != nil {
 		t.Fatal(err)
 	}
-	runs := []AgentRun{{OrgID: o.ID, TaskID: task.ID, AgentName: "Still going", Status: RunWorking, StartedBy: "Nia", StartedAt: time.Now()}}
+	runs := []store.AgentRun{{OrgID: o.ID, TaskID: task.ID, AgentName: "Still going", Status: store.RunWorking, StartedBy: "Nia", StartedAt: time.Now()}}
 	for i := range taskRunsPageSize + 3 {
-		runs = append(runs, AgentRun{OrgID: o.ID, TaskID: task.ID, AgentName: fmt.Sprint("Ended run ", i, "."), Status: "done", StartedBy: "Nia", StartedAt: time.Now()})
+		runs = append(runs, store.AgentRun{OrgID: o.ID, TaskID: task.ID, AgentName: fmt.Sprint("Ended run ", i, "."), Status: "done", StartedBy: "Nia", StartedAt: time.Now()})
 	}
 	if err := s.DB.Create(&runs).Error; err != nil {
 		t.Fatal(err)
 	}
 	start := time.Now().Add(-100 * time.Hour)
-	var events []Event
+	var events []store.Event
 	for i := range taskRunsPageSize + 4 {
-		events = append(events, Event{OrgID: o.ID, TaskID: task.ID, User: fmt.Sprintf("agent:worker%d", i), KeyID: int64(i + 1), Action: "add:fact",
+		events = append(events, store.Event{OrgID: o.ID, TaskID: task.ID, User: fmt.Sprintf("agent:worker%d", i), KeyID: int64(i + 1), Action: "add:fact",
 			At: start.Add(time.Duration(i) * time.Hour)})
 	}
 	if err := s.DB.CreateInBatches(events, 50).Error; err != nil {

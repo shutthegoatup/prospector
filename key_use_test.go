@@ -3,6 +3,8 @@ package main
 import (
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // TestAKeysLastUseIsWrittenOnceAMinute: a key busy all day doesn't turn every read
@@ -17,7 +19,7 @@ func TestAKeysLastUseIsWrittenOnceAMinute(t *testing.T) {
 	}
 	lastUse := func() time.Time {
 		t.Helper()
-		var k APIKey
+		var k store.APIKey
 		if err := s.DB.First(&k, key.ID).Error; err != nil || k.LastUsedAt == nil {
 			t.Fatalf("no last use: %+v %v", k, err)
 		}
@@ -25,7 +27,7 @@ func TestAKeysLastUseIsWrittenOnceAMinute(t *testing.T) {
 	}
 	setLastUse := func(at time.Time) {
 		t.Helper()
-		if err := s.DB.Model(&APIKey{}).Where("id = ?", key.ID).Update("last_used_at", at).Error; err != nil {
+		if err := s.DB.Model(&store.APIKey{}).Where("id = ?", key.ID).Update("last_used_at", at).Error; err != nil {
 			t.Fatal(err)
 		}
 	}

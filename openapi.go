@@ -21,6 +21,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/sales"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/signing"
+	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
@@ -232,7 +233,7 @@ func ownersOnly(scope string) bool {
 
 // agentOut is an agent with its card worked out as the Agents page shows it; all is
 // every agent of the organisation, the ones it could fall back to among them.
-func agentOut(c Agent, all []Agent, lang string) api.Agent {
+func agentOut(c store.Agent, all []store.Agent, lang string) api.Agent {
 	v := agentView(c, all)
 	st := v.State()
 	tools := []api.Tool{}
@@ -247,7 +248,7 @@ func agentOut(c Agent, all []Agent, lang string) api.Agent {
 }
 
 // oneAgentOut is agentOut for an agent read on its own.
-func (s apiServer) oneAgentOut(ctx context.Context, org int64, c Agent) (api.Agent, error) {
+func (s apiServer) oneAgentOut(ctx context.Context, org int64, c store.Agent) (api.Agent, error) {
 	all, err := s.a.s.Agents(org)
 	return agentOut(c, all, request.LanguageFrom(ctx)), err
 }
@@ -268,7 +269,7 @@ func settingsIn(id int64, b *api.AgentSettings) (AgentSettingsIn, error) {
 }
 
 // savedMessage says how a save went, for a person.
-func savedMessage(c *Agent) string {
+func savedMessage(c *store.Agent) string {
 	switch {
 	case c.Problem != "":
 		return c.Name + " saved, but " + c.Problem

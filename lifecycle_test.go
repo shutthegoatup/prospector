@@ -9,11 +9,12 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // everyContact is one contact per combination of the fields a contact's standing is read from.
-func everyContact() []Contact {
-	var out []Contact
+func everyContact() []store.Contact {
+	var out []store.Contact
 	for i := 0; i < 1<<8; i++ {
 		on := func(bit int) bool { return i&(1<<bit) != 0 }
 		// An empty mark counts as set, as it does to "is null" in SQL.
@@ -26,11 +27,11 @@ func everyContact() []Contact {
 			}
 			return &v
 		}
-		c := Contact{Key: fmt.Sprintf("p%03d", i), File: "test", Person: str("Person"), Note: str("Hello"),
+		c := store.Contact{Key: fmt.Sprintf("p%03d", i), File: "test", Person: store.Str("Person"), Note: store.Str("Hello"),
 			Hold: opt(on(0), "2020-01-01"), Replied: opt(on(1), "2020-01-02"), Declined: opt(on(2), "2020-01-03"),
 			EmailSent: opt(on(3), "2020-01-04")}
 		if on(4) {
-			c.Status = ContactSuggested
+			c.Status = store.ContactSuggested
 		}
 		if on(5) {
 			c.Stage = "meeting"
@@ -45,22 +46,22 @@ func everyContact() []Contact {
 
 func TestContactStageNames(t *testing.T) {
 	t.Parallel()
-	d := str("2020-01-01")
+	d := store.Str("2020-01-01")
 	for _, tc := range []struct {
-		c    Contact
+		c    store.Contact
 		want string
 	}{
-		{Contact{}, "not contacted"},
-		{Contact{LinkedinAdded: d}, "in outreach"},
-		{Contact{EmailSent: d}, "in outreach"},
-		{Contact{Called: d}, "in outreach"},
-		{Contact{Accepted: d}, "not contacted"},
-		{Contact{EmailSent: d, Hold: d}, "hold"},
-		{Contact{EmailSent: d, Replied: d}, "replied"},
-		{Contact{Replied: d, Stage: "proposal"}, "proposal"},
-		{Contact{Replied: d, Hold: d}, "replied"},
-		{Contact{Replied: d, Stage: "meeting", Declined: d}, "declined"},
-		{Contact{Status: ContactSuggested, Replied: d, Declined: d}, "suggested"},
+		{store.Contact{}, "not contacted"},
+		{store.Contact{LinkedinAdded: d}, "in outreach"},
+		{store.Contact{EmailSent: d}, "in outreach"},
+		{store.Contact{Called: d}, "in outreach"},
+		{store.Contact{Accepted: d}, "not contacted"},
+		{store.Contact{EmailSent: d, Hold: d}, "hold"},
+		{store.Contact{EmailSent: d, Replied: d}, "replied"},
+		{store.Contact{Replied: d, Stage: "proposal"}, "proposal"},
+		{store.Contact{Replied: d, Hold: d}, "replied"},
+		{store.Contact{Replied: d, Stage: "meeting", Declined: d}, "declined"},
+		{store.Contact{Status: store.ContactSuggested, Replied: d, Declined: d}, "suggested"},
 	} {
 		if got := research.ContactStage(tc.c); got != tc.want {
 			t.Errorf("contactStage(%+v) = %q, want %q", tc.c, got, tc.want)
@@ -70,25 +71,25 @@ func TestContactStageNames(t *testing.T) {
 
 func TestPipelineTakesTheFurthestContact(t *testing.T) {
 	t.Parallel()
-	d := str("2020-01-01")
+	d := store.Str("2020-01-01")
 	for _, tc := range []struct {
 		name   string
-		c      Company
-		people []Contact
+		c      store.Company
+		people []store.Contact
 		want   string
 	}{
-		{"nobody", Company{}, nil, "research"},
-		{"rejected", Company{Stage: prospecting.CompanyRejected}, nil, "rejected"},
-		{"untouched", Company{}, []Contact{{}}, "research"},
-		{"touched", Company{}, []Contact{{Called: d}}, "outreach"},
-		{"rejected but touched", Company{Stage: prospecting.CompanyRejected}, []Contact{{Called: d}}, "outreach"},
-		{"replied", Company{}, []Contact{{Called: d}, {Replied: d}}, "replied"},
-		{"furthest wins", Company{}, []Contact{{Replied: d, Stage: "proposal"}, {Replied: d, Stage: "meeting"}}, "proposal"},
-		{"lost ranks with outreach", Company{}, []Contact{{Replied: d, Stage: "lost"}, {Replied: d}}, "replied"},
-		{"held still counts", Company{}, []Contact{{EmailSent: d, Hold: d}}, "outreach"},
-		{"a reply later declined is no conversation", Company{}, []Contact{{Replied: d, Stage: "meeting", Declined: d}}, "outreach"},
-		{"declined before anyone reached them", Company{Stage: prospecting.CompanyRejected}, []Contact{{Declined: d}}, "rejected"},
-		{"declined beside a live conversation", Company{}, []Contact{{Replied: d, Stage: "proposal", Declined: d}, {Replied: d}}, "replied"},
+		{"nobody", store.Company{}, nil, "research"},
+		{"rejected", store.Company{Stage: prospecting.CompanyRejected}, nil, "rejected"},
+		{"untouched", store.Company{}, []store.Contact{{}}, "research"},
+		{"touched", store.Company{}, []store.Contact{{Called: d}}, "outreach"},
+		{"rejected but touched", store.Company{Stage: prospecting.CompanyRejected}, []store.Contact{{Called: d}}, "outreach"},
+		{"replied", store.Company{}, []store.Contact{{Called: d}, {Replied: d}}, "replied"},
+		{"furthest wins", store.Company{}, []store.Contact{{Replied: d, Stage: "proposal"}, {Replied: d, Stage: "meeting"}}, "proposal"},
+		{"lost ranks with outreach", store.Company{}, []store.Contact{{Replied: d, Stage: "lost"}, {Replied: d}}, "replied"},
+		{"held still counts", store.Company{}, []store.Contact{{EmailSent: d, Hold: d}}, "outreach"},
+		{"a reply later declined is no conversation", store.Company{}, []store.Contact{{Replied: d, Stage: "meeting", Declined: d}}, "outreach"},
+		{"declined before anyone reached them", store.Company{Stage: prospecting.CompanyRejected}, []store.Contact{{Declined: d}}, "rejected"},
+		{"declined beside a live conversation", store.Company{}, []store.Contact{{Replied: d, Stage: "proposal", Declined: d}, {Replied: d}}, "replied"},
 	} {
 		if got := prospecting.Pipeline(tc.c, tc.people); got != tc.want {
 			t.Errorf("%s: pipeline = %q, want %q", tc.name, got, tc.want)
@@ -109,7 +110,7 @@ func TestQueriesAgreeWithPhase(t *testing.T) {
 	if err := s.DB.CreateInBatches(all, 50).Error; err != nil {
 		t.Fatal(err)
 	}
-	keys := func(rows []Contact) []string {
+	keys := func(rows []store.Contact) []string {
 		var out []string
 		for _, r := range rows {
 			out = append(out, r.Key)
@@ -117,12 +118,12 @@ func TestQueriesAgreeWithPhase(t *testing.T) {
 		slices.Sort(out)
 		return out
 	}
-	var wantDue, wantBoard []Contact
+	var wantDue, wantBoard []store.Contact
 	for _, c := range all {
 		if c.Open() {
 			wantDue = append(wantDue, c)
 		}
-		if c.Phase() == PhaseConversation {
+		if c.Phase() == store.PhaseConversation {
 			wantBoard = append(wantBoard, c)
 		}
 	}
@@ -142,7 +143,7 @@ func TestQueriesAgreeWithPhase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var onBoard []Contact
+	var onBoard []store.Contact
 	for stage, list := range board {
 		for _, c := range list {
 			if c.ConversationStage() != stage {
@@ -160,18 +161,18 @@ func TestRejectedCompanysPeopleLeaveTheQueues(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	co := Company{OrgID: o.ID, Name: "Larkmoor", Stage: prospecting.CompanyQualified}
+	co := store.Company{OrgID: o.ID, Name: "Larkmoor", Stage: prospecting.CompanyQualified}
 	if err := s.DB.Create(&co).Error; err != nil {
 		t.Fatal(err)
 	}
-	old := str("2020-01-01")
-	people := []Contact{
-		{OrgID: o.ID, Key: "new", File: "test", Person: str("Hannah Pryce"), Note: str("Hello"), CompanyID: &co.ID},
-		{OrgID: o.ID, Key: "accepted", File: "test", Person: str("Jonas Weber"), LinkedinAdded: old, Accepted: old, CompanyID: &co.ID},
-		{OrgID: o.ID, Key: "call", File: "test", Person: str("Nia Okafor"), Phone: str("+44 20 7946 0000"), CompanyID: &co.ID},
-		{OrgID: o.ID, Key: "email", File: "test", Person: str("Max Muster"), LinkedinAdded: old, CompanyID: &co.ID},
-		{OrgID: o.ID, Key: "followup", File: "test", Person: str("Ines Duarte"), EmailSent: old, CompanyID: &co.ID},
-		{OrgID: o.ID, Key: "elsewhere", File: "test", Person: str("Tomas Reed"), Note: str("Hello")},
+	old := store.Str("2020-01-01")
+	people := []store.Contact{
+		{OrgID: o.ID, Key: "new", File: "test", Person: store.Str("Hannah Pryce"), Note: store.Str("Hello"), CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "accepted", File: "test", Person: store.Str("Jonas Weber"), LinkedinAdded: old, Accepted: old, CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "call", File: "test", Person: store.Str("Nia Okafor"), Phone: store.Str("+44 20 7946 0000"), CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "email", File: "test", Person: store.Str("Max Muster"), LinkedinAdded: old, CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "followup", File: "test", Person: store.Str("Ines Duarte"), EmailSent: old, CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "elsewhere", File: "test", Person: store.Str("Tomas Reed"), Note: store.Str("Hello")},
 	}
 	if err := s.DB.Create(&people).Error; err != nil {
 		t.Fatal(err)
@@ -208,7 +209,7 @@ func TestRejectedCompanysPeopleLeaveTheQueues(t *testing.T) {
 	}
 	listed := *o
 	listed.Settings.NeverContact = "larkmoor.example"
-	if err := s.DB.Model(&Contact{}).Where("key = ?", "new").Update("email", "hannah.pryce@larkmoor.example").Error; err != nil {
+	if err := s.DB.Model(&store.Contact{}).Where("key = ?", "new").Update("email", "hannah.pryce@larkmoor.example").Error; err != nil {
 		t.Fatal(err)
 	}
 	if names := s.NeverContactCovers(&listed); len(names) != 0 {
@@ -229,7 +230,7 @@ func TestStageIsOneOfTheBoardsColumns(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	c := Contact{OrgID: o.ID, Key: "hannah", File: "test", Person: str("Hannah Pryce")}
+	c := store.Contact{OrgID: o.ID, Key: "hannah", File: "test", Person: store.Str("Hannah Pryce")}
 	if err := s.DB.Create(&c).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +243,7 @@ func TestStageIsOneOfTheBoardsColumns(t *testing.T) {
 	if err := s.Update(o.ID, c.ID, "stage", "nearly", "test"); err == nil {
 		t.Fatal("a stage the board has no column for was saved")
 	}
-	for _, st := range Stages {
+	for _, st := range store.Stages {
 		if err := s.Update(o.ID, c.ID, "stage", st.Key, "test"); err != nil {
 			t.Fatalf("stage %q refused: %v", st.Key, err)
 		}
@@ -251,9 +252,9 @@ func TestStageIsOneOfTheBoardsColumns(t *testing.T) {
 		t.Fatalf("a lost conversation couldn't be reopened: %v", err)
 	}
 	var events int64
-	s.InOrg(o.ID).Model(&Event{}).Where("action = ?", "set:stage").Count(&events)
-	if int(events) != len(Stages)+1 {
-		t.Fatalf("%d stage changes logged, want %d: a refused one left a history line", events, len(Stages)+1)
+	s.InOrg(o.ID).Model(&store.Event{}).Where("action = ?", "set:stage").Count(&events)
+	if int(events) != len(store.Stages)+1 {
+		t.Fatalf("%d stage changes logged, want %d: a refused one left a history line", events, len(store.Stages)+1)
 	}
 }
 
@@ -261,14 +262,14 @@ func TestMarkChecksApplyToEveryCaller(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	suggested := Contact{OrgID: o.ID, Key: "jonas", File: "test", Person: str("Jonas Weber"), Status: ContactSuggested}
-	picked := Contact{OrgID: o.ID, Key: "hannah", File: "test", Person: str("Hannah Pryce")}
-	for _, c := range []*Contact{&suggested, &picked} {
+	suggested := store.Contact{OrgID: o.ID, Key: "jonas", File: "test", Person: store.Str("Jonas Weber"), Status: store.ContactSuggested}
+	picked := store.Contact{OrgID: o.ID, Key: "hannah", File: "test", Person: store.Str("Hannah Pryce")}
+	for _, c := range []*store.Contact{&suggested, &picked} {
 		if err := s.DB.Create(c).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := s.Mark(o.ID, suggested.ID, "linkedin", today(), "test"); err == nil {
+	if err := s.Mark(o.ID, suggested.ID, "linkedin", store.Today(), "test"); err == nil {
 		t.Fatal("a suggestion nobody picked was marked as contacted")
 	}
 	for _, bad := range []string{"", "yesterday", "02/01/2020", "2999-01-01"} {
@@ -276,7 +277,7 @@ func TestMarkChecksApplyToEveryCaller(t *testing.T) {
 			t.Fatalf("mark accepted the date %q", bad)
 		}
 	}
-	if err := s.Mark(o.ID, picked.ID, "linkedin", today(), "test"); err != nil {
+	if err := s.Mark(o.ID, picked.ID, "linkedin", store.Today(), "test"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -297,20 +298,20 @@ func TestPickingSomeoneQualifiesTheirCompanyOnTheRecord(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	co := Company{OrgID: o.ID, Name: "Larkmoor", Stage: prospecting.CompanyReview}
+	co := store.Company{OrgID: o.ID, Name: "Larkmoor", Stage: prospecting.CompanyReview}
 	if err := s.DB.Create(&co).Error; err != nil {
 		t.Fatal(err)
 	}
-	people := []Contact{
-		{OrgID: o.ID, Key: "hannah", File: "test", Person: str("Hannah Pryce"), Status: ContactSuggested, CompanyID: &co.ID},
-		{OrgID: o.ID, Key: "jonas", File: "test", Person: str("Jonas Weber"), Status: ContactSuggested, CompanyID: &co.ID},
+	people := []store.Contact{
+		{OrgID: o.ID, Key: "hannah", File: "test", Person: store.Str("Hannah Pryce"), Status: store.ContactSuggested, CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "jonas", File: "test", Person: store.Str("Jonas Weber"), Status: store.ContactSuggested, CompanyID: &co.ID},
 	}
 	if err := s.DB.Create(&people).Error; err != nil {
 		t.Fatal(err)
 	}
 	qualified := func() int64 {
 		var n int64
-		s.InOrg(o.ID).Model(&Event{}).Where("company_id = ? and action = ? and \"user\" = ?", co.ID, "company:"+prospecting.CompanyQualified, "ada").Count(&n)
+		s.InOrg(o.ID).Model(&store.Event{}).Where("company_id = ? and action = ? and \"user\" = ?", co.ID, "company:"+prospecting.CompanyQualified, "ada").Count(&n)
 		return n
 	}
 	if err := s.PickContact(o.ID, o, people[0].ID, "ada"); err != nil {

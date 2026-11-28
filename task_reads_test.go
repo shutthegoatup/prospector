@@ -11,6 +11,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // The task reads moved into the spec answer exactly what the store says, which is what
@@ -18,12 +19,12 @@ import (
 func TestTheSpecsTaskReadsSayEverythingTheStoreDoes(t *testing.T) {
 	t.Parallel()
 	s, o, srv, ada := signedIn(t)
-	key := func(name string) (string, Actor) {
+	key := func(name string) (string, store.Actor) {
 		secret, k, err := s.CreateKey(o.ID, name, []string{"read", "research:write"}, "Ada Lovelace")
 		if err != nil {
 			t.Fatal(err)
 		}
-		return secret, Actor{Name: "agent:" + name, KeyID: k.ID}
+		return secret, store.Actor{Name: "agent:" + name, KeyID: k.ID}
 	}
 	scoutKey, scout := key("scout")
 	otherKey, _ := key("other")
@@ -71,10 +72,10 @@ func TestTheSpecsTaskReadsSayEverythingTheStoreDoes(t *testing.T) {
 
 	// A person reading the task claims nothing, and isn't anyone's agent.
 	var claims int64
-	s.DB.Model(&RequestClaim{}).Count(&claims)
+	s.DB.Model(&store.RequestClaim{}).Count(&claims)
 	code, body = call(t, ada, "GET", one, "", nil)
 	var after int64
-	s.DB.Model(&RequestClaim{}).Count(&after)
+	s.DB.Model(&store.RequestClaim{}).Count(&after)
 	if code != http.StatusOK || strings.Contains(body, `"claimed_request"`) || strings.Contains(body, `"yours"`) || after != claims {
 		t.Fatalf("a person reading the task: %d, claims %d then %d: %s", code, claims, after, body)
 	}

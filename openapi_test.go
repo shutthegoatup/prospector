@@ -13,6 +13,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // asKey calls the API with an API key, as an agent or script would.
@@ -95,8 +96,8 @@ func TestARobotWorksAgentsThroughTheAPIAsItsScopesAllow(t *testing.T) {
 		t.Fatalf("stopping the run: %d %s", code, body)
 	}
 	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
-		var ended AgentRun
-		if err := s.DB.First(&ended, run.Id).Error; err == nil && ended.Status != RunWorking && ended.Status != RunWaiting {
+		var ended store.AgentRun
+		if err := s.DB.First(&ended, run.Id).Error; err == nil && ended.Status != store.RunWorking && ended.Status != store.RunWaiting {
 			break
 		}
 		if time.Now().After(deadline) {

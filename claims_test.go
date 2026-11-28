@@ -13,13 +13,14 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
+	scout, second := store.Actor{Name: "agent:scout", KeyID: 1}, store.Actor{Name: "agent:second", KeyID: 2}
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders with a configurator.", "Ada Lovelace"))
 	now := time.Now()
 
@@ -49,13 +50,13 @@ func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
 	}
 
 	// A key under a name another key had is a different agent.
-	renamed := Actor{Name: "agent:scout", KeyID: 9}
+	renamed := store.Actor{Name: "agent:scout", KeyID: 9}
 	if got := must(s.AgentTaskAt(o.ID, renamed, task.ID, now.Add(4*time.Minute))); got.Claimed != 0 || got.Requests[0].Yours {
 		t.Fatalf("a new key took an old key's claim because they share a name: %+v", got)
 	}
 
 	// A key that can only read takes nothing.
-	reader := Actor{Name: "agent:reader", KeyID: 3, ReadOnly: true}
+	reader := store.Actor{Name: "agent:reader", KeyID: 3, ReadOnly: true}
 	if err := s.SetRequestDone(o.ID, more, true, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +66,7 @@ func TestTwoAgentsOnATaskTakeDifferentRequests(t *testing.T) {
 	if got := must(s.AgentTaskAt(o.ID, reader, task.ID, now.Add(5*time.Minute))); got.Claimed != 0 || got.Requests[2].HeldBy != "" {
 		t.Fatalf("a read-only key was kept a request: %+v", got.Requests[2])
 	}
-	var claims []RequestClaim
+	var claims []store.RequestClaim
 	s.DB.Where("org_id = ?", o.ID).Order("request_id").Find(&claims)
 	if len(claims) != 1 || claims[0].RequestID != brief {
 		t.Fatalf("finishing a request should end its claim, and reading take none: %+v", claims)
@@ -76,20 +77,20 @@ func TestAClaimLapsesUnlessTheHolderKeepsAdding(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
+	scout, second := store.Actor{Name: "agent:scout", KeyID: 1}, store.Actor{Name: "agent:second", KeyID: 2}
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
 	start := time.Now()
 	brief := must(s.AgentTaskAt(o.ID, scout, task.ID, start)).Claimed
 
 	expires := func() time.Time {
-		var c RequestClaim
+		var c store.RequestClaim
 		if err := s.DB.First(&c, "request_id = ?", brief).Error; err != nil {
 			t.Fatal(err)
 		}
 		return time.UnixMilli(c.ExpiresAt)
 	}
 	// Ten minutes in, the holder adds a company for the task, which keeps the claim.
-	if err := s.DB.Model(&RequestClaim{}).Where("request_id = ?", brief).Update("expires_at", time.Now().Add(5*time.Minute).UnixMilli()).Error; err != nil {
+	if err := s.DB.Model(&store.RequestClaim{}).Where("request_id = ?", brief).Update("expires_at", time.Now().Add(5*time.Minute).UnixMilli()).Error; err != nil {
 		t.Fatal(err)
 	}
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Task: task.ID, Name: "Larkmoor Yachts"}))
@@ -132,7 +133,7 @@ func TestOnlyOneOfManyAgentsWinsARequest(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			won[i], errs[i] = s.Claim(o.ID, task.ID, request, Actor{Name: "agent:" + strings.Repeat("x", i+1), KeyID: int64(i + 1)}, now)
+			won[i], errs[i] = s.Claim(o.ID, task.ID, request, store.Actor{Name: "agent:" + strings.Repeat("x", i+1), KeyID: int64(i + 1)}, now)
 		}()
 	}
 	wg.Wait()
@@ -149,7 +150,7 @@ func TestOnlyOneOfManyAgentsWinsARequest(t *testing.T) {
 		t.Fatalf("%d agents claimed the same request at once", winners)
 	}
 	var n int64
-	if s.DB.Model(&RequestClaim{}).Count(&n); n != 1 {
+	if s.DB.Model(&store.RequestClaim{}).Count(&n); n != 1 {
 		t.Fatalf("%d claim rows", n)
 	}
 }
@@ -204,7 +205,7 @@ func TestAClaimIsntTakenOnAFinishedRequestOrShownOnAClosedTask(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
+	scout, second := store.Actor{Name: "agent:scout", KeyID: 1}, store.Actor{Name: "agent:second", KeyID: 2}
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
 	now := time.Now()
 	stale := must(s.Task(o.ID, task.ID, now))
@@ -218,7 +219,7 @@ func TestAClaimIsntTakenOnAFinishedRequestOrShownOnAClosedTask(t *testing.T) {
 		t.Fatalf("a finished request was claimed: %d", got)
 	}
 	var n int64
-	if s.DB.Model(&RequestClaim{}).Count(&n); n != 0 {
+	if s.DB.Model(&store.RequestClaim{}).Count(&n); n != 0 {
 		t.Fatalf("%d claims on a finished request", n)
 	}
 
@@ -248,7 +249,7 @@ func TestAnotherOrganisationCantClaimThroughATaskItWasHanded(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o, other := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
 	now := time.Now()
 	v := must(s.Task(o.ID, task.ID, now))
@@ -256,7 +257,7 @@ func TestAnotherOrganisationCantClaimThroughATaskItWasHanded(t *testing.T) {
 		t.Fatalf("another organisation claimed request %d of this one's task", got)
 	}
 	var n int64
-	if s.DB.Model(&RequestClaim{}).Count(&n); n != 0 {
+	if s.DB.Model(&store.RequestClaim{}).Count(&n); n != 0 {
 		t.Fatalf("%d claims made by another organisation", n)
 	}
 	if got := must(s.ClaimNext(o.ID, v, scout, now)); got != v.Requests[0].ID {

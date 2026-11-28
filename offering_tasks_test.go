@@ -10,12 +10,13 @@ import (
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestATaskFindsCompaniesForItsOffering(t *testing.T) {
 	t.Parallel()
 	s, o, srv, _ := signedIn(t)
-	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO", LookFor: "trigger: a CTO leaving or a funding round"}, "Ada"))
+	cto := must(s.AddOffering(o.ID, store.Offering{Name: "Interim CTO", LookFor: "trigger: a CTO leaving or a funding round"}, "Ada"))
 	secret, _, err := s.CreateKey(o.ID, "robot", []string{"tasks:write", "read"}, "Ada Lovelace")
 	if err != nil {
 		t.Fatal(err)
@@ -27,13 +28,13 @@ func TestATaskFindsCompaniesForItsOffering(t *testing.T) {
 	}
 
 	beta := mustOrg(t, s, "beta")
-	theirs := must(s.AddOffering(beta.ID, Offering{Name: "Theirs"}, "Grace"))
+	theirs := must(s.AddOffering(beta.ID, store.Offering{Name: "Theirs"}, "Grace"))
 	if code, body := asKey(t, "POST", srv.URL+"/o/alpha/api/v1/tasks", secret, map[string]any{"brief": "x", "offering": theirs.ID}); code != http.StatusNotFound {
 		t.Fatalf("a task for another organisation's offering: %d %s", code, body)
 	}
 
 	// Rejected for the organisation's own offering, which says nothing about this one.
-	scout := Actor{Name: "agent:scout", KeyID: 9}
+	scout := store.Actor{Name: "agent:scout", KeyID: 9}
 	known := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Harbour Analytics", Domain: "harbour.example"}))
 	if err := s.SetCompanyStage(o.ID, known.ID, prospecting.CompanyRejected, "", "Ada"); err != nil {
 		t.Fatal(err)
@@ -106,9 +107,9 @@ func TestWhateverAnAgentWorksOnForAnOfferingWaitsInItsReview(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	agencies := must(s.AddOffering(o.ID, Offering{Name: "Agency partners"}, "Ada"))
+	agencies := must(s.AddOffering(o.ID, store.Offering{Name: "Agency partners"}, "Ada"))
 	task := must(s.CreateTaskFor(o.ID, agencies.ID, "", "Find agencies", "Ada"))
-	scout := Actor{Name: "agent:scout", KeyID: 3}
+	scout := store.Actor{Name: "agent:scout", KeyID: 3}
 	// Known before the task, and reached through a person and a fact rather than add_company.
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Quayside Talent", Domain: "quayside.example"}))
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Fernhill Search", Domain: "fernhill.example"}))

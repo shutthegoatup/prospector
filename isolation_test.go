@@ -18,6 +18,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/sales"
 	"github.com/shutthegoatup/prospector/internal/signing"
+	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
@@ -65,7 +66,7 @@ const (
 var tryWords = []string{"1", "", findable, theirEmail, theirDomain, "phone", "replied", "accepted", "note", "skipped", "qualified", "review", "2020-01-02", "linkedin"}
 
 type intruder struct {
-	org  *Org
+	org  *store.Org
 	word string
 	// spoken are the words for a method's own text arguments, in order.
 	spoken  []string
@@ -76,13 +77,13 @@ type intruder struct {
 func (in *intruder) value(t reflect.Type, name string, own bool) reflect.Value {
 	v := reflect.New(t).Elem()
 	switch {
-	case t == reflect.TypeOf(&Org{}):
+	case t == reflect.TypeOf(&store.Org{}):
 		return reflect.ValueOf(in.org)
 	case t == reflect.TypeOf(time.Time{}):
 		return reflect.ValueOf(time.Now())
-	case t == reflect.TypeOf([]Contact{}):
+	case t == reflect.TypeOf([]store.Contact{}):
 		// A person from the first organisation, as a page might hand back.
-		return reflect.ValueOf([]Contact{{ID: 1, OrgID: 1}})
+		return reflect.ValueOf([]store.Contact{{ID: 1, OrgID: 1}})
 	}
 	switch t.Kind() {
 	case reflect.Int64, reflect.Int:
@@ -151,13 +152,13 @@ func (in *intruder) call(s *Store, m reflect.Method) (said string, fell bool) {
 
 // everyWay calls a method as org with each way of filling its text arguments from
 // tryWords and its yes-or-noes, until do says to stop.
-func everyWay(s *Store, undo bool, m reflect.Method, org *Org, do func(said string, fell bool) (stop bool)) {
+func everyWay(s *Store, undo bool, m reflect.Method, org *store.Org, do func(said string, fell bool) (stop bool)) {
 	own, nested := 0, false
 	for j := 1; j < m.Type.NumIn(); j++ {
 		switch k := m.Type.In(j); {
 		case k.Kind() == reflect.String:
 			own++
-		case k.Kind() == reflect.Struct || k.Kind() == reflect.Pointer && k != reflect.TypeOf(&Org{}):
+		case k.Kind() == reflect.Struct || k.Kind() == reflect.Pointer && k != reflect.TypeOf(&store.Org{}):
 			nested = true
 		}
 	}
@@ -235,11 +236,11 @@ func holdings(t *testing.T, s *Store, org int64) map[string]string {
 
 // seedFirst gives the first organisation, in an empty database, a row in every table
 // an organisation has, each with id 1 where the table numbers its rows.
-func seedFirst(t *testing.T, s *Store) *Org {
+func seedFirst(t *testing.T, s *Store) *store.Org {
 	t.Helper()
 	first := mustOrg(t, s, "alpha")
 	owner := must(s.CreateUser("owner@alpha.example", "Owner One", "a long enough password"))
-	scout := Actor{Name: "agent:" + theirs, KeyID: 1}
+	scout := store.Actor{Name: "agent:" + theirs, KeyID: 1}
 	steps := []func() error{
 		func() error { return s.AddMember(first.ID, owner.ID, "owner", "") },
 		func() error { return s.SaveVoice(first.ID, owner.ID, theirs+" caller", theirs+" signature") },
@@ -271,10 +272,10 @@ func seedFirst(t *testing.T, s *Store) *Org {
 		func() error { return s.Mark(first.ID, 1, "replied", "2020-01-02", "Owner One") },
 		func() error {
 			// Made directly: an owner has to be a member's name, which wouldn't carry the mark.
-			return s.DB.Create(&Deal{OrgID: first.ID, ContactID: 1, Kind: sales.DealNew, Owner: theirs + " owner"}).Error
+			return s.DB.Create(&store.Deal{OrgID: first.ID, ContactID: 1, Kind: sales.DealNew, Owner: theirs + " owner"}).Error
 		},
 		func() error {
-			return s.DB.Create(&Deal{OrgID: first.ID, ContactID: 1, Seq: 1, Kind: "renewal", Stage: "replied", Owner: theirs + " owner"}).Error
+			return s.DB.Create(&store.Deal{OrgID: first.ID, ContactID: 1, Seq: 1, Kind: "renewal", Stage: "replied", Owner: theirs + " owner"}).Error
 		},
 		func() error {
 			_, err := s.AddSubscription(first.ID, sales.SubscriptionIn{Company: 1, Name: theirs + " plan", Amount: "100", Start: "2020-01-02", TermMonths: 12}, "Owner One")
@@ -304,14 +305,14 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			if err != nil {
 				return err
 			}
-			if _, err = s.PutAgreementFields(first.ID, a.ID, []AgreementField{{RecipientID: r.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.1, W: 0.3, H: 0.05}}); err != nil {
+			if _, err = s.PutAgreementFields(first.ID, a.ID, []store.AgreementField{{RecipientID: r.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.1, W: 0.3, H: 0.05}}); err != nil {
 				return err
 			}
 			if _, _, err := s.SealKey(first); err != nil {
 				return err
 			}
 			return s.DB.Transaction(func(tx *gorm.DB) error {
-				_, err := recordAgreementEvent(tx, AgreementEvent{OrgID: first.ID, AgreementID: a.ID, Round: 1, Kind: EventSent, Actor: "Owner One", Detail: theirs + " sent", IP: "203.0.113.9"})
+				_, err := recordAgreementEvent(tx, store.AgreementEvent{OrgID: first.ID, AgreementID: a.ID, Round: 1, Kind: EventSent, Actor: "Owner One", Detail: theirs + " sent", IP: "203.0.113.9"})
 				return err
 			})
 		},
@@ -434,7 +435,7 @@ func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {
 		if acrossOrganisations[m.Name] || withinTheStore[m.Name] {
 			continue
 		}
-		if m.Type.NumIn() < 2 || (m.Type.In(1).Kind() != reflect.Int64 && m.Type.In(1) != reflect.TypeOf(&Org{})) {
+		if m.Type.NumIn() < 2 || (m.Type.In(1).Kind() != reflect.Int64 && m.Type.In(1) != reflect.TypeOf(&store.Org{})) {
 			t.Errorf("Store.%s doesn't take its organisation first: give it one, or name it in acrossOrganisations if it isn't about one", m.Name)
 			continue
 		}

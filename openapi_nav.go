@@ -8,9 +8,10 @@ import (
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
-func orgSummary(o Org) api.OrgSummary {
+func orgSummary(o store.Org) api.OrgSummary {
 	return api.OrgSummary{Id: o.ID, Slug: o.Slug, Name: o.Name, Color: o.Color}
 }
 
@@ -64,7 +65,7 @@ func (s apiServer) CreateOrg(ctx context.Context, in api.CreateOrgRequestObject)
 
 // newOrgFor starts an organisation owned by whoever is signed in, unless their sign-in
 // came through another organisation's single sign-on, which opens that one alone.
-func newOrgFor(st *Store, q *request.Req, name string) (*Org, error) {
+func newOrgFor(st *Store, q *request.Req, name string) (*store.Org, error) {
 	if q.Session != nil && q.Session.Limited {
 		return nil, request.Refused{Text: say.New("you're signed in through one organisation's single sign-on, which opens only that organisation: sign in with a password to start another")}
 	}

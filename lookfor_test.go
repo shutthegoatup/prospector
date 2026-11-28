@@ -8,15 +8,16 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestLookForAssets(t *testing.T) {
 	t.Parallel()
-	got, err := OrgSettings{LookFor: "Careers page: a jobs page on their site\n\nats\ncareers-page: again"}.Assets()
-	if err != nil || len(got) != 2 || got[0] != (Asset{Field: "careers_page", Hint: "a jobs page on their site"}) || got[1] != (Asset{Field: "ats"}) {
+	got, err := store.OrgSettings{LookFor: "Careers page: a jobs page on their site\n\nats\ncareers-page: again"}.Assets()
+	if err != nil || len(got) != 2 || got[0] != (store.Asset{Field: "careers_page", Hint: "a jobs page on their site"}) || got[1] != (store.Asset{Field: "ats"}) {
 		t.Fatalf("assets: %+v %v", got, err)
 	}
-	if _, err := (OrgSettings{LookFor: ": no name"}).Assets(); err == nil {
+	if _, err := (store.OrgSettings{LookFor: ": no name"}).Assets(); err == nil {
 		t.Fatal("an asset without a name was accepted")
 	}
 
@@ -32,12 +33,12 @@ func TestLookForAssets(t *testing.T) {
 		t.Fatalf("saving what we look for: %d %s", code, body)
 	}
 	o, _ := s.OrgBySlug("alpha")
-	k := &APIKey{Scopes: "research:write"}
+	k := &store.APIKey{Scopes: "research:write"}
 	if g := agentInstructions(o, k); !strings.Contains(g, "- careers_page: a jobs page on their site") || !strings.Contains(g, "- ats: the applicant tracking system") {
 		t.Fatalf("agents aren't told what to look for: %q", g)
 	}
 
-	out, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Brightwell Staffing", Domain: "brightwell.example",
+	out, err := s.AgentAddCompany(o.ID, store.Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Brightwell Staffing", Domain: "brightwell.example",
 		Facts: []research.FactIn{{Field: "Careers page", Value: "Lists 14 open roles", SourceURL: "https://brightwell.example/jobs"}}})
 	if err != nil {
 		t.Fatal(err)
@@ -62,7 +63,7 @@ func TestOlderAgentsConfiguratorBecomesFacts(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	out, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Larkmoor Yachts",
+	out, err := s.AgentAddCompany(o.ID, store.Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Larkmoor Yachts",
 		ConfiguratorURL: "https://larkmoor.example/build", Platform: "Kickflip", BuiltBy: "Studio Vell"})
 	if err != nil {
 		t.Fatal(err)
@@ -71,11 +72,11 @@ func TestOlderAgentsConfiguratorBecomesFacts(t *testing.T) {
 	if facts["configurator"] != "https://larkmoor.example/build" || facts["platform"] != "Kickflip" || facts["built_by"] != "Studio Vell" {
 		t.Fatalf("facts: %v", facts)
 	}
-	corvane, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Corvane", Platform: "Kickflip"})
+	corvane, err := s.AgentAddCompany(o.ID, store.Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Corvane", Platform: "Kickflip"})
 	if err != nil {
 		t.Fatalf("an older agent's platform with no configurator link was refused: %v", err)
 	}
-	var uncited Fact
+	var uncited store.Fact
 	s.InOrg(o.ID).Where("company_id = ? and field = 'platform'", corvane.ID).First(&uncited)
 	if uncited.Value != "Kickflip" || uncited.SourceURL != "" || uncited.Actor != "agent:bot" {
 		t.Fatalf("a platform with nothing to cite: %+v", uncited)
@@ -87,7 +88,7 @@ func TestOlderAgentsConfiguratorBecomesFacts(t *testing.T) {
 
 func (s *Store) companyFacts(t *testing.T, org, company int64) map[string]string {
 	t.Helper()
-	var facts []Fact
+	var facts []store.Fact
 	if err := s.InOrg(org).Where("company_id = ?", company).Find(&facts).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +107,7 @@ func TestImportedConfiguratorsShow(t *testing.T) {
 		t.Fatal(err)
 	}
 	var facts int64
-	s.InOrg(o.ID).Model(&Fact{}).Where("field = 'configurator'").Count(&facts)
+	s.InOrg(o.ID).Model(&store.Fact{}).Where("field = 'configurator'").Count(&facts)
 	if o, _ = s.OrgBySlug("alpha"); facts == 0 || !strings.HasPrefix(o.Settings.LookFor, "configurator:") {
 		t.Fatalf("%d configurator facts imported, looking for %q", facts, o.Settings.LookFor)
 	}

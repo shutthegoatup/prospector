@@ -9,6 +9,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestAKeyThatCanOnlyReadDoesNotPickATaskUp(t *testing.T) {
@@ -16,12 +17,12 @@ func TestAKeyThatCanOnlyReadDoesNotPickATaskUp(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
-	reader := Actor{Name: "agent:reader", KeyID: 1, ReadOnly: true}
+	reader := store.Actor{Name: "agent:reader", KeyID: 1, ReadOnly: true}
 	if got := must(s.AgentTask(o.ID, reader, task.ID, paging.Page{})); got.Brief != "Yacht builders." {
 		t.Fatalf("a read-only key should still read the task: %+v", got)
 	}
 	var events int64
-	s.InOrg(o.ID).Model(&Event{}).Where(`"user" = ?`, reader.Name).Count(&events)
+	s.InOrg(o.ID).Model(&store.Event{}).Where(`"user" = ?`, reader.Name).Count(&events)
 	if list := must(firstOf(s.AgentTasks(o.ID, reader, paging.Page{}))); events != 0 || list[0].Status != research.TaskWaiting {
 		t.Fatalf("a key that can add nothing made the task look worked on: %d events, %s", events, list[0].Status)
 	}
@@ -46,24 +47,24 @@ func TestPickingUpATaskIsRecordedOnceARun(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
+	scout, second := store.Actor{Name: "agent:scout", KeyID: 1}, store.Actor{Name: "agent:second", KeyID: 2}
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
 	for range 3 {
 		must(s.AgentTask(o.ID, scout, task.ID, paging.Page{}))
 		must(s.AgentTask(o.ID, second, task.ID, paging.Page{}))
 	}
 	var pickups int64
-	s.InOrg(o.ID).Model(&Event{}).Where("action = ?", "task:pickup").Count(&pickups)
+	s.InOrg(o.ID).Model(&store.Event{}).Where("action = ?", "task:pickup").Count(&pickups)
 	if pickups != 2 {
 		t.Fatalf("two agents reading a task in turn should each be recorded once, got %d", pickups)
 	}
 	if err := s.SetTaskClosed(o.ID, task.ID, true, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if got := must(s.AgentTask(o.ID, Actor{Name: "agent:third", KeyID: 3}, task.ID, paging.Page{})); got.Status != research.TaskClosed {
+	if got := must(s.AgentTask(o.ID, store.Actor{Name: "agent:third", KeyID: 3}, task.ID, paging.Page{})); got.Status != research.TaskClosed {
 		t.Fatalf("a closed task can still be read, as closed: %s", got.Status)
 	}
-	if s.InOrg(o.ID).Model(&Event{}).Where("action = ?", "task:pickup").Count(&pickups); pickups != 2 {
+	if s.InOrg(o.ID).Model(&store.Event{}).Where("action = ?", "task:pickup").Count(&pickups); pickups != 2 {
 		t.Fatal("reading a closed task was recorded as picking it up")
 	}
 	if err := s.SetTaskClosed(o.ID, task.ID, false, "Ada Lovelace"); err != nil {
@@ -78,7 +79,7 @@ func TestACompanyNotedOnATaskCanStillBeFoundForIt(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
 	must(s.AgentNote(o.ID, scout, research.NoteIn{Task: task.ID, Company: "Larkmoor Yachts", Kind: "skipped", Text: "Looked, unsure."}))
@@ -92,7 +93,7 @@ func TestErasingSomeoneWithNoCompanyTakesTheirTasksNotes(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
 	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Linkedin: "https://www.linkedin.com/in/hannah-pryce", Name: "Hannah Pryce"}, "Ada Lovelace"))
 	if hannah.CompanyID != nil {

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func walkRuns(t *testing.T, s *Store, org int64, limit int) []research.Run {
@@ -26,12 +27,12 @@ func TestARunLongerThanAPageReadsIsShownNewestFirst(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	start := time.Now().Add(-100 * time.Hour).Truncate(time.Second)
-	var ev []Event
+	var ev []store.Event
 	for j := range 2500 {
-		ev = append(ev, Event{OrgID: o.ID, User: "agent:a", KeyID: 1, Action: "add:fact", At: start.Add(time.Duration(j) * time.Minute)})
+		ev = append(ev, store.Event{OrgID: o.ID, User: "agent:a", KeyID: 1, Action: "add:fact", At: start.Add(time.Duration(j) * time.Minute)})
 	}
 	for i := range 3 {
-		ev = append(ev, Event{OrgID: o.ID, User: "agent:b", KeyID: 2, Action: "add:fact", At: start.Add(2000*time.Minute + time.Duration(i)*2*time.Hour)})
+		ev = append(ev, store.Event{OrgID: o.ID, User: "agent:b", KeyID: 2, Action: "add:fact", At: start.Add(2000*time.Minute + time.Duration(i)*2*time.Hour)})
 	}
 	mustDone(t, s.DB.CreateInBatches(ev, 200).Error)
 	long, short := 0, 0
@@ -54,7 +55,7 @@ func TestRunsThatEndedTogetherShareAPage(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	at := time.Now().Add(-10 * time.Hour).Truncate(time.Second)
-	ev := []Event{
+	ev := []store.Event{
 		{OrgID: o.ID, User: "agent:a", KeyID: 1, Action: "add:fact", At: at.Add(-time.Minute)},
 		{OrgID: o.ID, User: "agent:a", KeyID: 1, Action: "add:fact", At: at},
 		{OrgID: o.ID, User: "agent:b", KeyID: 2, Action: "add:fact", At: at.Add(-time.Minute)},
@@ -71,11 +72,11 @@ func TestWalkingRunsCarriesOnPastALongOne(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	start := time.Now().Add(-200 * time.Hour).Truncate(time.Second)
-	var ev []Event
+	var ev []store.Event
 	// an old run, then a long one of 4500 events
-	ev = append(ev, Event{OrgID: o.ID, User: "agent:a", KeyID: 1, Action: "add:fact", At: start})
+	ev = append(ev, store.Event{OrgID: o.ID, User: "agent:a", KeyID: 1, Action: "add:fact", At: start})
 	for j := range 4500 {
-		ev = append(ev, Event{OrgID: o.ID, User: "agent:a", KeyID: 1, Action: "add:fact", At: start.Add(2*time.Hour + time.Duration(j)*time.Minute)})
+		ev = append(ev, store.Event{OrgID: o.ID, User: "agent:a", KeyID: 1, Action: "add:fact", At: start.Add(2*time.Hour + time.Duration(j)*time.Minute)})
 	}
 	mustDone(t, s.DB.CreateInBatches(ev, 200).Error)
 	all := walkRuns(t, s, o.ID, 12)

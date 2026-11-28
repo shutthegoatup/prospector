@@ -7,16 +7,17 @@ import (
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestPeopleAreReachedForTheOfferingTheyWerePickedFor(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO", NoteTemplate: "Hi {first}, about technology leadership at {company}.",
+	cto := must(s.AddOffering(o.ID, store.Offering{Name: "Interim CTO", NoteTemplate: "Hi {first}, about technology leadership at {company}.",
 		Pitch: "I step in as interim CTO at companies like {company}."}, "Ada"))
 	task := must(s.CreateTaskFor(o.ID, cto.ID, "", "Find scale-ups without a CTO", "Ada"))
-	scout := Actor{Name: "agent:scout", KeyID: 2}
+	scout := store.Actor{Name: "agent:scout", KeyID: 2}
 
 	co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Northwind Payments", Domain: "northwind.example"}))
 	ownPerson := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: co.Name, Name: "Ada Vale", Title: "Head of Platform",
@@ -29,12 +30,12 @@ func TestPeopleAreReachedForTheOfferingTheyWerePickedFor(t *testing.T) {
 		}
 	}
 
-	var picked Contact
+	var picked store.Contact
 	if err := s.InOrg(o.ID).Where("id = ?", ctoPerson.ID).First(&picked).Error; err != nil {
 		t.Fatal(err)
 	}
-	if picked.OfferingID != cto.ID || !strings.HasPrefix(deref(picked.Note), "Hi Bram, about technology leadership at Northwind Payments") {
-		t.Fatalf("someone suggested for an offering should get its note: %d %q", picked.OfferingID, deref(picked.Note))
+	if picked.OfferingID != cto.ID || !strings.HasPrefix(store.Deref(picked.Note), "Hi Bram, about technology leadership at Northwind Payments") {
+		t.Fatalf("someone suggested for an offering should get its note: %d %q", picked.OfferingID, store.Deref(picked.Note))
 	}
 	if v := must(s.Verdicts(o.ID, co.ID)); len(v) != 1 || v[0].Stage != prospecting.CompanyQualified {
 		t.Fatalf("picking someone for an offering should qualify the company for it: %+v", v)
@@ -100,9 +101,9 @@ func TestPickingForAnOfferingLeavesTheCompanysOwnStage(t *testing.T) {
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	plain := must(s.AddOffering(o.ID, Offering{Name: "Agency partners"}, "Ada"))
+	plain := must(s.AddOffering(o.ID, store.Offering{Name: "Agency partners"}, "Ada"))
 	task := must(s.CreateTaskFor(o.ID, plain.ID, "", "Find agencies", "Ada"))
-	scout := Actor{Name: "agent:scout", KeyID: 2}
+	scout := store.Actor{Name: "agent:scout", KeyID: 2}
 	co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Quayside Talent", Domain: "quayside.example", Task: task.ID}))
 	p := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: co.Name, Name: "Rhea Moss", Title: "Contract lead",
 		SourceURL: "https://quayside.example/team", Task: task.ID}))
@@ -112,9 +113,9 @@ func TestPickingForAnOfferingLeavesTheCompanysOwnStage(t *testing.T) {
 	if got := companyRow(t, s, o.ID, co.ID).Stage; got != prospecting.CompanyReview {
 		t.Fatalf("picking someone only for an offering changed the company's own stage to %s", got)
 	}
-	var c Contact
-	if err := s.InOrg(o.ID).Where("id = ?", p.ID).First(&c).Error; err != nil || deref(c.Note) != "Hello Rhea from "+o.Name+"." {
-		t.Fatalf("an offering without a note of its own should use the organisation's: %q %v", deref(c.Note), err)
+	var c store.Contact
+	if err := s.InOrg(o.ID).Where("id = ?", p.ID).First(&c).Error; err != nil || store.Deref(c.Note) != "Hello Rhea from "+o.Name+"." {
+		t.Fatalf("an offering without a note of its own should use the organisation's: %q %v", store.Deref(c.Note), err)
 	}
 	script := scriptText(callScript(c, "Rhea Moss", request.Voice{Org: "alpha", Pitch: o.Settings.Pitch, Pitches: map[int64]string{plain.ID: ""}}))
 	if !strings.Contains(script, "Our own pitch for Quayside Talent.") {

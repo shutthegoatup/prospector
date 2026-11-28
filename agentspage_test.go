@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // agentCard is what one of Prospector's agents' cards on the Agents page says, as the API
@@ -151,7 +152,7 @@ func TestAnAgentWithThinkingOffAsksItsModelNotToThink(t *testing.T) {
 		t.Fatal("an agent that thinks was sent chat_template_kwargs")
 	}
 
-	if c := must(r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{Name: "Claude", Kind: kindAnthropic, APIKey: claudeTestKey,
+	if c := must(r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{Name: "Claude", Kind: store.KindAnthropic, APIKey: claudeTestKey,
 		Model: defaultClaude, ThinkingOff: true}, "Ada Lovelace")); c.ThinkingOff {
 		t.Fatal("thinking off was kept for an Anthropic agent, which ignores it")
 	}

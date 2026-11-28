@@ -11,13 +11,14 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestTheCompaniesListComesThroughTheAPIWithItsFilters(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	other := mustOrg(t, s, "beta")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	repliedPerson(t, s, o, "Hannah Pryce")
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Corvane Marine", Segment: "tenders"}))
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Belair Kitchens", Segment: "kitchens"}))
@@ -70,7 +71,7 @@ func TestACompanysPageComesThroughTheAPI(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	other := mustOrg(t, s, "beta")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example",
 		Facts: []research.FactIn{{Field: "configurator", Value: "Builds to order online", SourceURL: "https://larkmoor.example/build"}}}))
 	hannah := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}))
@@ -135,9 +136,9 @@ func TestACompanysPageComesThroughTheAPI(t *testing.T) {
 func TestOnlyReviewersDeleteAgentsNotes(t *testing.T) {
 	t.Parallel()
 	s, o, srv, ada := signedIn(t)
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
-	note := func() *TaskNote {
+	note := func() *store.TaskNote {
 		return must(s.AgentNote(o.ID, scout, research.NoteIn{Company: "Larkmoor Yachts", Kind: "dead_end", Text: "No team page."}))
 	}
 	grace := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
@@ -204,7 +205,7 @@ func TestOnlyAnOwnerExportsOrErasesAPersonThroughTheAPI(t *testing.T) {
 		t.Fatalf("an owner erasing her: %d %s", code, body)
 	}
 	var left int64
-	s.InOrg(o.ID).Model(&Contact{}).Where("id = ?", hannah.ID).Count(&left)
+	s.InOrg(o.ID).Model(&store.Contact{}).Where("id = ?", hannah.ID).Count(&left)
 	if left != 0 {
 		t.Fatal("she is still held after being erased")
 	}
@@ -216,7 +217,7 @@ func TestOnlyAnOwnerExportsOrErasesAPersonThroughTheAPI(t *testing.T) {
 func TestReadingCompaniesNeedsTheReadScope(t *testing.T) {
 	t.Parallel()
 	s, o, srv, _ := signedIn(t)
-	co := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout", KeyID: 1}, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
+	co := must(s.AgentAddCompany(o.ID, store.Actor{Name: "agent:scout", KeyID: 1}, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	writer, _ := must2(s.CreateKey(o.ID, "scout", []string{"research:write"}, "Ada Lovelace"))
 	base := srv.URL + "/o/alpha/api/v1/"
 	for _, path := range []string{"companies", "segments", "companies/" + itoa(co.ID) + "/overview", "companies/" + itoa(co.ID) + "/history", "companies/" + itoa(co.ID) + "/notes"} {

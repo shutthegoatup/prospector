@@ -15,6 +15,7 @@ import (
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/agents"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 const searchTool = "brave-search_brave_web_search"
@@ -42,8 +43,8 @@ func chatText(text string) string {
 type runSetup struct {
 	s      *Store
 	a      *App
-	o      *Org
-	task   *Task
+	o      *store.Org
+	task   *store.Task
 	brief  int64
 	agent  int64
 	mu     sync.Mutex
@@ -69,10 +70,10 @@ func newRunSetup(t *testing.T, fake *fakeEndpoint) *runSetup {
 	return r
 }
 
-func (r *runSetup) finished(t *testing.T, id int64) AgentRun {
+func (r *runSetup) finished(t *testing.T, id int64) store.AgentRun {
 	t.Helper()
 	r.a.runs.wg.Wait()
-	var run AgentRun
+	var run store.AgentRun
 	if err := r.s.DB.First(&run, id).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +164,7 @@ func TestTheAgentWorksATaskToTheEnd(t *testing.T) {
 		t.Fatal("the model wasn't told why its made-up source was refused")
 	}
 	var claims int64
-	if r.s.DB.Model(&RequestClaim{}).Count(&claims); claims != 0 {
+	if r.s.DB.Model(&store.RequestClaim{}).Count(&claims); claims != 0 {
 		t.Fatal("finishing should end the agent's claim")
 	}
 }
@@ -249,7 +250,7 @@ func TestAPersonStopsTheAgent(t *testing.T) {
 	r := newRunSetup(t, fake)
 	fake.chat = func(n int, _ map[string]any) (int, string) {
 		if n == 1 {
-			var run AgentRun
+			var run store.AgentRun
 			r.s.DB.Last(&run)
 			if err := r.a.StopRun(r.o.ID, run.ID); err != nil {
 				t.Error(err)
@@ -274,13 +275,13 @@ func TestARunCarriesOnAfterItsServerStops(t *testing.T) {
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))
 	}
 	lapsed := time.Now().Add(-time.Minute).UnixMilli()
-	left := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, StartedBy: "Ada Lovelace", Model: "router/auto", Status: RunWorking,
+	left := store.AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, StartedBy: "Ada Lovelace", Model: "router/auto", Status: store.RunWorking,
 		Owner: "a server that stopped", LeaseUntil: lapsed, StartedAt: time.Now(), Turns: 7}
 	stopped := left
 	stopped.StopAsked, stopped.TaskID = true, must(r.s.CreateTask(r.o.ID, "Kitchens", "Kitchen makers.", "Ada Lovelace")).ID
 	r.s.DB.Create(&left)
 	r.s.DB.Create(&stopped)
-	held := AgentRun{OrgID: r.o.ID, AgentID: r.agent, TaskID: must(r.s.CreateTask(r.o.ID, "Boats", "Boat builders.", "Ada Lovelace")).ID, Status: RunWorking,
+	held := store.AgentRun{OrgID: r.o.ID, AgentID: r.agent, TaskID: must(r.s.CreateTask(r.o.ID, "Boats", "Boat builders.", "Ada Lovelace")).ID, Status: store.RunWorking,
 		Owner: "a live server", LeaseUntil: time.Now().Add(time.Minute).UnixMilli(), StartedAt: time.Now()}
 	r.s.DB.Create(&held)
 
@@ -292,7 +293,7 @@ func TestARunCarriesOnAfterItsServerStops(t *testing.T) {
 	if got := r.finished(t, stopped.ID); got.Status != agents.RunStopped {
 		t.Fatalf("a run a person had stopped shouldn't be carried on: %+v", got)
 	}
-	if got := r.finished(t, held.ID); got.Status != RunWorking || got.Owner != "a live server" {
+	if got := r.finished(t, held.ID); got.Status != store.RunWorking || got.Owner != "a live server" {
 		t.Fatalf("a run another server holds was taken over: %+v", got)
 	}
 }
@@ -347,7 +348,7 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 		var runs struct{ Items []api.Run }
 		json.Unmarshal([]byte(body), &runs)
 		for _, r := range runs.Items {
-			if r.Status == api.RunStatus(RunWorking) || r.Status == api.RunStatus(RunWaiting) {
+			if r.Status == api.RunStatus(store.RunWorking) || r.Status == api.RunStatus(store.RunWaiting) {
 				names = append(names, r.AgentName)
 			}
 		}
@@ -357,7 +358,7 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 	if len(ready()) != 0 {
 		t.Fatal("agents nobody set up are ready")
 	}
-	var agents []*Agent
+	var agents []*store.Agent
 	for _, name := range []string{"Claude", "Gateway"} {
 		if code, body := saveAgentAt(t, ada, srv.URL, map[string]any{"name": name,
 			"base_url": fake.srv.URL + "/v1", "api_key": agentTestKey, "model": "router/auto"}); code != http.StatusOK {
@@ -404,7 +405,7 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 		t.Fatalf("both runs should be going, so neither is offered again: %v", going())
 	}
 	close(release)
-	var runs []AgentRun
+	var runs []store.AgentRun
 	waitFor(t, func() bool {
 		s.DB.Where("task_id = ?", task.ID).Find(&runs)
 		return len(runs) == 2 && !runs[0].Going() && !runs[1].Going()
@@ -413,7 +414,7 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 		t.Fatalf("two agents on one task should take different requests: %d and %d", runs[0].RequestID, runs[1].RequestID)
 	}
 	var keys []int64
-	s.DB.Model(&AgentRun{}).Where("task_id = ?", task.ID).Distinct().Pluck("agent_id", &keys)
+	s.DB.Model(&store.AgentRun{}).Where("task_id = ?", task.ID).Distinct().Pluck("agent_id", &keys)
 	if len(keys) != 2 {
 		t.Fatalf("each run should be its agent's: %v", keys)
 	}
@@ -514,7 +515,7 @@ func TestOnlyOneRunStartsOnATask(t *testing.T) {
 	if started != 1 {
 		t.Fatalf("%d runs started on one task", started)
 	}
-	bad := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, Status: RunWaiting, StartedAt: time.Now()}
+	bad := store.AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, Status: store.RunWaiting, StartedAt: time.Now()}
 	if err := r.s.DB.Create(&bad).Error; err == nil {
 		t.Fatal("the database let a second going run onto the task")
 	}
@@ -530,9 +531,9 @@ func TestARunCarriedOnKeepsItsOwnClaim(t *testing.T) {
 	bk := must(r.s.AgentKey(r.o.ID, must(r.s.AgentByID(r.o.ID, r.agent))))
 	now := time.Now()
 	// The claim its run took before the server stopped, under a session that is gone.
-	r.s.DB.Create(&RequestClaim{RequestID: r.brief, OrgID: r.o.ID, TaskID: r.task.ID, Holder: fmt.Sprintf("key:%d session:gone", bk.ID),
+	r.s.DB.Create(&store.RequestClaim{RequestID: r.brief, OrgID: r.o.ID, TaskID: r.task.ID, Holder: fmt.Sprintf("key:%d session:gone", bk.ID),
 		Actor: "agent:prospector", ClaimedAt: now.Add(-5 * time.Minute).UnixMilli(), ExpiresAt: now.Add(10 * time.Minute).UnixMilli()})
-	left := AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, StartedBy: "Ada Lovelace", Model: "router/auto", Status: RunWorking,
+	left := store.AgentRun{OrgID: r.o.ID, TaskID: r.task.ID, AgentID: r.agent, StartedBy: "Ada Lovelace", Model: "router/auto", Status: store.RunWorking,
 		Owner: "a server that stopped", LeaseUntil: now.Add(-time.Second).UnixMilli(), StartedAt: now}
 	r.s.DB.Create(&left)
 	r.a.resumeLapsed(now)
@@ -580,14 +581,14 @@ func TestARunStartingLeavesOtherKeysClaimsAlone(t *testing.T) {
 	bk := must(r.s.AgentKey(r.o.ID, must(r.s.AgentByID(r.o.ID, r.agent))))
 	other := fmt.Sprintf("key:%d0 session:abc", bk.ID)
 	now := time.Now()
-	r.s.DB.Create(&RequestClaim{RequestID: r.brief, OrgID: r.o.ID, TaskID: r.task.ID, Holder: other, Actor: "agent:claude",
+	r.s.DB.Create(&store.RequestClaim{RequestID: r.brief, OrgID: r.o.ID, TaskID: r.task.ID, Holder: other, Actor: "agent:claude",
 		ClaimedAt: now.UnixMilli(), ExpiresAt: now.Add(10 * time.Minute).UnixMilli()})
 	fake.chat = func(int, map[string]any) (int, string) { return 200, chatText("unused") }
 	got := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace")).ID)
 	if got.StopReason != "other agents hold every open request" {
 		t.Fatalf("another agent's claim, on a key whose id starts like the built-in one's, was dropped: %+v", got)
 	}
-	var c RequestClaim
+	var c store.RequestClaim
 	if r.s.DB.First(&c, "request_id = ?", r.brief); c.Holder != other {
 		t.Fatalf("the other agent's claim: %+v", c)
 	}
@@ -634,7 +635,7 @@ func TestRevokingTheAgentsKeyStopsItsRun(t *testing.T) {
 	fake.chat = func(n int, _ map[string]any) (int, string) {
 		if n == 1 {
 			bk := must(r.s.AgentKey(r.o.ID, must(r.s.AgentByID(r.o.ID, r.agent))))
-			r.s.DB.Model(&APIKey{}).Where("id = ?", bk.ID).Update("revoked_at", time.Now())
+			r.s.DB.Model(&store.APIKey{}).Where("id = ?", bk.ID).Update("revoked_at", time.Now())
 		}
 		return 200, chatTools(searchTool, `{"query":"yachts"}`)
 	}

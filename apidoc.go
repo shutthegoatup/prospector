@@ -11,6 +11,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // The page at /api is the API's contract, drawn from api/openapi.yaml as people read
@@ -110,7 +111,7 @@ func apiDocOf(spec *openapi3.T) APIDoc {
 			sort.Strings(codes)
 			for _, code := range codes {
 				res := op.Responses.Value(code).Value
-				r := APIResponse{Code: code, About: oneLine(deref(res.Description))}
+				r := APIResponse{Code: code, About: oneLine(store.Deref(res.Description))}
 				for _, mt := range res.Content {
 					r.Type = typeOf(mt.Schema)
 				}

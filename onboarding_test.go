@@ -8,17 +8,18 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/onboarding"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 const fourSteps = "them: Name a project lead, 2 days\nthem: Send your product files, 7 days\n\nKick-off call, 10 days\nus: Go live"
 
 func TestOnboardingStepsAreReadALineEach(t *testing.T) {
 	t.Parallel()
-	plan, err := OrgSettings{OnboardingSteps: fourSteps}.Onboarding()
+	plan, err := store.OrgSettings{OnboardingSteps: fourSteps}.Onboarding()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []StepPlan{{Name: "Name a project lead", Who: StepTheirs, Days: 2}, {Name: "Send your product files", Who: StepTheirs, Days: 7}, {Name: "Kick-off call", Who: StepOurs, Days: 10}, {Name: "Go live", Who: StepOurs, Days: -1}}
+	want := []store.StepPlan{{Name: "Name a project lead", Who: store.StepTheirs, Days: 2}, {Name: "Send your product files", Who: store.StepTheirs, Days: 7}, {Name: "Kick-off call", Who: store.StepOurs, Days: 10}, {Name: "Go live", Who: store.StepOurs, Days: -1}}
 	if len(plan) != len(want) {
 		t.Fatalf("read %d steps, want %d: %+v", len(plan), len(want), plan)
 	}
@@ -28,16 +29,16 @@ func TestOnboardingStepsAreReadALineEach(t *testing.T) {
 		}
 	}
 	// A colon in a step's own name isn't who does it, and a number in it isn't its days.
-	odd, err := OrgSettings{OnboardingSteps: "Call them: agree 3 sites\nTHEM : Sign, 0 day"}.Onboarding()
-	if err != nil || len(odd) != 2 || odd[0] != (StepPlan{Name: "Call them: agree 3 sites", Who: StepOurs, Days: -1}) || odd[1] != (StepPlan{Name: "Sign", Who: StepTheirs, Days: 0}) {
+	odd, err := store.OrgSettings{OnboardingSteps: "Call them: agree 3 sites\nTHEM : Sign, 0 day"}.Onboarding()
+	if err != nil || len(odd) != 2 || odd[0] != (store.StepPlan{Name: "Call them: agree 3 sites", Who: store.StepOurs, Days: -1}) || odd[1] != (store.StepPlan{Name: "Sign", Who: store.StepTheirs, Days: 0}) {
 		t.Errorf("odd lines read as %+v (%v)", odd, err)
 	}
 	for why, text := range map[string]string{"no name": "them:, 3 days", "three years": "Go live, 1000 days", "too many": strings.Repeat("Step\n", 41)} {
-		if _, err := (OrgSettings{OnboardingSteps: text}).Onboarding(); err == nil {
+		if _, err := (store.OrgSettings{OnboardingSteps: text}).Onboarding(); err == nil {
 			t.Errorf("steps with %s were accepted", why)
 		}
 	}
-	if none, err := (OrgSettings{}).Onboarding(); err != nil || len(none) != 0 {
+	if none, err := (store.OrgSettings{}).Onboarding(); err != nil || len(none) != 0 {
 		t.Errorf("no steps read as %+v (%v)", none, err)
 	}
 }
@@ -68,7 +69,7 @@ func TestACustomerIsOnboardedStepByStep(t *testing.T) {
 		t.Fatalf("the onboarding as started: %+v", rows)
 	}
 	r := rows[0]
-	if deref(r.Steps[0].Due) != "2026-11-04" || deref(r.Steps[1].Due) != "2026-11-09" || deref(r.Steps[2].Due) != "2026-11-12" || r.Steps[3].Due != nil || r.Steps[0].Who != StepTheirs {
+	if store.Deref(r.Steps[0].Due) != "2026-11-04" || store.Deref(r.Steps[1].Due) != "2026-11-09" || store.Deref(r.Steps[2].Due) != "2026-11-12" || r.Steps[3].Due != nil || r.Steps[0].Who != store.StepTheirs {
 		t.Errorf("the steps' dates and who does them: %+v", r.Steps)
 	}
 	if r.Late != 1 || r.DueToday != 1 || r.Done != 0 || r.Next == nil || r.Next.Seq != 1 || r.Live() {
@@ -101,8 +102,8 @@ func TestACustomerIsOnboardedStepByStep(t *testing.T) {
 		t.Fatal(err)
 	}
 	r = must(s.Onboardings(o.ID, company, "2026-11-13"))[0]
-	if len(r.Steps) != 4 || r.Done != 1 || r.Steps[0].DoneBy != "Ada Lovelace" || deref(r.Steps[0].DoneOn) != today() ||
-		r.Late != 1 || r.Next.Seq != 2 || deref(r.Steps[1].Due) != "2026-11-20" || r.Steps[2].DoneOn != nil || r.Steps[2].DoneBy != "" {
+	if len(r.Steps) != 4 || r.Done != 1 || r.Steps[0].DoneBy != "Ada Lovelace" || store.Deref(r.Steps[0].DoneOn) != store.Today() ||
+		r.Late != 1 || r.Next.Seq != 2 || store.Deref(r.Steps[1].Due) != "2026-11-20" || r.Steps[2].DoneOn != nil || r.Steps[2].DoneBy != "" {
 		t.Errorf("part way through: %+v", r)
 	}
 	for seq := 2; seq <= 4; seq++ {
@@ -110,16 +111,16 @@ func TestACustomerIsOnboardedStepByStep(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if r = must(s.Onboardings(o.ID, 0, "2026-11-13"))[0]; !r.Live() || r.LiveOn != today() || r.Late != 0 || r.Next != nil {
+	if r = must(s.Onboardings(o.ID, 0, "2026-11-13"))[0]; !r.Live() || r.LiveOn != store.Today() || r.Late != 0 || r.Next != nil {
 		t.Errorf("with every step done: %+v", r)
 	}
 
-	var said []Event
+	var said []store.Event
 	if err := s.DB.Where("org_id = ? and company_id = ? and action like ?", o.ID, company, "onboard:%").Order("id").Find(&said).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(said) != 8 || said[0].Action != "onboard:start" || deref(said[0].Value) != "2026-11-02" || deref(said[1].Value) != "Name a project lead" ||
-		deref(said[2].Value) != "Send your product files: 2026-11-20" || said[4].Action != "onboard:undone" || said[0].ContactID != 0 {
+	if len(said) != 8 || said[0].Action != "onboard:start" || store.Deref(said[0].Value) != "2026-11-02" || store.Deref(said[1].Value) != "Name a project lead" ||
+		store.Deref(said[2].Value) != "Send your product files: 2026-11-20" || said[4].Action != "onboard:undone" || said[0].ContactID != 0 {
 		t.Errorf("the history of the onboarding: %+v", said)
 	}
 
@@ -162,7 +163,7 @@ func TestACustomerIsOnboardedStepByStep(t *testing.T) {
 		t.Fatal(err)
 	}
 	var steps int64
-	if err := s.DB.Model(&OnboardingStep{}).Where("org_id = ?", o.ID).Count(&steps).Error; err != nil || steps != 4 {
+	if err := s.DB.Model(&store.OnboardingStep{}).Where("org_id = ?", o.ID).Count(&steps).Error; err != nil || steps != 4 {
 		t.Errorf("removing an onboarding left %d steps, want the other one's four (%v)", steps, err)
 	}
 }
@@ -191,7 +192,7 @@ func TestOnboardingIsWorkedFromItsPages(t *testing.T) {
 	if code, body := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/onboardings", "application/json", map[string]any{"company": company, "name": "Leith site", "start": "2020-01-06"}); code != http.StatusCreated || !strings.Contains(body, `"who":"them"`) {
 		t.Fatalf("starting an onboarding: %d %s", code, body)
 	}
-	row := must(s.Onboardings(o.ID, 0, today()))[0]
+	row := must(s.Onboardings(o.ID, 0, store.Today()))[0]
 	// The API says who could be invited and whether a link can go, as the page does.
 	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/onboardings", "", nil); !strings.Contains(body, `"invitable":[`) || !strings.Contains(body, `"can_invite":false`) {
 		t.Errorf("the onboardings should say who could be invited and that no link can go without mail: %s", body)
@@ -220,7 +221,7 @@ func TestOnboardingIsWorkedFromItsPages(t *testing.T) {
 	if code, _ := call(t, client, "PATCH", srv.URL+"/o/alpha/api/v1/onboarding-steps/"+itoa(row.Steps[0].ID), "application/json", map[string]any{"name": "Other"}); code == http.StatusOK {
 		t.Error("a step was renamed through the route")
 	}
-	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/onboardings", "", nil); !strings.Contains(body, `"live_on":"`+today()+`"`) || !strings.Contains(body, `"done_by":"Ada Lovelace"`) {
+	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/onboardings", "", nil); !strings.Contains(body, `"live_on":"`+store.Today()+`"`) || !strings.Contains(body, `"done_by":"Ada Lovelace"`) {
 		t.Errorf("the onboarding doesn't say the customer is live, or who finished the steps: %s", body)
 	}
 	if !strings.Contains(late(), `"onboarding_steps":0`) {
@@ -278,7 +279,7 @@ func TestAWonDealOffersOnboarding(t *testing.T) {
 	if planned, offered, _ := board(); planned != 4 || offered != 1 {
 		t.Fatalf("onboarding is offered on %d cards with %d steps, want only the won one with 4", offered, planned)
 	}
-	if code, text := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/onboardings", "application/json", map[string]any{"company": *won.CompanyID, "start": today()}); code != http.StatusCreated {
+	if code, text := call(t, client, "POST", srv.URL+"/o/alpha/api/v1/onboardings", "application/json", map[string]any{"company": *won.CompanyID, "start": store.Today()}); code != http.StatusCreated {
 		t.Fatalf("starting onboarding from a won deal: %d %s", code, text)
 	}
 	if _, offered, running := board(); offered != 0 || running != 1 {
@@ -306,8 +307,8 @@ func TestAWonDealSaysWhenItsCompanyIsOnboarded(t *testing.T) {
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *won.CompanyID, Start: today()}, "Ada Lovelace"))
-	step := must(s.Onboardings(o.ID, 0, today()))[0].Steps[0]
+	must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *won.CompanyID, Start: store.Today()}, "Ada Lovelace"))
+	step := must(s.Onboardings(o.ID, 0, store.Today()))[0].Steps[0]
 	if err := s.SetOnboardingStep(o.ID, step.ID, "done", "yes", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +349,7 @@ func TestARobotWorksOnboardingAsItsScopesAllow(t *testing.T) {
 	if code != http.StatusCreated || !strings.Contains(body, `"due":"2020-01-13"`) || !strings.Contains(body, `"company":"Larkmoor Yachts"`) {
 		t.Fatalf("starting an onboarding: %d %s", code, body)
 	}
-	row := must(s.Onboardings(o.ID, 0, today()))[0]
+	row := must(s.Onboardings(o.ID, 0, store.Today()))[0]
 	step := base + "onboarding-steps/" + itoa(row.Steps[0].ID)
 	if code, body := asKey(t, "PATCH", step, reader, map[string]any{"done": true}); code != http.StatusForbidden {
 		t.Errorf("a read key marking a step: %d %s", code, body)
@@ -364,9 +365,9 @@ func TestARobotWorksOnboardingAsItsScopesAllow(t *testing.T) {
 	}
 
 	// With no start given, steps are dated from today.
-	if code, body := asKey(t, "POST", base+"onboardings", writer, map[string]any{"company": *hannah.CompanyID, "name": "Second site"}); code != http.StatusCreated || !strings.Contains(body, `"start":"`+today()+`"`) {
+	if code, body := asKey(t, "POST", base+"onboardings", writer, map[string]any{"company": *hannah.CompanyID, "name": "Second site"}); code != http.StatusCreated || !strings.Contains(body, `"start":"`+store.Today()+`"`) {
 		t.Errorf("starting an onboarding with no start: %d %s", code, body)
-	} else if err := s.DB.Where("name = ?", "Second site").Delete(&Onboarding{}).Error; err != nil {
+	} else if err := s.DB.Where("name = ?", "Second site").Delete(&store.Onboarding{}).Error; err != nil {
 		t.Fatal(err)
 	}
 	// Mailing a customer is a scope of its own.
@@ -409,7 +410,7 @@ func TestARobotWorksOnboardingAsItsScopesAllow(t *testing.T) {
 		}
 	}
 	box.take(t, 0)
-	if left := must(s.Onboardings(o.ID, 0, today())); len(left) != 1 || left[0].Steps[0].DoneOn != nil {
+	if left := must(s.Onboardings(o.ID, 0, store.Today())); len(left) != 1 || left[0].Steps[0].DoneOn != nil {
 		t.Errorf("another organisation's key changed something: %+v", left)
 	}
 
