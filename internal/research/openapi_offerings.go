@@ -60,9 +60,7 @@ func (s ResearchAPI) ChangeOffering(ctx context.Context, in api.ChangeOfferingRe
 		request.Put(&o.LookFor, c.LookFor)
 		request.Put(&o.Pitch, c.Pitch)
 		request.Put(&o.NoteTemplate, c.NoteTemplate)
-		if c.HasRoles != nil {
-			o.HasRoles = *c.HasRoles
-		}
+		request.Put(&o.HasRoles, c.HasRoles)
 	}, q.Actor())
 	if err != nil {
 		return nil, err
