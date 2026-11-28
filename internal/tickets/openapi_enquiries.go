@@ -116,16 +116,9 @@ func (s TicketsAPI) ListEnquiries(ctx context.Context, in api.ListEnquiriesReque
 }
 
 func (s TicketsAPI) ChangeEnquiry(ctx context.Context, in api.ChangeEnquiryRequestObject) (api.ChangeEnquiryResponseObject, error) {
-	var changes []store.Change
+	var changes store.Changes
 	if b := in.Body; b != nil {
-		for _, set := range []struct {
-			field string
-			value *string
-		}{{"state", b.State}, {"owner", b.Owner}, {"note", b.Note}} {
-			if set.value != nil {
-				changes = append(changes, store.Change{Field: set.field, Value: *set.value})
-			}
-		}
+		changes = changes.Set("state", b.State).Set("owner", b.Owner).Set("note", b.Note)
 	}
 	if len(changes) == 0 {
 		return nil, say.New("send what to change: state, owner or note")

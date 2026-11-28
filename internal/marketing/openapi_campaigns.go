@@ -142,16 +142,9 @@ func (s MarketingAPI) CreateCampaign(ctx context.Context, in api.CreateCampaignR
 }
 
 func (s MarketingAPI) ChangeCampaign(ctx context.Context, in api.ChangeCampaignRequestObject) (api.ChangeCampaignResponseObject, error) {
-	var changes []store.Change
+	var changes store.Changes
 	if b := in.Body; b != nil {
-		for _, set := range []struct {
-			field string
-			value *string
-		}{{"name", b.Name}, {"kind", b.Kind}, {"audience", b.Audience}, {"subject", b.Subject}, {"body", b.Body}} {
-			if set.value != nil {
-				changes = append(changes, store.Change{Field: set.field, Value: *set.value})
-			}
-		}
+		changes = changes.Set("name", b.Name).Set("kind", b.Kind).Set("audience", b.Audience).Set("subject", b.Subject).Set("body", b.Body)
 	}
 	if len(changes) == 0 {
 		return nil, say.New("send what to change: name, audience, subject or body")

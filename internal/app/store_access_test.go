@@ -133,6 +133,7 @@ func handedATransaction(fn *ast.FuncDecl) bool {
 // packages. TestOnlyTheStoreTouchesTheDatabase keeps them out of everything else.
 var withinTheStore = map[string]bool{
 	"InOrg": true, "Log": true, "LogAs": true,
+	"Apply":               true, // runs an area's changes in one transaction, handing each the tx
 	"SetDeal":             true, // prospecting writes a contact's deal through it
 	"SetContactField":     true, // accepting a suggestion writes the contact in its own transaction
 	"SuppressIn":          true, // a bounce, and an agent's address, suppress within their own work

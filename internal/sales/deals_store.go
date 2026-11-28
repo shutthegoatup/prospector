@@ -164,25 +164,15 @@ func (s *DealStore) ChangeDeal(org, id int64, field, value, actor string) error 
 // ChangeDealFields makes several changes to a deal after the conversation's own, or
 // none: one that is refused takes back those before it.
 func (s *DealStore) ChangeDealFields(org, id int64, changes []store.Change, actor string) error {
-	return s.DB.Transaction(func(tx *gorm.DB) error {
-		for _, c := range changes {
-			if err := s.changeDeal(tx, org, id, c.Field, strings.TrimSpace(c.Value), actor); err != nil {
-				return err
-			}
-		}
-		return nil
+	return s.Apply(changes, func(tx *gorm.DB, ch store.Change) error {
+		return s.changeDeal(tx, org, id, ch.Field, strings.TrimSpace(ch.Value), actor)
 	})
 }
 
 // SetDealFields does the same for a conversation's own deal, which is its contact's.
 func (s *DealStore) SetDealFields(org, contact int64, changes []store.Change, actor string) error {
-	return s.DB.Transaction(func(tx *gorm.DB) error {
-		for _, c := range changes {
-			if err := s.SetDeal(tx, org, contact, c.Field, c.Value, actor); err != nil {
-				return err
-			}
-		}
-		return nil
+	return s.Apply(changes, func(tx *gorm.DB, ch store.Change) error {
+		return s.SetDeal(tx, org, contact, ch.Field, ch.Value, actor)
 	})
 }
 

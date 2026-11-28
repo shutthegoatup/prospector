@@ -38,13 +38,8 @@ func (s *EnquiryStore) SetEnquiry(org, id int64, field, value, actor string) err
 
 // SetEnquiryFields makes several of those changes or none.
 func (s *EnquiryStore) SetEnquiryFields(org, id int64, changes []store.Change, actor string) error {
-	return s.DB.Transaction(func(tx *gorm.DB) error {
-		for _, c := range changes {
-			if err := s.setEnquiry(tx, org, id, c.Field, strings.TrimSpace(c.Value), actor); err != nil {
-				return err
-			}
-		}
-		return nil
+	return s.Apply(changes, func(tx *gorm.DB, ch store.Change) error {
+		return s.setEnquiry(tx, org, id, ch.Field, strings.TrimSpace(ch.Value), actor)
 	})
 }
 

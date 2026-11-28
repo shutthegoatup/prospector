@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"gorm.io/gorm"
+
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -90,3 +92,27 @@ func ParseMoney(text string) (int64, error) {
 
 // Change is one field given a new value.
 type Change struct{ Field, Value string }
+
+// Changes are what a request sent to change, in the order they are made.
+type Changes []Change
+
+// Set adds field's change when the request sent a value for it.
+func (c Changes) Set(field string, value *string) Changes {
+	if value == nil {
+		return c
+	}
+	return append(c, Change{Field: field, Value: *value})
+}
+
+// Apply makes each change through apply in one transaction, or none: one that is
+// refused takes back those before it.
+func (c *Core) Apply(changes []Change, apply func(tx *gorm.DB, ch Change) error) error {
+	return c.DB.Transaction(func(tx *gorm.DB) error {
+		for _, ch := range changes {
+			if err := apply(tx, ch); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}

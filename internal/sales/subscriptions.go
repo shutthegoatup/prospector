@@ -57,8 +57,6 @@ func checkTerm(months, notice int) error {
 	return nil
 }
 
-type SubscriptionChange struct{ Field, Value string }
-
 // SubscriptionRow is a subscription with its company's name and where it stands.
 type SubscriptionRow struct {
 	store.Subscription
