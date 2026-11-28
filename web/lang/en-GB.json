@@ -63,6 +63,10 @@
     "defaultMessage": "Place for {name}:",
     "description": "Before the buttons for the kinds of field to place on an agreement. {name} is the signer they are for"
   },
+  "/2ROzN": {
+    "defaultMessage": "Copied ✓",
+    "description": "The copy button once it has copied the secret"
+  },
   "/44NV6": {
     "defaultMessage": "An owner makes keys.",
     "description": "In place of the form for a new API key, for a member who isn't an owner"
@@ -86,6 +90,10 @@
   "/Tjak5": {
     "defaultMessage": "Start a draft above, then see who it would go to.",
     "description": "Hint when an organisation has no campaigns"
+  },
+  "/Ui2kK": {
+    "defaultMessage": "Webhooks",
+    "description": "Heading of the agents page's section of endpoints the organisation's events are posted to"
   },
   "/bDFuM": {
     "defaultMessage": "Delete {name}? Its runs stop and its key is revoked; what it found stays.",
@@ -455,6 +463,10 @@
     "defaultMessage": "Several organisations, one login",
     "description": "Heading of a feature card on the front page"
   },
+  "4JILpW": {
+    "defaultMessage": "taken · {code}",
+    "description": "A delivery the endpoint took. {code} is the HTTP status"
+  },
   "4KnQ8O": {
     "defaultMessage": "<b>{kind}</b><muted> with {person}</muted>",
     "description": "Heading of a renewal or expansion's card. {kind} is the kind of deal, such as Renewal; {person} is who it is with"
@@ -534,6 +546,10 @@
   "5E4w2C": {
     "defaultMessage": "met",
     "description": "A company's criterion is met"
+  },
+  "5IW/kP": {
+    "defaultMessage": "When",
+    "description": "Column heading: when a delivery was made"
   },
   "5JeqPz": {
     "defaultMessage": "Junk",
@@ -647,6 +663,10 @@
     "defaultMessage": "How each agent is doing",
     "description": "Heading of each agent's record of what people did with its suggestions"
   },
+  "6ZliXC": {
+    "defaultMessage": "Address",
+    "description": "Label of an endpoint's https address"
+  },
   "6dTQKZ": {
     "defaultMessage": "{n} cancelled",
     "description": "Count of a campaign's mails cancelled, in the line under its name"
@@ -687,6 +707,10 @@
     "defaultMessage": "No steps written yet",
     "description": "When the organisation has written no onboarding steps"
   },
+  "7Pd4MO": {
+    "defaultMessage": "What it is sent",
+    "description": "Label above the events an endpoint can be sent, as checkboxes"
+  },
   "7QmOpI": {
     "defaultMessage": "Single sign-on",
     "description": "Title of the page to sign in through an organisation's own provider"
@@ -698,6 +722,10 @@
   "7UEJYq": {
     "defaultMessage": "This organisation couldn't be opened",
     "description": "Heading of the page shown when an organisation fails to load"
+  },
+  "7YlTbn": {
+    "defaultMessage": "Sent",
+    "description": "Label before the events an endpoint is sent"
   },
   "7aLALl": {
     "defaultMessage": "Let people at your company's email domains sign in through your own provider: {providers} or anything else that speaks {oidc}.",
@@ -851,6 +879,10 @@
     "defaultMessage": "{first}, {second}",
     "description": "Two notes under a suggested detail, such as 'a guess' and 'in place of …'"
   },
+  "9wIDCS": {
+    "defaultMessage": "stopped {when} · {why} · with the key {key}",
+    "description": "Under an endpoint that was stopped. {when} is when, {why} why, {key} its API key's name"
+  },
   "9wLRa3": {
     "defaultMessage": "LinkedIn adds",
     "description": "Fourth in the list of what the Today page shows first: connection requests to send on LinkedIn"
@@ -950,6 +982,18 @@
   "BQ+Tmb": {
     "defaultMessage": "Then",
     "description": "Label of what happens when a subscription's term ends"
+  },
+  "Bco8ow": {
+    "defaultMessage": "Events",
+    "description": "Label above the events a new endpoint is sent"
+  },
+  "BdH+qr": {
+    "defaultMessage": "not sent",
+    "description": "A delivery dropped because its endpoint was stopped or its key revoked"
+  },
+  "BhEOIe": {
+    "defaultMessage": "New secret",
+    "description": "Button giving an endpoint a new signing secret"
   },
   "BjVmO+": {
     "defaultMessage": "Nothing yet.",
@@ -1563,6 +1607,10 @@
     "defaultMessage": "Companies",
     "description": "Title of the page listing every company"
   },
+  "JjrCrY": {
+    "defaultMessage": "If you lose it, give the endpoint a new secret: for a day, posts are signed with both.",
+    "description": "Under an endpoint's secret"
+  },
   "JjxF8R": {
     "defaultMessage": "Agents' notes",
     "description": "Heading of the notes agents left on a search"
@@ -1662,6 +1710,10 @@
   "L6iW3x": {
     "defaultMessage": "No search open.",
     "description": "On the research page when no search is open"
+  },
+  "LARsVT": {
+    "defaultMessage": "Saved ✓",
+    "description": "After an endpoint's events are saved"
   },
   "LG+8gx": {
     "defaultMessage": "Self-host in four commands.",
@@ -1871,6 +1923,10 @@
     "defaultMessage": "The LinkedIn queue: the connection note ready to copy, with keyboard shortcuts",
     "description": "Alt text of a screenshot of the app's LinkedIn queue"
   },
+  "O2eNSs": {
+    "defaultMessage": "sending · with the key {key}",
+    "description": "Under an endpoint that is being sent to. {key} is the name of its API key"
+  },
   "O3c/qR": {
     "defaultMessage": "Faster: from LinkedIn itself",
     "description": "Heading of the panel about the bookmarklet"
@@ -1882,6 +1938,10 @@
   "O3zy1f": {
     "defaultMessage": "{per, select, year {{figure} a year} month {{figure} a month} other {{figure} a {per}}}",
     "description": "A subscription's price. {figure} is the amount with its currency, {per} the period (year or month)"
+  },
+  "O9LCAi": {
+    "defaultMessage": "Its signing secret, shown only now:",
+    "description": "Above an endpoint's new secret"
   },
   "OFMRAO": {
     "defaultMessage": "{name} · {email}",
@@ -2098,6 +2158,10 @@
   "QTmUBQ": {
     "defaultMessage": "{by} replied · {at}",
     "description": "Above a reply in an enquiry's thread. {by} is who replied, {at} the date and time"
+  },
+  "QXeZss": {
+    "defaultMessage": "Save",
+    "description": "Button saving which events an endpoint is sent"
   },
   "QYg3/2": {
     "defaultMessage": "{n} / {max} chars",
@@ -2427,6 +2491,10 @@
     "defaultMessage": "{days} days without a reply",
     "description": "Beside the field for how many days to wait for a reply before following up. {days} is that field"
   },
+  "UePXLu": {
+    "defaultMessage": "Make a key that can read first, under Who works here.",
+    "description": "Instead of the key choice when no key has the read scope; Who works here is a section of the page"
+  },
   "UepY9r": {
     "defaultMessage": "It may be in another organisation, or the link is wrong.",
     "description": "When a task's page is opened for a task that isn't there: why"
@@ -2438,6 +2506,10 @@
   "UkanjM": {
     "defaultMessage": "Junked",
     "description": "A company's verdict for an offering: ruled out"
+  },
+  "UoZFGX": {
+    "defaultMessage": "Tries",
+    "description": "Column heading: how many times a delivery was tried"
   },
   "UtYZXR": {
     "defaultMessage": "Team",
@@ -2502,6 +2574,10 @@
   "Vk7CpX": {
     "defaultMessage": "Sidebar",
     "description": "What a screen reader calls the sidebar of every page in an organisation"
+  },
+  "VrB7gL": {
+    "defaultMessage": "Remove",
+    "description": "Button removing an endpoint"
   },
   "VwX+MR": {
     "defaultMessage": "Agents look for what you write. Settings › What you look for adds what they check at every company. <link>Change them</link>",
@@ -2927,6 +3003,10 @@
     "defaultMessage": "Enter a number, or 0 for none.",
     "description": "When a number field of a subscription was emptied"
   },
+  "bhywpy": {
+    "defaultMessage": "trying again {when} · {code}",
+    "description": "A delivery that failed and will be tried again. {when} is when, {code} the HTTP status"
+  },
   "bj8fFc": {
     "defaultMessage": "Copied ✓",
     "description": "The copy button's label once it has copied the address"
@@ -3151,6 +3231,10 @@
     "defaultMessage": "notice given",
     "description": "A subscription's status: the customer has given notice to end it"
   },
+  "eHMToe": {
+    "defaultMessage": "Last sent",
+    "description": "Label above the list of an endpoint's latest deliveries"
+  },
   "eQ0Zc+": {
     "defaultMessage": "Kept. Type a new one to replace it",
     "description": "Placeholder in the client secret field when one is already saved"
@@ -3258,6 +3342,10 @@
   "fxtUXV": {
     "defaultMessage": "Sell more than one thing? Each offering gets its own look-for list and queue, so a company that is wrong for one can still be right for another. Every fact keeps its source.",
     "description": "Second paragraph of the front page's step about the Research page"
+  },
+  "fya6ll": {
+    "defaultMessage": "Add",
+    "description": "Button adding an endpoint"
   },
   "fzP2kj": {
     "defaultMessage": "Say who you're looking for and an agent goes to find them. What agents, jobs and imports find waits here: nothing reaches outreach until someone qualifies it and picks a contact. Every fact keeps the link it came from.",
@@ -3447,6 +3535,18 @@
     "defaultMessage": "ending",
     "description": "A subscription's status: it ends at the end of its term"
   },
+  "hwzOfH": {
+    "defaultMessage": "It is sent only what this key may read, and nothing once the key is revoked.",
+    "description": "Under the endpoint's key choice"
+  },
+  "hyPlCy": {
+    "defaultMessage": "Nothing is sent anywhere yet.",
+    "description": "In the Webhooks section when no endpoint is set up"
+  },
+  "i1YhL/": {
+    "defaultMessage": "Change",
+    "description": "On an endpoint's card: opens what can be changed about it"
+  },
   "i28Gr1": {
     "defaultMessage": "Companies your agents and discovery jobs add will wait here.",
     "description": "On the research page when nothing is waiting to be reviewed"
@@ -3474,6 +3574,10 @@
   "iDuNyR": {
     "defaultMessage": "Prepare for signing",
     "description": "Title of the page preparing an agreement to be signed"
+  },
+  "iHXNmZ": {
+    "defaultMessage": "https, on the internet: nothing is posted to a private address.",
+    "description": "Under the endpoint address field"
   },
   "iI+i6h": {
     "defaultMessage": "That didn't work. Try again.",
@@ -3558,6 +3662,10 @@
   "jSsJTy": {
     "defaultMessage": "Rejected before",
     "description": "Why a company a search came to was left out: it was rejected before"
+  },
+  "jU4UrH": {
+    "defaultMessage": "Copy",
+    "description": "Button copying an endpoint's secret"
   },
   "jVc7oA": {
     "defaultMessage": "Searches",
@@ -3687,6 +3795,10 @@
     "defaultMessage": "Found by",
     "description": "Small heading over who found the company"
   },
+  "lgcH5X": {
+    "defaultMessage": "given up · {code}",
+    "description": "A delivery given up for good. {code} is the HTTP status, 0 if unreachable"
+  },
   "lhN4WM": {
     "defaultMessage": "It shows the steps that are yours while they set you up. Opening it here keeps it open in this browser for 30 days. The link works once.",
     "description": "What a customer's onboarding page is, before they open it"
@@ -3751,6 +3863,14 @@
     "defaultMessage": "Port",
     "description": "What a screen reader calls the mail server's port field"
   },
+  "mYChyH": {
+    "defaultMessage": "Key",
+    "description": "Label of the API key an endpoint is sent events as"
+  },
+  "malLjX": {
+    "defaultMessage": "Send again",
+    "description": "Button to start sending to an endpoint that was stopped"
+  },
   "mfLMho": {
     "defaultMessage": "Set next steps",
     "description": "In the Do now panel, beside a count of conversations needing a next step"
@@ -3758,6 +3878,10 @@
   "mhUdf/": {
     "defaultMessage": "Everything due across LinkedIn, email and phone, in this order:",
     "description": "Before a numbered list of what the Today page shows first"
+  },
+  "miItOE": {
+    "defaultMessage": "Stop",
+    "description": "Button to stop sending to an endpoint"
   },
   "mjBZXe": {
     "defaultMessage": "Who signs it",
@@ -3811,6 +3935,10 @@
     "defaultMessage": "<b>{agent}</b> · {state}",
     "description": "An agent's run on a search. {agent} is its name; {state} where its run is, such as finished"
   },
+  "naKg6T": {
+    "defaultMessage": "How it went",
+    "description": "Column heading: whether a delivery was taken"
+  },
   "nhv3JJ": {
     "defaultMessage": "Add an agent",
     "description": "Heading of the ways to add an agent"
@@ -3826,6 +3954,14 @@
   "np+FZ1": {
     "defaultMessage": "Who are you looking for?",
     "description": "Label of the box where a search is described"
+  },
+  "npIEEw": {
+    "defaultMessage": "Stop sending to {url} for good?",
+    "description": "Asked before removing an endpoint. {url} is its address"
+  },
+  "npap9+": {
+    "defaultMessage": "Event",
+    "description": "Column heading: the kind of event delivered"
   },
   "nppeRC": {
     "defaultMessage": "Email them a link",
@@ -3898,6 +4034,10 @@
   "oyGplP": {
     "defaultMessage": "Your own",
     "description": "Name of the organisation's own offering, when its name hasn't loaded"
+  },
+  "oyyljK": {
+    "defaultMessage": "Give {url} a new secret? The old one keeps signing for a day.",
+    "description": "Asked before giving an endpoint a new secret. {url} is its address"
   },
   "p3QEcq": {
     "defaultMessage": "Nothing to review",
@@ -4099,6 +4239,10 @@
     "defaultMessage": "Fit",
     "description": "Heading of how well a company fits, and what a screen reader calls the grade to qualify it at"
   },
+  "s7QSdk": {
+    "defaultMessage": "Add an endpoint",
+    "description": "Heading of the form adding an endpoint"
+  },
   "sAXDZu": {
     "defaultMessage": "Company",
     "description": "What a screen reader calls a company's page while it loads"
@@ -4251,6 +4395,10 @@
     "defaultMessage": "e.g. send renewal terms",
     "description": "Placeholder of a renewal or expansion's next step field: an example step"
   },
+  "tvsPRQ": {
+    "defaultMessage": "Check each post with it: deliveries are signed as <link>Standard Webhooks</link> sign them, which has a library for most languages.",
+    "description": "After an endpoint is added. <link> goes to the Standard Webhooks site, a name"
+  },
   "tzSPbm": {
     "defaultMessage": "{vendor} is told each person's name and their company's domain.",
     "description": "Under a data vendor's settings: what it is sent about a person. {vendor} is its name, Hunter"
@@ -4262,6 +4410,10 @@
   "u1umDV": {
     "defaultMessage": "Minutes",
     "description": "What a screen reader calls the field for how many minutes to wait before falling back"
+  },
+  "u6gwwT": {
+    "defaultMessage": "Nothing sent yet.",
+    "description": "In an endpoint's deliveries when none has been sent"
   },
   "u91Ufh": {
     "defaultMessage": "Agents",
@@ -4454,6 +4606,10 @@
   "wRJhmv": {
     "defaultMessage": "{months, plural, one {# month} other {# months}}, then {after}",
     "description": "A subscription's term: how many months it is committed for, then what happens"
+  },
+  "wTSsG4": {
+    "defaultMessage": "{prospector} posts to your systems as things happen: a company added, a person marked, a deal changed. Each endpoint uses one of your keys and is sent only what that key may read: ids and links, which your system reads back with the key.",
+    "description": "Under the heading of the Webhooks section. {prospector} is the product's name"
   },
   "waRVnL": {
     "defaultMessage": "Messages",
@@ -4750,6 +4906,10 @@
   "zec65k": {
     "defaultMessage": "All",
     "description": "Filter on the Enquiries page showing every enquiry"
+  },
+  "zoMTdr": {
+    "defaultMessage": "Signing secret",
+    "description": "What a screen reader calls an endpoint's secret"
   },
   "zrp8FV": {
     "defaultMessage": "Caller name",
