@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/onboarding"
 )
 
 const fourSteps = "them: Name a project lead, 2 days\nthem: Send your product files, 7 days\n\nKick-off call, 10 days\nus: Go live"
@@ -45,7 +47,7 @@ func TestACustomerIsOnboardedStepByStep(t *testing.T) {
 	o := mustOrg(t, s, "alpha")
 	person := repliedPerson(t, s, o, "Hannah Pryce")
 	company := *person.CompanyID
-	in := OnboardingIn{Company: company, Name: "Leith site", Start: "2026-11-02"}
+	in := onboarding.OnboardingIn{Company: company, Name: "Leith site", Start: "2026-11-02"}
 	if _, err := s.StartOnboarding(o.ID, in, "Ada Lovelace"); err == nil {
 		t.Error("an onboarding was started with no steps written")
 	}
@@ -53,7 +55,7 @@ func TestACustomerIsOnboardedStepByStep(t *testing.T) {
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	for why, bad := range map[string]OnboardingIn{"no start": {Company: company}, "no company": {Company: company + 99, Start: "2026-11-02"}} {
+	for why, bad := range map[string]onboarding.OnboardingIn{"no start": {Company: company}, "no company": {Company: company + 99, Start: "2026-11-02"}} {
 		if _, err := s.StartOnboarding(o.ID, bad, "Ada Lovelace"); err == nil {
 			t.Errorf("an onboarding with %s was started", why)
 		}
@@ -143,7 +145,7 @@ func TestACustomerIsOnboardedStepByStep(t *testing.T) {
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	second := must(s.StartOnboarding(o.ID, OnboardingIn{Company: company, Name: "Perth site", Start: "2026-11-01"}, "Ada Lovelace"))
+	second := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: company, Name: "Perth site", Start: "2026-11-01"}, "Ada Lovelace"))
 	if rows := must(s.Onboardings(o.ID, 0, "2026-11-13")); len(rows) != 2 || rows[0].ID != second.ID || rows[0].Late != 3 {
 		t.Errorf("two onboardings, the late one first: %+v", rows)
 	}
@@ -303,7 +305,7 @@ func TestAWonDealSaysWhenItsCompanyIsOnboarded(t *testing.T) {
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	must(s.StartOnboarding(o.ID, OnboardingIn{Company: *won.CompanyID, Start: today()}, "Ada Lovelace"))
+	must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *won.CompanyID, Start: today()}, "Ada Lovelace"))
 	step := must(s.Onboardings(o.ID, 0, today()))[0].Steps[0]
 	if err := s.SetOnboardingStep(o.ID, step.ID, "done", "yes", "Ada Lovelace"); err != nil {
 		t.Fatal(err)

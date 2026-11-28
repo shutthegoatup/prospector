@@ -8,6 +8,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/signing"
 )
 
 // uploads holds the one operation that takes a file: the body must be a PDF and not
@@ -22,8 +23,8 @@ func uploads(f api.StrictHandlerFunc, op string) api.StrictHandlerFunc {
 			writeProblem(w, r, http.StatusUnsupportedMediaType, say.New("send the document as application/pdf"))
 			return nil, nil
 		}
-		if r.ContentLength > agreementFileLimit {
-			writeProblem(w, r, http.StatusRequestEntityTooLarge, say.Errorf("a document is %d MB at most", agreementFileLimit>>20))
+		if r.ContentLength > signing.AgreementFileLimit {
+			writeProblem(w, r, http.StatusRequestEntityTooLarge, say.Errorf("a document is %d MB at most", signing.AgreementFileLimit>>20))
 			return nil, nil
 		}
 		out, err := f(ctx, w, r, in)

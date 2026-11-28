@@ -6,6 +6,8 @@ import (
 	"net/http/cookiejar"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/privacy"
 )
 
 func TestExportOrg(t *testing.T) {
@@ -81,7 +83,7 @@ func TestExportOrg(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("export: %d %s", code, body)
 	}
-	var out OrgExport
+	var out privacy.OrgExport
 	do(json.Unmarshal([]byte(body), &out))
 	if out.Organisation.Slug != "alpha" || len(out.Members) != 2 || out.Members[1].Email != "bob@example.com" || out.Members[1].Role != "member" {
 		t.Fatalf("organisation and members: %+v %+v", out.Organisation, out.Members)

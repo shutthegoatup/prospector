@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 func TestTheTasksPageHasPages(t *testing.T) {
@@ -77,7 +79,7 @@ func apiPages(t *testing.T, client *http.Client, u string) []apiPage {
 func TestTheEnquiriesPageHasPages(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
-	rows := make([]Enquiry, enquiryPageSize+1)
+	rows := make([]Enquiry, tickets.EnquiryPageSize+1)
 	for i := range rows {
 		rows[i] = Enquiry{OrgID: o.ID, Kind: "demo", Name: fmt.Sprint("Sender ", i), Email: fmt.Sprintf("sender%d@larkmoor.example", i),
 			Message: "Could you show us?", CreatedAt: time.Now().Add(time.Duration(i) * time.Second)}
@@ -85,25 +87,25 @@ func TestTheEnquiriesPageHasPages(t *testing.T) {
 	if err := s.DB.CreateInBatches(rows, 50).Error; err != nil {
 		t.Fatal(err)
 	}
-	first, pg, err := s.Enquiries(o.ID, EnquiryFilter{}, 1)
-	if err != nil || len(first) != enquiryPageSize || pg.Pages() != 2 || pg.Total != len(rows) || first[0].Name != fmt.Sprint("Sender ", enquiryPageSize) {
+	first, pg, err := s.Enquiries(o.ID, tickets.EnquiryFilter{}, 1)
+	if err != nil || len(first) != tickets.EnquiryPageSize || pg.Pages() != 2 || pg.Total != len(rows) || first[0].Name != fmt.Sprint("Sender ", tickets.EnquiryPageSize) {
 		t.Fatalf("the first page: %d rows, %+v, newest %q, %v", len(first), pg, first[0].Name, err)
 	}
-	second, pg, err := s.Enquiries(o.ID, EnquiryFilter{}, 2)
+	second, pg, err := s.Enquiries(o.ID, tickets.EnquiryFilter{}, 2)
 	if err != nil || len(second) != 1 || pg.N != 2 || second[0].Name != "Sender 0" {
 		t.Fatalf("the second page: %d rows, %+v, %v", len(second), pg, err)
 	}
 	// A page that is no longer there shows the last one, not nothing.
-	if beyond, pg, err := s.Enquiries(o.ID, EnquiryFilter{}, 9); err != nil || len(beyond) != 1 || pg.N != 2 {
+	if beyond, pg, err := s.Enquiries(o.ID, tickets.EnquiryFilter{}, 9); err != nil || len(beyond) != 1 || pg.N != 2 {
 		t.Fatalf("a page past the end: %d rows, %+v, %v", len(beyond), pg, err)
 	}
-	if none, pg, err := s.Enquiries(o.ID, EnquiryFilter{Kind: "support"}, 1); err != nil || len(none) != 0 || pg.Pages() != 1 {
+	if none, pg, err := s.Enquiries(o.ID, tickets.EnquiryFilter{Kind: "support"}, 1); err != nil || len(none) != 0 || pg.Pages() != 1 {
 		t.Fatalf("a filter that matches nothing: %d rows, %+v, %v", len(none), pg, err)
 	}
 
 	// The app walks the same list through the API, its filter kept from page to page.
-	pages := apiPages(t, client, srv.URL+"/o/alpha/api/v1/enquiries?kind=demo&limit="+fmt.Sprint(enquiryPageSize))
-	if len(pages) != 2 || len(pages[0].Items) != enquiryPageSize || len(pages[1].Items) != 1 || pages[1].Items[0]["email"] != "sender0@larkmoor.example" {
+	pages := apiPages(t, client, srv.URL+"/o/alpha/api/v1/enquiries?kind=demo&limit="+fmt.Sprint(tickets.EnquiryPageSize))
+	if len(pages) != 2 || len(pages[0].Items) != tickets.EnquiryPageSize || len(pages[1].Items) != 1 || pages[1].Items[0]["email"] != "sender0@larkmoor.example" {
 		t.Fatalf("the enquiries, a page at a time: %d pages", len(pages))
 	}
 	for _, e := range pages[0].Items {

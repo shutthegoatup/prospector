@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/sales"
 )
 
 func TestMonthsAreAddedWithoutSpillingIntoTheNext(t *testing.T) {
@@ -31,7 +32,7 @@ func TestMonthsAreAddedWithoutSpillingIntoTheNext(t *testing.T) {
 func TestWhereASubscriptionStands(t *testing.T) {
 	t.Parallel()
 	day := func(s string) *string { return &s }
-	yearly := Subscription{Start: "2026-01-12", TermMonths: 12, Then: ThenRenews, NoticeDays: 60, Per: PerYear}
+	yearly := Subscription{Start: "2026-01-12", TermMonths: 12, Then: sales.ThenRenews, NoticeDays: 60, Per: PerYear}
 	withNotice := func(on string) Subscription { s := yearly; s.NoticeOn = day(on); return s }
 	endedEarly := yearly
 	endedEarly.EndedOn = day("2026-06-30")
@@ -39,7 +40,7 @@ func TestWhereASubscriptionStands(t *testing.T) {
 	longNotice := Subscription{Start: "2026-01-01", Per: PerMonth, NoticeDays: 90}
 	longNoticeGiven := longNotice
 	longNoticeGiven.NoticeOn = day("2026-01-10")
-	leap := Subscription{Start: "2024-02-29", TermMonths: 12, Then: ThenRenews, NoticeDays: 30, Per: PerYear}
+	leap := Subscription{Start: "2024-02-29", TermMonths: 12, Then: sales.ThenRenews, NoticeDays: 30, Per: PerYear}
 	fixed := Subscription{Start: "2026-01-01", TermMonths: 24, Then: ThenEnds, Per: PerYear}
 	rolling := Subscription{Start: "2026-01-01", TermMonths: 6, Then: ThenRolls, NoticeDays: 30, Per: PerMonth}
 
@@ -95,8 +96,8 @@ func TestASubscriptionIsRecordedAgainstACompany(t *testing.T) {
 	o := mustOrg(t, s, "alpha")
 	person := repliedPerson(t, s, o, "Hannah Pryce")
 	company := *person.CompanyID
-	ok := SubscriptionIn{Company: company, Name: "Standard plan, 2 sites", Amount: "14,000", Start: "2026-01-12", TermMonths: 12, NoticeDays: 60}
-	for why, bad := range map[string]SubscriptionIn{
+	ok := sales.SubscriptionIn{Company: company, Name: "Standard plan, 2 sites", Amount: "14,000", Start: "2026-01-12", TermMonths: 12, NoticeDays: 60}
+	for why, bad := range map[string]sales.SubscriptionIn{
 		"no name":        {Company: company, Start: "2026-01-12"},
 		"no start":       {Company: company, Name: "Plan"},
 		"a bad price":    {Company: company, Name: "Plan", Start: "2026-01-12", Amount: "plenty"},
@@ -110,16 +111,16 @@ func TestASubscriptionIsRecordedAgainstACompany(t *testing.T) {
 		}
 	}
 	sub := must(s.AddSubscription(o.ID, ok, "Ada Lovelace"))
-	if sub.Amount != 1400000 || sub.Currency != "GBP" || sub.Per != PerYear || sub.Then != ThenRenews {
+	if sub.Amount != 1400000 || sub.Currency != "GBP" || sub.Per != PerYear || sub.Then != sales.ThenRenews {
 		t.Fatalf("the subscription recorded: %+v", sub)
 	}
-	second := must(s.AddSubscription(o.ID, SubscriptionIn{Company: company, Name: "Support hours", Amount: "300", Per: PerMonth, Start: "2026-03-01"}, "Ada Lovelace"))
+	second := must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: company, Name: "Support hours", Amount: "300", Per: PerMonth, Start: "2026-03-01"}, "Ada Lovelace"))
 
 	rows := must(s.Subscriptions(o.ID, 0, "2026-10-01"))
 	if len(rows) != 2 || rows[0].ID != second.ID || rows[0].Company != "Larkmoor Yachts" || rows[1].CancelBy != "2026-11-13" {
 		t.Fatalf("the list on 1 October, soonest first: %+v", rows)
 	}
-	if got := contracted(rows); got != "£17,600" {
+	if got := sales.Contracted(rows); got != "£17,600" {
 		t.Errorf("contracted for the year: %q, want the yearly one and twelve of the monthly", got)
 	}
 	if only := must(s.Subscriptions(o.ID, company+99, "2026-10-01")); len(only) != 0 {
@@ -267,7 +268,7 @@ func TestTodayPointsAtSubscriptionsComingDue(t *testing.T) {
 	on := func(days int) string { return now.AddDate(0, 0, days).Format(dayLayout) }
 	// A year-long term that began 11 months ago ends in about a month; its day to cancel by is nearer still.
 	record := func(start string, notice int) *Subscription {
-		return must(s.AddSubscription(o.ID, SubscriptionIn{Company: *person.CompanyID, Name: "Plan", Start: start, TermMonths: 12, NoticeDays: notice}, "Ada Lovelace"))
+		return must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *person.CompanyID, Name: "Plan", Start: start, TermMonths: 12, NoticeDays: notice}, "Ada Lovelace"))
 	}
 	if dueSubs(t, client, srv.URL) != 0 {
 		t.Fatal("Today points at subscriptions when there are none")
@@ -318,8 +319,8 @@ func TestTodayPointsAtSubscriptionsComingDue(t *testing.T) {
 
 	// A plan that turns over every month always has a term ending within the month:
 	// that is routine, until it has a day it stops.
-	monthly := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *person.CompanyID, Name: "Monthly", Per: PerMonth, Start: on(-100)}, "Ada Lovelace"))
-	rolled := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *person.CompanyID, Name: "Rolled", Per: PerMonth, Start: now.AddDate(0, -8, 0).Format(dayLayout), TermMonths: 6, Then: ThenRolls}, "Ada Lovelace"))
+	monthly := must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *person.CompanyID, Name: "Monthly", Per: PerMonth, Start: on(-100)}, "Ada Lovelace"))
+	rolled := must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *person.CompanyID, Name: "Rolled", Per: PerMonth, Start: now.AddDate(0, -8, 0).Format(dayLayout), TermMonths: 6, Then: ThenRolls}, "Ada Lovelace"))
 	if dueSubs(t, client, srv.URL) != 0 {
 		t.Error("Today points at plans that only turn over monthly")
 	}
@@ -339,7 +340,7 @@ func TestTodayPointsAtSubscriptionsComingDue(t *testing.T) {
 		{Subscription{Start: "2026-01-01", Per: PerMonth, TermMonths: 6, Then: ThenRolls}, "2026-06-30", 6},
 		{Subscription{Start: "2026-01-01", Per: PerMonth, TermMonths: 6, Then: ThenRolls}, "2026-07-01", 1},
 		{Subscription{Start: "2026-01-01", Per: PerYear, TermMonths: 6, Then: ThenRolls}, "2026-07-01", 12},
-		{Subscription{Start: "2026-01-01", Per: PerMonth, TermMonths: 6, Then: ThenRenews}, "2027-03-01", 6},
+		{Subscription{Start: "2026-01-01", Per: PerMonth, TermMonths: 6, Then: sales.ThenRenews}, "2027-03-01", 6},
 	} {
 		if got := c.sub.MonthsNow(c.on); got != c.want {
 			t.Errorf("%+v on %s is in a term of %d months, want %d", c.sub, c.on, got, c.want)
@@ -358,11 +359,11 @@ func TestARenewalDealIsStartedFromASubscription(t *testing.T) {
 		t.Fatal(err)
 	}
 	start := mustDay(today()).AddDate(0, -11, 0).Format(dayLayout)
-	sub := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Amount: "1,500", Per: PerMonth, Start: start, TermMonths: 12, NoticeDays: 30}, "Ada Lovelace"))
-	ended := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *hannah.CompanyID, Name: "Old plan", Start: "2020-01-01", TermMonths: 12, Then: ThenEnds}, "Ada Lovelace"))
+	sub := must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Amount: "1,500", Per: PerMonth, Start: start, TermMonths: 12, NoticeDays: 30}, "Ada Lovelace"))
+	ended := must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *hannah.CompanyID, Name: "Old plan", Start: "2020-01-01", TermMonths: 12, Then: ThenEnds}, "Ada Lovelace"))
 
 	rows := must(s.Subscriptions(o.ID, 0, today()))
-	var row SubscriptionRow
+	var row sales.SubscriptionRow
 	for _, r := range rows {
 		if r.ID == sub.ID {
 			row = r

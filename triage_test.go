@@ -4,13 +4,15 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 func TestATriageKeyWorksEnquiriesButNotDeals(t *testing.T) {
 	t.Parallel()
 	s, o, srv, _ := signedIn(t)
 	c := repliedPerson(t, s, o, "Hannah Pryce")
-	help := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "support", Name: "Edsger Dijkstra", Email: "edsger@eindhoven.example", Message: "Colours look pale on phones"}))
+	help := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "support", Name: "Edsger Dijkstra", Email: "edsger@eindhoven.example", Message: "Colours look pale on phones"}))
 	base := srv.URL + "/o/alpha/api/v1/"
 	keyed := func(scopes ...string) *http.Client {
 		secret, _, err := s.CreateKey(o.ID, strings.Join(scopes, "+"), scopes, "test")

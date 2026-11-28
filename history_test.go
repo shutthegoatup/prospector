@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/paging"
 )
 
@@ -61,7 +62,7 @@ func TestHistoryKeepsNoPersonalDetails(t *testing.T) {
 	history := must(firstOf(s.History(o.ID, *hannah.CompanyID, 1)))
 	lines := map[string]bool{}
 	for _, h := range history {
-		lines[historyText(h).Error()] = true
+		lines[crm.HistoryText(h).Error()] = true
 	}
 	for _, want := range []string{"set phone · Hannah Pryce-Lindqvist", "set stage · Hannah Pryce-Lindqvist: meeting", "added · " + displayName(*nia), "suggested a contact · Jonas Lindqvist"} {
 		if !lines[want] {

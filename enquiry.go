@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 const (
@@ -96,7 +97,7 @@ func (a *App) intake(w http.ResponseWriter, r *http.Request) {
 	if org == nil {
 		return
 	}
-	var in EnquiryIn
+	var in tickets.EnquiryIn
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, enquiryBodyLimit)).Decode(&in); err != nil {
 		fail(w, r, say.New("the enquiry couldn't be read"), http.StatusBadRequest)
 		return
@@ -111,7 +112,7 @@ func (a *App) intake(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := a.s.AddEnquiry(org.ID, "form", in); err != nil {
 		code := http.StatusInternalServerError
-		if errors.Is(err, errEnquiryEmail) {
+		if errors.Is(err, tickets.ErrEnquiryEmail) {
 			code = http.StatusBadRequest
 		}
 		fail(w, r, err, code)

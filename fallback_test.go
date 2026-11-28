@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/agents"
 )
 
 func TestAWaitingAgentHandsItsTaskToItsFallback(t *testing.T) {
@@ -31,7 +33,7 @@ func TestAWaitingAgentHandsItsTaskToItsFallback(t *testing.T) {
 	maxRunning = 1
 	t.Cleanup(func() { maxRunning = was })
 	run := r.finished(t, must(r.a.StartRun(r.o.ID, r.task.ID, first.ID, "Ada Lovelace")).ID)
-	if run.Status != RunStopped || !strings.Contains(run.StopReason, "handed the task to Claude") || len(r.sleeps) != 0 {
+	if run.Status != agents.RunStopped || !strings.Contains(run.StopReason, "handed the task to Claude") || len(r.sleeps) != 0 {
 		t.Fatalf("a run facing an hour's wait should hand over at once: %+v, waited %v", run, r.sleeps)
 	}
 	var next AgentRun

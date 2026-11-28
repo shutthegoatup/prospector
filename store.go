@@ -9,6 +9,13 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/shutthegoatup/prospector/internal/agents"
+	"github.com/shutthegoatup/prospector/internal/onboarding"
+	"github.com/shutthegoatup/prospector/internal/privacy"
+	"github.com/shutthegoatup/prospector/internal/sales"
+	"github.com/shutthegoatup/prospector/internal/signing"
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 // Store is every area's queries, each area a type of its own embedded here so its
@@ -17,32 +24,32 @@ import (
 type Store struct {
 	*core
 	researchStore
-	privacyStore
+	privacy.PrivacyStore
 	outreachStore
-	agreementStore
-	enquiryStore
+	signing.AgreementStore
+	tickets.EnquiryStore
 	prospectingStore
 	crmStore
 	identityStore
-	agentStore
+	agents.AgentStore
 	ssoStore
 	suppressionStore
-	customerStore
-	dealStore
-	subscriptionStore
-	onboardingStore
+	onboarding.CustomerStore
+	sales.DealStore
+	sales.SubscriptionStore
+	onboarding.OnboardingStore
 }
 
 func newStore(c *core) *Store {
-	s := &Store{core: c, identityStore: identityStore{Core: c}, agentStore: agentStore{Core: c}, ssoStore: ssoStore{Core: c},
-		suppressionStore: suppressionStore{Core: c}, customerStore: customerStore{Core: c}, dealStore: dealStore{Core: c},
-		subscriptionStore: subscriptionStore{Core: c}, onboardingStore: onboardingStore{Core: c}, privacyStore: privacyStore{Core: c}}
+	s := &Store{core: c, identityStore: identityStore{Core: c}, AgentStore: agents.AgentStore{Core: c}, ssoStore: ssoStore{Core: c},
+		suppressionStore: suppressionStore{Core: c}, CustomerStore: onboarding.CustomerStore{Core: c}, DealStore: sales.DealStore{Core: c},
+		SubscriptionStore: sales.SubscriptionStore{Core: c}, OnboardingStore: onboarding.OnboardingStore{Core: c}, PrivacyStore: privacy.PrivacyStore{Core: c}}
 	// An area that needs another's queries holds that area, not the whole store.
-	s.crmStore = crmStore{Core: c, Sales: &s.dealStore}
+	s.crmStore = crmStore{Core: c, Sales: &s.DealStore}
 	s.prospectingStore = prospectingStore{Core: c, Identity: &s.identityStore, CRM: &s.crmStore}
-	s.enquiryStore = enquiryStore{Core: c, CRM: &s.crmStore}
-	s.agreementStore = agreementStore{Core: c, CRM: &s.crmStore, Identity: &s.identityStore}
-	s.outreachStore = outreachStore{Core: c, Identity: &s.identityStore, Suppression: &s.suppressionStore, Billing: &s.subscriptionStore}
+	s.EnquiryStore = tickets.EnquiryStore{Core: c, CRM: &s.crmStore}
+	s.AgreementStore = signing.AgreementStore{Core: c, CRM: &s.crmStore, Identity: &s.identityStore}
+	s.outreachStore = outreachStore{Core: c, Identity: &s.identityStore, Suppression: &s.suppressionStore, Billing: &s.SubscriptionStore}
 	s.researchStore = researchStore{Core: c, Prospecting: &s.prospectingStore, CRM: &s.crmStore, Identity: &s.identityStore, Outreach: &s.outreachStore}
 	return s
 }

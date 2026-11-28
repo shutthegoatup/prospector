@@ -18,7 +18,9 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/privacy"
 )
 
 func mustOrg(t *testing.T, s *Store, slug string) *Org {
@@ -110,7 +112,7 @@ func TestImportLegacy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	old.Exec(snapshotSchema)
+	old.Exec(privacy.SnapshotSchema)
 	old.Exec("alter table contacts add column accepted text")
 	old.Exec("insert into contacts (id, key, file, maker, person, first, linkedin_added, accepted) values (7, 'Ada Lovelace', 'x.md', 'Analytical Engines (UK)', 'Ada Lovelace, Countess', 'Ada', '2026-11-20', '2026-11-22')")
 	s := tempStore(t)
@@ -509,8 +511,8 @@ func TestAgentMarks(t *testing.T) {
 			h = append(h, it)
 		}
 	}
-	if len(h) != 1 || h[0].Actor != "agent:bot" || historyText(h[0]).Error() != "marked not interested · Hannah Pryce: Allan says no" {
-		t.Fatalf("decline history: %+v %q", h, historyText(h[0]).Error())
+	if len(h) != 1 || h[0].Actor != "agent:bot" || crm.HistoryText(h[0]).Error() != "marked not interested · Hannah Pryce: Allan says no" {
+		t.Fatalf("decline history: %+v %q", h, crm.HistoryText(h[0]).Error())
 	}
 }
 

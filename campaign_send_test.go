@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/sales"
 )
 
 // postbox records what a campaign would send and can be told how each mail goes.
@@ -469,7 +470,7 @@ func TestAServiceNoticeReachesCustomersWhoUnsubscribedButNobodyElse(t *testing.T
 	if err := s.DB.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AddSubscription(o.ID, SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"); err != nil {
+	if _, err := s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	person(t, s, o, "Never Mail", "Larkmoor Yachts", "never@larkmoor.example", false)
@@ -569,7 +570,7 @@ func TestAServiceNoticeStopsAtSomeoneNoLongerACustomer(t *testing.T) {
 	if err := s.DB.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
 		t.Fatal(err)
 	}
-	sub := must(s.AddSubscription(o.ID, SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"))
+	sub := must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"))
 	must(s.Suppress(o.ID, "tom@larkmoor.example", "Ada Lovelace"))
 	c := must(s.AddCampaign(o.ID, CampaignIn{Name: "Price change", Kind: KindService, Audience: AudienceCustomers, Subject: "Your price", Body: "It changes."}, "Ada Lovelace"))
 	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))

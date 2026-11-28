@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/privacy"
 )
 
 // A column added to Contact has to be carried by the snapshot, or be named here as
@@ -20,11 +22,11 @@ func TestASnapshotCarriesEveryContactColumn(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, f := range stmt.Schema.Fields {
-		if !slices.Contains(snapshotColumns, f.DBName) && !slices.Contains(rebuilt, f.DBName) {
+		if !slices.Contains(privacy.SnapshotColumns, f.DBName) && !slices.Contains(rebuilt, f.DBName) {
 			t.Errorf("contacts.%s is in no snapshot, so a restore would empty it: add it to laterColumns", f.DBName)
 		}
 	}
-	if len(laterColumns) != len((&Contact{}).Later()) {
+	if len(privacy.LaterColumns) != len((&Contact{}).Later()) {
 		t.Fatal("laterColumns and Contact.later() have drifted apart")
 	}
 }
@@ -72,8 +74,8 @@ func TestRestoreBringsBackEveryColumn(t *testing.T) {
 	for _, c := range before {
 		for i, f := range c.Later() {
 			// Between them the two hold something in every column: only one still waiting has a status.
-			if (c.ID == suggested) == (laterColumns[i] == "status") && deref(laterValue(f)) == "" {
-				t.Fatalf("the test leaves %s empty for contact %d, so it wouldn't notice it lost", laterColumns[i], c.ID)
+			if (c.ID == suggested) == (privacy.LaterColumns[i] == "status") && deref(privacy.LaterValue(f)) == "" {
+				t.Fatalf("the test leaves %s empty for contact %d, so it wouldn't notice it lost", privacy.LaterColumns[i], c.ID)
 			}
 		}
 	}
@@ -104,10 +106,10 @@ func TestAnOlderSnapshotLeavesLaterColumnsAlone(t *testing.T) {
 	older := ""
 	for _, c := range before {
 		older += fmt.Sprintf("insert into contacts (id, key, file, maker, person, email) values (%d, %s, 'leads.md', %s, %s, %s);\n",
-			c.ID, sqlQuote(&c.Key), sqlQuote(c.Maker), sqlQuote(c.Person), sqlQuote(c.Email))
+			c.ID, privacy.SqlQuote(&c.Key), privacy.SqlQuote(c.Maker), privacy.SqlQuote(c.Person), privacy.SqlQuote(c.Email))
 	}
-	rows, absent, err := parseInserts(older)
-	if err != nil || len(rows) != len(before) || !slices.Equal(absent, laterColumns) {
+	rows, absent, err := privacy.ParseInserts(older)
+	if err != nil || len(rows) != len(before) || !slices.Equal(absent, privacy.LaterColumns) {
 		t.Fatalf("an older snapshot should name none of the later columns: %d rows, absent %v, %v", len(rows), absent, err)
 	}
 	if _, err := s.Restore(o.ID, older); err != nil {
@@ -115,8 +117,8 @@ func TestAnOlderSnapshotLeavesLaterColumnsAlone(t *testing.T) {
 	}
 	for i, c := range contactsOf(t, s, o.ID) {
 		for j, f := range c.Later() {
-			if got, want := deref(laterValue(f)), deref(laterValue(before[i].Later()[j])); got != want {
-				t.Errorf("%s: %s was %q and is now %q", c.Key, laterColumns[j], want, got)
+			if got, want := deref(privacy.LaterValue(f)), deref(privacy.LaterValue(before[i].Later()[j])); got != want {
+				t.Errorf("%s: %s was %q and is now %q", c.Key, privacy.LaterColumns[j], want, got)
 			}
 		}
 	}

@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/tz"
 )
@@ -60,7 +61,7 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 		if err := importCompanies(tx, org, p.Companies); err != nil {
 			return err
 		}
-		if err := linkCompanies(tx, org, p.Companies); err != nil {
+		if err := privacy.LinkCompanies(tx, org, p.Companies); err != nil {
 			return err
 		}
 		var missing []Contact
@@ -147,17 +148,17 @@ func knownMakers(tx *gorm.DB, org int64) (string, error) {
 
 // importCompanies keeps the Python tracker's "org:" placeholder contacts so the
 // snapshot stays the same file; the companies table is filled by linkCompanies.
-func importCompanies(tx *gorm.DB, org int64, companies []CompanyRow) error {
+func importCompanies(tx *gorm.DB, org int64, companies []privacy.CompanyRow) error {
 	known, err := knownMakers(tx, org)
 	if err != nil {
 		return err
 	}
 	for _, r := range companies {
 		name := r["name"]
-		if strings.Contains(known, companyStem(name)) {
+		if strings.Contains(known, privacy.CompanyStem(name)) {
 			continue
 		}
-		hold := competitorHold(r)
+		hold := privacy.CompetitorHold(r)
 		var flags []string
 		for _, x := range []string{r["segment"], r["fit_reason"], labelled("Buyer: ", r["buyer_role"]),
 			labelled("Configurator built by: ", r["configurator_built_by"])} {
@@ -199,7 +200,7 @@ func importCompanies(tx *gorm.DB, org int64, companies []CompanyRow) error {
 		return err
 	}
 	for _, o := range orgs {
-		if strings.Contains(known, companyStem(deref(o.Maker))) {
+		if strings.Contains(known, privacy.CompanyStem(deref(o.Maker))) {
 			if err := tx.Delete(&o).Error; err != nil {
 				return err
 			}

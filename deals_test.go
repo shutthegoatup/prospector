@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 func repliedPerson(t *testing.T, s *Store, o *Org, name string) *Contact {
@@ -540,8 +541,8 @@ func TestARobotWorksDealsAndEnquiriesAsItsScopesAllow(t *testing.T) {
 	}
 
 	// Enquiries: listed, tracked, and deleted only by a key given that, or an owner.
-	e := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Tom Ellery", Email: "tom@larkmoor.example", Message: "Do you cover Leith?"}))
-	spam := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: "Bot", Email: "bot@spam.example", Message: "hello", Trap: "caught"}))
+	e := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: "Tom Ellery", Email: "tom@larkmoor.example", Message: "Do you cover Leith?"}))
+	spam := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: "Bot", Email: "bot@spam.example", Message: "hello", Trap: "caught"}))
 	code, body = asKey(t, "GET", base+"enquiries", reader, nil)
 	if code != http.StatusOK || !strings.Contains(body, `"email":"tom@larkmoor.example"`) || strings.Contains(body, "bot@spam.example") || strings.Contains(body, `"next_cursor"`) || !strings.Contains(body, `"state":"open"`) {
 		t.Errorf("listing enquiries: %d %s", code, body)

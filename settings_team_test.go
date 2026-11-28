@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/say"
 )
 
@@ -365,7 +366,7 @@ func TestExportingEverythingThroughTheAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var out OrgExport
+	var out privacy.OrgExport
 	json.NewDecoder(res.Body).Decode(&out)
 	res.Body.Close()
 	if res.StatusCode != http.StatusOK || res.Header.Get("Cache-Control") != "no-store" || out.Organisation.Name == "" || len(out.Members) != 2 {

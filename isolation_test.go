@@ -8,10 +8,14 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/onboarding"
+	"github.com/shutthegoatup/prospector/internal/sales"
+	"github.com/shutthegoatup/prospector/internal/signing"
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 // Methods that aren't about one organisation: people and their sessions, making
@@ -264,13 +268,13 @@ func seedFirst(t *testing.T, s *Store) *Org {
 		func() error { return s.Mark(first.ID, 1, "replied", "2020-01-02", "Owner One") },
 		func() error {
 			// Made directly: an owner has to be a member's name, which wouldn't carry the mark.
-			return s.DB.Create(&Deal{OrgID: first.ID, ContactID: 1, Kind: DealNew, Owner: theirs + " owner"}).Error
+			return s.DB.Create(&Deal{OrgID: first.ID, ContactID: 1, Kind: sales.DealNew, Owner: theirs + " owner"}).Error
 		},
 		func() error {
 			return s.DB.Create(&Deal{OrgID: first.ID, ContactID: 1, Seq: 1, Kind: "renewal", Stage: "replied", Owner: theirs + " owner"}).Error
 		},
 		func() error {
-			_, err := s.AddSubscription(first.ID, SubscriptionIn{Company: 1, Name: theirs + " plan", Amount: "100", Start: "2020-01-02", TermMonths: 12}, "Owner One")
+			_, err := s.AddSubscription(first.ID, sales.SubscriptionIn{Company: 1, Name: theirs + " plan", Amount: "100", Start: "2020-01-02", TermMonths: 12}, "Owner One")
 			return err
 		},
 		func() error {
@@ -278,7 +282,7 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			if err := s.SaveOrg(first); err != nil {
 				return err
 			}
-			_, err := s.StartOnboarding(first.ID, OnboardingIn{Company: 1, Name: theirs + " site", Start: "2020-01-02"}, "Owner One")
+			_, err := s.StartOnboarding(first.ID, onboarding.OnboardingIn{Company: 1, Name: theirs + " site", Start: "2020-01-02"}, "Owner One")
 			return err
 		},
 		func() error {
@@ -293,7 +297,7 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			}
 			// The picked contact, so who signs carries the mark.
 			contact := int64(1)
-			r, err := s.AddRecipient(first, a.ID, RecipientSigner, &contact, nil, "Owner One")
+			r, err := s.AddRecipient(first, a.ID, signing.RecipientSigner, &contact, nil, "Owner One")
 			if err != nil {
 				return err
 			}
@@ -317,7 +321,7 @@ func seedFirst(t *testing.T, s *Store) *Org {
 			return err
 		},
 		func() error {
-			_, err := s.AddEnquiry(first.ID, "form", EnquiryIn{Name: theirs, Email: theirEmail, Message: theirs + " asks"})
+			_, err := s.AddEnquiry(first.ID, "form", tickets.EnquiryIn{Name: theirs, Email: theirEmail, Message: theirs + " asks"})
 			return err
 		},
 		func() error {
@@ -419,10 +423,10 @@ var saysNothingBack = map[string]bool{
 
 func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {
 	t.Parallel()
-	store := reflect.TypeOf(&Store{})
+	storeType := reflect.TypeOf(&Store{})
 	var methods []reflect.Method
-	for i := range store.NumMethod() {
-		m := store.Method(i)
+	for i := range storeType.NumMethod() {
+		m := storeType.Method(i)
 		// Not queries of their own but what the store's code writes them with (withinTheStore).
 		if acrossOrganisations[m.Name] || withinTheStore[m.Name] {
 			continue

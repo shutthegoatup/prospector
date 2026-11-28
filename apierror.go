@@ -18,6 +18,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/signing"
 )
 
 // ours reports a failure that is the server's rather than the caller's: the database,
@@ -141,7 +142,7 @@ func statusOf(err error) int {
 		return http.StatusBadGateway
 	case errors.As(err, &missing), errors.Is(err, gorm.ErrRecordNotFound):
 		return http.StatusNotFound
-	case errors.Is(err, errTampered):
+	case errors.Is(err, signing.ErrTampered):
 		return http.StatusInternalServerError
 	case errors.Is(err, errErased), errors.As(err, &clash), breaksRule(err):
 		return http.StatusConflict

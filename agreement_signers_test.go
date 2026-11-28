@@ -14,6 +14,8 @@ import (
 
 	"github.com/pdfcpu/pdfcpu/pkg/api"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
+
+	"github.com/shutthegoatup/prospector/internal/signing"
 )
 
 // preparing starts a draft for Larkmoor with a two-page document, and gives what a
@@ -74,8 +76,8 @@ func TestAnAgreementsSignersAreItsCompanysPeopleOrItsMembers(t *testing.T) {
 		t.Errorf("adding Hannah twice: %d", code)
 	}
 	_, body := call(t, member, "GET", recipients, "", nil)
-	list := items[Party](t, body)
-	if len(list) != 3 || list[0].Name != "Hannah Pryce" || list[0].Email != "hannah@larkmoor.example" || list[1].Name != "Ada Lovelace" || list[1].Email != "ada@example.com" || list[2].Role != RecipientCopy {
+	list := items[signing.Party](t, body)
+	if len(list) != 3 || list[0].Name != "Hannah Pryce" || list[0].Email != "hannah@larkmoor.example" || list[1].Name != "Ada Lovelace" || list[1].Email != "ada@example.com" || list[2].Role != signing.RecipientCopy {
 		t.Fatalf("who it goes to: %+v", list)
 	}
 
@@ -84,7 +86,7 @@ func TestAnAgreementsSignersAreItsCompanysPeopleOrItsMembers(t *testing.T) {
 		t.Errorf("moving Ada first: %d %s", code, out)
 	}
 	_, body = call(t, member, "GET", recipients, "", nil)
-	if list := items[Party](t, body); list[0].Name != "Ada Lovelace" || list[1].Name != "Hannah Pryce" {
+	if list := items[signing.Party](t, body); list[0].Name != "Ada Lovelace" || list[1].Name != "Hannah Pryce" {
 		t.Errorf("the order after moving: %+v", list)
 	}
 	ines := must(s.QuickAddPerson(o, QuickAdd{Name: "Ines Ward", Company: "Larkmoor Yachts", Email: "ines@larkmoor.example"}, "Ada Lovelace"))
@@ -100,8 +102,8 @@ func TestAnAgreementsSignersAreItsCompanysPeopleOrItsMembers(t *testing.T) {
 func TestFieldsLieOnTheDocumentForItsSigners(t *testing.T) {
 	t.Parallel()
 	s, o, base, member, a, hannah, theo := preparing(t)
-	signer := must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
-	copied := must(s.AddRecipient(o, a.ID, RecipientCopy, &theo.ID, nil, "Ada Lovelace"))
+	signer := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	copied := must(s.AddRecipient(o, a.ID, signing.RecipientCopy, &theo.ID, nil, "Ada Lovelace"))
 	fields := base + "/fields"
 	field := func(recipient int64, page int, kind string, x, y, w, h float64) map[string]any {
 		return map[string]any{"recipient_id": recipient, "page": page, "kind": kind, "x": x, "y": y, "w": w, "h": h}
@@ -165,11 +167,11 @@ func TestAnAgreementThatWentOutKeepsWhoItWentTo(t *testing.T) {
 	if err := s.AddMember(o.ID, grace.ID, "member", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	h := must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
-	g := must(s.AddRecipient(o, a.ID, RecipientSigner, nil, &grace.ID, "Ada Lovelace"))
+	h := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	g := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, nil, &grace.ID, "Ada Lovelace"))
 	must(s.PutAgreementFields(o.ID, a.ID, []AgreementField{{RecipientID: h.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.1, W: 0.3, H: 0.05}}))
 	draft := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Still a draft", "Ada Lovelace"))
-	must(s.AddRecipient(o, draft.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	must(s.AddRecipient(o, draft.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
 	if err := s.DB.Model(&Agreement{}).Where("id = ?", a.ID).Update("status", "sent").Error; err != nil {
 		t.Fatal(err)
 	}
@@ -227,9 +229,9 @@ func TestAnAgreementsRecipientsGoWithWhoTheyStandFor(t *testing.T) {
 	if err := s.AddMember(o.ID, grace.ID, "member", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	h := must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
-	g := must(s.AddRecipient(o, a.ID, RecipientSigner, nil, &grace.ID, "Ada Lovelace"))
-	must(s.AddRecipient(o, a.ID, RecipientSigner, &theo.ID, nil, "Ada Lovelace"))
+	h := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	g := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, nil, &grace.ID, "Ada Lovelace"))
+	must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &theo.ID, nil, "Ada Lovelace"))
 	must(s.PutAgreementFields(o.ID, a.ID, []AgreementField{
 		{RecipientID: h.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.1, W: 0.3, H: 0.05},
 		{RecipientID: g.ID, Page: 1, Kind: "signature", X: 0.5, Y: 0.1, W: 0.3, H: 0.05},
@@ -295,10 +297,10 @@ func TestAKeyPreparesAnAgreementWithTheWriteScope(t *testing.T) {
 func TestAnAgreementIsPreparedOnItsOwnPage(t *testing.T) {
 	t.Parallel()
 	s, o, base, member, a, hannah, theo := preparing(t)
-	must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
-	must(s.AddRecipient(o, a.ID, RecipientCopy, &theo.ID, nil, "Ada Lovelace"))
+	must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	must(s.AddRecipient(o, a.ID, signing.RecipientCopy, &theo.ID, nil, "Ada Lovelace"))
 	// Ada signs after Hannah, with Theo's copy between them in the order.
-	ada := must(s.AddRecipient(o, a.ID, RecipientSigner, nil, &must(s.UserByEmail("ada@example.com")).ID, "Ada Lovelace"))
+	ada := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, nil, &must(s.UserByEmail("ada@example.com")).ID, "Ada Lovelace"))
 	srv := strings.TrimSuffix(base, "/o/alpha/api/v1/agreements/"+itoa(a.ID))
 	page := srv + "/o/alpha/agreements/" + itoa(a.ID) + "/prepare"
 
@@ -406,7 +408,7 @@ func TestAnAgreementTakesAPDFThatBendsItsVersionsRules(t *testing.T) {
 func TestTheReactPreparePageReadsItsAgreementThroughTheAPI(t *testing.T) {
 	t.Parallel()
 	s, o, base, member, a, hannah, theo := preparing(t)
-	must(s.AddRecipient(o, a.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
 	srv := strings.TrimSuffix(base, "/o/alpha/api/v1/agreements/"+itoa(a.ID))
 
 	code, body := call(t, member, "GET", base, "", nil)
@@ -509,7 +511,7 @@ func TestAgreementsSavedBeforePagesWereCountedArePrepared(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r := must(s.AddRecipient(o, readable.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	r := must(s.AddRecipient(o, readable.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
 	if _, err := s.PutAgreementFields(o.ID, readable.ID, []AgreementField{{RecipientID: r.ID, Page: 2, Kind: "signature", X: 0.1, Y: 0.8, W: 0.3, H: 0.05}}); err != nil {
 		t.Fatalf("placing a field on an agreement whose pages weren't counted: %v", err)
 	}
@@ -517,7 +519,7 @@ func TestAgreementsSavedBeforePagesWereCountedArePrepared(t *testing.T) {
 		t.Errorf("its pages, counted when first needed: %d", a.PageCount)
 	}
 
-	l := must(s.AddRecipient(o, legacy.ID, RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
+	l := must(s.AddRecipient(o, legacy.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
 	field := []AgreementField{{RecipientID: l.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.8, W: 0.3, H: 0.05}}
 	if _, err := s.PutAgreementFields(o.ID, legacy.ID, field); err == nil || !strings.Contains(err.Error(), "can't be read") {
 		t.Errorf("fields on a document that can't be read: %v", err)

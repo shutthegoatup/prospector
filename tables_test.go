@@ -7,6 +7,8 @@ import (
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
+
+	"github.com/shutthegoatup/prospector/internal/privacy"
 )
 
 func tableOf(t *testing.T, s *Store, model any) *schema.Schema {
@@ -101,10 +103,10 @@ func TestEveryTableIsInTheExportsOrSaysWhyNot(t *testing.T) {
 	for _, m := range models {
 		sch := tableOf(t, s, m)
 		if sch.LookUpField("org_id") != nil {
-			check(sch.Table, orgExportHolds, OrgExport{}, "the organisation's export")
+			check(sch.Table, orgExportHolds, privacy.OrgExport{}, "the organisation's export")
 		}
 		if sch.LookUpField("contact_id") != nil {
-			check(sch.Table, personExportHolds, PersonExport{}, "a person's export")
+			check(sch.Table, personExportHolds, privacy.PersonExport{}, "a person's export")
 		}
 	}
 }
@@ -157,7 +159,7 @@ func TestWhateverPointsAtAPersonGoesWhenTheyDo(t *testing.T) {
 
 	erased := add("Ada Vale")
 	left := pointingAt(t, s, o.ID, erased.ID)
-	if len(left()) < len(pointAtContacts) {
+	if len(left()) < len(privacy.PointAtContacts) {
 		t.Fatalf("the test put rows in fewer tables than point at a contact: %v", left())
 	}
 	if err := s.ErasePerson(o.ID, erased.ID, "Nia"); err != nil {
@@ -183,7 +185,7 @@ func TestARestoreMovesEveryTableThatPointsAtAContact(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	moved := map[string]bool{}
-	for _, m := range pointAtContacts {
+	for _, m := range privacy.PointAtContacts {
 		moved[tableOf(t, s, m).Table] = true
 	}
 	for _, m := range models {

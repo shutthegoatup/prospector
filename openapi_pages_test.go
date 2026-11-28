@@ -9,6 +9,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 // Every list in the spec comes a page at a time, the same way: a list operation added
@@ -113,7 +114,7 @@ func TestTheAPIsListsWalkToTheirEnd(t *testing.T) {
 		if err := s.DB.Create(&AgentRun{OrgID: o.ID, TaskID: task.ID, Status: "done", StartedBy: "Nia"}).Error; err != nil {
 			t.Fatal(err)
 		}
-		must(s.AddEnquiry(o.ID, "form", EnquiryIn{Name: fmt.Sprint("Sender ", i), Email: fmt.Sprintf("sender%d@larkmoor.example", i), Message: "Could you show us?"}))
+		must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: fmt.Sprint("Sender ", i), Email: fmt.Sprintf("sender%d@larkmoor.example", i), Message: "Could you show us?"}))
 	}
 	base := srv.URL + "/o/alpha/api/v1/"
 	for _, list := range []string{"agents", fmt.Sprintf("tasks/%d/runs", task.ID), "enquiries"} {

@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/privacy"
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 // A write the spec adds without saying whose work it is would be open to everyone.
@@ -38,7 +40,7 @@ func TestEachAreaChangesOnlyItsOwnWork(t *testing.T) {
 	grace := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
 	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")
 	c := repliedPerson(t, s, o, "Hannah Pryce")
-	help := must(s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "support", Name: "Edsger Dijkstra", Email: "edsger@eindhoven.example", Message: "Colours look pale on phones"}))
+	help := must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "support", Name: "Edsger Dijkstra", Email: "edsger@eindhoven.example", Message: "Colours look pale on phones"}))
 	base := srv.URL + "/o/alpha/"
 	sales := func(cl *http.Client) (int, string) {
 		code, body := call(t, cl, "PATCH", base+"api/v1/contacts/"+itoa(c.ID), "application/json", map[string]any{"call_notes": "rang twice"})
@@ -173,7 +175,7 @@ func TestEachAreaChangesOnlyItsOwnWork(t *testing.T) {
 	}
 }
 
-func memberAreas(e *OrgExport) []string {
+func memberAreas(e *privacy.OrgExport) []string {
 	var out []string
 	for _, m := range e.Members {
 		out = append(out, m.Email+"="+m.Areas)

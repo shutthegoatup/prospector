@@ -5,6 +5,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 // together runs do n times at once and fails the test if any of them does.
@@ -137,7 +139,7 @@ func TestAnEnquirySentTwiceAtOnceIsKeptOnce(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	together(t, atOnce, func(int) error {
-		_, err := s.AddEnquiry(o.ID, "form", EnquiryIn{Kind: "demo", Name: "Ada Vale", Email: "ada.vale@larkmoor.example", Message: "Could you show us?"})
+		_, err := s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Kind: "demo", Name: "Ada Vale", Email: "ada.vale@larkmoor.example", Message: "Could you show us?"})
 		return err
 	})
 	if n := count(t, s, &Enquiry{}, "org_id = ?", o.ID); n != 1 {

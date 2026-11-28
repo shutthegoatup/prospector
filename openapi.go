@@ -11,8 +11,14 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/crm"
+	"github.com/shutthegoatup/prospector/internal/onboarding"
+	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/sales"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/signing"
+	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 // The API in api/openapi.yaml is the one way to do anything: the web app calls it with
@@ -21,13 +27,13 @@ import (
 // apiServer implements the spec's operations.
 type apiServer struct {
 	a *App
-	signingAPI
-	salesAPI
-	ticketsAPI
-	onboardingAPI
+	signing.SigningAPI
+	sales.SalesAPI
+	tickets.TicketsAPI
+	onboarding.OnboardingAPI
 	marketingAPI
-	crmAPI
-	privacyAPI
+	crm.CRMAPI
+	privacy.PrivacyAPI
 	researchAPI
 }
 
@@ -35,14 +41,14 @@ type apiServer struct {
 func newAPIServer(a *App) apiServer {
 	return apiServer{a: a,
 		researchAPI:   researchAPI{Research: &a.s.researchStore, Finding: &a.s.prospectingStore, Records: &a.s.crmStore, Runs: a},
-		privacyAPI:    privacyAPI{Store: &a.s.privacyStore},
-		crmAPI:        crmAPI{Records: &a.s.crmStore},
-		signingAPI:    signingAPI{Store: &a.s.agreementStore},
-		ticketsAPI:    ticketsAPI{Enquiries: &a.s.enquiryStore, Mail: a},
-		onboardingAPI: onboardingAPI{Steps: &a.s.onboardingStore, Customers: &a.s.customerStore, App: a},
+		PrivacyAPI:    privacy.PrivacyAPI{Store: &a.s.PrivacyStore},
+		CRMAPI:        crm.CRMAPI{Records: &a.s.crmStore},
+		SigningAPI:    signing.SigningAPI{Store: &a.s.AgreementStore},
+		TicketsAPI:    tickets.TicketsAPI{Enquiries: &a.s.EnquiryStore, Mail: a},
+		OnboardingAPI: onboarding.OnboardingAPI{Steps: &a.s.OnboardingStore, Customers: &a.s.CustomerStore, App: a},
 		marketingAPI:  marketingAPI{Campaigns: &a.s.outreachStore, Suppression: &a.s.suppressionStore, App: a},
-		salesAPI: salesAPI{Pipeline: &a.s.dealStore, Subscriptions: &a.s.subscriptionStore,
-			People: &a.s.crmStore, Onboarding: &a.s.onboardingStore},
+		SalesAPI: sales.SalesAPI{Pipeline: &a.s.DealStore, Subscriptions: &a.s.SubscriptionStore,
+			People: &a.s.crmStore, Onboarding: &a.s.OnboardingStore},
 	}
 }
 
