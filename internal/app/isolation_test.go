@@ -391,6 +391,8 @@ var saysNothingBack = map[string]bool{
 	"AddMember": true, "RemoveMember": true, "SetRole": true, "SetAreas": true, "SaveVoice": true, "SaveOrg": true, "ChangeSettings": true, "RevokeKey": true, "SetKeyScopes": true, "DeleteOrgMail": true, "SaveOrgMail": true,
 	// A webhook secret is new random words, and the others say yes or no of the caller's own.
 	"NewBounceHook": true, "DropBounceHook": true, "HasBounceHook": true,
+	// Says only whether the caller's own event was seen; TestTheSameEventPostedTwiceAtOnceIsTakenOnce tries another's.
+	"Receive": true,
 	// Need a key and an https address the fuzzing's words aren't; TestAWebhookStaysInItsOrganisation tries them.
 	"AddWebhook": true, "ChangeWebhook": true, "RotateWebhookSecret": true, "DeleteWebhook": true,
 	// Settle a delivery ClaimDue handed out; webhook_delivery_test.go sends and settles them.
