@@ -679,6 +679,211 @@ paths:
         "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
+  /o/{org}/api/v1/webhook-events:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listWebhookEvents
+      tags: [agents]
+      summary: What a webhook can be sent
+      description: |
+        Every kind of event an endpoint can ask for, by name, in the order they are listed.
+        An event says what happened and to which records, by id, with a link to read each
+        through the API; the receiver reads the rest with its endpoint's key.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: [read]
+      responses:
+        "200":
+          description: The kinds of event.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/WebhookEventType" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /o/{org}/api/v1/webhooks:
+    parameters:
+      - $ref: "#/components/parameters/org"
+    get:
+      operationId: listWebhooks
+      tags: [agents]
+      summary: Where the organisation's events are sent
+      description: Every endpoint, newest first. Never its secret. Only a signed-in owner.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: ["agents:configure"]
+      responses:
+        "200":
+          description: The endpoints.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/WebhookEndpoint" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    post:
+      operationId: createWebhook
+      tags: [agents]
+      summary: Send events to an endpoint
+      description: |
+        Only a signed-in owner: no key can make, change or remove an endpoint, whatever its
+        scopes. The endpoint is sent only what its key may read, and nothing once the key is
+        revoked. Its address is https and on the public internet. Deliveries are signed as
+        Standard Webhooks sign them (`webhook-id`, `webhook-timestamp`, `webhook-signature`)
+        with the secret in the answer, shown this once.
+      security:
+        - session: []
+        - bearer: ["agents:configure"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WebhookNew" }
+      responses:
+        "201":
+          description: The endpoint, with its secret this once.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WebhookMade" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /o/{org}/api/v1/webhooks/{id}:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: getWebhook
+      tags: [agents]
+      summary: One endpoint
+      description: Only a signed-in owner. Never its secret.
+      security:
+        - session: []
+        - bearer: ["agents:configure"]
+      responses:
+        "200":
+          description: The endpoint.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WebhookEndpoint" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    patch:
+      operationId: changeWebhook
+      tags: [agents]
+      summary: Change an endpoint
+      description: |
+        Only a signed-in owner. Send what changes: its address, the events it is sent, or
+        `enabled: true` to send to one that was stopped again (or `false` to stop it).
+      security:
+        - session: []
+        - bearer: ["agents:configure"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WebhookChange" }
+      responses:
+        "200":
+          description: The endpoint as it is now.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WebhookEndpoint" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    delete:
+      operationId: deleteWebhook
+      tags: [agents]
+      summary: Stop sending to an endpoint, for good
+      description: Only a signed-in owner. What is waiting to be sent to it isn't.
+      security:
+        - session: []
+        - bearer: ["agents:configure"]
+      responses:
+        "204": { description: Removed. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /o/{org}/api/v1/webhooks/{id}/secret:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    post:
+      operationId: rotateWebhookSecret
+      tags: [agents]
+      summary: Give an endpoint a new secret
+      description: |
+        Only a signed-in owner. The new secret is in the answer once. For a day, deliveries
+        carry a signature by each, so the receiver can change over without missing any.
+      security:
+        - session: []
+        - bearer: ["agents:configure"]
+      responses:
+        "200":
+          description: The new secret, this once.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WebhookSecret" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "415": { $ref: "#/components/responses/NotJSON" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
   /o/{org}/api/v1/agent-scores:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -6202,6 +6407,74 @@ components:
         key: { $ref: "#/components/schemas/APIKey" }
         secret: { type: string, description: "The key itself, `pk_…`, shown this once." }
         message: { type: string, description: "A sentence for a person, with the secret in it." }
+
+    WebhookEventType:
+      type: object
+      required: [name, about]
+      properties:
+        name: { type: string, description: "As events are named: what happened to what, such as `company.added`." }
+        about: { type: string }
+
+    WebhookEndpoint:
+      type: object
+      required: [id, url, key, key_name, events, created_by, created_at, disabled_at, disabled_why]
+      properties:
+        id: { type: integer, format: int64 }
+        url: { type: string }
+        key: { type: integer, format: int64, description: "The key whose scopes say what it is sent." }
+        key_name: { type: string }
+        events:
+          type: array
+          items: { type: string }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+        disabled_at:
+          type: string
+          format: date-time
+          nullable: true
+          x-go-type-skip-optional-pointer: false
+          description: "When sending to it stopped: an owner stopped it, it answered 410 Gone, or it took nothing for three days."
+        disabled_why: { type: string, description: "Why sending to it stopped, when it has." }
+
+    WebhookNew:
+      type: object
+      required: [url, key, events]
+      properties:
+        url: { type: string, description: "An https address on the public internet." }
+        key: { type: integer, format: int64, description: "One of the organisation's keys, which needs the `read` scope." }
+        events:
+          type: array
+          minItems: 1
+          items: { type: string }
+          description: "Names from `GET /webhook-events`."
+
+    WebhookChange:
+      type: object
+      properties:
+        url: { type: string, x-go-type-skip-optional-pointer: false }
+        events:
+          type: array
+          minItems: 1
+          items: { type: string }
+          x-go-type-skip-optional-pointer: false
+        enabled: { type: boolean, x-go-type-skip-optional-pointer: false }
+
+    WebhookMade:
+      type: object
+      required: [webhook, secret]
+      properties:
+        webhook: { $ref: "#/components/schemas/WebhookEndpoint" }
+        secret: { $ref: "#/components/schemas/WebhookSecretText" }
+
+    WebhookSecret:
+      type: object
+      required: [secret]
+      properties:
+        secret: { $ref: "#/components/schemas/WebhookSecretText" }
+
+    WebhookSecretText:
+      type: string
+      description: "`whsec_` and the base64 of the key, as Standard Webhooks' libraries take it."
 
     KeyChanged:
       type: object

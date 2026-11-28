@@ -156,6 +156,8 @@ var historyVerbs = map[string]*say.Text{
 	"agents:new": say.New("added an agent"), "agents:change": say.New("changed an agent's settings"), "agents:remove": say.New("removed an agent"),
 	"sso:add-domain": say.New("added a sign-on domain"), "sso:verify-domain": say.New("verified a sign-on domain"), "sso:remove-domain": say.New("removed a sign-on domain"),
 	"webhook:new": say.New("made a new bounce webhook secret"), "webhook:remove": say.New("removed the bounce webhook"),
+	"endpoint:new": say.New("added a webhook endpoint"), "endpoint:change": say.New("changed a webhook endpoint"),
+	"endpoint:remove": say.New("removed a webhook endpoint"), "endpoint:secret": say.New("gave a webhook endpoint a new secret"),
 	"smtp:change": say.New("changed the mail server"), "smtp:remove": say.New("removed the mail server"),
 	"enricher:save": say.New("saved an enrichment vendor"), "enricher:remove": say.New("removed an enrichment vendor"),
 	"member:add": say.New("added a member"), "member:role": say.New("changed a member's role"),

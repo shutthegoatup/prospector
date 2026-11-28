@@ -22,6 +22,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/signing"
 	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tickets"
+	"github.com/shutthegoatup/prospector/internal/webhooks"
 )
 
 // Store is every area's queries, each area a type of its own embedded here so its
@@ -31,6 +32,7 @@ type Store struct {
 	*store.Core
 	research.ResearchStore
 	privacy.PrivacyStore
+	webhooks.WebhookStore
 	marketing.OutreachStore
 	signing.AgreementStore
 	tickets.EnquiryStore
@@ -56,6 +58,7 @@ func newStore(c *store.Core) *Store {
 	s.EnquiryStore = tickets.EnquiryStore{Core: c, CRM: &s.CRMStore}
 	s.AgreementStore = signing.AgreementStore{Core: c, CRM: &s.CRMStore, Identity: &s.IdentityStore}
 	s.OutreachStore = marketing.OutreachStore{Core: c, Identity: &s.IdentityStore, Suppression: &s.SuppressionStore, Billing: &s.SubscriptionStore}
+	s.WebhookStore = webhooks.WebhookStore{Core: c}
 	s.PrivacyStore = privacy.PrivacyStore{Core: c, Identity: &s.IdentityStore, CRM: &s.CRMStore}
 	s.ResearchStore = research.ResearchStore{Core: c, Prospecting: &s.ProspectingStore, CRM: &s.CRMStore, Identity: &s.IdentityStore, Outreach: &s.OutreachStore}
 	return s
@@ -63,7 +66,7 @@ func newStore(c *store.Core) *Store {
 
 var models = []any{&store.User{}, &store.Org{}, &store.Membership{}, &store.Session{}, &store.APIKey{},
 	&store.Company{}, &store.Fact{}, &store.Contact{}, &store.Event{}, &store.Erasure{}, &store.Identity{}, &store.SSOConnection{}, &store.SSODomain{}, &store.Enquiry{}, &store.EnquiryMessage{}, &store.Suppression{}, &store.UnsubscribeLink{}, &store.Campaign{}, &store.CampaignRecipient{}, &store.Agreement{}, &store.AgreementFile{}, &store.AgreementRecipient{}, &store.AgreementField{}, &store.AgreementEvent{}, &store.SealKey{}, &store.Suggestion{},
-	&store.Task{}, &store.TaskRequest{}, &store.TaskNote{}, &store.RequestClaim{}, &store.PasswordToken{}, &store.OrgMail{}, &store.Agent{}, &store.AgentRun{}, &store.Deal{}, &store.Subscription{}, &store.Onboarding{}, &store.OnboardingStep{}, &store.CustomerGrant{}, &store.CustomerLink{}, &store.CustomerSession{}, &store.MailDomain{}, &store.Enricher{}, &store.EnrichUsage{}, &store.Offering{}, &store.Verdict{}, &store.Role{}, &store.BounceHook{}}
+	&store.Task{}, &store.TaskRequest{}, &store.TaskNote{}, &store.RequestClaim{}, &store.PasswordToken{}, &store.OrgMail{}, &store.Agent{}, &store.AgentRun{}, &store.Deal{}, &store.Subscription{}, &store.Onboarding{}, &store.OnboardingStep{}, &store.CustomerGrant{}, &store.CustomerLink{}, &store.CustomerSession{}, &store.MailDomain{}, &store.Enricher{}, &store.EnrichUsage{}, &store.Offering{}, &store.Verdict{}, &store.Role{}, &store.BounceHook{}, &store.WebhookEndpoint{}}
 
 // Open takes a postgres:// URL and brings its schema up to date.
 func Open(dsn string) (*Store, error) {

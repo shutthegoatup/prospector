@@ -1871,6 +1871,822 @@
       }
      ],
      "curl": "curl -X DELETE https://prospector.invalid/o/your-org/api/v1/keys/{id} \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
+     "anchor": "op-listWebhookEvents",
+     "method": "GET",
+     "tone": "is-green",
+     "path": "/o/{org}/api/v1/webhook-events",
+     "summary": "What a webhook can be sent",
+     "about": [
+      {
+       "text": "Every kind of event an endpoint can ask for, by name, in the order they are listed. An event says what happened and to which records, by id, with a link to read each through the API; the receiver reads the rest with its endpoint's key."
+      }
+     ],
+     "scope": "read",
+     "params": [
+      {
+       "name": "limit",
+       "type": {
+        "name": "integer"
+       },
+       "about": [
+        {
+         "text": "How many to return. 50 if left out; 200 at most."
+        }
+       ]
+      },
+      {
+       "name": "cursor",
+       "type": {
+        "name": "string"
+       },
+       "about": [
+        {
+         "text": "The "
+        },
+        {
+         "text": "next_cursor",
+         "code": true
+        },
+        {
+         "text": " of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters."
+        }
+       ]
+      }
+     ],
+     "responses": [
+      {
+       "code": "200",
+       "about": "The kinds of event.",
+       "type": {
+        "name": "object"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl https://prospector.invalid/o/your-org/api/v1/webhook-events \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
+     "anchor": "op-listWebhooks",
+     "method": "GET",
+     "tone": "is-green",
+     "path": "/o/{org}/api/v1/webhooks",
+     "summary": "Where the organisation's events are sent",
+     "about": [
+      {
+       "text": "Every endpoint, newest first. Never its secret. Only a signed-in owner."
+      }
+     ],
+     "scope": "agents:configure",
+     "owner_only": true,
+     "params": [
+      {
+       "name": "limit",
+       "type": {
+        "name": "integer"
+       },
+       "about": [
+        {
+         "text": "How many to return. 50 if left out; 200 at most."
+        }
+       ]
+      },
+      {
+       "name": "cursor",
+       "type": {
+        "name": "string"
+       },
+       "about": [
+        {
+         "text": "The "
+        },
+        {
+         "text": "next_cursor",
+         "code": true
+        },
+        {
+         "text": " of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters."
+        }
+       ]
+      }
+     ],
+     "responses": [
+      {
+       "code": "200",
+       "about": "The endpoints.",
+       "type": {
+        "name": "object"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl https://prospector.invalid/o/your-org/api/v1/webhooks \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
+     "anchor": "op-createWebhook",
+     "method": "POST",
+     "tone": "is-gold",
+     "path": "/o/{org}/api/v1/webhooks",
+     "summary": "Send events to an endpoint",
+     "about": [
+      {
+       "text": "Only a signed-in owner: no key can make, change or remove an endpoint, whatever its scopes. The endpoint is sent only what its key may read, and nothing once the key is revoked. Its address is https and on the public internet. Deliveries are signed as Standard Webhooks sign them ("
+      },
+      {
+       "text": "webhook-id",
+       "code": true
+      },
+      {
+       "text": ", "
+      },
+      {
+       "text": "webhook-timestamp",
+       "code": true
+      },
+      {
+       "text": ", "
+      },
+      {
+       "text": "webhook-signature",
+       "code": true
+      },
+      {
+       "text": ") with the secret in the answer, shown this once."
+      }
+     ],
+     "scope": "agents:configure",
+     "owner_only": true,
+     "params": [],
+     "body": {
+      "of": {
+       "name": "WebhookNew",
+       "link": "#schema-WebhookNew"
+      },
+      "fields": [
+       {
+        "name": "events",
+        "type": {
+         "name": "string[]"
+        },
+        "about": [
+         {
+          "text": "Names from "
+         },
+         {
+          "text": "GET /webhook-events",
+          "code": true
+         },
+         {
+          "text": "."
+         }
+        ],
+        "required": true
+       },
+       {
+        "name": "key",
+        "type": {
+         "name": "integer"
+        },
+        "about": [
+         {
+          "text": "One of the organisation's keys, which needs the "
+         },
+         {
+          "text": "read",
+          "code": true
+         },
+         {
+          "text": " scope."
+         }
+        ],
+        "required": true
+       },
+       {
+        "name": "url",
+        "type": {
+         "name": "string"
+        },
+        "about": [
+         {
+          "text": "An https address on the public internet."
+         }
+        ],
+        "required": true
+       }
+      ]
+     },
+     "responses": [
+      {
+       "code": "201",
+       "about": "The endpoint, with its secret this once.",
+       "type": {
+        "name": "WebhookMade",
+        "link": "#schema-WebhookMade"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "409",
+       "bad": true,
+       "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "415",
+       "bad": true,
+       "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/webhooks \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"events\": [], \"key\": 1, \"url\": \"…\"}'"
+    },
+    {
+     "anchor": "op-getWebhook",
+     "method": "GET",
+     "tone": "is-green",
+     "path": "/o/{org}/api/v1/webhooks/{id}",
+     "summary": "One endpoint",
+     "about": [
+      {
+       "text": "Only a signed-in owner. Never its secret."
+      }
+     ],
+     "scope": "agents:configure",
+     "owner_only": true,
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      }
+     ],
+     "responses": [
+      {
+       "code": "200",
+       "about": "The endpoint.",
+       "type": {
+        "name": "WebhookEndpoint",
+        "link": "#schema-WebhookEndpoint"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl https://prospector.invalid/o/your-org/api/v1/webhooks/{id} \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
+     "anchor": "op-changeWebhook",
+     "method": "PATCH",
+     "tone": "is-violet",
+     "path": "/o/{org}/api/v1/webhooks/{id}",
+     "summary": "Change an endpoint",
+     "about": [
+      {
+       "text": "Only a signed-in owner. Send what changes: its address, the events it is sent, or "
+      },
+      {
+       "text": "enabled: true",
+       "code": true
+      },
+      {
+       "text": " to send to one that was stopped again (or "
+      },
+      {
+       "text": "false",
+       "code": true
+      },
+      {
+       "text": " to stop it)."
+      }
+     ],
+     "scope": "agents:configure",
+     "owner_only": true,
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      }
+     ],
+     "body": {
+      "of": {
+       "name": "WebhookChange",
+       "link": "#schema-WebhookChange"
+      },
+      "fields": [
+       {
+        "name": "enabled",
+        "type": {
+         "name": "boolean"
+        },
+        "about": []
+       },
+       {
+        "name": "events",
+        "type": {
+         "name": "string[]"
+        },
+        "about": []
+       },
+       {
+        "name": "url",
+        "type": {
+         "name": "string"
+        },
+        "about": []
+       }
+      ]
+     },
+     "responses": [
+      {
+       "code": "200",
+       "about": "The endpoint as it is now.",
+       "type": {
+        "name": "WebhookEndpoint",
+        "link": "#schema-WebhookEndpoint"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "409",
+       "bad": true,
+       "about": "It clashes with what is already here; asking again won't help until one of the two changes.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "415",
+       "bad": true,
+       "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X PATCH https://prospector.invalid/o/your-org/api/v1/webhooks/{id} \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"enabled\": true, \"events\": [], \"url\": \"…\"}'"
+    },
+    {
+     "anchor": "op-deleteWebhook",
+     "method": "DELETE",
+     "tone": "is-coral",
+     "path": "/o/{org}/api/v1/webhooks/{id}",
+     "summary": "Stop sending to an endpoint, for good",
+     "about": [
+      {
+       "text": "Only a signed-in owner. What is waiting to be sent to it isn't."
+      }
+     ],
+     "scope": "agents:configure",
+     "owner_only": true,
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      }
+     ],
+     "responses": [
+      {
+       "code": "204",
+       "about": "Removed."
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X DELETE https://prospector.invalid/o/your-org/api/v1/webhooks/{id} \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
+     "anchor": "op-rotateWebhookSecret",
+     "method": "POST",
+     "tone": "is-gold",
+     "path": "/o/{org}/api/v1/webhooks/{id}/secret",
+     "summary": "Give an endpoint a new secret",
+     "about": [
+      {
+       "text": "Only a signed-in owner. The new secret is in the answer once. For a day, deliveries carry a signature by each, so the receiver can change over without missing any."
+      }
+     ],
+     "scope": "agents:configure",
+     "owner_only": true,
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      }
+     ],
+     "responses": [
+      {
+       "code": "200",
+       "about": "The new secret, this once.",
+       "type": {
+        "name": "WebhookSecret",
+        "link": "#schema-WebhookSecret"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "415",
+       "bad": true,
+       "about": "A browser's body must be `application/json`, or what the operation names.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl -X POST https://prospector.invalid/o/your-org/api/v1/webhooks/{id}/secret \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
     }
    ]
   },
@@ -30647,6 +31463,294 @@
      "required": true
     }
    ]
+  },
+  {
+   "anchor": "schema-WebhookChange",
+   "name": "WebhookChange",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "enabled",
+     "type": {
+      "name": "boolean"
+     },
+     "about": []
+    },
+    {
+     "name": "events",
+     "type": {
+      "name": "string[]"
+     },
+     "about": []
+    },
+    {
+     "name": "url",
+     "type": {
+      "name": "string"
+     },
+     "about": []
+    }
+   ]
+  },
+  {
+   "anchor": "schema-WebhookEndpoint",
+   "name": "WebhookEndpoint",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "created_at",
+     "type": {
+      "name": "date-time"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "created_by",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "disabled_at",
+     "type": {
+      "name": "date-time?"
+     },
+     "about": [
+      {
+       "text": "When sending to it stopped: an owner stopped it, it answered 410 Gone, or it took nothing for three days."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "disabled_why",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "Why sending to it stopped, when it has."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "events",
+     "type": {
+      "name": "string[]"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "key",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "The key whose scopes say what it is sent."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "key_name",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "url",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-WebhookEventType",
+   "name": "WebhookEventType",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "about",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "name",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "As events are named: what happened to what, such as "
+      },
+      {
+       "text": "company.added",
+       "code": true
+      },
+      {
+       "text": "."
+      }
+     ],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-WebhookMade",
+   "name": "WebhookMade",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "secret",
+     "type": {
+      "name": "WebhookSecretText",
+      "link": "#schema-WebhookSecretText"
+     },
+     "about": [
+      {
+       "text": "whsec_",
+       "code": true
+      },
+      {
+       "text": " and the base64 of the key, as Standard Webhooks' libraries take it."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "webhook",
+     "type": {
+      "name": "WebhookEndpoint",
+      "link": "#schema-WebhookEndpoint"
+     },
+     "about": [],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-WebhookNew",
+   "name": "WebhookNew",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "events",
+     "type": {
+      "name": "string[]"
+     },
+     "about": [
+      {
+       "text": "Names from "
+      },
+      {
+       "text": "GET /webhook-events",
+       "code": true
+      },
+      {
+       "text": "."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "key",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "One of the organisation's keys, which needs the "
+      },
+      {
+       "text": "read",
+       "code": true
+      },
+      {
+       "text": " scope."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "url",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "An https address on the public internet."
+      }
+     ],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-WebhookSecret",
+   "name": "WebhookSecret",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "secret",
+     "type": {
+      "name": "WebhookSecretText",
+      "link": "#schema-WebhookSecretText"
+     },
+     "about": [
+      {
+       "text": "whsec_",
+       "code": true
+      },
+      {
+       "text": " and the base64 of the key, as Standard Webhooks' libraries take it."
+      }
+     ],
+     "required": true
+    }
+   ]
+  },
+  {
+   "anchor": "schema-WebhookSecretText",
+   "name": "WebhookSecretText",
+   "about": [
+    {
+     "text": "whsec_",
+     "code": true
+    },
+    {
+     "text": " and the base64 of the key, as Standard Webhooks' libraries take it."
+    }
+   ],
+   "enum": [],
+   "fields": []
   },
   {
    "anchor": "schema-Week",
