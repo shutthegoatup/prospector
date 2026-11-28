@@ -163,7 +163,7 @@ func TestChangingAKeysScopes(t *testing.T) {
 	}
 	other := mustOrg(t, s, "beta")
 	_, theirs, _ := s.CreateKey(other.ID, "beta-bot", []string{"read"}, "test")
-	if code, _ := scopes(ada, theirs.ID, "read", "research:write"); code != http.StatusBadRequest {
+	if code, _ := scopes(ada, theirs.ID, "read", "research:write"); code != http.StatusNotFound {
 		t.Fatalf("another organisation's key was changed: %d", code)
 	}
 	if s.DB.First(theirs, theirs.ID); theirs.Scopes != "read" {
@@ -177,7 +177,7 @@ func TestChangingAKeysScopes(t *testing.T) {
 	if err := s.RevokeKey(o.ID, k.ID); err != nil {
 		t.Fatal(err)
 	}
-	if code, _ := scopes(ada, k.ID, "read", "research:write"); code != http.StatusBadRequest {
+	if code, _ := scopes(ada, k.ID, "read", "research:write"); code != http.StatusNotFound {
 		t.Fatalf("a revoked key's scopes were changed: %d", code)
 	}
 }

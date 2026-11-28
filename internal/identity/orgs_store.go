@@ -215,7 +215,7 @@ func (s *IdentityStore) SetRole(org, user int64, role string) error {
 		}
 		var m store.Membership
 		if err := tx.Where("org_id = ? and user_id = ?", org, user).First(&m).Error; errors.Is(err, gorm.ErrRecordNotFound) {
-			return say.New("that person isn't in this organisation")
+			return store.NoSuch("that person isn't in this organisation")
 		} else if err != nil {
 			return err
 		}
@@ -233,7 +233,7 @@ func (s *IdentityStore) RemoveMember(org, user int64, actor string) (*store.User
 		}
 		var m store.Membership
 		if err := tx.Where("org_id = ? and user_id = ?", org, user).First(&m).Error; errors.Is(err, gorm.ErrRecordNotFound) {
-			return say.New("that person isn't in this organisation")
+			return store.NoSuch("that person isn't in this organisation")
 		} else if err != nil {
 			return err
 		}
@@ -394,7 +394,7 @@ func (s *IdentityStore) SetKeyScopes(org, id int64, scopes []string) error {
 	}
 	var k store.APIKey
 	if err := s.InOrg(org).Where("id = ? and revoked_at is null", id).First(&k).Error; errors.Is(err, gorm.ErrRecordNotFound) {
-		return say.New("that key isn't in this organisation, or has been revoked")
+		return store.NoSuch("that key isn't in this organisation, or has been revoked")
 	} else if err != nil {
 		return err
 	}
@@ -490,7 +490,7 @@ func (s *IdentityStore) SetAreas(org, user int64, areas []string) error {
 	}
 	res := s.DB.Model(&store.Membership{}).Where("org_id = ? and user_id = ?", org, user).Update("areas", strings.Join(keep, " "))
 	if res.Error == nil && res.RowsAffected == 0 {
-		return say.New("that person isn't in this organisation")
+		return store.NoSuch("that person isn't in this organisation")
 	}
 	return res.Error
 }

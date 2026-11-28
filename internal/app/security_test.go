@@ -477,7 +477,7 @@ func TestRemoveMember(t *testing.T) {
 	if m, err := s.Membership(o.ID, adaUser.ID); err != nil || m.Role != "owner" {
 		t.Fatalf("the last owner is now %+v %v", m, err)
 	}
-	if code, _ := remove(ada, 987654); code != http.StatusBadRequest {
+	if code, _ := remove(ada, 987654); code != http.StatusNotFound {
 		t.Fatalf("removing someone who isn't a member: %d", code)
 	}
 
