@@ -203,7 +203,7 @@ func (s *IdentityStore) AddMember(org, user int64, role, callerName, actor strin
 			if err := tx.Create(&store.Membership{OrgID: org, UserID: user, Role: role, CallerName: callerName}).Error; err != nil {
 				return err
 			}
-			return s.Log(tx, org, 0, nil, actor, "member:add", new(u.Email+": "+role))
+			return s.Log(tx, org, 0, nil, actor, store.ActMemberAdd, new(u.Email+": "+role))
 		}
 		if err != nil {
 			return err
@@ -257,7 +257,7 @@ func (s *IdentityStore) RemoveMember(org, user int64, actor string) (*store.User
 		if err := DropRecipients(tx, tx.Where("org_id = ? and user_id = ?", org, user)); err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, nil, actor, "member:remove", &u.Email)
+		return s.Log(tx, org, 0, nil, actor, store.ActMemberRemove, &u.Email)
 	})
 }
 
@@ -365,7 +365,7 @@ func (s *IdentityStore) CreateKey(org int64, name string, scopes []string, by st
 		if err := tx.Create(k).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, nil, by, "key:new", new(k.Name+": "+k.Scopes))
+		return s.Log(tx, org, 0, nil, by, store.ActKeyNew, new(k.Name+": "+k.Scopes))
 	})
 }
 
@@ -433,7 +433,7 @@ func (s *IdentityStore) SetKeyScopes(org, id int64, scopes []string, actor strin
 		if res.RowsAffected == 0 {
 			return say.New("that key isn't in this organisation, or has been revoked")
 		}
-		return s.Log(tx, org, 0, nil, actor, "key:scopes", new(k.Name+": "+now))
+		return s.Log(tx, org, 0, nil, actor, store.ActKeyScopes, new(k.Name+": "+now))
 	})
 }
 
@@ -450,7 +450,7 @@ func (s *IdentityStore) RevokeKey(org, id int64, actor string) error {
 			}
 			return nil
 		}
-		return s.Log(tx, org, 0, nil, actor, "key:revoke", &k.Name)
+		return s.Log(tx, org, 0, nil, actor, store.ActKeyRevoke, &k.Name)
 	})
 }
 
@@ -475,7 +475,7 @@ func (s *IdentityStore) ChangeSettings(o *store.Org, who store.Actor, changed []
 		if err := tx.Model(o).Select("name", "color", "settings").Updates(o).Error; err != nil {
 			return err
 		}
-		return s.LogAs(tx, o.ID, 0, nil, who, "settings:change", &what)
+		return s.LogAs(tx, o.ID, 0, nil, who, store.ActSettings, &what)
 	})
 }
 

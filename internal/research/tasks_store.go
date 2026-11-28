@@ -73,7 +73,7 @@ func (s *ResearchStore) CreateTaskWanting(org, offering int64, want int, title, 
 		if err := tx.Create(&store.TaskRequest{OrgID: org, TaskID: t.ID, Text: brief, AskedBy: by, AskedAt: time.Now()}).Error; err != nil {
 			return err
 		}
-		return s.LogAs(tx, org, 0, nil, store.Actor{Name: by, Task: t.ID}, "task:new", nil)
+		return s.LogAs(tx, org, 0, nil, store.Actor{Name: by, Task: t.ID}, store.ActTaskNew, nil)
 	})
 }
 
@@ -105,7 +105,7 @@ func (s *ResearchStore) matched(tx *gorm.DB, org int64, who store.Actor, contact
 		return nil
 	}
 	// A note about a company doesn't make it a result.
-	q := tx.Model(&store.Event{}).Where("org_id = ? and task_id = ? and company_id = ? and action not like 'note:%'", org, who.Task, company)
+	q := tx.Model(&store.Event{}).Where("org_id = ? and task_id = ? and company_id = ? and action not like ?", org, who.Task, company, store.Noted.Like())
 	if contact != 0 {
 		q = q.Where("contact_id = ?", contact)
 	}
@@ -113,7 +113,7 @@ func (s *ResearchStore) matched(tx *gorm.DB, org int64, who store.Actor, contact
 	if err := q.Count(&n).Error; err != nil || n > 0 {
 		return err
 	}
-	return s.LogAs(tx, org, contact, company, who, "task:match", nil)
+	return s.LogAs(tx, org, contact, company, who, store.ActTaskMatch, nil)
 }
 
 func (s *ResearchStore) AskTask(org, task int64, text, by string) (*store.TaskRequest, error) {
@@ -129,7 +129,7 @@ func (s *ResearchStore) AskTask(org, task int64, text, by string) (*store.TaskRe
 		if err := tx.Create(r).Error; err != nil {
 			return err
 		}
-		return s.LogAs(tx, org, 0, nil, store.Actor{Name: by, Task: task}, "task:ask", nil)
+		return s.LogAs(tx, org, 0, nil, store.Actor{Name: by, Task: task}, store.ActTaskAsk, nil)
 	})
 }
 
@@ -162,9 +162,9 @@ func (s *ResearchStore) setRequestDone(org, request int64, done bool, who store.
 		if done == (r.DoneAt != nil) {
 			return nil
 		}
-		updates, action := map[string]any{"done_at": nil, "done_by": ""}, "task:reopen"
+		updates, action := map[string]any{"done_at": nil, "done_by": ""}, store.ActTaskReopen
 		if done {
-			updates, action = map[string]any{"done_at": time.Now(), "done_by": who.Name}, "task:done"
+			updates, action = map[string]any{"done_at": time.Now(), "done_by": who.Name}, store.ActTaskDone
 		}
 		// Only a request still as it was read is changed, so two finishing it at once record it once.
 		was := "done_at is not null"
@@ -206,10 +206,10 @@ func (s *ResearchStore) SetTaskClosed(org, task int64, closed bool, by string) e
 			}
 		}
 		var at *time.Time
-		action := "task:open"
+		action := store.ActTaskOpen
 		if closed {
 			now := time.Now()
-			at, action = &now, "task:close"
+			at, action = &now, store.ActTaskClose
 		}
 		if err := tx.Model(&t).Update("closed_at", at).Error; err != nil {
 			return err
@@ -232,7 +232,7 @@ func (s *ResearchStore) DeleteNote(org, id int64, actor string) error {
 		if n.CompanyID != 0 {
 			company = &n.CompanyID
 		}
-		return s.Log(tx, org, 0, company, actor, "note:remove", &n.Kind)
+		return s.Log(tx, org, 0, company, actor, store.ActNoteRemove, &n.Kind)
 	})
 }
 
@@ -484,13 +484,13 @@ func (s *ResearchStore) taskViews(tx *gorm.DB, org int64, tasks []store.Task, no
 				v.Last = &events[j]
 			}
 			// A note about a company isn't a find: it is often why the company was passed over.
-			if strings.HasPrefix(e.Action, "note:") {
+			if _, ok := store.Noted.In(e.Action); ok {
 				continue
 			}
-			if e.Action == prospecting.ActionWithheld && e.Value != nil {
+			if e.Action == store.ActTaskWithheld.String() && e.Value != nil {
 				v.Withheld[*e.Value]++
 			}
-			if e.Action == prospecting.ActionHeld && e.CompanyID != nil && e.Value != nil {
+			if e.Action == store.ActTaskHeld.String() && e.CompanyID != nil && e.Value != nil {
 				heldAs[*e.CompanyID] = *e.Value
 			}
 			if e.CompanyID != nil {
@@ -775,7 +775,7 @@ func (s *ResearchStore) agentTaskPage(org int64, who store.Actor, id int64, page
 		return nil, err
 	}
 	who.Task = id
-	return &out, s.LogAs(s.DB, org, 0, nil, who, "task:pickup", nil)
+	return &out, s.LogAs(s.DB, org, 0, nil, who, store.ActTaskPickup, nil)
 }
 
 func (s *ResearchStore) AgentNote(org int64, who store.Actor, in NoteIn) (*store.TaskNote, error) {
@@ -805,7 +805,7 @@ func (s *ResearchStore) AgentNote(org int64, who store.Actor, in NoteIn) (*store
 		if err := tx.Create(&n).Error; err != nil {
 			return err
 		}
-		return s.LogAs(tx, org, 0, company, who, "note:"+in.Kind, nil)
+		return s.LogAs(tx, org, 0, company, who, store.Noted.Of(in.Kind), nil)
 	})
 }
 
@@ -897,7 +897,7 @@ func (s *ResearchStore) AddOffering(org int64, o store.Offering, actor string) (
 		if err := tx.Create(&o).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, nil, actor, "offering:added", &o.Name)
+		return s.Log(tx, org, 0, nil, actor, store.ActOfferingAdded, &o.Name)
 	})
 	return &o, err
 }
@@ -934,7 +934,7 @@ func (s *ResearchStore) ChangeOffering(org, id int64, change func(*store.Offerin
 		if err := tx.Model(o).Select("name", "look_for", "pitch", "note_template", "has_roles", "updated_by", "updated_at").Updates(o).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, nil, actor, "offering:changed", &o.Name)
+		return s.Log(tx, org, 0, nil, actor, store.ActOfferingChanged, &o.Name)
 	})
 	return o, err
 }
@@ -975,7 +975,7 @@ func (s *ResearchStore) RemoveOffering(org, id int64, actor string) error {
 		if err := tx.Delete(o).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, nil, actor, "offering:removed", &o.Name)
+		return s.Log(tx, org, 0, nil, actor, store.ActOfferingRemoved, &o.Name)
 	})
 }
 
@@ -1025,7 +1025,7 @@ func (s *ResearchStore) JudgeCompany(org, offering, company int64, stage, fit, r
 		if v.Reason != "" {
 			said += ": " + v.Reason
 		}
-		return s.Log(tx, org, 0, &company, actor, "verdict:"+stage, &said)
+		return s.Log(tx, org, 0, &company, actor, store.VerdictTo.Of(stage), &said)
 	})
 }
 
@@ -1133,7 +1133,7 @@ func (s *ResearchStore) addRole(tx *gorm.DB, org int64, o *store.Offering, compa
 	if err := tx.Create(&r).Error; err != nil {
 		return nil, false, err
 	}
-	if err := s.LogAs(tx, org, 0, &company, who, "add:role", new(o.Name+": "+r.Title)); err != nil {
+	if err := s.LogAs(tx, org, 0, &company, who, store.ActAddRole, new(o.Name+": "+r.Title)); err != nil {
 		return nil, false, err
 	}
 	return &r, false, s.followRoles(tx, org, o, company, who.Name)
@@ -1177,7 +1177,7 @@ func (s *ResearchStore) followRoles(tx *gorm.DB, org int64, o *store.Offering, c
 	if reason != "" {
 		said += ": " + reason
 	}
-	return s.Log(tx, org, 0, &company, actor, "verdict:"+want, &said)
+	return s.Log(tx, org, 0, &company, actor, store.VerdictTo.Of(want), &said)
 }
 
 // AddRole is a person adding a role they found to a company, for an offering with roles.
@@ -1254,7 +1254,7 @@ func (s *ResearchStore) JudgeRole(org, id int64, stage, reason, actor string) (*
 		if reason != "" {
 			said += ": " + reason
 		}
-		if err := s.Log(tx, org, 0, &r.CompanyID, actor, "role:"+stage, &said); err != nil {
+		if err := s.Log(tx, org, 0, &r.CompanyID, actor, store.RoleTo.Of(stage), &said); err != nil {
 			return err
 		}
 		return s.followRoles(tx, org, o, r.CompanyID, actor)
@@ -1416,9 +1416,9 @@ func (s *ResearchStore) AgentAddCompany(org int64, who store.Actor, in AddCompan
 		if !created && added == 0 {
 			return s.matched(tx, org, who, 0, &c.ID)
 		}
-		action := "add:company"
+		action := store.ActAddCompany
 		if !created {
-			action = "add:facts"
+			action = store.ActAddFacts
 		}
 		return s.LogAs(tx, org, 0, &c.ID, who, action, new(fmt.Sprintf("%s, %d facts", c.Name, added)))
 	})
@@ -1456,7 +1456,7 @@ func (s *ResearchStore) AgentAddFact(org int64, who store.Actor, in AddFactIn) (
 		if had {
 			return s.matched(tx, org, who, 0, &c.ID)
 		}
-		return s.LogAs(tx, org, 0, &c.ID, who, "add:fact", new(f.Field))
+		return s.LogAs(tx, org, 0, &c.ID, who, store.ActAddFact, new(f.Field))
 	})
 	return &out, err
 }
@@ -1536,7 +1536,7 @@ func (s *ResearchStore) AgentAddContact(o *store.Org, who store.Actor, in prospe
 			return err
 		}
 		out = AddContactOut{ID: contact.ID, Status: contact.Status}
-		return s.LogAs(tx, o.ID, contact.ID, &c.ID, who, "add:contact", nil)
+		return s.LogAs(tx, o.ID, contact.ID, &c.ID, who, store.ActAddContact, nil)
 	})
 	return &out, err
 }
@@ -1585,7 +1585,7 @@ func (s *ResearchStore) AgentDraft(org int64, who store.Actor, in DraftIn) error
 		if err := tx.Model(&c).Updates(updates).Error; err != nil {
 			return err
 		}
-		return s.LogAs(tx, org, c.ID, c.CompanyID, who, "draft:"+in.Kind, nil)
+		return s.LogAs(tx, org, c.ID, c.CompanyID, who, store.Drafted.Of(in.Kind), nil)
 	})
 }
 
@@ -1805,10 +1805,10 @@ func (s *ResearchStore) AgentScores(org int64) []AgentScore {
 		Contacts, Picked, Replied int
 	}
 	_ = store.Logged(s.DB.Raw(`select e."user" as actor, count(*) as contacts,
-		sum(case when exists (select 1 from events p where p.org_id = e.org_id and p.contact_id = e.contact_id and p.action = 'pick') then 1 else 0 end) as picked,
+		sum(case when exists (select 1 from events p where p.org_id = e.org_id and p.contact_id = e.contact_id and p.action = ?) then 1 else 0 end) as picked,
 		sum(case when c.replied is not null then 1 else 0 end) as replied
 		from events e join contacts c on c.id = e.contact_id
-		where e.org_id = ? and e.action = 'add:contact' and e."user" like 'agent:%' group by e."user"`, org).Scan(&contacts))
+		where e.org_id = ? and e.action = ? and e."user" like 'agent:%' group by e."user"`, store.ActPick.String(), org, store.ActAddContact.String()).Scan(&contacts))
 	for _, r := range contacts {
 		a := get(r.Actor)
 		a.Contacts, a.Picked, a.Replied = r.Contacts, r.Picked, r.Replied
@@ -1839,9 +1839,9 @@ func (s *ResearchStore) AgentMarks(org int64, ids []int64) map[int64]map[string]
 		return out
 	}
 	var events []store.Event
-	_ = store.Logged(s.InOrg(org).Where("contact_id in ? and action like 'mark:%'", ids).Order("at, id").Find(&events))
+	_ = store.Logged(s.InOrg(org).Where("contact_id in ? and action like ?", ids, store.Marked.Like()).Order("at, id").Find(&events))
 	for _, e := range events {
-		step := strings.TrimPrefix(e.Action, "mark:")
+		step, _ := store.Marked.In(e.Action)
 		if out[e.ContactID] == nil {
 			out[e.ContactID] = map[string]string{}
 		}

@@ -50,7 +50,7 @@ func (s *OnboardingStore) StartOnboarding(org int64, in OnboardingIn, actor stri
 		if err := tx.Create(&steps).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, &c.ID, actor, "onboard:start", &in.Start)
+		return s.Log(tx, org, 0, &c.ID, actor, store.ActOnboardStart, &in.Start)
 	})
 	if err != nil {
 		return nil, err
@@ -80,12 +80,12 @@ func (s *OnboardingStore) SetOnboardingStep(org, id int64, field, value, actor s
 			return store.Missing(err, "no onboarding %d", st.OnboardingID)
 		}
 		updates := map[string]any{}
-		action, logged := "onboard:"+field, st.Name
+		action, logged := store.OnboardField.Of(field), st.Name
 		switch field {
 		case "done":
 			switch {
 			case value == "":
-				updates["done_on"], updates["done_by"], updates["done_entry"], action = nil, "", 0, "onboard:undone"
+				updates["done_on"], updates["done_by"], updates["done_entry"], action = nil, "", 0, store.ActOnboardUndone
 			case value != "yes":
 				return say.Errorf("a step is done (yes) or not (empty), not %q", value)
 			case st.DoneOn != nil:
@@ -130,7 +130,7 @@ func (s *OnboardingStore) RemoveOnboarding(org, id int64, actor string) error {
 		if err := tx.Delete(&ob).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, &ob.CompanyID, actor, "onboard:remove", nil)
+		return s.Log(tx, org, 0, &ob.CompanyID, actor, store.ActOnboardRemove, nil)
 	})
 }
 

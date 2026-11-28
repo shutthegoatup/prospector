@@ -20,7 +20,7 @@ func (s *OutreachStore) NewBounceHook(org int64, actor string) (string, error) {
 		if err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, nil, actor, "webhook:new", nil)
+		return s.Log(tx, org, 0, nil, actor, store.ActWebhookNew, nil)
 	})
 }
 
@@ -30,7 +30,7 @@ func (s *OutreachStore) DropBounceHook(org int64, actor string) error {
 		if res.Error != nil || res.RowsAffected == 0 {
 			return res.Error
 		}
-		return s.Log(tx, org, 0, nil, actor, "webhook:remove", nil)
+		return s.Log(tx, org, 0, nil, actor, store.ActWebhookDrop, nil)
 	})
 }
 

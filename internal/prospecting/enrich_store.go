@@ -47,7 +47,7 @@ func (s *ProspectingStore) SaveEnricher(org int64, in EnricherIn, by string) (*s
 		if err := tx.Save(&e).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, nil, by, "enricher:save", &e.Kind)
+		return s.Log(tx, org, 0, nil, by, store.ActEnricherSave, &e.Kind)
 	})
 }
 
@@ -61,7 +61,7 @@ func (s *ProspectingStore) DeleteEnricher(org, id int64, actor string) error {
 		if res.Error != nil {
 			return res.Error
 		}
-		return s.Log(tx, org, 0, nil, actor, "enricher:remove", &e.Kind)
+		return s.Log(tx, org, 0, nil, actor, store.ActEnricherDrop, &e.Kind)
 	})
 }
 
@@ -96,7 +96,7 @@ func (s *ProspectingStore) KeepFind(org int64, who store.Actor, contact int64, f
 		if made, err = s.suggestOne(tx, who, c, field, value, status, "", kind); err != nil {
 			return err
 		}
-		return s.LogAs(tx, org, c.ID, c.CompanyID, who, "enrich:"+field, new(kind+": "+LookupFound))
+		return s.LogAs(tx, org, c.ID, c.CompanyID, who, store.Enriched.Of(field), new(kind+": "+LookupFound))
 	})
 }
 
@@ -104,7 +104,7 @@ func (s *ProspectingStore) KeepFind(org int64, who store.Actor, contact int64, f
 // was recently enough that asking again would only spend a lookup.
 func (s *ProspectingStore) AskedLately(org, contact int64, field, kind string) *time.Time {
 	var e store.Event
-	res := s.DB.Where("org_id = ? and contact_id = ? and action = ? and value like ? and at > ?", org, contact, "enrich:"+field, kind+":%", time.Now().Add(-EnrichAgain)).
+	res := s.DB.Where("org_id = ? and contact_id = ? and action = ? and value like ? and at > ?", org, contact, store.Enriched.Of(field).String(), kind+":%", time.Now().Add(-EnrichAgain)).
 		Order("at desc").Limit(1).Find(&e)
 	if store.Logged(res) != nil || res.RowsAffected == 0 {
 		return nil
@@ -120,7 +120,7 @@ func (s *ProspectingStore) lookupsOf(org int64, people []int64) (map[int64][]Loo
 		return out, nil
 	}
 	var events []store.Event
-	if err := s.DB.Where("org_id = ? and contact_id in ? and action like 'enrich:%' and at > ?", org, people, time.Now().Add(-EnrichAgain)).
+	if err := s.DB.Where("org_id = ? and contact_id in ? and action like ? and at > ?", org, people, store.Enriched.Like(), time.Now().Add(-EnrichAgain)).
 		Order("at desc, id desc").Find(&events).Error; err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (s *ProspectingStore) lookupsOf(org int64, people []int64) (map[int64][]Loo
 		if !ok {
 			continue
 		}
-		field := strings.TrimPrefix(e.Action, "enrich:")
+		field, _ := store.Enriched.In(e.Action)
 		if k := fmt.Sprint(e.ContactID, field, kind); !seen[k] {
 			seen[k] = true
 			out[e.ContactID] = append(out[e.ContactID], Lookup{Field: field, Vendor: kind, Outcome: said, At: e.At})
@@ -145,5 +145,5 @@ func (s *ProspectingStore) LogEnrich(org int64, who store.Actor, contact int64, 
 	if err != nil {
 		return err
 	}
-	return s.LogAs(s.DB, org, c.ID, c.CompanyID, who, "enrich:"+field, &value)
+	return s.LogAs(s.DB, org, c.ID, c.CompanyID, who, store.Enriched.Of(field), &value)
 }

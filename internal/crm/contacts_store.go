@@ -89,7 +89,7 @@ func (s *CRMStore) MarkAs(org, id int64, step, date string, who store.Actor, not
 		if note != "" {
 			value += " · " + note
 		}
-		return s.LogAs(tx, org, id, c.CompanyID, who, "mark:"+step, &value)
+		return s.LogAs(tx, org, id, c.CompanyID, who, store.Marked.Of(step), &value)
 	})
 }
 
@@ -161,7 +161,7 @@ func (s *CRMStore) SetContactField(tx *gorm.DB, org, id int64, field, value, act
 	if loggedValue[field] {
 		logged = store.NonEmpty(value)
 	}
-	return s.Log(tx, org, id, c.CompanyID, actor, "set:"+field, logged)
+	return s.Log(tx, org, id, c.CompanyID, actor, store.SetField.Of(field), logged)
 }
 
 // Find matches the CLI's name argument against person, maker or first name.

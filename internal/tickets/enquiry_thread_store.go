@@ -118,13 +118,13 @@ func (s *EnquiryStore) SettleReply(org int64, m *store.EnquiryMessage, sent bool
 		if err := tx.Model(&store.Enquiry{}).Where("org_id = ? and id = ?", org, e.ID).Updates(updates).Error; err != nil {
 			return err
 		}
-		return s.logEnquiry(tx, e, actor, "enquiry:reply")
+		return s.logEnquiry(tx, e, actor, store.ActEnquiryReply)
 	})
 }
 
 // logEnquiry puts a turn in the history of whoever wrote in, when they are held here.
 // It says that it happened, not what was said: the words are in the thread.
-func (s *EnquiryStore) logEnquiry(tx *gorm.DB, e store.Enquiry, actor, action string) error {
+func (s *EnquiryStore) logEnquiry(tx *gorm.DB, e store.Enquiry, actor string, action store.Action) error {
 	if e.ContactID == nil && e.CompanyID == nil {
 		return nil
 	}
@@ -158,7 +158,7 @@ func (s *EnquiryStore) HearEnquiry(org, enquiry int64, text, actor string) (*sto
 		if err := tx.Model(&store.Enquiry{}).Where("org_id = ? and id = ?", org, enquiry).Update("state", EnquiryOpen).Error; err != nil {
 			return err
 		}
-		return s.logEnquiry(tx, e, actor, "enquiry:heard")
+		return s.logEnquiry(tx, e, actor, store.ActEnquiryHeard)
 	})
 	return m, err
 }
