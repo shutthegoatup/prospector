@@ -343,7 +343,7 @@ func (s *ProspectingStore) AgentActivity(org int64, page int) ([]AgentEvent, Pag
 // AgentEvents is limit of what agents did from offset, newest first, and how many they
 // did in all; a limit of 0 reads none, only the count.
 func (s *ProspectingStore) AgentEvents(org int64, offset, limit int) ([]AgentEvent, int) {
-	agents := func() *gorm.DB { return s.InOrg(org).Model(&store.Event{}).Where(`"user" like 'agent:%'`) }
+	agents := func() *gorm.DB { return s.InOrg(org).Model(&store.Event{}).Where(`"user" like ?`, store.AgentsLike) }
 	var total int64
 	_ = store.Logged(agents().Count(&total))
 	if limit == 0 {
@@ -353,7 +353,7 @@ func (s *ProspectingStore) AgentEvents(org int64, offset, limit int) ([]AgentEve
 	_ = store.Logged(agents().Order("at desc, id desc").Limit(limit).Offset(offset).Find(&events))
 	out := make([]AgentEvent, len(events))
 	for i, e := range events {
-		out[i] = AgentEvent{e.At, strings.TrimPrefix(e.User, "agent:"), e.Action, store.Deref(e.Value)}
+		out[i] = AgentEvent{e.At, store.AgentName(e.User), e.Action, store.Deref(e.Value)}
 	}
 	return out, int(total)
 }
@@ -363,7 +363,7 @@ func (s *ProspectingStore) AgentEvents(org int64, offset, limit int) ([]AgentEve
 // page starts, 0 once there is none, and how many there are in all. It reads from where
 // it left off rather than counting past every row before it.
 func (s *ProspectingStore) AgentEventsBefore(org, atMicro, id int64, limit int) (events []AgentEvent, nextAt, nextID int64, total int) {
-	agents := func() *gorm.DB { return s.InOrg(org).Model(&store.Event{}).Where(`"user" like 'agent:%'`) }
+	agents := func() *gorm.DB { return s.InOrg(org).Model(&store.Event{}).Where(`"user" like ?`, store.AgentsLike) }
 	var n int64
 	_ = store.Logged(agents().Count(&n))
 	q := agents().Order("at desc, id desc").Limit(limit + 1)
@@ -380,7 +380,7 @@ func (s *ProspectingStore) AgentEventsBefore(org, atMicro, id int64, limit int) 
 	}
 	events = make([]AgentEvent, len(rows))
 	for i, e := range rows {
-		events[i] = AgentEvent{e.At, strings.TrimPrefix(e.User, "agent:"), e.Action, store.Deref(e.Value)}
+		events[i] = AgentEvent{e.At, store.AgentName(e.User), e.Action, store.Deref(e.Value)}
 	}
 	return events, nextAt, nextID, int(n)
 }

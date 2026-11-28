@@ -371,7 +371,7 @@ func actorLabel(actor string) say.Sayer {
 	if actor == onboarding.CustomerActor {
 		return say.New("the customer")
 	}
-	if a, ok := strings.CutPrefix(actor, "agent:"); ok {
+	if a, ok := strings.CutPrefix(actor, store.AgentPrefix); ok {
 		return say.Errorf("agent · %s", a)
 	}
 	return say.New(actor)

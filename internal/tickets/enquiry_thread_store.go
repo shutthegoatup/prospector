@@ -1,7 +1,6 @@
 package tickets
 
 import (
-	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -112,7 +111,7 @@ func (s *EnquiryStore) SettleReply(org int64, m *store.EnquiryMessage, sent bool
 			return err
 		}
 		updates := map[string]any{"state": EnquiryWaiting}
-		if e.Owner == "" && !strings.HasPrefix(actor, "agent:") {
+		if e.Owner == "" && !store.IsAgent(actor) {
 			updates["owner"] = actor
 		}
 		if err := tx.Model(&store.Enquiry{}).Where("org_id = ? and id = ?", org, e.ID).Updates(updates).Error; err != nil {

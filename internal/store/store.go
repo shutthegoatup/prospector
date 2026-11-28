@@ -312,6 +312,21 @@ func FirstField(s string) string {
 // CustomerActor is the actor recorded for what a customer does on their onboarding page.
 const CustomerActor = "customer"
 
+// AgentPrefix starts the actor recorded for what an agent does: "agent:" and its key's name.
+const AgentPrefix = "agent:"
+
+// AgentsLike matches an agent's actor in a SQL like.
+const AgentsLike = AgentPrefix + "%"
+
+// AgentActor is the actor recorded for what the agent with that key's name does.
+func AgentActor(name string) string { return AgentPrefix + name }
+
+// AgentName is the key's name in an agent's actor.
+func AgentName(actor string) string { return strings.TrimPrefix(actor, AgentPrefix) }
+
+// IsAgent is whether an actor is an agent's.
+func IsAgent(actor string) bool { return strings.HasPrefix(actor, AgentPrefix) }
+
 // NotSent is a failure of the mail server, not of what was asked.
 type NotSent struct{ Err error }
 

@@ -30,10 +30,10 @@ type ReqKey struct{}
 // when the name is missing or would read as an agent, the CLI or an import.
 func (q *Req) Actor() string {
 	if q.Key != nil {
-		return "agent:" + q.Key.Name
+		return store.AgentActor(q.Key.Name)
 	}
 	name := strings.TrimSpace(q.User.Name)
-	if name == "" || strings.HasPrefix(name, "agent:") || name == "cli" || name == "import" || name == store.CustomerActor {
+	if name == "" || store.IsAgent(name) || name == "cli" || name == "import" || name == store.CustomerActor {
 		return q.User.Email
 	}
 	return name

@@ -86,7 +86,7 @@ func RunsOf(events []store.Event) []Run {
 		done = append(done, o.run)
 	}
 	for _, e := range events {
-		if !strings.HasPrefix(e.User, "agent:") {
+		if !store.IsAgent(e.User) {
 			continue
 		}
 		key := fmt.Sprintf("%d\x00%s", e.KeyID, e.User)
