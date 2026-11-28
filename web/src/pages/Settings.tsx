@@ -242,8 +242,9 @@ const m = defineMessages({
     description: "Asked before stopping Postmark's reports",
   },
   hookShownOnce: {
-    defaultMessage: "The address holds its password and is shown only now. If you lose it, connect again: the old one stops working.",
-    id: "HU8Z1U",
+    defaultMessage: "The address holds its password and is shown only now. If you lose it, connect again: the old one stops working a day later.",
+    id: "GhgLQQ",
+
     description: "Under the address to paste into Postmark",
   },
   copyHook: { defaultMessage: "Copy", id: "JVE/Sg", description: "Button copying the address to paste into Postmark" },
