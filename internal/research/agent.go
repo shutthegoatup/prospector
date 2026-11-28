@@ -79,6 +79,23 @@ func checkFact(f FactIn) error {
 
 // addFact stores a fact unless the company already has the same one from the same
 // page, so an agent that runs again, or a second agent, doesn't double the list.
+// filedOtherwise is what an agent said of a known company that differs from what is on
+// file. The company keeps its own; what the agent said is kept beside it as facts, which
+// cite nothing, as the company's own fields don't.
+func filedOtherwise(c *store.Company, domain, country, segment string) []FactIn {
+	var out []FactIn
+	for _, f := range []struct{ field, said, filed string }{
+		{"domain", domain, c.Domain},
+		{"country", strings.TrimSpace(country), c.Country},
+		{"segment", strings.TrimSpace(segment), c.Segment},
+	} {
+		if f.said != "" && !strings.EqualFold(f.said, strings.TrimSpace(f.filed)) {
+			out = append(out, FactIn{Field: f.field, Value: f.said})
+		}
+	}
+	return out
+}
+
 func addFact(tx *gorm.DB, org, company int64, in FactIn, actor string) (*store.Fact, bool, error) {
 	answer, err := factAnswer(in.Answer)
 	if err != nil {

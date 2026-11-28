@@ -5046,7 +5046,7 @@ components:
       type: object
       required: [field, value, source_url]
       properties:
-        field: { type: string, description: "What the fact is about, e.g. team_page or press, or one of the things the organisation looks for." }
+        field: { type: string, description: "What the fact is about, e.g. team_page or press; owned_by for who owns the company or its parent; status for it being dissolved, in administration or acquired; or one of the things the organisation looks for." }
         value: { type: string, description: "The fact itself, one sentence; for answer unknown, where you looked." }
         source_url: { type: string, description: "The page that shows it; required unless answer is unknown." }
         answer: { type: string, description: "For something the organisation looks for: yes (the default), no, or unknown." }
@@ -5074,7 +5074,7 @@ components:
       properties:
         id: { type: integer, format: int64 }
         name: { type: string, description: "The name it is filed under, which can differ from yours if the domain was already known." }
-        existed: { type: boolean, description: "The company was already known; facts it didn't have were still added." }
+        existed: { type: boolean, description: "The company was already known; facts it didn't have were still added, and a domain, country or segment other than the one on file is kept as a fact beside it." }
         stage: { type: string }
     AgentAddFactIn:
       allOf:

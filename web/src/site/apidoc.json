@@ -19508,7 +19508,7 @@
      },
      "about": [
       {
-       "text": "The company was already known; facts it didn't have were still added."
+       "text": "The company was already known; facts it didn't have were still added, and a domain, country or segment other than the one on file is kept as a fact beside it."
       }
      ],
      "required": true
@@ -20446,7 +20446,7 @@
      },
      "about": [
       {
-       "text": "What the fact is about, e.g. team_page or press, or one of the things the organisation looks for."
+       "text": "What the fact is about, e.g. team_page or press; owned_by for who owns the company or its parent; status for it being dissolved, in administration or acquired; or one of the things the organisation looks for."
       }
      ],
      "required": true
