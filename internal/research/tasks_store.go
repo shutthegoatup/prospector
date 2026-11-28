@@ -1606,7 +1606,7 @@ func (s *ResearchStore) lastAgents(org int64, who store.Actor, companies []int64
 		return out, nil
 	}
 	latest := s.DB.Model(&store.Event{}).Select("max(id)").
-		Where(`org_id = ? and company_id in ? and "user" like 'agent:%'`, org, companies).Group("company_id")
+		Where(`org_id = ? and company_id in ? and "user" like ?`, org, companies, store.AgentsLike).Group("company_id")
 	var events []store.Event
 	if err := s.InOrg(org).Where("id in (?)", latest).Find(&events).Error; err != nil {
 		return nil, err
@@ -1800,7 +1800,7 @@ func (s *ResearchStore) AgentScores(org int64) []AgentScore {
 		N              int
 	}
 	_ = store.Logged(s.DB.Raw(`select found_by, stage, count(*) as n from companies
-		where org_id = ? and found_by like 'agent:%' group by found_by, stage`, org).Scan(&companies))
+		where org_id = ? and found_by like ? group by found_by, stage`, org, store.AgentsLike).Scan(&companies))
 	for _, r := range companies {
 		a := get(r.FoundBy)
 		a.Companies += r.N
@@ -1819,7 +1819,7 @@ func (s *ResearchStore) AgentScores(org int64) []AgentScore {
 		sum(case when exists (select 1 from events p where p.org_id = e.org_id and p.contact_id = e.contact_id and p.action = ?) then 1 else 0 end) as picked,
 		sum(case when c.replied is not null then 1 else 0 end) as replied
 		from events e join contacts c on c.id = e.contact_id
-		where e.org_id = ? and e.action = ? and e."user" like 'agent:%' group by e."user"`, store.ActPick.String(), org, store.ActAddContact.String()).Scan(&contacts))
+		where e.org_id = ? and e.action = ? and e."user" like ? group by e."user"`, store.ActPick.String(), org, store.ActAddContact.String(), store.AgentsLike).Scan(&contacts))
 	for _, r := range contacts {
 		a := get(r.Actor)
 		a.Contacts, a.Picked, a.Replied = r.Contacts, r.Picked, r.Replied

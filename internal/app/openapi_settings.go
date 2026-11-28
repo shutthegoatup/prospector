@@ -61,9 +61,7 @@ func (s apiServer) ChangeSettings(ctx context.Context, in api.ChangeSettingsRequ
 	request.Put(&set.Currency, c.Currency)
 	request.Put(&set.PostalAddress, c.PostalAddress)
 	request.Put(&set.CustomerLanguage, c.CustomerLanguage)
-	if c.IncorporatedOnly != nil {
-		set.IncorporatedOnly = *c.IncorporatedOnly
-	}
+	request.Put(&set.IncorporatedOnly, c.IncorporatedOnly)
 	if err := checkOrg(o); err != nil {
 		return nil, err
 	}

@@ -122,7 +122,8 @@ func NextLink(ctx context.Context, next string) string {
 	return "<" + at.Path + "?" + q.Encode() + `>; rel="next"`
 }
 
-func Put(to, v *string) {
+// Put sets *to to what a request sent, when it sent anything.
+func Put[T any](to, v *T) {
 	if v != nil {
 		*to = *v
 	}
