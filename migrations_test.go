@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // Built by the server itself at start-up, best-effort, or by hand in a migration: not
@@ -94,6 +96,43 @@ func TestADatabaseFromBeforeGooseIsOnlyRecorded(t *testing.T) {
 		if !after[l] {
 			t.Errorf("the baseline changed what was there: %s", l)
 		}
+	}
+}
+
+// TestWhatEarlierMovesLeftBehindIsDropped: production still had the table and columns
+// #58 and #82 moved out of, which AutoMigrate never dropped.
+func TestWhatEarlierMovesLeftBehindIsDropped(t *testing.T) {
+	t.Parallel()
+	s := emptyStore(t)
+	if err := s.DB.AutoMigrate(models...); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		"create table agent_configs (org_id integer primary key, base_url text not null default '')",
+		"alter table companies add column configurator_url text, add column platform text, add column built_by text",
+	} {
+		if err := s.DB.Exec(q).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	o := mustOrg(t, s, "alpha")
+	c := store.Company{OrgID: o.ID, Name: "Larkmoor"}
+	if err := s.DB.Create(&c).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := s.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	have := tablesOf(t, s)
+	for l := range have {
+		if strings.Contains(l, "agent_configs.") || strings.Contains(l, "companies.configurator_url ") ||
+			strings.Contains(l, "companies.platform ") || strings.Contains(l, "companies.built_by ") {
+			t.Errorf("still there: %s", l)
+		}
+	}
+	var name string
+	if err := s.DB.Raw("select name from companies where id = ?", c.ID).Scan(&name).Error; err != nil || name != "Larkmoor" {
+		t.Fatalf("the company was lost: %q %v", name, err)
 	}
 }
 
