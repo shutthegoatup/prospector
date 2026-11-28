@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -95,16 +96,15 @@ func (d *Deliverer) payloadOf(due Due) payload {
 	return payload{Type: due.Type, Timestamp: e.At.UTC(), Data: data}
 }
 
-// signatures are the delivery's webhook-signature: one by its secret, and one by the
-// secret it replaced while that still signs.
+// signatures are the delivery's webhook-signature: one by each of the endpoint's keys
+// still live, the newest first.
 func (d *Deliverer) signatures(due Due, at time.Time, body []byte) (string, error) {
 	var out []string
-	secrets := []string{due.Endpoint.Secret}
-	if due.Endpoint.PreviousSecret != "" && due.Endpoint.PreviousUntil != nil && at.Before(*due.Endpoint.PreviousUntil) {
-		secrets = append(secrets, due.Endpoint.PreviousSecret)
-	}
-	for _, sealed := range secrets {
-		secret, err := d.Store.Keyring.Open(sealed)
+	for _, k := range due.Keys {
+		if !k.Live(at) {
+			continue
+		}
+		secret, err := d.Store.Keyring.Open(k.Secret)
 		if err != nil {
 			return "", err
 		}
@@ -113,6 +113,9 @@ func (d *Deliverer) signatures(due Due, at time.Time, body []byte) (string, erro
 			return "", err
 		}
 		out = append(out, sig)
+	}
+	if len(out) == 0 {
+		return "", errors.New("it has no key that signs")
 	}
 	return strings.Join(out, " "), nil
 }

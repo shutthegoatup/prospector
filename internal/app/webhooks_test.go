@@ -45,12 +45,16 @@ func TestAnOwnerSendsEventsToAnEndpoint(t *testing.T) {
 	if code != http.StatusOK || !strings.HasPrefix(rotated.Secret, "whsec_") || rotated.Secret == made.Secret {
 		t.Fatalf("a new secret: %d %s", code, body)
 	}
-	e := must(s.Webhook(o.ID, made.Webhook.Id))
-	if e.PreviousSecret == "" || e.PreviousUntil == nil {
-		t.Fatalf("the old secret doesn't sign beside the new: %+v", e)
+	var keys []store.EndpointKey
+	s.DB.Where("org_id = ? and endpoint_id = ?", o.ID, made.Webhook.Id).Order("id").Find(&keys)
+	if len(keys) != 2 || keys[0].ExpiresAt == nil || keys[1].ExpiresAt != nil || keys[0].Kid == keys[1].Kid {
+		t.Fatalf("the key set: %+v", keys)
 	}
-	if was, err := s.Keyring.Open(e.PreviousSecret); err != nil || was != made.Secret {
+	if was, err := s.Keyring.Open(keys[0].Secret); err != nil || was != made.Secret {
 		t.Fatalf("the old secret kept: %q %v", was, err)
+	}
+	if now, err := s.Keyring.Open(keys[1].Secret); err != nil || now != rotated.Secret {
+		t.Fatalf("the new secret: %q %v", now, err)
 	}
 	if code, _ := call(t, ada, "DELETE", one, "", nil); code != http.StatusNoContent {
 		t.Fatalf("removing it: %d", code)

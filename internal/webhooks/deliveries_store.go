@@ -13,8 +13,10 @@ import (
 type Due struct {
 	store.WebhookDelivery
 	Endpoint store.WebhookEndpoint
-	Event    store.Event
-	Slug     string
+	// Keys are the endpoint's, newest first; those still live sign.
+	Keys  []store.EndpointKey
+	Event store.Event
+	Slug  string
 	// Live is whether it may still go: its endpoint there and not stopped, its key not
 	// revoked and still able to read, its event not erased.
 	Live bool
@@ -49,6 +51,9 @@ func (s *WebhookStore) ClaimDue(now time.Time, lease time.Duration, n int) ([]Du
 		due := Due{WebhookDelivery: d}
 		var org store.Org
 		err := s.DB.Where("org_id = ? and id = ?", d.OrgID, d.EndpointID).Limit(1).Find(&due.Endpoint).Error
+		if err == nil {
+			err = s.DB.Where("org_id = ? and endpoint_id = ?", d.OrgID, d.EndpointID).Order("id desc").Find(&due.Keys).Error
+		}
 		if err == nil {
 			err = s.DB.Where("org_id = ? and id = ?", d.OrgID, d.EventID).Limit(1).Find(&due.Event).Error
 		}
