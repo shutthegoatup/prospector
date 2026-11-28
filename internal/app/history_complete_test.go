@@ -53,6 +53,7 @@ const (
 var untried = map[string]string{
 	"AskRunStop": notInState, "Claim": notInState, "ClaimNext": notInState, "DropKeyClaims": notInState, "EndRun": notInState,
 	"HoldRun": notInState, "RenewRun": notInState, "StopLapsedRun": notInState, "TakeOverRun": notInState,
+	"AddWebhook": logsByHand, "ChangeWebhook": logsByHand,
 	"AddCampaign": logsByHand, "AddMember": logsByHand, "AddRole": logsByHand, "AddSubscription": logsByHand,
 	"AgentAddContact": logsByHand, "AgentAddFact": logsByHand, "AgentAddRole": logsByHand, "AgentNote": logsByHand,
 	"ChangeContactFields": logsByHand, "ChangeDeal": logsByHand, "ChangeDealFields": logsByHand, "ChangeOffering": logsByHand,

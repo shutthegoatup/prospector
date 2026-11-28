@@ -389,6 +389,8 @@ var saysNothingBack = map[string]bool{
 	"AddMember": true, "RemoveMember": true, "SetRole": true, "SetAreas": true, "SaveVoice": true, "SaveOrg": true, "ChangeSettings": true, "RevokeKey": true, "SetKeyScopes": true, "DeleteOrgMail": true, "SaveOrgMail": true,
 	// A webhook secret is new random words, and the others say yes or no of the caller's own.
 	"NewBounceHook": true, "DropBounceHook": true, "HasBounceHook": true,
+	// Need a key and an https address the fuzzing's words aren't; TestAWebhookStaysInItsOrganisation tries them.
+	"AddWebhook": true, "ChangeWebhook": true, "RotateWebhookSecret": true, "DeleteWebhook": true,
 	"Mark": true, "MarkAs": true, "Claim": true, "Withheld": true, "Update": true,
 	// Needs a task read for it; TestAnotherOrganisationCantClaimThroughATaskItWasHanded tries it.
 	"ClaimNext": true,

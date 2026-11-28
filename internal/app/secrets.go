@@ -70,7 +70,6 @@ func newSecretKey() string {
 	return hex.EncodeToString(b)
 }
 
-// sealedColumn is where one kind of sealed secret is stored, a row to an organisation.
 // sealedColumn is where one kind of sealed secret is stored, and the column that tells
 // its rows apart: an organisation's, where it has one, or each row's own id.
 type sealedColumn struct {
@@ -83,6 +82,8 @@ var sealedColumns = []sealedColumn{
 	{"org_mails", "password", "mail password", "org_id"},
 	{"agents", "api_key", "agent endpoint key", "id"},
 	{"seal_keys", "key", "agreement sealing key", "org_id"},
+	{"webhook_endpoints", "secret", "webhook signing secret", "id"},
+	{"webhook_endpoints", "previous_secret", "webhook's previous signing secret", "id"},
 }
 
 type storedSecret struct {

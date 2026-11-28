@@ -338,6 +338,120 @@ export interface paths {
         patch: operations["changeKey"];
         trace?: never;
     };
+    "/o/{org}/api/v1/webhook-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What a webhook can be sent
+         * @description Every kind of event an endpoint can ask for, by name, in the order they are listed.
+         *     An event says what happened and to which records, by id, with a link to read each
+         *     through the API; the receiver reads the rest with its endpoint's key.
+         */
+        get: operations["listWebhookEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/webhooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Where the organisation's events are sent
+         * @description Every endpoint, newest first. Never its secret. Only a signed-in owner.
+         */
+        get: operations["listWebhooks"];
+        put?: never;
+        /**
+         * Send events to an endpoint
+         * @description Only a signed-in owner: no key can make, change or remove an endpoint, whatever its
+         *     scopes. The endpoint is sent only what its key may read, and nothing once the key is
+         *     revoked. Its address is https and on the public internet. Deliveries are signed as
+         *     Standard Webhooks sign them (`webhook-id`, `webhook-timestamp`, `webhook-signature`)
+         *     with the secret in the answer, shown this once.
+         */
+        post: operations["createWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/o/{org}/api/v1/webhooks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * One endpoint
+         * @description Only a signed-in owner. Never its secret.
+         */
+        get: operations["getWebhook"];
+        put?: never;
+        post?: never;
+        /**
+         * Stop sending to an endpoint, for good
+         * @description Only a signed-in owner. What is waiting to be sent to it isn't.
+         */
+        delete: operations["deleteWebhook"];
+        options?: never;
+        head?: never;
+        /**
+         * Change an endpoint
+         * @description Only a signed-in owner. Send what changes: its address, the events it is sent, or
+         *     `enabled: true` to send to one that was stopped again (or `false` to stop it).
+         */
+        patch: operations["changeWebhook"];
+        trace?: never;
+    };
+    "/o/{org}/api/v1/webhooks/{id}/secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give an endpoint a new secret
+         * @description Only a signed-in owner. The new secret is in the answer once. For a day, deliveries
+         *     carry a signature by each, so the receiver can change over without missing any.
+         */
+        post: operations["rotateWebhookSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/agent-scores": {
         parameters: {
             query?: never;
@@ -4098,6 +4212,58 @@ export interface components {
             /** @description A sentence for a person, with the secret in it. */
             message: string;
         };
+        WebhookEventType: {
+            /** @description As events are named: what happened to what, such as `company.added`. */
+            name: string;
+            about: string;
+        };
+        WebhookEndpoint: {
+            /** Format: int64 */
+            id: number;
+            url: string;
+            /**
+             * Format: int64
+             * @description The key whose scopes say what it is sent.
+             */
+            key: number;
+            key_name: string;
+            events: string[];
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description When sending to it stopped: an owner stopped it, it answered 410 Gone, or it took nothing for three days.
+             */
+            disabled_at: string | null;
+            /** @description Why sending to it stopped, when it has. */
+            disabled_why: string;
+        };
+        WebhookNew: {
+            /** @description An https address on the public internet. */
+            url: string;
+            /**
+             * Format: int64
+             * @description One of the organisation's keys, which needs the `read` scope.
+             */
+            key: number;
+            /** @description Names from `GET /webhook-events`. */
+            events: string[];
+        };
+        WebhookChange: {
+            url?: string;
+            events?: string[];
+            enabled?: boolean;
+        };
+        WebhookMade: {
+            webhook: components["schemas"]["WebhookEndpoint"];
+            secret: components["schemas"]["WebhookSecretText"];
+        };
+        WebhookSecret: {
+            secret: components["schemas"]["WebhookSecretText"];
+        };
+        /** @description `whsec_` and the base64 of the key, as Standard Webhooks' libraries take it. */
+        WebhookSecretText: string;
         KeyChanged: {
             key: components["schemas"]["APIKey"];
             /** @description A sentence saying how the change went, for a person. */
@@ -5772,6 +5938,242 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    listWebhookEvents: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The kinds of event. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WebhookEventType"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    listWebhooks: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The endpoints. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WebhookEndpoint"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    createWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookNew"];
+            };
+        };
+        responses: {
+            /** @description The endpoint, with its secret this once. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookMade"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    getWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The endpoint. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookEndpoint"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    deleteWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    changeWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookChange"];
+            };
+        };
+        responses: {
+            /** @description The endpoint as it is now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookEndpoint"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    rotateWebhookSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new secret, this once. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookSecret"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            415: components["responses"]["NotJSON"];
             429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };

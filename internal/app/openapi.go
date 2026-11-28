@@ -10,6 +10,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/apidoc"
 	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/webhooks"
 
 	"github.com/shutthegoatup/prospector/internal/slicesx"
 
@@ -43,6 +44,7 @@ type apiServer struct {
 	marketing.MarketingAPI
 	crm.CRMAPI
 	privacy.PrivacyAPI
+	webhooks.WebhooksAPI
 	research.ResearchAPI
 }
 
@@ -51,6 +53,7 @@ func newAPIServer(a *App) apiServer {
 	return apiServer{a: a,
 		ResearchAPI: research.ResearchAPI{Research: &a.s.ResearchStore, Finding: &a.s.ProspectingStore, Records: &a.s.CRMStore, Runs: a},
 		PrivacyAPI:  privacy.PrivacyAPI{Store: &a.s.PrivacyStore},
+		Endpoints:   &a.s.WebhookStore,
 		CRMAPI:      crm.CRMAPI{Records: &a.s.CRMStore},
 		SigningAPI:  signing.SigningAPI{Store: &a.s.AgreementStore},
 		Enquiries:   &a.s.EnquiryStore, Mail: a,
