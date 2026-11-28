@@ -16,14 +16,15 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/v2/option"
 
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // An agent reaches its model one of two ways: any OpenAI-compatible endpoint, or
 // Anthropic's own API through its SDK.
 
 var AgentKinds = []struct{ Key, Label string }{
-	{kindOpenAI, "OpenAI-compatible"},
-	{kindAnthropic, "Anthropic (Claude)"},
+	{store.KindOpenAI, "OpenAI-compatible"},
+	{store.KindAnthropic, "Anthropic (Claude)"},
 }
 
 // defaultClaude is the model an Anthropic agent is offered first.
@@ -42,7 +43,7 @@ var claudeFallbacks = []string{"claude-fable-5-2", "claude-fable-5-1", "claude-o
 // environment, profiles and base URL stay out of it, so an operator's credentials can
 // never go to an address an owner typed. Prospector's loop does its own waiting, so the
 // SDK doesn't retry.
-func (a *App) claudeClient(c *Agent, key string) anthropic.Client {
+func (a *App) claudeClient(c *store.Agent, key string) anthropic.Client {
 	opts := []option.RequestOption{option.WithoutEnvironmentDefaults(), option.WithAPIKey(key), option.WithHTTPClient(a.agentHTTP()),
 		option.WithMaxRetries(0), option.WithRequestTimeout(completionLimit)}
 	if c.BaseURL != "" {
@@ -77,7 +78,7 @@ func claudeErr(err error) error {
 	return err
 }
 
-func (a *App) listClaudeModels(ctx context.Context, c *Agent, key string) ([]string, error) {
+func (a *App) listClaudeModels(ctx context.Context, c *store.Agent, key string) ([]string, error) {
 	client := a.claudeClient(c, key)
 	pages := client.Models.ListAutoPaging(ctx, anthropic.ModelListParams{})
 	var out []string
@@ -124,7 +125,7 @@ type claudeChat struct {
 	pending []anthropic.BetaContentBlockParamUnion
 }
 
-func (a *App) newClaudeChat(c *Agent, key string, tools []toolDef, system, opening string) *claudeChat {
+func (a *App) newClaudeChat(c *store.Agent, key string, tools []toolDef, system, opening string) *claudeChat {
 	params := anthropic.BetaMessageNewParams{
 		Model:     anthropic.Model(c.Model),
 		MaxTokens: claudeMaxTokens,

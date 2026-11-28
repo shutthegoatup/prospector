@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // hashSlots caps how many password hashes run at once, so a burst of sign-in
@@ -42,7 +43,7 @@ func (g *loginGuard) clock() time.Time {
 }
 
 // loginKey is a hash so that a huge email field can't be held in memory.
-func loginKey(email string) string { return hashToken(strings.ToLower(strings.TrimSpace(email))) }
+func loginKey(email string) string { return store.HashToken(strings.ToLower(strings.TrimSpace(email))) }
 
 // loginWait doubles with each failure past the free ones, up to maxLoginWait.
 func loginWait(failures int) time.Duration {
@@ -130,9 +131,9 @@ const (
 // server's secret key: whoever can read the password hash could make one, but all it
 // buys is being counted apart from other guessers, and a year of browsers would
 // otherwise be forgotten the day a key is set.
-func newDeviceToken(u *User) string {
-	nonce := randomToken(16)
+func newDeviceToken(u *store.User) string {
+	nonce := store.RandomToken(16)
 	return nonce + "." + identity.DeviceMAC(u, nonce)
 }
 
-func changeBucket(u *User) string { return "change\x00" + u.Email }
+func changeBucket(u *store.User) string { return "change\x00" + u.Email }

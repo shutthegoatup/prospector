@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/api"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestFindStartsTheChosenAgentsOnANewSearch(t *testing.T) {
@@ -72,7 +73,7 @@ func TestFindStartsTheChosenAgentsOnANewSearch(t *testing.T) {
 		t.Fatalf("a key without agents:run started agents: %d %s", code, body)
 	}
 	var tasks int64
-	s.DB.Model(&Task{}).Where("org_id = ?", o.ID).Count(&tasks)
+	s.DB.Model(&store.Task{}).Where("org_id = ?", o.ID).Count(&tasks)
 	if tasks != 1 {
 		t.Fatalf("a refused start still made a task: %d tasks", tasks)
 	}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // The React Agents page draws each card from the API, so the API says what the card says.
@@ -102,9 +103,9 @@ func TestWhatAgentsDidIsInTheAPI(t *testing.T) {
 	// Activity comes a page at a time, saying how much there is for the page's "Page 1 of 2".
 	_, before := s.AgentEvents(o.ID, 0, 0)
 	start := time.Now().Add(-time.Hour)
-	var events []Event
+	var events []store.Event
 	for i := range 24 {
-		events = append(events, Event{OrgID: o.ID, User: "agent:scout", Action: "add:fact", Value: new("employees: 40"), At: start.Add(time.Duration(i) * time.Second)})
+		events = append(events, store.Event{OrgID: o.ID, User: "agent:scout", Action: "add:fact", Value: new("employees: 40"), At: start.Add(time.Duration(i) * time.Second)})
 	}
 	if err := s.DB.Create(&events).Error; err != nil {
 		t.Fatal(err)

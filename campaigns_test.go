@@ -9,14 +9,15 @@ import (
 	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/sales"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // person adds someone at a company with an address, in conversation unless cold.
-func person(t *testing.T, s *Store, o *Org, name, company, email string, replied bool) *Contact {
+func person(t *testing.T, s *Store, o *store.Org, name, company, email string, replied bool) *store.Contact {
 	t.Helper()
 	c := must(s.QuickAddPerson(o, crm.QuickAdd{Name: name, Company: company, Email: email}, "Ada Lovelace"))
 	if replied {
-		if err := s.Mark(o.ID, c.ID, "replied", today(), "Ada Lovelace"); err != nil {
+		if err := s.Mark(o.ID, c.ID, "replied", store.Today(), "Ada Lovelace"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -44,7 +45,7 @@ func TestACampaignGoesOnlyToPeopleWithARelationship(t *testing.T) {
 	person(t, s, o, "Sven Dahl", "Nordkap Boats", "sven@nordkap.example", true)
 	person(t, s, o, "Cold Prospect", "Quayside Ltd", "cold@quayside.example", false)
 	declined := person(t, s, o, "Said No", "Quayside Ltd", "no@quayside.example", true)
-	if err := s.Mark(o.ID, declined.ID, "declined", today(), "Ada Lovelace"); err != nil {
+	if err := s.Mark(o.ID, declined.ID, "declined", store.Today(), "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	must(s.Suppress(o.ID, "jo@larkmoor.example", "Ada Lovelace"))
@@ -91,17 +92,17 @@ func TestACampaignGoesOnlyToPeopleWithARelationship(t *testing.T) {
 
 	// Customers: everyone at a company with a subscription that hasn't ended, whether or
 	// not they are in conversation; nobody at one whose subscription has.
-	var hannah Contact
+	var hannah store.Contact
 	if err := s.DB.First(&hannah, people[0].ContactID).Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *declined.CompanyID, Name: "Old plan", Start: "2020-01-01", TermMonths: 12, Then: ThenEnds}, "Ada Lovelace"); err != nil {
+	if _, err := s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *declined.CompanyID, Name: "Old plan", Start: "2020-01-01", TermMonths: 12, Then: store.ThenEnds}, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	c = must(s.ChangeCampaign(o.ID, c.ID, []Change{{Field: "audience", Value: AudienceCustomers}}, "Ada Lovelace"))
+	c = must(s.ChangeCampaign(o.ID, c.ID, []store.Change{{Field: "audience", Value: store.AudienceCustomers}}, "Ada Lovelace"))
 	got = leftOut(must(s.Audience(o, *c)))
 	for _, name := range []string{"Hannah Pryce", "Tom Ellery", "Jo Marsh"} {
 		if _, there := got[name]; !there {
@@ -182,7 +183,7 @@ func TestCampaignDraftsAreKeptByMembersAndKeys(t *testing.T) {
 	}
 
 	// One that isn't a draft any more is kept as it went.
-	if err := s.DB.Model(&Campaign{}).Where("id = ?", c.ID).Update("status", "sent").Error; err != nil {
+	if err := s.DB.Model(&store.Campaign{}).Where("id = ?", c.ID).Update("status", "sent").Error; err != nil {
 		t.Fatal(err)
 	}
 	if code, _ := asKey(t, "PATCH", one, writer, map[string]any{"name": "Changed after"}); code != http.StatusBadRequest {
@@ -191,7 +192,7 @@ func TestCampaignDraftsAreKeptByMembersAndKeys(t *testing.T) {
 	if code, _ := asKey(t, "DELETE", one, writer, nil); code != http.StatusBadRequest {
 		t.Errorf("removing one that went: %d", code)
 	}
-	if err := s.DB.Model(&Campaign{}).Where("id = ?", c.ID).Update("status", marketing.CampaignDraft).Error; err != nil {
+	if err := s.DB.Model(&store.Campaign{}).Where("id = ?", c.ID).Update("status", marketing.CampaignDraft).Error; err != nil {
 		t.Fatal(err)
 	}
 
@@ -233,7 +234,7 @@ func TestTheAudienceHoldsAtItsEdges(t *testing.T) {
 	t.Parallel()
 	s, o, srv, member := signedIn(t)
 	listedByProfile := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Profile Listed", Company: "Larkmoor Yachts", Email: "listed@larkmoor.example", Linkedin: "https://www.linkedin.com/in/li-never"}, "Ada Lovelace"))
-	if err := s.Mark(o.ID, listedByProfile.ID, "replied", today(), "Ada Lovelace"); err != nil {
+	if err := s.Mark(o.ID, listedByProfile.ID, "replied", store.Today(), "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	o.Settings.NeverContact = "linkedin.com/in/li-never"
@@ -252,7 +253,7 @@ func TestTheAudienceHoldsAtItsEdges(t *testing.T) {
 	if _, err := s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *later.CompanyID, Name: "Starts later", Start: "2099-01-01", TermMonths: 12}, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	c = must(s.ChangeCampaign(o.ID, c.ID, []Change{{Field: "audience", Value: AudienceCustomers}}, "Ada Lovelace"))
+	c = must(s.ChangeCampaign(o.ID, c.ID, []store.Change{{Field: "audience", Value: store.AudienceCustomers}}, "Ada Lovelace"))
 	if _, there := leftOut(must(s.Audience(o, *c)))["Not Yet"]; there {
 		t.Error("someone at a company whose subscription has not started is in the customers' audience")
 	}

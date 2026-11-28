@@ -20,6 +20,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/signing"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestAnAgreementsEventsShowAnyChangeAfterTheFact(t *testing.T) {
@@ -29,7 +30,7 @@ func TestAnAgreementsEventsShowAnyChangeAfterTheFact(t *testing.T) {
 	add := func(kind, detail string) {
 		t.Helper()
 		if err := s.DB.Transaction(func(tx *gorm.DB) error {
-			_, err := recordAgreementEvent(tx, AgreementEvent{OrgID: o.ID, AgreementID: 7, Round: 1, Kind: kind, Actor: "Ada Lovelace", Detail: detail, IP: "203.0.113.5"})
+			_, err := recordAgreementEvent(tx, store.AgreementEvent{OrgID: o.ID, AgreementID: 7, Round: 1, Kind: kind, Actor: "Ada Lovelace", Detail: detail, IP: "203.0.113.5"})
 			return err
 		}); err != nil {
 			t.Fatal(err)
@@ -52,20 +53,20 @@ func TestAnAgreementsEventsShowAnyChangeAfterTheFact(t *testing.T) {
 
 	for what, change := range map[string]func(*gorm.DB) error{
 		"a detail rewritten": func(tx *gorm.DB) error {
-			return tx.Model(&AgreementEvent{}).Where("id = ?", events[1].ID).Update("detail", "nothing to see").Error
+			return tx.Model(&store.AgreementEvent{}).Where("id = ?", events[1].ID).Update("detail", "nothing to see").Error
 		},
 		"an event taken out": func(tx *gorm.DB) error {
-			return tx.Delete(&AgreementEvent{}, events[1].ID).Error
+			return tx.Delete(&store.AgreementEvent{}, events[1].ID).Error
 		},
 		"a time moved": func(tx *gorm.DB) error {
-			return tx.Model(&AgreementEvent{}).Where("id = ?", events[2].ID).Update("at", events[2].At.Add(-time.Hour)).Error
+			return tx.Model(&store.AgreementEvent{}).Where("id = ?", events[2].ID).Update("at", events[2].At.Add(-time.Hour)).Error
 		},
 	} {
 		err := s.DB.Transaction(func(tx *gorm.DB) error {
 			if err := change(tx); err != nil {
 				return err
 			}
-			var all []AgreementEvent
+			var all []store.AgreementEvent
 			if err := tx.Where("agreement_id = ?", 7).Order("id").Find(&all).Error; err != nil {
 				return err
 			}
@@ -95,8 +96,8 @@ func TestAnOrganisationsSealingKeyIsMadeOnceAndKeptSealed(t *testing.T) {
 	if cert.Subject.CommonName != "Alpha (Prospector)" || len(cert.UnknownExtKeyUsage) != 1 || !cert.UnknownExtKeyUsage[0].Equal(signing.DocumentSigning) {
 		t.Errorf("the certificate: %s, %v", cert.Subject, cert.UnknownExtKeyUsage)
 	}
-	var stored SealKey
-	if err := s.DB.First(&stored, "org_id = ?", o.ID).Error; err != nil || !sealed(stored.Key) {
+	var stored store.SealKey
+	if err := s.DB.First(&stored, "org_id = ?", o.ID).Error; err != nil || !store.Sealed(stored.Key) {
 		t.Errorf("the private key is stored as %.12q (%v)", stored.Key, err)
 	}
 	other := mustOrg(t, s, "beta")
@@ -115,7 +116,7 @@ func TestAnOrganisationsSealingKeyIsMadeOnceAndKeptSealed(t *testing.T) {
 	}
 
 	s.Keyring = nil
-	if _, _, err := s.SealKey(mustOrg(t, s, "gamma")); !errors.Is(err, errNoKeys) {
+	if _, _, err := s.SealKey(mustOrg(t, s, "gamma")); !errors.Is(err, store.ErrNoKeys) {
 		t.Errorf("making a key without a server secret to keep it under: %v", err)
 	}
 }
@@ -129,7 +130,7 @@ func TestAPDFTakenAtUploadCanBeSealed(t *testing.T) {
 	a := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Form", "Ada Lovelace"))
 	must(s.PutAgreementFile(o.ID, a.ID, "form.pdf", buildPDF("1.3", 2, "", "/Annots [<< /Type /Annot /Subtype /Caret /Rect [10 10 20 20] >>] "), "Ada Lovelace"))
 	r := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
-	must(s.PutAgreementFields(o.ID, a.ID, []AgreementField{{RecipientID: r.ID, Page: 2, Kind: "signature", X: 0.1, Y: 0.7, W: 0.3, H: 0.06}}))
+	must(s.PutAgreementFields(o.ID, a.ID, []store.AgreementField{{RecipientID: r.ID, Page: 2, Kind: "signature", X: 0.1, Y: 0.7, W: 0.3, H: 0.06}}))
 	if err := s.TrySeal(o, a.ID); err != nil {
 		t.Errorf("sealing a PDF the upload took: %v", err)
 	}
@@ -137,7 +138,7 @@ func TestAPDFTakenAtUploadCanBeSealed(t *testing.T) {
 
 // sealedDraft is a draft with two signers and their fields on a three-page document,
 // one of the pages turned.
-func sealedDraft(t *testing.T) (*Store, *Org, *Agreement) {
+func sealedDraft(t *testing.T) (*Store, *store.Org, *store.Agreement) {
 	t.Helper()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
@@ -147,7 +148,7 @@ func sealedDraft(t *testing.T) (*Store, *Org, *Agreement) {
 	must(s.PutAgreementFile(o.ID, a.ID, "service.pdf", buildPDF("1.7", 3, "", "/Rotate 90 "), "Ada Lovelace"))
 	h := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
 	z := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &zoe.ID, nil, "Ada Lovelace"))
-	must(s.PutAgreementFields(o.ID, a.ID, []AgreementField{
+	must(s.PutAgreementFields(o.ID, a.ID, []store.AgreementField{
 		{RecipientID: h.ID, Page: 3, Kind: "signature", X: 0.1, Y: 0.7, W: 0.3, H: 0.06},
 		{RecipientID: h.ID, Page: 3, Kind: "date", X: 0.1, Y: 0.78, W: 0.2, H: 0.03},
 		{RecipientID: z.ID, Page: 3, Kind: "signature", X: 0.55, Y: 0.7, W: 0.35, H: 0.06},
@@ -163,7 +164,7 @@ func TestADraftCanBeFilledInAndSealedBeforeItIsSent(t *testing.T) {
 	if err := s.TrySeal(o, a.ID); err != nil {
 		t.Fatalf("a dry run of sealing: %v", err)
 	}
-	var made []AgreementEvent
+	var made []store.AgreementEvent
 	if err := s.DB.Find(&made).Error; err != nil || len(made) != 0 {
 		t.Errorf("a dry run left %d events (%v)", len(made), err)
 	}

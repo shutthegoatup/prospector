@@ -13,6 +13,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // GORM reports a failed query in the Error field of what it returns, which nothing
@@ -63,15 +64,15 @@ func TestAFailedQueryIsntTakenForNothingThere(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	co := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Larkmoor"}))
-	if err := s.DB.Migrator().DropTable(&Contact{}, &Membership{}); err != nil {
+	co := must(s.AgentAddCompany(o.ID, store.Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Larkmoor"}))
+	if err := s.DB.Migrator().DropTable(&store.Contact{}, &store.Membership{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := firstOf(s.History(o.ID, co.ID, 1)); err == nil {
 		t.Error("a company's history came back as if complete when its people couldn't be read")
 	}
 	srv := newAPIServer(&App{s: s})
-	ctx := context.WithValue(context.Background(), request.ReqKey{}, &request.Req{Org: o, User: &User{}, Member: &Membership{}})
+	ctx := context.WithValue(context.Background(), request.ReqKey{}, &request.Req{Org: o, User: &store.User{}, Member: &store.Membership{}})
 	if _, err := srv.GetCompanyOverview(ctx, api.GetCompanyOverviewRequestObject{Id: co.ID}); err == nil {
 		t.Error("a company's overview with its people unreadable came back instead of failing")
 	}

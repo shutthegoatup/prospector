@@ -11,6 +11,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 const hannahEmail = "hannah.pryce@larkmoor.example"
@@ -35,7 +36,7 @@ func TestErasePerson(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, org := range []*Org{o, other} {
+	for _, org := range []*store.Org{o, other} {
 		if _, err := s.Import(org.ID, readFixtures(t)); err != nil {
 			t.Fatal(err)
 		}
@@ -46,10 +47,10 @@ func TestErasePerson(t *testing.T) {
 	do(s.Update(o.ID, hannah.ID, "linkedin", "https://www.linkedin.com/in/hannah-pryce-4a2b1c/", "ada"))
 	do(s.Update(o.ID, hannah.ID, "phone", "+44 20 7946 0000", "ada"))
 	do(s.Update(o.ID, hannah.ID, "call_notes", "prefers mornings, has a dog called Biscuit", "ada"))
-	do(s.AgentMark(o.ID, Actor{Name: "agent:scout"}, research.MarkIn{ContactID: hannah.ID, Step: "replied", Date: "2020-01-02", Note: "she wrote back from her own gmail"}))
+	do(s.AgentMark(o.ID, store.Actor{Name: "agent:scout"}, research.MarkIn{ContactID: hannah.ID, Step: "replied", Date: "2020-01-02", Note: "she wrote back from her own gmail"}))
 	do(s.Update(o.ID, hannah.ID, "stage", "meeting", "ada"))
-	do(s.DB.Create(&Fact{OrgID: o.ID, CompanyID: *hannah.CompanyID, ContactID: &hannah.ID, Field: "role", Value: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}).Error)
-	var placeholder Contact
+	do(s.DB.Create(&store.Fact{OrgID: o.ID, CompanyID: *hannah.CompanyID, ContactID: &hannah.ID, Field: "role", Value: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}).Error)
+	var placeholder store.Contact
 	do(s.InOrg(o.ID).Where("key like 'org:%'").First(&placeholder).Error)
 
 	jar, _ := cookiejar.New(nil)
@@ -85,29 +86,29 @@ func TestErasePerson(t *testing.T) {
 	gone := func(when string) {
 		t.Helper()
 		var n int64
-		s.InOrg(o.ID).Model(&Contact{}).Where("id = ? or lower(email) = ? or person like 'Hannah%'", hannah.ID, hannahEmail).Count(&n)
+		s.InOrg(o.ID).Model(&store.Contact{}).Where("id = ? or lower(email) = ? or person like 'Hannah%'", hannah.ID, hannahEmail).Count(&n)
 		if n != 0 {
 			t.Fatalf("%s: Hannah is in the contacts", when)
 		}
 	}
 	gone("after erasing")
 	var facts, attached int64
-	s.InOrg(o.ID).Model(&Fact{}).Where("contact_id = ?", hannah.ID).Count(&facts)
-	s.InOrg(o.ID).Model(&Event{}).Where("contact_id = ?", hannah.ID).Count(&attached)
+	s.InOrg(o.ID).Model(&store.Fact{}).Where("contact_id = ?", hannah.ID).Count(&facts)
+	s.InOrg(o.ID).Model(&store.Event{}).Where("contact_id = ?", hannah.ID).Count(&attached)
 	if facts != 0 || attached != 0 {
 		t.Fatalf("%d facts and %d events still point at her", facts, attached)
 	}
-	var events []Event
+	var events []store.Event
 	do(s.InOrg(o.ID).Find(&events).Error)
 	kept := map[string]string{}
 	for _, e := range events {
-		v := strings.ToLower(deref(e.Value))
+		v := strings.ToLower(store.Deref(e.Value))
 		for _, secret := range []string{"hannah", "7946", "biscuit", "gmail", "larkmoor.example"} {
 			if strings.Contains(v, secret) {
-				t.Errorf("the history still says %q under %s", deref(e.Value), e.Action)
+				t.Errorf("the history still says %q under %s", store.Deref(e.Value), e.Action)
 			}
 		}
-		kept[e.Action] = deref(e.Value)
+		kept[e.Action] = store.Deref(e.Value)
 	}
 	if kept["mark:replied"] != "2020-01-02" || kept["set:stage"] != "meeting" {
 		t.Fatalf("the history lost what the counts are built from: %v", kept)
@@ -129,23 +130,23 @@ func TestErasePerson(t *testing.T) {
 		t.Fatalf("an import that still holds her went through: %v", err)
 	}
 	gone("after re-importing her file")
-	if _, err := s.QuickAddPerson(o, crm.QuickAdd{Name: "H Pryce", Email: " Hannah.Pryce@Larkmoor.example "}, "ada"); !errors.Is(err, errErased) {
+	if _, err := s.QuickAddPerson(o, crm.QuickAdd{Name: "H Pryce", Email: " Hannah.Pryce@Larkmoor.example "}, "ada"); !errors.Is(err, store.ErrErased) {
 		t.Fatalf("she was added again by email: %v", err)
 	}
-	if _, err := s.AgentAddContact(o, Actor{Name: "agent:scout"}, prospecting.AddContactIn{Company: strconv.FormatInt(*hannah.CompanyID, 10), Name: "H Pryce",
-		Linkedin: "https://uk.linkedin.com/in/hannah-pryce-4a2b1c?trk=x", SourceURL: "https://larkmoor.example/team"}); !errors.Is(err, errErased) {
+	if _, err := s.AgentAddContact(o, store.Actor{Name: "agent:scout"}, prospecting.AddContactIn{Company: strconv.FormatInt(*hannah.CompanyID, 10), Name: "H Pryce",
+		Linkedin: "https://uk.linkedin.com/in/hannah-pryce-4a2b1c?trk=x", SourceURL: "https://larkmoor.example/team"}); !errors.Is(err, store.ErrErased) {
 		t.Fatalf("an agent suggested her again by profile: %v", err)
 	}
 	for _, link := range []string{"https://www.linkedin.com/in/Hannah-Pryce-4a2b1c/details/experience/", "linkedin.com/in/hannah-pryce-4a2b1c/en"} {
-		if _, err := s.QuickAddPerson(o, crm.QuickAdd{Name: "H Pryce", Linkedin: "https://" + strings.TrimPrefix(link, "https://")}, "ada"); !errors.Is(err, errErased) {
+		if _, err := s.QuickAddPerson(o, crm.QuickAdd{Name: "H Pryce", Linkedin: "https://" + strings.TrimPrefix(link, "https://")}, "ada"); !errors.Is(err, store.ErrErased) {
 			t.Fatalf("she was added again by a page under her profile, %s: %v", link, err)
 		}
 	}
-	if _, err := s.QuickAddPerson(o, crm.QuickAdd{Name: "H Pryce", Email: "mailto:" + hannahEmail}, "ada"); !errors.Is(err, errErased) {
+	if _, err := s.QuickAddPerson(o, crm.QuickAdd{Name: "H Pryce", Email: "mailto:" + hannahEmail}, "ada"); !errors.Is(err, store.ErrErased) {
 		t.Fatalf("she was added again by a mailto link: %v", err)
 	}
-	if _, err := s.AgentAddContact(o, Actor{Name: "agent:scout"}, prospecting.AddContactIn{Company: strconv.FormatInt(*hannah.CompanyID, 10), Name: "hannah pryce",
-		Title: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}); !errors.Is(err, errErased) {
+	if _, err := s.AgentAddContact(o, store.Actor{Name: "agent:scout"}, prospecting.AddContactIn{Company: strconv.FormatInt(*hannah.CompanyID, 10), Name: "hannah pryce",
+		Title: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}); !errors.Is(err, store.ErrErased) {
 		t.Fatalf("an agent suggested her again by name at the same company: %v", err)
 	}
 	namesake := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Ostrel"}, "ada"))
@@ -153,13 +154,13 @@ func TestErasePerson(t *testing.T) {
 	if n, err := s.Restore(o.ID, withNamesake); err != nil || n == 0 {
 		t.Fatalf("restore: %d, %v", n, err)
 	}
-	var twin Contact
+	var twin store.Contact
 	if err := s.InOrg(o.ID).First(&twin, namesake.ID).Error; err != nil {
 		t.Fatal("a restore dropped someone at another company who shares her name")
 	}
 	do(s.DB.Delete(&twin).Error)
 	jonas := must(s.FindOne(o.ID, "Jonas"))
-	if err := s.Update(o.ID, jonas.ID, "email", hannahEmail, "ada"); !errors.Is(err, errErased) {
+	if err := s.Update(o.ID, jonas.ID, "email", hannahEmail, "ada"); !errors.Is(err, store.ErrErased) {
 		t.Fatalf("her address was put on someone else: %v", err)
 	}
 	n, err := s.Restore(o.ID, before)
@@ -171,7 +172,7 @@ func TestErasePerson(t *testing.T) {
 
 	fresh := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Nia Okafor", Company: "Larkmoor"}, "ada"))
 	var inherited int64
-	s.InOrg(o.ID).Model(&Event{}).Where("contact_id = ? and action <> ?", fresh.ID, "add:person").Count(&inherited)
+	s.InOrg(o.ID).Model(&store.Event{}).Where("contact_id = ? and action <> ?", fresh.ID, "add:person").Count(&inherited)
 	if inherited != 0 {
 		t.Fatalf("the next person added inherited %d lines of history", inherited)
 	}
@@ -186,14 +187,14 @@ func TestErasePerson(t *testing.T) {
 
 func TestOnlyAProfileOrAddressIdentifiesSomeone(t *testing.T) {
 	t.Parallel()
-	if got := identifiers(1, "Hannah Pryce", "", "", "https://www.linkedin.com/search/results/people/?keywords=Larkmoor%20marketing"); len(got) != 0 {
+	if got := store.Identifiers(1, "Hannah Pryce", "", "", "https://www.linkedin.com/search/results/people/?keywords=Larkmoor%20marketing"); len(got) != 0 {
 		t.Fatal("a LinkedIn search link, or a name with no company, counts as a person")
 	}
-	a := identifiers(1, "", "", "A@x.example, b@x.example", "https://www.linkedin.com/in/someone/")
+	a := store.Identifiers(1, "", "", "A@x.example, b@x.example", "https://www.linkedin.com/in/someone/")
 	if len(a) != 3 {
 		t.Fatalf("two addresses and a profile gave %d identifiers", len(a))
 	}
-	if b := identifiers(2, "", "", "a@x.example", ""); b[0] == a[0] {
+	if b := store.Identifiers(2, "", "", "a@x.example", ""); b[0] == a[0] {
 		t.Fatal("the same address hashes alike in two organisations")
 	}
 }

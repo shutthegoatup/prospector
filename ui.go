@@ -9,6 +9,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
@@ -20,18 +21,18 @@ type Nav struct {
 }
 
 // conversations are the organisation's, read once a request.
-func (a *App) conversations(q *request.Req) map[string][]Contact {
+func (a *App) conversations(q *request.Req) map[string][]store.Contact {
 	if q.OpenConversations == nil {
 		q.OpenConversations, _ = a.s.Conversations(q.Org.ID)
 	}
 	return q.OpenConversations
 }
 
-func (a *App) dueByStep(q *request.Req, now time.Time) map[string][]Contact {
+func (a *App) dueByStep(q *request.Req, now time.Time) map[string][]store.Contact {
 	if q.DueByStep != nil {
 		return q.DueByStep
 	}
-	out := map[string][]Contact{}
+	out := map[string][]store.Contact{}
 	q.DueByStep = out
 	for _, s := range Steps {
 		if s.Key == "next" {
@@ -105,12 +106,12 @@ func (a *App) todayElsewhere(org int64, now time.Time, d *TodayData) error {
 			}
 		}
 	}
-	subs, err := a.s.Subscriptions(org, 0, now.Format(dayLayout))
+	subs, err := a.s.Subscriptions(org, 0, now.Format(store.DayLayout))
 	if err != nil {
 		return err
 	}
 	d.Enquiries = a.s.EnquiryCounts(org)["state:"+tickets.EnquiryOpen]
-	onboard, err := a.s.Onboardings(org, 0, now.Format(dayLayout))
+	onboard, err := a.s.Onboardings(org, 0, now.Format(store.DayLayout))
 	if err != nil {
 		return err
 	}
@@ -118,7 +119,7 @@ func (a *App) todayElsewhere(org int64, now time.Time, d *TodayData) error {
 		d.Steps += ob.Late + ob.DueToday
 	}
 	for _, sub := range subs {
-		if sub.Soon(now.Format(dayLayout)) {
+		if sub.Soon(now.Format(store.DayLayout)) {
 			d.Subs++
 		}
 	}
@@ -159,7 +160,7 @@ func (a *App) addMember(ctx context.Context, q *request.Req, in memberIn) (strin
 	u, err := a.s.UserByEmail(in.Email)
 	password := ""
 	if err != nil {
-		password = randomToken(12)
+		password = store.RandomToken(12)
 		u, err = a.s.InviteUser(in.Email, in.Name, password)
 	}
 	if err == nil {

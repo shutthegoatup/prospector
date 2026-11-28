@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
@@ -194,7 +195,7 @@ func TestFrontOrgIsMadeOnce(t *testing.T) {
 		t.Errorf("a restart listed %q again", o.Settings.EnquirySites)
 	}
 	var orgs int64
-	if s.DB.Model(&Org{}).Count(&orgs); orgs != 2 {
+	if s.DB.Model(&store.Org{}).Count(&orgs); orgs != 2 {
 		t.Errorf("%d organisations after two starts", orgs)
 	}
 

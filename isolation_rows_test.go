@@ -10,6 +10,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // TestRunsAndMailsStayInTheirOrganisation tries, as another organisation, the methods
@@ -25,16 +26,16 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 	now := time.Now()
 
 	task := must(s.CreateTask(first.ID, "Find them", "a brief", "Owner One"))
-	var request TaskRequest
+	var request store.TaskRequest
 	if err := s.DB.Where("task_id = ?", task.ID).First(&request).Error; err != nil {
 		t.Fatal(err)
 	}
-	agent := Agent{OrgID: first.ID, Name: "scout"}
+	agent := store.Agent{OrgID: first.ID, Name: "scout"}
 	if err := s.DB.Create(&agent).Error; err != nil {
 		t.Fatal(err)
 	}
 	lease := now.Add(-time.Minute).UnixMilli()
-	run := must(s.AddRun(first.ID, AgentRun{TaskID: task.ID, AgentID: agent.ID, Status: RunWorking, Owner: "server-a", LeaseUntil: lease, StartedAt: now}))
+	run := must(s.AddRun(first.ID, store.AgentRun{TaskID: task.ID, AgentID: agent.ID, Status: store.RunWorking, Owner: "server-a", LeaseUntil: lease, StartedAt: now}))
 	_, key, err := s.CreateKey(first.ID, "scout's key", []string{"read"}, "Owner One")
 	if err != nil {
 		t.Fatal(err)
@@ -45,46 +46,46 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 	if err := s.DB.Model(&request).Update("done_at", now).Error; err != nil {
 		t.Fatal(err)
 	}
-	claim := RequestClaim{RequestID: request.ID, OrgID: first.ID, TaskID: task.ID, Holder: fmt.Sprintf("key:%d", key.ID), Actor: "scout", ClaimedAt: now.UnixMilli()}
+	claim := store.RequestClaim{RequestID: request.ID, OrgID: first.ID, TaskID: task.ID, Holder: fmt.Sprintf("key:%d", key.ID), Actor: "scout", ClaimedAt: now.UnixMilli()}
 	domain := must(s.AddSSODomain(first.ID, "alpha.example"))
-	campaign := Campaign{OrgID: first.ID, Name: "Spring", Status: marketing.CampaignSending}
+	campaign := store.Campaign{OrgID: first.ID, Name: "Spring", Status: marketing.CampaignSending}
 	if err := s.DB.Create(&campaign).Error; err != nil {
 		t.Fatal(err)
 	}
-	queued := CampaignRecipient{OrgID: first.ID, CampaignID: campaign.ID, Address: "ann@alpha.example", Status: marketing.MailQueued}
-	sent := CampaignRecipient{OrgID: first.ID, CampaignID: campaign.ID, Address: "bob@alpha.example", Status: marketing.MailSent, SentAt: &now}
-	note := TaskNote{OrgID: first.ID, TaskID: task.ID, CompanyID: 7, Actor: "scout", Kind: "skipped", Text: "not for us"}
+	queued := store.CampaignRecipient{OrgID: first.ID, CampaignID: campaign.ID, Address: "ann@alpha.example", Status: marketing.MailQueued}
+	sent := store.CampaignRecipient{OrgID: first.ID, CampaignID: campaign.ID, Address: "bob@alpha.example", Status: marketing.MailSent, SentAt: &now}
+	note := store.TaskNote{OrgID: first.ID, TaskID: task.ID, CompanyID: 7, Actor: "scout", Kind: "skipped", Text: "not for us"}
 	for _, row := range []any{&claim, &queued, &sent, &note} {
 		if err := s.DB.Create(row).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
 	ann := person(t, s, first, "Ann Alpha", "Alpha Works", "ann@alpha.example", false)
-	company := Company{ID: *ann.CompanyID}
+	company := store.Company{ID: *ann.CompanyID}
 	if err := s.DB.Model(&company).Update("stage", prospecting.CompanyReview).Error; err != nil {
 		t.Fatal(err)
 	}
-	enquiry := Enquiry{OrgID: first.ID, Name: "Ann Alpha", Email: "ann@alpha.example", CompanyID: ann.CompanyID, ContactID: &ann.ID}
+	enquiry := store.Enquiry{OrgID: first.ID, Name: "Ann Alpha", Email: "ann@alpha.example", CompanyID: ann.CompanyID, ContactID: &ann.ID}
 	if err := s.DB.Create(&enquiry).Error; err != nil {
 		t.Fatal(err)
 	}
-	reply := EnquiryMessage{OrgID: first.ID, EnquiryID: enquiry.ID, Ours: true, Text: "Thanks", By: "Owner One", CreatedAt: now}
-	plan := Onboarding{OrgID: first.ID, CompanyID: company.ID, Name: "Setup"}
-	subscription := Subscription{OrgID: first.ID, CompanyID: company.ID, Name: "Licence", Start: "2020-01-01"}
+	reply := store.EnquiryMessage{OrgID: first.ID, EnquiryID: enquiry.ID, Ours: true, Text: "Thanks", By: "Owner One", CreatedAt: now}
+	plan := store.Onboarding{OrgID: first.ID, CompanyID: company.ID, Name: "Setup"}
+	subscription := store.Subscription{OrgID: first.ID, CompanyID: company.ID, Name: "Licence", Start: "2020-01-01"}
 	for _, row := range []any{&reply, &plan, &subscription} {
 		if err := s.DB.Create(row).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
-	step := OnboardingStep{OrgID: first.ID, OnboardingID: plan.ID, Seq: 1, Name: "Send files", Who: StepTheirs}
-	grant := CustomerGrant{OrgID: first.ID, OnboardingID: plan.ID, ContactID: ann.ID}
+	step := store.OnboardingStep{OrgID: first.ID, OnboardingID: plan.ID, Seq: 1, Name: "Send files", Who: store.StepTheirs}
+	grant := store.CustomerGrant{OrgID: first.ID, OnboardingID: plan.ID, ContactID: ann.ID}
 	for _, row := range []any{&step, &grant} {
 		if err := s.DB.Create(row).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
-	link := randomToken(16)
-	if err := s.DB.Create(&CustomerLink{OrgID: first.ID, GrantID: grant.ID, TokenHash: hashToken(link), ExpiresAt: now.Add(time.Hour)}).Error; err != nil {
+	link := store.RandomToken(16)
+	if err := s.DB.Create(&store.CustomerLink{OrgID: first.ID, GrantID: grant.ID, TokenHash: store.HashToken(link), ExpiresAt: now.Add(time.Hour)}).Error; err != nil {
 		t.Fatal(err)
 	}
 	customer := &onboarding.CustomerAccess{Grant: grant, Org: *first, Onboarding: plan, Contact: *ann}
@@ -117,7 +118,7 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 		{"AskRunStop", nil, func(s *Store, org int64) any { return answer(s.AskRunStop(org, run.ID)) }},
 		{"RenewRun", false, func(s *Store, org int64) any { return answer(s.RenewRun(org, run.ID, run.Owner, now.Add(time.Hour))) }},
 		{"HoldRun", false, func(s *Store, org int64) any {
-			return answer(s.HoldRun(org, *run, RunWaiting, nil, now.Add(time.Hour)))
+			return answer(s.HoldRun(org, *run, store.RunWaiting, nil, now.Add(time.Hour)))
 		}},
 		{"TakeOverRun", false, func(s *Store, org int64) any {
 			return answer(s.TakeOverRun(org, run.ID, lease, "server-b", now.Add(time.Hour), 1))
@@ -140,17 +141,17 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 		{"FinishIfDone", changes, func(s *Store, org int64) any { return s.FinishIfDone(org, campaign.ID) }},
 		{"AgentNamed", false, func(s *Store, org int64) any { return answer(s.AgentNamed(org, agent.Name)) != nil }},
 		{"AgentKey", changes, func(s *Store, org int64) any {
-			return answer(s.AgentKey(org, &Agent{ID: agent.ID, OrgID: first.ID, Name: agent.Name}))
+			return answer(s.AgentKey(org, &store.Agent{ID: agent.ID, OrgID: first.ID, Name: agent.Name}))
 		}},
 		{"SaveAgentRow", changes, func(s *Store, org int64) any {
-			return s.SaveAgentRow(org, &Agent{ID: agent.ID, OrgID: first.ID, Name: "renamed"})
+			return s.SaveAgentRow(org, &store.Agent{ID: agent.ID, OrgID: first.ID, Name: "renamed"})
 		}},
 		{"OnTask", false, func(s *Store, org int64) any {
-			_, err := s.OnTask(org, Actor{Name: "scout"}, task.ID)
+			_, err := s.OnTask(org, store.Actor{Name: "scout"}, task.ID)
 			return err == nil
 		}},
 		{"TaskBriefsFor", 0, func(s *Store, org int64) any {
-			briefs, _, err := s.TaskBriefsFor(org, Actor{}, false, nil, paging.Page{})
+			briefs, _, err := s.TaskBriefsFor(org, store.Actor{}, false, nil, paging.Page{})
 			return len(must(briefs, err))
 		}},
 		{"ResearchList", 0, func(s *Store, org int64) any {
@@ -160,11 +161,11 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 		{"HistoryCount", 0, func(s *Store, org int64) any { return answer(s.HistoryCount(org, company.ID)) }},
 		{"CustomerCompanies", 0, func(s *Store, org int64) any { return len(must(s.CustomerCompanies(org))) }},
 		{"AroundEnquiries", 0, func(s *Store, org int64) any {
-			around := must(s.AroundEnquiries(org, []Enquiry{enquiry}))
+			around := must(s.AroundEnquiries(org, []store.Enquiry{enquiry}))
 			return len(around.Companies) + len(around.Threads)
 		}},
 		{"StartReply", changes, func(s *Store, org int64) any {
-			_, _, err := s.StartReply(&Org{ID: org, Name: "x"}, enquiry.ID, "Another word", "Owner One")
+			_, _, err := s.StartReply(&store.Org{ID: org, Name: "x"}, enquiry.ID, "Another word", "Owner One")
 			return err
 		}},
 		{"SettleReply", changes, func(s *Store, org int64) any { return s.SettleReply(org, &reply, true, "Owner One") }},

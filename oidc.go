@@ -22,6 +22,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 var (
@@ -38,7 +39,7 @@ const tenantPlaceholder = "{tenantid}"
 var errManyTenants = say.New("that issuer signs in every tenant under one registration, so it pins nobody to yours: use your own tenant's issuer")
 
 type idp struct {
-	spec        idpSpec
+	spec        store.IdpSpec
 	client      *http.Client
 	provider    *oidc.Provider
 	oauth       *oauth2.Config
@@ -47,7 +48,7 @@ type idp struct {
 	namesItself bool
 }
 
-func discover(ctx context.Context, client *http.Client, spec idpSpec) (*idp, error) {
+func discover(ctx context.Context, client *http.Client, spec store.IdpSpec) (*idp, error) {
 	template, err := discoveredIssuer(ctx, client, spec.Issuer)
 	if err != nil {
 		return nil, err
@@ -131,7 +132,7 @@ const (
 
 // processKey signs the attempt cookie on a server given no secret key. It lasts as long
 // as the process, so a restart costs the sign-ins in flight.
-var processKey = []byte(randomToken(32))
+var processKey = []byte(store.RandomToken(32))
 
 // signAttempt signs the attempt cookie, so a callback nobody started here can't make
 // the server call a provider.
@@ -139,18 +140,18 @@ func (a *App) signAttempt(value string) string {
 	if a.s.Keyring != nil {
 		return a.s.Keyring.Sign(attempts, value)
 	}
-	return mac(processKey, value)
+	return store.Mac(processKey, value)
 }
 
 func (a *App) attemptSigned(value, signature string) bool {
 	if a.s.Keyring != nil {
 		return a.s.Keyring.Verify(attempts, value, signature)
 	}
-	return hmac.Equal([]byte(mac(processKey, value)), []byte(signature))
+	return hmac.Equal([]byte(store.Mac(processKey, value)), []byte(signature))
 }
 
 func (a *App) beginAttempt(w http.ResponseWriter, r *http.Request, p *idp, att attempt, options ...oauth2.AuthCodeOption) {
-	att.State, att.Verifier, att.Nonce = randomToken(32), oauth2.GenerateVerifier(), randomToken(32)
+	att.State, att.Verifier, att.Nonce = store.RandomToken(32), oauth2.GenerateVerifier(), store.RandomToken(32)
 	att.At = time.Now().Unix()
 	if len(att.Next) > 512 {
 		att.Next = ""
@@ -303,7 +304,7 @@ type idpEntry struct {
 const retryAfter = 30 * time.Second
 
 // probe reads a provider without remembering it: for a connection not yet saved.
-func (a *App) probe(ctx context.Context, spec idpSpec) (*idp, error) {
+func (a *App) probe(ctx context.Context, spec store.IdpSpec) (*idp, error) {
 	spec.Redirect = a.callbackURL()
 	client := a.outbound
 	if client == nil {
@@ -312,8 +313,8 @@ func (a *App) probe(ctx context.Context, spec idpSpec) (*idp, error) {
 	return discover(ctx, client, spec)
 }
 
-func (a *App) idp(ctx context.Context, spec idpSpec) (*idp, error) {
-	key := hashToken(strings.Join([]string{spec.Issuer, spec.ClientID, spec.Secret, a.callbackURL()}, "\x00"))
+func (a *App) idp(ctx context.Context, spec store.IdpSpec) (*idp, error) {
+	key := store.HashToken(strings.Join([]string{spec.Issuer, spec.ClientID, spec.Secret, a.callbackURL()}, "\x00"))
 	a.idps.mu.Lock()
 	if a.idps.m == nil {
 		a.idps.m = map[string]*idpEntry{}

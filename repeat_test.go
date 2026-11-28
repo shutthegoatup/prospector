@@ -7,13 +7,14 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestRepeatedAgentWorkAddsNothing(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
+	scout, second := store.Actor{Name: "agent:scout", KeyID: 1}, store.Actor{Name: "agent:second", KeyID: 2}
 	builder := research.FactIn{Field: "configurator", Value: "Day Cruiser 45 builder", SourceURL: "https://larkmoor.example/build"}
 
 	first, err := s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example", Facts: []research.FactIn{builder}})
@@ -57,7 +58,7 @@ func TestRepeatedAgentWorkAddsNothing(t *testing.T) {
 	} {
 		in.Company, in.SourceURL = "Larkmoor Yachts", "https://larkmoor.example/about"
 		got, err := s.AgentAddContact(o, second, in)
-		if err != nil || !got.Existed || got.ID != hannah.ID || got.Status != ContactSuggested {
+		if err != nil || !got.Existed || got.ID != hannah.ID || got.Status != store.ContactSuggested {
 			t.Fatalf("the same person by %s was added again: %+v %v", why, got, err)
 		}
 	}
@@ -72,7 +73,7 @@ func TestRepeatedAgentWorkAddsNothing(t *testing.T) {
 		t.Fatalf("want Hannah, Jonas and Grace, got %d people", len(people))
 	}
 
-	var events []Event
+	var events []store.Event
 	s.InOrg(o.ID).Order("id").Find(&events)
 	var did []string
 	for _, e := range events {
@@ -84,7 +85,7 @@ func TestRepeatedAgentWorkAddsNothing(t *testing.T) {
 	if got := strings.Join(did, " "); got != "add:company add:facts add:fact add:contact add:contact add:contact" {
 		t.Fatalf("work that changed nothing shouldn't be in the history: %s", got)
 	}
-	if v := deref(events[1].Value); v != "Larkmoor Yachts, 1 facts" {
+	if v := store.Deref(events[1].Value); v != "Larkmoor Yachts, 1 facts" {
 		t.Fatalf("the history should count the facts that were new: %q", v)
 	}
 }
@@ -93,7 +94,7 @@ func TestASharedSiteNamesNoCompany(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	add := func(name string, facts ...research.FactIn) *research.AddCompanyOut {
 		t.Helper()
 		out, err := s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: name, Domain: "brandtech.example", Facts: facts})
@@ -108,7 +109,7 @@ func TestASharedSiteNamesNoCompany(t *testing.T) {
 	if err != nil || second.Existed {
 		t.Fatalf("add company: %+v %v", second, err)
 	}
-	if err := s.InOrg(o.ID).Model(&Company{}).Where("id = ?", second.ID).Update("domain", "brandtech.example").Error; err != nil {
+	if err := s.InOrg(o.ID).Model(&store.Company{}).Where("id = ?", second.ID).Update("domain", "brandtech.example").Error; err != nil {
 		t.Fatal(err)
 	}
 	if again := add("larkmoor yachts"); again.ID != first.ID {
@@ -137,14 +138,14 @@ func TestANoteTypedWhenAddingSomeoneIsTheirs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AgentDraft(o.ID, Actor{Name: "agent:scout", KeyID: 1}, research.DraftIn{ContactID: c.ID, Kind: "note", Text: "Hi Hannah."}); err == nil {
+	if err := s.AgentDraft(o.ID, store.Actor{Name: "agent:scout", KeyID: 1}, research.DraftIn{ContactID: c.ID, Kind: "note", Text: "Hi Hannah."}); err == nil {
 		t.Fatal("an agent replaced the note a person typed when adding them")
 	}
 	templated, err := s.QuickAddPerson(o, crm.QuickAdd{Linkedin: "https://www.linkedin.com/in/jonas-weber", Name: "Jonas Weber", Company: "Larkmoor Yachts"}, "Ada Lovelace")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AgentDraft(o.ID, Actor{Name: "agent:scout", KeyID: 1}, research.DraftIn{ContactID: templated.ID, Kind: "note", Text: "Hi Jonas."}); err != nil {
+	if err := s.AgentDraft(o.ID, store.Actor{Name: "agent:scout", KeyID: 1}, research.DraftIn{ContactID: templated.ID, Kind: "note", Text: "Hi Jonas."}); err != nil {
 		t.Fatalf("the template note is there to be improved on: %v", err)
 	}
 }
@@ -153,7 +154,7 @@ func TestAgentsLeaveAPersonsWordsAlone(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
+	scout, second := store.Actor{Name: "agent:scout", KeyID: 1}, store.Actor{Name: "agent:second", KeyID: 2}
 	if _, err := s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}); err != nil {
 		t.Fatal(err)
 	}
@@ -165,11 +166,11 @@ func TestAgentsLeaveAPersonsWordsAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 	note := func() string {
-		var row Contact
+		var row store.Contact
 		s.InOrg(o.ID).First(&row, c.ID)
-		return deref(row.Note)
+		return store.Deref(row.Note)
 	}
-	draft := func(who Actor, kind, text string) error {
+	draft := func(who store.Actor, kind, text string) error {
 		return s.AgentDraft(o.ID, who, research.DraftIn{ContactID: c.ID, Kind: kind, Text: text})
 	}
 	if err := draft(scout, "note", "Hi Hannah, saw the Day Cruiser builder."); err != nil {
@@ -194,7 +195,7 @@ func TestAgentsLeaveAPersonsWordsAlone(t *testing.T) {
 	if err := draft(scout, "note", "Hi Hannah, a fresh note."); err != nil {
 		t.Fatalf("a note a person cleared is open again: %v", err)
 	}
-	if err := s.Mark(o.ID, c.ID, "linkedin", today(), "Ada Lovelace"); err != nil {
+	if err := s.Mark(o.ID, c.ID, "linkedin", store.Today(), "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
 	if err := draft(scout, "note", "Hi Hannah, too late."); err == nil || note() != "Hi Hannah, a fresh note." {

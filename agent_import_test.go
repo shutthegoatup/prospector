@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // What `prospector push` and `pull` send and get back: an import of the old tracker's
@@ -46,7 +48,7 @@ func TestPushAndPullAnswerAsTheyAlwaysHave(t *testing.T) {
 		t.Fatalf("a push: %d %s", res.StatusCode, body)
 	}
 	people := must(s.FindOne(o.ID, "Hannah Pryce"))
-	if deref(people.Email) != "hannah@larkmoor.example" || deref(people.Subject) != "Your boats" || deref(people.Phone) == "" {
+	if store.Deref(people.Email) != "hannah@larkmoor.example" || store.Deref(people.Subject) != "Your boats" || store.Deref(people.Phone) == "" {
 		t.Errorf("a pushed draft didn't land whole: %+v", people)
 	}
 

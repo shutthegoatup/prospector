@@ -14,6 +14,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/mailer"
 	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/sales"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // postbox records what a campaign would send and can be told how each mail goes.
@@ -48,7 +49,7 @@ func (p *postbox) to() []string {
 
 // campaignSite is a server whose organisation can send a campaign: its own mail
 // server, a postal address, an https address, and three people in conversation.
-func campaignSite(t *testing.T) (*App, *Store, *Org, string, *http.Client, *postbox) {
+func campaignSite(t *testing.T) (*App, *Store, *store.Org, string, *http.Client, *postbox) {
 	t.Helper()
 	box := &postbox{}
 	var app *App
@@ -58,7 +59,7 @@ func campaignSite(t *testing.T) (*App, *Store, *Org, string, *http.Client, *post
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SaveOrgMail(&OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
+	if err := s.SaveOrgMail(&store.OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
 		t.Fatal(err)
 	}
 	for _, p := range []struct{ name, email string }{{"Hannah Pryce", "hannah@larkmoor.example"}, {"Tom Ellery", "tom@larkmoor.example"}, {"Sven Dahl", "sven@nordkap.example"}} {
@@ -67,14 +68,14 @@ func campaignSite(t *testing.T) (*App, *Store, *Org, string, *http.Client, *post
 	return app, s, o, srv.URL + "/o/alpha/api/v1/campaigns", member, box
 }
 
-func draft(t *testing.T, s *Store, o *Org) *Campaign {
+func draft(t *testing.T, s *Store, o *store.Org) *store.Campaign {
 	t.Helper()
 	return must(s.AddCampaign(o.ID, marketing.CampaignIn{Name: "Spring price list", Subject: "Our spring prices", Body: "Prices change on 1 March."}, "Ada Lovelace"))
 }
 
-func mailOf(t *testing.T, s *Store, o *Org, c *Campaign) map[string]CampaignRecipient {
+func mailOf(t *testing.T, s *Store, o *store.Org, c *store.Campaign) map[string]store.CampaignRecipient {
 	t.Helper()
-	out := map[string]CampaignRecipient{}
+	out := map[string]store.CampaignRecipient{}
 	for _, r := range must(s.CampaignRecipients(o.ID, c.ID)) {
 		out[r.Address] = r
 	}
@@ -145,7 +146,7 @@ func TestACampaignIsRefusedWhereItCannotBeSentProperly(t *testing.T) {
 	if code, body := send(); code != http.StatusBadRequest || !strings.Contains(body, "own mail server") {
 		t.Errorf("sending through the server's own mail: %d %s", code, body)
 	}
-	if err := s.SaveOrgMail(&OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
+	if err := s.SaveOrgMail(&store.OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
 		t.Fatal(err)
 	}
 	o.Settings.PostalAddress = " "
@@ -260,7 +261,7 @@ func TestAMailThatMayHaveGoneIsNeverSentAgain(t *testing.T) {
 		t.Errorf("the campaign is %s", now.Status)
 	}
 	var links int64
-	if err := s.DB.Model(&UnsubscribeLink{}).Where("address = ?", "sven@nordkap.example").Count(&links).Error; err != nil || links != 0 {
+	if err := s.DB.Model(&store.UnsubscribeLink{}).Where("address = ?", "sven@nordkap.example").Count(&links).Error; err != nil || links != 0 {
 		t.Errorf("a mail that was refused left %d unsubscribe links (%v)", links, err)
 	}
 }
@@ -272,7 +273,7 @@ func TestAMailClaimedByAServerThatStoppedIsGivenUp(t *testing.T) {
 	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
 	// As if a server claimed one and stopped before settling it.
 	long := time.Now().Add(-2 * claimStale)
-	if err := s.DB.Model(&CampaignRecipient{}).Where("address = ?", "hannah@larkmoor.example").Updates(map[string]any{"status": marketing.MailSending, "claimed_at": long}).Error; err != nil {
+	if err := s.DB.Model(&store.CampaignRecipient{}).Where("address = ?", "hannah@larkmoor.example").Updates(map[string]any{"status": marketing.MailSending, "claimed_at": long}).Error; err != nil {
 		t.Fatal(err)
 	}
 	a.sendRound(context.Background(), time.Now())
@@ -381,11 +382,11 @@ func TestAMailReadBeforeAnErasureIsNotSent(t *testing.T) {
 		t.Fatalf("mail went to someone erased while it was being sent: %v", got)
 	}
 	var links int64
-	s.DB.Model(&UnsubscribeLink{}).Where("address = ?", hannah.Address).Count(&links)
+	s.DB.Model(&store.UnsubscribeLink{}).Where("address = ?", hannah.Address).Count(&links)
 	if links != 0 {
 		t.Error("an unsubscribe link keeps the erased address")
 	}
-	if r := must(s.CampaignRecipients(o.ID, c.ID)); len(r) != 3 || slices.ContainsFunc(r, func(r CampaignRecipient) bool { return r.Status == marketing.MailSending }) {
+	if r := must(s.CampaignRecipients(o.ID, c.ID)); len(r) != 3 || slices.ContainsFunc(r, func(r store.CampaignRecipient) bool { return r.Status == marketing.MailSending }) {
 		t.Errorf("the mail was claimed after the erasure: %+v", r)
 	}
 }
@@ -397,7 +398,7 @@ func TestCampaignSendingHoldsAtItsEdges(t *testing.T) {
 	a, s, o, list, member, box := campaignSite(t)
 
 	// Never straight to a recipient's server, and never without signing in.
-	for _, m := range []OrgMail{{OrgID: o.ID, Host: "mx.larkmoor.example", Port: 25, Username: "x", Sender: "Alpha <news@alpha.example>"}, {OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Sender: "Alpha <news@alpha.example>"}} {
+	for _, m := range []store.OrgMail{{OrgID: o.ID, Host: "mx.larkmoor.example", Port: 25, Username: "x", Sender: "Alpha <news@alpha.example>"}, {OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Sender: "Alpha <news@alpha.example>"}} {
 		if err := s.SaveOrgMail(&m); err != nil {
 			t.Fatal(err)
 		}
@@ -409,7 +410,7 @@ func TestCampaignSendingHoldsAtItsEdges(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := s.SaveOrgMail(&OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
+	if err := s.SaveOrgMail(&store.OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
 		t.Fatal(err)
 	}
 	// A server removed after a campaign is sent pauses it; it never falls back to the host's.
@@ -422,7 +423,7 @@ func TestCampaignSendingHoldsAtItsEdges(t *testing.T) {
 	if len(box.to()) != 0 || must(s.Campaign(o.ID, c.ID)).Status != marketing.CampaignPaused {
 		t.Fatalf("with its mail server gone: mailed %v, campaign %s", box.to(), must(s.Campaign(o.ID, c.ID)).Status)
 	}
-	if err := s.SaveOrgMail(&OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
+	if err := s.SaveOrgMail(&store.OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -467,7 +468,7 @@ func TestAServiceNoticeReachesCustomersWhoUnsubscribedButNobodyElse(t *testing.T
 	t.Parallel()
 	a, s, o, list, member, box := campaignSite(t)
 	// Everyone made by campaignSite is at Larkmoor Yachts; make it a current customer.
-	var hannah Contact
+	var hannah store.Contact
 	if err := s.DB.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -526,7 +527,7 @@ func TestAServiceNoticeReachesCustomersWhoUnsubscribedButNobodyElse(t *testing.T
 	box.mu.Lock()
 	box.sent = nil
 	box.mu.Unlock()
-	marketing := must(s.AddCampaign(o.ID, marketing.CampaignIn{Name: "Offer", Audience: AudienceCustomers, Subject: "An offer", Body: "Buy more."}, "Ada Lovelace"))
+	marketing := must(s.AddCampaign(o.ID, marketing.CampaignIn{Name: "Offer", Audience: store.AudienceCustomers, Subject: "An offer", Body: "Buy more."}, "Ada Lovelace"))
 	must(s.SendCampaign(o, marketing.ID, "Ada Lovelace"))
 	a.sendRound(context.Background(), time.Now())
 	for _, to := range box.to() {
@@ -544,7 +545,7 @@ func TestAServiceNoticeIsCheckedAgainAsItIsSent(t *testing.T) {
 	_, s, o, _, _, _ := campaignSite(t)
 	c := draft(t, s, o)
 	// As a rollback to a release without kinds, or an edit racing the send, could leave it.
-	if err := s.DB.Model(&Campaign{}).Where("id = ?", c.ID).Update("kind", KindService).Error; err != nil {
+	if err := s.DB.Model(&store.Campaign{}).Where("id = ?", c.ID).Update("kind", store.KindService).Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.SendCampaign(o, c.ID, "Ada Lovelace"); err == nil || !strings.Contains(err.Error(), "customers only") {
@@ -556,8 +557,8 @@ func TestAServiceNoticeIsCheckedAgainAsItIsSent(t *testing.T) {
 
 	// Changing a draft to a service notice takes it to customers.
 	m := draft(t, s, o)
-	changed := must(s.ChangeCampaign(o.ID, m.ID, []Change{{Field: "kind", Value: KindService}}, "Ada Lovelace"))
-	if changed.Kind != KindService || changed.Audience != AudienceCustomers {
+	changed := must(s.ChangeCampaign(o.ID, m.ID, []store.Change{{Field: "kind", Value: store.KindService}}, "Ada Lovelace"))
+	if changed.Kind != store.KindService || changed.Audience != store.AudienceCustomers {
 		t.Errorf("after making it a service notice: %s to %s", changed.Kind, changed.Audience)
 	}
 }
@@ -567,19 +568,19 @@ func TestAServiceNoticeIsCheckedAgainAsItIsSent(t *testing.T) {
 func TestAServiceNoticeStopsAtSomeoneNoLongerACustomer(t *testing.T) {
 	t.Parallel()
 	a, s, o, _, _, box := campaignSite(t)
-	var hannah Contact
+	var hannah store.Contact
 	if err := s.DB.Where("org_id = ? and email = ?", o.ID, "hannah@larkmoor.example").First(&hannah).Error; err != nil {
 		t.Fatal(err)
 	}
 	sub := must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: *hannah.CompanyID, Name: "Standard plan", Start: "2026-01-12", TermMonths: 12}, "Ada Lovelace"))
 	must(s.Suppress(o.ID, "tom@larkmoor.example", "Ada Lovelace"))
-	c := must(s.AddCampaign(o.ID, marketing.CampaignIn{Name: "Price change", Kind: KindService, Audience: AudienceCustomers, Subject: "Your price", Body: "It changes."}, "Ada Lovelace"))
+	c := must(s.AddCampaign(o.ID, marketing.CampaignIn{Name: "Price change", Kind: store.KindService, Audience: store.AudienceCustomers, Subject: "Your price", Body: "It changes."}, "Ada Lovelace"))
 	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
 	if _, queued := mailOf(t, s, o, c)["tom@larkmoor.example"]; !queued {
 		t.Fatal("the unsubscribed customer was not queued")
 	}
 
-	if err := s.DB.Model(&Subscription{}).Where("id = ?", sub.ID).Update("ended_on", "2026-02-01").Error; err != nil {
+	if err := s.DB.Model(&store.Subscription{}).Where("id = ?", sub.ID).Update("ended_on", "2026-02-01").Error; err != nil {
 		t.Fatal(err)
 	}
 	a.sendRound(context.Background(), time.Now())

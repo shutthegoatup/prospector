@@ -10,6 +10,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // The account operations sign people in and out, so they are asked by whoever is there:
@@ -39,7 +40,7 @@ func signedInFrom(ctx context.Context) (*request.Req, error) {
 
 // sessionOut is a session as the API shows it: the organisations it opens, each saying
 // whether its own sign-on still stands in the way.
-func (a *App) sessionOut(sess *Session, u *User) (api.Session, error) {
+func (a *App) sessionOut(sess *store.Session, u *store.User) (api.Session, error) {
 	out := api.Session{User: api.SessionUser{Id: u.ID, Name: u.Name, Email: u.Email, HasPassword: u.HasPassword()},
 		MustChangePassword: u.MustChangePassword, Limited: sess.Limited, Orgs: []api.SessionOrg{}}
 	orgs, err := a.s.OrgsFor(u.ID)
@@ -51,7 +52,7 @@ func (a *App) sessionOut(sess *Session, u *User) (api.Session, error) {
 			continue
 		}
 		out.Orgs = append(out.Orgs, api.SessionOrg{Slug: o.Slug, Name: o.Name, Role: api.SessionOrgRole(o.Role),
-			SsoRequired: a.ssoRequired(&o.Org, u, &Membership{Role: o.Role}, sess)})
+			SsoRequired: a.ssoRequired(&o.Org, u, &store.Membership{Role: o.Role}, sess)})
 	}
 	return out, nil
 }
@@ -168,13 +169,13 @@ func (f ssoFound) VisitFindSingleSignOnResponse(w http.ResponseWriter) error {
 
 func (s apiServer) FindSingleSignOn(ctx context.Context, in api.FindSingleSignOnRequestObject) (api.FindSingleSignOnResponseObject, error) {
 	if s.a.base == "" {
-		return nil, noSuch("this server has no address of its own (PROSPECTOR_URL) for a provider to send people back to, so it has no single sign-on")
+		return nil, store.NoSuch("this server has no address of its own (PROSPECTOR_URL) for a provider to send people back to, so it has no single sign-on")
 	}
 	if in.Body == nil {
 		return nil, say.New(`send {"email": "…"}`)
 	}
 	email := strings.ToLower(strings.TrimSpace(in.Body.Email))
-	orgs, err := s.a.s.SSOOrgsFor(emailDomain(email))
+	orgs, err := s.a.s.SSOOrgsFor(store.EmailDomain(email))
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +188,7 @@ func (s apiServer) FindSingleSignOn(ctx context.Context, in api.FindSingleSignOn
 
 func (s apiServer) RequestPasswordReset(ctx context.Context, in api.RequestPasswordResetRequestObject) (api.RequestPasswordResetResponseObject, error) {
 	if !s.a.mailOn() {
-		return nil, noSuch("this server sends no mail, so it can't email a link: ask whoever runs it to reset your password")
+		return nil, store.NoSuch("this server sends no mail, so it can't email a link: ask whoever runs it to reset your password")
 	}
 	if in.Body == nil {
 		return nil, say.New(`send {"email": "…"}`)

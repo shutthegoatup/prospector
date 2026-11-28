@@ -18,6 +18,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 var googleIssuer = "https://accounts.google.com"
@@ -29,8 +30,8 @@ type socialWay struct {
 	ClientID, Secret   string
 }
 
-func (way socialWay) spec() idpSpec {
-	return idpSpec{Issuer: way.Issuer, ClientID: way.ClientID, Secret: way.Secret, Plain: way.Plain, ManyTenants: way.ManyTenants}
+func (way socialWay) spec() store.IdpSpec {
+	return store.IdpSpec{Issuer: way.Issuer, ClientID: way.ClientID, Secret: way.Secret, Plain: way.Plain, ManyTenants: way.ManyTenants}
 }
 
 var socialWays = []socialWay{
@@ -91,7 +92,7 @@ func (a *App) loginWith(w http.ResponseWriter, r *http.Request) {
 // ssoPageURL is where a member is sent when an organisation requires its sign-on. It
 // is the page, which offers the provider as a link, and not the provider itself: going
 // there has to be the person's own click.
-func ssoPageURL(org *Org, email, next string) string {
+func ssoPageURL(org *store.Org, email, next string) string {
 	return "/login/sso?" + url.Values{"org": {org.Slug}, "email": {email}, "next": {next}}.Encode()
 }
 
@@ -106,7 +107,7 @@ func (a *App) askedCookie(r *http.Request) *http.Cookie {
 		Secure: a.secure(r), SameSite: http.SameSiteStrictMode}
 }
 
-func ssoStartURL(org *Org, email, next string) string {
+func ssoStartURL(org *store.Org, email, next string) string {
 	return "/login/sso/start?" + url.Values{"org": {org.Slug}, "email": {email}, "next": {next}}.Encode()
 }
 
@@ -120,7 +121,7 @@ func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 	}
 	email := strings.ToLower(strings.TrimSpace(query.Get("email")))
 	org, err := a.s.OrgBySlug(query.Get("org"))
-	var sso *SSO
+	var sso *store.SSO
 	if err == nil {
 		sso, err = a.s.SSO(org.ID)
 	}
@@ -146,7 +147,7 @@ func (a *App) ssoStart(w http.ResponseWriter, r *http.Request) {
 // unopenable is what people are told when a connection's kept secret can't be opened.
 // It isn't an outage, and trying again won't help: the server needs its key back, or
 // an owner has to type the secret again.
-func unopenable(org *Org) *say.Text {
+func unopenable(org *store.Org) *say.Text {
 	return say.Errorf("%s's single sign-on isn't working here, and trying again won't help. Tell one of its owners, or whoever runs this server.", org.Name)
 }
 
@@ -245,7 +246,7 @@ func (a *App) finishSSO(w http.ResponseWriter, r *http.Request, att attempt, ref
 		err = errWrongDomain
 	// Anyone can open a Google account under an address they read mail at; hd says
 	// the organisation's own Workspace holds this one.
-	case who.Issuer == googleIssuer && who.HostedBy != emailDomain(email):
+	case who.Issuer == googleIssuer && who.HostedBy != store.EmailDomain(email):
 		err = errWrongDomain
 	}
 	if err != nil {
@@ -286,7 +287,7 @@ func sentence(err error) say.Sayer {
 
 // ssoRequired is whether this member must come through the organisation's own sign-in
 // and hasn't. Owners keep their password, so a broken provider can be put right.
-func (a *App) ssoRequired(org *Org, u *User, m *Membership, sess *Session) bool {
+func (a *App) ssoRequired(org *store.Org, u *store.User, m *store.Membership, sess *store.Session) bool {
 	if m.Role == "owner" || sess.Proves(org.ID) {
 		return false
 	}
@@ -325,15 +326,15 @@ func (a *App) saveSSO(ctx context.Context, q *request.Req, in ssoIn) error {
 	if err != nil {
 		return err
 	}
-	c := SSOConnection{OrgID: q.Org.ID, Issuer: strings.TrimSpace(in.Issuer), ClientID: strings.TrimSpace(in.ClientID),
+	c := store.SSOConnection{OrgID: q.Org.ID, Issuer: strings.TrimSpace(in.Issuer), ClientID: strings.TrimSpace(in.ClientID),
 		Required: in.Required, AutoJoin: in.AutoJoin}
 	if c.Issuer == "" {
-		return a.s.SaveSSO(&SSOConnection{OrgID: q.Org.ID}, q.Actor())
+		return a.s.SaveSSO(&store.SSOConnection{OrgID: q.Org.ID}, q.Actor())
 	}
 	secret := strings.TrimSpace(in.Secret)
 	switch {
 	case secret != "" && a.s.Keyring == nil:
-		return fmt.Errorf("a client secret is kept sealed, and %w", errNoKeys)
+		return fmt.Errorf("a client secret is kept sealed, and %w", store.ErrNoKeys)
 	case secret != "":
 		// Sealed here, where it is known to have been typed: one that happens to look
 		// sealed already would otherwise be stored as it came.
@@ -367,7 +368,7 @@ func (a *App) saveSSO(ctx context.Context, q *request.Req, in ssoIn) error {
 	if err == nil {
 		// Reading the provider now catches a mistyped issuer before anyone is sent to it.
 		// Discovery sends no secret.
-		if _, derr := a.probe(ctx, idpSpec{Issuer: c.Issuer, ClientID: c.ClientID}); errors.Is(derr, errManyTenants) {
+		if _, derr := a.probe(ctx, store.IdpSpec{Issuer: c.Issuer, ClientID: c.ClientID}); errors.Is(derr, errManyTenants) {
 			err = derr
 		} else if derr != nil {
 			err = elsewhere{fmt.Errorf("that issuer couldn't be read, so nothing was saved: %w", derr)}
@@ -379,7 +380,7 @@ func (a *App) saveSSO(ctx context.Context, q *request.Req, in ssoIn) error {
 	return a.s.SaveSSO(&c, q.Actor())
 }
 
-func (a *App) addSSODomain(org int64, raw string) (*SSODomain, error) {
+func (a *App) addSSODomain(org int64, raw string) (*store.SSODomain, error) {
 	domain := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(raw)), "@")
 	if !domainRe.MatchString(domain) {
 		return nil, say.Errorf("a domain looks like example.com, not %q", raw)
@@ -413,7 +414,7 @@ func (a *App) lookupTXT(ctx context.Context, name string) ([]string, error) {
 	return net.DefaultResolver.LookupTXT(ctx, name)
 }
 
-func (a *App) verifySSODomain(ctx context.Context, org int64, domain string) (*SSODomain, error) {
+func (a *App) verifySSODomain(ctx context.Context, org int64, domain string) (*store.SSODomain, error) {
 	d, err := a.s.SSODomain(org, domain)
 	if err != nil {
 		return nil, err

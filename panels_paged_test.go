@@ -9,27 +9,28 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestACompanysHistoryAndNotesHavePages(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
-	co := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Larkmoor"}))
-	var events []Event
+	co := must(s.AgentAddCompany(o.ID, store.Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Larkmoor"}))
+	var events []store.Event
 	for i := range crm.HistoryPageSize + 9 {
 		action := "mark:email"
 		if i%2 == 1 {
 			action = "set:phone"
 		}
-		events = append(events, Event{OrgID: o.ID, CompanyID: &co.ID, User: "Nia", Action: action, Value: str(fmt.Sprint("2020-01-", 10+i%10)),
+		events = append(events, store.Event{OrgID: o.ID, CompanyID: &co.ID, User: "Nia", Action: action, Value: store.Str(fmt.Sprint("2020-01-", 10+i%10)),
 			At: time.Date(2020, 1, 1, 0, i, 0, 0, time.UTC)})
 	}
 	if err := s.DB.CreateInBatches(events, 50).Error; err != nil {
 		t.Fatal(err)
 	}
-	notes := make([]TaskNote, research.CompanyNotesPageSize+3)
+	notes := make([]store.TaskNote, research.CompanyNotesPageSize+3)
 	for i := range notes {
-		notes[i] = TaskNote{OrgID: o.ID, CompanyID: co.ID, Actor: "agent:scout", Kind: "next", Text: fmt.Sprint("Left note ", i, ".")}
+		notes[i] = store.TaskNote{OrgID: o.ID, CompanyID: co.ID, Actor: "agent:scout", Kind: "next", Text: fmt.Sprint("Left note ", i, ".")}
 	}
 	if err := s.DB.CreateInBatches(notes, 50).Error; err != nil {
 		t.Fatal(err)
@@ -75,9 +76,9 @@ func TestACompanysHistoryAndNotesHavePages(t *testing.T) {
 func TestAgentActivityHasPages(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
-	events := make([]Event, prospecting.ActivityPageSize+4)
+	events := make([]store.Event, prospecting.ActivityPageSize+4)
 	for i := range events {
-		events[i] = Event{OrgID: o.ID, User: "agent:scout", Action: "add:fact", Value: str(fmt.Sprint("fact number ", i, ".")),
+		events[i] = store.Event{OrgID: o.ID, User: "agent:scout", Action: "add:fact", Value: store.Str(fmt.Sprint("fact number ", i, ".")),
 			At: time.Date(2020, 1, 1, 0, i, 0, 0, time.UTC)}
 	}
 	if err := s.DB.CreateInBatches(events, 50).Error; err != nil {
@@ -104,12 +105,12 @@ func TestAgentActivityPagesThroughEventsAtTheSameMoment(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	at := time.Date(2020, 1, 1, 9, 0, 0, 0, time.UTC)
-	var events []Event
+	var events []store.Event
 	for i := range 7 {
 		// Three moments, two or three events in each.
-		events = append(events, Event{OrgID: o.ID, User: "agent:scout", Action: "add:fact", Value: str(fmt.Sprint("fact ", i)), At: at.Add(time.Duration(i/3) * time.Minute)})
+		events = append(events, store.Event{OrgID: o.ID, User: "agent:scout", Action: "add:fact", Value: store.Str(fmt.Sprint("fact ", i)), At: at.Add(time.Duration(i/3) * time.Minute)})
 	}
-	events = append(events, Event{OrgID: o.ID, User: "Ada Lovelace", Action: "note", Value: str("by hand"), At: at})
+	events = append(events, store.Event{OrgID: o.ID, User: "Ada Lovelace", Action: "note", Value: store.Str("by hand"), At: at})
 	if err := s.DB.Create(&events).Error; err != nil {
 		t.Fatal(err)
 	}

@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 const claudeTestKey = "sk-ant-test-fedcba9876543210"
@@ -100,7 +102,7 @@ func claudeSetup(t *testing.T) (*runSetup, *fakeClaude, *fakeEndpoint) {
 	tools, claude := newFakeEndpoint(t), newFakeClaude(t)
 	tools.srv.Client().Transport.(*http.Transport).TLSClientConfig.RootCAs.AddCert(claude.srv.Certificate())
 	r := newRunSetup(t, tools)
-	c := must(r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{Name: "Claude", Kind: kindAnthropic, BaseURL: claude.srv.URL,
+	c := must(r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{Name: "Claude", Kind: store.KindAnthropic, BaseURL: claude.srv.URL,
 		APIKey: claudeTestKey, ToolsURL: tools.srv.URL + "/mcp", Tools: []string{searchTool}}, "Ada Lovelace"))
 	r.agent = c.ID
 	return r, claude, tools
@@ -110,7 +112,7 @@ func TestAClaudeAgentIsSetUpFromAnthropicsModelList(t *testing.T) {
 	t.Parallel()
 	r, _, tools := claudeSetup(t)
 	c := must(r.s.AgentByID(r.o.ID, r.agent))
-	if c.Kind != kindAnthropic || c.Model != defaultClaude || strings.Join(c.ModelList(), " ") != "claude-haiku-5-5 claude-opus-5-5" || !c.Ready() {
+	if c.Kind != store.KindAnthropic || c.Model != defaultClaude || strings.Join(c.ModelList(), " ") != "claude-haiku-5-5 claude-opus-5-5" || !c.Ready() {
 		t.Fatalf("an Anthropic agent should list Anthropic's models and pick Claude Opus 5.5: %+v", c)
 	}
 	if len(c.ToolList()) != 2 || c.Problem != "" {
@@ -122,10 +124,10 @@ func TestAClaudeAgentIsSetUpFromAnthropicsModelList(t *testing.T) {
 			t.Fatal("the Anthropic key was sent to a tool server")
 		}
 	}
-	if (Agent{Kind: kindAnthropic, APIKey: "sealed", Model: defaultClaude}).Ready() != true {
+	if (store.Agent{Kind: store.KindAnthropic, APIKey: "sealed", Model: defaultClaude}).Ready() != true {
 		t.Fatal("an Anthropic agent needs no endpoint of its own")
 	}
-	if (Agent{Kind: kindOpenAI, APIKey: "sealed", Model: "gpt"}).Ready() {
+	if (store.Agent{Kind: store.KindOpenAI, APIKey: "sealed", Model: "gpt"}).Ready() {
 		t.Fatal("an OpenAI-compatible agent needs its endpoint")
 	}
 	if _, err := r.a.saveAgent(context.Background(), r.o.ID, AgentSettingsIn{Name: "Odd", Kind: "carrier-pigeon", BaseURL: "https://x.example/v1", APIKey: agentTestKey}, "Ada Lovelace"); err == nil {
@@ -203,19 +205,19 @@ func TestAnAgentChangesKindOnlyWhenTold(t *testing.T) {
 	c := must(r.s.AgentByID(r.o.ID, r.agent))
 	same := AgentSettingsIn{ID: c.ID, Name: c.Name, BaseURL: c.BaseURL, Model: c.Model, ToolsURL: c.ToolsURL, Tools: []string{searchTool}}
 	kept := must(r.a.saveAgent(ctx, r.o.ID, same, "Ada Lovelace"))
-	if kept.Kind != kindAnthropic || kept.Problem != "" {
+	if kept.Kind != store.KindAnthropic || kept.Problem != "" {
 		t.Fatalf("a save that names no kind should keep the agent's own, and its key: %+v", kept)
 	}
 
 	toOpenAI := same
-	toOpenAI.Kind = kindOpenAI
+	toOpenAI.Kind = store.KindOpenAI
 	if _, err := r.a.saveAgent(ctx, r.o.ID, toOpenAI, "Ada Lovelace"); err == nil || !strings.Contains(err.Error(), "API key") {
 		t.Fatalf("a change of kind should need its key entered again: %v", err)
 	}
 	toOpenAI.BaseURL, toOpenAI.APIKey, toOpenAI.Model = tools.srv.URL+"/v1", agentTestKey, ""
 	moved := must(r.a.saveAgent(ctx, r.o.ID, toOpenAI, "Ada Lovelace"))
 	stored := must(r.s.AgentByID(r.o.ID, r.agent))
-	if stored.Kind != kindOpenAI || slices.Contains(stored.ModelList(), defaultClaude) || moved.Kind != kindOpenAI {
+	if stored.Kind != store.KindOpenAI || slices.Contains(stored.ModelList(), defaultClaude) || moved.Kind != store.KindOpenAI {
 		t.Fatalf("the new kind should be stored, with the old endpoint's models gone: %+v", stored)
 	}
 }
@@ -291,7 +293,7 @@ func TestAClaudeAgentNeverUsesTheServersOwnAnthropicCredentials(t *testing.T) {
 	t.Setenv("ANTHROPIC_CUSTOM_HEADERS", "X-Operator: secret")
 	a := &App{agentClient: claude.srv.Client()}
 	claude.reply = func(int) (int, string) { return 200, claudeTurn() }
-	chat := a.newClaudeChat(&Agent{Kind: kindAnthropic, BaseURL: claude.srv.URL, Model: defaultClaude}, claudeTestKey, nil, "system", "hello")
+	chat := a.newClaudeChat(&store.Agent{Kind: store.KindAnthropic, BaseURL: claude.srv.URL, Model: defaultClaude}, claudeTestKey, nil, "system", "hello")
 	if _, err := chat.next(context.Background()); err != nil {
 		t.Fatalf("a message through the agent's own endpoint: %v", err)
 	}

@@ -21,6 +21,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 const (
@@ -186,13 +187,13 @@ func (a *App) toolSession(ctx context.Context, endpoint, key string) (*mcp.Clien
 
 // listTools reads what the MCP server offers, keeping only tools a model can be
 // given by name, each described briefly.
-func (a *App) listTools(ctx context.Context, endpoint, key string) ([]AgentTool, error) {
+func (a *App) listTools(ctx context.Context, endpoint, key string) ([]store.AgentTool, error) {
 	session, err := a.toolSession(ctx, endpoint, key)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't connect to the tools at %s: %w", endpoint, err)
 	}
 	defer func() { _ = session.Close() }()
-	var out []AgentTool
+	var out []store.AgentTool
 	for t, err := range session.Tools(ctx, nil) {
 		if err != nil {
 			return nil, fmt.Errorf("listing the tools at %s: %w", endpoint, err)
@@ -204,9 +205,9 @@ func (a *App) listTools(ctx context.Context, endpoint, key string) ([]AgentTool,
 		if r := []rune(desc); len(r) > maxToolText {
 			desc = string(r[:maxToolText-1]) + "…"
 		}
-		out = append(out, AgentTool{Name: t.Name, Description: desc})
+		out = append(out, store.AgentTool{Name: t.Name, Description: desc})
 	}
-	slices.SortFunc(out, func(x, y AgentTool) int { return strings.Compare(x.Name, y.Name) })
+	slices.SortFunc(out, func(x, y store.AgentTool) int { return strings.Compare(x.Name, y.Name) })
 	return out, nil
 }
 
@@ -245,12 +246,12 @@ func agentName(raw string) (string, error) {
 
 // saveAgent stores an agent's settings, then checks them. A check that fails, as when
 // the endpoint's daily limit is spent, is reported but doesn't stop the save.
-func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by string) (*Agent, error) {
+func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by string) (*store.Agent, error) {
 	name, err := agentName(in.Name)
 	if err != nil {
 		return nil, err
 	}
-	c := &Agent{OrgID: org, Kind: kindOpenAI, Models: "[]", Tools: "[]", Allowed: "[]"}
+	c := &store.Agent{OrgID: org, Kind: store.KindOpenAI, Models: "[]", Tools: "[]", Allowed: "[]"}
 	if in.ID != 0 {
 		if c, err = a.s.AgentByID(org, in.ID); err != nil {
 			return nil, err
@@ -269,7 +270,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 		return nil, err
 	}
 	// Anthropic's own address is the SDK's; another is for a proxy in front of it.
-	if base == "" && kind == kindOpenAI {
+	if base == "" && kind == store.KindOpenAI {
 		return nil, say.New("enter the endpoint's address")
 	}
 	tools, err := endpointURL(in.ToolsURL)
@@ -283,7 +284,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	if taken, err := a.s.AgentNameTaken(org, name, c.ID); err != nil {
 		return nil, err
 	} else if taken {
-		return nil, conflict{Text: say.Errorf("there is already an agent called %q", name)}
+		return nil, store.Conflict{Text: say.Errorf("there is already an agent called %q", name)}
 	}
 	renamed := c.ID != 0 && c.Name != name
 	c.Name = name
@@ -341,7 +342,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 		return nil, say.New("wait between a minute and a week before falling back")
 	}
 	c.FallbackID, c.FallbackMinutes = fallback, in.FallbackMinutes
-	c.ThinkingOff = in.ThinkingOff && kind == kindOpenAI
+	c.ThinkingOff = in.ThinkingOff && kind == store.KindOpenAI
 	c.Kind, c.BaseURL, c.APIKey, c.ToolsURL, c.SearchURL, c.UpdatedBy = kind, base, sealedKey, tools, search, by
 	c.Model = strings.TrimSpace(in.Model)
 	if len(c.Model) > 200 {
@@ -352,7 +353,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	check, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 	var models []string
-	if kind == kindAnthropic {
+	if kind == store.KindAnthropic {
 		models, err = a.listClaudeModels(check, c, key)
 	} else {
 		models, err = a.listModels(check, base, key)
@@ -365,7 +366,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 		case c.Model != "":
 		case len(models) == 1:
 			c.Model = models[0]
-		case kind == kindAnthropic && slices.Contains(models, defaultClaude):
+		case kind == store.KindAnthropic && slices.Contains(models, defaultClaude):
 			c.Model = defaultClaude
 		}
 	}
@@ -390,7 +391,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	}
 	if in.Tools == nil {
 		allowed = slices.DeleteFunc(c.AllowedTools(), func(name string) bool {
-			return !slices.ContainsFunc(c.ToolList(), func(t AgentTool) bool { return t.Name == name })
+			return !slices.ContainsFunc(c.ToolList(), func(t store.AgentTool) bool { return t.Name == name })
 		})
 	}
 	c.Allowed = encodeList(allowed)
@@ -401,7 +402,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 	}
 	if renamed && c.KeyID != 0 {
 		// Its key carries its name into the record; MCP servers built for it hold the old one.
-		if err := a.s.RenameKey(org, c.KeyID, builtinKeyName(c.Name)); err != nil {
+		if err := a.s.RenameKey(org, c.KeyID, store.BuiltinKeyName(c.Name)); err != nil {
 			return nil, err
 		}
 		a.mu.Lock()
@@ -432,19 +433,19 @@ func (a *App) deleteAgent(org, id int64) error {
 
 // AgentView is what the Agents page shows of an agent: never the key.
 type AgentView struct {
-	Agent
+	store.Agent
 	HasKey bool
 	// Others are the agents it could fall back to.
-	Others []Agent
+	Others []store.Agent
 }
 
 // agentView is c as its card shows it, with those of all it could fall back to.
-func agentView(c Agent, all []Agent) AgentView {
+func agentView(c store.Agent, all []store.Agent) AgentView {
 	view := AgentView{Agent: c, HasKey: c.APIKey != ""}
 	view.APIKey = ""
 	for _, o := range all {
 		if o.ID != c.ID {
-			view.Others = append(view.Others, Agent{ID: o.ID, Name: o.Name})
+			view.Others = append(view.Others, store.Agent{ID: o.ID, Name: o.Name})
 		}
 	}
 	return view
@@ -465,7 +466,7 @@ func (v AgentView) State() AgentState {
 	switch {
 	case !v.HasKey:
 		return AgentState{"stop", say.New("✕ Can't run"), say.New("It needs an API key.")}
-	case v.Kind == kindOpenAI && v.BaseURL == "":
+	case v.Kind == store.KindOpenAI && v.BaseURL == "":
 		return AgentState{"stop", say.New("✕ Can't run"), say.New("It needs the endpoint's address.")}
 	case v.Model == "":
 		return AgentState{"stop", say.Errorf("✕ Can't run%s", checked), say.New("Pick one of the models the endpoint lists.")}

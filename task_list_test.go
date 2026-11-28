@@ -11,6 +11,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // queries counts the reads a store makes while do runs.
@@ -29,7 +30,7 @@ func TestTheTaskListTakesNoMoreQueriesForMoreTasks(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
+	scout, second := store.Actor{Name: "agent:scout", KeyID: 1}, store.Actor{Name: "agent:second", KeyID: 2}
 	work := func(i int) {
 		task := must(s.CreateTask(o.ID, "", fmt.Sprint("Find makers of garden rooms, part ", i), "Nia"))
 		must(s.AgentTask(o.ID, scout, task.ID, paging.Page{}))

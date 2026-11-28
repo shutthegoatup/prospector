@@ -11,6 +11,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // A token bucket per caller: a burst of requests goes straight through, after which they
@@ -82,8 +83,8 @@ func (g *rateGuard) dropFull(now time.Time) {
 	}
 }
 
-func keyBucket(k *APIKey) string { return "key\x00" + strconv.FormatInt(k.ID, 10) }
-func userBucket(u *User) string  { return "user\x00" + strconv.FormatInt(u.ID, 10) }
+func keyBucket(k *store.APIKey) string { return "key\x00" + strconv.FormatInt(k.ID, 10) }
+func userBucket(u *store.User) string  { return "user\x00" + strconv.FormatInt(u.ID, 10) }
 
 // limited lets the request on, or refuses it for the whole seconds Retry-After takes.
 func (a *App) limited(w http.ResponseWriter, r *http.Request, who string, limit rateLimit) bool {

@@ -15,6 +15,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // apiRoutes holds the one route the spec doesn't: MCP, a protocol of its own.
@@ -66,7 +67,7 @@ func (a *App) mcpServer(q *request.Req) *mcp.Server {
 	}
 	org, actor, k := q.Org, q.Agent(), q.Key
 	// Each session holds its own claims, so two clients sharing a key take different requests.
-	sessionOf := func(r *mcp.CallToolRequest) Actor {
+	sessionOf := func(r *mcp.CallToolRequest) store.Actor {
 		who := actor
 		if r != nil && r.Session != nil {
 			who.Session = r.Session.ID()
@@ -74,7 +75,7 @@ func (a *App) mcpServer(q *request.Req) *mcp.Server {
 		return who
 	}
 	// Settings saved while a session is open (waits, the never-contact list) apply to its next call.
-	current := func() (*Org, error) { return a.s.OrgByID(org.ID) }
+	current := func() (*store.Org, error) { return a.s.OrgByID(org.ID) }
 	s := mcp.NewServer(&mcp.Implementation{Name: "prospector", Title: "Prospector: " + org.Name, Version: "1"},
 		&mcp.ServerOptions{Instructions: agentInstructions(org, k)})
 	if k.Has("read") {

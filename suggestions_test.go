@@ -11,13 +11,14 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
 	other := mustOrg(t, s, "beta")
-	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
+	scout, second := store.Actor{Name: "agent:scout", KeyID: 1}, store.Actor{Name: "agent:second", KeyID: 2}
 	team := "https://larkmoor.example/team"
 	co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example"}))
 	hannah := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce",
@@ -31,16 +32,16 @@ func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
 	if !got.Existed || got.ID != hannah.ID || strings.Join(got.Suggested, " ") != "email phone" {
 		t.Fatalf("an email and a different number should wait, the profile she already has should not: %+v", got)
 	}
-	person := func() Contact {
+	person := func() store.Contact {
 		t.Helper()
-		var c Contact
+		var c store.Contact
 		if err := s.InOrg(o.ID).First(&c, hannah.ID).Error; err != nil {
 			t.Fatal(err)
 		}
 		return c
 	}
-	if c := person(); c.Email != nil || deref(c.Phone) != "+44 20 7946 0000" {
-		t.Fatalf("a suggestion changed her before anyone accepted it: email %v, phone %q", c.Email, deref(c.Phone))
+	if c := person(); c.Email != nil || store.Deref(c.Phone) != "+44 20 7946 0000" {
+		t.Fatalf("a suggestion changed her before anyone accepted it: email %v, phone %q", c.Email, store.Deref(c.Phone))
 	}
 
 	again := must(s.AgentAddContact(o, scout, found))
@@ -81,8 +82,8 @@ func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
 	if code, _ := decide(pending[0].ID, prospecting.SuggestionDismissed); code != http.StatusConflict {
 		t.Fatalf("a settled suggestion was settled again: %d", code)
 	}
-	if c := person(); deref(c.Email) != "hannah.pryce@larkmoor.example" || c.EmailStatus != "guess" || deref(c.Phone) != "+44 20 7946 0000" {
-		t.Fatalf("accepted email %q (%s), dismissed number left her with %q", deref(c.Email), c.EmailStatus, deref(c.Phone))
+	if c := person(); store.Deref(c.Email) != "hannah.pryce@larkmoor.example" || c.EmailStatus != "guess" || store.Deref(c.Phone) != "+44 20 7946 0000" {
+		t.Fatalf("accepted email %q (%s), dismissed number left her with %q", store.Deref(c.Email), c.EmailStatus, store.Deref(c.Phone))
 	}
 	if _, body := call(t, client, "GET", srv.URL+page, "", nil); !strings.Contains(body, `"pending":[]`) || strings.Contains(body, `"pending":[{`) {
 		t.Fatal("settled suggestions are still offered")
@@ -96,12 +97,12 @@ func TestNewDetailsForSomeoneKnownWaitForAPerson(t *testing.T) {
 		t.Fatalf("a dismissed number or an accepted email was raised again: %+v", after)
 	}
 	var n int64
-	s.DB.Model(&Suggestion{}).Where("org_id = ?", o.ID).Count(&n)
+	s.DB.Model(&store.Suggestion{}).Where("org_id = ?", o.ID).Count(&n)
 	if n != 2 {
 		t.Fatalf("want the two suggestions, got %d rows", n)
 	}
 
-	var events []Event
+	var events []store.Event
 	s.InOrg(o.ID).Where("contact_id = ?", hannah.ID).Order("id").Find(&events)
 	var did []string
 	for _, e := range events {
@@ -122,7 +123,7 @@ func TestASuggestionCantGetPastTheNeverContactListOrAnErasure(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	in := prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	hannah := must(s.AgentAddContact(o, scout, in))
@@ -132,7 +133,7 @@ func TestASuggestionCantGetPastTheNeverContactListOrAnErasure(t *testing.T) {
 	if got := must(s.AgentAddContact(o, scout, in)); len(got.Suggested) != 1 {
 		t.Fatalf("want her email waiting: %+v", got)
 	}
-	var sg Suggestion
+	var sg store.Suggestion
 	if err := s.DB.Where("contact_id = ?", hannah.ID).First(&sg).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +154,7 @@ func TestASuggestionCantGetPastTheNeverContactListOrAnErasure(t *testing.T) {
 	if err := s.ErasePerson(o.ID, hannah.ID, "ada"); err != nil {
 		t.Fatal(err)
 	}
-	var left []Suggestion
+	var left []store.Suggestion
 	s.DB.Find(&left)
 	if len(left) != 0 {
 		t.Fatalf("erasing her left what was suggested for her: %+v", left)
@@ -172,7 +173,7 @@ func TestSuggestionsAreInBothExports(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	in := prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	hannah := must(s.AgentAddContact(o, scout, in))
@@ -194,7 +195,7 @@ func TestDetailsSentUnderAnotherNameAreNobodys(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	team := "https://larkmoor.example/team"
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	jonas := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Jonas Weber", Email: "jonas@larkmoor.example", SourceURL: team}))
@@ -205,7 +206,7 @@ func TestDetailsSentUnderAnotherNameAreNobodys(t *testing.T) {
 	mixed := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", Email: "jonas@larkmoor.example",
 		Linkedin: profile, Phone: "+44 20 7946 0000", SourceURL: team}))
 	var n int64
-	s.DB.Model(&Suggestion{}).Count(&n)
+	s.DB.Model(&store.Suggestion{}).Count(&n)
 	if !mixed.Existed || mixed.ID != jonas.ID || len(mixed.Suggested) != 0 || n != 0 {
 		t.Fatalf("details sent under another name were filed for the person the address matched: %+v, %d rows", mixed, n)
 	}
@@ -214,15 +215,15 @@ func TestDetailsSentUnderAnotherNameAreNobodys(t *testing.T) {
 	if got.ID != hannah.ID || strings.Join(got.Suggested, " ") != "phone linkedin" {
 		t.Fatalf("want her number and profile waiting: %+v", got)
 	}
-	var waiting []Suggestion
+	var waiting []store.Suggestion
 	s.DB.Where("contact_id = ?", hannah.ID).Order("id").Find(&waiting)
 	if err := s.DecideSuggestion(o.ID, waiting[0].ID, prospecting.SuggestionAccepted, "ada"); err != nil {
 		t.Fatal(err)
 	}
-	var c Contact
+	var c store.Contact
 	s.InOrg(o.ID).First(&c, hannah.ID)
-	if deref(c.Phone) != "+44 20 7946 0000" || deref(c.Tz) == "" {
-		t.Fatalf("an accepted number should bring its time zone, as a typed one does: %q %q", deref(c.Phone), deref(c.Tz))
+	if store.Deref(c.Phone) != "+44 20 7946 0000" || store.Deref(c.Tz) == "" {
+		t.Fatalf("an accepted number should bring its time zone, as a typed one does: %q %q", store.Deref(c.Phone), store.Deref(c.Tz))
 	}
 
 	// Typed in by a person meanwhile: nothing is left to offer.
@@ -239,7 +240,7 @@ func TestOneOfSeveralAddressesIsAlreadyHeld(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	in := prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	hannah := must(s.AgentAddContact(o, scout, in))
@@ -256,7 +257,7 @@ func TestErasingSomeoneCoversWhatWasSuggestedForThem(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	team := "https://larkmoor.example/team"
 	in := prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: team}
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
@@ -265,7 +266,7 @@ func TestErasingSomeoneCoversWhatWasSuggestedForThem(t *testing.T) {
 	must(s.AgentAddContact(o, scout, in))
 	in.Email = "hannah.pryce@larkmoor.example"
 	must(s.AgentAddContact(o, scout, in))
-	var waiting []Suggestion
+	var waiting []store.Suggestion
 	s.DB.Where("contact_id = ?", hannah.ID).Order("id").Find(&waiting)
 	if len(waiting) != 3 || waiting[0].Value != "not.hers@larkmoor.example" {
 		t.Fatalf("want two addresses and a profile waiting: %+v", waiting)
@@ -273,14 +274,14 @@ func TestErasingSomeoneCoversWhatWasSuggestedForThem(t *testing.T) {
 	if err := s.DecideSuggestion(o.ID, waiting[0].ID, prospecting.SuggestionDismissed, "ada"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DB.Create(&Enquiry{OrgID: o.ID, Name: "H", Email: "hannah.pryce@larkmoor.example", Message: "Could you send pricing?"}).Error; err != nil {
+	if err := s.DB.Create(&store.Enquiry{OrgID: o.ID, Name: "H", Email: "hannah.pryce@larkmoor.example", Message: "Could you send pricing?"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := s.ErasePerson(o.ID, hannah.ID, "ada"); err != nil {
 		t.Fatal(err)
 	}
 	var enquiries int64
-	s.DB.Model(&Enquiry{}).Count(&enquiries)
+	s.DB.Model(&store.Enquiry{}).Count(&enquiries)
 	if enquiries != 0 {
 		t.Fatal("what she wrote from an address suggested for her outlived her erasure")
 	}
@@ -300,7 +301,7 @@ func TestARestoreDropsSuggestionsForPeopleItDrops(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	in := prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	// A restore refuses a file with nobody in it, so someone else is there throughout.
@@ -313,7 +314,7 @@ func TestARestoreDropsSuggestionsForPeopleItDrops(t *testing.T) {
 		t.Fatal(err)
 	}
 	var n int64
-	s.DB.Model(&Suggestion{}).Count(&n)
+	s.DB.Model(&store.Suggestion{}).Count(&n)
 	if n != 0 {
 		t.Fatalf("%d suggestions wait for someone the restore removed", n)
 	}
@@ -324,7 +325,7 @@ func TestADetailFoundForATaskWaitsAndCountsTowardsTheTask(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	hannah := must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}))
 	task := must(s.CreateTask(o.ID, "Phones", "Find phone numbers for the people at Larkmoor.", "Ada Lovelace"))
@@ -343,7 +344,7 @@ func TestAnAgentsGuessesDontPileUpOnOnePerson(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	in := prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
 	co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	hannah := must(s.AgentAddContact(o, scout, in))
@@ -354,7 +355,7 @@ func TestAnAgentsGuessesDontPileUpOnOnePerson(t *testing.T) {
 	in.Email, in.Phone = "", strings.Repeat("7", prospecting.MaxDetail+1)
 	must(s.AgentAddContact(o, scout, in))
 	var waiting int64
-	if s.DB.Model(&Suggestion{}).Where("contact_id = ?", hannah.ID).Count(&waiting); waiting != prospecting.MaxWaiting {
+	if s.DB.Model(&store.Suggestion{}).Where("contact_id = ?", hannah.ID).Count(&waiting); waiting != prospecting.MaxWaiting {
 		t.Fatalf("want %d addresses waiting and no overlong number, got %d rows", prospecting.MaxWaiting, waiting)
 	}
 
@@ -367,7 +368,7 @@ func TestAnAgentsGuessesDontPileUpOnOnePerson(t *testing.T) {
 			t.Fatal(err)
 		}
 		if guess != "hpryce" {
-			var sg Suggestion
+			var sg store.Suggestion
 			s.DB.Where("contact_id = ? and value = ?", hannah.ID, guess+"@larkmoor.example").First(&sg)
 			if err := s.DecideSuggestion(o.ID, sg.ID, prospecting.SuggestionDismissed, "ada"); err != nil {
 				t.Fatal(err)
@@ -383,7 +384,7 @@ func TestARestoreDoesntHandASuggestionToWhoeverGotTheId(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	in := prospecting.AddContactIn{Company: "Larkmoor Yachts", Name: "Hannah Pryce", SourceURL: "https://larkmoor.example/team"}
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	hannah := must(s.AgentAddContact(o, scout, in))
@@ -391,14 +392,14 @@ func TestARestoreDoesntHandASuggestionToWhoeverGotTheId(t *testing.T) {
 	must(s.AgentAddContact(o, scout, in))
 	snapshot := must(s.SnapshotText(o.ID))
 	count := func() (n int64) {
-		s.DB.Model(&Suggestion{}).Count(&n)
+		s.DB.Model(&store.Suggestion{}).Count(&n)
 		return n
 	}
 	if _, err := s.Restore(o.ID, snapshot); err != nil || count() != 1 {
 		t.Fatalf("a restore that brings the same person back keeps what waits for her: %d %v", count(), err)
 	}
 	// The id is somebody else now; the snapshot gives it back to Hannah.
-	if err := s.DB.Model(&Contact{}).Where("id = ?", hannah.ID).Update("key", "somebody-else").Error; err != nil {
+	if err := s.DB.Model(&store.Contact{}).Where("id = ?", hannah.ID).Update("key", "somebody-else").Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Restore(o.ID, snapshot); err != nil || count() != 0 {

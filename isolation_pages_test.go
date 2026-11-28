@@ -24,6 +24,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/mailer"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // sourceFiles are the package's own, without tests or generated templates.
@@ -224,7 +225,7 @@ func tryRoutesAsAnotherOrganisation(t *testing.T, gets, posts []string) int {
 	s := tempStore(t)
 	first := seedFirst(t, s)
 	// A run still going, since stopping one only looks among those.
-	if err := s.DB.Model(&AgentRun{}).Where("org_id = ?", first.ID).Update("status", RunWorking).Error; err != nil {
+	if err := s.DB.Model(&store.AgentRun{}).Where("org_id = ?", first.ID).Update("status", store.RunWorking).Error; err != nil {
 		t.Fatal(err)
 	}
 	before := holdings(t, s, first.ID)
@@ -368,7 +369,7 @@ func tryRoutesAsAnotherOrganisation(t *testing.T, gets, posts []string) int {
 		// What it says back of what it was sent isn't a leak; anything else of theirs is.
 		for _, sent := range named {
 			// A look-for list says back each line's name as the field it reads it into.
-			said = strings.ReplaceAll(strings.ReplaceAll(said, sent.(string), ""), assetKey(sent.(string)), "")
+			said = strings.ReplaceAll(strings.ReplaceAll(said, sent.(string), ""), store.AssetKey(sent.(string)), "")
 		}
 		// A part of one, quoted back by a form that reads several from one field.
 		said = strings.ReplaceAll(strings.ReplaceAll(said, `"`+theirs+`"`, ""), `\"`+theirs+`\"`, "")

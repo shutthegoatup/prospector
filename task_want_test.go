@@ -10,6 +10,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // Find asks for about so many companies: the searches list shows how far it has got
@@ -30,7 +31,7 @@ func TestASearchAsksForAboutSoManyCompanies(t *testing.T) {
 		t.Fatalf("asking for about 3: %d %s", code, body)
 	}
 
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example", Task: made.Id}))
 	kept := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Halvard Marine", Domain: "halvard.example", Task: made.Id}))
 	if err := s.SetCompanyStage(o.ID, kept.ID, prospecting.CompanyQualified, "A", "Ada Lovelace"); err != nil {

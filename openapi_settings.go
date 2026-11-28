@@ -12,9 +12,10 @@ import (
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
-func settingsOut(o *Org) api.Settings {
+func settingsOut(o *store.Org) api.Settings {
 	set := o.Settings.WithDefaults()
 	return api.Settings{Name: o.Name, Color: o.Color, EmailAfterDays: int32(set.EmailAfterDays), FollowupAfterDays: int32(set.FollowupAfterDays),
 		NoteTemplate: set.NoteTemplate, Pitch: set.Pitch, NeverContact: set.NeverContact, LookFor: set.LookFor, AgentGuidance: set.AgentGuidance,
@@ -66,7 +67,7 @@ func (s apiServer) ChangeSettings(ctx context.Context, in api.ChangeSettingsRequ
 	// Compared as they take effect, so the page sending back the defaults it showed, or
 	// "gbp" for GBP, isn't a change.
 	changed := settingsDiff(before, settingsOut(o))
-	who := Actor{Name: q.Actor()}
+	who := store.Actor{Name: q.Actor()}
 	if q.Key != nil {
 		who.KeyID = q.Key.ID
 	}
@@ -103,7 +104,7 @@ func settingsDiff(a, b api.Settings) []string {
 }
 
 // checkOrg refuses settings that can't be worked with, and tidies the name and currency.
-func checkOrg(o *Org) error {
+func checkOrg(o *store.Org) error {
 	set := &o.Settings
 	if o.Name = strings.TrimSpace(o.Name); o.Name == "" {
 		return say.New("the organisation needs a name")
@@ -111,7 +112,7 @@ func checkOrg(o *Org) error {
 	if set.EmailAfterDays < 0 || set.FollowupAfterDays < 0 || set.EmailAfterDays > 60 || set.FollowupAfterDays > 60 {
 		return say.New("waits are between 0 and 60 days")
 	}
-	if _, err := enquiryOrigins(set.EnquirySites); err != nil {
+	if _, err := store.EnquiryOrigins(set.EnquirySites); err != nil {
 		return err
 	}
 	if _, err := set.Assets(); err != nil {

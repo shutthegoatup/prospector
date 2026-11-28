@@ -28,6 +28,7 @@ import (
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // fakeIdP is a working OpenID Connect provider: discovery, keys, and a token endpoint
@@ -155,7 +156,7 @@ func (p *fakeIdP) approve(sentTo string) url.Values {
 	if guarded := q.Get("code_challenge_method") == "S256" && q.Get("nonce") != ""; guarded == p.plain {
 		p.t.Fatalf("PKCE and a nonce should be sent to every provider but LinkedIn: %s", sentTo)
 	}
-	code := randomToken(8)
+	code := store.RandomToken(8)
 	p.mu.Lock()
 	p.grants[code] = q
 	p.mu.Unlock()
@@ -265,7 +266,7 @@ func (b *browser) through(p *fakeIdP, start string) (code int, body, location st
 	return b.get("/login/callback?" + p.approve(location).Encode())
 }
 
-func mustUser(t *testing.T, s *Store, o *Org, email, name, role string) *User {
+func mustUser(t *testing.T, s *Store, o *store.Org, email, name, role string) *store.User {
 	t.Helper()
 	u, err := s.CreateUser(email, name, "correct horse battery")
 	if err != nil {
@@ -282,7 +283,7 @@ func mustUser(t *testing.T, s *Store, o *Org, email, name, role string) *User {
 func identities(t *testing.T, s *Store) int64 {
 	t.Helper()
 	var n int64
-	if err := s.DB.Model(&Identity{}).Count(&n).Error; err != nil {
+	if err := s.DB.Model(&store.Identity{}).Count(&n).Error; err != nil {
 		t.Fatal(err)
 	}
 	return n
@@ -572,7 +573,7 @@ func TestOrganisationSingleSignOn(t *testing.T) {
 	}
 
 	// A linked subject whose account has since moved off the organisation's domains isn't its to vouch for.
-	if err := s.DB.Model(&User{}).Where("id = ?", bob.ID).Update("email", "bob@elsewhere.example").Error; err != nil {
+	if err := s.DB.Model(&store.User{}).Where("id = ?", bob.ID).Update("email", "bob@elsewhere.example").Error; err != nil {
 		t.Fatal(err)
 	}
 	if code, body, _ := newBrowser(t, srv.URL).through(okta, start); code != http.StatusForbidden || !strings.Contains(body, "isn't at this organisation") {
@@ -859,13 +860,13 @@ func TestSingleSignOnSettings(t *testing.T) {
 	if !strings.Contains(page, `"redirect_uri":"`+srv.URL+`/login/callback"`) || !strings.Contains(page, `"has_client_secret":true`) {
 		t.Fatalf("Settings doesn't show the redirect URI to register, or that the secret is kept: %s", page)
 	}
-	var events []Event
+	var events []store.Event
 	s.InOrg(alpha.ID).Where("action = ?", "sso:change").Find(&events)
 	if len(events) != 2 || events[0].User != "Ada Lovelace" {
 		t.Fatalf("changes to the connection in the history: %+v", events)
 	}
 	for _, e := range events {
-		page += deref(e.Value)
+		page += store.Deref(e.Value)
 	}
 	if strings.Contains(page, "s3cret-value") {
 		t.Fatal("the client secret is shown back, or kept in the history")
@@ -920,7 +921,7 @@ func TestSingleSignOnSettings(t *testing.T) {
 }
 
 func TestGoogleWorkspaceMustHoldTheAddress(t *testing.T) {
-	c := &SSO{Domains: []SSODomain{{Domain: "alpha.example", VerifiedAt: new(time.Time)}}}
+	c := &store.SSO{Domains: []store.SSODomain{{Domain: "alpha.example", VerifiedAt: new(time.Time)}}}
 	if !c.Proves("ada@alpha.example") {
 		t.Fatal("a verified domain isn't believed")
 	}
@@ -949,8 +950,8 @@ func TestGoogleWorkspaceMustHoldTheAddress(t *testing.T) {
 
 func TestSingleSignOnIsAskedAgainAfterADay(t *testing.T) {
 	t.Parallel()
-	sess := &Session{Limited: true}
-	sess.Prove(3, time.Now().Add(-proofLife-time.Minute))
+	sess := &store.Session{Limited: true}
+	sess.Prove(3, time.Now().Add(-store.ProofLife-time.Minute))
 	sess.Prove(7, time.Now().Add(-time.Hour))
 	if sess.Proves(3) || sess.Opens(3) {
 		t.Fatal("going through the provider more than a day ago still counts")
@@ -967,7 +968,7 @@ func TestSingleSignOnIsAskedAgainAfterADay(t *testing.T) {
 func TestAnAccountWithNoPasswordIsRefusedAsSlowlyAsAnyOther(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
-	if err := s.DB.Create(&User{Email: "dan@example.com", Name: "Dan Okafor", PasswordHash: unusableHash()}).Error; err != nil {
+	if err := s.DB.Create(&store.User{Email: "dan@example.com", Name: "Dan Okafor", PasswordHash: store.UnusableHash()}).Error; err != nil {
 		t.Fatal(err)
 	}
 	timed := func(email string) time.Duration {

@@ -16,6 +16,7 @@ import (
 	"github.com/go-jose/go-jose/v4"
 
 	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 var (
@@ -23,7 +24,7 @@ var (
 	newKey = strings.Repeat("0b", 32)
 )
 
-func mustKeys(t *testing.T, spec string) *keyring {
+func mustKeys(t *testing.T, spec string) *store.Keyring {
 	t.Helper()
 	k, err := parseKeys(spec)
 	if err != nil {
@@ -81,10 +82,10 @@ func TestTokensAreFoundByAKeyedLookup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var sess Session
+	var sess store.Session
 	s.DB.First(&sess)
 	for what, stored := range map[string]string{"session": sess.TokenHash, "API key": key.Hash} {
-		if lookupVersion(stored) != 1 || strings.Contains(stored, hashToken(token)) || strings.Contains(stored, hashToken(secret)) {
+		if store.LookupVersion(stored) != 1 || strings.Contains(stored, store.HashToken(token)) || strings.Contains(stored, store.HashToken(secret)) {
 			t.Fatalf("a %s is stored as %q, not under key 1", what, stored)
 		}
 	}
@@ -94,7 +95,7 @@ func TestTokensAreFoundByAKeyedLookup(t *testing.T) {
 
 	// Whoever can write to the database but hasn't the key can't mint either: a row
 	// holding a plain hash, as before there was a key, signs nobody in.
-	if err := s.DB.Create(&Session{TokenHash: hashToken("made-up"), UserID: u.ID, ExpiresAt: time.Now().Add(time.Hour)}).Error; err != nil {
+	if err := s.DB.Create(&store.Session{TokenHash: store.HashToken("made-up"), UserID: u.ID, ExpiresAt: time.Now().Add(time.Hour)}).Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.SessionUser("made-up"); err == nil {
@@ -111,7 +112,7 @@ func TestTokensAreFoundByAKeyedLookup(t *testing.T) {
 	}
 	s.DB.First(&sess, sess.ID)
 	s.DB.First(key, key.ID)
-	if lookupVersion(sess.TokenHash) != 2 || lookupVersion(key.Hash) != 2 {
+	if store.LookupVersion(sess.TokenHash) != 2 || store.LookupVersion(key.Hash) != 2 {
 		t.Fatalf("after use under the new key: session %q, API key %q", sess.TokenHash, key.Hash)
 	}
 	s.Keyring = mustKeys(t, "2:"+newKey)
@@ -150,7 +151,7 @@ func TestAnAgentsKeyOutlivesTheServerBeingGivenASecretKey(t *testing.T) {
 	s.Keyring = nil
 	token, _ := s.NewSession(u.ID, 0)
 	secret, key, err := s.CreateKey(alpha.ID, "bot", []string{"read"}, "test")
-	if err != nil || key.Hash != hashToken(secret) {
+	if err != nil || key.Hash != store.HashToken(secret) {
 		t.Fatalf("an API key made with no secret key: %q %v", key.Hash, err)
 	}
 	if _, err := s.SessionUser(token); err != nil {
@@ -167,7 +168,7 @@ func TestAnAgentsKeyOutlivesTheServerBeingGivenASecretKey(t *testing.T) {
 		t.Fatalf("an API key from before there was a key: %v", err)
 	}
 	s.DB.First(key, key.ID)
-	if lookupVersion(key.Hash) != 1 {
+	if store.LookupVersion(key.Hash) != 1 {
 		t.Fatalf("the API key after its first use: %q", key.Hash)
 	}
 	if _, err := s.KeyFor(secret); err != nil {
@@ -200,10 +201,10 @@ func TestAnAgentsKeyOutlivesTheServerBeingGivenASecretKey(t *testing.T) {
 	if _, err := s.KeyFor(secret); err != nil {
 		t.Fatalf("an API key under the newer key, on a server still using the older: %v", err)
 	}
-	var sess Session
+	var sess store.Session
 	s.DB.Where("token_hash in ?", s.Keyring.Lookups(identity.Sessions, fresh)).First(&sess)
 	s.DB.First(key, key.ID)
-	if lookupVersion(sess.TokenHash) != 2 || lookupVersion(key.Hash) != 2 {
+	if store.LookupVersion(sess.TokenHash) != 2 || store.LookupVersion(key.Hash) != 2 {
 		t.Fatalf("moved back to the older key: session %q, API key %q", sess.TokenHash, key.Hash)
 	}
 }
@@ -217,7 +218,7 @@ func TestAClearSecretIsSealedWhateverItLooksLike(t *testing.T) {
 			t.Errorf("%q, kept in clear, passes for sealed under a key", clear)
 		}
 	}
-	if lookupVersion("k12345") != -1 || lookupVersion(hashToken("x")) != -1 || lookupVersion("k3:abc") != 3 {
+	if store.LookupVersion("k12345") != -1 || store.LookupVersion(store.HashToken("x")) != -1 || store.LookupVersion("k3:abc") != 3 {
 		t.Fatal("reading the key a lookup names")
 	}
 }
@@ -226,7 +227,7 @@ func TestSealedSecretsOutliveAKeyChange(t *testing.T) {
 	t.Parallel()
 	before := mustKeys(t, "1:"+oldKey)
 	stored, err := before.Seal("s3cret-value")
-	if err != nil || !sealed(stored) || strings.Contains(stored, "s3cret") {
+	if err != nil || !store.Sealed(stored) || strings.Contains(stored, "s3cret") {
 		t.Fatalf("sealing: %q %v", stored, err)
 	}
 	if again, _ := before.Seal("s3cret-value"); again == stored {
@@ -245,7 +246,7 @@ func TestSealedSecretsOutliveAKeyChange(t *testing.T) {
 	}
 	// Retired too early: a value still under the old key says which key it needs.
 	retired := mustKeys(t, "2:"+newKey)
-	if _, err := retired.Open(stored); !errors.Is(err, errUnknownKey) {
+	if _, err := retired.Open(stored); !errors.Is(err, store.ErrUnknownKey) {
 		t.Fatalf("a value under a key no longer held: %v", err)
 	}
 
@@ -262,14 +263,14 @@ func TestSealedSecretsOutliveAKeyChange(t *testing.T) {
 		t.Fatal("a tampered value opened")
 	}
 	// A value kept in clear before there was a key reads back as it is, key or no key.
-	var none *keyring
+	var none *store.Keyring
 	if plain, err := none.Open("kept-in-clear"); err != nil || plain != "kept-in-clear" {
 		t.Fatalf("a clear value with no key: %q %v", plain, err)
 	}
-	if _, err := none.Open(stored); !errors.Is(err, errNoKeys) {
+	if _, err := none.Open(stored); !errors.Is(err, store.ErrNoKeys) {
 		t.Fatalf("a sealed value with no key: %v", err)
 	}
-	if _, err := none.Seal("x"); !errors.Is(err, errNoKeys) {
+	if _, err := none.Seal("x"); !errors.Is(err, store.ErrNoKeys) {
 		t.Fatalf("sealing with no key: %v", err)
 	}
 }
@@ -278,7 +279,7 @@ func TestEachJobHasAKeyOfItsOwnDerivedFromTheMaster(t *testing.T) {
 	t.Parallel()
 	k := mustKeys(t, "1:"+oldKey)
 	master, _ := hex.DecodeString(oldKey)
-	seen := map[string]purpose{hex.EncodeToString(master): "the master key"}
+	seen := map[string]store.Purpose{hex.EncodeToString(master): "the master key"}
 	for _, p := range purposes {
 		// RFC 5869, with the job as info.
 		want, _ := hkdf.Key(sha256.New, master, nil, string(p), 32)
@@ -297,7 +298,7 @@ func TestEachJobHasAKeyOfItsOwnDerivedFromTheMaster(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if plain, err := obj.Decrypt(k.Versions[0].Derived[sealing]); err != nil || string(plain) != "s3cret-value" {
+	if plain, err := obj.Decrypt(k.Versions[0].Derived[store.Sealing]); err != nil || string(plain) != "s3cret-value" {
 		t.Fatalf("opening with the sealing key: %q %v", plain, err)
 	}
 	if _, err := obj.Decrypt(master); err == nil {
@@ -321,7 +322,7 @@ func TestTheServerSealsWhatItFindsWhenItStartsWithAKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	alpha := mustOrg(t, seed, "alpha")
-	if err := seed.DB.Create(&SSOConnection{OrgID: alpha.ID, Issuer: "https://login.alpha.example", ClientID: "client", ClientSecret: "kept-in-clear"}).Error; err != nil {
+	if err := seed.DB.Create(&store.SSOConnection{OrgID: alpha.ID, Issuer: "https://login.alpha.example", ClientID: "client", ClientSecret: "kept-in-clear"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	closeStore(seed)
@@ -346,14 +347,14 @@ func TestTheServerSealsWhatItFindsWhenItStartsWithAKey(t *testing.T) {
 	}
 	t.Cleanup(func() { closeStore(after) })
 	stored := clientSecret(t, after, alpha.ID)
-	if plain, err := mustKeys(t, "1:"+newKey).Open(stored); err != nil || plain != "kept-in-clear" || !sealed(stored) {
+	if plain, err := mustKeys(t, "1:"+newKey).Open(stored); err != nil || plain != "kept-in-clear" || !store.Sealed(stored) {
 		t.Fatalf("after starting with a key: %q %v", stored, err)
 	}
 }
 
 func clientSecret(t *testing.T, s *Store, org int64) string {
 	t.Helper()
-	var c SSOConnection
+	var c store.SSOConnection
 	if err := s.DB.Where("org_id = ?", org).First(&c).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -404,7 +405,7 @@ func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
 		t.Fatalf("resealing: %d %v", moved, err)
 	}
 	under2 := clientSecret(t, s, alpha.ID)
-	if under2 == under1 || s.Keyring.Behind(under2) || sealedVersion(under2) != 2 {
+	if under2 == under1 || s.Keyring.Behind(under2) || store.SealedVersion(under2) != 2 {
 		t.Fatal("the stored secret wasn't moved to the new key")
 	}
 	if moved, err := s.Reseal(); err != nil || moved != 0 {
@@ -450,7 +451,7 @@ func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
 	} else if plain, err := s.Keyring.Open(stored); err != nil || plain != lookalike {
 		t.Fatalf("opening it again: %q %v", plain, err)
 	}
-	if err := s.DB.Model(&SSOConnection{}).Where("org_id = ?", alpha.ID).Update("client_secret", under2).Error; err != nil {
+	if err := s.DB.Model(&store.SSOConnection{}).Where("org_id = ?", alpha.ID).Update("client_secret", under2).Error; err != nil {
 		t.Fatal(err)
 	}
 	s.Keyring = mustKeys(t, "2:"+newKey)
@@ -458,7 +459,7 @@ func TestTheKeyIsChangedWithoutLosingAnOrganisationsSignIn(t *testing.T) {
 
 	// Removed before the reseal, the old key takes the secret with it, and says so.
 	s.Keyring = mustKeys(t, "3:"+strings.Repeat("0c", 32))
-	if moved, err := s.Reseal(); moved != 0 || !errors.Is(err, errUnknownKey) {
+	if moved, err := s.Reseal(); moved != 0 || !errors.Is(err, store.ErrUnknownKey) {
 		t.Fatalf("resealing what no held key opens: %d %v", moved, err)
 	}
 	// It isn't an outage, and people aren't told to try again.
@@ -480,7 +481,7 @@ func TestASecretKeptInClearIsSealedOnceThereIsAKey(t *testing.T) {
 	_, srv := ssoServer(t, s, dns, okta)
 	connected(t, srv, dns, s, "alpha", "alpha.example", okta, nil)
 	// As the release before sealing left it, on a server not yet given a key.
-	if err := s.DB.Model(&SSOConnection{}).Where("org_id = ?", alpha.ID).Update("client_secret", "secret").Error; err != nil {
+	if err := s.DB.Model(&store.SSOConnection{}).Where("org_id = ?", alpha.ID).Update("client_secret", "secret").Error; err != nil {
 		t.Fatal(err)
 	}
 	keys := s.Keyring
@@ -489,7 +490,7 @@ func TestASecretKeptInClearIsSealedOnceThereIsAKey(t *testing.T) {
 	if code, _, _ := newBrowser(t, srv.URL).through(okta, "/login/sso/start?org=alpha&email=ada@alpha.example"); code != http.StatusSeeOther {
 		t.Fatalf("signing in with a secret kept in clear and no key: %d", code)
 	}
-	if moved, err := s.Reseal(); moved != 0 || !errors.Is(err, errNoKeys) {
+	if moved, err := s.Reseal(); moved != 0 || !errors.Is(err, store.ErrNoKeys) {
 		t.Fatalf("resealing with no key: %d %v", moved, err)
 	}
 
@@ -520,7 +521,7 @@ func TestASecretKeptInClearIsSealedOnceThereIsAKey(t *testing.T) {
 	if !strings.Contains(sso, `"sealing":false`) || code != http.StatusOK || !strings.Contains(domains, `"domain":"alpha.example"`) {
 		t.Fatalf("with no key and no connection, Settings should say a key is needed and still list the domains: %s %d %s", sso, code, domains)
 	}
-	if err := s.DB.Create(&SSOConnection{OrgID: alpha.ID, Issuer: okta.srv.URL, ClientID: "client", ClientSecret: "secret"}).Error; err != nil {
+	if err := s.DB.Create(&store.SSOConnection{OrgID: alpha.ID, Issuer: okta.srv.URL, ClientID: "client", ClientSecret: "secret"}).Error; err != nil {
 		t.Fatal(err)
 	}
 
@@ -528,7 +529,7 @@ func TestASecretKeptInClearIsSealedOnceThereIsAKey(t *testing.T) {
 	if moved, err := s.Reseal(); err != nil || moved != 1 {
 		t.Fatalf("sealing what was kept in clear: %d %v", moved, err)
 	}
-	if stored := clientSecret(t, s, alpha.ID); !sealed(stored) || strings.Contains(stored, "secret") {
+	if stored := clientSecret(t, s, alpha.ID); !store.Sealed(stored) || strings.Contains(stored, "secret") {
 		t.Fatalf("still in clear: %q", stored)
 	}
 	if code, _, _ := newBrowser(t, srv.URL).through(okta, "/login/sso/start?"+url.Values{"org": {"alpha"}, "email": {"ada@alpha.example"}}.Encode()); code != http.StatusSeeOther {

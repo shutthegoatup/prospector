@@ -11,6 +11,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // The Settings page offers the owner's parts only to an owner, by the nav's word.
@@ -118,7 +119,7 @@ func fmtMembers(ms []identity.Member) string {
 	return strings.Join(out, " ")
 }
 
-func keySecret(secret string, _ *APIKey, err error) string {
+func keySecret(secret string, _ *store.APIKey, err error) string {
 	if err != nil {
 		panic(err)
 	}
@@ -229,7 +230,7 @@ func TestOutgoingMailThroughTheAPI(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, `"has_password":true`) || strings.Contains(body, "s3cret") || strings.Contains(body, stored.Password) {
 		t.Fatalf("saving the server shows its password, or didn't save: %d %s", code, body)
 	}
-	if !sealed(stored.Password) {
+	if !store.Sealed(stored.Password) {
 		t.Fatal("the password is stored unsealed")
 	}
 	code, body = asKey(t, "GET", url, mailer, nil)
@@ -323,7 +324,7 @@ func TestSingleSignOnThroughTheAPI(t *testing.T) {
 		t.Fatalf("saving the provider: %d %s", code, body)
 	}
 	conn, _ := s.SSO(alpha.ID)
-	if conn.ClientSecret == "the-client-secret" || !sealed(conn.ClientSecret) {
+	if conn.ClientSecret == "the-client-secret" || !store.Sealed(conn.ClientSecret) {
 		t.Fatal("the client secret is stored unsealed")
 	}
 	if _, body := do(ada, "GET", base, nil); strings.Contains(body, "the-client-secret") || strings.Contains(body, conn.ClientSecret) {

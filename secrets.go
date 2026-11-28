@@ -14,25 +14,26 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/internal/identity"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 const (
 
 	// attempts signs the cookie that carries a sign-in to a provider and back.
-	attempts purpose = "prospector: sign-in attempts"
+	attempts store.Purpose = "prospector: sign-in attempts"
 )
 
-var purposes = []purpose{sealing, attempts, identity.Sessions, identity.ApiKeys}
+var purposes = []store.Purpose{store.Sealing, attempts, identity.Sessions, identity.ApiKeys}
 
 const keySize = 32
 
 // parseKeys reads PROSPECTOR_SECRET_KEYS: comma-separated "<version>:<64 hex>" entries.
 // Empty means no keys, and a nil keyring.
-func parseKeys(spec string) (*keyring, error) {
+func parseKeys(spec string) (*store.Keyring, error) {
 	if strings.TrimSpace(spec) == "" {
 		return nil, nil
 	}
-	k := &keyring{ByKID: map[string]secretKey{}}
+	k := &store.Keyring{ByKID: map[string]store.SecretKey{}}
 	for _, entry := range strings.Split(spec, ",") {
 		version, material, ok := strings.Cut(strings.TrimSpace(entry), ":")
 		if !ok {
@@ -51,7 +52,7 @@ func parseKeys(spec string) (*keyring, error) {
 		if err != nil || len(master) != keySize {
 			return nil, fmt.Errorf("PROSPECTOR_SECRET_KEYS: version %d must be %d hex characters", v, 2*keySize)
 		}
-		key := secretKey{Kid: version, Derived: map[purpose][]byte{}}
+		key := store.SecretKey{Kid: version, Derived: map[store.Purpose][]byte{}}
 		for _, p := range purposes {
 			if key.Derived[p], err = hkdf.Key(sha256.New, master, nil, string(p), keySize); err != nil {
 				return nil, err
@@ -100,7 +101,7 @@ func (s *Store) stored(in sealedColumn) *gorm.DB {
 // stored before there was one. Once it reports nothing left, an older key can be removed.
 func (s *Store) Reseal() (moved int, err error) {
 	if s.Keyring == nil {
-		return 0, errNoKeys
+		return 0, store.ErrNoKeys
 	}
 	var failed []error
 	for _, in := range sealedColumns {
@@ -152,7 +153,7 @@ func (s *Store) resealOne(in sealedColumn, row storedSecret) (moved, raced bool,
 func (s *Store) ResealAtStart() {
 	if s.Keyring == nil {
 		var clear int64
-		_ = logged(s.DB.Model(&SSOConnection{}).Where("client_secret <> ''").Count(&clear))
+		_ = store.Logged(s.DB.Model(&store.SSOConnection{}).Where("client_secret <> ''").Count(&clear))
 		if clear > 0 {
 			log.Printf("secrets: PROSPECTOR_SECRET_KEYS isn't set: single sign-on secrets kept as stored, which none can be changed from: %d", clear)
 		}
@@ -169,7 +170,7 @@ func (s *Store) ResealAtStart() {
 	// An API key can't be moved until it is next shown, so an old key that is removed
 	// first takes with it whichever haven't been used since.
 	var hashes []string
-	_ = logged(s.DB.Model(&APIKey{}).Where("revoked_at is null").Pluck("hash", &hashes))
+	_ = store.Logged(s.DB.Model(&store.APIKey{}).Where("revoked_at is null").Pluck("hash", &hashes))
 	waiting := 0
 	for _, h := range hashes {
 		if s.Keyring.LookupBehind(h) {

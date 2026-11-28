@@ -19,6 +19,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // An agent is told what it got wrong in the store's words, and nothing of the database's.
@@ -59,7 +60,7 @@ func TestALostRaceForAnAddressReadsAsTaken(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	mustOrg(t, s, "alpha")
-	clash := s.DB.Create(&Org{Slug: "alpha", Name: "Alpha", Color: "#56c5f4"}).Error
+	clash := s.DB.Create(&store.Org{Slug: "alpha", Name: "Alpha", Color: "#56c5f4"}).Error
 	if !identity.Unstorable(clash) {
 		t.Fatalf("the index on an organisation's slug answered: %v", clash)
 	}
@@ -80,7 +81,7 @@ func TestNoRawDatabaseErrorsGoOut(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	mustOrg(t, s, "alpha")
-	clash := s.DB.Create(&Org{Slug: "alpha", Name: "Alpha", Color: "#56c5f4"}).Error
+	clash := s.DB.Create(&store.Org{Slug: "alpha", Name: "Alpha", Color: "#56c5f4"}).Error
 	if clash == nil {
 		t.Fatal("a second organisation took a slug already in use")
 	}
@@ -188,7 +189,7 @@ func TestAnAPIErrorSaysWhoseFaultItIs(t *testing.T) {
 	}
 
 	// The database failing is the server's fault, and its own words stay in the log.
-	if err := s.DB.Migrator().DropTable(&Fact{}); err != nil {
+	if err := s.DB.Migrator().DropTable(&store.Fact{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, p := ask(writer, "POST", "companies", `{"name":"Larkmoor"}`); p.Status != 0 {
@@ -207,15 +208,15 @@ func TestStatusOf(t *testing.T) {
 		code int
 	}{
 		{errors.New("a fact needs a field and a value"), 400},
-		{noSuch("no contact %d", 7), 404},
-		{fmt.Errorf("reading it: %w", noSuch("no task 3")), 404},
-		{errErased, 409},
+		{store.NoSuch("no contact %d", 7), 404},
+		{fmt.Errorf("reading it: %w", store.NoSuch("no task 3")), 404},
+		{store.ErrErased, 409},
 		{context.DeadlineExceeded, 500},
 		{fmt.Errorf("query: %w", context.Canceled), 500},
-		{missing(gorm.ErrRecordNotFound, "no task %d", 3), 404},
+		{store.Missing(gorm.ErrRecordNotFound, "no task %d", 3), 404},
 		// A look-up that failed says nothing about whether the thing is there.
-		{missing(context.DeadlineExceeded, "no task %d", 3), 500},
-		{missing(&pgconn.PgError{Code: "08006"}, "no task %d", 3), 500},
+		{store.Missing(context.DeadlineExceeded, "no task %d", 3), 500},
+		{store.Missing(&pgconn.PgError{Code: "08006"}, "no task %d", 3), 500},
 		// A character Postgres won't store is the caller's to take out.
 		{&pgconn.PgError{Code: "22021"}, 400},
 		{&pgconn.PgError{Code: "23505"}, 409},
@@ -241,7 +242,7 @@ func TestALostConnectionIsTheServersFailure(t *testing.T) {
 			tx.AddError(lostMidway())
 		}
 	})
-	var none []Contact
+	var none []store.Contact
 	down = true
 	err := s.DB.Find(&none).Error
 	if code, text := telling("test", fmt.Errorf("saving it: %w", err), http.StatusBadRequest); code != http.StatusInternalServerError || text.Error() != sayOurs {

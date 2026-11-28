@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/shutthegoatup/prospector/internal/signing"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 const (
@@ -29,8 +30,8 @@ const (
 
 // recordAgreementEvent adds an event after the last one on its agreement, inside the
 // transaction that made it happen.
-func recordAgreementEvent(tx *gorm.DB, e AgreementEvent) (*AgreementEvent, error) {
-	var last AgreementEvent
+func recordAgreementEvent(tx *gorm.DB, e store.AgreementEvent) (*store.AgreementEvent, error) {
+	var last store.AgreementEvent
 	err := tx.Where("org_id = ? and agreement_id = ?", e.OrgID, e.AgreementID).Order("id desc").Limit(1).Find(&last).Error
 	if err != nil {
 		return nil, err

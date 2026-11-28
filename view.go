@@ -14,6 +14,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // Steps are Today's filters, in the order the chips show.
@@ -61,7 +62,7 @@ var weekdays = map[string]*say.Text{
 }
 
 type Card struct {
-	Contact
+	store.Contact
 	Name, Title, Status, Number, About, Tel, Text, Copy string
 	State                                               string
 	People                                              []privacy.Person
@@ -96,8 +97,8 @@ func titleOf(people []privacy.Person, name string) string {
 }
 
 // forPerson re-addresses every message to whoever is chosen in "Send to".
-func forPerson(c Contact, people []privacy.Person) Contact {
-	to, first := deref(c.SendTo), deref(c.First)
+func forPerson(c store.Contact, people []privacy.Person) store.Contact {
+	to, first := store.Deref(c.SendTo), store.Deref(c.First)
 	if to == "" || first == "" {
 		return c
 	}
@@ -115,7 +116,7 @@ func forPerson(c Contact, people []privacy.Person) Contact {
 		if p == nil {
 			return nil
 		}
-		return str(word.ReplaceAllLiteralString(*p, toFirst))
+		return store.Str(word.ReplaceAllLiteralString(*p, toFirst))
 	}
 	c.First, c.Note, c.Body, c.Followup = &toFirst, swap(c.Note), swap(c.Body), swap(c.Followup)
 	return c
@@ -155,10 +156,10 @@ func localTime(tz string, now time.Time) *Local {
 	return &Local{Text: say.Errorf("%s %s in %s: %s", weekdays[day], t.Format("15:04"), city, why), State: state}
 }
 
-func badges(c Contact, name string, now time.Time, noMail map[string]bool) []Badge {
+func badges(c store.Contact, name string, now time.Time, noMail map[string]bool) []Badge {
 	var b []Badge
-	phone := deref(c.Phone)
-	if l := localTime(deref(c.Tz), now); l != nil {
+	phone := store.Deref(c.Phone)
+	if l := localTime(store.Deref(c.Tz), now); l != nil {
 		b = append(b, Badge{l.Text, l.State})
 	} else {
 		b = append(b, Badge{say.New("Time zone unknown: set it below"), "warn"})
@@ -172,36 +173,36 @@ func badges(c Contact, name string, now time.Time, noMail map[string]bool) []Bad
 	if pressLine.MatchString(phone) && !directLine.MatchString(phone) {
 		b = append(b, Badge{say.New("Press line: ask who to speak to, don't pitch"), "warn"})
 	}
-	if strings.Contains(deref(c.Flags), "INFERRED") {
+	if strings.Contains(store.Deref(c.Flags), "INFERRED") {
 		b = append(b, Badge{say.New("Email may be a guess: verify"), "warn"})
 	}
-	if dead := deadAddress(deref(c.Email), noMail); dead != "" {
+	if dead := deadAddress(store.Deref(c.Email), noMail); dead != "" {
 		b = append(b, Badge{say.Errorf("%s takes no mail: find another address", dead[strings.IndexByte(dead, '@')+1:]), "warn"})
 	}
-	if role := roleAddress(deref(c.Email)); role != "" && !strings.HasPrefix(c.Key, "org:") {
+	if role := roleAddress(store.Deref(c.Email)); role != "" && !strings.HasPrefix(c.Key, "org:") {
 		b = append(b, Badge{say.Errorf("%s is a shared inbox: ask for %s's own", role, name), ""})
 	}
 	if phoneLooksWrong(phone) {
 		b = append(b, Badge{say.New("Phone number isn't one any country uses: check it"), "warn"})
 	}
-	if deref(c.Email) == "" {
+	if store.Deref(c.Email) == "" {
 		b = append(b, Badge{say.New("No email on file"), ""})
 	}
 	return b
 }
 
-func callScript(c Contact, name string, v request.Voice) []Line {
-	maker := strings.TrimSpace(afterDot.ReplaceAllString(parenthesis.ReplaceAllString(deref(c.Maker), " "), ""))
+func callScript(c store.Contact, name string, v request.Voice) []Line {
+	maker := strings.TrimSpace(afterDot.ReplaceAllString(parenthesis.ReplaceAllString(store.Deref(c.Maker), " "), ""))
 	said := ""
-	if parts := strings.Split(deref(c.Note), "\n\n"); len(parts) > 1 {
+	if parts := strings.Split(store.Deref(c.Note), "\n\n"); len(parts) > 1 {
 		said = parts[1]
 		if r, size := utf8.DecodeRuneInString(said); size > 0 {
 			said = string(unicode.ToUpper(r)) + said[size:]
 		}
 	}
-	first := deref(c.First)
+	first := store.Deref(c.First)
 	var lines []Line
-	if switchboard.MatchString(deref(c.Phone)) || pressLine.MatchString(deref(c.Phone)) {
+	if switchboard.MatchString(store.Deref(c.Phone)) || pressLine.MatchString(store.Deref(c.Phone)) {
 		lines = append(lines, Line{say.New("If someone else answers"),
 			say.Errorf("Hi, could I speak to %s, please? It's %s from %s.", name, v.CallerFull(), v.Org)})
 	}
@@ -225,7 +226,7 @@ func callScript(c Contact, name string, v request.Voice) []Line {
 	)
 }
 
-func status(c Contact) string {
+func status(c store.Contact) string {
 	var parts []string
 	for _, p := range []struct {
 		label string
@@ -245,27 +246,27 @@ func status(c Contact) string {
 var stateRank = map[string]int{"ok": 0, "warn": 1, "stop": 2}
 
 // MakeCard turns one contact due at one step into what the page shows.
-func MakeCard(step string, raw Contact, v request.Voice, now time.Time, noMail map[string]bool) Card {
-	people := privacy.Alternates(deref(raw.Person))
+func MakeCard(step string, raw store.Contact, v request.Voice, now time.Time, noMail map[string]bool) Card {
+	people := privacy.Alternates(store.Deref(raw.Person))
 	c := forPerson(raw, people)
-	name := displayName(c)
+	name := store.DisplayName(c)
 	title := titleOf(people, name)
 	if title == "" {
 		title = c.Title
 	}
 	card := Card{Contact: c, Step: step, Name: name, Title: title, People: people,
 		Badges: badges(c, name, now, noMail), Held: c.Hold != nil, Status: status(c)}
-	if l := localTime(deref(c.Tz), now); l != nil {
+	if l := localTime(store.Deref(c.Tz), now); l != nil {
 		card.State = l.State
 	}
-	for _, u := range strings.Split(deref(c.Sources), "\n") {
+	for _, u := range strings.Split(store.Deref(c.Sources), "\n") {
 		if u != "" {
 			card.SourceList = append(card.SourceList, u)
 		}
 	}
 	switch step {
 	case "call":
-		phone := deref(c.Phone)
+		phone := store.Deref(c.Phone)
 		card.Number = strings.TrimSpace(numberCut.Split(phone, 2)[0])
 		card.Tel = notTel.ReplaceAllString(card.Number, "")
 		if m := aboutRe.FindStringSubmatch(phone); m != nil {
@@ -273,16 +274,16 @@ func MakeCard(step string, raw Contact, v request.Voice, now time.Time, noMail m
 		}
 		card.Script = callScript(c, name, v)
 	case "email":
-		card.Text = deref(c.Body)
+		card.Text = store.Deref(c.Body)
 	case "followup":
-		card.Text = deref(c.Followup)
+		card.Text = store.Deref(c.Followup)
 	case "accepted":
-		card.Text = deref(c.Message)
+		card.Text = store.Deref(c.Message)
 		if card.Text == "" {
-			card.Text = deref(c.Body)
+			card.Text = store.Deref(c.Body)
 		}
 	case "linkedin":
-		card.Text = deref(c.Note)
+		card.Text = store.Deref(c.Note)
 	}
 	card.Copy = card.Text
 	if step == "email" || step == "followup" {
@@ -315,7 +316,7 @@ func todayRank(c Card) int {
 }
 
 // Today merges every step's queue into one list, with counts per step.
-func Today(byStep map[string][]Contact, v request.Voice, now time.Time, noMail map[string]bool) ([]Card, map[string]int) {
+func Today(byStep map[string][]store.Contact, v request.Voice, now time.Time, noMail map[string]bool) ([]Card, map[string]int) {
 	var cards []Card
 	counts := map[string]int{}
 	for _, s := range Steps {
@@ -347,20 +348,20 @@ func safeHref(u string) string {
 
 // profileHref is where "Open + copy" goes: the stored profile, or a people search for
 // someone added without one.
-func profileHref(c Contact) string {
-	if u := safeHref(deref(c.Linkedin)); u != "#" {
+func profileHref(c store.Contact) string {
+	if u := safeHref(store.Deref(c.Linkedin)); u != "#" {
 		return u
 	}
-	name := strings.SplitN(deref(c.Person), ",", 2)[0]
-	words := strings.Join(strings.Fields(name+" "+deref(c.Maker)), " ")
+	name := strings.SplitN(store.Deref(c.Person), ",", 2)[0]
+	words := strings.Join(strings.Fields(name+" "+store.Deref(c.Maker)), " ")
 	if words == "" {
 		return "#"
 	}
 	return "https://www.linkedin.com/search/results/people/?keywords=" + strings.ReplaceAll(url.QueryEscape(words), "+", "%20")
 }
 
-func openLabel(c Contact) *say.Text {
-	if safeHref(deref(c.Linkedin)) == "#" {
+func openLabel(c store.Contact) *say.Text {
+	if safeHref(store.Deref(c.Linkedin)) == "#" {
 		return say.New("Search + copy")
 	}
 	return say.New("Open + copy")

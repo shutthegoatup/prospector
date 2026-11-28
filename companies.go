@@ -3,10 +3,12 @@ package main
 import (
 	"regexp"
 	"strings"
+
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // NeedsNextStep is a live conversation with no next step, or one that's due.
-func NeedsNextStep(c Contact, day string) bool {
+func NeedsNextStep(c store.Contact, day string) bool {
 	if c.Stage == "won" || c.Stage == "lost" {
 		return false
 	}

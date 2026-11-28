@@ -11,6 +11,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestExportPerson(t *testing.T) {
@@ -23,26 +24,26 @@ func TestExportPerson(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, org := range []*Org{o, other} {
+	for _, org := range []*store.Org{o, other} {
 		if _, err := s.Import(org.ID, readFixtures(t)); err != nil {
 			t.Fatal(err)
 		}
 	}
 	hannah := must(s.FindOne(o.ID, "Hannah"))
-	colleague := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Nia Okafor", Company: deref(hannah.Maker), Email: "nia.okafor@larkmoor.example"}, "ada"))
+	colleague := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Nia Okafor", Company: store.Deref(hannah.Maker), Email: "nia.okafor@larkmoor.example"}, "ada"))
 	do(s.Update(o.ID, colleague.ID, "call_notes", "asked for a callback in spring", "ada"))
 	do(s.Update(o.ID, hannah.ID, "phone", "+44 20 7946 0000", "ada"))
 	do(s.Update(o.ID, hannah.ID, "call_notes", "prefers mornings, has a dog called Biscuit", "ada"))
-	do(s.AgentMark(o.ID, Actor{Name: "agent:scout"}, research.MarkIn{ContactID: hannah.ID, Step: "replied", Date: "2020-01-02", Note: "she wrote back from her own gmail"}))
+	do(s.AgentMark(o.ID, store.Actor{Name: "agent:scout"}, research.MarkIn{ContactID: hannah.ID, Step: "replied", Date: "2020-01-02", Note: "she wrote back from her own gmail"}))
 	do(s.Update(o.ID, hannah.ID, "stage", "meeting", "ada"))
-	do(s.DB.Create(&Fact{OrgID: o.ID, CompanyID: *hannah.CompanyID, ContactID: &hannah.ID, Field: "role", Value: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}).Error)
-	do(s.DB.Create(&[]Enquiry{
+	do(s.DB.Create(&store.Fact{OrgID: o.ID, CompanyID: *hannah.CompanyID, ContactID: &hannah.ID, Field: "role", Value: "Head of Marketing", SourceURL: "https://larkmoor.example/team"}).Error)
+	do(s.DB.Create(&[]store.Enquiry{
 		{OrgID: o.ID, Name: "Hannah Pryce", Email: hannahEmail, Message: "Could you send pricing?", ContactID: &hannah.ID},
 		{OrgID: o.ID, Name: "H. Pryce", Email: hannahEmail, Message: "Following up on pricing"},
 		{OrgID: o.ID, Name: "Nia Okafor", Email: "nia.okafor@larkmoor.example", Message: "Please ring the front desk", ContactID: &colleague.ID},
 		{OrgID: other.ID, Name: "Hannah Pryce", Email: hannahEmail, Message: "A note to the other organisation"},
 	}).Error)
-	var placeholder Contact
+	var placeholder store.Contact
 	do(s.InOrg(o.ID).Where("key like 'org:%'").First(&placeholder).Error)
 	theirs := must(s.FindOne(other.ID, "Hannah"))
 
@@ -82,7 +83,7 @@ func TestExportPerson(t *testing.T) {
 		}
 	}
 	var early int64
-	s.InOrg(o.ID).Model(&Event{}).Where("action = ?", "export").Count(&early)
+	s.InOrg(o.ID).Model(&store.Event{}).Where("action = ?", "export").Count(&early)
 	if early != 0 {
 		t.Fatalf("%d refused exports were written into the history", early)
 	}
@@ -100,8 +101,8 @@ func TestExportPerson(t *testing.T) {
 	}
 	var out privacy.PersonExport
 	do(json.Unmarshal([]byte(body), &out))
-	if deref(out.Person.Email) != hannahEmail || deref(out.Person.Phone) != "+44 20 7946 0000" || out.Person.Stage != "meeting" ||
-		!strings.Contains(deref(out.Person.CallNotes), "Biscuit") || deref(out.Person.Note) == "" {
+	if store.Deref(out.Person.Email) != hannahEmail || store.Deref(out.Person.Phone) != "+44 20 7946 0000" || out.Person.Stage != "meeting" ||
+		!strings.Contains(store.Deref(out.Person.CallNotes), "Biscuit") || store.Deref(out.Person.Note) == "" {
 		t.Fatalf("the export is missing her details: %+v", out.Person)
 	}
 	if out.Company == "" || out.Note != "" {
@@ -130,7 +131,7 @@ func TestExportPerson(t *testing.T) {
 		}
 	}
 
-	var noted []Event
+	var noted []store.Event
 	do(s.InOrg(o.ID).Where("action = ?", "export").Find(&noted).Error)
 	if len(noted) != 1 || noted[0].ContactID != hannah.ID || noted[0].Value != nil || noted[0].User == "" {
 		t.Fatalf("the history should note one export of her, by name and with no details: %+v", noted)
@@ -139,7 +140,7 @@ func TestExportPerson(t *testing.T) {
 		t.Fatalf("the company's history doesn't show that she was exported: %s", history)
 	}
 
-	row := Contact{OrgID: o.ID, Key: "pair", File: "test", Person: str("Jonas Weber, CMO; Ines Duarte, Head of Digital")}
+	row := store.Contact{OrgID: o.ID, Key: "pair", File: "test", Person: store.Str("Jonas Weber, CMO; Ines Duarte, Head of Digital")}
 	do(s.DB.Create(&row).Error)
 	both := must(s.ExportPerson(o.ID, row.ID, "ada"))
 	if both.Note == "" {

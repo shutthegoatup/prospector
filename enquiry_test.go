@@ -11,12 +11,13 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
 const formSite = "https://www.shop.example"
 
-func takeEnquiriesFrom(t *testing.T, s *Store, o *Org, sites string) {
+func takeEnquiriesFrom(t *testing.T, s *Store, o *store.Org, sites string) {
 	t.Helper()
 	o.Settings.EnquirySites = sites
 	if err := s.SaveOrg(o); err != nil {
@@ -168,7 +169,7 @@ func TestEnquiryFindsWhoSentIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	added, err := s.AgentAddCompany(o.ID, Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Reef Boats", Domain: "reef.example"})
+	added, err := s.AgentAddCompany(o.ID, store.Actor{Name: "agent:bot"}, research.AddCompanyIn{Name: "Reef Boats", Domain: "reef.example"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +183,7 @@ func TestEnquiryFindsWhoSentIt(t *testing.T) {
 			t.Fatalf("%s: %d", in.Email, res.StatusCode)
 		}
 	}
-	by := map[string]Enquiry{}
+	by := map[string]store.Enquiry{}
 	rows, _ := firstOf(s.Enquiries(o.ID, tickets.EnquiryFilter{}, 1))
 	for _, e := range rows {
 		by[e.Email] = e
@@ -208,7 +209,7 @@ func TestEnquiryFindsWhoSentIt(t *testing.T) {
 	if _, err := s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Email: "hannah@quay.example", Message: "An older note"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DB.Model(&Enquiry{}).Where("message = ?", "An older note").Update("contact_id", nil).Error; err != nil {
+	if err := s.DB.Model(&store.Enquiry{}).Where("message = ?", "An older note").Update("contact_id", nil).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := s.ErasePerson(o.ID, known.ID, "Ada Lovelace"); err != nil {

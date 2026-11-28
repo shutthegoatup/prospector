@@ -5,6 +5,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // TestTheDetailsCountIsTheDetailsList: the count is worked out without reading what
@@ -14,7 +15,7 @@ func TestTheDetailsCountIsTheDetailsList(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
+	scout, second := store.Actor{Name: "agent:scout", KeyID: 1}, store.Actor{Name: "agent:second", KeyID: 2}
 	for _, name := range []string{"Larkmoor Yachts", "Windrush Marine", "Quay Boats"} {
 		must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: name}))
 		must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: name, Name: "Hannah " + name, Phone: "+44 20 7946 0000", SourceURL: "https://example.example/team"}))

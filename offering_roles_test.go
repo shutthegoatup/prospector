@@ -12,11 +12,12 @@ import (
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
-func verdictFor(t *testing.T, s *Store, org, offering, company int64) Verdict {
+func verdictFor(t *testing.T, s *Store, org, offering, company int64) store.Verdict {
 	t.Helper()
-	var v Verdict
+	var v store.Verdict
 	if err := s.InOrg(org).Where("offering_id = ? and company_id = ?", offering, company).First(&v).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -30,10 +31,10 @@ func TestEachRoleAtACompanyIsPursuedOrJunkedOnItsOwn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	roles := must(s.AddOffering(o.ID, Offering{Name: "Contract roles", HasRoles: true}, "Ada"))
-	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO"}, "Ada"))
+	roles := must(s.AddOffering(o.ID, store.Offering{Name: "Contract roles", HasRoles: true}, "Ada"))
+	cto := must(s.AddOffering(o.ID, store.Offering{Name: "Interim CTO"}, "Ada"))
 	task := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find contract roles", "Ada"))
-	scout := Actor{Name: "agent:scout", KeyID: 3}
+	scout := store.Actor{Name: "agent:scout", KeyID: 3}
 	north := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Northwind Payments", Domain: "northwind.example", Task: task.ID}))
 	lead := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: task.ID, RoleIn: research.RoleIn{
 		Title: "Lead platform engineer (contract, 6 months)", SourceURL: "https://northwind.example/jobs/1", Details: "£700/day, outside IR35"}}))
@@ -88,7 +89,7 @@ func TestEachRoleAtACompanyIsPursuedOrJunkedOnItsOwn(t *testing.T) {
 	}
 	_, err = s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: task.ID, RoleIn: research.RoleIn{
 		Title: "Platform engineer (contract)", SourceURL: "https://northwind.example/jobs/2"}})
-	var refused conflict
+	var refused store.Conflict
 	if !errors.As(err, &refused) || !strings.Contains(err.Error(), "Inside IR35 after all") {
 		t.Fatalf("a junked role added again should be refused with why: %v", err)
 	}
@@ -128,8 +129,8 @@ func TestANewRoleAtACompanyRuledOutIsANewFindForTheTask(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	roles := must(s.AddOffering(o.ID, Offering{Name: "Contract roles", HasRoles: true}, "Ada"))
-	scout := Actor{Name: "agent:scout"}
+	roles := must(s.AddOffering(o.ID, store.Offering{Name: "Contract roles", HasRoles: true}, "Ada"))
+	scout := store.Actor{Name: "agent:scout"}
 	first := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find contract roles", "Ada"))
 	north := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Northwind Payments", Task: first.ID}))
 	old := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: first.ID, RoleIn: research.RoleIn{
@@ -140,7 +141,7 @@ func TestANewRoleAtACompanyRuledOutIsANewFindForTheTask(t *testing.T) {
 	}
 
 	next := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find more contract roles", "Ada"))
-	brief := must(s.AgentTask(o.ID, Actor{Name: "agent:scout", ReadOnly: true}, next.ID, paging.Page{}))
+	brief := must(s.AgentTask(o.ID, store.Actor{Name: "agent:scout", ReadOnly: true}, next.ID, paging.Page{}))
 	if brief.Offering == nil || !brief.Offering.HasRoles || !strings.Contains(brief.Offering.Guidance, "add_role") ||
 		strings.Contains(brief.Offering.Guidance, "skip one rejected") {
 		t.Fatalf("an agent on a task for an offering with roles should be told to add each role: %+v", brief.Offering)
@@ -157,22 +158,22 @@ func TestRolesAreKeptOnlyForAnOfferingThatHasThem(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO"}, "Ada"))
-	north := must(s.AgentAddCompany(o.ID, Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Northwind Payments"}))
+	cto := must(s.AddOffering(o.ID, store.Offering{Name: "Interim CTO"}, "Ada"))
+	north := must(s.AgentAddCompany(o.ID, store.Actor{Name: "agent:scout"}, research.AddCompanyIn{Name: "Northwind Payments"}))
 	role := research.RoleIn{Title: "Interim CTO, 6 months"}
 	for _, offering := range []int64{0, cto.ID} {
-		var refused conflict
+		var refused store.Conflict
 		if _, err := s.AddRole(o.ID, offering, north.ID, role, "Ada"); !errors.As(err, &refused) {
 			t.Fatalf("a role for offering %d, which has none: %v", offering, err)
 		}
 	}
 	own := must(s.CreateTask(o.ID, "", "Find clients", "Ada"))
-	if _, err := s.AgentAddRole(o.ID, Actor{Name: "agent:scout"}, research.AddRoleIn{Company: "Northwind Payments", Task: own.ID,
+	if _, err := s.AgentAddRole(o.ID, store.Actor{Name: "agent:scout"}, research.AddRoleIn{Company: "Northwind Payments", Task: own.ID,
 		RoleIn: research.RoleIn{Title: "Platform engineer", SourceURL: "https://northwind.example/jobs/2"}}); err == nil {
 		t.Fatal("add_role on a task for the organisation's own")
 	}
 
-	must(s.ChangeOffering(o.ID, cto.ID, func(o *Offering) { o.HasRoles = true }, "Ada"))
+	must(s.ChangeOffering(o.ID, cto.ID, func(o *store.Offering) { o.HasRoles = true }, "Ada"))
 	if _, err := s.AddRole(o.ID, cto.ID, north.ID, research.RoleIn{Title: "x", SourceURL: "not a link"}, "Ada"); err == nil {
 		t.Fatal("a role whose posting isn't a link")
 	}
@@ -183,8 +184,8 @@ func TestRolesAreKeptOnlyForAnOfferingThatHasThem(t *testing.T) {
 	if v := verdictFor(t, s, o.ID, cto.ID, north.ID); v.Stage != prospecting.CompanyReview {
 		t.Fatalf("a role added by a person should put the company up for review for the offering: %+v", v)
 	}
-	var kept conflict
-	if _, err := s.ChangeOffering(o.ID, cto.ID, func(o *Offering) { o.HasRoles = false }, "Ada"); !errors.As(err, &kept) {
+	var kept store.Conflict
+	if _, err := s.ChangeOffering(o.ID, cto.ID, func(o *store.Offering) { o.HasRoles = false }, "Ada"); !errors.As(err, &kept) {
 		t.Fatalf("turning roles off while it has some: %v", err)
 	}
 	beta := mustOrg(t, s, "beta")
@@ -211,8 +212,8 @@ func TestANewRoleAtACompanyAlreadyPursuedWaitsForReview(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	roles := must(s.AddOffering(o.ID, Offering{Name: "Contract roles", HasRoles: true}, "Ada"))
-	scout := Actor{Name: "agent:scout"}
+	roles := must(s.AddOffering(o.ID, store.Offering{Name: "Contract roles", HasRoles: true}, "Ada"))
+	scout := store.Actor{Name: "agent:scout"}
 	first := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find contract roles", "Ada"))
 	north := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Northwind Payments", Task: first.ID}))
 	lead := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: first.ID, RoleIn: research.RoleIn{
@@ -249,8 +250,8 @@ func TestAVerdictThatFollowsRolesIsntSetByHand(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	roles := must(s.AddOffering(o.ID, Offering{Name: "Contract roles", HasRoles: true}, "Ada"))
-	scout := Actor{Name: "agent:scout"}
+	roles := must(s.AddOffering(o.ID, store.Offering{Name: "Contract roles", HasRoles: true}, "Ada"))
+	scout := store.Actor{Name: "agent:scout"}
 	task := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find contract roles", "Ada"))
 	north := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Northwind Payments", Task: task.ID}))
 	harbour := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Harbour Analytics", Task: task.ID}))
@@ -258,7 +259,7 @@ func TestAVerdictThatFollowsRolesIsntSetByHand(t *testing.T) {
 		Title: "Platform engineer (contract)", SourceURL: "https://northwind.example/jobs/2"}}))
 	must(s.JudgeRole(o.ID, junked.ID, research.RoleJunked, "Inside IR35", "Ada"))
 
-	var refused conflict
+	var refused store.Conflict
 	if err := s.JudgeCompany(o.ID, roles.ID, north.ID, prospecting.CompanyQualified, "", "", "Ada"); !errors.As(err, &refused) {
 		t.Fatalf("qualifying by hand a company whose roles decide: %v", err)
 	}

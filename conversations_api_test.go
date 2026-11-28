@@ -10,6 +10,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/onboarding"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // The React Conversations page reads the board, cards and all, from the API.
@@ -20,7 +21,7 @@ func TestTheBoardIsReadThroughTheAPI(t *testing.T) {
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	day := today()
+	day := store.Today()
 	hannah := repliedPerson(t, s, o, "Hannah Pryce")
 	for field, value := range map[string]string{"call_notes": "Wants a configurator by spring", "deal_amount": "14,000", "deal_owner": "Ada Lovelace", "stage": "won"} {
 		if err := s.Update(o.ID, hannah.ID, field, value, "Ada Lovelace"); err != nil {

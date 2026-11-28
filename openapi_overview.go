@@ -10,6 +10,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/sales"
 	"github.com/shutthegoatup/prospector/internal/signing"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // GetCompanyOverview reads what the company page reads, with the same calls.
@@ -18,7 +19,7 @@ func (s apiServer) GetCompanyOverview(ctx context.Context, in api.GetCompanyOver
 	org := q.Org.ID
 	c, err := st.CompanyByID(org, in.Id)
 	if err != nil {
-		return nil, missing(err, "no company %d", in.Id)
+		return nil, store.Missing(err, "no company %d", in.Id)
 	}
 	facts, err := st.Facts(org, c.ID)
 	if err != nil {
@@ -40,7 +41,7 @@ func (s apiServer) GetCompanyOverview(ctx context.Context, in api.GetCompanyOver
 	if err != nil {
 		return nil, err
 	}
-	day := today()
+	day := store.Today()
 	subs, err := st.Subscriptions(org, c.ID, day)
 	if err != nil {
 		return nil, err
@@ -61,9 +62,9 @@ func (s apiServer) GetCompanyOverview(ctx context.Context, in api.GetCompanyOver
 		out.Facts = append(out.Facts, factOut(f))
 	}
 	for _, p := range people {
-		person := api.CompanyPerson{Id: p.ID, Name: displayName(p), Title: p.Title, Linkedin: deref(p.Linkedin), Stage: research.ContactStage(p), Pending: []api.PendingDetail{}}
-		if len(privacy.Alternates(deref(p.Person))) > 1 {
-			person.Several = deref(p.Person)
+		person := api.CompanyPerson{Id: p.ID, Name: store.DisplayName(p), Title: p.Title, Linkedin: store.Deref(p.Linkedin), Stage: research.ContactStage(p), Pending: []api.PendingDetail{}}
+		if len(privacy.Alternates(store.Deref(p.Person))) > 1 {
+			person.Several = store.Deref(p.Person)
 		}
 		for _, d := range pending[p.ID] {
 			person.Pending = append(person.Pending, research.PendingOut(d))
@@ -79,7 +80,7 @@ func (s apiServer) GetCompanyOverview(ctx context.Context, in api.GetCompanyOver
 	return api.GetCompanyOverview200JSONResponse(out), nil
 }
 
-func factOut(f Fact) api.ResearchFact {
+func factOut(f store.Fact) api.ResearchFact {
 	return api.ResearchFact{Id: f.ID, Field: f.Field, Value: f.Value, SourceUrl: f.SourceURL, Answer: research.FactAnswerOut(f.Answer), Inferred: f.Inferred, By: f.Actor, At: f.CreatedAt}
 }
 

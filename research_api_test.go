@@ -10,12 +10,13 @@ import (
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestARobotAddsPeopleAndReviewsResearchAsItsScopesAllow(t *testing.T) {
 	t.Parallel()
 	s, o, srv, _ := signedIn(t)
-	key := func(name string, scopes ...string) (string, *APIKey) {
+	key := func(name string, scopes ...string) (string, *store.APIKey) {
 		secret, k, err := s.CreateKey(o.ID, name, scopes, "Ada Lovelace")
 		if err != nil {
 			t.Fatal(err)
@@ -26,7 +27,7 @@ func TestARobotAddsPeopleAndReviewsResearchAsItsScopesAllow(t *testing.T) {
 	contacts, _ := key("assistant", "contacts:write")
 	reviewer, _ := key("reviewer", "research:review")
 	scoutKey, scoutRow := key("scout", "research:write")
-	scout := Actor{Name: "agent:scout", KeyID: scoutRow.ID}
+	scout := store.Actor{Name: "agent:scout", KeyID: scoutRow.ID}
 	base := srv.URL + "/o/alpha/api/v1/"
 
 	// Adding someone yourself.
@@ -45,22 +46,22 @@ func TestARobotAddsPeopleAndReviewsResearchAsItsScopesAllow(t *testing.T) {
 	if code, body := asKey(t, "PATCH", contact, contacts, map[string]any{"phone": "+44 20 7946 0000", "call_notes": "Rang, left a message."}); code != http.StatusNoContent {
 		t.Fatalf("changing two details: %d %s", code, body)
 	}
-	c := row[Contact](t, s, o.ID, added.Id)
-	if deref(c.Phone) != "+44 20 7946 0000" || deref(c.CallNotes) != "Rang, left a message." || deref(c.Tz) == "" {
+	c := row[store.Contact](t, s, o.ID, added.Id)
+	if store.Deref(c.Phone) != "+44 20 7946 0000" || store.Deref(c.CallNotes) != "Rang, left a message." || store.Deref(c.Tz) == "" {
 		t.Fatalf("both details, and a time zone guessed from the phone: %+v", c)
 	}
 	if code, _ := asKey(t, "PATCH", contact, contacts, map[string]any{"call_notes": "Changed my mind.", "stage": "no such stage"}); code == http.StatusNoContent {
 		t.Fatal("a change with a bad field was taken")
 	}
-	if c := row[Contact](t, s, o.ID, added.Id); deref(c.CallNotes) != "Rang, left a message." {
-		t.Fatalf("a refused change still changed the other field: %q", deref(c.CallNotes))
+	if c := row[store.Contact](t, s, o.ID, added.Id); store.Deref(c.CallNotes) != "Rang, left a message." {
+		t.Fatalf("a refused change still changed the other field: %q", store.Deref(c.CallNotes))
 	}
 	// A time zone sent alongside a new phone is kept, not replaced by the phone's guess.
 	if code, body := asKey(t, "PATCH", contact, contacts, map[string]any{"phone": "+1 212 555 0100", "tz": "Europe/Lisbon"}); code != http.StatusNoContent {
 		t.Fatalf("a phone and a time zone together: %d %s", code, body)
 	}
-	if c := row[Contact](t, s, o.ID, added.Id); deref(c.Tz) != "Europe/Lisbon" {
-		t.Fatalf("the time zone sent should win over the phone's guess: %q", deref(c.Tz))
+	if c := row[store.Contact](t, s, o.ID, added.Id); store.Deref(c.Tz) != "Europe/Lisbon" {
+		t.Fatalf("the time zone sent should win over the phone's guess: %q", store.Deref(c.Tz))
 	}
 	if code, _ := asKey(t, "PATCH", contact, contacts, map[string]any{}); code != http.StatusBadRequest {
 		t.Fatalf("a change of nothing: %d", code)
@@ -80,7 +81,7 @@ func TestARobotAddsPeopleAndReviewsResearchAsItsScopesAllow(t *testing.T) {
 	if code, body := asKey(t, "PATCH", company, reviewer, map[string]any{"stage": "qualified", "fit": "Builds to order"}); code != http.StatusNoContent {
 		t.Fatalf("a reviewer qualifying a company: %d %s", code, body)
 	}
-	if got := row[Company](t, s, o.ID, co.ID); got.Stage != prospecting.CompanyQualified || got.Fit != "Builds to order" {
+	if got := row[store.Company](t, s, o.ID, co.ID); got.Stage != prospecting.CompanyQualified || got.Fit != "Builds to order" {
 		t.Fatalf("the company: %+v", got)
 	}
 	if code, _ := asKey(t, "PATCH", company, reviewer, map[string]any{"stage": "maybe"}); code != http.StatusBadRequest {
@@ -89,13 +90,13 @@ func TestARobotAddsPeopleAndReviewsResearchAsItsScopesAllow(t *testing.T) {
 	if code, body := asKey(t, "POST", fmt.Sprintf("%scontacts/%d/pick", base, suggested.ID), reviewer, nil); code != http.StatusNoContent {
 		t.Fatalf("a reviewer picking a suggested person: %d %s", code, body)
 	}
-	if got := row[Contact](t, s, o.ID, suggested.ID); got.Status != "" {
+	if got := row[store.Contact](t, s, o.ID, suggested.ID); got.Status != "" {
 		t.Fatalf("a picked person should leave Research: %+v", got)
 	}
 
 	// A detail found for someone already stored waits to be accepted.
 	must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Corvane Marine", Name: "Tom Ellery", Email: "tom@corvane.example", SourceURL: "https://corvane.example/team"}))
-	var pending []Suggestion
+	var pending []store.Suggestion
 	if err := s.DB.Where("org_id = ? and contact_id = ? and decision = ''", o.ID, suggested.ID).Find(&pending).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -109,8 +110,8 @@ func TestARobotAddsPeopleAndReviewsResearchAsItsScopesAllow(t *testing.T) {
 	if code, body := asKey(t, "PATCH", decide, reviewer, map[string]any{"decision": "accepted"}); code != http.StatusNoContent {
 		t.Fatalf("accepting it: %d %s", code, body)
 	}
-	if got := row[Contact](t, s, o.ID, suggested.ID); deref(got.Email) != "tom@corvane.example" {
-		t.Fatalf("an accepted address should be filled in: %q", deref(got.Email))
+	if got := row[store.Contact](t, s, o.ID, suggested.ID); store.Deref(got.Email) != "tom@corvane.example" {
+		t.Fatalf("an accepted address should be filled in: %q", store.Deref(got.Email))
 	}
 	if code, _ := asKey(t, "PATCH", decide, reviewer, map[string]any{"decision": "dismissed"}); code != http.StatusConflict {
 		t.Fatalf("deciding it twice: %d", code)

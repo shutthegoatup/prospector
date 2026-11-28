@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
@@ -70,7 +71,7 @@ const intakePattern = "/o/{org}/intake"
 // intakeOrigin answers for a site allowed to post this organisation's enquiries, and
 // refuses any other. A browser enforces it; anything else could claim an origin, which
 // is why the route can only add enquiries and is bounded by enquiryGuard.
-func (a *App) intakeOrigin(w http.ResponseWriter, r *http.Request) *Org {
+func (a *App) intakeOrigin(w http.ResponseWriter, r *http.Request) *store.Org {
 	origin := r.Header.Get("Origin")
 	org, err := a.s.OrgBySlug(r.PathValue("org"))
 	if err != nil || origin == "" || !org.Settings.TakesEnquiriesFrom(origin) {

@@ -28,6 +28,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestSafeNext(t *testing.T) {
@@ -264,9 +265,9 @@ func TestNeverContactCatchesMistakes(t *testing.T) {
 	if _, err := s.Import(o.ID, p); err == nil || !strings.Contains(err.Error(), p.Drafts[0].Key) {
 		t.Fatalf("an import with a never-contact address went through: %v", err)
 	}
-	var kept Contact
+	var kept store.Contact
 	s.InOrg(o.ID).Where("key = ?", p.Drafts[0].Key).First(&kept)
-	if deref(kept.Note) == "changed" {
+	if store.Deref(kept.Note) == "changed" {
 		t.Fatal("a refused import still wrote")
 	}
 }
@@ -433,7 +434,7 @@ func TestRemoveMember(t *testing.T) {
 	t.Parallel()
 	s, o, srv, ada := signedIn(t)
 	other := mustOrg(t, s, "beta")
-	join := func(email string, org *Org, role string) (*User, *http.Client) {
+	join := func(email string, org *store.Org, role string) (*store.User, *http.Client) {
 		t.Helper()
 		u, err := s.UserByEmail(email)
 		if err != nil {
@@ -518,7 +519,7 @@ func TestRemoveMember(t *testing.T) {
 		t.Fatal("an empty role was accepted")
 	}
 	var removals int64
-	s.InOrg(o.ID).Model(&Event{}).Where("action = ?", "member:remove").Count(&removals)
+	s.InOrg(o.ID).Model(&store.Event{}).Where("action = ?", "member:remove").Count(&removals)
 	if removals != 2 {
 		t.Fatalf("%d removals in the history, want 2", removals)
 	}
@@ -532,12 +533,12 @@ func TestNeverContactLeavesTheQueue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	email := deref(c.Email)
+	email := store.Deref(c.Email)
 	domain := email[strings.Index(email, "@")+1:]
 	now := time.Now()
 	queued := func(step, list string) bool {
 		t.Helper()
-		rows, err := s.Due(o.ID, step, now, OrgSettings{NeverContact: list})
+		rows, err := s.Due(o.ID, step, now, store.OrgSettings{NeverContact: list})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -599,7 +600,7 @@ func TestNeverContactLeavesTheQueue(t *testing.T) {
 	if _, body := call(t, client, "GET", srv.URL+"/o/alpha/api/v1/conversations", "", nil); !strings.Contains(body, "Hannah") {
 		t.Fatalf("a listed person who replied left Conversations: %s", body)
 	}
-	var back Contact
+	var back store.Contact
 	do(s.InOrg(o.ID).First(&back, c.ID).Error)
 	do(s.DB.Model(&back).Updates(map[string]any{"replied": nil, "stage": ""}).Error)
 	fresh, err := s.OrgByID(o.ID)
@@ -651,7 +652,7 @@ func TestNeverContactEntries(t *testing.T) {
 		{"other.example, larkmoor.example", email, "", true},
 		{"", email, profile, false},
 	} {
-		got := OrgSettings{NeverContact: c.entry}.Listed(c.email, c.link) != nil
+		got := store.OrgSettings{NeverContact: c.entry}.Listed(c.email, c.link) != nil
 		if got != c.listed {
 			t.Errorf("entry %q against %q %q: listed = %v, want %v", c.entry, c.email, c.link, got, c.listed)
 		}
@@ -667,13 +668,13 @@ func TestContentPolicy(t *testing.T) {
 	if _, _, err := s.CreateKey(o.ID, "bot", []string{"read"}, "test"); err != nil {
 		t.Fatal(err)
 	}
-	var company Company
+	var company store.Company
 	if err := s.InOrg(o.ID).First(&company).Error; err != nil {
 		t.Fatal(err)
 	}
 	// A task with work and a note on it, so those parts of the pages are rendered.
 	task := must(s.CreateTask(o.ID, "", `Makers with a "configurator" <script>alert(1)</script>`, "Ada Lovelace"))
-	bot := Actor{Name: "agent:bot", KeyID: 1}
+	bot := store.Actor{Name: "agent:bot", KeyID: 1}
 	must(s.AgentAddCompany(o.ID, bot, research.AddCompanyIn{Name: company.Name, Task: task.ID}))
 	must(s.AgentNote(o.ID, bot, research.NoteIn{Task: task.ID, Company: company.Name, Kind: "skipped", Text: `No builder, only a <img src=x onerror=alert(1)> brochure.`}))
 	res, err := http.Get(srv.URL + "/login")
@@ -720,7 +721,7 @@ func TestContentPolicy(t *testing.T) {
 	for _, page := range pages {
 		check(page, "<title>")
 	}
-	if err := s.DB.Model(&User{}).Where("email = ?", "ada@example.com").Update("must_change_password", true).Error; err != nil {
+	if err := s.DB.Model(&store.User{}).Where("email = ?", "ada@example.com").Update("must_change_password", true).Error; err != nil {
 		t.Fatal(err)
 	}
 	check("/password", `<div id="app"></div>`)
@@ -747,7 +748,7 @@ func TestOrgIsCreatedWithItsOwner(t *testing.T) {
 
 	// The owner's row can't be written (one is already there for the id the next
 	// organisation will get), so the organisation must not be left behind either.
-	if err := s.DB.Create(&Membership{OrgID: gamma.ID + 1, UserID: ada.ID, Role: "member"}).Error; err != nil {
+	if err := s.DB.Create(&store.Membership{OrgID: gamma.ID + 1, UserID: ada.ID, Role: "member"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	if o, err := s.CreateOrgWithOwner("delta", "Delta", ada); err == nil {
@@ -807,11 +808,11 @@ func TestHistoryNamesPeopleInFull(t *testing.T) {
 		{"cli", "sly@example.com", "sly@example.com"},
 		{"import", "sly@example.com", "sly@example.com"},
 	} {
-		if got := (&request.Req{User: &User{Name: c.name, Email: c.email}}).Actor(); got != c.want {
+		if got := (&request.Req{User: &store.User{Name: c.name, Email: c.email}}).Actor(); got != c.want {
 			t.Errorf("a person named %q is recorded as %q, want %q", c.name, got, c.want)
 		}
 	}
-	if got := (&request.Req{User: &User{Name: "Sam Reed"}, Key: &APIKey{Name: "claude"}}).Actor(); got != "agent:claude" {
+	if got := (&request.Req{User: &store.User{Name: "Sam Reed"}, Key: &store.APIKey{Name: "claude"}}).Actor(); got != "agent:claude" {
 		t.Errorf("a key is recorded as %q", got)
 	}
 

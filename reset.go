@@ -11,6 +11,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/mailer"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // mailSlots bounds the sends running at once; a request past that is dropped rather
@@ -93,7 +94,7 @@ func (a *App) sendReset(email, lang string) {
 // The organisation's own server carries it only for an account this request created.
 // Whoever runs that server reads the link, and for an account that was already here
 // the link would hand them someone else's account.
-func (a *App) invite(ctx context.Context, q *request.Req, u *User, created bool) (bool, error) {
+func (a *App) invite(ctx context.Context, q *request.Req, u *store.User, created bool) (bool, error) {
 	via, err := a.mail, error(nil)
 	if created {
 		via, err = a.MailFor(q.Org.ID)
@@ -157,7 +158,7 @@ func (a *App) saveMail(org int64, in mailIn) (cleared bool, err error) {
 	if in.Host == "" {
 		return true, a.s.DeleteOrgMail(org)
 	}
-	m := &OrgMail{OrgID: org, Host: in.Host, Port: in.Port, Username: strings.TrimSpace(in.Username), Sender: strings.TrimSpace(in.Sender)}
+	m := &store.OrgMail{OrgID: org, Host: in.Host, Port: in.Port, Username: strings.TrimSpace(in.Username), Sender: strings.TrimSpace(in.Sender)}
 	err = (mailer.Server{Host: m.Host, Port: m.Port, From: m.Sender}).Check()
 	// Only the operator may name this machine, where any port and no TLS are allowed.
 	if err == nil && mailer.Loopback(m.Host) {
@@ -193,7 +194,7 @@ func (a *App) testMail(ctx context.Context, q *request.Req) (string, error) {
 	err = a.deliver(ctx, *via, mailer.Message{To: q.User.Email, Subject: say.Errorf("Prospector can send mail for %s", q.Org.Name).In(lang),
 		Body: say.Errorf("This is the test %s asked for in Settings.\n\nIt was sent through %s as %s.\n", q.Actor(), via.Host, via.From).In(lang)})
 	if err != nil {
-		return "", notSent{Err: err}
+		return "", store.NotSent{Err: err}
 	}
 	return say.Errorf("Sent to %s through %s.", q.User.Email, via.Host).In(lang), nil
 }

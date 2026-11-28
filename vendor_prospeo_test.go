@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 const prospeoTestKey = "prospeo-test-key"
@@ -99,7 +101,7 @@ func TestProspeoFindsAMobileAnEmailAndAProfile(t *testing.T) {
 			t.Errorf("%s: %+v", r.Field, r)
 		}
 	}
-	var found []Suggestion
+	var found []store.Suggestion
 	s.DB.Where("contact_id = ?", nell.ID).Order("field").Find(&found)
 	got := map[string]string{}
 	for _, sg := range found {
@@ -165,7 +167,7 @@ func TestProspeoMissesFailuresAndMaskedFinds(t *testing.T) {
 		t.Errorf("an impossible number: %+v", out)
 	}
 	var n int64
-	s.DB.Model(&Suggestion{}).Count(&n)
+	s.DB.Model(&store.Suggestion{}).Count(&n)
 	if n != 0 {
 		t.Errorf("%d suggestions kept, want none", n)
 	}
@@ -192,7 +194,7 @@ func TestAVendorThatFindsNothingGivesWayToTheNext(t *testing.T) {
 	if _, out := enrich(t, client, api, nell.ID, "email"); out.Results[0] != (EnrichAsked{Field: "email", Vendor: "prospeo", Outcome: "suggested"}) {
 		t.Fatalf("asked: %+v", out)
 	}
-	var sg Suggestion
+	var sg store.Suggestion
 	s.DB.Where("contact_id = ?", nell.ID).First(&sg)
 	if sg.Vendor != "prospeo" || sg.EmailStatus != "guess" {
 		t.Errorf("the suggestion: %+v", sg)

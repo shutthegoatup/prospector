@@ -205,7 +205,7 @@ func parseSectioned(name, text, ownDomain string) []Draft {
 			d.Flags = strings.TrimSpace(f)
 		}
 		if strings.Contains(s.head, "HOLD") || holdFitRe.MatchString(row.fit) || strings.HasPrefix(first, "{") {
-			d.Hold = str("file")
+			d.Hold = store.Str("file")
 		}
 		d.Sources, d.Phone = evidence(s.body, ownDomain)
 		out = append(out, d)
@@ -284,7 +284,7 @@ func ReadRepo(repo, ownDomain string) (*ImportPayload, error) {
 			drafts = parseSectioned(name, string(b), ownDomain)
 		}
 		for _, d := range drafts {
-			d.Key = personKey(d.Person)
+			d.Key = store.PersonKey(d.Person)
 			if d.Key == "" {
 				d.Key = d.First + " @ " + d.Maker
 			}

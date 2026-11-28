@@ -14,6 +14,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/mailer"
 	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // link makes an unsubscribe link for an address, as a marketing mail will.
@@ -216,12 +217,12 @@ func TestErasureAndNeverContactKeepAnAddressUnmailed(t *testing.T) {
 		t.Fatal(err)
 	}
 	var left int64
-	for _, table := range []any{&Suppression{}, &UnsubscribeLink{}} {
+	for _, table := range []any{&store.Suppression{}, &store.UnsubscribeLink{}} {
 		if err := s.DB.Model(table).Where("address = ?", "hannah@larkmoor.example").Count(&left).Error; err != nil || left != 0 {
 			t.Errorf("erasing her left %d rows of %T with her address (%v)", left, table, err)
 		}
 	}
-	if err := s.Marketable(s.DB, o, "hannah@larkmoor.example", ""); err != errErased {
+	if err := s.Marketable(s.DB, o, "hannah@larkmoor.example", ""); err != store.ErrErased {
 		t.Errorf("an erased address is marketable: %v", err)
 	}
 
@@ -273,7 +274,7 @@ func TestTheListHoldsAtItsEdges(t *testing.T) {
 
 	// A member takes an address off just as the person unsubscribes: theirs stays.
 	added := must(s.Suppress(o.ID, "tom@larkmoor.example", "Ada Lovelace"))
-	if err := s.DB.Model(&Suppression{}).Where("id = ?", added.ID).Update("reason", marketing.SuppressUnsubscribed).Error; err != nil {
+	if err := s.DB.Model(&store.Suppression{}).Where("id = ?", added.ID).Update("reason", marketing.SuppressUnsubscribed).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Unsuppress(o.ID, added.ID, "Ada Lovelace"); err == nil {
@@ -294,7 +295,7 @@ func TestTheListHoldsAtItsEdges(t *testing.T) {
 
 	// Erasure and the person's export count the addresses erasure does.
 	jo := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Jo Marsh", Company: "Larkmoor Yachts", Email: "jo@larkmoor.example."}, "Ada Lovelace"))
-	if err := s.DB.Create(&Suggestion{OrgID: o.ID, ContactID: jo.ID, Field: "email", Value: "jo.marsh@larkmoor.example", SourceURL: "https://larkmoor.example/team"}).Error; err != nil {
+	if err := s.DB.Create(&store.Suggestion{OrgID: o.ID, ContactID: jo.ID, Field: "email", Value: "jo.marsh@larkmoor.example", SourceURL: "https://larkmoor.example/team"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	for _, address := range []string{"jo@larkmoor.example", "jo.marsh@larkmoor.example"} {
@@ -309,7 +310,7 @@ func TestTheListHoldsAtItsEdges(t *testing.T) {
 		t.Fatal(err)
 	}
 	var left int64
-	if err := s.DB.Model(&Suppression{}).Where("address like ?", "jo%").Count(&left).Error; err != nil || left != 0 {
+	if err := s.DB.Model(&store.Suppression{}).Where("address like ?", "jo%").Count(&left).Error; err != nil || left != 0 {
 		t.Errorf("erasing her left %d of her addresses on the list (%v)", left, err)
 	}
 

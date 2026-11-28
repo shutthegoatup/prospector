@@ -19,11 +19,12 @@ import (
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/signing"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // preparing starts a draft for Larkmoor with a two-page document, and gives what a
 // test of its signers needs.
-func preparing(t *testing.T) (s *Store, o *Org, base string, member *http.Client, a *Agreement, hannah, theo *Contact) {
+func preparing(t *testing.T) (s *Store, o *store.Org, base string, member *http.Client, a *store.Agreement, hannah, theo *store.Contact) {
 	t.Helper()
 	s, o, srv, member := signedIn(t)
 	hannah = must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
@@ -129,7 +130,7 @@ func TestFieldsLieOnTheDocumentForItsSigners(t *testing.T) {
 			t.Errorf("%s was kept: %s", why, out)
 		}
 	}
-	if code, out := put(field(signer.ID, 2, "signature", 0.1, 0.7, 0.35, 0.06), field(signer.ID, 2, "date", 0.1, 0.8, 0.2, 0.03)); code != http.StatusOK || len(items[AgreementField](t, out)) != 2 {
+	if code, out := put(field(signer.ID, 2, "signature", 0.1, 0.7, 0.35, 0.06), field(signer.ID, 2, "date", 0.1, 0.8, 0.2, 0.03)); code != http.StatusOK || len(items[store.AgreementField](t, out)) != 2 {
 		t.Fatalf("placing two fields: %d %s", code, out)
 	}
 	if missing := must(s.Readiness(o.ID, *must(s.Agreement(o.ID, a.ID)))); len(missing) != 0 {
@@ -172,10 +173,10 @@ func TestAnAgreementThatWentOutKeepsWhoItWentTo(t *testing.T) {
 	}
 	h := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
 	g := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, nil, &grace.ID, "Ada Lovelace"))
-	must(s.PutAgreementFields(o.ID, a.ID, []AgreementField{{RecipientID: h.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.1, W: 0.3, H: 0.05}}))
+	must(s.PutAgreementFields(o.ID, a.ID, []store.AgreementField{{RecipientID: h.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.1, W: 0.3, H: 0.05}}))
 	draft := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Still a draft", "Ada Lovelace"))
 	must(s.AddRecipient(o, draft.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
-	if err := s.DB.Model(&Agreement{}).Where("id = ?", a.ID).Update("status", "sent").Error; err != nil {
+	if err := s.DB.Model(&store.Agreement{}).Where("id = ?", a.ID).Update("status", "sent").Error; err != nil {
 		t.Fatal(err)
 	}
 
@@ -185,7 +186,7 @@ func TestAnAgreementThatWentOutKeepsWhoItWentTo(t *testing.T) {
 	if _, err := s.RemoveMember(o.ID, grace.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	var rows []AgreementRecipient
+	var rows []store.AgreementRecipient
 	if err := s.DB.Where("agreement_id = ?", a.ID).Order("id").Find(&rows).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +194,7 @@ func TestAnAgreementThatWentOutKeepsWhoItWentTo(t *testing.T) {
 		t.Errorf("who a sent agreement went to, after erasing and removing them: %+v", rows)
 	}
 	var fields int64
-	if err := s.DB.Model(&AgreementField{}).Where("agreement_id = ?", a.ID).Count(&fields).Error; err != nil || fields != 1 {
+	if err := s.DB.Model(&store.AgreementField{}).Where("agreement_id = ?", a.ID).Count(&fields).Error; err != nil || fields != 1 {
 		t.Errorf("the sent agreement's fields: %d (%v)", fields, err)
 	}
 	if left := must(s.AgreementRecipients(o.ID, draft.ID)); len(left) != 0 {
@@ -215,7 +216,7 @@ func TestAnOperationWithoutAKeyScopeRefusesKeys(t *testing.T) {
 	for _, sc := range identity.Scopes {
 		all = append(all, sc.Name)
 	}
-	ctx := context.WithValue(context.Background(), request.ReqKey{}, &request.Req{Key: &APIKey{Scopes: strings.Join(all, " ")}})
+	ctx := context.WithValue(context.Background(), request.ReqKey{}, &request.Req{Key: &store.APIKey{Scopes: strings.Join(all, " ")}})
 	w := httptest.NewRecorder()
 	if _, err := handler(ctx, w, httptest.NewRequest("POST", "/", nil), nil); err != nil {
 		t.Fatal(err)
@@ -235,7 +236,7 @@ func TestAnAgreementsRecipientsGoWithWhoTheyStandFor(t *testing.T) {
 	h := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
 	g := must(s.AddRecipient(o, a.ID, signing.RecipientSigner, nil, &grace.ID, "Ada Lovelace"))
 	must(s.AddRecipient(o, a.ID, signing.RecipientSigner, &theo.ID, nil, "Ada Lovelace"))
-	must(s.PutAgreementFields(o.ID, a.ID, []AgreementField{
+	must(s.PutAgreementFields(o.ID, a.ID, []store.AgreementField{
 		{RecipientID: h.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.1, W: 0.3, H: 0.05},
 		{RecipientID: g.ID, Page: 1, Kind: "signature", X: 0.5, Y: 0.1, W: 0.3, H: 0.05},
 	}))
@@ -263,7 +264,7 @@ func TestAnAgreementsRecipientsGoWithWhoTheyStandFor(t *testing.T) {
 		t.Fatal(err)
 	}
 	var n int64
-	if err := s.DB.Model(&AgreementRecipient{}).Count(&n).Error; err != nil || n != 0 {
+	if err := s.DB.Model(&store.AgreementRecipient{}).Count(&n).Error; err != nil || n != 0 {
 		t.Errorf("removing the draft left %d recipients (%v)", n, err)
 	}
 }
@@ -504,18 +505,18 @@ func TestAgreementsSavedBeforePagesWereCountedArePrepared(t *testing.T) {
 	legacy := must(s.AddAgreement(o.ID, *hannah.CompanyID, "Old agreement", "Ada Lovelace"))
 	scrap := []byte("%PDF-1.7 only its first bytes were ever checked")
 	sum := sha256.Sum256(scrap)
-	if err := s.DB.Create(&AgreementFile{AgreementID: legacy.ID, OrgID: o.ID, Data: scrap}).Error; err != nil {
+	if err := s.DB.Create(&store.AgreementFile{AgreementID: legacy.ID, OrgID: o.ID, Data: scrap}).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DB.Model(&Agreement{}).Where("id = ?", legacy.ID).Updates(map[string]any{"file_name": "old.pdf", "file_hash": hex.EncodeToString(sum[:])}).Error; err != nil {
+	if err := s.DB.Model(&store.Agreement{}).Where("id = ?", legacy.ID).Updates(map[string]any{"file_name": "old.pdf", "file_hash": hex.EncodeToString(sum[:])}).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := s.DB.Model(&Agreement{}).Where("org_id = ?", o.ID).Update("page_count", 0).Error; err != nil {
+	if err := s.DB.Model(&store.Agreement{}).Where("org_id = ?", o.ID).Update("page_count", 0).Error; err != nil {
 		t.Fatal(err)
 	}
 
 	r := must(s.AddRecipient(o, readable.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
-	if _, err := s.PutAgreementFields(o.ID, readable.ID, []AgreementField{{RecipientID: r.ID, Page: 2, Kind: "signature", X: 0.1, Y: 0.8, W: 0.3, H: 0.05}}); err != nil {
+	if _, err := s.PutAgreementFields(o.ID, readable.ID, []store.AgreementField{{RecipientID: r.ID, Page: 2, Kind: "signature", X: 0.1, Y: 0.8, W: 0.3, H: 0.05}}); err != nil {
 		t.Fatalf("placing a field on an agreement whose pages weren't counted: %v", err)
 	}
 	if a := must(s.Agreement(o.ID, readable.ID)); a.PageCount != 2 {
@@ -523,7 +524,7 @@ func TestAgreementsSavedBeforePagesWereCountedArePrepared(t *testing.T) {
 	}
 
 	l := must(s.AddRecipient(o, legacy.ID, signing.RecipientSigner, &hannah.ID, nil, "Ada Lovelace"))
-	field := []AgreementField{{RecipientID: l.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.8, W: 0.3, H: 0.05}}
+	field := []store.AgreementField{{RecipientID: l.ID, Page: 1, Kind: "signature", X: 0.1, Y: 0.8, W: 0.3, H: 0.05}}
 	if _, err := s.PutAgreementFields(o.ID, legacy.ID, field); err == nil || !strings.Contains(err.Error(), "can't be read") {
 		t.Errorf("fields on a document that can't be read: %v", err)
 	}

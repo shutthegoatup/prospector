@@ -22,6 +22,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/mailer"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 const sessionCookie = "session"
@@ -140,7 +141,7 @@ func publicURL(raw string) (string, error) {
 	return u.Scheme + "://" + u.Host, nil
 }
 
-func (a *App) session(r *http.Request) (*Session, *User) {
+func (a *App) session(r *http.Request) (*store.Session, *store.User) {
 	c, err := r.Cookie(sessionCookie)
 	if err != nil {
 		return nil, nil
@@ -152,7 +153,7 @@ func (a *App) session(r *http.Request) (*Session, *User) {
 	return sess, u
 }
 
-func (a *App) sessionUser(r *http.Request) *User {
+func (a *App) sessionUser(r *http.Request) *store.User {
 	_, u := a.session(r)
 	return u
 }
@@ -202,7 +203,7 @@ func (a *App) member(next http.HandlerFunc) http.HandlerFunc {
 		}
 		if slug := r.PathValue("org"); slug != "" {
 			org, err := a.s.OrgBySlug(slug)
-			var m *Membership
+			var m *store.Membership
 			if err == nil {
 				m, err = a.s.Membership(org.ID, u.ID)
 			}
@@ -411,7 +412,7 @@ func safeNext(next string) string {
 // passwordSignIn checks a password. wait is the seconds to hold off after too many
 // attempts; device is set when this browser is new to the account, so its own attempts
 // are counted apart from a stranger's.
-func (a *App) passwordSignIn(r *http.Request, email, password string) (token string, u *User, device *http.Cookie, wait int, err error) {
+func (a *App) passwordSignIn(r *http.Request, email, password string) (token string, u *store.User, device *http.Cookie, wait int, err error) {
 	select {
 	case hashSlots <- struct{}{}:
 		defer func() { <-hashSlots }()
@@ -445,7 +446,7 @@ func (a *App) passwordSignIn(r *http.Request, email, password string) (token str
 }
 
 // deviceCookie vouches for this browser to u's account.
-func (a *App) deviceCookie(r *http.Request, u *User) *http.Cookie {
+func (a *App) deviceCookie(r *http.Request, u *store.User) *http.Cookie {
 	return &http.Cookie{Name: deviceCookie, Value: newDeviceToken(u), Path: "/", HttpOnly: true, Secure: a.secure(r),
 		SameSite: http.SameSiteLaxMode, Expires: time.Now().Add(deviceLife)}
 }
@@ -506,7 +507,7 @@ const passwordChanged = "Password changed. Your other sessions are signed out."
 // passwordChange changes u's password, keeping the session r came with, and gives the
 // device cookie the new password vouches for. wait is the seconds to hold off when there
 // have been too many attempts.
-func (a *App) passwordChange(r *http.Request, u *User, current, next string) (device *http.Cookie, wait int, err error) {
+func (a *App) passwordChange(r *http.Request, u *store.User, current, next string) (device *http.Cookie, wait int, err error) {
 	keep := ""
 	if c, err := r.Cookie(sessionCookie); err == nil {
 		keep = c.Value

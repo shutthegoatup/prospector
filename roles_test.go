@@ -10,6 +10,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestChangingSomeonesRole(t *testing.T) {
@@ -168,7 +169,7 @@ func TestChangingAKeysScopes(t *testing.T) {
 	if s.DB.First(theirs, theirs.ID); theirs.Scopes != "read" {
 		t.Fatalf("another organisation's key now has %q", theirs.Scopes)
 	}
-	builtin := &APIKey{OrgID: o.ID, Name: "agent", Prefix: builtinPrefix, Hash: "builtin:test", Scopes: "read research:write"}
+	builtin := &store.APIKey{OrgID: o.ID, Name: "agent", Prefix: store.BuiltinPrefix, Hash: "builtin:test", Scopes: "read research:write"}
 	s.DB.Create(builtin)
 	if code, body := scopes(ada, builtin.ID, "read"); code != http.StatusBadRequest || !strings.Contains(body, "own agents") {
 		t.Fatalf("a built-in agent's key was changed here: %d %s", code, body)

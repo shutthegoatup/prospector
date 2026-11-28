@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // Postgres won't keep a NUL or bytes that aren't UTF-8, so neither reaches it: what a
@@ -38,7 +40,7 @@ func TestTextArrivesWithoutWhatPostgresWontKeep(t *testing.T) {
 	}
 	res.Body.Close()
 	var named int64
-	s.InOrg(o.ID).Model(&Company{}).Where("name = ?", "Quay Marine").Count(&named)
+	s.InOrg(o.ID).Model(&store.Company{}).Where("name = ?", "Quay Marine").Count(&named)
 	if res.StatusCode >= 300 || named != 1 {
 		t.Errorf("a key holder's company with a NUL, sent as application/x-json: %d, kept as named %d", res.StatusCode, named)
 	}

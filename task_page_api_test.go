@@ -10,6 +10,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // The tasks page lists closed tasks after the open ones when asked, and counts both, as
@@ -30,7 +31,7 @@ func TestTheTaskListTakesClosedTasksAfterTheOpenOnes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	must(s.AgentTask(o.ID, Actor{Name: "agent:scout", KeyID: k.ID}, ids[3], paging.Page{}))
+	must(s.AgentTask(o.ID, store.Actor{Name: "agent:scout", KeyID: k.ID}, ids[3], paging.Page{}))
 
 	type list struct {
 		Items []struct {
@@ -99,7 +100,7 @@ func TestATasksPageReadsItsPromptNotesAndWorkThroughTheAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scout := Actor{Name: "agent:scout", KeyID: k.ID}
+	scout := store.Actor{Name: "agent:scout", KeyID: k.ID}
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders with a configurator.", "Ada Lovelace"))
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts", Task: task.ID,
 		Facts: []research.FactIn{{Field: "configurator", Value: "Day cruiser builder", SourceURL: "https://larkmoor.example/build"}}}))
@@ -171,7 +172,7 @@ func TestDeletingANoteIsSalesWorkThroughTheAPI(t *testing.T) {
 	grace := mustUser(t, s, o, "grace@example.com", "Grace Hopper", "member")
 	asGrace := signInAs(t, srv, "grace@example.com", "correct horse battery")
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders with a configurator.", "Ada Lovelace"))
-	note := must(s.AgentNote(o.ID, Actor{Name: "Ada Lovelace"}, research.NoteIn{Task: task.ID, Kind: "next", Text: "Look at their dealer list."}))
+	note := must(s.AgentNote(o.ID, store.Actor{Name: "Ada Lovelace"}, research.NoteIn{Task: task.ID, Kind: "next", Text: "Look at their dealer list."}))
 	one := fmt.Sprintf("%s/o/alpha/api/v1/notes/%d", srv.URL, note.ID)
 	areas := func(to ...string) {
 		t.Helper()
@@ -193,7 +194,7 @@ func TestDeletingANoteIsSalesWorkThroughTheAPI(t *testing.T) {
 	}
 	beta := mustOrg(t, s, "beta")
 	theirTask := must(s.CreateTask(beta.ID, "Theirs", "Not yours.", "someone"))
-	theirs := must(s.AgentNote(beta.ID, Actor{Name: "someone"}, research.NoteIn{Task: theirTask.ID, Kind: "next", Text: "Theirs."}))
+	theirs := must(s.AgentNote(beta.ID, store.Actor{Name: "someone"}, research.NoteIn{Task: theirTask.ID, Kind: "next", Text: "Theirs."}))
 	if code, _ := call(t, ada, "DELETE", fmt.Sprintf("%s/o/alpha/api/v1/notes/%d", srv.URL, theirs.ID), "", nil); code != http.StatusNotFound {
 		t.Errorf("another organisation's note: %d", code)
 	}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // Agent operations: the REST API and the MCP server both call these, with the
@@ -23,7 +24,7 @@ type SearchOut struct {
 
 // agentInstructions describes each task rather than naming a model: the client
 // picks the model, and the agents page shows how each key's suggestions fare.
-func agentInstructions(o *Org, k *APIKey) string {
+func agentInstructions(o *store.Org, k *store.APIKey) string {
 	parts := []string{"Research and outreach data for " + o.Name + ". Companies and contacts you add wait in Research until a person qualifies them. Every fact and contact needs a source URL. Search before adding, to avoid duplicates. You can draft messages; only people send them.",
 		"search, list_tasks and list_due answer a page at a time, and so do the lists inside get_company and get_task. When an answer has next_cursor, there is more: pass it back as cursor, with the same arguments, before concluding a company, person or fact isn't here. A company's older history and notes are there if you need them; you needn't read them all.",
 		"Other agents and people work the same companies. get_company returns the company's history: read it before researching, don't suggest again what a person rejected, and if last_agent shows another agent was there within the hour, take a different company unless a task's open request asks for work on that one. by_you marks what this key did, perhaps in an earlier run."}
@@ -60,7 +61,7 @@ func agentInstructions(o *Org, k *APIKey) string {
 
 // lookForGuidance names the assets the organisation looks for, so agents record
 // each under the field the Research page checks.
-func lookForGuidance(o *Org) string {
+func lookForGuidance(o *store.Org) string {
 	return research.LookForList(o.Name, o.Settings.LookFor)
 }
 

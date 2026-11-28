@@ -15,13 +15,14 @@ import (
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
+	scout, second := store.Actor{Name: "agent:scout", KeyID: 1}, store.Actor{Name: "agent:second", KeyID: 2}
 	// Known before anyone wrote the task.
 	old := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Ostrel Aviation", Domain: "ostrel.example"}))
 
@@ -78,9 +79,9 @@ func TestATaskIsCarriedOnByAnotherAgent(t *testing.T) {
 		t.Fatalf("continuing a task made duplicates: %+v %+v %+v", again, same, known)
 	}
 	var companies, people, matches int64
-	s.InOrg(o.ID).Model(&Company{}).Count(&companies)
-	s.InOrg(o.ID).Model(&Contact{}).Count(&people)
-	s.InOrg(o.ID).Model(&Event{}).Where("action = ?", "task:match").Count(&matches)
+	s.InOrg(o.ID).Model(&store.Company{}).Count(&companies)
+	s.InOrg(o.ID).Model(&store.Contact{}).Count(&people)
+	s.InOrg(o.ID).Model(&store.Event{}).Where("action = ?", "task:match").Count(&matches)
 	if companies != 3 || people != 1 || matches != 1 {
 		t.Fatalf("want 3 companies, 1 person and the one new match recorded once, got %d, %d, %d", companies, people, matches)
 	}
@@ -133,7 +134,7 @@ func TestTasksStayInTheirOrganisation(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	a, b := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	task := must(s.CreateTask(a.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
 	if list := must(firstOf(s.AgentTasks(b.ID, scout, paging.Page{}))); len(list) != 0 {
 		t.Fatalf("another organisation's tasks are listed: %+v", list)
@@ -167,7 +168,7 @@ func TestNotesAreShortAndAboutSomething(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
+	scout, second := store.Actor{Name: "agent:scout", KeyID: 1}, store.Actor{Name: "agent:second", KeyID: 2}
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts"}))
 	for why, in := range map[string]research.NoteIn{
 		"about nothing":   {Kind: "next", Text: "Try the trade register."},
@@ -199,7 +200,7 @@ func TestErasingAPersonTakesTheNotesAroundThem(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders.", "Ada Lovelace"))
 	other := must(s.CreateTask(o.ID, "Aviation", "Aircraft makers.", "Ada Lovelace"))
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts", Task: task.ID}))
@@ -215,7 +216,7 @@ func TestErasingAPersonTakesTheNotesAroundThem(t *testing.T) {
 	if err := s.ErasePerson(o.ID, hannah.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	var left []TaskNote
+	var left []store.TaskNote
 	s.InOrg(o.ID).Find(&left)
 	if len(left) != 1 || left[0].Text != "No configurator." {
 		t.Fatalf("notes about the erased person's company and its task should be gone, others kept: %+v", left)
@@ -234,10 +235,10 @@ func TestRunsSplitOnAQuietHalfHour(t *testing.T) {
 	t.Parallel()
 	at := time.Date(2026, 11, 24, 9, 0, 0, 0, time.UTC)
 	one, two := int64(1), int64(2)
-	event := func(mins int, user string, key int64, action string, company *int64, task int64) Event {
-		return Event{At: at.Add(time.Duration(mins) * time.Minute), User: user, KeyID: key, Action: action, CompanyID: company, TaskID: task}
+	event := func(mins int, user string, key int64, action string, company *int64, task int64) store.Event {
+		return store.Event{At: at.Add(time.Duration(mins) * time.Minute), User: user, KeyID: key, Action: action, CompanyID: company, TaskID: task}
 	}
-	runs := research.RunsOf([]Event{
+	runs := research.RunsOf([]store.Event{
 		event(0, "agent:scout", 1, "task:pickup", nil, 7),
 		event(5, "agent:scout", 1, "add:company", &one, 7),
 		event(10, "Ada Lovelace", 0, "company:qualified", &one, 0),
@@ -324,7 +325,7 @@ func TestTasksOverMCPAndThePages(t *testing.T) {
 		t.Fatalf("a read-only key reading a task: %v %+v", err, res)
 	}
 	var byReader int64
-	if s.InOrg(o.ID).Model(&Event{}).Where(`"user" = ?`, "agent:reader").Count(&byReader); byReader != 0 {
+	if s.InOrg(o.ID).Model(&store.Event{}).Where(`"user" = ?`, "agent:reader").Count(&byReader); byReader != 0 {
 		t.Fatalf("a read-only key reading a task was recorded as picking it up: %d", byReader)
 	}
 	var names []string

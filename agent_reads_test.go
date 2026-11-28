@@ -13,6 +13,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // The reads an agent makes with a key: what they answer, how they page, and whom they
@@ -128,7 +129,7 @@ func TestAnAgentsReadsSayEverythingTheStoreDoes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scout := Actor{Name: "agent:scout", KeyID: k.ID}
+	scout := store.Actor{Name: "agent:scout", KeyID: k.ID}
 	task := must(s.CreateTask(o.ID, "Yachts", "Yacht builders with a configurator.", "Ada Lovelace"))
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts", Domain: "larkmoor.example", Task: task.ID,
 		Facts: []research.FactIn{{Field: "configurator", Value: "Day cruiser builder", SourceURL: "https://larkmoor.example/build"}}}))

@@ -13,6 +13,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
 	"github.com/shutthegoatup/prospector/internal/sales"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // A search that comes to companies already here says so, by how each stood when it
@@ -20,8 +21,8 @@ import (
 func TestASearchLeavesOutWhatWasAlreadyHere(t *testing.T) {
 	t.Parallel()
 	s, o, srv, ada := signedIn(t)
-	scout := Actor{Name: "agent:scout", KeyID: 1}
-	today := time.Now().Format(dayLayout)
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
+	today := time.Now().Format(store.DayLayout)
 
 	rejected := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Corvane Marine", Domain: "corvane.example"}))
 	if err := s.SetCompanyStage(o.ID, rejected.ID, prospecting.CompanyRejected, "", "Ada Lovelace"); err != nil {
@@ -31,7 +32,7 @@ func TestASearchLeavesOutWhatWasAlreadyHere(t *testing.T) {
 	if err := s.SetCompanyStage(o.ID, customer.ID, prospecting.CompanyQualified, "", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: customer.ID, Name: "Support", Amount: "1200", Per: PerYear, Start: today, TermMonths: 12, Then: sales.ThenRenews}, "Ada Lovelace"))
+	must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: customer.ID, Name: "Support", Amount: "1200", Per: store.PerYear, Start: today, TermMonths: 12, Then: sales.ThenRenews}, "Ada Lovelace"))
 	talking := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
 	if err := s.SetCompanyStage(o.ID, *talking.CompanyID, prospecting.CompanyQualified, "", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
@@ -109,12 +110,12 @@ func TestASearchLeavesOutWhatWasAlreadyHere(t *testing.T) {
 func TestACompanyReachedThroughAPersonIsHeldToo(t *testing.T) {
 	t.Parallel()
 	s, o, srv, ada := signedIn(t)
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	belair := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Belair Kitchens", Domain: "belair.example"}))
 	if err := s.SetCompanyStage(o.ID, belair.ID, prospecting.CompanyQualified, "", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: belair.ID, Name: "Support", Amount: "1200", Per: PerYear, Start: time.Now().Format(dayLayout), TermMonths: 12, Then: sales.ThenRenews}, "Ada Lovelace"))
+	must(s.AddSubscription(o.ID, sales.SubscriptionIn{Company: belair.ID, Name: "Support", Amount: "1200", Per: store.PerYear, Start: time.Now().Format(store.DayLayout), TermMonths: 12, Then: sales.ThenRenews}, "Ada Lovelace"))
 	quiet := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Fennholt Campers", Domain: "fennholt.example"}))
 	if err := s.SetCompanyStage(o.ID, quiet.ID, prospecting.CompanyQualified, "", "Ada Lovelace"); err != nil {
 		t.Fatal(err)
@@ -137,8 +138,8 @@ func TestACompanyReachedThroughAPersonIsHeldToo(t *testing.T) {
 func TestARejectionForAnotherOfferingIsntLeftOut(t *testing.T) {
 	t.Parallel()
 	s, o, srv, ada := signedIn(t)
-	scout := Actor{Name: "agent:scout", KeyID: 1}
-	cto := must(s.AddOffering(o.ID, Offering{Name: "Interim CTO"}, "Ada"))
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
+	cto := must(s.AddOffering(o.ID, store.Offering{Name: "Interim CTO"}, "Ada"))
 	known := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Harbour Analytics", Domain: "harbour.example"}))
 	if err := s.SetCompanyStage(o.ID, known.ID, prospecting.CompanyRejected, "", "Ada"); err != nil {
 		t.Fatal(err)
@@ -155,7 +156,7 @@ func TestARejectionForAnotherOfferingIsntLeftOut(t *testing.T) {
 func TestASearchCountsThePeopleItWasRefused(t *testing.T) {
 	t.Parallel()
 	s, o, srv, ada := signedIn(t)
-	scout := Actor{Name: "agent:scout", KeyID: 1}
+	scout := store.Actor{Name: "agent:scout", KeyID: 1}
 	gone := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Ines Ward", Company: "Larkmoor Yachts"}, "Ada Lovelace"))
 	if err := s.ErasePerson(o.ID, gone.ID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
@@ -174,7 +175,7 @@ func TestASearchCountsThePeopleItWasRefused(t *testing.T) {
 		t.Fatal("Theo is on the never-contact list")
 	}
 	var events int64
-	s.DB.Model(&Event{}).Where("org_id = ? and action = ?", o.ID, prospecting.ActionWithheld).Count(&events)
+	s.DB.Model(&store.Event{}).Where("org_id = ? and action = ?", o.ID, prospecting.ActionWithheld).Count(&events)
 	if events != 0 {
 		t.Fatalf("a refusal outside a search was counted: %d", events)
 	}
@@ -193,7 +194,7 @@ func TestASearchCountsThePeopleItWasRefused(t *testing.T) {
 		t.Errorf("Theo refused twice and Ines once: %+v", left)
 	}
 
-	var counted []Event
+	var counted []store.Event
 	s.DB.Where("org_id = ? and action = ?", o.ID, prospecting.ActionWithheld).Find(&counted)
 	for _, e := range counted {
 		if e.ContactID != 0 || e.CompanyID != nil || e.Value == nil || (*e.Value != research.WithheldNeverContact && *e.Value != research.WithheldErased) {

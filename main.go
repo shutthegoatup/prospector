@@ -58,6 +58,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/mailer"
 	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // version is set at release time by -ldflags "-X main.version=…".
@@ -403,8 +404,8 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		if !strings.EqualFold(strings.TrimSpace(rest[0]), displayName(*c)) {
-			return fmt.Errorf("export-person needs the full name, to be sure it's them: %q", displayName(*c))
+		if !strings.EqualFold(strings.TrimSpace(rest[0]), store.DisplayName(*c)) {
+			return fmt.Errorf("export-person needs the full name, to be sure it's them: %q", store.DisplayName(*c))
 		}
 		out, err := s.ExportPerson(org.ID, c.ID, "cli")
 		if err != nil {
@@ -426,13 +427,13 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		if !strings.EqualFold(strings.TrimSpace(rest[0]), displayName(*c)) {
-			return fmt.Errorf("erase needs the full name, to be sure it's them: %q", displayName(*c))
+		if !strings.EqualFold(strings.TrimSpace(rest[0]), store.DisplayName(*c)) {
+			return fmt.Errorf("erase needs the full name, to be sure it's them: %q", store.DisplayName(*c))
 		}
 		if err := s.ErasePerson(org.ID, c.ID, "cli"); err != nil {
 			return err
 		}
-		fmt.Printf("erased %s @ %s; take them out of your lead files too\n", deref(c.Person), deref(c.Maker))
+		fmt.Printf("erased %s @ %s; take them out of your lead files too\n", store.Deref(c.Person), store.Deref(c.Maker))
 	case "mark":
 		if len(rest) < 2 {
 			return fmt.Errorf("usage: prospector mark <name> <step> [date]")
@@ -441,11 +442,11 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		date := arg(rest, 2, today())
+		date := arg(rest, 2, store.Today())
 		if err := s.Mark(org.ID, c.ID, rest[1], date, "cli"); err != nil {
 			return err
 		}
-		fmt.Printf("%s @ %s: %s = %s\n", deref(c.First), deref(c.Maker), crm.Marks[rest[1]], date)
+		fmt.Printf("%s @ %s: %s = %s\n", store.Deref(c.First), store.Deref(c.Maker), crm.Marks[rest[1]], date)
 	case "set":
 		if len(rest) < 3 {
 			return fmt.Errorf("usage: prospector set <name> <field> <value>")
@@ -457,16 +458,16 @@ func run(args []string) error {
 		if err := s.Update(org.ID, c.ID, rest[1], rest[2], "cli"); err != nil {
 			return err
 		}
-		fmt.Printf("%s @ %s: %s = %s\n", deref(c.First), deref(c.Maker), rest[1], rest[2])
+		fmt.Printf("%s @ %s: %s = %s\n", store.Deref(c.First), store.Deref(c.Maker), rest[1], rest[2])
 	case "list":
 		rows, err := s.Due(org.ID, arg(rest, 0, "linkedin"), time.Now(), org.Settings)
 		if err != nil {
 			return err
 		}
 		for _, r := range rows {
-			maker := []rune(deref(r.Maker))
-			fmt.Printf("%-6s %-28s %-12s %-10s %s\n", deref(r.Fit), string(maker[:min(28, len(maker))]),
-				deref(r.First), deref(r.LinkedinAdded), deref(r.Email))
+			maker := []rune(store.Deref(r.Maker))
+			fmt.Printf("%-6s %-28s %-12s %-10s %s\n", store.Deref(r.Fit), string(maker[:min(28, len(maker))]),
+				store.Deref(r.First), store.Deref(r.LinkedinAdded), store.Deref(r.Email))
 		}
 	default:
 		return fmt.Errorf("unknown command %q (try prospector help)", cmd)

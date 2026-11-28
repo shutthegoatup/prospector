@@ -5,6 +5,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // opArea is the area whose people may make each API write. Keys go by their scopes
@@ -14,15 +15,15 @@ import (
 var opArea = map[string]string{
 	"ChangeEnquiry": identity.AreaSupport, "ReplyToEnquiry": identity.AreaSupport, "RecordEnquiryAnswer": identity.AreaSupport,
 	"AddSubscription": identity.AreaSupport, "ChangeSubscription": identity.AreaSupport, "RemoveSubscription": identity.AreaSupport, "StartRenewal": identity.AreaSupport,
-	"StartOnboarding": areaAny, "RemoveOnboarding": identity.AreaSupport, "ChangeOnboardingStep": identity.AreaSupport,
+	"StartOnboarding": store.AreaAny, "RemoveOnboarding": identity.AreaSupport, "ChangeOnboardingStep": identity.AreaSupport,
 	"InviteCustomer": identity.AreaSupport, "WithdrawCustomerInvite": identity.AreaSupport,
 	"StartDeal": identity.AreaSales, "ChangeDeal": identity.AreaSales, "RemoveDeal": identity.AreaSales, "ChangeOwnDeal": identity.AreaSales,
 	"StartRun": identity.AreaSales, "StopRun": identity.AreaSales,
 	"CreateTask": identity.AreaSales, "ChangeTask": identity.AreaSales, "AskTask": identity.AreaSales, "ChangeTaskRequest": identity.AreaSales,
-	"AgentAddCompany": identity.AreaSales, "AgentAddFact": identity.AreaSales, "AgentAddContact": identity.AreaSales, "AgentDraft": identity.AreaSales, "AgentAddEnquiry": identity.AreaSupport, "AgentImport": areaAny, "AgentSnapshot": areaAny,
+	"AgentAddCompany": identity.AreaSales, "AgentAddFact": identity.AreaSales, "AgentAddContact": identity.AreaSales, "AgentDraft": identity.AreaSales, "AgentAddEnquiry": identity.AreaSupport, "AgentImport": store.AreaAny, "AgentSnapshot": store.AreaAny,
 	"AddPerson": identity.AreaSales, "ChangeContact": identity.AreaSales, "MarkOutcome": identity.AreaSales, "PickContact": identity.AreaSales, "ReviewCompany": identity.AreaSales, "AddRole": identity.AreaSales, "JudgeRole": identity.AreaSales, "DecideSuggestion": identity.AreaSales,
 	"AddNote": identity.AreaSales, "FinishRequest": identity.AreaSales, "DeleteNote": identity.AreaSales,
-	"ConverseEnquiry": areaAny, "AddSuppression": areaAny, "RemoveSuppression": identity.AreaSales,
+	"ConverseEnquiry": store.AreaAny, "AddSuppression": store.AreaAny, "RemoveSuppression": identity.AreaSales,
 	"CreateCampaign": identity.AreaSales, "ChangeCampaign": identity.AreaSales, "RemoveCampaign": identity.AreaSales,
 	"SendCampaign": identity.AreaSales, "CancelCampaign": identity.AreaSales, "ResumeCampaign": identity.AreaSales,
 	"CreateAgreement": identity.AreaSales, "ChangeAgreement": identity.AreaSales, "RemoveAgreement": identity.AreaSales, "PutAgreementDocument": identity.AreaSales,
@@ -37,7 +38,7 @@ var opArea = map[string]string{
 
 // landing is the page someone starts on: Today is outreach, so someone who works only
 // in support starts on what is theirs to answer.
-func landing(m *Membership) string {
+func landing(m *store.Membership) string {
 	if !m.Works(identity.AreaSales) && m.Works(identity.AreaSupport) {
 		return "enquiries"
 	}
@@ -45,13 +46,13 @@ func landing(m *Membership) string {
 }
 
 func areaRefusal(area string) *say.Text {
-	if area == areaAny {
+	if area == store.AreaAny {
 		return say.New("you read only here: an owner can give you an area on the Team list in Settings")
 	}
 	return say.Errorf("that's %[1]s work, which you don't do here: an owner can add %[1]s to you on the Team list in Settings", area)
 }
 
-func memberWork(m Membership) string {
+func memberWork(m store.Membership) string {
 	if m.Role == "owner" {
 		return "owner"
 	}

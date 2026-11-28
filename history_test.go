@@ -10,6 +10,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/paging"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 func TestHistoryKeepsNoPersonalDetails(t *testing.T) {
@@ -37,20 +38,20 @@ func TestHistoryKeepsNoPersonalDetails(t *testing.T) {
 	do(s.Update(o.ID, hannah.ID, "stage", "meeting", "ada"))
 	do(s.Update(o.ID, hannah.ID, "next_date", "2020-02-03", "ada"))
 	do(s.Update(o.ID, hannah.ID, "lost_reason", "went with her agency's tool", "ada"))
-	nia := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Nia Okafor", Company: deref(hannah.Maker), Linkedin: "https://www.linkedin.com/in/nia-okafor-9z8y7x/", Note: "Hi Nia, saw the relaunch"}, "ada"))
-	must(s.AgentAddContact(o, Actor{Name: "agent:scout", KeyID: 1}, prospecting.AddContactIn{Company: strconv.FormatInt(*hannah.CompanyID, 10), Name: "Jonas Lindqvist", Title: "CMO", SourceURL: "https://larkmoor.example/team"}))
+	nia := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Nia Okafor", Company: store.Deref(hannah.Maker), Linkedin: "https://www.linkedin.com/in/nia-okafor-9z8y7x/", Note: "Hi Nia, saw the relaunch"}, "ada"))
+	must(s.AgentAddContact(o, store.Actor{Name: "agent:scout", KeyID: 1}, prospecting.AddContactIn{Company: strconv.FormatInt(*hannah.CompanyID, 10), Name: "Jonas Lindqvist", Title: "CMO", SourceURL: "https://larkmoor.example/team"}))
 
-	var events []Event
+	var events []store.Event
 	do(s.InOrg(o.ID).Find(&events).Error)
 	said := map[string]string{}
 	for _, e := range events {
-		v := strings.ToLower(deref(e.Value))
+		v := strings.ToLower(store.Deref(e.Value))
 		for _, detail := range []string{"7946", "pryce", "biscuit", "lindqvist", "marketing", "relaunch", "tuesday", "agency", "nia-okafor"} {
 			if strings.Contains(v, detail) {
-				t.Errorf("the history copied %q under %s", deref(e.Value), e.Action)
+				t.Errorf("the history copied %q under %s", store.Deref(e.Value), e.Action)
 			}
 		}
-		said[e.Action] = deref(e.Value)
+		said[e.Action] = store.Deref(e.Value)
 	}
 	for _, action := range []string{"set:phone", "set:email", "set:call_notes", "set:person", "set:next_step", "add:person", "add:contact"} {
 		if _, ok := said[action]; !ok {
@@ -66,7 +67,7 @@ func TestHistoryKeepsNoPersonalDetails(t *testing.T) {
 	for _, h := range history {
 		lines[crm.HistoryText(h).Error()] = true
 	}
-	for _, want := range []string{"set phone · Hannah Pryce-Lindqvist", "set stage · Hannah Pryce-Lindqvist: meeting", "added · " + displayName(*nia), "suggested a contact · Jonas Lindqvist"} {
+	for _, want := range []string{"set phone · Hannah Pryce-Lindqvist", "set stage · Hannah Pryce-Lindqvist: meeting", "added · " + store.DisplayName(*nia), "suggested a contact · Jonas Lindqvist"} {
 		if !lines[want] {
 			t.Errorf("the company's history has no line %q: %v", want, lines)
 		}
@@ -77,7 +78,7 @@ func TestAgentsSeeWhatHappenedAtACompany(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	scout, second := Actor{Name: "agent:scout", KeyID: 1}, Actor{Name: "agent:second", KeyID: 2}
+	scout, second := store.Actor{Name: "agent:scout", KeyID: 1}, store.Actor{Name: "agent:second", KeyID: 2}
 	added, err := s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor Yachts",
 		Facts: []research.FactIn{{Field: "configurator", Value: "Day Cruiser 45 builder", SourceURL: "https://larkmoor.example/build"}}})
 	if err != nil {
@@ -132,7 +133,7 @@ func TestAgentsSeeWhatHappenedAtACompany(t *testing.T) {
 		t.Fatalf("the first agent should recognise its own work and not Ada's: %+v %v", mine, err)
 	}
 	// A key recreated under the same name is a different agent.
-	if again, _ := s.AgentCompany(o.ID, Actor{Name: "agent:scout", KeyID: 9}, "Larkmoor Yachts", paging.Page{}); again.LastAgent.ByYou {
+	if again, _ := s.AgentCompany(o.ID, store.Actor{Name: "agent:scout", KeyID: 9}, "Larkmoor Yachts", paging.Page{}); again.LastAgent.ByYou {
 		t.Fatal("a new key took an old key's work for its own because they share a name")
 	}
 

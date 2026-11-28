@@ -10,6 +10,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/privacy"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tz"
 )
 
@@ -24,11 +25,11 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 	}
 	var blocked []string
 	stored := func(fresh string, have *string) bool {
-		return strings.EqualFold(strings.TrimSpace(fresh), strings.TrimSpace(deref(have)))
+		return strings.EqualFold(strings.TrimSpace(fresh), strings.TrimSpace(store.Deref(have)))
 	}
 	for _, d := range p.Drafts {
 		if err := crm.ErasedIn(s.DB, org, d.Person, d.Maker, d.Email, d.Linkedin); err != nil {
-			if !errors.Is(err, errErased) {
+			if !errors.Is(err, store.ErrErased) {
 				return 0, err
 			}
 			blocked = append(blocked, fmt.Sprintf("%s in %s was erased on request; take them out of the file", d.Key, d.File))
@@ -37,7 +38,7 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 		if email == nil && link == nil {
 			continue
 		}
-		var have Contact
+		var have store.Contact
 		known := s.InOrg(org).Where("key = ?", d.Key).First(&have).Error == nil
 		if email != nil && !(known && stored(d.Email, have.Email)) { //nolint:staticcheck // unless it's already stored
 			blocked = append(blocked, fmt.Sprintf("%s in %s (%v)", d.Key, d.File, email))
@@ -65,18 +66,18 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 		if err := privacy.LinkCompanies(tx, org, p.Companies); err != nil {
 			return err
 		}
-		var missing []Contact
+		var missing []store.Contact
 		if err := tx.Where("org_id = ? and tz is null", org).Find(&missing).Error; err != nil {
 			return err
 		}
 		for _, c := range missing {
-			if zone := tz.Guess(deref(c.Phone), deref(c.Maker)); zone != nil {
+			if zone := tz.Guess(store.Deref(c.Phone), store.Deref(c.Maker)); zone != nil {
 				if err := tx.Model(&c).Update("tz", zone).Error; err != nil {
 					return err
 				}
 			}
 		}
-		return tx.Model(&Contact{}).Where("org_id = ?", org).Count(&total).Error
+		return tx.Model(&store.Contact{}).Where("org_id = ?", org).Count(&total).Error
 	})
 	return total, err
 }
@@ -89,23 +90,23 @@ func prefer(fresh string, old *string) *string {
 }
 
 func upsertDraft(tx *gorm.DB, org int64, d Draft) error {
-	var c Contact
+	var c store.Contact
 	err := tx.Where("org_id = ? and key = ?", org, d.Key).First(&c).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		c = Contact{OrgID: org, Key: d.Key, File: d.File, Section: str(d.Section), Fit: str(d.Fit), Maker: str(d.Maker),
-			Person: str(d.Person), First: str(d.First), Linkedin: str(d.Linkedin), Email: str(d.Email),
-			Note: str(d.Note), Subject: str(d.Subject), Body: str(d.Body), Followup: str(d.Followup),
-			Flags: str(d.Flags), Hold: d.Hold, Sources: nonEmpty(d.Sources), Phone: nonEmpty(d.Phone)}
+		c = store.Contact{OrgID: org, Key: d.Key, File: d.File, Section: store.Str(d.Section), Fit: store.Str(d.Fit), Maker: store.Str(d.Maker),
+			Person: store.Str(d.Person), First: store.Str(d.First), Linkedin: store.Str(d.Linkedin), Email: store.Str(d.Email),
+			Note: store.Str(d.Note), Subject: store.Str(d.Subject), Body: store.Str(d.Body), Followup: store.Str(d.Followup),
+			Flags: store.Str(d.Flags), Hold: d.Hold, Sources: store.NonEmpty(d.Sources), Phone: store.NonEmpty(d.Phone)}
 		return tx.Create(&c).Error
 	}
 	if err != nil {
 		return err
 	}
 	if c.Sources == nil {
-		c.Sources = nonEmpty(d.Sources)
+		c.Sources = store.NonEmpty(d.Sources)
 	}
 	if c.Phone == nil {
-		c.Phone = nonEmpty(d.Phone)
+		c.Phone = store.NonEmpty(d.Phone)
 	}
 	c.Fit, c.Maker, c.First = prefer(d.Fit, c.Fit), prefer(d.Maker, c.Maker), prefer(d.First, c.First)
 	c.Linkedin, c.Email, c.Note = prefer(d.Linkedin, c.Linkedin), prefer(d.Email, c.Email), prefer(d.Note, c.Note)
@@ -120,7 +121,7 @@ func upsertDraft(tx *gorm.DB, org int64, d Draft) error {
 // seedSentLog: people listed under a date in sent-log.md were added on LinkedIn that day.
 func seedSentLog(tx *gorm.DB, org int64, entries []SentLogEntry) error {
 	for _, e := range entries {
-		var rows []Contact
+		var rows []store.Contact
 		if err := tx.Where("org_id = ? and linkedin_added is null", org).Find(&rows).Error; err != nil {
 			return err
 		}
@@ -136,13 +137,13 @@ func seedSentLog(tx *gorm.DB, org int64, entries []SentLogEntry) error {
 }
 
 func knownMakers(tx *gorm.DB, org int64) (string, error) {
-	var people []Contact
+	var people []store.Contact
 	if err := tx.Where("org_id = ? and key not like 'org:%'", org).Find(&people).Error; err != nil {
 		return "", err
 	}
 	var makers []string
 	for _, p := range people {
-		makers = append(makers, strings.ToLower(deref(p.Maker)))
+		makers = append(makers, strings.ToLower(store.Deref(p.Maker)))
 	}
 	return strings.Join(makers, " | "), nil
 }
@@ -171,12 +172,12 @@ func importCompanies(tx *gorm.DB, org int64, companies []privacy.CompanyRow) err
 		words := strings.Fields(name)
 		linkedin := "https://www.linkedin.com/search/results/people/?keywords=" +
 			strings.Join(append(words[:min(2, len(words))], "marketing"), "%20")
-		var c Contact
+		var c store.Contact
 		err := tx.Where("org_id = ? and key = ?", org, "org:"+name).First(&c).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c = Contact{OrgID: org, Key: "org:" + name, File: "prospects.csv", Fit: str(r["priority"]), Maker: str(name),
-				Person: str(""), First: str(""), Linkedin: &linkedin, Flags: str(strings.Join(flags, "\n")),
-				Sources: nonEmpty(sources), Hold: hold}
+			c = store.Contact{OrgID: org, Key: "org:" + name, File: "prospects.csv", Fit: store.Str(r["priority"]), Maker: store.Str(name),
+				Person: store.Str(""), First: store.Str(""), Linkedin: &linkedin, Flags: store.Str(strings.Join(flags, "\n")),
+				Sources: store.NonEmpty(sources), Hold: hold}
 			if err := tx.Create(&c).Error; err != nil {
 				return err
 			}
@@ -185,23 +186,23 @@ func importCompanies(tx *gorm.DB, org int64, companies []privacy.CompanyRow) err
 		if err != nil {
 			return err
 		}
-		c.Fit, c.Flags = str(r["priority"]), str(strings.Join(flags, "\n"))
+		c.Fit, c.Flags = store.Str(r["priority"]), store.Str(strings.Join(flags, "\n"))
 		if c.Sources == nil {
-			c.Sources = nonEmpty(sources)
+			c.Sources = store.NonEmpty(sources)
 		}
-		if h := deref(c.Hold); c.Hold == nil || h == "competitor" {
+		if h := store.Deref(c.Hold); c.Hold == nil || h == "competitor" {
 			c.Hold = hold
 		}
 		if err := tx.Save(&c).Error; err != nil {
 			return err
 		}
 	}
-	var orgs []Contact
+	var orgs []store.Contact
 	if err := tx.Where("org_id = ? and key like 'org:%'", org).Find(&orgs).Error; err != nil {
 		return err
 	}
 	for _, o := range orgs {
-		if strings.Contains(known, privacy.CompanyStem(deref(o.Maker))) {
+		if strings.Contains(known, privacy.CompanyStem(store.Deref(o.Maker))) {
 			if err := tx.Delete(&o).Error; err != nil {
 				return err
 			}

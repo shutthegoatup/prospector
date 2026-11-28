@@ -8,13 +8,14 @@ import (
 	"github.com/nyaruka/phonenumbers/v2"
 
 	"github.com/shutthegoatup/prospector/internal/marketing"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // A domain that takes mail rarely stops; one that doesn't may be set up next week.
 
 // deadAddress is the first of an email field's addresses whose domain takes no mail.
 func deadAddress(email string, noMail map[string]bool) string {
-	for _, e := range emailRe.FindAllString(strings.ToLower(email), -1) {
+	for _, e := range store.EmailRe.FindAllString(strings.ToLower(email), -1) {
 		if noMail[marketing.MailDomainOf(e)] {
 			return e
 		}
@@ -42,7 +43,7 @@ var roleBoxes = map[string]bool{"info": true, "hello": true, "contact": true, "s
 	"billing": true, "reception": true, "noreply": true, "no-reply": true, "webmaster": true, "general": true}
 
 func roleAddress(email string) string {
-	for _, e := range emailRe.FindAllString(strings.ToLower(email), -1) {
+	for _, e := range store.EmailRe.FindAllString(strings.ToLower(email), -1) {
 		if local, _, _ := strings.Cut(e, "@"); roleBoxes[local] {
 			return e
 		}

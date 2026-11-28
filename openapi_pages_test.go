@@ -9,6 +9,7 @@ import (
 
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/store"
 	"github.com/shutthegoatup/prospector/internal/tickets"
 )
 
@@ -108,10 +109,10 @@ func TestTheAPIsListsWalkToTheirEnd(t *testing.T) {
 	}
 	task := must(s.CreateTask(o.ID, "", "Find makers of garden rooms", "Nia"))
 	for i := range 5 {
-		if err := s.DB.Create(&Agent{OrgID: o.ID, Name: fmt.Sprint("Agent ", i), Kind: kindOpenAI, Models: "[]", Tools: "[]", Allowed: "[]"}).Error; err != nil {
+		if err := s.DB.Create(&store.Agent{OrgID: o.ID, Name: fmt.Sprint("Agent ", i), Kind: store.KindOpenAI, Models: "[]", Tools: "[]", Allowed: "[]"}).Error; err != nil {
 			t.Fatal(err)
 		}
-		if err := s.DB.Create(&AgentRun{OrgID: o.ID, TaskID: task.ID, Status: "done", StartedBy: "Nia"}).Error; err != nil {
+		if err := s.DB.Create(&store.AgentRun{OrgID: o.ID, TaskID: task.ID, Status: "done", StartedBy: "Nia"}).Error; err != nil {
 			t.Fatal(err)
 		}
 		must(s.AddEnquiry(o.ID, "form", tickets.EnquiryIn{Name: fmt.Sprint("Sender ", i), Email: fmt.Sprintf("sender%d@larkmoor.example", i), Message: "Could you show us?"}))

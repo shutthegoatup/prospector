@@ -9,6 +9,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/request"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // translatedInto swaps in languages to choose from, as Prospector has none translated yet. en-XA
@@ -143,7 +144,7 @@ func TestAnOrganisationSpeaksToItsOutsidersInItsLanguage(t *testing.T) {
 		t.Fatal(err)
 	}
 	hannah := must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts", Email: "hannah@larkmoor.example"}, "Ada Lovelace"))
-	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Name: "Leith site", Start: today()}, "Ada Lovelace"))
+	ob := must(s.StartOnboarding(o.ID, onboarding.OnboardingIn{Company: *hannah.CompanyID, Name: "Leith site", Start: store.Today()}, "Ada Lovelace"))
 	if code, body := call(t, member, "POST", srv.URL+"/o/alpha/api/v1/onboardings/"+itoa(ob.ID)+"/invites", "application/json", map[string]any{"contact": hannah.ID}); code != http.StatusNoContent {
 		t.Fatalf("inviting a customer: %d %s", code, body)
 	}

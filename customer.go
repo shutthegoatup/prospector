@@ -12,6 +12,7 @@ import (
 	"github.com/shutthegoatup/prospector/internal/onboarding"
 	"github.com/shutthegoatup/prospector/internal/request"
 	"github.com/shutthegoatup/prospector/internal/say"
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // A customer's page shows someone outside the organisation the onboarding steps that
@@ -32,7 +33,7 @@ func (a *App) CustomerMailOn(org int64) bool {
 	return err == nil && via != nil && a.base != ""
 }
 
-func (a *App) CustomerLinkMail(ctx context.Context, org *Org, to, token string) error {
+func (a *App) CustomerLinkMail(ctx context.Context, org *store.Org, to, token string) error {
 	via, err := a.MailFor(org.ID)
 	if err != nil {
 		return err
@@ -95,7 +96,7 @@ type CustomerView struct {
 	State string
 	Org   string
 	Email string
-	Steps []OnboardingStep
+	Steps []store.OnboardingStep
 	Day   string
 	// Lang is the organisation's language for its customers, for a browser that asks
 	// for none Prospector has.
@@ -143,7 +144,7 @@ func (a *App) customerAgain(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 	if acc, err := a.s.CustomerByToken("link", token); err == nil && a.CustomerMailOn(acc.Org.ID) {
 		if fresh, err := a.s.FreshCustomerLink(acc.Org.ID, acc.Grant.ID); err == nil {
-			org, to := acc.Org, deref(acc.Contact.Email)
+			org, to := acc.Org, store.Deref(acc.Contact.Email)
 			a.background(func() {
 				ctx, cancel := context.WithTimeout(context.Background(), mailer.SendLimit)
 				defer cancel()
@@ -182,7 +183,7 @@ func (a *App) customerPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "the page couldn't be read", http.StatusInternalServerError)
 		return
 	}
-	v := CustomerView{State: "steps", Org: acc.Org.Name, Email: deref(acc.Contact.Email), Steps: steps, Day: today(), Lang: acc.Org.Settings.CustomerLanguage}
+	v := CustomerView{State: "steps", Org: acc.Org.Name, Email: store.Deref(acc.Contact.Email), Steps: steps, Day: store.Today(), Lang: acc.Org.Settings.CustomerLanguage}
 	a.customerRender(w, r, http.StatusOK, v)
 }
 

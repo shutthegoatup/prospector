@@ -16,6 +16,8 @@ import (
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/charset"
+
+	"github.com/shutthegoatup/prospector/internal/store"
 )
 
 // Prospector's own agents search and read the web without a paid search service:
@@ -31,7 +33,7 @@ const (
 
 // webTools are the built-in tools an agent has: reading pages always, searching when
 // it has a SearXNG instance to ask.
-func webTools(c *Agent) []toolDef {
+func webTools(c *store.Agent) []toolDef {
 	def := func(name, about, params string) toolDef {
 		var d toolDef
 		d.Type, d.Function.Name, d.Function.Description, d.Function.Parameters = "function", name, about, json.RawMessage(params)
@@ -64,7 +66,7 @@ func (a *App) pageHTTP() *http.Client {
 }
 
 // webCall runs a built-in web tool.
-func (a *App) webCall(ctx context.Context, c *Agent, name string, args map[string]any) (string, error) {
+func (a *App) webCall(ctx context.Context, c *store.Agent, name string, args map[string]any) (string, error) {
 	text := func(key string) string { s, _ := args[key].(string); return strings.TrimSpace(s) }
 	switch name {
 	case fetchPageTool:
