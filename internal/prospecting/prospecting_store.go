@@ -492,7 +492,10 @@ func (s *ProspectingStore) DecideSuggestion(org, id int64, decision, actor strin
 			return store.Missing(err, "no suggestion %d", id)
 		}
 		if sg.Decision != "" {
-			return store.Conflict{Text: say.Errorf("that suggestion was already %s by %s", sg.Decision, sg.DecidedBy)}
+			if sg.Decision == SuggestionAccepted {
+				return store.Conflict{Text: say.Errorf("that suggestion was already accepted by %s", sg.DecidedBy)}
+			}
+			return store.Conflict{Text: say.Errorf("that suggestion was already dismissed by %s", sg.DecidedBy)}
 		}
 		now := time.Now()
 		res := tx.Model(&store.Suggestion{}).Where("id = ? and decision = ''", sg.ID).

@@ -175,6 +175,9 @@ func (s *OutreachStore) CancelCampaign(org, id int64) (*store.Campaign, error) {
 			if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
 				return store.Missing(err, "no campaign %d", id)
 			}
+			if t, ok := notCancellable[c.Status]; ok {
+				return t
+			}
 			return say.Errorf("a campaign that is %s can't be cancelled", c.Status)
 		}
 		if err := tx.Model(&store.CampaignRecipient{}).Where("org_id = ? and campaign_id = ? and status = ?", org, id, MailQueued).
@@ -239,4 +242,11 @@ func (s *OutreachStore) DropUnsubscribeLink(token string) {
 	if token != "" {
 		stored(s.DB.Where("token_hash = ?", store.HashToken(token)).Delete(&store.UnsubscribeLink{}))
 	}
+}
+
+// notCancellable are whole sentences, so each status is worded in the reader's language.
+var notCancellable = map[string]*say.Text{
+	CampaignDraft:     say.New("a campaign that is draft can't be cancelled"),
+	CampaignSent:      say.New("a campaign that is sent can't be cancelled"),
+	CampaignCancelled: say.New("a campaign that is cancelled can't be cancelled"),
 }

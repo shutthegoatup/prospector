@@ -5,8 +5,10 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: "IBM Plex Sans", ui-sans-serif, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  /* IBM Plex has no Japanese: name the systems' own Gothic faces before a generic
+     fallback that may pick anything. */
+  --font-sans: "IBM Plex Sans", "Hiragino Sans", "Yu Gothic UI", "Noto Sans CJK JP", "Noto Sans JP", ui-sans-serif, sans-serif;
+  --font-mono: "IBM Plex Mono", "Hiragino Sans", "Yu Gothic UI", "Noto Sans CJK JP", "Noto Sans JP", ui-monospace, monospace;
   --font-heading: "Bricolage Grotesque", var(--font-sans);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -190,3 +192,7 @@
 .rail[data-state="ok"] { --rail: var(--ok-fill); }
 .rail[data-state="warn"] { --rail: var(--warn-fill); }
 .rail[data-state="stop"] { --rail: var(--stop-fill); }
+
+/* Tracking is set for Latin letters; Japanese is set solid. Unlayered, so it outranks
+   the tracking utilities. */
+:lang(ja) * { letter-spacing: normal; }

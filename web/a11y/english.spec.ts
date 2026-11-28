@@ -44,7 +44,8 @@ const products = [
   "LinkedIn",
   "GitHub",
 ];
-const languages = ["en-GB", "en-XA"].map((l) => new Intl.DisplayNames([l], { type: "language" }).of(l) ?? l);
+const locales = JSON.parse(readFileSync(new URL("../locales.json", import.meta.url), "utf8")) as { source: string; translated: string[]; pseudo: string[] };
+const languages = [locales.source, ...locales.translated, ...locales.pseudo].map((l) => new Intl.DisplayNames([l], { type: "language" }).of(l) ?? l);
 
 const allowed = [
   "Prospector",

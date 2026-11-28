@@ -34,6 +34,14 @@ const site = "overflow-x-clip bg-background font-sans text-[17px] leading-[1.6] 
 const locales = JSON.parse(await readFile("locales.json", "utf8"));
 const attr = (text) => text.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 
+// Every language's front page is at /, so a search engine is told where each is
+// (?lang= picks it), at the server's own address, which it puts in for the stand-in.
+const origin = "https://prospector.invalid";
+const alternates = [
+  ...[locales.source, ...locales.translated].map((l) => `<link rel="alternate" hreflang="${l}" href="${origin}/?lang=${l}" />`),
+  `<link rel="alternate" hreflang="x-default" href="${origin}/" />`,
+].join("\n    ");
+
 for (const locale of [locales.source, ...locales.translated, ...locales.pseudo]) {
   const messages = locale === locales.source ? {} : JSON.parse(await readFile(`src/lang/site/${locale}.json`, "utf8"));
   const front = landing(locale, messages);
@@ -43,7 +51,7 @@ for (const locale of [locales.source, ...locales.translated, ...locales.pseudo])
     page(
       locale,
       head(attr(front.title), attr(locale === locales.source ? `${front.description} ${pricing}` : front.description), ["output"]) +
-        `\n    <script type="module" src="/assets/app/site.js"></script>`,
+        `\n    ${alternates}\n    <script type="module" src="/assets/app/site.js"></script>`,
       site,
       `<div id="site">${front.html}</div>`,
     ),
