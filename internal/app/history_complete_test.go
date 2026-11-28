@@ -173,6 +173,7 @@ func TestAccessChangesGoInTheHistory(t *testing.T) {
 	do(s.SetRole(o.ID, u.ID, "owner", who))
 	do(s.SetRole(o.ID, u.ID, "owner", who))
 	row := must(s.Suppress(o.ID, "ines@larkmoor.example", who))
+	must(s.Suppress(o.ID, "ines@larkmoor.example", who))
 	do(s.Unsuppress(o.ID, row.ID, who))
 	c := must(s.AddCampaign(o.ID, marketing.CampaignIn{Name: "Spring news"}, who))
 	do(s.RemoveCampaign(o.ID, c.ID, who))
@@ -187,7 +188,8 @@ func TestAccessChangesGoInTheHistory(t *testing.T) {
 		got = append(got, e.Action+" "+store.Deref(e.Value))
 	}
 	// Scopes sent again unchanged, a key revoked twice, a domain removed twice and a role
-	// given twice say nothing more. The do-not-mail list's entries leave its address out.
+	// given twice, and an address added twice, say nothing more. The do-not-mail list's entries
+	// leave its address out.
 	want := []string{"key:new scout: read", "key:scopes scout: read research:write", "key:revoke scout",
 		"enricher:save hunter", "enricher:remove hunter", "sso:add-domain alpha.example", "sso:verify-domain alpha.example",
 		"sso:remove-domain alpha.example", "webhook:new ", "webhook:remove ", "smtp:change smtp.alpha.example", "smtp:remove ",
@@ -224,6 +226,33 @@ func TestAgreementsAndEnquiriesGoInTheCompanysHistory(t *testing.T) {
 	want := []string{"removed an enquiry", "sent an enquiry: Other", "removed a draft agreement: Pilot terms", "started an agreement: Pilot terms"}
 	if !slices.Equal(lines, want) {
 		t.Errorf("history:\n got %q\nwant %q", lines, want)
+	}
+}
+
+// What happens to a campaign once it is sent is in the history, and who did it; the
+// server pausing it is said on the campaign instead.
+func TestCampaignsGoInTheHistory(t *testing.T) {
+	t.Parallel()
+	_, s, o, _, _, _ := campaignSite(t)
+	c := draft(t, s, o)
+	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
+	if err := s.PauseCampaign(o.ID, c.ID, "the mail server refused"); err != nil {
+		t.Fatal(err)
+	}
+	must(s.ResumeCampaign(o.ID, c.ID, "Ada Lovelace"))
+	must(s.CancelCampaign(o.ID, c.ID, "Ada Lovelace"))
+	var events []store.Event
+	if err := s.DB.Where("org_id = ? and action like 'campaign:%'", o.ID).Order("id").Find(&events).Error; err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, e := range events {
+		got = append(got, e.User+" "+e.Action+" "+store.Deref(e.Value))
+	}
+	want := []string{"Ada Lovelace campaign:add Spring price list", "Ada Lovelace campaign:send Spring price list",
+		"Ada Lovelace campaign:resume Spring price list", "Ada Lovelace campaign:cancel Spring price list"}
+	if !slices.Equal(got, want) {
+		t.Errorf("history:\n got %q\nwant %q", got, want)
 	}
 }
 

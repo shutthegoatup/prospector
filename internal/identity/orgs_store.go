@@ -426,8 +426,12 @@ func (s *IdentityStore) SetKeyScopes(org, id int64, scopes []string, actor strin
 		return nil
 	}
 	return s.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&store.APIKey{}).Where("org_id = ? and id = ? and revoked_at is null", org, id).Update("scopes", now).Error; err != nil {
-			return err
+		res := tx.Model(&store.APIKey{}).Where("org_id = ? and id = ? and revoked_at is null", org, id).Update("scopes", now)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return say.New("that key isn't in this organisation, or has been revoked")
 		}
 		return s.Log(tx, org, 0, nil, actor, "key:scopes", new(k.Name+": "+now))
 	})

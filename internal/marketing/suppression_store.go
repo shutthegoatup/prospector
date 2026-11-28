@@ -23,8 +23,15 @@ func (s *SuppressionStore) Suppress(org int64, address, actor string) (*store.Su
 	}
 	var row *store.Suppression
 	err = s.DB.Transaction(func(tx *gorm.DB) error {
+		var was store.Suppression
+		if err := tx.Where("org_id = ? and address = ?", org, addr).Limit(1).Find(&was).Error; err != nil {
+			return err
+		}
 		if row, err = s.SuppressIn(tx, org, addr, SuppressAdded, actor); err != nil {
 			return err
+		}
+		if was.ID != 0 && was.Reason == row.Reason {
+			return nil
 		}
 		// Not the address: the history would keep it after they were erased.
 		return s.Log(tx, org, 0, nil, actor, "suppression:add", nil)
