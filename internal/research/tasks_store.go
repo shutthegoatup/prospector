@@ -1407,6 +1407,17 @@ func (s *ResearchStore) AgentAddCompany(org int64, who store.Actor, in AddCompan
 				added++
 			}
 		}
+		if !created {
+			for _, f := range filedOtherwise(c, domain, in.Country, in.Segment) {
+				_, had, err := addFact(tx, org, c.ID, f, who.Name)
+				if err != nil {
+					return err
+				}
+				if !had {
+					added++
+				}
+			}
+		}
 		// Older clients' fields become facts; with no configurator link they cite nothing, as they did as columns.
 		older, err := AddConfiguratorFacts(tx, org, c.ID, in.ConfiguratorURL, in.Platform, in.BuiltBy, who.Name)
 		if err != nil {
