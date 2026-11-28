@@ -1,0 +1,73 @@
+package app
+
+import (
+	"fmt"
+	"reflect"
+	"testing"
+	"time"
+
+	"gorm.io/gorm"
+
+	"github.com/shutthegoatup/prospector/internal/paging"
+	"github.com/shutthegoatup/prospector/internal/prospecting"
+	"github.com/shutthegoatup/prospector/internal/research"
+	"github.com/shutthegoatup/prospector/internal/store"
+)
+
+// queries counts the reads a store makes while do runs.
+func queries(t *testing.T, s *Store, do func()) (n int) {
+	t.Helper()
+	name := "count:" + t.Name()
+	if err := s.DB.Callback().Query().Before("gorm:query").Register(name, func(*gorm.DB) { n++ }); err != nil {
+		t.Fatal(err)
+	}
+	defer s.DB.Callback().Query().Remove(name)
+	do()
+	return n
+}
+
+func TestTheTaskListTakesNoMoreQueriesForMoreTasks(t *testing.T) {
+	t.Parallel()
+	s := tempStore(t)
+	o := mustOrg(t, s, "alpha")
+	scout, second := store.Actor{Name: "agent:scout", KeyID: 1}, store.Actor{Name: "agent:second", KeyID: 2}
+	work := func(i int) {
+		task := must(s.CreateTask(o.ID, "", fmt.Sprint("Find makers of garden rooms, part ", i), "Nia"))
+		must(s.AgentTask(o.ID, scout, task.ID, paging.Page{}))
+		co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: fmt.Sprint("Larkmoor ", i), Task: task.ID}))
+		must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: co.Name, Name: fmt.Sprintf("Ada V%cle", rune(0x61+i)),
+			SourceURL: "https://larkmoor.example/team", Task: task.ID}))
+		must(s.AgentNote(o.ID, second, research.NoteIn{Task: task.ID, Company: "Larkmoor 0", Kind: "skipped", Text: "No team page"}))
+		if _, err := s.AskTask(o.ID, task.ID, "And their head of digital", "Nia"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	work(0)
+	now := time.Now()
+	var one, many []research.TaskView
+	forOne := queries(t, s, func() { one = must(firstOf(s.Tasks(o.ID, true, 1, now))) })
+	for i := 1; i < 12; i++ {
+		work(i)
+	}
+	forMany := queries(t, s, func() { many = must(firstOf(s.Tasks(o.ID, true, 1, now))) })
+	if len(one) != 1 || len(many) != 12 {
+		t.Fatalf("listed %d and %d tasks", len(one), len(many))
+	}
+	if forMany != forOne {
+		t.Fatalf("a list of 12 tasks took %d queries where a list of one took %d", forMany, forOne)
+	}
+
+	// Each task in the list reads as it does by itself.
+	for _, listed := range many {
+		alone := must(s.Task(o.ID, listed.ID, now))
+		if len(listed.Requests) != 2 || len(listed.Companies) != 1 || len(listed.People) != 1 || len(listed.Notes) != 1 || listed.Last == nil {
+			t.Fatalf("task %d in the list is missing what was done for it: %+v", listed.ID, listed)
+		}
+		if listed.Notes[0].Company != "Larkmoor 0" {
+			t.Fatalf("a note about a company the task didn't find lost its name: %+v", listed.Notes[0])
+		}
+		if !reflect.DeepEqual(listed, *alone) {
+			t.Fatalf("task %d reads differently in the list:\nlisted %+v\nalone  %+v", listed.ID, listed, *alone)
+		}
+	}
+}
