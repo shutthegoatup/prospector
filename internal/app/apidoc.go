@@ -2,6 +2,7 @@ package app
 
 import (
 	"log"
+	"maps"
 	"net/http"
 	"slices"
 	"sort"
@@ -80,7 +81,7 @@ func apiDocOf(spec *openapi3.T) APIDoc {
 		order = append(order, t.Name)
 	}
 	paths := spec.Paths.InMatchingOrder()
-	sort.Strings(paths)
+	slices.Sort(paths)
 	methods := []string{"GET", "POST", "PUT", "PATCH", "DELETE"}
 	for _, path := range paths {
 		item := spec.Paths.Value(path)
@@ -104,11 +105,7 @@ func apiDocOf(spec *openapi3.T) APIDoc {
 					o.Body = &body
 				}
 			}
-			codes := make([]string, 0, op.Responses.Len())
-			for code := range op.Responses.Map() {
-				codes = append(codes, code)
-			}
-			sort.Strings(codes)
+			codes := slices.Sorted(maps.Keys(op.Responses.Map()))
 			for _, code := range codes {
 				res := op.Responses.Value(code).Value
 				r := APIResponse{Code: code, About: oneLine(store.Deref(res.Description))}
@@ -131,11 +128,7 @@ func apiDocOf(spec *openapi3.T) APIDoc {
 	for _, name := range order {
 		doc.Groups = append(doc.Groups, *groups[name])
 	}
-	names := make([]string, 0, len(spec.Components.Schemas))
-	for name := range spec.Components.Schemas {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(spec.Components.Schemas))
 	for _, name := range names {
 		doc.Schemas = append(doc.Schemas, schemaOf(name, spec.Components.Schemas[name]))
 	}

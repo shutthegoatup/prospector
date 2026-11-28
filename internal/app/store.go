@@ -38,7 +38,7 @@ type Store struct {
 	crm.CRMStore
 	identity.IdentityStore
 	agents.AgentStore
-	identity.SsoStore
+	identity.SSOStore
 	marketing.SuppressionStore
 	onboarding.CustomerStore
 	sales.DealStore
@@ -47,7 +47,7 @@ type Store struct {
 }
 
 func newStore(c *store.Core) *Store {
-	s := &Store{Core: c, IdentityStore: identity.IdentityStore{Core: c}, AgentStore: agents.AgentStore{Core: c}, SsoStore: identity.SsoStore{Core: c},
+	s := &Store{Core: c, IdentityStore: identity.IdentityStore{Core: c}, AgentStore: agents.AgentStore{Core: c}, SSOStore: identity.SSOStore{Core: c},
 		SuppressionStore: marketing.SuppressionStore{Core: c}, CustomerStore: onboarding.CustomerStore{Core: c}, DealStore: sales.DealStore{Core: c},
 		SubscriptionStore: sales.SubscriptionStore{Core: c}, OnboardingStore: onboarding.OnboardingStore{Core: c}, PrivacyStore: privacy.PrivacyStore{Core: c}}
 	// An area that needs another's queries holds that area, not the whole store.

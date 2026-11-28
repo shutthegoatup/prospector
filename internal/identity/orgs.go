@@ -10,7 +10,6 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"github.com/jackc/pgx/v5/pgconn"
 
@@ -87,12 +86,6 @@ func (s *IdentityStore) setRole(tx *gorm.DB, org int64, m *store.Membership, rol
 		return err
 	}
 	return s.Log(tx, org, 0, nil, actor, store.ActMemberRole, new(u.Email+": "+role))
-}
-
-// lockOrg makes changes to one organisation's members take turns, so two owners
-// removing each other at the same moment can't both count the other as remaining.
-func lockOrg(tx *gorm.DB, org int64) error {
-	return tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&store.Org{}, org).Error
 }
 
 func LastOwner(tx *gorm.DB, org int64) bool {

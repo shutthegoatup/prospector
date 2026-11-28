@@ -190,7 +190,7 @@ func (s *IdentityStore) AddMember(org, user int64, role, callerName, actor strin
 		return say.Errorf("a role is owner or member, not %q", role)
 	}
 	return s.DB.Transaction(func(tx *gorm.DB) error {
-		if err := lockOrg(tx, org); err != nil {
+		if err := store.HoldOrg(tx, org); err != nil {
 			return err
 		}
 		var m store.Membership
@@ -218,7 +218,7 @@ func (s *IdentityStore) SetRole(org, user int64, role, actor string) error {
 		return say.Errorf("a role is owner or member, not %q", role)
 	}
 	return s.DB.Transaction(func(tx *gorm.DB) error {
-		if err := lockOrg(tx, org); err != nil {
+		if err := store.HoldOrg(tx, org); err != nil {
 			return err
 		}
 		var m store.Membership
@@ -236,7 +236,7 @@ func (s *IdentityStore) SetRole(org, user int64, role, actor string) error {
 func (s *IdentityStore) RemoveMember(org, user int64, actor string) (*store.User, error) {
 	var u store.User
 	return &u, s.DB.Transaction(func(tx *gorm.DB) error {
-		if err := lockOrg(tx, org); err != nil {
+		if err := store.HoldOrg(tx, org); err != nil {
 			return err
 		}
 		var m store.Membership

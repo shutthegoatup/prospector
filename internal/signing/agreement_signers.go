@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math"
 	"net/mail"
+	"slices"
 	"strings"
 
 	"github.com/pdfcpu/pdfcpu/pkg/api"
@@ -105,7 +106,7 @@ func fieldFits(f store.AgreementField, pages int, signers map[int64]bool) error 
 	switch {
 	case !signers[f.RecipientID]:
 		return say.Errorf("recipient %d isn't one of this agreement's signers", f.RecipientID)
-	case !Contains(fieldKinds, f.Kind):
+	case !slices.Contains(fieldKinds, f.Kind):
 		return say.Errorf("a field is one of %s", strings.Join(fieldKinds, ", "))
 	case f.Page < 1 || f.Page > pages:
 		return say.Errorf("the document has pages 1 to %d", pages)
