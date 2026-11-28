@@ -12,6 +12,7 @@ import { actor, onDay } from "@/lib/format";
 import { intl } from "@/i18n";
 import { safeHref } from "@/lib/links";
 import { useSession } from "@/session";
+import { writeClipboard } from "@/lib/clipboard";
 
 type DueCard = components["schemas"]["DueCard"];
 type Step = DueCard["step"];
@@ -198,24 +199,6 @@ function clock(d: Date) {
 const today = (d = new Date()) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
 
 const typing = () => /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "");
-
-// The clipboard API exists only on HTTPS and localhost; on a plain-HTTP LAN address
-// the older execCommand copy still works inside the click.
-function writeClipboard(text: string) {
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text).catch(() => {});
-    return;
-  }
-  const area = document.createElement("textarea");
-  area.value = text;
-  area.setAttribute("readonly", "");
-  area.style.position = "fixed";
-  area.style.opacity = "0";
-  document.body.append(area);
-  area.select();
-  document.execCommand("copy");
-  area.remove();
-}
 
 type LinkTo = (props: { className: string; children: ReactNode }) => ReactNode;
 type Todo = { label: string; count: number; link: LinkTo };

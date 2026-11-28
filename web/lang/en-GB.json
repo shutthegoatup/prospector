@@ -671,6 +671,10 @@
     "defaultMessage": "key saved · {used} of {limit, plural, one {# lookup} other {# lookups}} used in {month} (UTC)",
     "description": "On a data vendor's card: how many of this month's lookups are used. {month} is the month's name"
   },
+  "70Htj2": {
+    "defaultMessage": "Postmark isn't reporting here yet.",
+    "description": "In the Bounces section, before Postmark is connected"
+  },
   "738jqv": {
     "defaultMessage": "verified",
     "description": "Tag beside a domain proved to be the organisation's"
@@ -1171,6 +1175,10 @@
     "defaultMessage": "Download everything",
     "description": "Button to download everything the organisation holds as one file"
   },
+  "Et85CB": {
+    "defaultMessage": "Mail {address} again? It bounced on {date}; if it still bounces, Postmark puts it back.",
+    "description": "Asked before taking a bounced address off the list not to be mailed. {address} is the address, {date} when it bounced"
+  },
   "EtAwvM": {
     "defaultMessage": "Every contact goes through these steps; the waits come from above.",
     "description": "Under the heading of the Sequence section; the waits are the day counts set in the Organisation section"
@@ -1190,6 +1198,10 @@
   "F/wbYX": {
     "defaultMessage": "{prospector}'s agents",
     "description": "What a screen reader calls the counts of the product's own agents by state. {prospector} is the product's name, Prospector"
+  },
+  "F2/5Ij": {
+    "defaultMessage": "When mail to an address bounces for good, or someone marks it as spam, Postmark tells {prospector}, and the address goes on Not to be mailed. Soft bounces change nothing.",
+    "description": "Under the heading of the Bounces section. {prospector} is the product's name"
   },
   "F2Pytr": {
     "defaultMessage": "Twenty more, in Scotland this time.",
@@ -1351,6 +1363,10 @@
     "defaultMessage": "Unsubscribe",
     "description": "Title of the page an unsubscribe link opens, and its button"
   },
+  "HU8Z1U": {
+    "defaultMessage": "The address holds its password and is shown only now. If you lose it, connect again: the old one stops working.",
+    "description": "Under the address to paste into Postmark"
+  },
   "HVKPd7": {
     "defaultMessage": "Accept",
     "description": "Button to accept a detail found for a person"
@@ -1374,6 +1390,10 @@
   "HgOAJ9": {
     "defaultMessage": "Redirect URI",
     "description": "Label of the address the provider sends people back to"
+  },
+  "HiUpGg": {
+    "defaultMessage": "Tick <b>Bounce</b> and <b>Spam Complaint</b>, and leave the other events off.",
+    "description": "Which of Postmark's webhook events to turn on. <b> marks Postmark's names for them"
   },
   "HkI9B7": {
     "defaultMessage": "You won't get these again",
@@ -1514,6 +1534,10 @@
   "JTms4T": {
     "defaultMessage": "Connection note",
     "description": "Label of the field for the note sent with a LinkedIn connection request"
+  },
+  "JVE/Sg": {
+    "defaultMessage": "Copy",
+    "description": "Button copying the address to paste into Postmark"
   },
   "JX+D3g": {
     "defaultMessage": "Ask for more",
@@ -1835,6 +1859,10 @@
     "defaultMessage": "A SearXNG instance you run: free, open-source search, with json among its search.formats. The agent searches through it, and reads pages itself, with no paid search service.",
     "description": "Under the field for an agent's search. SearXNG is a product's name; json and search.formats are its settings, kept as they are"
   },
+  "NwFzBG": {
+    "defaultMessage": "Postmark reports bounces and spam complaints here.",
+    "description": "In the Bounces section, once Postmark is connected"
+  },
   "NwGjP1": {
     "defaultMessage": "Nobody yet.",
     "description": "Under Signers when nobody signs the agreement yet"
@@ -2114,6 +2142,10 @@
   "QzOhFx": {
     "defaultMessage": "{claudeCode} or any MCP client, with a key that has only the scopes it needs. No key can mark anything sent or reach another organisation, and only one with {scope} can change settings.",
     "description": "Under the choice to add the organisation's own agent. {claudeCode} is a product's name, Claude Code; {scope} is the name of a key's scope, settings:write"
+  },
+  "R1ZNJ9": {
+    "defaultMessage": "A new address replaces the one Postmark has, so paste it there too.",
+    "description": "Under the Make a new address button"
   },
   "R4Ycdt": {
     "defaultMessage": "marked a mail as spam {date}",
@@ -2895,6 +2927,10 @@
     "defaultMessage": "Enter a number, or 0 for none.",
     "description": "When a number field of a subscription was emptied"
   },
+  "bj8fFc": {
+    "defaultMessage": "Copied ✓",
+    "description": "The copy button's label once it has copied the address"
+  },
   "bl7mMD": {
     "defaultMessage": "Due",
     "description": "What a screen reader calls a step's due date field"
@@ -3142,6 +3178,10 @@
   "ehKP45": {
     "defaultMessage": "{n} skipped",
     "description": "Count of a campaign's mails skipped, in the line under its name"
+  },
+  "eklRVU": {
+    "defaultMessage": "Bounces and spam complaints",
+    "description": "Heading of the settings section that connects Postmark's reports of mail that came back"
   },
   "em6+Ov": {
     "defaultMessage": "Agreements, ready to sign",
@@ -3391,6 +3431,10 @@
     "defaultMessage": "Make member",
     "description": "Button to make an owner a member"
   },
+  "hp9sm0": {
+    "defaultMessage": "Make a new address",
+    "description": "Button replacing the address Postmark reports to, as when it was lost"
+  },
   "hrbyYj": {
     "defaultMessage": "Currency",
     "description": "Label of the currency deals are valued in"
@@ -3418,6 +3462,10 @@
   "i9tD0N": {
     "defaultMessage": "No agents yet.",
     "description": "On the agents page when there are no agents"
+  },
+  "iAm3Gz": {
+    "defaultMessage": "Stop taking bounces and spam complaints from Postmark? Addresses already listed stay listed.",
+    "description": "Asked before stopping Postmark's reports"
   },
   "iCmTO/": {
     "defaultMessage": "Settings",
@@ -3450,6 +3498,10 @@
   "iYWqCK": {
     "defaultMessage": "Client ID",
     "description": "Label of the client ID the provider gave for single sign-on"
+  },
+  "ieSwqc": {
+    "defaultMessage": "For the Postmark server your mail goes through.",
+    "description": "Under the Connect Postmark button"
   },
   "iq/mRr": {
     "defaultMessage": "From a company name to a signed deal, in three pages.",
@@ -3827,6 +3879,10 @@
     "defaultMessage": "What you sell",
     "description": "Heading of the settings page's section of the organisation's offerings"
   },
+  "oWRzxG": {
+    "defaultMessage": "Connect Postmark",
+    "description": "Button making the address Postmark reports bounces and spam complaints to"
+  },
   "or6Zzo": {
     "defaultMessage": "Password",
     "description": "Label of the mail server's password"
@@ -4171,6 +4227,10 @@
     "defaultMessage": "Your voice",
     "description": "Heading of the settings page's section for the member's caller name and signature"
   },
+  "tiOCmO": {
+    "defaultMessage": "Address for Postmark",
+    "description": "What a screen reader calls the address to paste into Postmark"
+  },
   "tm5UAO": {
     "defaultMessage": "Email",
     "description": "Label of the email address field"
@@ -4206,6 +4266,10 @@
   "u91Ufh": {
     "defaultMessage": "Agents",
     "description": "Front page navigation link to the section on AI agents and the API"
+  },
+  "uCjplR": {
+    "defaultMessage": "Paste this address into Postmark: your server, then <b>Webhooks</b>, then <b>Add webhook</b>.",
+    "description": "Above the address to paste into Postmark. <b> marks the names of Postmark's own pages"
   },
   "uFqR/b": {
     "defaultMessage": "asks {vendors} in {month}",
@@ -4498,6 +4562,10 @@
   "xfzi4R": {
     "defaultMessage": "e.g. 14,000",
     "description": "Placeholder of the field for what a deal is worth: an example amount"
+  },
+  "xkH+Dm": {
+    "defaultMessage": "Stop",
+    "description": "Button to stop taking bounces and spam complaints from Postmark"
   },
   "xkqhRH": {
     "defaultMessage": "Open my steps",
