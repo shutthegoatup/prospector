@@ -88,13 +88,13 @@ func (s SalesAPI) ChangeSubscription(ctx context.Context, in api.ChangeSubscript
 	}
 	// Dates being cleared go first, since a start is checked against them; those being
 	// set go last, since they are checked against the start.
-	var cleared, changes, dated []SubscriptionChange
+	var cleared, changes, dated []store.Change
 	for _, set := range []struct {
 		field string
 		value *string
 	}{{"name", b.Name}, {"amount", b.Amount}, {"per", b.Per}, {"start", b.Start}, {"term_months", number(b.TermMonths)}, {"then", b.Then},
 		{"notice_days", number(b.NoticeDays)}, {"notice_on", b.NoticeOn}, {"ended_on", b.EndedOn}} {
-		switch c := (SubscriptionChange{Field: set.field, Value: store.Deref(set.value)}); {
+		switch c := (store.Change{Field: set.field, Value: store.Deref(set.value)}); {
 		case set.value == nil:
 		case set.field != "notice_on" && set.field != "ended_on":
 			changes = append(changes, c)

@@ -73,19 +73,14 @@ func (s *SubscriptionStore) AddSubscription(org int64, in SubscriptionIn, actor 
 // was agreed when; a name is free text and a price is the customer's business, so
 // those are noted as changed and no more.
 func (s *SubscriptionStore) ChangeSubscription(org, id int64, field, value, actor string) error {
-	return s.ChangeSubscriptionFields(org, id, []SubscriptionChange{{field, value}}, actor)
+	return s.ChangeSubscriptionFields(org, id, []store.Change{{Field: field, Value: value}}, actor)
 }
 
 // ChangeSubscriptionFields makes several changes or none: one that is refused takes
 // back those before it.
-func (s *SubscriptionStore) ChangeSubscriptionFields(org, id int64, changes []SubscriptionChange, actor string) error {
-	return s.DB.Transaction(func(tx *gorm.DB) error {
-		for _, c := range changes {
-			if err := s.changeSubscription(tx, org, id, c.Field, strings.TrimSpace(c.Value), actor); err != nil {
-				return err
-			}
-		}
-		return nil
+func (s *SubscriptionStore) ChangeSubscriptionFields(org, id int64, changes []store.Change, actor string) error {
+	return s.Apply(changes, func(tx *gorm.DB, ch store.Change) error {
+		return s.changeSubscription(tx, org, id, ch.Field, strings.TrimSpace(ch.Value), actor)
 	})
 }
 

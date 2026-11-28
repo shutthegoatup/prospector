@@ -105,13 +105,8 @@ func (s *CRMStore) Update(org, id int64, field, value, actor string) error {
 // ChangeContactFields makes several changes to a person, or none: one that is refused
 // takes back those before it.
 func (s *CRMStore) ChangeContactFields(org, id int64, changes []store.Change, actor string) error {
-	return s.DB.Transaction(func(tx *gorm.DB) error {
-		for _, c := range changes {
-			if err := s.SetContactField(tx, org, id, c.Field, c.Value, actor); err != nil {
-				return err
-			}
-		}
-		return nil
+	return s.Apply(changes, func(tx *gorm.DB, ch store.Change) error {
+		return s.SetContactField(tx, org, id, ch.Field, ch.Value, actor)
 	})
 }
 

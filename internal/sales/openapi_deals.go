@@ -86,18 +86,9 @@ func (s SalesAPI) deal(org int64, own bool, id int64) (api.Deal, error) {
 	return api.Deal{}, store.NoSuch("no deal %d", id)
 }
 
-func dealChanges(b *api.DealChange) []store.Change {
-	var out []store.Change
-	for _, set := range []struct {
-		field string
-		value *string
-	}{{"kind", b.Kind}, {"amount", b.Amount}, {"close_date", b.CloseDate}, {"owner", b.Owner}, {"stage", b.Stage},
-		{"next_step", b.NextStep}, {"next_date", b.NextDate}, {"lost_reason", b.LostReason}} {
-		if set.value != nil {
-			out = append(out, store.Change{Field: set.field, Value: *set.value})
-		}
-	}
-	return out
+func dealChanges(b *api.DealChange) store.Changes {
+	return store.Changes{}.Set("kind", b.Kind).Set("amount", b.Amount).Set("close_date", b.CloseDate).Set("owner", b.Owner).
+		Set("stage", b.Stage).Set("next_step", b.NextStep).Set("next_date", b.NextDate).Set("lost_reason", b.LostReason)
 }
 
 func (s SalesAPI) ListDeals(ctx context.Context, in api.ListDealsRequestObject) (api.ListDealsResponseObject, error) {
