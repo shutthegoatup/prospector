@@ -1,5 +1,1 @@
-{
-  "source": "en-GB",
-  "translated": [],
-  "pseudo": ["en-XA"]
-}
+{ "source": "en-GB", "translated": ["es", "de", "fr", "ja", "it", "nl", "pt", "sv", "da", "nb"], "pseudo": ["en-XA"] }

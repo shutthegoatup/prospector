@@ -35,7 +35,7 @@ async function first(tab: Page, list: string) {
 // Every page inside an organisation: those the server lists in appPages, read from where
 // it lists them so a new one is checked without being added here, and one of each kind
 // of page about a single thing.
-const listed = [...readFileSync(new URL("../../app_ui.go", import.meta.url), "utf8").matchAll(/^var appPages = \[\]string\{(.*)\}$/gm)]
+const listed = [...readFileSync(new URL("../../internal/app/app_ui.go", import.meta.url), "utf8").matchAll(/^var appPages = \[\]string\{(.*)\}$/gm)]
   .flatMap((m) => (m[1] ?? "").split(", "))
   .map((p) => JSON.parse(p) as string);
 const pages: { name: string; path: (tab: Page) => Promise<string> }[] = [

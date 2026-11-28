@@ -33,6 +33,7 @@
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
     "@formatjs/cli": "6.16.36",
+    "@formatjs/icu-messageformat-parser": "3.5.23",
     "@playwright/test": "1.65.1",
     "@stoplight/spectral-cli": "6.17.1",
     "@types/node": "26.6.11",

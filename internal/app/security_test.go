@@ -1240,6 +1240,9 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	if _, message := problemText(request.Locales.Source, http.StatusUnauthorized, "an API key is needed: Authorization: Bearer pk_…"); strings.HasSuffix(message, "….") {
 		t.Fatalf("a full stop was added after an ellipsis: %q", message)
 	}
+	if _, message := problemText("ja", http.StatusUnauthorized, "APIキーが必要です。"); message != "APIキーが必要です。" {
+		t.Fatalf("a full stop was added after a Japanese one: %q", message)
+	}
 
 	// A proxy's Basic sign-in travels with every request the browser makes, another
 	// site's included, so it doesn't count as a key.

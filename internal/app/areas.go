@@ -49,7 +49,16 @@ func areaRefusal(area string) *say.Text {
 	if area == store.AreaAny {
 		return say.New("you read only here: an owner can give you an area on the Team list in Settings")
 	}
+	if t, ok := areaRefusals[area]; ok {
+		return t
+	}
 	return say.Errorf("that's %[1]s work, which you don't do here: an owner can add %[1]s to you on the Team list in Settings", area)
+}
+
+// areaRefusals are whole sentences, so each area is worded in the reader's language.
+var areaRefusals = map[string]*say.Text{
+	identity.AreaSales:   say.New("that's sales work, which you don't do here: an owner can add sales to you on the Team list in Settings"),
+	identity.AreaSupport: say.New("that's support work, which you don't do here: an owner can add support to you on the Team list in Settings"),
 }
 
 func memberWork(m store.Membership) string {

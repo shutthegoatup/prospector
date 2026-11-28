@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -131,20 +132,60 @@ func constant(e ast.Expr, consts map[string]string) (string, bool) {
 	return "", false
 }
 
+// verbs are the format's verbs, each with the argument it fills, so that a translation
+// may put them in another order with explicit indices (%[2]d … %[1]s) but fills each
+// argument as the source does.
 func verbs(format string) []string {
 	var v []string
+	arg := 1
 	for _, p := range say.Split(format) {
-		if strings.HasPrefix(p, "%") && p != "%%" {
-			v = append(v, p)
+		if !strings.HasPrefix(p, "%") || p == "%%" {
+			continue
 		}
+		if i := strings.IndexByte(p, '['); i >= 0 {
+			if n, err := strconv.Atoi(p[i+1 : strings.IndexByte(p, ']')]); err == nil {
+				arg = n
+			}
+		}
+		v = append(v, fmt.Sprintf("%d:%c", arg, p[len(p)-1]))
+		arg++
 	}
 	slices.Sort(v)
 	return v
 }
 
+func TestATranslationMayReorderItsVerbsByIndex(t *testing.T) {
+	source := verbs("%s is marked added; their email comes up in %d days.")
+	for format, fits := range map[string]bool{
+		"In %[2]d Tagen kommt die E-Mail an %[1]s.": true,
+		"%s: E-Mail in %d Tagen.":                   true,
+		"In %d Tagen kommt die E-Mail an %s.":       false,
+		"%s: E-Mail bald.":                          false,
+	} {
+		if got := slices.Equal(verbs(format), source); got != fits {
+			t.Errorf("%q fits %v: %v", format, source, got)
+		}
+	}
+}
+
+func writeCatalogue(t *testing.T, path string, c map[string]say.Message) {
+	t.Helper()
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(c); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, b.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // TestTheServersWordsAreCatalogued gathers what the server says into the source's
 // catalogue, internal/say/lang/en-GB.json, which translators work from: run with
-// PROSPECTOR_WRITE_LANG=1 to write it after changing what the server says. A
+// PROSPECTOR_WRITE_LANG=1 to write it after changing what the server says, which also
+// drops translations of what it no longer says. A
 // translation may leave a format out, which then reads in English, but has none the
 // source lacks, and fills the same verbs.
 func TestTheServersWordsAreCatalogued(t *testing.T) {
@@ -163,15 +204,20 @@ func TestTheServersWordsAreCatalogued(t *testing.T) {
 			}
 			c[f] = m
 		}
-		var b bytes.Buffer
-		enc := json.NewEncoder(&b)
-		enc.SetEscapeHTML(false)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(c); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, b.Bytes(), 0o644); err != nil {
-			t.Fatal(err)
+		writeCatalogue(t, path, c)
+		// A translation of what the server no longer says is dropped: changing the
+		// English asks for it again.
+		for _, lang := range say.Languages() {
+			if lang == say.Source {
+				continue
+			}
+			kept := map[string]say.Message{}
+			for f, m := range say.Catalogue(lang) {
+				if _, ok := c[f]; ok {
+					kept[f] = m
+				}
+			}
+			writeCatalogue(t, filepath.Join("../..", "internal", "say", "lang", lang+".json"), kept)
 		}
 		return
 	}
@@ -194,7 +240,7 @@ func TestTheServersWordsAreCatalogued(t *testing.T) {
 		}
 		for f, m := range say.Catalogue(lang) {
 			if _, ok := source[f]; !ok {
-				t.Errorf("%s: %q isn't something the server says", lang, f)
+				t.Errorf("%s: %q isn't something the server says: run PROSPECTOR_WRITE_LANG=1 go test -run TestTheServersWordsAreCatalogued .", lang, f)
 				continue
 			}
 			texts := []string{m.Text}

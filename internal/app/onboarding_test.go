@@ -33,6 +33,12 @@ func TestOnboardingStepsAreReadALineEach(t *testing.T) {
 	if err != nil || len(odd) != 2 || odd[0] != (store.StepPlan{Name: "Call them: agree 3 sites", Who: store.StepOurs, Days: -1}) || odd[1] != (store.StepPlan{Name: "Sign", Who: store.StepTheirs, Days: 0}) {
 		t.Errorf("odd lines read as %+v (%v)", odd, err)
 	}
+	// The days may be in the organisation's own words.
+	for line, days := range map[string]int{"us: Kick-off call, 10 dni": 10, "them: プロジェクト責任者を決める、2日": 2, "Go live, 30": 30} {
+		if got, err := (store.OrgSettings{OnboardingSteps: line}).Onboarding(); err != nil || len(got) != 1 || got[0].Days != days {
+			t.Errorf("%q read as %+v (%v), want %d days", line, got, err, days)
+		}
+	}
 	for why, text := range map[string]string{"no name": "them:, 3 days", "three years": "Go live, 1000 days", "too many": strings.Repeat("Step\n", 41)} {
 		if _, err := (store.OrgSettings{OnboardingSteps: text}).Onboarding(); err == nil {
 			t.Errorf("steps with %s were accepted", why)

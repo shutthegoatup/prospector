@@ -48,7 +48,9 @@ type StepPlan struct {
 	Days int
 }
 
-var StepDays = regexp.MustCompile(`(?i),\s*(\d+)\s*days?\s*$`)
+// StepDays is a step's days at the end of its line, after a comma, in whatever word
+// the organisation's language has for them: ", 7 days", ", 7 dni", "、7日".
+var StepDays = regexp.MustCompile(`[,、，]\s*(\d+)\s*\p{L}*\s*$`)
 
 const MaxOnboardingSteps = 40
 

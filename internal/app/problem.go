@@ -101,7 +101,7 @@ func problemText(lang string, code int, text string) (title, message string) {
 	if first, size := utf8.DecodeRuneInString(message); size > 0 {
 		message = string(unicode.ToUpper(first)) + message[size:]
 	}
-	if last, _ := utf8.DecodeLastRuneInString(message); message != "" && !strings.ContainsRune(".!?…", last) {
+	if last, _ := utf8.DecodeLastRuneInString(message); message != "" && !unicode.Is(unicode.Sentence_Terminal, last) && last != '…' {
 		message += "."
 	}
 	switch {

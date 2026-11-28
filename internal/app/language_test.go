@@ -203,6 +203,15 @@ func TestTheFrontPageIsInTheVisitorsLanguage(t *testing.T) {
 	if got := res.Header.Get("Content-Language"); got != pseudo || !strings.Contains(res.Header.Get("Vary"), "Accept-Language, Cookie") {
 		t.Errorf("Content-Language %q, Vary %q", got, res.Header.Get("Vary"))
 	}
+	// A search engine is told where each language's front page is, at this server's address.
+	for _, lang := range append([]string{request.Locales.Source}, request.Locales.Translated...) {
+		if want := `<link rel="alternate" hreflang="` + lang + `" href="` + srv.URL + `/?lang=` + lang + `" />`; !strings.Contains(body, want) {
+			t.Errorf("the front page lacks %s", want)
+		}
+	}
+	if strings.Contains(body, "prospector.invalid") || !strings.Contains(body, `hreflang="x-default" href="`+srv.URL+`/"`) {
+		t.Error("the front page's alternates aren't at this server's address")
+	}
 	// The hosted terms stay English, and say so.
 	start := strings.Index(body, `id="pricing"`)
 	if start < 0 {
