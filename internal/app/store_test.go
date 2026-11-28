@@ -68,7 +68,7 @@ func TestSnapshotRoundTrip(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "acme")
-	if _, err := s.Import(o.ID, readFixtures(t)); err != nil {
+	if _, err := s.Import(o.ID, readFixtures(t), "import"); err != nil {
 		t.Fatal(err)
 	}
 	want, err := s.SnapshotText(o.ID)
@@ -136,7 +136,7 @@ func TestImportKeepsRecordedDates(t *testing.T) {
 	p := readFixtures(t)
 	s := tempStore(t)
 	o := mustOrg(t, s, "acme")
-	if _, err := s.Import(o.ID, p); err != nil {
+	if _, err := s.Import(o.ID, p, "import"); err != nil {
 		t.Fatal(err)
 	}
 	c, err := s.FindOne(o.ID, p.Drafts[len(p.Drafts)-1].Person)
@@ -146,7 +146,7 @@ func TestImportKeepsRecordedDates(t *testing.T) {
 	if err := s.Mark(o.ID, c.ID, "email", "2026-01-02", "test"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Import(o.ID, p); err != nil {
+	if _, err := s.Import(o.ID, p, "import"); err != nil {
 		t.Fatal(err)
 	}
 	var after store.Contact
@@ -263,7 +263,7 @@ func signedIn(t *testing.T) (*Store, *store.Org, *httptest.Server, *http.Client)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AddMember(o.ID, u.ID, "owner", u.Name); err != nil {
+	if err := s.AddMember(o.ID, u.ID, "owner", u.Name, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	srv := httptest.NewServer((&App{s: s}).Routes())
@@ -394,7 +394,7 @@ func TestAPIKeys(t *testing.T) {
 	if code, body := call(t, keyed(readOnly), "GET", api+"search?q=fjord", "", nil); code != http.StatusOK || !strings.Contains(body, "Fjordline") {
 		t.Fatalf("search: %d %s", code, body)
 	}
-	if err := s.RevokeKey(o.ID, writerKey.ID); err != nil {
+	if err := s.RevokeKey(o.ID, writerKey.ID, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	if code, _ := call(t, keyed(writer), "GET", api+"due", "", nil); code != http.StatusUnauthorized {

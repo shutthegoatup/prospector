@@ -224,7 +224,7 @@ func TestNeverContactCatchesMistakes(t *testing.T) {
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	p := readFixtures(t)
-	if _, err := s.Import(o.ID, p); err != nil {
+	if _, err := s.Import(o.ID, p, "import"); err != nil {
 		t.Fatal(err)
 	}
 	c, err := s.FindOne(o.ID, "Hannah")
@@ -252,17 +252,17 @@ func TestNeverContactCatchesMistakes(t *testing.T) {
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Import(o.ID, fresh); err != nil {
+	if _, err := s.Import(o.ID, fresh, "import"); err != nil {
 		t.Fatalf("listing someone already stored broke the next import: %v", err)
 	}
 	fresh.Drafts[1].Linkedin = "https://www.linkedin.com/in/a-new-profile"
 	fresh.Drafts[1].Email = strings.ToUpper(fresh.Drafts[1].Email)
-	if _, err := s.Import(o.ID, fresh); err != nil {
+	if _, err := s.Import(o.ID, fresh, "import"); err != nil {
 		t.Fatalf("a listed person's unlisted link couldn't change: %v", err)
 	}
 	p.Drafts[0].Email = "someone@blocked.example"
 	p.Drafts[0].Note = "changed"
-	if _, err := s.Import(o.ID, p); err == nil || !strings.Contains(err.Error(), p.Drafts[0].Key) {
+	if _, err := s.Import(o.ID, p, "import"); err == nil || !strings.Contains(err.Error(), p.Drafts[0].Key) {
 		t.Fatalf("an import with a never-contact address went through: %v", err)
 	}
 	var kept store.Contact
@@ -442,7 +442,7 @@ func TestRemoveMember(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		if err := s.AddMember(org.ID, u.ID, role, u.Name); err != nil {
+		if err := s.AddMember(org.ID, u.ID, role, u.Name, "Owner One"); err != nil {
 			t.Fatal(err)
 		}
 		jar, _ := cookiejar.New(nil)
@@ -515,7 +515,7 @@ func TestRemoveMember(t *testing.T) {
 	if _, err := s.RemoveMember(o.ID, carol.ID, "test"); err == nil {
 		t.Fatal("the organisation was left with no owner")
 	}
-	if err := s.AddMember(o.ID, carol.ID, "", carol.Name); err == nil {
+	if err := s.AddMember(o.ID, carol.ID, "", carol.Name, "Owner One"); err == nil {
 		t.Fatal("an empty role was accepted")
 	}
 	var removals int64
@@ -662,7 +662,7 @@ func TestNeverContactEntries(t *testing.T) {
 func TestContentPolicy(t *testing.T) {
 	t.Parallel()
 	s, o, srv, client := signedIn(t)
-	if _, err := s.Import(o.ID, readFixtures(t)); err != nil {
+	if _, err := s.Import(o.ID, readFixtures(t), "import"); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := s.CreateKey(o.ID, "bot", []string{"read"}, "test"); err != nil {
@@ -906,7 +906,7 @@ func TestFirstPasswordMustBeChanged(t *testing.T) {
 	// Being added to another organisation, or made by the CLI, doesn't ask again.
 	other := mustOrg(t, s, "beta")
 	adaUser, _ := s.UserByEmail("ada@example.com")
-	if err := s.AddMember(other.ID, adaUser.ID, "owner", adaUser.Name); err != nil {
+	if err := s.AddMember(other.ID, adaUser.ID, "owner", adaUser.Name, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	if code, body := call(t, ada, "POST", srv.URL+"/o/beta/api/v1/members", "application/json",
@@ -1023,7 +1023,7 @@ func TestPublicURL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AddMember(o.ID, u.ID, "owner", u.Name); err != nil {
+	if err := s.AddMember(o.ID, u.ID, "owner", u.Name, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	signIn := func(app *App, headers map[string]string) (*httptest.Server, *http.Cookie, http.Header) {

@@ -43,7 +43,7 @@ var acrossOrganisations = map[string]bool{
 	// What the server does as it starts.
 	"ResealAtStart": true, "FrontFormOff": true,
 	// These take a row that already names its organisation, which their callers read with it.
-	"SaveOrgMail": true, "SaveSSO": true,
+	"SaveSSO": true,
 	// The server's own sweeps, over every organisation; what they find is then handled
 	// by methods that take its organisation.
 	"LapsedRuns": true, "CampaignsSending": true, "FreeStaleMail": true, "Users": true,
@@ -151,8 +151,9 @@ func (in *intruder) call(s *Store, m reflect.Method) (said string, fell bool) {
 }
 
 // everyWay calls a method as org with each way of filling its text arguments from
-// tryWords and its yes-or-noes, until do says to stop.
-func everyWay(s *Store, undo bool, m reflect.Method, org *store.Org, do func(said string, fell bool) (stop bool)) {
+// tryWords and its yes-or-noes, until do says to stop. When undoing, do sees the call's
+// transaction before it is rolled back.
+func everyWay(s *Store, undo bool, m reflect.Method, org *store.Org, do func(said string, fell bool, on *Store) (stop bool)) {
 	own, nested := 0, false
 	for j := 1; j < m.Type.NumIn(); j++ {
 		switch k := m.Type.In(j); {
@@ -183,10 +184,11 @@ func everyWay(s *Store, undo bool, m reflect.Method, org *store.Org, do func(sai
 				on = s.through(s.DB.Begin())
 			}
 			said, fell := in.call(on, m)
+			stop := do(said, fell, on)
 			if undo {
 				on.DB.Rollback()
 			}
-			if do(said, fell) {
+			if stop {
 				return true
 			}
 			if !in.sawBool {
@@ -216,6 +218,15 @@ func orgTables(t *testing.T, s *Store) (tables []string) {
 // holdings is every row an organisation has, table by table.
 func holdings(t *testing.T, s *Store, org int64) map[string]string {
 	t.Helper()
+	out, err := holdingsOn(t, s, org)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+func holdingsOn(t *testing.T, s *Store, org int64) (map[string]string, error) {
+	t.Helper()
 	out := map[string]string{}
 	for _, m := range models {
 		sch := tableOf(t, s, m)
@@ -224,14 +235,14 @@ func holdings(t *testing.T, s *Store, org int64) map[string]string {
 		}
 		var rows []map[string]any
 		if err := s.DB.Table(sch.Table).Where("org_id = ?", org).Order(sch.PrioritizedPrimaryField.DBName).Find(&rows).Error; err != nil {
-			t.Fatal(err)
+			return nil, err
 		}
 		if len(rows) > 0 {
 			text, _ := json.Marshal(rows)
 			out[sch.Table] = string(text)
 		}
 	}
-	return out
+	return out, nil
 }
 
 // seedFirst gives the first organisation, in an empty database, a row in every table
@@ -242,7 +253,7 @@ func seedFirst(t *testing.T, s *Store) *store.Org {
 	owner := must(s.CreateUser("owner@alpha.example", "Owner One", "a long enough password"))
 	scout := store.Actor{Name: "agent:" + theirs, KeyID: 1}
 	steps := []func() error{
-		func() error { return s.AddMember(first.ID, owner.ID, "owner", "") },
+		func() error { return s.AddMember(first.ID, owner.ID, "owner", "", "Owner One") },
 		func() error { return s.SaveVoice(first.ID, owner.ID, theirs+" caller", theirs+" signature") },
 		func() error {
 			_, _, err := s.CreateKey(first.ID, theirs+" key", []string{"read"}, "Owner One")
@@ -375,7 +386,7 @@ func seedFirst(t *testing.T, s *Store) *store.Org {
 // test to see: they change something and answer with a yes, a count, a number or only
 // what they were given.
 var saysNothingBack = map[string]bool{
-	"AddMember": true, "RemoveMember": true, "SetRole": true, "SetAreas": true, "SaveVoice": true, "SaveOrg": true, "ChangeSettings": true, "RevokeKey": true, "SetKeyScopes": true, "DeleteOrgMail": true,
+	"AddMember": true, "RemoveMember": true, "SetRole": true, "SetAreas": true, "SaveVoice": true, "SaveOrg": true, "ChangeSettings": true, "RevokeKey": true, "SetKeyScopes": true, "DeleteOrgMail": true, "SaveOrgMail": true,
 	// A webhook secret is new random words, and the others say yes or no of the caller's own.
 	"NewBounceHook": true, "DropBounceHook": true, "HasBounceHook": true,
 	"Mark": true, "MarkAs": true, "Claim": true, "Withheld": true, "Update": true,
@@ -427,9 +438,20 @@ var saysNothingBack = map[string]bool{
 
 func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {
 	t.Parallel()
-	storeType := reflect.TypeFor[*Store]()
-	var methods []reflect.Method
-	for m := range storeType.Methods() {
+	methods := orgMethods(t)
+	for i := range isolationShares {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
+			tryMethodsAsAnotherOrganisation(t, share(methods, i))
+		})
+	}
+}
+
+// orgMethods is every exported method of the store about one organisation, which
+// has to take it first.
+func orgMethods(t *testing.T) (methods []reflect.Method) {
+	t.Helper()
+	for m := range reflect.TypeFor[*Store]().Methods() {
 		// Not queries of their own but what the store's code writes them with (withinTheStore).
 		if acrossOrganisations[m.Name] || withinTheStore[m.Name] {
 			continue
@@ -440,12 +462,7 @@ func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {
 		}
 		methods = append(methods, m)
 	}
-	for i := range isolationShares {
-		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			t.Parallel()
-			tryMethodsAsAnotherOrganisation(t, share(methods, i))
-		})
-	}
+	return methods
 }
 
 // tryMethodsAsAnotherOrganisation tries the methods on a database of its own.
@@ -462,7 +479,7 @@ func tryMethodsAsAnotherOrganisation(t *testing.T, methods []reflect.Method) {
 
 	for _, m := range methods {
 		calls, falls := 0, 0
-		everyWay(s, false, m, second, func(said string, fell bool) bool {
+		everyWay(s, false, m, second, func(said string, fell bool, _ *Store) bool {
 			calls++
 			if fell {
 				falls++
@@ -491,7 +508,7 @@ func tryMethodsAsAnotherOrganisation(t *testing.T, methods []reflect.Method) {
 			continue
 		}
 		reached := false
-		everyWay(s, true, m, first, func(said string, _ bool) bool {
+		everyWay(s, true, m, first, func(said string, _ bool, _ *Store) bool {
 			reached = strings.Contains(said, theirs)
 			return reached
 		})

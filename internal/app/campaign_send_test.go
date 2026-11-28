@@ -59,7 +59,7 @@ func campaignSite(t *testing.T) (*App, *Store, *store.Org, string, *http.Client,
 	if err := s.SaveOrg(o); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SaveOrgMail(&store.OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
+	if err := s.SaveOrgMail(o.ID, &store.OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	for _, p := range []struct{ name, email string }{{"Hannah Pryce", "hannah@larkmoor.example"}, {"Tom Ellery", "tom@larkmoor.example"}, {"Sven Dahl", "sven@nordkap.example"}} {
@@ -140,13 +140,13 @@ func TestACampaignIsRefusedWhereItCannotBeSentProperly(t *testing.T) {
 	send := func() (int, string) {
 		return call(t, member, "POST", list+"/"+itoa(c.ID)+"/send", "application/json", map[string]any{})
 	}
-	if err := s.DeleteOrgMail(o.ID); err != nil {
+	if err := s.DeleteOrgMail(o.ID, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	if code, body := send(); code != http.StatusBadRequest || !strings.Contains(body, "own mail server") {
 		t.Errorf("sending through the server's own mail: %d %s", code, body)
 	}
-	if err := s.SaveOrgMail(&store.OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
+	if err := s.SaveOrgMail(o.ID, &store.OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	o.Settings.PostalAddress = " "
@@ -397,31 +397,31 @@ func TestCampaignSendingHoldsAtItsEdges(t *testing.T) {
 
 	// Never straight to a recipient's server, and never without signing in.
 	for _, m := range []store.OrgMail{{OrgID: o.ID, Host: "mx.larkmoor.example", Port: 25, Username: "x", Sender: "Alpha <news@alpha.example>"}, {OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Sender: "Alpha <news@alpha.example>"}} {
-		if err := s.SaveOrgMail(&m); err != nil {
+		if err := s.SaveOrgMail(o.ID, &m, "Owner One"); err != nil {
 			t.Fatal(err)
 		}
 		c := draft(t, s, o)
 		if code, body := call(t, member, "POST", list+"/"+itoa(c.ID)+"/send", "application/json", map[string]any{}); code != http.StatusBadRequest || !strings.Contains(body, "sign in to") {
 			t.Errorf("sending through %s:%d with username %q: %d %s", m.Host, m.Port, m.Username, code, body)
 		}
-		if err := s.RemoveCampaign(o.ID, c.ID); err != nil {
+		if err := s.RemoveCampaign(o.ID, c.ID, "Owner One"); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := s.SaveOrgMail(&store.OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
+	if err := s.SaveOrgMail(o.ID, &store.OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	// A server removed after a campaign is sent pauses it; it never falls back to the host's.
 	c := draft(t, s, o)
 	must(s.SendCampaign(o, c.ID, "Ada Lovelace"))
-	if err := s.DeleteOrgMail(o.ID); err != nil {
+	if err := s.DeleteOrgMail(o.ID, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	a.sendRound(context.Background(), time.Now())
 	if len(box.to()) != 0 || must(s.Campaign(o.ID, c.ID)).Status != marketing.CampaignPaused {
 		t.Fatalf("with its mail server gone: mailed %v, campaign %s", box.to(), must(s.Campaign(o.ID, c.ID)).Status)
 	}
-	if err := s.SaveOrgMail(&store.OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}); err != nil {
+	if err := s.SaveOrgMail(o.ID, &store.OrgMail{OrgID: o.ID, Host: "smtp.alpha.example", Port: 587, Username: "news@alpha.example", Sender: "Alpha <news@alpha.example>"}, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -430,7 +430,7 @@ func TestCampaignSendingHoldsAtItsEdges(t *testing.T) {
 	if err := s.ErasePerson(o.ID, *hannah.ContactID, "Ada Lovelace"); err != nil {
 		t.Fatal(err)
 	}
-	must(s.ResumeCampaign(o.ID, c.ID))
+	must(s.ResumeCampaign(o.ID, c.ID, "Owner One"))
 	a.sendRound(context.Background(), time.Now())
 	if got := box.to(); len(got) != 2 {
 		t.Errorf("after erasing someone still waiting, mailed %v", got)

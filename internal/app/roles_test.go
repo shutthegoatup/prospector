@@ -174,7 +174,7 @@ func TestChangingAKeysScopes(t *testing.T) {
 	if code, body := scopes(ada, builtin.ID, "read"); code != http.StatusBadRequest || !strings.Contains(body, "own agents") {
 		t.Fatalf("a built-in agent's key was changed here: %d %s", code, body)
 	}
-	if err := s.RevokeKey(o.ID, k.ID); err != nil {
+	if err := s.RevokeKey(o.ID, k.ID, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	if code, _ := scopes(ada, k.ID, "read", "research:write"); code != http.StatusNotFound {

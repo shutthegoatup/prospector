@@ -70,11 +70,7 @@ func (s apiServer) ChangeSettings(ctx context.Context, in api.ChangeSettingsRequ
 	// Compared as they take effect, so the page sending back the defaults it showed, or
 	// "gbp" for GBP, isn't a change.
 	changed := settingsDiff(before, settingsOut(o))
-	who := store.Actor{Name: q.Actor()}
-	if q.Key != nil {
-		who.KeyID = q.Key.ID
-	}
-	if err := s.a.s.ChangeSettings(o, who, changed); err != nil {
+	if err := s.a.s.ChangeSettings(o, q.Who(), changed); err != nil {
 		return nil, err
 	}
 	if len(changed) > 0 {

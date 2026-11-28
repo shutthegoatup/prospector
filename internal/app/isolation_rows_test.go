@@ -40,14 +40,14 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.RevokeKey(first.ID, key.ID); err != nil {
+	if err := s.RevokeKey(first.ID, key.ID, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.DB.Model(&request).Update("done_at", now).Error; err != nil {
 		t.Fatal(err)
 	}
 	claim := store.RequestClaim{RequestID: request.ID, OrgID: first.ID, TaskID: task.ID, Holder: fmt.Sprintf("key:%d", key.ID), Actor: "scout", ClaimedAt: now.UnixMilli()}
-	domain := must(s.AddSSODomain(first.ID, "alpha.example"))
+	domain := must(s.AddSSODomain(first.ID, "alpha.example", "Owner One"))
 	campaign := store.Campaign{OrgID: first.ID, Name: "Spring", Status: marketing.CampaignSending}
 	if err := s.DB.Create(&campaign).Error; err != nil {
 		t.Fatal(err)
@@ -126,8 +126,8 @@ func TestRunsAndMailsStayInTheirOrganisation(t *testing.T) {
 		{"EndRun", changes, func(s *Store, org int64) any { return s.EndRun(org, *run, RunFailed, "ended", now) }},
 		{"StopLapsedRun", changes, func(s *Store, org int64) any { return s.StopLapsedRun(org, run.ID, lease, now) }},
 		{"DropKeyClaims", changes, func(s *Store, org int64) any { return s.DropKeyClaims(org, task.ID, key.ID) }},
-		{"VerifySSODomain", changes, func(s *Store, org int64) any { return s.VerifySSODomain(org, domain.ID, now) }},
-		{"RemoveSSODomain", changes, func(s *Store, org int64) any { return s.RemoveSSODomain(org, domain.Domain) }},
+		{"VerifySSODomain", changes, func(s *Store, org int64) any { return s.VerifySSODomain(org, domain.ID, now, "Owner One") }},
+		{"RemoveSSODomain", changes, func(s *Store, org int64) any { return s.RemoveSSODomain(org, domain.Domain, "Owner One") }},
 		{"CompanyNotes", int64(0), func(s *Store, org int64) any {
 			_, total, err := s.CompanyNotes(org, note.CompanyID, 0, 10)
 			return answer(total, err)

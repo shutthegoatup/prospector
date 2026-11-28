@@ -21,7 +21,7 @@ func TestACallerPastItsBurstWaitsAndOthersDont(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AddMember(o.ID, u.ID, "owner", u.Name); err != nil {
+	if err := s.AddMember(o.ID, u.ID, "owner", u.Name, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	clock := time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)

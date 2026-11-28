@@ -93,7 +93,7 @@ func (s apiServer) ChangeKey(ctx context.Context, in api.ChangeKeyRequestObject)
 		return nil, say.New("send the key's scopes")
 	}
 	org := request.ReqFrom(ctx).Org.ID
-	if err := s.a.s.SetKeyScopes(org, in.Id, in.Body.Scopes); err != nil {
+	if err := s.a.s.SetKeyScopes(org, in.Id, in.Body.Scopes, request.ReqFrom(ctx).Actor()); err != nil {
 		return nil, err
 	}
 	k, err := s.keyByID(org, in.Id)
@@ -104,7 +104,8 @@ func (s apiServer) ChangeKey(ctx context.Context, in api.ChangeKeyRequestObject)
 }
 
 func (s apiServer) RevokeKey(ctx context.Context, in api.RevokeKeyRequestObject) (api.RevokeKeyResponseObject, error) {
-	if err := s.a.s.RevokeKey(request.ReqFrom(ctx).Org.ID, in.Id); err != nil {
+	q := request.ReqFrom(ctx)
+	if err := s.a.s.RevokeKey(q.Org.ID, in.Id, q.Actor()); err != nil {
 		return nil, err
 	}
 	return api.RevokeKey204Response{}, nil

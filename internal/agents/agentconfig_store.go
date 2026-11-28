@@ -41,16 +41,26 @@ func (s *AgentStore) AgentNamed(org int64, name string) (*store.Agent, error) {
 // run made meanwhile be lost.
 func (s *AgentStore) SaveAgentRow(org int64, c *store.Agent) error {
 	c.OrgID = org
-	if c.ID == 0 {
-		return s.DB.Create(c).Error
-	}
-	res := s.DB.Model(&store.Agent{}).Where("id = ? and org_id = ?", c.ID, org).
-		Select("name", "kind", "base_url", "fallback_id", "fallback_minutes", "thinking_off", "api_key", "model", "tools_url", "search_url", "models", "tools", "allowed", "problem", "checked_at", "updated_by", "updated_at").
-		Updates(c)
-	if res.Error == nil && res.RowsAffected == 0 {
-		return say.Errorf("%s was deleted meanwhile", c.Name)
-	}
-	return res.Error
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		action := "agents:change"
+		if c.ID == 0 {
+			if err := tx.Create(c).Error; err != nil {
+				return err
+			}
+			action = "agents:new"
+		} else {
+			res := tx.Model(&store.Agent{}).Where("id = ? and org_id = ?", c.ID, org).
+				Select("name", "kind", "base_url", "fallback_id", "fallback_minutes", "thinking_off", "api_key", "model", "tools_url", "search_url", "models", "tools", "allowed", "problem", "checked_at", "updated_by", "updated_at").
+				Updates(c)
+			if res.Error != nil {
+				return res.Error
+			}
+			if res.RowsAffected == 0 {
+				return say.Errorf("%s was deleted meanwhile", c.Name)
+			}
+		}
+		return s.Log(tx, org, 0, nil, c.UpdatedBy, action, &c.Name)
+	})
 }
 
 func (s *AgentStore) AgentNameTaken(org int64, name string, except int64) (bool, error) {
@@ -71,7 +81,7 @@ func (s *AgentStore) AgentRunsGoing(org, agent int64) ([]store.AgentRun, error) 
 
 // DeleteAgent revokes its key and forgets its settings, and any agent falling back to it
 // falls back to nothing.
-func (s *AgentStore) DeleteAgent(org, id int64) error {
+func (s *AgentStore) DeleteAgent(org, id int64, actor string) error {
 	now := time.Now()
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var c store.Agent
@@ -86,6 +96,9 @@ func (s *AgentStore) DeleteAgent(org, id int64) error {
 		if err := tx.Model(&store.Agent{}).Where("org_id = ? and fallback_id = ?", org, c.ID).Update("fallback_id", 0).Error; err != nil {
 			return err
 		}
-		return tx.Delete(&c).Error
+		if err := tx.Delete(&c).Error; err != nil {
+			return err
+		}
+		return s.Log(tx, org, 0, nil, actor, "agents:remove", &c.Name)
 	})
 }

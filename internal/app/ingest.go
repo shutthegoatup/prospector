@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"gorm.io/gorm"
@@ -18,7 +19,7 @@ import (
 // but a date or edit recorded in the tracker is never cleared. It is refused whole if it
 // would bring in an address on the never-contact list; one already stored may stay, so
 // listing someone who opted out doesn't break every later import.
-func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
+func (s *Store) Import(org int64, p *ImportPayload, actor string) (int64, error) {
 	o, err := s.OrgByID(org)
 	if err != nil {
 		return 0, err
@@ -77,7 +78,10 @@ func (s *Store) Import(org int64, p *ImportPayload) (int64, error) {
 				}
 			}
 		}
-		return tx.Model(&store.Contact{}).Where("org_id = ?", org).Count(&total).Error
+		if err := tx.Model(&store.Contact{}).Where("org_id = ?", org).Count(&total).Error; err != nil {
+			return err
+		}
+		return s.Log(tx, org, 0, nil, actor, "import", new(strconv.FormatInt(total, 10)))
 	})
 	return total, err
 }

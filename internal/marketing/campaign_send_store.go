@@ -157,13 +157,16 @@ func (s *OutreachStore) SendCampaign(o *store.Org, id int64, actor string) (*sto
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(rows, 200).Error; err != nil {
 			return err
 		}
+		if err := s.Log(tx, o.ID, 0, nil, actor, "campaign:send", &c.Name); err != nil {
+			return err
+		}
 		return tx.Where("org_id = ? and id = ?", o.ID, id).First(&c).Error
 	})
 	return &c, err
 }
 
 // CancelCampaign stops what hasn't gone. What went stays recorded.
-func (s *OutreachStore) CancelCampaign(org, id int64) (*store.Campaign, error) {
+func (s *OutreachStore) CancelCampaign(org, id int64, actor string) (*store.Campaign, error) {
 	var c store.Campaign
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		res := tx.Model(&store.Campaign{}).Where("org_id = ? and id = ? and status in ?", org, id, []string{CampaignSending, CampaignPaused}).
@@ -184,26 +187,35 @@ func (s *OutreachStore) CancelCampaign(org, id int64) (*store.Campaign, error) {
 			Update("status", MailCancelled).Error; err != nil {
 			return err
 		}
-		return tx.Where("org_id = ? and id = ?", org, id).First(&c).Error
+		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
+			return err
+		}
+		return s.Log(tx, org, 0, nil, actor, "campaign:cancel", &c.Name)
 	})
 	return &c, err
 }
 
 // ResumeCampaign sets a paused campaign going again, once someone has looked.
-func (s *OutreachStore) ResumeCampaign(org, id int64) (*store.Campaign, error) {
-	res := s.InOrg(org).Model(&store.Campaign{}).Where("id = ? and status = ?", id, CampaignPaused).
-		Updates(map[string]any{"status": CampaignSending, "paused": "", "failures": 0})
-	if res.Error != nil {
-		return nil, res.Error
-	}
-	c, err := s.Campaign(org, id)
+func (s *OutreachStore) ResumeCampaign(org, id int64, actor string) (*store.Campaign, error) {
+	var c store.Campaign
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
+		res := tx.Model(&store.Campaign{}).Where("org_id = ? and id = ? and status = ?", org, id, CampaignPaused).
+			Updates(map[string]any{"status": CampaignSending, "paused": "", "failures": 0})
+		if res.Error != nil {
+			return res.Error
+		}
+		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
+			return store.Missing(err, "no campaign %d", id)
+		}
+		if res.RowsAffected == 0 {
+			return say.Errorf("only a paused campaign can be resumed, and this one is %s", c.Status)
+		}
+		return s.Log(tx, org, 0, nil, actor, "campaign:resume", &c.Name)
+	})
 	if err != nil {
 		return nil, err
 	}
-	if res.RowsAffected == 0 {
-		return nil, say.Errorf("only a paused campaign can be resumed, and this one is %s", c.Status)
-	}
-	return c, nil
+	return &c, nil
 }
 
 // CampaignTally counts a campaign's mails by how they went.

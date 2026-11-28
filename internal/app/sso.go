@@ -380,15 +380,15 @@ func (a *App) saveSSO(ctx context.Context, q *request.Req, in ssoIn) error {
 	return a.s.SaveSSO(&c, q.Actor())
 }
 
-func (a *App) addSSODomain(org int64, raw string) (*store.SSODomain, error) {
+func (a *App) addSSODomain(org int64, raw, actor string) (*store.SSODomain, error) {
 	domain := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(raw)), "@")
 	if !domainRe.MatchString(domain) {
 		return nil, say.Errorf("a domain looks like example.com, not %q", raw)
 	}
-	return a.s.AddSSODomain(org, domain)
+	return a.s.AddSSODomain(org, domain, actor)
 }
 
-func (a *App) removeSSODomain(org int64, domain string) error {
+func (a *App) removeSSODomain(org int64, domain, actor string) error {
 	sso, err := a.s.SSO(org)
 	if err != nil {
 		return err
@@ -402,7 +402,7 @@ func (a *App) removeSSODomain(org int64, domain string) error {
 	if others == 0 && (sso.Required || sso.AutoJoin) {
 		return say.New("that is the last verified domain: stop requiring single sign-on and letting people join first")
 	}
-	return a.s.RemoveSSODomain(org, domain)
+	return a.s.RemoveSSODomain(org, domain, actor)
 }
 
 func (a *App) lookupTXT(ctx context.Context, name string) ([]string, error) {
@@ -414,7 +414,7 @@ func (a *App) lookupTXT(ctx context.Context, name string) ([]string, error) {
 	return net.DefaultResolver.LookupTXT(ctx, name)
 }
 
-func (a *App) verifySSODomain(ctx context.Context, org int64, domain string) (*store.SSODomain, error) {
+func (a *App) verifySSODomain(ctx context.Context, org int64, domain, actor string) (*store.SSODomain, error) {
 	d, err := a.s.SSODomain(org, domain)
 	if err != nil {
 		return nil, err
@@ -423,7 +423,7 @@ func (a *App) verifySSODomain(ctx context.Context, org int64, domain string) (*s
 	for _, record := range records {
 		if strings.TrimSpace(record) == d.Token {
 			now := time.Now()
-			if err := a.s.VerifySSODomain(org, d.ID, now); err != nil {
+			if err := a.s.VerifySSODomain(org, d.ID, now, actor); err != nil {
 				return nil, err
 			}
 			d.VerifiedAt = &now

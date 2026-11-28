@@ -21,7 +21,22 @@ func (s *SuppressionStore) Suppress(org int64, address, actor string) (*store.Su
 	if err != nil {
 		return nil, err
 	}
-	return s.SuppressIn(s.DB, org, addr, SuppressAdded, actor)
+	var row *store.Suppression
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
+		var was store.Suppression
+		if err := tx.Where("org_id = ? and address = ?", org, addr).Limit(1).Find(&was).Error; err != nil {
+			return err
+		}
+		if row, err = s.SuppressIn(tx, org, addr, SuppressAdded, actor); err != nil {
+			return err
+		}
+		if was.ID != 0 && was.Reason == row.Reason {
+			return nil
+		}
+		// Not the address: the history would keep it after they were erased.
+		return s.Log(tx, org, 0, nil, actor, "suppression:add", nil)
+	})
+	return row, err
 }
 
 func (s *SuppressionStore) SuppressIn(tx *gorm.DB, org int64, addr, reason, actor string) (*store.Suppression, error) {
@@ -63,15 +78,18 @@ func (s *SuppressionStore) Unsuppress(org, id int64, actor string) error {
 	if err := s.InOrg(org).Where("id = ?", id).First(&row).Error; err != nil {
 		return store.Missing(err, "no suppression %d", id)
 	}
-	// Checked again in the delete itself: they may have unsubscribed since it was read.
-	gone := s.InOrg(org).Where("id = ? and reason in ?", id, []string{SuppressAdded, SuppressBounced}).Delete(&store.Suppression{})
-	if gone.Error != nil {
-		return gone.Error
-	}
-	if gone.RowsAffected == 0 {
-		return say.New("they asked themselves not to be mailed, by unsubscribing or marking a mail as spam, so only they can be mailed again by signing up again")
-	}
-	return nil
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		// Checked again in the delete itself: they may have unsubscribed since it was read.
+		gone := tx.Clauses(clause.Returning{}).Where("org_id = ? and id = ? and reason in ?", org, id, []string{SuppressAdded, SuppressBounced}).Delete(&row)
+		if gone.Error != nil {
+			return gone.Error
+		}
+		if gone.RowsAffected == 0 {
+			return say.New("they asked themselves not to be mailed, by unsubscribing or marking a mail as spam, so only they can be mailed again by signing up again")
+		}
+		// Not the address: the history would keep it after they were erased.
+		return s.Log(tx, org, 0, nil, actor, "suppression:remove", &row.Reason)
+	})
 }
 
 // Suppressions are the list, newest first, a page at a time.

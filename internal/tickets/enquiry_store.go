@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/shutthegoatup/prospector/internal/crm"
 	"github.com/shutthegoatup/prospector/internal/paging"
@@ -146,16 +147,21 @@ func (s *EnquiryStore) AddEnquiry(org int64, via string, in EnquiryIn) (*store.E
 }
 
 // DeleteEnquiry removes one for good: spam, or a person asking for what they sent to go.
-func (s *EnquiryStore) DeleteEnquiry(org, id int64) error {
+// What it said goes with it; the history keeps only that one was removed.
+func (s *EnquiryStore) DeleteEnquiry(org, id int64, actor string) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
-		res := tx.Where("org_id = ? and id = ?", org, id).Delete(&store.Enquiry{})
+		var e store.Enquiry
+		res := tx.Clauses(clause.Returning{}).Where("org_id = ? and id = ?", org, id).Delete(&e)
 		if res.Error == nil && res.RowsAffected == 0 {
 			return store.NoSuch("no enquiry %d", id)
 		}
 		if res.Error != nil {
 			return res.Error
 		}
-		return tx.Where("org_id = ? and enquiry_id = ?", org, id).Delete(&store.EnquiryMessage{}).Error
+		if err := tx.Where("org_id = ? and enquiry_id = ?", org, id).Delete(&store.EnquiryMessage{}).Error; err != nil {
+			return err
+		}
+		return s.Log(tx, org, 0, e.CompanyID, actor, "enquiry:remove", nil)
 	})
 }
 

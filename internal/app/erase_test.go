@@ -37,7 +37,7 @@ func TestErasePerson(t *testing.T) {
 		}
 	}
 	for _, org := range []*store.Org{o, other} {
-		if _, err := s.Import(org.ID, readFixtures(t)); err != nil {
+		if _, err := s.Import(org.ID, readFixtures(t), "import"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -56,7 +56,7 @@ func TestErasePerson(t *testing.T) {
 	jar, _ := cookiejar.New(nil)
 	bob := &http.Client{Jar: jar}
 	u := must(s.CreateUser("bob@example.com", "Bob", "correct horse battery"))
-	do(s.AddMember(o.ID, u.ID, "member", u.Name))
+	do(s.AddMember(o.ID, u.ID, "member", u.Name, "Owner One"))
 	res, err := signInWith(bob, srv.URL, "bob@example.com", "correct horse battery")
 	if err != nil || res.StatusCode != http.StatusOK {
 		t.Fatalf("login: %v", err)
@@ -126,7 +126,7 @@ func TestErasePerson(t *testing.T) {
 		t.Fatalf("the company page still names her, or doesn't say someone was erased: %s", page)
 	}
 
-	if _, err := s.Import(o.ID, readFixtures(t)); err == nil || !strings.Contains(err.Error(), "erased on request") {
+	if _, err := s.Import(o.ID, readFixtures(t), "import"); err == nil || !strings.Contains(err.Error(), "erased on request") {
 		t.Fatalf("an import that still holds her went through: %v", err)
 	}
 	gone("after re-importing her file")
@@ -180,7 +180,7 @@ func TestErasePerson(t *testing.T) {
 	if _, err := s.FindOne(other.ID, "Hannah"); err != nil {
 		t.Fatalf("erasing her in one organisation removed her from another: %v", err)
 	}
-	if _, err := s.Import(other.ID, readFixtures(t)); err != nil {
+	if _, err := s.Import(other.ID, readFixtures(t), "import"); err != nil {
 		t.Fatalf("another organisation can no longer import her: %v", err)
 	}
 }

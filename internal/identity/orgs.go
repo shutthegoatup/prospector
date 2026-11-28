@@ -72,11 +72,21 @@ func createOrg(tx *gorm.DB, slug, name string) (*store.Org, error) {
 
 var errLastOwner = say.New("an organisation needs an owner: make someone else an owner first")
 
-func setRole(tx *gorm.DB, org int64, m *store.Membership, role string) error {
-	if m.Role == "owner" && role != "owner" && LastOwner(tx, org) {
+func (s *IdentityStore) setRole(tx *gorm.DB, org int64, m *store.Membership, role, actor string) error {
+	if m.Role == role {
+		return nil
+	}
+	if m.Role == "owner" && LastOwner(tx, org) {
 		return errLastOwner
 	}
-	return tx.Model(m).Update("role", role).Error
+	var u store.User
+	if err := tx.First(&u, m.UserID).Error; err != nil {
+		return err
+	}
+	if err := tx.Model(m).Update("role", role).Error; err != nil {
+		return err
+	}
+	return s.Log(tx, org, 0, nil, actor, "member:role", new(u.Email+": "+role))
 }
 
 // lockOrg makes changes to one organisation's members take turns, so two owners

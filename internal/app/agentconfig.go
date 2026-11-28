@@ -414,7 +414,7 @@ func (a *App) saveAgent(ctx context.Context, org int64, in AgentSettingsIn, by s
 
 // deleteAgent stops what the agent is doing, revokes its key so nothing more is done
 // in its name, and forgets its settings. What it found stays, as any agent's does.
-func (a *App) deleteAgent(org, id int64) error {
+func (a *App) deleteAgent(org, id int64, actor string) error {
 	c, err := a.s.AgentByID(org, id)
 	if err != nil {
 		return err
@@ -428,7 +428,7 @@ func (a *App) deleteAgent(org, id int64) error {
 			log.Printf("agent %d: run %d not asked to stop: %v", c.ID, run.ID, err)
 		}
 	}
-	return a.s.DeleteAgent(org, c.ID)
+	return a.s.DeleteAgent(org, c.ID, actor)
 }
 
 // AgentView is what the Agents page shows of an agent: never the key.

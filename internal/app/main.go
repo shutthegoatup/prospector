@@ -270,7 +270,7 @@ func run(args []string) error {
 		if err != nil {
 			return fmt.Errorf("no user %q", rest[2])
 		}
-		return s.AddMember(o.ID, u.ID, arg(rest, 3, "owner"), u.Name)
+		return s.AddMember(o.ID, u.ID, arg(rest, 3, "owner"), u.Name, "cli")
 	case "key":
 		if arg(rest, 0, "") != "add" || len(rest) < 4 {
 			return fmt.Errorf("usage: prospector key add <org> <name> <scope>…")
@@ -304,7 +304,7 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		total, err := s.Import(org.ID, p)
+		total, err := s.Import(org.ID, p, "cli")
 		if err != nil {
 			return err
 		}

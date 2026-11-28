@@ -93,8 +93,22 @@ func (s *IdentityStore) OrgMail(org int64) (*store.OrgMail, error) {
 	return &m, s.DB.First(&m, "org_id = ?", org).Error
 }
 
-func (s *IdentityStore) SaveOrgMail(m *store.OrgMail) error { return s.DB.Save(m).Error }
+func (s *IdentityStore) SaveOrgMail(org int64, m *store.OrgMail, actor string) error {
+	m.OrgID = org
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(m).Error; err != nil {
+			return err
+		}
+		return s.Log(tx, org, 0, nil, actor, "smtp:change", &m.Host)
+	})
+}
 
-func (s *IdentityStore) DeleteOrgMail(org int64) error {
-	return s.DB.Delete(&store.OrgMail{}, "org_id = ?", org).Error
+func (s *IdentityStore) DeleteOrgMail(org int64, actor string) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		res := tx.Delete(&store.OrgMail{}, "org_id = ?", org)
+		if res.Error != nil || res.RowsAffected == 0 {
+			return res.Error
+		}
+		return s.Log(tx, org, 0, nil, actor, "smtp:remove", nil)
+	})
 }

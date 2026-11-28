@@ -249,7 +249,7 @@ func TestOnlySalesWorksAgreements(t *testing.T) {
 	company := *must(s.QuickAddPerson(o, crm.QuickAdd{Name: "Hannah Pryce", Company: "Larkmoor Yachts"}, "Ada Lovelace")).CompanyID
 	a := must(s.AddAgreement(o.ID, company, "Service agreement", "Ada Lovelace"))
 	grace := must(s.CreateUser("grace@example.com", "Grace Hopper", "correct horse battery"))
-	if err := s.AddMember(o.ID, grace.ID, "member", "Ada Lovelace"); err != nil {
+	if err := s.AddMember(o.ID, grace.ID, "member", "Ada Lovelace", "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetAreas(o.ID, grace.ID, []string{"support"}); err != nil {

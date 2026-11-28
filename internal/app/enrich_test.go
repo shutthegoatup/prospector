@@ -76,7 +76,7 @@ func vendorsAt(t *testing.T, fake *httptest.Server) (*Store, *store.Org, string,
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
 	u := must(s.CreateUser("ada@example.com", "Ada Lovelace", "correct horse battery"))
-	if err := s.AddMember(o.ID, u.ID, "owner", u.Name); err != nil {
+	if err := s.AddMember(o.ID, u.ID, "owner", u.Name, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	srv := httptest.NewServer((&App{s: s, vendorClient: fake.Client(), vendorBase: fake.URL}).Routes())

@@ -231,7 +231,7 @@ func tryRoutesAsAnotherOrganisation(t *testing.T, gets, posts []string) int {
 	before := holdings(t, s, first.ID)
 	second := mustOrg(t, s, "beta")
 	owner := must(s.CreateUser("owner@beta.example", "Owner Two", "another long password"))
-	if err := s.AddMember(second.ID, owner.ID, "owner", ""); err != nil {
+	if err := s.AddMember(second.ID, owner.ID, "owner", "", "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	nowhere := &http.Client{Transport: roundTrip(func(*http.Request) (*http.Response, error) { return nil, errors.New("no network in this test") })}

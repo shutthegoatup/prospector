@@ -165,7 +165,7 @@ func (s apiServer) ChangeMember(ctx context.Context, in api.ChangeMemberRequestO
 		return nil, err
 	}
 	if in.Body.Role != "" {
-		if err := s.a.s.SetRole(org, in.User, string(in.Body.Role)); err != nil {
+		if err := s.a.s.SetRole(org, in.User, string(in.Body.Role), request.ReqFrom(ctx).Actor()); err != nil {
 			return nil, err
 		}
 	}
@@ -228,7 +228,7 @@ func (s apiServer) MakeBounceHook(ctx context.Context, _ api.MakeBounceHookReque
 		return nil, say.New("Postmark needs this server's public https address (PROSPECTOR_URL) to post to") //nolint:staticcheck // Postmark is a name
 	}
 	org := request.ReqFrom(ctx).Org
-	secret, err := s.a.s.NewBounceHook(org.ID)
+	secret, err := s.a.s.NewBounceHook(org.ID, request.ReqFrom(ctx).Actor())
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +238,8 @@ func (s apiServer) MakeBounceHook(ctx context.Context, _ api.MakeBounceHookReque
 }
 
 func (s apiServer) DropBounceHook(ctx context.Context, _ api.DropBounceHookRequestObject) (api.DropBounceHookResponseObject, error) {
-	if err := s.a.s.DropBounceHook(request.ReqFrom(ctx).Org.ID); err != nil {
+	q := request.ReqFrom(ctx)
+	if err := s.a.s.DropBounceHook(q.Org.ID, q.Actor()); err != nil {
 		return nil, err
 	}
 	return api.DropBounceHook204Response{}, nil
@@ -250,7 +251,7 @@ func (s apiServer) SaveMailServer(ctx context.Context, in api.SaveMailServerRequ
 	}
 	org := request.ReqFrom(ctx).Org.ID
 	b := in.Body
-	if _, err := s.a.saveMail(org, mailIn{Host: b.Host, Port: b.Port, Username: b.Username, Password: b.Password, Sender: b.Sender}); err != nil {
+	if _, err := s.a.saveMail(org, mailIn{Host: b.Host, Port: b.Port, Username: b.Username, Password: b.Password, Sender: b.Sender}, request.ReqFrom(ctx).Actor()); err != nil {
 		return nil, err
 	}
 	return api.SaveMailServer200JSONResponse(s.mailServerOut(org)), nil
@@ -329,7 +330,8 @@ func (s apiServer) AddSSODomain(ctx context.Context, in api.AddSSODomainRequestO
 	if in.Body == nil {
 		return nil, say.New("say which: {\"domain\": \"example.com\"}")
 	}
-	d, err := s.a.addSSODomain(request.ReqFrom(ctx).Org.ID, in.Body.Domain)
+	q := request.ReqFrom(ctx)
+	d, err := s.a.addSSODomain(q.Org.ID, in.Body.Domain, q.Actor())
 	if err != nil {
 		return nil, err
 	}
@@ -337,14 +339,16 @@ func (s apiServer) AddSSODomain(ctx context.Context, in api.AddSSODomainRequestO
 }
 
 func (s apiServer) RemoveSSODomain(ctx context.Context, in api.RemoveSSODomainRequestObject) (api.RemoveSSODomainResponseObject, error) {
-	if err := s.a.removeSSODomain(request.ReqFrom(ctx).Org.ID, in.Domain); err != nil {
+	q := request.ReqFrom(ctx)
+	if err := s.a.removeSSODomain(q.Org.ID, in.Domain, q.Actor()); err != nil {
 		return nil, err
 	}
 	return api.RemoveSSODomain204Response{}, nil
 }
 
 func (s apiServer) VerifySSODomain(ctx context.Context, in api.VerifySSODomainRequestObject) (api.VerifySSODomainResponseObject, error) {
-	d, err := s.a.verifySSODomain(ctx, request.ReqFrom(ctx).Org.ID, in.Domain)
+	q := request.ReqFrom(ctx)
+	d, err := s.a.verifySSODomain(ctx, q.Org.ID, in.Domain, q.Actor())
 	if err != nil {
 		return nil, err
 	}

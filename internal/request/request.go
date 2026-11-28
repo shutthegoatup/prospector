@@ -39,6 +39,15 @@ func (q *Req) Actor() string {
 	return name
 }
 
+// Who is the request's actor as the history records it, with the key behind an agent.
+func (q *Req) Who() store.Actor {
+	who := store.Actor{Name: q.Actor()}
+	if q.Key != nil {
+		who.KeyID = q.Key.ID
+	}
+	return who
+}
+
 func (q *Req) Agent() store.Actor {
 	return store.Actor{Name: q.Actor(), KeyID: q.Key.ID, ReadOnly: !q.Key.Has("research:write")}
 }

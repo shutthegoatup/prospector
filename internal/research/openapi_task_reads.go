@@ -133,7 +133,8 @@ func (s ResearchAPI) ListTaskWork(ctx context.Context, in api.ListTaskWorkReques
 }
 
 func (s ResearchAPI) DeleteNote(ctx context.Context, in api.DeleteNoteRequestObject) (api.DeleteNoteResponseObject, error) {
-	if err := s.Research.DeleteNote(request.ReqFrom(ctx).Org.ID, in.Id); err != nil {
+	q := request.ReqFrom(ctx)
+	if err := s.Research.DeleteNote(q.Org.ID, in.Id, q.Actor()); err != nil {
 		return nil, err
 	}
 	return api.DeleteNote204Response{}, nil

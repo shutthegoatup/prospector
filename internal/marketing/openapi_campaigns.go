@@ -63,7 +63,7 @@ func (s MarketingAPI) SendCampaign(ctx context.Context, in api.SendCampaignReque
 
 func (s MarketingAPI) CancelCampaign(ctx context.Context, in api.CancelCampaignRequestObject) (api.CancelCampaignResponseObject, error) {
 	q := request.ReqFrom(ctx)
-	c, err := s.Campaigns.CancelCampaign(q.Org.ID, in.Id)
+	c, err := s.Campaigns.CancelCampaign(q.Org.ID, in.Id, q.Actor())
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (s MarketingAPI) ResumeCampaign(ctx context.Context, in api.ResumeCampaignR
 	if err := s.App.Sendable(q.Org); err != nil {
 		return nil, err
 	}
-	c, err := s.Campaigns.ResumeCampaign(q.Org.ID, in.Id)
+	c, err := s.Campaigns.ResumeCampaign(q.Org.ID, in.Id, q.Actor())
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,8 @@ func (s MarketingAPI) ChangeCampaign(ctx context.Context, in api.ChangeCampaignR
 }
 
 func (s MarketingAPI) RemoveCampaign(ctx context.Context, in api.RemoveCampaignRequestObject) (api.RemoveCampaignResponseObject, error) {
-	if err := s.Campaigns.RemoveCampaign(request.ReqFrom(ctx).Org.ID, in.Id); err != nil {
+	q := request.ReqFrom(ctx)
+	if err := s.Campaigns.RemoveCampaign(q.Org.ID, in.Id, q.Actor()); err != nil {
 		return nil, err
 	}
 	return api.RemoveCampaign204Response{}, nil

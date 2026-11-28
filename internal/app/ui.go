@@ -164,7 +164,7 @@ func (a *App) addMember(ctx context.Context, q *request.Req, in memberIn) (strin
 		u, err = a.s.InviteUser(in.Email, in.Name, password)
 	}
 	if err == nil {
-		err = a.s.AddMember(q.Org.ID, u.ID, in.Role, u.Name)
+		err = a.s.AddMember(q.Org.ID, u.ID, in.Role, u.Name, q.Actor())
 	}
 	if err != nil {
 		return "", err

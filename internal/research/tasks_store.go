@@ -218,12 +218,22 @@ func (s *ResearchStore) SetTaskClosed(org, task int64, closed bool, by string) e
 	})
 }
 
-func (s *ResearchStore) DeleteNote(org, id int64) error {
-	res := s.InOrg(org).Where("id = ?", id).Delete(&store.TaskNote{})
-	if res.Error == nil && res.RowsAffected == 0 {
-		return store.NoSuch("no note %d", id)
-	}
-	return res.Error
+func (s *ResearchStore) DeleteNote(org, id int64, actor string) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		var n store.TaskNote
+		res := tx.Clauses(clause.Returning{}).Where("org_id = ? and id = ?", org, id).Delete(&n)
+		if res.Error == nil && res.RowsAffected == 0 {
+			return store.NoSuch("no note %d", id)
+		}
+		if res.Error != nil {
+			return res.Error
+		}
+		var company *int64
+		if n.CompanyID != 0 {
+			company = &n.CompanyID
+		}
+		return s.Log(tx, org, 0, company, actor, "note:remove", &n.Kind)
+	})
 }
 
 // TaskNotesPage is one page of the notes agents left on a task, newest first, each

@@ -212,7 +212,7 @@ func TestWhoCanBeRepliedToAndByWhom(t *testing.T) {
 	}
 
 	// Deleting an enquiry takes its thread.
-	if err := s.DeleteEnquiry(o.ID, real.ID); err != nil {
+	if err := s.DeleteEnquiry(o.ID, real.ID, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.DB.Model(&store.EnquiryMessage{}).Count(&kept).Error; err != nil || kept != 0 {

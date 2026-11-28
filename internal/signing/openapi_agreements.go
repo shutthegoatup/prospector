@@ -201,7 +201,8 @@ func (s SigningAPI) PutAgreementFields(ctx context.Context, in api.PutAgreementF
 }
 
 func (s SigningAPI) RemoveAgreement(ctx context.Context, in api.RemoveAgreementRequestObject) (api.RemoveAgreementResponseObject, error) {
-	if err := s.Store.RemoveAgreement(request.ReqFrom(ctx).Org.ID, in.Id); err != nil {
+	q := request.ReqFrom(ctx)
+	if err := s.Store.RemoveAgreement(q.Org.ID, in.Id, q.Actor()); err != nil {
 		return nil, err
 	}
 	return api.RemoveAgreement204Response{}, nil

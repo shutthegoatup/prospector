@@ -159,7 +159,7 @@ func TestTasksStayInTheirOrganisation(t *testing.T) {
 		t.Fatal("another organisation's task was closed")
 	}
 	note := must(s.AgentNote(a.ID, scout, research.NoteIn{Task: task.ID, Kind: "next", Text: "Try the trade register."}))
-	if err := s.DeleteNote(b.ID, note.ID); err == nil {
+	if err := s.DeleteNote(b.ID, note.ID, "Owner One"); err == nil {
 		t.Fatal("another organisation's note was deleted")
 	}
 }

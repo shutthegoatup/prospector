@@ -43,15 +43,26 @@ func (s *ProspectingStore) SaveEnricher(org int64, in EnricherIn, by string) (*s
 		e.APIKey = sealedKey
 	}
 	e.OrgID, e.Kind, e.Position, e.MonthlyLimit, e.UpdatedBy, e.UpdatedAt = org, kind, in.Position, in.MonthlyLimit, by, time.Now()
-	return &e, s.DB.Save(&e).Error
+	return &e, s.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&e).Error; err != nil {
+			return err
+		}
+		return s.Log(tx, org, 0, nil, by, "enricher:save", &e.Kind)
+	})
 }
 
-func (s *ProspectingStore) DeleteEnricher(org, id int64) error {
-	res := s.DB.Where("org_id = ? and id = ?", org, id).Delete(&store.Enricher{})
-	if res.Error == nil && res.RowsAffected == 0 {
-		return store.NoSuch("no vendor %d in this organisation", id)
-	}
-	return res.Error
+func (s *ProspectingStore) DeleteEnricher(org, id int64, actor string) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		var e store.Enricher
+		res := tx.Clauses(clause.Returning{}).Where("org_id = ? and id = ?", org, id).Delete(&e)
+		if res.Error == nil && res.RowsAffected == 0 {
+			return store.NoSuch("no vendor %d in this organisation", id)
+		}
+		if res.Error != nil {
+			return res.Error
+		}
+		return s.Log(tx, org, 0, nil, actor, "enricher:remove", &e.Kind)
+	})
 }
 
 func (s *ProspectingStore) EnricherUsed(org int64, kind string, now time.Time) int {

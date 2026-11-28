@@ -273,7 +273,7 @@ func mustUser(t *testing.T, s *Store, o *store.Org, email, name, role string) *s
 		t.Fatal(err)
 	}
 	if o != nil {
-		if err := s.AddMember(o.ID, u.ID, role, name); err != nil {
+		if err := s.AddMember(o.ID, u.ID, role, name, "Owner One"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -489,7 +489,7 @@ func TestOrganisationSingleSignOn(t *testing.T) {
 	alpha, beta := mustOrg(t, s, "alpha"), mustOrg(t, s, "beta")
 	mustUser(t, s, alpha, "ada@alpha.example", "Ada Lovelace", "owner")
 	bob := mustUser(t, s, alpha, "bob@alpha.example", "Bob Stone", "member")
-	if err := s.AddMember(beta.ID, bob.ID, "member", bob.Name); err != nil {
+	if err := s.AddMember(beta.ID, bob.ID, "member", bob.Name, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	okta := newIdP(t, "", false)
@@ -586,7 +586,7 @@ func TestRequiredSingleSignOn(t *testing.T) {
 	mustUser(t, s, alpha, "ada@alpha.example", "Ada Lovelace", "owner")
 	bob := mustUser(t, s, alpha, "bob@alpha.example", "Bob Stone", "member")
 	mustUser(t, s, alpha, "carol@contractor.example", "Carol Reyes", "member")
-	if err := s.AddMember(beta.ID, bob.ID, "member", bob.Name); err != nil {
+	if err := s.AddMember(beta.ID, bob.ID, "member", bob.Name, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	okta := newIdP(t, "", false)
@@ -732,7 +732,7 @@ func TestInvitersPasswordEndsAtAProviderSignIn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AddMember(alpha.ID, bob.ID, "member", bob.Name); err != nil {
+	if err := s.AddMember(alpha.ID, bob.ID, "member", bob.Name, "Owner One"); err != nil {
 		t.Fatal(err)
 	}
 	inviter, _, err := s.Login("bob@alpha.example", "seen by the inviter")
