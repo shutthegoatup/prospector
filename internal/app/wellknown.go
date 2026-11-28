@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/apidoc"
+
 	"github.com/shutthegoatup/prospector/internal/cleantext"
 
 	"github.com/shutthegoatup/prospector/api"
@@ -21,7 +23,7 @@ func (a *App) wellKnownRoutes(mux *http.ServeMux) {
 	if err != nil {
 		log.Fatalf("the API spec: %v", err)
 	}
-	doc := apiDocOf(spec)
+	doc := apidoc.Of(spec)
 	mux.HandleFunc("GET /robots.txt", func(w http.ResponseWriter, r *http.Request) {
 		plainText(w, robotsTxt(a.baseURL(r)))
 	})
@@ -79,7 +81,7 @@ func xmlEscape(s string) string {
 
 // llmsTxt follows llmstxt.org: a title, a one-line summary, then lists of links. The
 // operations are drawn from the spec so the file can't fall behind it.
-func llmsTxt(doc APIDoc, base string) string {
+func llmsTxt(doc apidoc.Doc, base string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s\n\n", doc.Title)
 	b.WriteString("> A self-hosted, account-based prospecting workbench for small teams selling to a few hundred named accounts. " +
@@ -99,7 +101,7 @@ func llmsTxt(doc APIDoc, base string) string {
 		}
 		fmt.Fprintf(&b, "\n## %s\n\n", g.Name)
 		for _, o := range g.Ops {
-			fmt.Fprintf(&b, "- [%s %s](%s/api#%s)", o.Method, o.Path, base, opAnchor(o))
+			fmt.Fprintf(&b, "- [%s %s](%s/api#%s)", o.Method, o.Path, base, apidoc.OpAnchor(o))
 			if o.Summary != "" {
 				b.WriteString(": " + cleantext.OneLine(o.Summary))
 			}

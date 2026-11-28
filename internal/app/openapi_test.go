@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shutthegoatup/prospector/internal/apidoc"
+
 	"github.com/shutthegoatup/prospector/api"
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/store"
@@ -132,7 +134,7 @@ func TestTheContractPageIsPublicAndShowsEveryOperation(t *testing.T) {
 	if code != http.StatusOK || strings.Contains(body, "<script") {
 		t.Fatalf("the contract page, signed out: %d", code)
 	}
-	if !strings.Contains(body, "/o/your-org/api/v1/") || strings.Contains(body, docBase) {
+	if !strings.Contains(body, "/o/your-org/api/v1/") || strings.Contains(body, apidoc.Base) {
 		t.Error("the page's examples don't use this server's address")
 	}
 	spec := must(api.Spec())
@@ -168,7 +170,7 @@ func TestTheSpecIsServedAndEveryOperationNamesAScopeAKeyCanHave(t *testing.T) {
 	for path, item := range spec.Paths.Map() {
 		for method, op := range item.Operations() {
 			ops++
-			scopes := opScopes(op)
+			scopes := apidoc.OpScopes(op)
 			if slices.Contains(op.Tags, "account") {
 				if len(scopes) > 0 || op.Security == nil {
 					t.Errorf("%s %s is an account's: it should say its security, and offer a key none", method, path)

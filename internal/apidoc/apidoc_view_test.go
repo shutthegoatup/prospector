@@ -1,4 +1,4 @@
-package app
+package apidoc
 
 import (
 	"bytes"
@@ -19,7 +19,7 @@ func TestTheAPIReferenceIsBuiltFromTheSpec(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, err := json.MarshalIndent(docViewOf(apiDocOf(spec)), "", " ")
+	want, err := json.MarshalIndent(View(Of(spec)), "", " ")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,8 +37,8 @@ func TestTheAPIReferenceIsBuiltFromTheSpec(t *testing.T) {
 
 func TestTheServersAddressGoesIntoTheReference(t *testing.T) {
 	t.Parallel()
-	page := []byte(`<code>curl ` + docBase + `/o/your-org/api/v1/today</code>`)
-	if got := string(withBase(page, `https://crm.example/"><b>`)); got != `<code>curl https://crm.example/&#34;&gt;&lt;b&gt;/o/your-org/api/v1/today</code>` {
+	page := []byte(`<code>curl ` + Base + `/o/your-org/api/v1/today</code>`)
+	if got := string(WithBase(page, `https://crm.example/"><b>`)); got != `<code>curl https://crm.example/&#34;&gt;&lt;b&gt;/o/your-org/api/v1/today</code>` {
 		t.Errorf("%s", got)
 	}
 }

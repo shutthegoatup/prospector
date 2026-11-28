@@ -240,3 +240,12 @@ func DeviceMAC(u *store.User, nonce string) string {
 func SignInBucket(email string) string {
 	return "sign-in\x00" + store.EmailKey(email)
 }
+
+// OwnersOnly is whether only an owner, of the members, may use a scope.
+func OwnersOnly(scope string) bool {
+	switch scope {
+	case "agents:configure", "enquiries:delete", "settings:write", "people:privacy", "team:write", "mail:configure", "sso:configure", "org:export":
+		return true
+	}
+	return false
+}
