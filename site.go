@@ -6,8 +6,11 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
+
+	"github.com/shutthegoatup/prospector/internal/request"
 )
 
 // The public site's pages are React, rendered when the app is built (web/prerender.mjs)
@@ -47,20 +50,42 @@ func builtPage(name string, edit func([]byte) []byte) func() ([]byte, error) {
 // siteScript brings the front page's enquiry form, and nothing else.
 const siteScript = `<script type="module" src="/assets/app/site.js"></script>`
 
-var (
-	frontWithForm = builtPage("site.html", nil)
-	// Without a form the front page loads no script at all.
-	frontPlain       = builtPage("site.html", func(b []byte) []byte { return bytes.Replace(b, []byte(siteScript), nil, 1) })
-	apiReferencePage = builtPage("api.html", nil)
-)
+type builtFront struct{ withForm, plain func() ([]byte, error) }
+
+// frontPages is the front page in each language prerender.mjs built it in.
+var frontPages = func() map[string]builtFront {
+	l := request.Locales
+	pages := map[string]builtFront{}
+	for _, lang := range slices.Concat([]string{l.Source}, l.Translated, l.Pseudo) {
+		name := "site." + lang + ".html"
+		pages[lang] = builtFront{
+			withForm: builtPage(name, nil),
+			// Without a form the front page loads no script at all.
+			plain: builtPage(name, func(b []byte) []byte { return bytes.Replace(b, []byte(siteScript), nil, 1) }),
+		}
+	}
+	return pages
+}()
+
+var apiReferencePage = builtPage("api.html", nil)
 
 func (a *App) frontPage(w http.ResponseWriter, r *http.Request) {
+	lang := a.pickLanguage(w, r)
 	intake, origin := a.frontIntake(r)
-	read := frontPlain
-	if intake != "" {
-		read = frontWithForm
+	read := func(p builtFront) ([]byte, error) {
+		if intake != "" {
+			return p.withForm()
+		}
+		return p.plain()
 	}
-	b, err := read()
+	b, err := read(frontPages[lang])
+	if err != nil && lang != request.Locales.Source {
+		log.Print(err)
+		lang = request.Locales.Source
+		b, err = read(frontPages[lang])
+	}
+	w.Header().Set("Content-Language", lang)
+	w.Header().Add("Vary", "Accept-Language, Cookie")
 	if err == nil && intake != "" {
 		var data []byte
 		data, err = json.Marshal(map[string]string{"intake": intake, "origin": origin})

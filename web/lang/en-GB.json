@@ -27,6 +27,10 @@
     "defaultMessage": "Copy only",
     "description": "Button making a signer someone who only gets a copy of the agreement"
   },
+  "+YJ41H": {
+    "defaultMessage": "The Today page: everything due, best first, with a Do now list beside them",
+    "description": "Alt text of a screenshot of the app's Today page. 'Do now' is the name of a list on that page"
+  },
   "+auOns": {
     "defaultMessage": "Look up {detail}",
     "description": "Button to ask an enrichment vendor for a person's detail. {detail} is the detail, such as email"
@@ -103,9 +107,17 @@
     "defaultMessage": "Showing the first {shown} of {total}. Clear some, or filter by step above.",
     "description": "Under the Today page's list when only some of what is due is shown"
   },
+  "/v2qca": {
+    "defaultMessage": "Hosted Prospector",
+    "description": "Choice in the enquiry form: asking for Prospector hosted by us"
+  },
   "/vLmGD": {
     "defaultMessage": "This organisation's own mail server. Invitations to new members leave through it; without one, a new member's first password is shown to you instead.",
     "description": "Under the heading of the Outgoing mail section, when neither the organisation nor the site can send mail"
+  },
+  "/vu1Zq": {
+    "defaultMessage": "A key can",
+    "description": "Heading of the list of what an API key can be allowed to do"
   },
   "/xCPC3": {
     "defaultMessage": "{n} left out",
@@ -179,6 +191,10 @@
     "defaultMessage": "Use your organisation's single sign-on",
     "description": "Button to sign in through an organisation's own provider"
   },
+  "0qqw/u": {
+    "defaultMessage": "Enquiries answered",
+    "description": "Heading of a feature card on the front page"
+  },
   "0sf5ei": {
     "defaultMessage": "LinkedIn message if accepted, else email",
     "description": "Second step of the outreach sequence"
@@ -194,6 +210,10 @@
   "1C5aX2": {
     "defaultMessage": "{kind} · {name}",
     "description": "Written in a field placed on an agreement's page. {kind} is the kind of field, such as Signature; {name} the signer's first name"
+  },
+  "1F/aO5": {
+    "defaultMessage": "Send",
+    "description": "Button to send the enquiry form"
   },
   "1FV3pz": {
     "defaultMessage": "That didn't go through. Check your connection and try again.",
@@ -239,9 +259,17 @@
     "defaultMessage": "Nothing named yet",
     "description": "When the organisation has named nothing to look for in a company"
   },
+  "1WOqSh": {
+    "defaultMessage": "Prospector is a workbench for teams selling to named accounts, from the first fact about a company to the agreement it signs. Agents research and draft. People qualify, decide and send.",
+    "description": "The front page's opening paragraph, under the headline"
+  },
   "1ddbfD": {
     "defaultMessage": "key saved · a limit of 0: it isn't asked",
     "description": "On a data vendor's card when it may be asked no times a month"
+  },
+  "1f+u6p": {
+    "defaultMessage": "Pricing",
+    "description": "Small heading of the front page's pricing section"
   },
   "1gF6jj": {
     "defaultMessage": "The pages appear here.",
@@ -254,6 +282,10 @@
   "1nOXrK": {
     "defaultMessage": "Loading…",
     "description": "Read out by a screen reader while a page's data is on its way"
+  },
+  "1tBHRP": {
+    "defaultMessage": "One queue a day.",
+    "description": "Second line of the front page's main headline"
   },
   "1w6LoO": {
     "defaultMessage": "Reload to try again.",
@@ -286,6 +318,10 @@
   "2GslWn": {
     "defaultMessage": "Remove draft",
     "description": "Button deleting a draft campaign"
+  },
+  "2IlrPu": {
+    "defaultMessage": "Deals, the contract, what they're on, getting them live, what they write in about and what you write to them, all on the company you prospected. Each has its operations in the published API.",
+    "description": "Intro of the front page's section on customers"
   },
   "2OK37z": {
     "defaultMessage": "There's no such page here.",
@@ -355,9 +391,17 @@
     "defaultMessage": "Feature request",
     "description": "What an enquiry is about: asking for a feature. A filter and a label on each enquiry"
   },
+  "38qEvi": {
+    "defaultMessage": "This form can't send from here at the moment.",
+    "description": "Beside the enquiry form's button when the server won't take it"
+  },
   "3CZtXe": {
     "defaultMessage": "Set {variable} to this app's address first: it is where the provider sends people back.",
     "description": "In the Single sign-on section when the server doesn't know its own address. {variable} is the setting's name"
+  },
+  "3IYZLh": {
+    "defaultMessage": "See it running",
+    "description": "Choice in the enquiry form: asking for a demo"
   },
   "3S7eks": {
     "defaultMessage": "Delete this enquiry from {email} for good?",
@@ -407,6 +451,10 @@
     "defaultMessage": "None: wait however long it takes",
     "description": "The choice of no agent to fall back to"
   },
+  "47dYdS": {
+    "defaultMessage": "Several organisations, one login",
+    "description": "Heading of a feature card on the front page"
+  },
   "4KnQ8O": {
     "defaultMessage": "<b>{kind}</b><muted> with {person}</muted>",
     "description": "Heading of a renewal or expansion's card. {kind} is the kind of deal, such as Renewal; {person} is who it is with"
@@ -414,6 +462,10 @@
   "4MZWhE": {
     "defaultMessage": "That didn't work. Reload and try again.",
     "description": "When adding a person failed and the server said nothing about why"
+  },
+  "4PE95e": {
+    "defaultMessage": "Contact",
+    "description": "Front page navigation link to the enquiry form, and the small heading above it"
   },
   "4QQelz": {
     "defaultMessage": "Remove: recorded by mistake",
@@ -458,6 +510,10 @@
   "4vytQM": {
     "defaultMessage": "Signs",
     "description": "Button making someone who gets a copy of an agreement one of its signers"
+  },
+  "52CSdy": {
+    "defaultMessage": "Prospector · A few hundred accounts, one queue a day",
+    "description": "The front page's title, in the browser tab and search results. Prospector is the product's name"
   },
   "54Xc1m": {
     "defaultMessage": "Every search, closed ones too",
@@ -535,6 +591,10 @@
     "defaultMessage": "Email",
     "description": "Top of a card on the Today page: an email to send"
   },
+  "63zNMm": {
+    "defaultMessage": "No lock-in.",
+    "description": "Heading of a note under the pricing: you are never tied to Prospector"
+  },
   "659pta": {
     "defaultMessage": "Sign in with a password instead",
     "description": "Link from single sign-on back to signing in with a password"
@@ -546,6 +606,10 @@
   "6Dz4/z": {
     "defaultMessage": "That company isn't here.",
     "description": "Heading of a company's page when there is no such company"
+  },
+  "6E9hpO": {
+    "defaultMessage": "Sent. Someone will write back to you.",
+    "description": "Beside the enquiry form's button once the message is sent"
   },
   "6H+N3d": {
     "defaultMessage": "Add and check",
@@ -675,6 +739,14 @@
     "defaultMessage": "suggested",
     "description": "A person an agent suggested, for a member who can't pick them"
   },
+  "8JCXDc": {
+    "defaultMessage": "Agents and API",
+    "description": "Small heading of the front page's section on AI agents and the API"
+  },
+  "8MVInx": {
+    "defaultMessage": "Replies become deals",
+    "description": "Heading of the front page's step about the Conversations page"
+  },
   "8OWYeB": {
     "defaultMessage": "Add",
     "description": "Button on the settings page to add what was entered (an offering, an address, a member)"
@@ -727,6 +799,10 @@
     "defaultMessage": "used {when} · key {prefix}… · made by {who}",
     "description": "On an API key's card. {when} is when it was last used, {prefix} the start of the key, {who} the member who made it"
   },
+  "8xJZ/y": {
+    "defaultMessage": "Prospects and customers for small teams",
+    "description": "Small heading above the front page's main headline"
+  },
   "94B7zC": {
     "defaultMessage": "Would go to {people}; {leftOut} left out",
     "description": "Opens a draft campaign's recipients. {people} is how many it would go to, such as 3 people; {leftOut} is how many it leaves out"
@@ -771,6 +847,10 @@
     "defaultMessage": "{first}, {second}",
     "description": "Two notes under a suggested detail, such as 'a guess' and 'in place of …'"
   },
+  "9wLRa3": {
+    "defaultMessage": "LinkedIn adds",
+    "description": "Fourth in the list of what the Today page shows first: connection requests to send on LinkedIn"
+  },
   "9y7E+h": {
     "defaultMessage": "name",
     "description": "Placeholder in the field for a new member's name"
@@ -810,6 +890,14 @@
   "Ak+wss": {
     "defaultMessage": "Main",
     "description": "What a screen reader calls the sidebar's list of pages"
+  },
+  "Amq20g": {
+    "defaultMessage": "Email a reply to someone who wrote in",
+    "description": "What an API key with the enquiries:reply scope can do"
+  },
+  "Anm6Lz": {
+    "defaultMessage": "LinkedIn messages, emails and follow-ups",
+    "description": "Third in the list of what the Today page shows first"
   },
   "Av0sf/": {
     "defaultMessage": "No mail server of this organisation's own.",
@@ -931,6 +1019,10 @@
     "defaultMessage": "Dismiss",
     "description": "Button to turn down a suggested detail for a person"
   },
+  "CksL2a": {
+    "defaultMessage": "Every fact <em>sourced.</em>",
+    "description": "Third line of the front page's main headline; <em> marks the highlighted word"
+  },
   "CsCbwg": {
     "defaultMessage": "A secret is kept sealed, so none can be saved until whoever runs this server sets {variable} ({command} makes one). Everything else here can still be changed.",
     "description": "Under the client secret field when the server has no key to seal it with. {variable} is the setting's name, {command} the command that makes a key"
@@ -983,6 +1075,10 @@
     "defaultMessage": "sent by {who}",
     "description": "In the line under a sent campaign's name, between its kind and its mail counts. {who} is a member or an agent"
   },
+  "DW1meq": {
+    "defaultMessage": "Email",
+    "description": "Label of the enquiry form's email field"
+  },
   "DXkbGZ": {
     "defaultMessage": "Filter by step",
     "description": "What a screen reader calls the row of filters by step on the Today page"
@@ -998,6 +1094,10 @@
   "DtEQxO": {
     "defaultMessage": "Open a company and start one.",
     "description": "Under 'Nobody is being onboarded'"
+  },
+  "Dv39bL": {
+    "defaultMessage": "Agents do the reading. You decide what they may send.",
+    "description": "Heading of the front page's section on agents"
   },
   "DvtELE": {
     "defaultMessage": "Enquiries appear here once a site listed in Settings posts one, or a key with the enquiries:write scope does.",
@@ -1063,6 +1163,10 @@
     "defaultMessage": "e.g. 14,000",
     "description": "Example in the field for a subscription's price"
   },
+  "Er8yGs": {
+    "defaultMessage": "queue a day",
+    "description": "Beside a large number 1 on the front page: one queue a day"
+  },
   "EsfgKc": {
     "defaultMessage": "Download everything",
     "description": "Button to download everything the organisation holds as one file"
@@ -1078,6 +1182,10 @@
   "Ewp4ZD": {
     "defaultMessage": "Your browser's ({language})",
     "description": "In the list of languages, when none is chosen: the choice to use the browser's languages. {language} is the one they came to, named in itself"
+  },
+  "ExMpnf": {
+    "defaultMessage": "Message",
+    "description": "Label of the enquiry form's message field"
   },
   "F/wbYX": {
     "defaultMessage": "{prospector}'s agents",
@@ -1095,6 +1203,10 @@
     "defaultMessage": "Save scopes",
     "description": "Button saving what an API key may do"
   },
+  "FCW3rl": {
+    "defaultMessage": "An agent's fact without one is refused.",
+    "description": "Under 'source link per fact' on the front page"
+  },
   "FD+/u9": {
     "defaultMessage": "Every agent in one list: those {prospector} runs and those that connect with a key. The colour behind each card is its state.",
     "description": "Under the heading of every agent. {prospector} is the product's name, Prospector"
@@ -1102,6 +1214,10 @@
   "FQQ+lf": {
     "defaultMessage": "Someone in your organisation",
     "description": "Choice of a member of the organisation to add to an agreement"
+  },
+  "FS8zJF": {
+    "defaultMessage": "added",
+    "description": "What the keyboard shortcut a does in the LinkedIn queue: marks the person as added"
   },
   "FZDrq9": {
     "defaultMessage": "Call",
@@ -1111,6 +1227,10 @@
     "defaultMessage": "<b>{agent}</b> · {state}",
     "description": "An agent's run on a task. {agent} is its name; {state} where its run is, such as Working, with a model, or finished with why it stopped"
   },
+  "FiVE0K": {
+    "defaultMessage": "Your name",
+    "description": "Label of the enquiry form's name field"
+  },
   "Fj4Bnp": {
     "defaultMessage": "+ Add person",
     "description": "Button on the research page to add a person by hand"
@@ -1118,6 +1238,10 @@
   "FlkLbK": {
     "defaultMessage": "Save and check",
     "description": "Button saving an agent's settings and checking it can run"
+  },
+  "Fmb078": {
+    "defaultMessage": "Site forms and your product's sign-ups arrive open, to be given an owner. Reply by email from the card, and paste their answer into the thread.",
+    "description": "Text of the front page's card about enquiries"
   },
   "Fnd5y4": {
     "defaultMessage": "Delete this note?",
@@ -1154,6 +1278,10 @@
   "GYHhwE": {
     "defaultMessage": "Data vendors",
     "description": "Heading of the enrichment vendors asked for a person's contact details"
+  },
+  "GaKi1r": {
+    "defaultMessage": "The customer stays on the same record.",
+    "description": "Heading of the front page's section on customers"
   },
   "GaTn8A": {
     "defaultMessage": "{brand} keeps the PDF as uploaded, with its SHA-256, and doesn't read what it says. It is not for deeds, or anything that must be witnessed or notarised. You can set out who signs it and where; sending it for signature comes later.",
@@ -1239,6 +1367,10 @@
     "defaultMessage": "New people",
     "description": "Label of the setting for people who sign in through single sign-on before being added"
   },
+  "HblqzJ": {
+    "defaultMessage": "What it's about",
+    "description": "Label of the enquiry form's choice of what the enquiry is about"
+  },
   "HgOAJ9": {
     "defaultMessage": "Redirect URI",
     "description": "Label of the address the provider sends people back to"
@@ -1283,9 +1415,17 @@
     "defaultMessage": "Nothing here",
     "description": "Heading on the research page when no company was rejected"
   },
+  "IHsWKh": {
+    "defaultMessage": "Record subscriptions and work customers' onboarding",
+    "description": "What an API key with the customers:write scope can do"
+  },
   "ILygsp": {
     "defaultMessage": "None.",
     "description": "When there are no agents' notes"
+  },
+  "ITQdyJ": {
+    "defaultMessage": "Add companies, facts and suggested contacts, each with a source URL",
+    "description": "What an API key with the research:write scope can do"
   },
   "ITXTKL": {
     "defaultMessage": "Create task",
@@ -1323,9 +1463,17 @@
     "defaultMessage": "Remove {domain}? People at it can no longer use single sign-on here.",
     "description": "Asked before removing a domain from single sign-on. {domain} is the domain"
   },
+  "J7RWLh": {
+    "defaultMessage": "Facts with the link they came from",
+    "description": "Heading of the front page's step about the Research page"
+  },
   "JBdCBL": {
     "defaultMessage": "None yet.",
     "description": "In place of agents' recent work or activity when there is none"
+  },
+  "JEshDK": {
+    "defaultMessage": "Send a campaign to everyone in conversation or at a customer, through your own mail server, each with an unsubscribe link",
+    "description": "What an API key with the campaigns:send scope can do"
   },
   "JF4NIn": {
     "defaultMessage": "Update",
@@ -1395,6 +1543,10 @@
     "defaultMessage": "Agents' notes",
     "description": "Heading of the notes agents left on a search"
   },
+  "Jmexbw": {
+    "defaultMessage": "01 · Research",
+    "description": "Tag of the first step on the front page. Research is the name of a page in the app"
+  },
   "JnJ6Mx": {
     "defaultMessage": "Later",
     "description": "Heading of the Today page's panel of calls to make once it is office hours"
@@ -1414,6 +1566,10 @@
   "Jvx1by": {
     "defaultMessage": "whenever a number is known, in office hours",
     "description": "In the outreach sequence: when the call after the follow-up email comes"
+  },
+  "JxKi4r": {
+    "defaultMessage": "Domains, email addresses and LinkedIn profiles. A company on a listed domain stays on file but out of review and outreach. It applies to agents, imports and edits alike.",
+    "description": "Text of the front page's card about the never-contact list"
   },
   "K2NMhm": {
     "defaultMessage": "suggested {field, select, linkedin {{linkedin} profile} phone {phone number} other {{field}}}",
@@ -1439,9 +1595,17 @@
     "defaultMessage": "Sign in this order",
     "description": "Checkbox: the signers sign one after another, in the order listed"
   },
+  "KS+dKG": {
+    "defaultMessage": "It didn't send. Your message is still here: try again in a minute.",
+    "description": "Beside the enquiry form's button when it couldn't reach the server"
+  },
   "KWZmkc": {
     "defaultMessage": "Recent agent activity",
     "description": "Heading of the log of what agents did"
+  },
+  "KZqqpp": {
+    "defaultMessage": "An owner can download everything the organisation holds as one file, whenever they like. Or <link>run Prospector yourself</link>, free.",
+    "description": "Under 'No lock-in.' by the pricing; <link> goes to the section on running Prospector yourself"
   },
   "KetojS": {
     "defaultMessage": "Nobody yet",
@@ -1467,9 +1631,17 @@
     "defaultMessage": "Delete",
     "description": "Button deleting an enquiry"
   },
+  "L6AqVU": {
+    "defaultMessage": "Campaigns to people you know",
+    "description": "Heading of a feature card on the front page"
+  },
   "L6iW3x": {
     "defaultMessage": "No search open.",
     "description": "On the research page when no search is open"
+  },
+  "LG+8gx": {
+    "defaultMessage": "Self-host in four commands.",
+    "description": "Heading of the front page's section on self-hosting"
   },
   "LMExaj": {
     "defaultMessage": "Start onboarding",
@@ -1527,6 +1699,10 @@
     "defaultMessage": "There is nothing for you to do at the moment.",
     "description": "On a customer's onboarding page with no steps of theirs"
   },
+  "M0bQxp": {
+    "defaultMessage": "Prices and terms are given in English, and the English is the version that holds.",
+    "description": "Under the pricing, shown in every language but English: the plans and their terms are deliberately left in English, and the English text is the binding one"
+  },
   "M16a9r": {
     "defaultMessage": "Model",
     "description": "Label of an agent's model, on its card and in its settings"
@@ -1554,6 +1730,14 @@
   "MNh7Fx": {
     "defaultMessage": "Copied ✓",
     "description": "A copy button's label once it has copied the text"
+  },
+  "MNkSRl": {
+    "defaultMessage": "Customers",
+    "description": "Front page navigation link to the section on working with customers"
+  },
+  "MPYBMP": {
+    "defaultMessage": "Search companies and people, and read what's due and the tasks people wrote",
+    "description": "What an API key with the read scope can do"
   },
   "MQ49SY": {
     "defaultMessage": "Days' notice",
@@ -1599,6 +1783,10 @@
     "defaultMessage": "Subscriptions",
     "description": "Title of the page of customers' subscriptions"
   },
+  "N3Nc7T": {
+    "defaultMessage": "The full history",
+    "description": "Heading of a feature card on the front page"
+  },
   "N5m6RU": {
     "defaultMessage": "Waiting on them",
     "description": "Where answering an enquiry stands: answered, waiting on the enquirer. A filter, a choice and a label on each enquiry"
@@ -1639,6 +1827,10 @@
     "defaultMessage": "Name what you look for",
     "description": "Link to settings, for an owner, when nothing is named to look for in a company"
   },
+  "Nk501a": {
+    "defaultMessage": "agent · {name}",
+    "description": "A badge on the front page's screenshot, naming who did something: an agent, and {name} is its name"
+  },
   "NqTzWu": {
     "defaultMessage": "A SearXNG instance you run: free, open-source search, with json among its search.formats. The agent searches through it, and reads pages itself, with no paid search service.",
     "description": "Under the field for an agent's search. SearXNG is a product's name; json and search.formats are its settings, kept as they are"
@@ -1646,6 +1838,10 @@
   "NwGjP1": {
     "defaultMessage": "Nobody yet.",
     "description": "Under Signers when nobody signs the agreement yet"
+  },
+  "O+HnZh": {
+    "defaultMessage": "The LinkedIn queue: the connection note ready to copy, with keyboard shortcuts",
+    "description": "Alt text of a screenshot of the app's LinkedIn queue"
   },
   "O3c/qR": {
     "defaultMessage": "Faster: from LinkedIn itself",
@@ -1735,9 +1931,21 @@
     "defaultMessage": "Everyone in conversation",
     "description": "Whom a campaign goes to: everyone in a conversation with the organisation"
   },
+  "Oy5xR9": {
+    "defaultMessage": "The details that keep a list clean.",
+    "description": "Heading of the front page's section on details for small teams"
+  },
   "P2V68J": {
     "defaultMessage": "Not tracked",
     "description": "Where answering an enquiry stands, when nobody has said"
+  },
+  "P37KKy": {
+    "defaultMessage": "open and copy the note",
+    "description": "What the keyboard shortcut o does in the LinkedIn queue"
+  },
+  "P6XntI": {
+    "defaultMessage": "What each customer is on, for how long, and the notice it needs. Today flags one a month before its date, and a renewal deal starts from it.",
+    "description": "Text of the front page's card about subscriptions. Today is the name of a page in the app"
   },
   "PO4dho": {
     "defaultMessage": "{seq} · {who, select, them {them} other {us}} ·",
@@ -1887,6 +2095,10 @@
     "defaultMessage": "Continue to {org}",
     "description": "Button to an organisation's own sign-in. {org} is its name"
   },
+  "QpPC7N": {
+    "defaultMessage": "Bring your own files",
+    "description": "Heading of a feature card on the front page"
+  },
   "QvJCFf": {
     "defaultMessage": "{vendor} charges a credit only when it finds an address.",
     "description": "Under a data vendor's settings: what it charges. {vendor} is its name, Hunter"
@@ -1959,6 +2171,18 @@
     "defaultMessage": "LinkedIn profile",
     "description": "Label of the field for a person's LinkedIn profile address"
   },
+  "S4FfM/": {
+    "defaultMessage": "Calls at a sensible hour",
+    "description": "Heading of a feature card on the front page"
+  },
+  "S4Idq2": {
+    "defaultMessage": "Your data stays yours",
+    "description": "Heading of a feature card on the front page"
+  },
+  "S5tChX": {
+    "defaultMessage": "They draft. Only people send.",
+    "description": "Under 'messages sent by agents' on the front page"
+  },
   "S7V2h5": {
     "defaultMessage": "why it fits",
     "description": "Beside an agent's reason a company fits"
@@ -2019,6 +2243,10 @@
     "defaultMessage": "thinking off",
     "description": "Tag on an agent's card: it answers without thinking first"
   },
+  "SwuXVA": {
+    "defaultMessage": "A few hundred accounts.",
+    "description": "First line of the front page's main headline"
+  },
   "T1eJzT": {
     "defaultMessage": "Your provider's {oidc} issuer. Empty turns single sign-on off.",
     "description": "Under the single sign-on issuer field. {oidc} is the standard's name"
@@ -2042,6 +2270,10 @@
   "T7yEjP": {
     "defaultMessage": "Add on LinkedIn",
     "description": "In the Do now panel, beside a count of people to add on LinkedIn"
+  },
+  "TOMOWW": {
+    "defaultMessage": "That couldn't be taken. Check the email address and try again.",
+    "description": "Beside the enquiry form's button when the server refused what was filled in"
   },
   "TOtIK2": {
     "defaultMessage": "now {current}",
@@ -2102,6 +2334,10 @@
   "TwURc5": {
     "defaultMessage": "e.g. Spring price list",
     "description": "Example in the empty box for a new campaign's name"
+  },
+  "Tyec9L": {
+    "defaultMessage": "How it works",
+    "description": "Small heading of the front page's section on how Prospector works"
   },
   "U+hYJs": {
     "defaultMessage": "It currently keeps {total, plural, one {# person} other {# people}} already here out of the queue: {shown}{more, plural, =0 {} one { and # more} other { and # more}}.",
@@ -2187,9 +2423,17 @@
     "defaultMessage": "Password you were given",
     "description": "Label of the field for the password a new member was given"
   },
+  "V0EDl0": {
+    "defaultMessage": "Releases",
+    "description": "Footer link to Prospector's releases on GitHub"
+  },
   "V2aK35": {
     "defaultMessage": "Tools agents get",
     "description": "Heading of the list of tools an agent connecting to the product can call"
+  },
+  "V4ji5l": {
+    "defaultMessage": "Hosting, a question, a demo, or help getting it running. Someone will write back to the address you give.",
+    "description": "Text beside the front page's enquiry form"
   },
   "V5m+z7": {
     "defaultMessage": "closes {date}",
@@ -2218,6 +2462,10 @@
   "VjgnON": {
     "defaultMessage": "Reload to try again.",
     "description": "Under the heading when a task failed to load"
+  },
+  "Vjpit0": {
+    "defaultMessage": "Company",
+    "description": "Label of the enquiry form's company field"
   },
   "Vk7CpX": {
     "defaultMessage": "Sidebar",
@@ -2343,6 +2591,10 @@
     "defaultMessage": "declined",
     "description": "A person's stage: they said no"
   },
+  "XH8vj/": {
+    "defaultMessage": "02 · Today",
+    "description": "Tag of the second step on the front page. Today is the name of a page in the app"
+  },
   "XNsziM": {
     "defaultMessage": "a year",
     "description": "A price's period: per year"
@@ -2355,9 +2607,17 @@
     "defaultMessage": "{vendor} ({left} of {limit} left)",
     "description": "A vendor a lookup would go to. {vendor} is its name; {left} the lookups left this month of {limit}"
   },
+  "XVUPCU": {
+    "defaultMessage": "Too many messages just now. Your message is still here: try again in an hour.",
+    "description": "Beside the enquiry form's button when too many enquiries were sent"
+  },
   "XVpLSg": {
     "defaultMessage": "runs, missing something",
     "description": "In the key to the agent cards' colours: an agent that runs but lacks something"
+  },
+  "XXpPYS": {
+    "defaultMessage": "One queue, best first",
+    "description": "Heading of the front page's step about the Today page"
   },
   "XbHScK": {
     "defaultMessage": "Follow-up",
@@ -2378,6 +2638,10 @@
   "Xm3zph": {
     "defaultMessage": "{done} of {total, plural, one {# of your steps is} other {# of your steps are}} done. Mark each one when you have done it.",
     "description": "How many of a customer's own onboarding steps are done"
+  },
+  "XvcPD6": {
+    "defaultMessage": "Subscriptions and their notice",
+    "description": "Heading of a feature card on the front page"
   },
   "XxgWDg": {
     "defaultMessage": "Send to",
@@ -2402,6 +2666,10 @@
   "Y1XZJo": {
     "defaultMessage": "Next step",
     "description": "Label of the field for the next step in a conversation"
+  },
+  "Y281lY": {
+    "defaultMessage": "Say where answering an enquiry stands, without deals",
+    "description": "What an API key with the enquiries:triage scope can do"
   },
   "Y3YflR": {
     "defaultMessage": "Address not to mail",
@@ -2439,6 +2707,10 @@
     "defaultMessage": "Agents get its look-for fields, and what they find waits in its review.",
     "description": "Under the field picking which offering a new task is for: what picking one does"
   },
+  "YS8/Zq": {
+    "defaultMessage": "Terminal",
+    "description": "Title over example shell commands"
+  },
   "YSzd1j": {
     "defaultMessage": "What they skipped or couldn't find, in their words. Not checked by anyone.",
     "description": "Under the heading of a task's section of agents' notes"
@@ -2463,6 +2735,10 @@
     "defaultMessage": "nobody has it yet",
     "description": "On an enquiry, after where answering it stands: no member is answering it"
   },
+  "Yuv5oH": {
+    "defaultMessage": "Each organisation has an MCP endpoint and a REST API with scoped keys. Connect Claude or your own agent in one command, and decide what each key may do. Or let Prospector run the agents itself, through Claude, any OpenAI-compatible endpoint or a model you host, with free search from your own SearXNG. Each agent's card says whether it is ready, and why not.",
+    "description": "Intro of the front page's section on agents. MCP, REST, Claude, OpenAI and SearXNG are names to keep"
+  },
   "Z/1XxQ": {
     "defaultMessage": "Not done",
     "description": "Button taking back an onboarding step's being done"
@@ -2471,9 +2747,17 @@
     "defaultMessage": "done {on}",
     "description": "When an onboarding step was done. {on} is a date"
   },
+  "Z1e1wV": {
+    "defaultMessage": "Email a customer the link to their onboarding steps",
+    "description": "What an API key with the customers:invite scope can do"
+  },
   "Z1lVj5": {
     "defaultMessage": "Answer enquiries",
     "description": "In the Do now panel, beside a count of unanswered enquiries"
+  },
+  "Z8g7Hx": {
+    "defaultMessage": "Deals with a value",
+    "description": "Heading of a feature card on the front page"
   },
   "Z8qXFm": {
     "defaultMessage": "Only {org}'s own.",
@@ -2487,6 +2771,10 @@
     "defaultMessage": "Saved ✓",
     "description": "After a reply was sent or an answer recorded"
   },
+  "Zie3DC": {
+    "defaultMessage": "Draft notes, emails and follow-ups, shown as the agent's",
+    "description": "What an API key with the drafts:write scope can do"
+  },
   "Zj/wNE": {
     "defaultMessage": "{n} can't run",
     "description": "Count of the product's own agents that can't run"
@@ -2494,6 +2782,10 @@
   "Zon+75": {
     "defaultMessage": "Enquiry form sites",
     "description": "Label of the list of websites whose forms may send enquiries"
+  },
+  "ZtFBeW": {
+    "defaultMessage": "Write once to everyone in conversation or at a current customer, never to cold prospects. It goes through your own mail server with your postal address and a one-click unsubscribe, and nobody is mailed twice. A service notice, such as a price change, reaches customers who unsubscribed from marketing. With Postmark, an address that bounces or calls a mail spam gets no more.",
+    "description": "Text of the front page's card about campaigns. Postmark is the name of a mail service"
   },
   "Zxy8BI": {
     "defaultMessage": "Renewal with",
@@ -2515,6 +2807,14 @@
     "defaultMessage": "None yet.",
     "description": "When no one at a company has been found"
   },
+  "a6OlUA": {
+    "defaultMessage": "Sending…",
+    "description": "Beside the enquiry form's button while it sends"
+  },
+  "aIfCtj": {
+    "defaultMessage": "Each one needs a next step with a date. Any without one, or due today, come back to the top of Today.",
+    "description": "On the front page, about the Conversations board. Today is the name of a page in the app"
+  },
   "aMRUY/": {
     "defaultMessage": "What you do",
     "description": "Label of the pitch line used in call scripts"
@@ -2530,6 +2830,14 @@
   "ablhav": {
     "defaultMessage": "a month",
     "description": "A price's period: per month"
+  },
+  "ad/3Ql": {
+    "defaultMessage": "Office hours come from the contact's phone number, so Zurich gets called when Zurich is at work.",
+    "description": "Text of the front page's card about calling at office hours. Zurich is an example city"
+  },
+  "ahPhRQ": {
+    "defaultMessage": "Footer",
+    "description": "Accessible name of the public site's footer links."
   },
   "ahRYK4": {
     "defaultMessage": "Update",
@@ -2555,6 +2863,10 @@
     "defaultMessage": "Marketing mail from this sender won't go to the address this link was sent to. Mail about something you already have with them, such as a change to your contract, can still reach you.",
     "description": "After unsubscribing: what stops, and what can still come"
   },
+  "bDmlI2": {
+    "defaultMessage": "Prospector is one program for Linux or macOS, on SQLite or Postgres, with every feature. Download it, name your organisation, add yourself and start working the list. Your server, your mail, your models.",
+    "description": "Text of the front page's section on self-hosting"
+  },
   "bFkWVL": {
     "defaultMessage": "Asked at most {n, plural, one {# time} other {# times}} a month. Changed by {who}, {when}.",
     "description": "On a data vendor's card, for a member who isn't an owner. {who} is who last changed it, {when} the date and time"
@@ -2574,6 +2886,10 @@
   "bWjJSC": {
     "defaultMessage": "Start",
     "description": "Button to start another deal with someone, of the kind chosen"
+  },
+  "ba8ibw": {
+    "defaultMessage": "After it's won",
+    "description": "Small heading of the front page's section on customers, after a deal is won"
   },
   "be0lfg": {
     "defaultMessage": "Enter a number, or 0 for none.",
@@ -2615,9 +2931,17 @@
     "defaultMessage": "ending",
     "description": "A subscription's status: ends when its term does"
   },
+  "c21Z0e": {
+    "defaultMessage": "A prospecting and customer workbench for small teams selling to named accounts: research, deals, agreements, subscriptions and onboarding on one company record. Agents research and draft; you decide what they may send.",
+    "description": "The front page's description for search results and link previews"
+  },
   "c2Y0by": {
     "defaultMessage": "Reaches {where}. Only an owner changes its setup.",
     "description": "On an agent's card, for a member who isn't an owner. {where} is the address it sends requests to, or Anthropic's own API"
+  },
+  "c8CUG4": {
+    "defaultMessage": "Your steps and theirs, dated from the start. The customer gets a page of their own steps from an emailed link, no password, and marks theirs done. Late steps come back to Today.",
+    "description": "Text of the front page's card about onboarding. Today is the name of a page in the app"
   },
   "cB+Ak2": {
     "defaultMessage": "LinkedIn connection request",
@@ -2691,6 +3015,10 @@
     "defaultMessage": "Record a subscription",
     "description": "Line that opens the form to record a subscription"
   },
+  "cw0EMg": {
+    "defaultMessage": "Calls where it's office hours for the contact",
+    "description": "Second in the list of what the Today page shows first"
+  },
   "d2Cw+R": {
     "defaultMessage": "Add someone",
     "description": "Link to add a person at a company"
@@ -2706,6 +3034,10 @@
   "dGSIwS": {
     "defaultMessage": "{n} refused",
     "description": "Count of a campaign's mails the mail server refused, in the line under its name"
+  },
+  "dHfUeW": {
+    "defaultMessage": "Record an outcome, shown as the agent's in the history",
+    "description": "What an API key with the outcomes:write scope can do"
   },
   "dK/U8c": {
     "defaultMessage": "For {email}. 10 characters or more.",
@@ -2791,6 +3123,10 @@
     "defaultMessage": "Forgot your password?",
     "description": "Link from the sign-in page to reset a password"
   },
+  "eU5tL+": {
+    "defaultMessage": "Value deals, work a renewal or expansion through its stages, and say where answering an enquiry stands",
+    "description": "What an API key with the pipeline:write scope can do"
+  },
   "eeJYXA": {
     "defaultMessage": "We'll email you a link to choose a new one.",
     "description": "On the page to ask for a password reset link"
@@ -2807,6 +3143,10 @@
     "defaultMessage": "{n} skipped",
     "description": "Count of a campaign's mails skipped, in the line under its name"
   },
+  "em6+Ov": {
+    "defaultMessage": "Agreements, ready to sign",
+    "description": "Heading of a feature card on the front page"
+  },
   "enFDdr": {
     "defaultMessage": "last change {when}",
     "description": "In a stretch of an agent's work still going: when it last changed something. {when} is how long ago, such as 5 min ago"
@@ -2822,6 +3162,10 @@
   "erqsBj": {
     "defaultMessage": "Service notice",
     "description": "A campaign's kind: a notice to customers about what they already have"
+  },
+  "eu18cr": {
+    "defaultMessage": "How it works",
+    "description": "Front page navigation link to the section on how Prospector works"
   },
   "eu9lWY": {
     "defaultMessage": "About how many companies",
@@ -2866,6 +3210,14 @@
   "fsVQKi": {
     "defaultMessage": "must",
     "description": "Beside a criterion a company has to meet"
+  },
+  "ftqOQi": {
+    "defaultMessage": "A never-contact list that holds",
+    "description": "Heading of a feature card on the front page"
+  },
+  "fxtUXV": {
+    "defaultMessage": "Sell more than one thing? Each offering gets its own look-for list and queue, so a company that is wrong for one can still be right for another. Every fact keeps its source.",
+    "description": "Second paragraph of the front page's step about the Research page"
   },
   "fzP2kj": {
     "defaultMessage": "Say who you're looking for and an agent goes to find them. What agents, jobs and imports find waits here: nothing reaches outreach until someone qualifies it and picks a contact. Every fact keeps the link it came from.",
@@ -2939,6 +3291,10 @@
     "defaultMessage": "Your sign-in",
     "description": "Heading of the settings page's section for a member who signs in only through a provider"
   },
+  "gczrAX": {
+    "defaultMessage": "Each has its own prospects, wording, team and keys. None can see another's. Sign in with a password, Google, Microsoft, LinkedIn or your organisation's own single sign-on.",
+    "description": "Text of the front page's card about organisations and signing in"
+  },
   "gd4kEc": {
     "defaultMessage": "← Previous",
     "description": "Button to the previous page of agents' activity"
@@ -2958,6 +3314,10 @@
   "gsLlgl": {
     "defaultMessage": "Getting you set up",
     "description": "Heading of a customer's onboarding page"
+  },
+  "gzG4sZ": {
+    "defaultMessage": "Read the docs",
+    "description": "Button to Prospector's documentation on GitHub"
   },
   "h+YFUf": {
     "defaultMessage": "Write a brief and hand it to your agent with the prompt on its page.",
@@ -2979,6 +3339,10 @@
     "defaultMessage": "Research",
     "description": "Sidebar: the page of companies and people to look into"
   },
+  "hBspLb": {
+    "defaultMessage": "Free for {n, plural, one {# user} other {# users}}",
+    "description": "Front page button that scrolls to the pricing. {n} is how many users are free"
+  },
   "hD6tPx": {
     "defaultMessage": "Where it stands",
     "description": "Small heading over a company's verdict for each offering"
@@ -2987,9 +3351,17 @@
     "defaultMessage": "The steps between a signature and a live customer. Each onboarding is a copy of your steps, made the day it starts, so changing them in Settings later leaves the ones running as they are. Start one from a company's page. Ones running late come first.",
     "description": "What the onboarding page is, under its title"
   },
+  "hGV56V": {
+    "defaultMessage": "Every company shows who did what and when, people and agents alike.",
+    "description": "Text of the front page's card about history"
+  },
   "hGXKjJ": {
     "defaultMessage": "Your own agent connects",
     "description": "The choice to add the organisation's own agent, which connects with a key"
+  },
+  "hLm9qE": {
+    "defaultMessage": "Download Prospector",
+    "description": "Button to download Prospector's latest release from GitHub"
   },
   "hMigST": {
     "defaultMessage": "{org} · your onboarding",
@@ -3035,6 +3407,10 @@
     "defaultMessage": "Companies your agents and discovery jobs add will wait here.",
     "description": "On the research page when nothing is waiting to be reviewed"
   },
+  "i69Ymq": {
+    "defaultMessage": "Help running it",
+    "description": "Choice in the enquiry form: asking for help running Prospector"
+  },
   "i9Qbxx": {
     "defaultMessage": "To invite anyone, an owner sets a mail server in Settings and the server needs its public address (PROSPECTOR_URL).",
     "description": "Why nobody can be invited: mail isn't set up"
@@ -3075,6 +3451,14 @@
     "defaultMessage": "Client ID",
     "description": "Label of the client ID the provider gave for single sign-on"
   },
+  "iq/mRr": {
+    "defaultMessage": "From a company name to a signed deal, in three pages.",
+    "description": "Heading of the front page's section on how it works"
+  },
+  "iuz4f9": {
+    "defaultMessage": "source link per fact",
+    "description": "Beside a large number 1 on the front page: each fact has one source link"
+  },
   "iz5wxg": {
     "defaultMessage": "Name",
     "description": "Label of an agent's name in its settings"
@@ -3090,6 +3474,10 @@
   "j941lb": {
     "defaultMessage": "{status, select, finished {finished} stopped {stopped} failed {failed} other {{status}}}: {reason}",
     "description": "How an agent's run on a task ended: finished, stopped or failed. {reason} is why it stopped, in the run's own words"
+  },
+  "j9C4ax": {
+    "defaultMessage": "Upload the contract as a PDF. It is kept exactly as uploaded and checked against its hash on every download. Choose who signs and in what order, and drag their fields onto the pages. Sending for signature comes next.",
+    "description": "Text of the front page's card about agreements"
   },
   "j9HJpA": {
     "defaultMessage": "{day} · {time}",
@@ -3159,6 +3547,10 @@
     "defaultMessage": "Start",
     "description": "Button to start an onboarding or an agreement"
   },
+  "k+Yd9p": {
+    "defaultMessage": "Ask us anything.",
+    "description": "Heading of the front page's enquiry form"
+  },
   "k4kThJ": {
     "defaultMessage": "← First",
     "description": "Button back to the start of the research page's list"
@@ -3183,6 +3575,10 @@
     "defaultMessage": "An owner writes the steps under Settings, one a line. Then start an onboarding from a company's page.",
     "description": "Under 'No steps written yet'"
   },
+  "kZmmkX": {
+    "defaultMessage": "03 · Conversations",
+    "description": "Tag of the third step on the front page. Conversations is the name of a page in the app"
+  },
   "ka0pPD": {
     "defaultMessage": "Page {n} of {total}",
     "description": "What a screen reader calls one of an agreement's pages. {n} is the page's number, {total} how many pages there are"
@@ -3199,6 +3595,10 @@
     "defaultMessage": "They sign in this order.",
     "description": "Under Signers, read only: they sign one after another, in the order listed"
   },
+  "l2ksjH": {
+    "defaultMessage": "Agents: each of Prospector's agents on a card saying whether it is ready, with its model, search, tools and fallback",
+    "description": "Alt text of a screenshot of the app's Agents page"
+  },
   "l8EYoK": {
     "defaultMessage": "What agents added for this task, or matched to it. Companies and people wait in Research until someone qualifies or picks them.",
     "description": "Under the heading of a task's section of what was found. Research is the page of that name"
@@ -3206,6 +3606,10 @@
   "lA8Isj": {
     "defaultMessage": "Subscriptions are support work, so here you read it.",
     "description": "For a member who doesn't do support work, on the subscriptions page"
+  },
+  "lD82WV": {
+    "defaultMessage": "Replies move across a board: replied, meeting, proposal, won, lost.",
+    "description": "On the front page, the stages of the Conversations board"
   },
   "lXKsMn": {
     "defaultMessage": "Delete",
@@ -3247,9 +3651,21 @@
     "defaultMessage": "Saving fetches the endpoint's list to choose from.",
     "description": "Under the field for an agent's model before its endpoint's models are known"
   },
+  "lwvUKS": {
+    "defaultMessage": "A question",
+    "description": "Choice in the enquiry form: a general question"
+  },
+  "lxa+wR": {
+    "defaultMessage": "Site",
+    "description": "What a screen reader calls the front page's top navigation"
+  },
   "lzZnZc": {
     "defaultMessage": "{vendor} charges a credit for an email and ten for a mobile, only when it finds one, and nothing to look up the same person again within 90 days. Each lookup keeps only the detail it was for.",
     "description": "Under a data vendor's settings: what it charges. {vendor} is its name, Prospeo"
+  },
+  "m1Gk6c": {
+    "defaultMessage": "Research fills the list. Today works it. Conversations closes it. The screenshots show invented companies and people.",
+    "description": "Intro of the section on how it works. Research, Today and Conversations are the names of pages in the app"
   },
   "m3WkmC": {
     "defaultMessage": "For {offering}",
@@ -3287,6 +3703,10 @@
     "defaultMessage": "Set next steps",
     "description": "In the Do now panel, beside a count of conversations needing a next step"
   },
+  "mhUdf/": {
+    "defaultMessage": "Everything due across LinkedIn, email and phone, in this order:",
+    "description": "Before a numbered list of what the Today page shows first"
+  },
   "mjBZXe": {
     "defaultMessage": "Who signs it",
     "description": "Link to see who signs an agreement"
@@ -3294,6 +3714,10 @@
   "mp4wvV": {
     "defaultMessage": "Qualify",
     "description": "Button to qualify a company"
+  },
+  "mrqp5v": {
+    "defaultMessage": "Self-host",
+    "description": "Footer link to the section on running Prospector yourself"
   },
   "msXQvr": {
     "defaultMessage": "email verified",
@@ -3322,6 +3746,10 @@
   "nVpam5": {
     "defaultMessage": "Reopen",
     "description": "Button to mark a request on a task as not done after all"
+  },
+  "nW5AbG": {
+    "defaultMessage": "See how it works",
+    "description": "Front page button that scrolls to the section on how it works"
   },
   "nXFGEy": {
     "defaultMessage": "Qualified",
@@ -3355,6 +3783,10 @@
     "defaultMessage": "Make owner",
     "description": "Button to make a member an owner"
   },
+  "nv53Jo": {
+    "defaultMessage": "Conversations that need a next step",
+    "description": "First in the list of what the Today page shows first"
+  },
   "nvR3+z": {
     "defaultMessage": "Every vendor {prospector} can ask is added.",
     "description": "In place of the form adding a data vendor when all are added. {prospector} is the product's name, Prospector"
@@ -3367,6 +3799,10 @@
     "defaultMessage": "not contacted",
     "description": "A person's stage: no one has contacted them yet"
   },
+  "o09nP+": {
+    "defaultMessage": "skip",
+    "description": "What the keyboard shortcut s does in the LinkedIn queue"
+  },
   "o8wiUL": {
     "defaultMessage": "Claude, ChatGPT, the gateway…",
     "description": "Examples in the empty field for an agent's name; Claude and ChatGPT are products' names"
@@ -3374,6 +3810,10 @@
   "oDszhZ": {
     "defaultMessage": "inferred",
     "description": "How a criterion was checked: an agent inferred it"
+  },
+  "oMCXeP": {
+    "defaultMessage": "Import companies from CSV and drafts from markdown. Re-importing never clears a date or an edit made in the app.",
+    "description": "Text of the front page's card about importing"
   },
   "oO4acB": {
     "defaultMessage": "{name} · {file} · {n, plural, one {# page} other {# pages}}",
@@ -3451,6 +3891,14 @@
     "defaultMessage": "Looking for",
     "description": "Small heading over what the organisation looks for in a company, and whether this one has it"
   },
+  "pc1G6v": {
+    "defaultMessage": "Say who you're looking for and send an agent after them. Ask for about so many companies and watch how far the search has got. What it finds that you already have is left out, and nothing reaches outreach until someone qualifies it.",
+    "description": "First paragraph of the front page's step about the Research page"
+  },
+  "pcDz+Y": {
+    "defaultMessage": "Pricing",
+    "description": "Front page navigation link to the pricing section"
+  },
   "peu3qk": {
     "defaultMessage": "✓ Every signer has a signature field.",
     "description": "When an agreement has all it needs before it can be sent"
@@ -3466,6 +3914,10 @@
   "plpp7+": {
     "defaultMessage": "Campaigns",
     "description": "Sidebar: the page of mail campaigns"
+  },
+  "pnotm2": {
+    "defaultMessage": "messages sent by agents",
+    "description": "Beside a large number 0 on the front page: no messages are sent by agents"
   },
   "q+kFC6": {
     "defaultMessage": "Dead end",
@@ -3507,6 +3959,10 @@
     "defaultMessage": "Ask",
     "description": "Button sending a request for more to a task's agents"
   },
+  "qydMvc": {
+    "defaultMessage": "Sign in",
+    "description": "Front page link to the sign-in page"
+  },
   "qzUXSB": {
     "defaultMessage": "+ Add person",
     "description": "Sidebar button to add a person to prospect"
@@ -3514,6 +3970,10 @@
   "r5Zsvr": {
     "defaultMessage": "ends {on}",
     "description": "When a subscription ends. {on} is a date"
+  },
+  "rCr15Q": {
+    "defaultMessage": "Rather run it yourself?",
+    "description": "Small heading of the front page's section on self-hosting"
   },
   "rJg0SS": {
     "defaultMessage": "Then",
@@ -3571,6 +4031,10 @@
     "defaultMessage": "Gets a copy",
     "description": "Heading of the people who get a copy of an agreement without signing it"
   },
+  "s/s0Nw": {
+    "defaultMessage": "Research: a brief for an agent at the top, its search, and two companies it found, each with sourced facts",
+    "description": "Alt text of a screenshot of the app's Research page"
+  },
   "s1zF84": {
     "defaultMessage": "For, if they have several",
     "description": "Label of the field naming which of a customer's sites or teams an onboarding is for"
@@ -3610,6 +4074,10 @@
   "sTSLFC": {
     "defaultMessage": "New",
     "description": "Label of the field for the member's new password"
+  },
+  "sUzOXT": {
+    "defaultMessage": "across LinkedIn, email and phone.",
+    "description": "Under 'queue a day' on the front page"
   },
   "scH4Dg": {
     "defaultMessage": "{n, plural, one {# company} other {# companies}}",
@@ -3655,6 +4123,10 @@
     "defaultMessage": "Sales",
     "description": "What an enquiry is about: buying. A filter and a label on each enquiry"
   },
+  "tAwscG": {
+    "defaultMessage": "Sign an agreement",
+    "description": "In the list of what no API key can do"
+  },
   "tFxWT0": {
     "defaultMessage": "{by} · {at} · {since, select, first {found so far} other {added since}}: {found}",
     "description": "Under a request on a task. {by} is who asked; {at} when; {since} says whether it is the task's first request, so what was found counts from the start; {found} how many companies and people, such as 3 companies, 5 people"
@@ -3670,6 +4142,10 @@
   "tNR2Cj": {
     "defaultMessage": "This link has been used or has run out",
     "description": "Heading when a customer's link no longer opens their page"
+  },
+  "tNT4bP": {
+    "defaultMessage": "Connect Claude Code",
+    "description": "Title over shell commands that connect Claude Code (a product's name) to Prospector"
   },
   "tRWcdn": {
     "defaultMessage": "Copy prompt",
@@ -3727,6 +4203,10 @@
     "defaultMessage": "Minutes",
     "description": "What a screen reader calls the field for how many minutes to wait before falling back"
   },
+  "u91Ufh": {
+    "defaultMessage": "Agents",
+    "description": "Front page navigation link to the section on AI agents and the API"
+  },
   "uFqR/b": {
     "defaultMessage": "asks {vendors} in {month}",
     "description": "Under the buttons to look up a person's details: who they ask. {vendors} are vendors joined with or; {month} the month"
@@ -3754,6 +4234,10 @@
   "uXvX1U": {
     "defaultMessage": "Never an owner. Someone you remove here joins again while your provider still lets them in: remove them there too.",
     "description": "Under the checkbox to let people join by single sign-on"
+  },
+  "ubXCYi": {
+    "defaultMessage": "{when} in London: good time to call",
+    "description": "A badge on the front page's screenshot, as the app shows it. {when} is a weekday and time, such as Tue 16:39"
   },
   "ufF1TC": {
     "defaultMessage": "By",
@@ -3791,6 +4275,14 @@
     "defaultMessage": "Add someone",
     "description": "Heading of the forms adding a signer or someone to get a copy"
   },
+  "v/6xeR": {
+    "defaultMessage": "Host it yourself on SQLite or Postgres, or let us. An owner can download everything the organisation holds as one file, and erase a person who asks to be forgotten.",
+    "description": "Text of the front page's card about owning your data"
+  },
+  "v0HOOZ": {
+    "defaultMessage": "Conversations: a board from replied to won",
+    "description": "Alt text of a screenshot of the app's Conversations board"
+  },
   "v3fBNO": {
     "defaultMessage": "The task couldn't be read.",
     "description": "Heading when a task failed to load"
@@ -3806,6 +4298,10 @@
   "v8v3AO": {
     "defaultMessage": "Already here when this search came to them, or on a domain the never-contact list covers: kept, never up for review.",
     "description": "In the panel of companies a search left out: why they were"
+  },
+  "vDAK3/": {
+    "defaultMessage": "See another organisation",
+    "description": "In the list of what no API key can do"
   },
   "vDbQhP": {
     "defaultMessage": "Lost",
@@ -3863,6 +4359,10 @@
     "defaultMessage": "{n} to review",
     "description": "After how many companies a search found: how many of them wait for review"
   },
+  "vwsqU/": {
+    "defaultMessage": "Add anyone on your never-contact list",
+    "description": "In the list of what no API key can do"
+  },
   "w4EZ+4": {
     "defaultMessage": "the customer",
     "description": "Who did something, when it was the customer themselves"
@@ -3874,6 +4374,14 @@
   "wBVcnU": {
     "defaultMessage": "meeting",
     "description": "A person's stage: a meeting is arranged"
+  },
+  "wIq9T8": {
+    "defaultMessage": "Leave this empty",
+    "description": "Label of a hidden field in the enquiry form that only spam robots fill in; people never see it"
+  },
+  "wIwV2t": {
+    "defaultMessage": "Send mail without a scope that says so, or to anyone on your never-contact list or erased on request",
+    "description": "In the list of what no API key can do"
   },
   "wLHbPM": {
     "defaultMessage": "No vendors yet.",
@@ -3923,6 +4431,10 @@
     "defaultMessage": "Save",
     "description": "Button saving a data vendor's settings"
   },
+  "x6tAYp": {
+    "defaultMessage": "Something it should do",
+    "description": "Choice in the enquiry form: asking for a feature"
+  },
   "x9OsPh": {
     "defaultMessage": "Current",
     "description": "Label of the field for the member's current password"
@@ -3966,6 +4478,14 @@
   "xayQrS": {
     "defaultMessage": "Colour",
     "description": "Label of the organisation's colour picker"
+  },
+  "xbe2Sy": {
+    "defaultMessage": "Onboarding to go-live",
+    "description": "Heading of a feature card on the front page"
+  },
+  "xcOSPc": {
+    "defaultMessage": "Each conversation carries what it's worth, who has it and when it should close. Start a second one for a renewal or an expansion.",
+    "description": "Text of the front page's card about deals"
   },
   "xfJnWy": {
     "defaultMessage": "Phone",
@@ -4047,6 +4567,10 @@
     "defaultMessage": "Onboarding steps",
     "description": "Label of the list of steps a new customer goes through"
   },
+  "yYgFLT": {
+    "defaultMessage": "Make or revoke API keys. Only {settings} can change your organisation's settings, {team} its members, {mail} its mail server and {sso} its single sign-on, and only {agents} Prospector's own agents",
+    "description": "In the list of what no API key can do. Each {placeholder} is the name of a key scope, such as settings:write, kept as code"
+  },
   "yZSQsb": {
     "defaultMessage": "Our note",
     "description": "What a screen reader calls the field for the members' note on an enquiry"
@@ -4066,6 +4590,10 @@
   "ynGBDI": {
     "defaultMessage": "Remove",
     "description": "Button on the settings page to remove an offering, a domain or a member"
+  },
+  "ys5NYV": {
+    "defaultMessage": "Prospects and customers for small teams with a named list.",
+    "description": "Line in the front page's footer saying what Prospector is"
   },
   "yxe9Ac": {
     "defaultMessage": "Continue with {provider}",
@@ -4087,6 +4615,10 @@
     "defaultMessage": "Who are you looking for, for {offering}?",
     "description": "Label of the box where a search is described. {offering} is the name of what the search is for"
   },
+  "z7jFrM": {
+    "defaultMessage": "Built for a small team",
+    "description": "Small heading of the front page's section on details for small teams"
+  },
   "zByJ0E": {
     "defaultMessage": "Saved ✓",
     "description": "Once the fields placed on an agreement are saved"
@@ -4094,6 +4626,10 @@
   "zD1vHd": {
     "defaultMessage": "Agents & API",
     "description": "Title of the page of agents, their API keys and data vendors"
+  },
+  "zDd24Z": {
+    "defaultMessage": "Set out who signs an agreement and place their fields",
+    "description": "What an API key with the agreements:write scope can do"
   },
   "zFcu5E": {
     "defaultMessage": "Upload the PDF.",
@@ -4106,6 +4642,10 @@
   "zH3KfT": {
     "defaultMessage": "Not yet ready to send: {reason}.",
     "description": "On the Campaigns page when nothing can be sent yet. {reason} is the server's reason, such as a postal address missing"
+  },
+  "zHN//b": {
+    "defaultMessage": "No key can",
+    "description": "Heading of the list of what no API key can do"
   },
   "zJ6dfh": {
     "defaultMessage": "Owner",
