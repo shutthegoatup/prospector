@@ -13,7 +13,6 @@ const docBase = "https://prospector.invalid"
 type docView struct {
 	Title   string      `json:"title"`
 	Version string      `json:"version"`
-	Intro   [][]docSpan `json:"intro"`
 	Scopes  []docScope  `json:"scopes"`
 	Groups  []docGroup  `json:"groups"`
 	Schemas []docSchema `json:"schemas"`
@@ -110,10 +109,7 @@ func docViewOf(doc APIDoc) docView {
 		}
 		return out
 	}
-	v := docView{Title: doc.Title, Version: doc.Version, Intro: [][]docSpan{}, Scopes: []docScope{}, Groups: []docGroup{}, Schemas: []docSchema{}}
-	for _, p := range doc.Intro {
-		v.Intro = append(v.Intro, spans(p))
-	}
+	v := docView{Title: doc.Title, Version: doc.Version, Scopes: []docScope{}, Groups: []docGroup{}, Schemas: []docSchema{}}
 	for _, s := range doc.Scopes {
 		v.Scopes = append(v.Scopes, docScope(s))
 	}

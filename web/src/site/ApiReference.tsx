@@ -26,7 +26,6 @@ export type DocSchema = { anchor: string; name: string; about: DocSpan[]; enum: 
 export type Doc = {
   title: string;
   version: string;
-  intro: DocSpan[][];
   scopes: { name: string; what: string; owner?: boolean }[];
   groups: { name: string; about: DocSpan[]; ops: DocOp[] }[];
   schemas: DocSchema[];
@@ -173,12 +172,7 @@ export function ApiReference({ doc }: { doc: Doc }) {
           </nav>
           <div className="max-w-[760px] pt-10 pb-12">
             <Eyebrow>{`${doc.title} API · v${doc.version} · OpenAPI 3`}</Eyebrow>
-            <h1 className="mt-3.5 mb-[18px] font-heading text-[clamp(40px,6vw,64px)] leading-[1.02] font-bold tracking-[-0.03em]">The contract.</h1>
-            {doc.intro.map((p, i) => (
-              <p className="mt-3 text-lg text-muted-foreground" key={i}>
-                <Spans of={p} />
-              </p>
-            ))}
+            <h1 className="mt-3.5 font-heading text-[clamp(40px,6vw,64px)] leading-[1.02] font-bold tracking-[-0.03em]">The contract.</h1>
           </div>
         </Wrap>
       </header>
