@@ -6,19 +6,17 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"os"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/cleantext"
+	"github.com/shutthegoatup/prospector/internal/egress"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -90,24 +88,7 @@ func refusal(res *http.Response, now time.Time) error {
 // allows private addresses, each connection is checked as it is made, and a
 // redirect, being a second destination, isn't followed. Contexts bound each call.
 func agentClient() *http.Client {
-	return publicClient(os.Getenv("PROSPECTOR_AGENT_ALLOW_PRIVATE") == "1")
-}
-
-func publicClient(allowPrivate bool) *http.Client {
-	dialer := &net.Dialer{Timeout: 10 * time.Second}
-	if !allowPrivate {
-		dialer.Control = func(_, address string, _ syscall.RawConn) error {
-			ap, err := netip.ParseAddrPort(address)
-			if err != nil || !publicAddr(ap.Addr()) {
-				return say.Errorf("%s isn't a public address", address)
-			}
-			return nil
-		}
-	}
-	return &http.Client{
-		Transport:     &http.Transport{DialContext: dialer.DialContext, TLSHandshakeTimeout: 10 * time.Second, IdleConnTimeout: 90 * time.Second},
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-	}
+	return egress.Client(egress.Options{AllowPrivate: os.Getenv("PROSPECTOR_AGENT_ALLOW_PRIVATE") == "1"})
 }
 
 func (a *App) agentHTTP() *http.Client {

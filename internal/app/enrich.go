@@ -11,6 +11,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/shutthegoatup/prospector/internal/egress"
 	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/prospecting"
 	"github.com/shutthegoatup/prospector/internal/research"
@@ -185,7 +186,7 @@ func (a *App) vendorHTTP() *http.Client {
 	if a.vendorClient != nil {
 		return a.vendorClient
 	}
-	return publicClient(false)
+	return egress.Client(egress.Options{})
 }
 
 // EnrichOut is what came of each field asked for.

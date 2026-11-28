@@ -48,20 +48,6 @@ try {
   cli(["org", "add", org.slug, org.name, `--owner=${member.email}`]);
   cli(["user", "add", reader.email, reader.name], reader.password + "\n");
   cli(["member", "add", org.slug, reader.email, "member"]);
-  // Postmark connected, and an address it reported bouncing for good. Through the API that
-  // takes a public https address, which this server on 127.0.0.1 hasn't, so they are rows.
-  execFileSync(
-    "psql",
-    [
-      database.href,
-      "-qc",
-      `
-    insert into bounce_hooks (org_id, secret_hash, created_at) select id, 'a11y', now() from orgs where slug = '${org.slug}';
-    insert into suppressions (org_id, address, reason, by, created_at, bounced_at)
-      select id, 'ines@harbourline.example', 'bounced', 'Postmark', now(), now() from orgs where slug = '${org.slug}';`,
-    ],
-    { stdio: "inherit" },
-  );
 } catch (err) {
   cleanUp();
   throw err;

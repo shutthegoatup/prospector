@@ -8,18 +8,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 
+	"github.com/shutthegoatup/prospector/internal/egress"
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/say"
 	"github.com/shutthegoatup/prospector/internal/store"
@@ -339,48 +337,5 @@ func (a *App) idp(ctx context.Context, spec store.IdpSpec) (*idp, error) {
 	return e.p, e.err
 }
 
-// notPublic is address space no sign-in provider lives in: this host, private
-// networks, link-local (where cloud metadata services sit) and the reserved ranges.
-var notPublic = func() []netip.Prefix {
-	var out []netip.Prefix
-	for _, p := range []string{"0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12",
-		"192.0.0.0/24", "192.0.2.0/24", "192.168.0.0/16", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24", "224.0.0.0/4",
-		"240.0.0.0/4", "2001::/23", "2001:db8::/32", "2002::/16", "3fff::/20"} {
-		out = append(out, netip.MustParsePrefix(p))
-	}
-	return out
-}()
-
-var publicV6 = netip.MustParsePrefix("2000::/3")
-
-func publicAddr(addr netip.Addr) bool {
-	addr = addr.Unmap()
-	if !addr.IsValid() || (addr.Is6() && !publicV6.Contains(addr)) {
-		return false
-	}
-	for _, p := range notPublic {
-		if p.Contains(addr) {
-			return false
-		}
-	}
-	return true
-}
-
-// guardedClient reaches an issuer an organisation's owner typed in. The address is
-// checked as the connection is made, so a name that resolves somewhere else the
-// second time gets no further, and a redirect, being a second destination, isn't followed.
-var guardedClient = &http.Client{
-	Timeout: 10 * time.Second,
-	Transport: &http.Transport{
-		DialContext: (&net.Dialer{Timeout: 5 * time.Second, Control: func(_, address string, _ syscall.RawConn) error {
-			ap, err := netip.ParseAddrPort(address)
-			if err != nil || !publicAddr(ap.Addr()) {
-				return say.Errorf("%s isn't a public address", address)
-			}
-			return nil
-		}}).DialContext,
-		TLSHandshakeTimeout: 5 * time.Second,
-		IdleConnTimeout:     90 * time.Second,
-	},
-	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-}
+// guardedClient reaches an issuer an organisation's owner typed in, and nothing inside.
+var guardedClient = egress.Client(egress.Options{Timeout: 10 * time.Second, DialTimeout: 5 * time.Second})
