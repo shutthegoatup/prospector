@@ -2,7 +2,6 @@ package signing
 
 import (
 	"path"
-	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -52,8 +51,4 @@ func FileName(name string) string {
 		name += ".pdf"
 	}
 	return name
-}
-
-func Contains(xs []string, x string) bool {
-	return slices.Contains(xs, x)
 }

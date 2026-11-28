@@ -1,7 +1,7 @@
 package sales
 
 import (
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/shutthegoatup/prospector/internal/say"
@@ -81,6 +81,6 @@ func Contracted(rows []SubscriptionRow) string {
 	for currency, sum := range sums {
 		parts = append(parts, store.FormatMoney(sum, currency))
 	}
-	sort.Strings(parts)
+	slices.Sort(parts)
 	return strings.Join(parts, " + ")
 }

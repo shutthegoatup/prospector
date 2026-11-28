@@ -5,11 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/shutthegoatup/prospector/internal/privacy"
-	"github.com/shutthegoatup/prospector/internal/signing"
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
@@ -77,13 +76,13 @@ func evidence(text, ownDomain string) (string, string) {
 	var urls, phones []string
 	for _, u := range urlRe.FindAllString(text, -1) {
 		u = strings.TrimRight(u, ".;:'\"")
-		if !strings.Contains(u, "linkedin.com/search") && (ownDomain == "" || !strings.Contains(u, ownDomain)) && !signing.Contains(urls, u) {
+		if !strings.Contains(u, "linkedin.com/search") && (ownDomain == "" || !strings.Contains(u, ownDomain)) && !slices.Contains(urls, u) {
 			urls = append(urls, u)
 		}
 	}
 	for _, m := range phoneRe.FindAllStringSubmatch(text, -1) {
 		p := strings.Join(strings.Fields(m[1]), " ")
-		if !signing.Contains(phones, p) {
+		if !slices.Contains(phones, p) {
 			phones = append(phones, p)
 		}
 	}
@@ -270,7 +269,7 @@ func ReadRepo(repo, ownDomain string) (*ImportPayload, error) {
 	if err != nil {
 		return nil, err
 	}
-	sort.Strings(paths)
+	slices.Sort(paths)
 	for _, path := range paths {
 		b, err := os.ReadFile(path)
 		if err != nil {

@@ -66,9 +66,7 @@ func parseKeys(spec string) (*store.Keyring, error) {
 
 func newSecretKey() string {
 	b := make([]byte, keySize)
-	if _, err := rand.Read(b); err != nil {
-		panic(err)
-	}
+	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
 }
 
