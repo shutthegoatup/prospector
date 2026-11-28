@@ -427,6 +427,33 @@ export interface paths {
         patch: operations["changeWebhook"];
         trace?: never;
     };
+    "/o/{org}/api/v1/webhooks/{id}/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What was sent to an endpoint
+         * @description Its deliveries, newest first, the last 500: each event's type, the `webhook-id` every
+         *     attempt carried, and how it went. One that fails is tried again, further apart each
+         *     time, for three days; then it is given up and the endpoint stopped. So is one that
+         *     answers 410 Gone. Only a signed-in owner.
+         */
+        get: operations["listWebhookDeliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/o/{org}/api/v1/webhooks/{id}/secret": {
         parameters: {
             query?: never;
@@ -4262,6 +4289,31 @@ export interface components {
         WebhookSecret: {
             secret: components["schemas"]["WebhookSecretText"];
         };
+        WebhookDelivery: {
+            /** Format: int64 */
+            id: number;
+            type: string;
+            /** @description The `webhook-id` it is sent with, the same on every attempt. */
+            message_id: string;
+            /**
+             * @description `cancelled` when its endpoint was stopped or removed, its key revoked, or its event erased before it went.
+             * @enum {string}
+             */
+            status: "pending" | "delivered" | "failed" | "cancelled";
+            attempts: number;
+            /** @description The status the endpoint last answered with; 0 when it couldn't be reached. */
+            last_code: number;
+            last_error: string;
+            /**
+             * Format: date-time
+             * @description When it is tried next, while it is pending.
+             */
+            next_at: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            delivered_at: string | null;
+        };
         /** @description `whsec_` and the base64 of the key, as Standard Webhooks' libraries take it. */
         WebhookSecretText: string;
         KeyChanged: {
@@ -6143,6 +6195,45 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["NotJSON"];
+            429: components["responses"]["Throttled"];
+            500: components["responses"]["ServerError"];
+        };
+    };
+    listWebhookDeliveries: {
+        parameters: {
+            query?: {
+                /** @description How many to return. 50 if left out; 200 at most. */
+                limit?: components["parameters"]["limit"];
+                /** @description The `next_cursor` of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters. */
+                cursor?: components["parameters"]["cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description The organisation's slug. */
+                org: components["parameters"]["org"];
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The deliveries. */
+            200: {
+                headers: {
+                    Link: components["headers"]["Link"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WebhookDelivery"][];
+                        next_cursor?: components["schemas"]["NextCursor"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["Throttled"];
             500: components["responses"]["ServerError"];
         };

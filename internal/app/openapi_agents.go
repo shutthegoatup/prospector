@@ -24,7 +24,7 @@ import (
 // keyless are operations no key makes, whatever its scopes: a key that could make or
 // widen keys could give itself any scope.
 var keyless = map[string]bool{"CreateKey": true, "ChangeKey": true, "RevokeKey": true, "CreateOrg": true,
-	"ListWebhooks": true, "GetWebhook": true, "CreateWebhook": true, "ChangeWebhook": true, "DeleteWebhook": true, "RotateWebhookSecret": true}
+	"ListWebhooks": true, "GetWebhook": true, "CreateWebhook": true, "ChangeWebhook": true, "DeleteWebhook": true, "RotateWebhookSecret": true, "ListWebhookDeliveries": true}
 
 func (s apiServer) GetConnect(ctx context.Context, _ api.GetConnectRequestObject) (api.GetConnectResponseObject, error) {
 	q := request.ReqFrom(ctx)

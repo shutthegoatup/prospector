@@ -856,6 +856,47 @@ paths:
         "429": { $ref: "#/components/responses/Throttled" }
         "500": { $ref: "#/components/responses/ServerError" }
 
+  /o/{org}/api/v1/webhooks/{id}/deliveries:
+    parameters:
+      - $ref: "#/components/parameters/org"
+      - $ref: "#/components/parameters/id"
+    get:
+      operationId: listWebhookDeliveries
+      tags: [agents]
+      summary: What was sent to an endpoint
+      description: |
+        Its deliveries, newest first, the last 500: each event's type, the `webhook-id` every
+        attempt carried, and how it went. One that fails is tried again, further apart each
+        time, for three days; then it is given up and the endpoint stopped. So is one that
+        answers 410 Gone. Only a signed-in owner.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/cursor"
+      security:
+        - session: []
+        - bearer: ["agents:configure"]
+      responses:
+        "200":
+          description: The deliveries.
+          headers:
+            Link: { $ref: "#/components/headers/Link" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/WebhookDelivery" }
+                  next_cursor: { $ref: "#/components/schemas/NextCursor" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/Throttled" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
   /o/{org}/api/v1/webhooks/{id}/secret:
     parameters:
       - $ref: "#/components/parameters/org"
@@ -6471,6 +6512,21 @@ components:
       required: [secret]
       properties:
         secret: { $ref: "#/components/schemas/WebhookSecretText" }
+
+    WebhookDelivery:
+      type: object
+      required: [id, type, message_id, status, attempts, last_code, last_error, next_at, created_at, delivered_at]
+      properties:
+        id: { type: integer, format: int64 }
+        type: { type: string }
+        message_id: { type: string, description: "The `webhook-id` it is sent with, the same on every attempt." }
+        status: { type: string, enum: [pending, delivered, failed, cancelled], description: "`cancelled` when its endpoint was stopped or removed, its key revoked, or its event erased before it went." }
+        attempts: { type: integer }
+        last_code: { type: integer, description: "The status the endpoint last answered with; 0 when it couldn't be reached." }
+        last_error: { type: string }
+        next_at: { type: string, format: date-time, description: "When it is tried next, while it is pending." }
+        created_at: { type: string, format: date-time }
+        delivered_at: { type: string, format: date-time, nullable: true, x-go-type-skip-optional-pointer: false }
 
     WebhookSecretText:
       type: string

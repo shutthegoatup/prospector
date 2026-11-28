@@ -2591,6 +2591,130 @@
      "curl": "curl -X DELETE https://prospector.invalid/o/your-org/api/v1/webhooks/{id} \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
     },
     {
+     "anchor": "op-listWebhookDeliveries",
+     "method": "GET",
+     "tone": "is-green",
+     "path": "/o/{org}/api/v1/webhooks/{id}/deliveries",
+     "summary": "What was sent to an endpoint",
+     "about": [
+      {
+       "text": "Its deliveries, newest first, the last 500: each event's type, the "
+      },
+      {
+       "text": "webhook-id",
+       "code": true
+      },
+      {
+       "text": " every attempt carried, and how it went. One that fails is tried again, further apart each time, for three days; then it is given up and the endpoint stopped. So is one that answers 410 Gone. Only a signed-in owner."
+      }
+     ],
+     "scope": "agents:configure",
+     "owner_only": true,
+     "params": [
+      {
+       "name": "id",
+       "type": {
+        "name": "integer"
+       },
+       "about": [],
+       "required": true
+      },
+      {
+       "name": "limit",
+       "type": {
+        "name": "integer"
+       },
+       "about": [
+        {
+         "text": "How many to return. 50 if left out; 200 at most."
+        }
+       ]
+      },
+      {
+       "name": "cursor",
+       "type": {
+        "name": "string"
+       },
+       "about": [
+        {
+         "text": "The "
+        },
+        {
+         "text": "next_cursor",
+         "code": true
+        },
+        {
+         "text": " of the previous page, to carry on from where it ended. Leave it out to start. It is only good for the list that gave it out, with the same filters."
+        }
+       ]
+      }
+     ],
+     "responses": [
+      {
+       "code": "200",
+       "about": "The deliveries.",
+       "type": {
+        "name": "object"
+       }
+      },
+      {
+       "code": "400",
+       "bad": true,
+       "about": "The request can't be done as sent; `detail` says what to change.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "401",
+       "bad": true,
+       "about": "No sign-in or key that holds here: `signed_out` with none, `session_limited` for a session another organisation's single sign-on began, `wrong_login` from `signIn`.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "403",
+       "bad": true,
+       "about": "Not for this caller: a key without the scope, a member without the role or area, a key on a browser-only operation, or a browser request from another site. Untyped, except `must_change_password` and `sso_required`, which say what to do first.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "404",
+       "bad": true,
+       "about": "Nothing here by that name or id, or nothing this caller may see.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "429",
+       "bad": true,
+       "about": "`throttled`: too many tries, or too many requests.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      },
+      {
+       "code": "500",
+       "bad": true,
+       "about": "The server couldn't finish; try again in a moment. `detail` never says more.",
+       "type": {
+        "name": "Problem",
+        "link": "#schema-Problem"
+       }
+      }
+     ],
+     "curl": "curl https://prospector.invalid/o/your-org/api/v1/webhooks/{id}/deliveries \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\""
+    },
+    {
      "anchor": "op-rotateWebhookSecret",
      "method": "POST",
      "tone": "is-gold",
@@ -31490,6 +31614,121 @@
       "name": "string"
      },
      "about": []
+    }
+   ]
+  },
+  {
+   "anchor": "schema-WebhookDelivery",
+   "name": "WebhookDelivery",
+   "about": [],
+   "enum": [],
+   "fields": [
+    {
+     "name": "attempts",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "created_at",
+     "type": {
+      "name": "date-time"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "delivered_at",
+     "type": {
+      "name": "date-time?"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "id",
+     "type": {
+      "name": "integer"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "last_code",
+     "type": {
+      "name": "integer"
+     },
+     "about": [
+      {
+       "text": "The status the endpoint last answered with; 0 when it couldn't be reached."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "last_error",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
+    },
+    {
+     "name": "message_id",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "The "
+      },
+      {
+       "text": "webhook-id",
+       "code": true
+      },
+      {
+       "text": " it is sent with, the same on every attempt."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "next_at",
+     "type": {
+      "name": "date-time"
+     },
+     "about": [
+      {
+       "text": "When it is tried next, while it is pending."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "status",
+     "type": {
+      "name": "string"
+     },
+     "about": [
+      {
+       "text": "cancelled",
+       "code": true
+      },
+      {
+       "text": " when its endpoint was stopped or removed, its key revoked, or its event erased before it went."
+      }
+     ],
+     "required": true
+    },
+    {
+     "name": "type",
+     "type": {
+      "name": "string"
+     },
+     "about": [],
+     "required": true
     }
    ]
   },
