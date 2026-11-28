@@ -86,7 +86,7 @@ func (s *IdentityStore) setRole(tx *gorm.DB, org int64, m *store.Membership, rol
 	if err := tx.Model(m).Update("role", role).Error; err != nil {
 		return err
 	}
-	return s.Log(tx, org, 0, nil, actor, "member:role", new(u.Email+": "+role))
+	return s.Log(tx, org, 0, nil, actor, store.ActMemberRole, new(u.Email+": "+role))
 }
 
 // lockOrg makes changes to one organisation's members take turns, so two owners

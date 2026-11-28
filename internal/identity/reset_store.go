@@ -99,7 +99,7 @@ func (s *IdentityStore) SaveOrgMail(org int64, m *store.OrgMail, actor string) e
 		if err := tx.Save(m).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, nil, actor, "smtp:change", &m.Host)
+		return s.Log(tx, org, 0, nil, actor, store.ActSMTPChange, &m.Host)
 	})
 }
 
@@ -109,6 +109,6 @@ func (s *IdentityStore) DeleteOrgMail(org int64, actor string) error {
 		if res.Error != nil || res.RowsAffected == 0 {
 			return res.Error
 		}
-		return s.Log(tx, org, 0, nil, actor, "smtp:remove", nil)
+		return s.Log(tx, org, 0, nil, actor, store.ActSMTPRemove, nil)
 	})
 }

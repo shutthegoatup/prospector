@@ -129,7 +129,7 @@ func (s *PrivacyStore) ErasePerson(org, id int64, actor string) error {
 				return err
 			}
 		}
-		return s.Log(tx, org, 0, c.CompanyID, actor, "erase", nil)
+		return s.Log(tx, org, 0, c.CompanyID, actor, store.ActErase, nil)
 	})
 }
 

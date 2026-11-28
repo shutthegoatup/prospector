@@ -253,12 +253,12 @@ type Core struct {
 // store's exported methods to their organisation is TestNoMethodReachesIntoAnotherOrganisation.
 func (s *Core) InOrg(org int64) *gorm.DB { return s.DB.Where("org_id = ?", org) }
 
-func (s *Core) Log(tx *gorm.DB, org, contact int64, company *int64, actor, action string, value *string) error {
+func (s *Core) Log(tx *gorm.DB, org, contact int64, company *int64, actor string, action Action, value *string) error {
 	return s.LogAs(tx, org, contact, company, Actor{Name: actor}, action, value)
 }
 
-func (s *Core) LogAs(tx *gorm.DB, org, contact int64, company *int64, who Actor, action string, value *string) error {
-	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: who.Name, KeyID: who.KeyID, TaskID: who.Task, Action: action, Value: value, At: time.Now()}).Error
+func (s *Core) LogAs(tx *gorm.DB, org, contact int64, company *int64, who Actor, action Action, value *string) error {
+	return tx.Create(&Event{OrgID: org, ContactID: contact, CompanyID: company, User: who.Name, KeyID: who.KeyID, TaskID: who.Task, Action: action.String(), Value: value, At: time.Now()}).Error
 }
 
 // HoldOrg and hold make a transaction wait its turn on one row, so a rule that is

@@ -162,35 +162,54 @@ var historyVerbs = map[string]*say.Text{
 	"suppression:add": say.New("added an address to the do-not-mail list"), "suppression:remove": say.New("took an address off the do-not-mail list"),
 	"campaign:add": say.New("started a campaign"), "campaign:remove": say.New("removed a draft campaign"), "campaign:send": say.New("sent a campaign"),
 	"campaign:cancel": say.New("cancelled a campaign"), "campaign:resume": say.New("resumed a campaign"),
-	"import": say.New("imported people"),
+	"import":          say.New("imported people"),
+	"export:org":      say.New("exported the organisation"),
+	"settings:change": say.New("changed settings"), "sso:change": say.New("changed single sign-on"),
+	"member:join": say.New("joined through single sign-on"), "member:remove": say.New("removed a member"),
+	"task:withheld": say.New("left someone out of a task"),
+	"enrich:email":  say.New("looked up an email"), "enrich:phone": say.New("looked up a phone number"),
+}
+
+// verbFor says what an action was, or that it has no words yet.
+func verbFor(action string) (say.Sayer, bool) {
+	if v, ok := historyVerbs[action]; ok {
+		return v, true
+	}
+	if f, ok := store.SetField.In(action); ok {
+		return say.Errorf("set %s", strings.ReplaceAll(f, "_", " ")), true
+	}
+	if f, ok := store.EnquiryField.In(action); ok {
+		return say.Errorf("set an enquiry's %s", f), true
+	}
+	if f, ok := store.DealField.In(action); ok {
+		return say.Errorf("set the deal's %s", strings.ReplaceAll(f, "_", " ")), true
+	}
+	if f, ok := store.SubField.In(action); ok {
+		return say.Errorf("changed a subscription's %s", strings.ReplaceAll(f, "_", " ")), true
+	}
+	if k, ok := store.Drafted.In(action); ok {
+		return say.Errorf("drafted the %s", k), true
+	}
+	return say.New(action), false
+}
+
+// Worded says whether the history has words for an action.
+func Worded(action store.Action) bool {
+	_, ok := verbFor(action.String())
+	return ok
 }
 
 // HistoryText is a history entry's line: what was done, to whom, and what with.
 func HistoryText(h HistoryItem) say.Sayer {
-	var verb say.Sayer
-	if v, ok := historyVerbs[h.Action]; ok {
-		verb = v
-	} else if f, ok := strings.CutPrefix(h.Action, "set:"); ok {
-		verb = say.Errorf("set %s", strings.ReplaceAll(f, "_", " "))
-	} else if f, ok := strings.CutPrefix(h.Action, "enquiry:"); ok {
-		verb = say.Errorf("set an enquiry's %s", f)
-	} else if f, ok := strings.CutPrefix(h.Action, "deal:"); ok {
-		verb = say.Errorf("set the deal's %s", strings.ReplaceAll(f, "_", " "))
-	} else if f, ok := strings.CutPrefix(h.Action, "sub:"); ok {
-		verb = say.Errorf("changed a subscription's %s", strings.ReplaceAll(f, "_", " "))
-	} else if k, ok := strings.CutPrefix(h.Action, "draft:"); ok {
-		verb = say.Errorf("drafted the %s", k)
-	} else {
-		verb = say.New(h.Action)
-	}
-	s := verb
+	s, _ := verbFor(h.Action)
 	if h.Person != "" {
 		s = say.Errorf("%s · %s", s, h.Person)
 	}
-	if _, note, found := strings.Cut(h.Value, " · "); found && strings.HasPrefix(h.Action, "mark:") {
+	marked := store.Marked.Has(h.Action)
+	if _, note, found := strings.Cut(h.Value, " · "); found && marked {
 		s = say.Errorf("%s: %s", s, note)
 	}
-	if h.Value != "" && !strings.HasPrefix(h.Action, "mark:") && h.Action != "add:contact" && len(h.Value) < 80 {
+	if h.Value != "" && !marked && h.Action != store.ActAddContact.String() && len(h.Value) < 80 {
 		s = say.Errorf("%s: %s", s, h.Value)
 	}
 	return s

@@ -61,7 +61,7 @@ func (s *SubscriptionStore) AddSubscription(org int64, in SubscriptionIn, actor 
 		if err := tx.Create(&sub).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, &c.ID, actor, "sub:new", &in.Start)
+		return s.Log(tx, org, 0, &c.ID, actor, store.ActSubNew, &in.Start)
 	})
 	if err != nil {
 		return nil, err
@@ -173,7 +173,7 @@ func (s *SubscriptionStore) changeSubscription(tx *gorm.DB, org, id int64, field
 		if err := tx.Model(&sub).Updates(updates).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, &sub.CompanyID, actor, "sub:"+field, store.NonEmpty(logged))
+		return s.Log(tx, org, 0, &sub.CompanyID, actor, store.SubField.Of(field), store.NonEmpty(logged))
 	}
 }
 
@@ -192,7 +192,7 @@ func (s *SubscriptionStore) RemoveSubscription(org, id int64, actor string) erro
 		if err := tx.Model(&store.Deal{}).Where("org_id = ? and subscription_id = ?", org, id).Update("subscription_id", 0).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, &sub.CompanyID, actor, "sub:remove", nil)
+		return s.Log(tx, org, 0, &sub.CompanyID, actor, store.ActSubDrop, nil)
 	})
 }
 
@@ -306,7 +306,7 @@ func (s *SubscriptionStore) StartRenewal(org, subscription, contact int64, actor
 		if err := tx.Create(&d).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, contact, c.CompanyID, actor, "deal:start", new("renewal"))
+		return s.Log(tx, org, contact, c.CompanyID, actor, store.ActDealStart, new("renewal"))
 	})
 	if err != nil {
 		return nil, err

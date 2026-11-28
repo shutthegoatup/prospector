@@ -103,7 +103,7 @@ func RunsOf(events []store.Event) []Run {
 		if e.TaskID != 0 {
 			o.tasks[e.TaskID] = true
 		}
-		if e.Action == "task:pickup" {
+		if e.Action == store.ActTaskPickup.String() {
 			continue
 		}
 		o.run.Changes++
@@ -111,9 +111,9 @@ func RunsOf(events []store.Event) []Run {
 			o.companies[*e.CompanyID] = true
 		}
 		switch {
-		case e.Action == "add:contact":
+		case e.Action == store.ActAddContact.String():
 			o.run.People++
-		case strings.HasPrefix(e.Action, "draft:"):
+		case store.Drafted.Has(e.Action):
 			o.run.Drafts++
 		}
 	}

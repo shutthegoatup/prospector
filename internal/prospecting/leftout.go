@@ -8,12 +8,6 @@ import (
 	"github.com/shutthegoatup/prospector/internal/store"
 )
 
-const // ActionHeld marks a company a task came to that was already held, with how.
-ActionHeld = "task:held"
-
-const // ActionWithheld counts a person refused for a task, with only why.
-ActionWithheld = "task:withheld"
-
 const HeldRejected = "rejected"
 
 const HeldCustomer = "customer"

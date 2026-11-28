@@ -161,7 +161,7 @@ func (s *CustomerStore) InviteCustomer(o *store.Org, onboarding, contact int64, 
 		if token, err = s.newCustomerLink(tx, g); err != nil {
 			return err
 		}
-		return s.Log(tx, o.ID, c.ID, c.CompanyID, actor, "onboard:invite", nil)
+		return s.Log(tx, o.ID, c.ID, c.CompanyID, actor, store.ActOnboardInvite, nil)
 	})
 	return token, &c, err
 }
@@ -183,7 +183,7 @@ func (s *CustomerStore) RevokeCustomer(org, grant int64, actor string) error {
 		} else if err != nil {
 			return err
 		}
-		return s.Log(tx, org, c.ID, c.CompanyID, actor, "onboard:revoke", nil)
+		return s.Log(tx, org, c.ID, c.CompanyID, actor, store.ActOnboardRevoke, nil)
 	})
 }
 
@@ -241,7 +241,7 @@ func (s *CustomerStore) CustomerSetStep(org int64, a *CustomerAccess, step int64
 		if err := tx.Where("org_id = ? and onboarding_id = ? and id = ? and who = ?", org, a.Onboarding.ID, step, store.StepTheirs).First(&st).Error; err != nil {
 			return ErrNoCustomer
 		}
-		updates, action := map[string]any{"done_on": store.Today(), "done_by": CustomerActor}, "onboard:done"
+		updates, action := map[string]any{"done_on": store.Today(), "done_by": CustomerActor}, store.ActOnboardDone.String()
 		switch {
 		case done && st.DoneOn != nil, !done && (st.DoneOn == nil || st.DoneBy != CustomerActor):
 			return nil
@@ -265,6 +265,6 @@ func (s *CustomerStore) CustomerSetStep(org int64, a *CustomerAccess, step int64
 		if st.DoneEntry == 0 {
 			return nil
 		}
-		return tx.Where("org_id = ? and id = ? and action = ?", org, st.DoneEntry, "onboard:done").Delete(&store.Event{}).Error
+		return tx.Where("org_id = ? and id = ? and action = ?", org, st.DoneEntry, store.ActOnboardDone.String()).Delete(&store.Event{}).Error
 	})
 }

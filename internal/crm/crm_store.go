@@ -111,7 +111,7 @@ func (s *CRMStore) HistoryAt(org, company int64, offset, limit int) ([]HistoryIt
 func (s *CRMStore) Touches(org, company int64) (int, error) {
 	var n int64
 	err := s.InOrg(org).Model(&store.Event{}).Where("company_id = ? and action in ?", company,
-		[]string{"mark:linkedin", "mark:email", "mark:followup", "mark:call"}).Count(&n).Error
+		[]string{store.Marked.Of("linkedin").String(), store.Marked.Of("email").String(), store.Marked.Of("followup").String(), store.Marked.Of("call").String()}).Count(&n).Error
 	return int(n), err
 }
 
@@ -178,12 +178,12 @@ func (s *CRMStore) PickContactFor(org int64, o *store.Org, id int64, offeringID 
 				return res.Error
 			}
 			if res.RowsAffected > 0 {
-				if err := s.Log(tx, org, 0, c.CompanyID, actor, "company:"+CompanyQualified, nil); err != nil {
+				if err := s.Log(tx, org, 0, c.CompanyID, actor, store.CompanyTo.Of(CompanyQualified), nil); err != nil {
 					return err
 				}
 			}
 		}
-		return s.Log(tx, org, id, c.CompanyID, actor, "pick", nil)
+		return s.Log(tx, org, id, c.CompanyID, actor, store.ActPick, nil)
 	})
 }
 
@@ -307,7 +307,7 @@ func (s *CRMStore) Week(org int64, now time.Time) Stats {
 		st.Touches += n
 	}
 	_ = store.Logged(s.InOrg(org).Model(&store.Contact{}).Where("replied >= ?", day).Count(&st.Replies))
-	_ = store.Logged(s.InOrg(org).Model(&store.Event{}).Where("at >= ? and action = ? and value = ?", since, "set:stage", "meeting").Count(&st.Meetings))
+	_ = store.Logged(s.InOrg(org).Model(&store.Event{}).Where("at >= ? and action = ? and value = ?", since, store.SetField.Of("stage").String(), "meeting").Count(&st.Meetings))
 	_ = store.Logged(s.InOrg(org).Model(&store.Company{}).Where("created_at >= ? and found_by <> 'import'", since).Count(&st.Researched))
 	return st
 }
@@ -359,12 +359,12 @@ func (s *CRMStore) QuickAddPerson(o *store.Org, in QuickAdd, actor string) (*sto
 		if err := tx.Create(&out).Error; err != nil {
 			return err
 		}
-		if err := s.Log(tx, o.ID, out.ID, companyID, actor, "add:person", nil); err != nil {
+		if err := s.Log(tx, o.ID, out.ID, companyID, actor, store.ActAddPerson, nil); err != nil {
 			return err
 		}
 		if strings.TrimSpace(in.Note) != "" {
 			// Recorded as an edit so an agent's draft doesn't replace a note the person wrote.
-			return s.Log(tx, o.ID, out.ID, companyID, actor, "set:note", nil)
+			return s.Log(tx, o.ID, out.ID, companyID, actor, store.SetField.Of("note"), nil)
 		}
 		return nil
 	})

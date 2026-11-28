@@ -90,7 +90,7 @@ func (s *EnquiryStore) setEnquiry(tx *gorm.DB, org, id int64, field, value, acto
 		if e.ContactID != nil {
 			contact = *e.ContactID
 		}
-		return s.Log(tx, org, contact, e.CompanyID, actor, "enquiry:"+field, store.NonEmpty(logged))
+		return s.Log(tx, org, contact, e.CompanyID, actor, store.EnquiryField.Of(field), store.NonEmpty(logged))
 	}
 }
 
@@ -142,7 +142,7 @@ func (s *EnquiryStore) AddEnquiry(org int64, via string, in EnquiryIn) (*store.E
 		if e.ContactID != nil {
 			contact = *e.ContactID
 		}
-		return s.Log(tx, org, contact, e.CompanyID, via, "enquiry", new(kindLabel(e.Kind)))
+		return s.Log(tx, org, contact, e.CompanyID, via, store.ActEnquiry, new(kindLabel(e.Kind)))
 	})
 }
 
@@ -161,7 +161,7 @@ func (s *EnquiryStore) DeleteEnquiry(org, id int64, actor string) error {
 		if err := tx.Where("org_id = ? and enquiry_id = ?", org, id).Delete(&store.EnquiryMessage{}).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, e.CompanyID, actor, "enquiry:remove", nil)
+		return s.Log(tx, org, 0, e.CompanyID, actor, store.ActEnquiryRemove, nil)
 	})
 }
 

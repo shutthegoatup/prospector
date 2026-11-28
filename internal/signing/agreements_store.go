@@ -49,7 +49,7 @@ func (s *AgreementStore) AddAgreement(org, company int64, name, actor string) (*
 		if err := tx.Create(&a).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, &company, actor, "agreement:add", &a.Name)
+		return s.Log(tx, org, 0, &company, actor, store.ActAgreementAdd, &a.Name)
 	})
 }
 
@@ -111,7 +111,7 @@ func (s *AgreementStore) RemoveAgreement(org, id int64, actor string) error {
 			}
 			return say.New("only a draft agreement can be removed; one that was sent is kept")
 		}
-		if err := s.Log(tx, org, 0, &a.CompanyID, actor, "agreement:remove", &a.Name); err != nil {
+		if err := s.Log(tx, org, 0, &a.CompanyID, actor, store.ActAgreementRemove, &a.Name); err != nil {
 			return err
 		}
 		for _, part := range []any{&store.AgreementFile{}, &store.AgreementRecipient{}, &store.AgreementField{}, &store.AgreementEvent{}} {

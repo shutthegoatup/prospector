@@ -157,7 +157,7 @@ func (s *OutreachStore) SendCampaign(o *store.Org, id int64, actor string) (*sto
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(rows, 200).Error; err != nil {
 			return err
 		}
-		if err := s.Log(tx, o.ID, 0, nil, actor, "campaign:send", &c.Name); err != nil {
+		if err := s.Log(tx, o.ID, 0, nil, actor, store.ActCampaignSend, &c.Name); err != nil {
 			return err
 		}
 		return tx.Where("org_id = ? and id = ?", o.ID, id).First(&c).Error
@@ -190,7 +190,7 @@ func (s *OutreachStore) CancelCampaign(org, id int64, actor string) (*store.Camp
 		if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, nil, actor, "campaign:cancel", &c.Name)
+		return s.Log(tx, org, 0, nil, actor, store.ActCampaignCancel, &c.Name)
 	})
 	return &c, err
 }
@@ -210,7 +210,7 @@ func (s *OutreachStore) ResumeCampaign(org, id int64, actor string) (*store.Camp
 		if res.RowsAffected == 0 {
 			return say.Errorf("only a paused campaign can be resumed, and this one is %s", c.Status)
 		}
-		return s.Log(tx, org, 0, nil, actor, "campaign:resume", &c.Name)
+		return s.Log(tx, org, 0, nil, actor, store.ActCampaignResume, &c.Name)
 	})
 	if err != nil {
 		return nil, err

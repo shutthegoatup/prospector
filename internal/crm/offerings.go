@@ -50,7 +50,7 @@ func qualifyFor(tx *gorm.DB, org int64, o *store.Offering, company int64, actor 
 	if res.Error != nil || res.RowsAffected == 0 {
 		return res.Error
 	}
-	return tx.Create(&store.Event{OrgID: org, CompanyID: &company, User: actor, Action: "verdict:" + CompanyQualified, Value: &o.Name, At: time.Now()}).Error
+	return tx.Create(&store.Event{OrgID: org, CompanyID: &company, User: actor, Action: store.VerdictTo.Of(CompanyQualified).String(), Value: &o.Name, At: time.Now()}).Error
 }
 
 func FoundForOwn(tx *gorm.DB, org, company int64) error {
