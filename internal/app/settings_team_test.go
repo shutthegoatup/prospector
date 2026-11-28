@@ -162,7 +162,7 @@ func TestYourOwnVoiceAndPasswordThroughTheAPI(t *testing.T) {
 	if code, body := call(t, ada, "POST", password, "application/json", map[string]any{"current": "wrong", "new": "a brand new password"}); code != http.StatusBadRequest {
 		t.Fatalf("a wrong current password: %d %s", code, body)
 	}
-	req, _ := http.NewRequest("POST", password, strings.NewReader(`{"current":"correct horse battery","new":"a brand new password"}`))
+	req, _ := http.NewRequest(http.MethodPost, password, strings.NewReader(`{"current":"correct horse battery","new":"a brand new password"}`))
 	req.Header.Set("Content-Type", "application/json")
 	res, err := ada.Do(req)
 	if err != nil {
@@ -185,7 +185,7 @@ func TestYourOwnVoiceAndPasswordThroughTheAPI(t *testing.T) {
 
 	// Guessing is slowed as it is on the old form.
 	for i := range freeAttempts + 1 {
-		req, _ := http.NewRequest("POST", password, strings.NewReader(`{"current":"a guess","new":"another new password"}`))
+		req, _ := http.NewRequest(http.MethodPost, password, strings.NewReader(`{"current":"a guess","new":"another new password"}`))
 		req.Header.Set("Content-Type", "application/json")
 		res, err := ada.Do(req)
 		if err != nil {
@@ -363,7 +363,7 @@ func TestExportingEverythingThroughTheAPI(t *testing.T) {
 	if code, body := asKey(t, "POST", url, keySecret(s.CreateKey(o.ID, "reader", []string{"read"}, "Ada Lovelace")), nil); code != http.StatusForbidden || !strings.Contains(body, "org:export") {
 		t.Fatalf("a read key exported everything: %d %s", code, body)
 	}
-	req, _ := http.NewRequest("POST", url, nil)
+	req, _ := http.NewRequest(http.MethodPost, url, nil)
 	req.Header.Set("Content-Type", "application/json")
 	res, err := ada.Do(req)
 	if err != nil {

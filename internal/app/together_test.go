@@ -20,12 +20,10 @@ func together(t *testing.T, n int, do func(i int) error) {
 	errs := make([]error, n)
 	var wg sync.WaitGroup
 	for i := range n {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			<-start
 			errs[i] = do(i)
-		}()
+		})
 	}
 	close(start)
 	wg.Wait()
@@ -88,7 +86,7 @@ func TestAgentsWorkingAtOnceAddEachThingOnce(t *testing.T) {
 
 	together(t, atOnce, func(i int) error {
 		_, err := s.AgentAddFact(o.ID, scout(i), research.AddFactIn{Company: "Larkmoor", Task: task.ID,
-			FactIn: research.FactIn{Field: "press", Value: "Opened a second workshop", SourceURL: "https://larkmoor.example/news"}})
+			Field: "press", Value: "Opened a second workshop", SourceURL: "https://larkmoor.example/news"})
 		return err
 	})
 	if n := count(t, s, &store.Fact{}, "org_id = ?", o.ID); n != 1 {

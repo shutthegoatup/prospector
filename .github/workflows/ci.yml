@@ -71,6 +71,11 @@ jobs:
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.15.0
+      # A function nothing reaches, not even a test, is one to delete.
+      - name: Dead code
+        run: |
+          dead=$(go run golang.org/x/tools/cmd/deadcode@v0.53.0 -test ./... | grep -v '^web/node_modules/' || true)
+          if [ -n "$dead" ]; then echo "$dead"; exit 1; fi
 
   # The tests, split across runners by name: each runs every third.
   tests:

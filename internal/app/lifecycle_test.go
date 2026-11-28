@@ -15,7 +15,7 @@ import (
 // everyContact is one contact per combination of the fields a contact's standing is read from.
 func everyContact() []store.Contact {
 	var out []store.Contact
-	for i := 0; i < 1<<8; i++ {
+	for i := range 1 << 8 {
 		on := func(bit int) bool { return i&(1<<bit) != 0 }
 		// An empty mark counts as set, as it does to "is null" in SQL.
 		opt := func(set bool, v string) *string {
@@ -27,7 +27,7 @@ func everyContact() []store.Contact {
 			}
 			return &v
 		}
-		c := store.Contact{Key: fmt.Sprintf("p%03d", i), File: "test", Person: store.Str("Person"), Note: store.Str("Hello"),
+		c := store.Contact{Key: fmt.Sprintf("p%03d", i), File: "test", Person: new("Person"), Note: new("Hello"),
 			Hold: opt(on(0), "2020-01-01"), Replied: opt(on(1), "2020-01-02"), Declined: opt(on(2), "2020-01-03"),
 			EmailSent: opt(on(3), "2020-01-04")}
 		if on(4) {
@@ -46,7 +46,7 @@ func everyContact() []store.Contact {
 
 func TestContactStageNames(t *testing.T) {
 	t.Parallel()
-	d := store.Str("2020-01-01")
+	d := new("2020-01-01")
 	for _, tc := range []struct {
 		c    store.Contact
 		want string
@@ -71,7 +71,7 @@ func TestContactStageNames(t *testing.T) {
 
 func TestPipelineTakesTheFurthestContact(t *testing.T) {
 	t.Parallel()
-	d := store.Str("2020-01-01")
+	d := new("2020-01-01")
 	for _, tc := range []struct {
 		name   string
 		c      store.Company
@@ -165,14 +165,14 @@ func TestRejectedCompanysPeopleLeaveTheQueues(t *testing.T) {
 	if err := s.DB.Create(&co).Error; err != nil {
 		t.Fatal(err)
 	}
-	old := store.Str("2020-01-01")
+	old := new("2020-01-01")
 	people := []store.Contact{
-		{OrgID: o.ID, Key: "new", File: "test", Person: store.Str("Hannah Pryce"), Note: store.Str("Hello"), CompanyID: &co.ID},
-		{OrgID: o.ID, Key: "accepted", File: "test", Person: store.Str("Jonas Weber"), LinkedinAdded: old, Accepted: old, CompanyID: &co.ID},
-		{OrgID: o.ID, Key: "call", File: "test", Person: store.Str("Nia Okafor"), Phone: store.Str("+44 20 7946 0000"), CompanyID: &co.ID},
-		{OrgID: o.ID, Key: "email", File: "test", Person: store.Str("Max Muster"), LinkedinAdded: old, CompanyID: &co.ID},
-		{OrgID: o.ID, Key: "followup", File: "test", Person: store.Str("Ines Duarte"), EmailSent: old, CompanyID: &co.ID},
-		{OrgID: o.ID, Key: "elsewhere", File: "test", Person: store.Str("Tomas Reed"), Note: store.Str("Hello")},
+		{OrgID: o.ID, Key: "new", File: "test", Person: new("Hannah Pryce"), Note: new("Hello"), CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "accepted", File: "test", Person: new("Jonas Weber"), LinkedinAdded: old, Accepted: old, CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "call", File: "test", Person: new("Nia Okafor"), Phone: new("+44 20 7946 0000"), CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "email", File: "test", Person: new("Max Muster"), LinkedinAdded: old, CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "followup", File: "test", Person: new("Ines Duarte"), EmailSent: old, CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "elsewhere", File: "test", Person: new("Tomas Reed"), Note: new("Hello")},
 	}
 	if err := s.DB.Create(&people).Error; err != nil {
 		t.Fatal(err)
@@ -230,7 +230,7 @@ func TestStageIsOneOfTheBoardsColumns(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	c := store.Contact{OrgID: o.ID, Key: "hannah", File: "test", Person: store.Str("Hannah Pryce")}
+	c := store.Contact{OrgID: o.ID, Key: "hannah", File: "test", Person: new("Hannah Pryce")}
 	if err := s.DB.Create(&c).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -262,8 +262,8 @@ func TestMarkChecksApplyToEveryCaller(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	suggested := store.Contact{OrgID: o.ID, Key: "jonas", File: "test", Person: store.Str("Jonas Weber"), Status: store.ContactSuggested}
-	picked := store.Contact{OrgID: o.ID, Key: "hannah", File: "test", Person: store.Str("Hannah Pryce")}
+	suggested := store.Contact{OrgID: o.ID, Key: "jonas", File: "test", Person: new("Jonas Weber"), Status: store.ContactSuggested}
+	picked := store.Contact{OrgID: o.ID, Key: "hannah", File: "test", Person: new("Hannah Pryce")}
 	for _, c := range []*store.Contact{&suggested, &picked} {
 		if err := s.DB.Create(c).Error; err != nil {
 			t.Fatal(err)
@@ -303,8 +303,8 @@ func TestPickingSomeoneQualifiesTheirCompanyOnTheRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 	people := []store.Contact{
-		{OrgID: o.ID, Key: "hannah", File: "test", Person: store.Str("Hannah Pryce"), Status: store.ContactSuggested, CompanyID: &co.ID},
-		{OrgID: o.ID, Key: "jonas", File: "test", Person: store.Str("Jonas Weber"), Status: store.ContactSuggested, CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "hannah", File: "test", Person: new("Hannah Pryce"), Status: store.ContactSuggested, CompanyID: &co.ID},
+		{OrgID: o.ID, Key: "jonas", File: "test", Person: new("Jonas Weber"), Status: store.ContactSuggested, CompanyID: &co.ID},
 	}
 	if err := s.DB.Create(&people).Error; err != nil {
 		t.Fatal(err)

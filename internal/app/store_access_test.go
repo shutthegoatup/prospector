@@ -149,20 +149,19 @@ var withinTheStore = map[string]bool{
 // method that took or gave back a handle on the database would let its caller query.
 func TestNoStoreMethodHandsOutTheDatabase(t *testing.T) {
 	t.Parallel()
-	handle := reflect.TypeOf(&gorm.DB{})
-	store := reflect.TypeOf(&Store{})
-	for i := range store.NumMethod() {
-		m := store.Method(i)
+	handle := reflect.TypeFor[*gorm.DB]()
+	store := reflect.TypeFor[*Store]()
+	for m := range store.Methods() {
 		if withinTheStore[m.Name] {
 			continue
 		}
-		for j := range m.Type.NumIn() {
-			if m.Type.In(j) == handle {
+		for in := range m.Type.Ins() {
+			if in == handle {
 				t.Errorf("Store.%s takes a *gorm.DB", m.Name)
 			}
 		}
-		for j := range m.Type.NumOut() {
-			if m.Type.Out(j) == handle {
+		for out := range m.Type.Outs() {
+			if out == handle {
 				t.Errorf("Store.%s gives back a *gorm.DB", m.Name)
 			}
 		}
@@ -207,9 +206,9 @@ func TestTheStoreKeepsFilesOfItsOwn(t *testing.T) {
 // storeTypes are Store and the types it embeds: the core and each area's queries.
 var storeTypes = func() map[string]bool {
 	out := map[string]bool{"Store": true}
-	typ := reflect.TypeOf(Store{})
-	for i := range typ.NumField() {
-		if f := typ.Field(i); f.Anonymous {
+	typ := reflect.TypeFor[Store]()
+	for f := range typ.Fields() {
+		if f.Anonymous {
 			t := f.Type
 			if t.Kind() == reflect.Pointer {
 				t = t.Elem()

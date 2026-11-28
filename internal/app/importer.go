@@ -99,7 +99,7 @@ func spaced(note string) string {
 
 func quoted(block string) string {
 	var out []string
-	for _, l := range strings.Split(strings.TrimSpace(block), "\n") {
+	for l := range strings.SplitSeq(strings.TrimSpace(block), "\n") {
 		switch {
 		case strings.HasPrefix(l, "> "):
 			out = append(out, l[2:])
@@ -116,7 +116,7 @@ type sendRow struct{ fit, maker, person, link, email string }
 
 func sendList(text string) []sendRow {
 	var rows []sendRow
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		cells := strings.Split(strings.Trim(strings.TrimSpace(line), "|"), "|")
 		for i := range cells {
 			cells[i] = strings.TrimSpace(cells[i])
@@ -205,7 +205,7 @@ func parseSectioned(name, text, ownDomain string) []Draft {
 			d.Flags = strings.TrimSpace(f)
 		}
 		if strings.Contains(s.head, "HOLD") || holdFitRe.MatchString(row.fit) || strings.HasPrefix(first, "{") {
-			d.Hold = store.Str("file")
+			d.Hold = new("file")
 		}
 		d.Sources, d.Phone = evidence(s.body, ownDomain)
 		out = append(out, d)
@@ -309,7 +309,7 @@ func ReadRepo(repo, ownDomain string) (*ImportPayload, error) {
 	}
 	if b, err := os.ReadFile(filepath.Join(repo, "leads/outreach/sent-log.md")); err == nil {
 		date := ""
-		for _, line := range strings.Split(string(b), "\n") {
+		for line := range strings.SplitSeq(string(b), "\n") {
 			if m := sentDateRe.FindStringSubmatch(line); m != nil {
 				date = m[1]
 			} else if date != "" && strings.HasPrefix(line, "- **") && !notSentRe.MatchString(line) {

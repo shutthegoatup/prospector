@@ -50,7 +50,7 @@ func (g *MailGate) WhyFor(kind, address, link string) error {
 		return ErrSuppressed
 	}
 	if err := g.o.Settings.Listed(addr, link); err != nil {
-		return fmt.Errorf("%w: %v", store.ErrNeverContact, err)
+		return fmt.Errorf("%w: %w", store.ErrNeverContact, err)
 	}
 	for _, h := range store.Identifiers(g.o.ID, "", "", addr, link) {
 		if g.erased[h] {

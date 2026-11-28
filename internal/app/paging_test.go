@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -63,7 +64,7 @@ func TestEveryListAnAgentReadsComesInPages(t *testing.T) {
 	if all, next, err := s.AgentSearch(o.ID, scout, "larkmoor", paging.Page{}); err != nil || len(all) != 10 || next != "" {
 		t.Fatalf("a search that fits one page: %d hits, next %q, %v", len(all), next, err)
 	}
-	if _, _, err := s.AgentSearch(o.ID, scout, "larkmoor", paging.Page{Cursor: "nonsense"}); err != paging.ErrCursor {
+	if _, _, err := s.AgentSearch(o.ID, scout, "larkmoor", paging.Page{Cursor: "nonsense"}); !errors.Is(err, paging.ErrCursor) {
 		t.Fatalf("a made-up cursor: %v", err)
 	}
 
@@ -106,7 +107,7 @@ func TestEveryListAnAgentReadsComesInPages(t *testing.T) {
 	for path, want := range map[string]int{"search?q=larkmoor&limit=2": 10, "tasks?limit=4": 6, "due?limit=3": 5} {
 		url, got, fetched := "/o/alpha/api/v1/"+path, 0, 0
 		for url != "" {
-			req, _ := http.NewRequest("GET", srv.URL+url, nil)
+			req, _ := http.NewRequest(http.MethodGet, srv.URL+url, nil)
 			req.Header.Set("Authorization", "Bearer "+key)
 			res, err := http.DefaultClient.Do(req)
 			if err != nil {
@@ -143,7 +144,7 @@ func TestEveryListAnAgentReadsComesInPages(t *testing.T) {
 		}
 	}
 	for path, says := range map[string]string{"tasks?limit=-1": "limit", "tasks?limit=lots": "limit", "tasks?cursor=nonsense": "cursor"} {
-		req, _ := http.NewRequest("GET", srv.URL+"/o/alpha/api/v1/"+path, nil)
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/o/alpha/api/v1/"+path, nil)
 		req.Header.Set("Authorization", "Bearer "+key)
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {

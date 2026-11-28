@@ -7,6 +7,8 @@ import (
 	"log"
 	"strings"
 
+	"gorm.io/gorm"
+
 	"github.com/shutthegoatup/prospector/internal/identity"
 	"github.com/shutthegoatup/prospector/internal/mailer"
 	"github.com/shutthegoatup/prospector/internal/request"
@@ -25,12 +27,10 @@ func (a *App) background(f func()) {
 	}
 	select {
 	case mailSlots <- struct{}{}:
-		a.sending.Add(1)
-		go func() {
-			defer a.sending.Done()
+		a.sending.Go(func() {
 			defer func() { <-mailSlots }()
 			f()
-		}()
+		})
 	default:
 		log.Print("mail is backed up: a password reset wasn't sent")
 	}
@@ -50,8 +50,11 @@ func (a *App) deliver(ctx context.Context, via mailer.Server, m mailer.Message) 
 // MailFor is the organisation's own server when it has one, else the app's, else nil.
 func (a *App) MailFor(org int64) (*mailer.Server, error) {
 	m, err := a.s.OrgMail(org)
-	if err != nil {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return a.mail, nil
+	}
+	if err != nil {
+		return nil, err
 	}
 	via := &mailer.Server{Host: m.Host, Port: m.Port, Username: m.Username, From: m.Sender}
 	if m.Password != "" {

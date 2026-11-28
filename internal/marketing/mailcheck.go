@@ -27,11 +27,11 @@ const MailRefusedFor = 7 * 24 * time.Hour
 const mailLookupFor = 5 * time.Second
 
 func MailDomainOf(address string) string {
-	at := strings.LastIndexByte(address, '@')
-	if at < 0 {
+	_, after, ok := strings.CutLast(address, "@")
+	if !ok {
 		return ""
 	}
-	domain, err := idna.Lookup.ToASCII(strings.Trim(strings.ToLower(address[at+1:]), ". "))
+	domain, err := idna.Lookup.ToASCII(strings.Trim(strings.ToLower(after), ". "))
 	if err != nil || !strings.Contains(domain, ".") {
 		return ""
 	}

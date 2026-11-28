@@ -393,11 +393,11 @@ func CheckSeal(doc []byte, cert *x509.Certificate) error {
 // byteRangeEnd is where the first signature's byte range ends: the second of its two
 // ranges' offset plus length.
 func byteRangeEnd(doc []byte) (int, bool) {
-	at := bytes.Index(doc, []byte("/ByteRange"))
-	if at < 0 {
+	_, after, ok := bytes.Cut(doc, []byte("/ByteRange"))
+	if !ok {
 		return 0, false
 	}
-	rest := doc[at+len("/ByteRange"):]
+	rest := after
 	open, shut := bytes.IndexByte(rest, '['), bytes.IndexByte(rest, ']')
 	if open < 0 || shut < open {
 		return 0, false
@@ -425,7 +425,7 @@ func standIn(kind, name string) string {
 		return "✓"
 	case "initials":
 		var out []rune
-		for _, word := range strings.Fields(name) {
+		for word := range strings.FieldsSeq(name) {
 			out = append(out, []rune(word)[0])
 		}
 		return string(out)

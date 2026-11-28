@@ -82,10 +82,11 @@ func (s *PrivacyStore) ExportPerson(org, id int64, actor string) (*PersonExport,
 		}
 		// Every address that is theirs, as erasure counts them: their own and any suggested
 		// for them that nobody dismissed.
-		addresses := store.Deref(c.Email)
+		var addresses strings.Builder
+		addresses.WriteString(store.Deref(c.Email))
 		for _, sg := range out.Suggested {
 			if sg.Field == "email" && sg.Decision != prospecting.SuggestionDismissed {
-				addresses += " " + sg.Value
+				addresses.WriteString(" " + sg.Value)
 			}
 		}
 		out.CampaignMail = []store.CampaignRecipient{}
@@ -93,7 +94,7 @@ func (s *PrivacyStore) ExportPerson(org, id int64, actor string) (*PersonExport,
 			return err
 		}
 		out.Suppressed = []store.Suppression{}
-		if emails := store.EmailRe.FindAllString(strings.ToLower(addresses), -1); len(emails) > 0 {
+		if emails := store.EmailRe.FindAllString(strings.ToLower(addresses.String()), -1); len(emails) > 0 {
 			for _, e := range emails {
 				emails = append(emails, strings.Trim(e, "."))
 			}

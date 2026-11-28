@@ -19,9 +19,9 @@ func TestARoundOfMailChecksReadsOnPastTheFirstBatch(t *testing.T) {
 	o := mustOrg(t, s, "alpha")
 	people := make([]store.Contact, 1001)
 	for i := range people {
-		people[i] = store.Contact{OrgID: o.ID, Key: fmt.Sprint("person-", i), File: "x.md", Email: store.Str(fmt.Sprint("p", i, "@larkmoor.example"))}
+		people[i] = store.Contact{OrgID: o.ID, Key: fmt.Sprint("person-", i), File: "x.md", Email: new(fmt.Sprint("p", i, "@larkmoor.example"))}
 	}
-	people[1000].Email = store.Str("late@windrush.example")
+	people[1000].Email = new("late@windrush.example")
 	if err := s.DB.CreateInBatches(people, 500).Error; err != nil {
 		t.Fatal(err)
 	}

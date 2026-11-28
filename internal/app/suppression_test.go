@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -62,7 +63,7 @@ func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
 
 	// A mail provider's one-click request, as RFC 8058 has it: a form body, no cookie, no
 	// origin, and an answer that is not a redirect.
-	req, _ := http.NewRequest("POST", srv.URL+hannah, strings.NewReader(url.Values{"List-Unsubscribe": {"One-Click"}}.Encode()))
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+hannah, strings.NewReader(url.Values{"List-Unsubscribe": {"One-Click"}}.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	res, err := stranger.Do(req)
 	if err != nil {
@@ -81,7 +82,7 @@ func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
 	}
 
 	// From a webmail page on its own origin, and twice: still one row, still theirs.
-	req, _ = http.NewRequest("POST", srv.URL+hannah, strings.NewReader("List-Unsubscribe=One-Click"))
+	req, _ = http.NewRequest(http.MethodPost, srv.URL+hannah, strings.NewReader("List-Unsubscribe=One-Click"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", "https://webmail.example")
 	req.Header.Set("Sec-Fetch-Site", "cross-site")
@@ -101,7 +102,7 @@ func TestAnUnsubscribeLinkStopsMarketingMailInOneClick(t *testing.T) {
 	}
 
 	// Marketing mail can't go to them now, whatever the case of the address.
-	if err := s.Marketable(s.DB, o, "HANNAH@larkmoor.example", ""); err != marketing.ErrSuppressed {
+	if err := s.Marketable(s.DB, o, "HANNAH@larkmoor.example", ""); !errors.Is(err, marketing.ErrSuppressed) {
 		t.Errorf("an unsubscribed address is marketable: %v", err)
 	}
 	if err := s.Marketable(s.DB, other, "hannah@larkmoor.example", ""); err != nil {
@@ -169,8 +170,8 @@ func TestTheListIsKeptByMembersAndKeys(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, "c@three.example") || strings.Contains(body, "a@one.example") || !strings.Contains(body, `"next_cursor":"`) {
 		t.Fatalf("the first page: %d %s", code, body)
 	}
-	cursor := body[strings.Index(body, `"next_cursor":"`)+len(`"next_cursor":"`):]
-	cursor = cursor[:strings.Index(cursor, `"`)]
+	_, cursor, _ := strings.Cut(body, `"next_cursor":"`)
+	cursor, _, _ = strings.Cut(cursor, `"`)
 	if code, body := asKey(t, "GET", list+"?limit=2&cursor="+cursor, reader, nil); code != http.StatusOK || !strings.Contains(body, "a@one.example") || strings.Contains(body, "c@three.example") || strings.Contains(body, "next_cursor") {
 		t.Errorf("the second page: %d %s", code, body)
 	}
@@ -222,7 +223,7 @@ func TestErasureAndNeverContactKeepAnAddressUnmailed(t *testing.T) {
 			t.Errorf("erasing her left %d rows of %T with her address (%v)", left, table, err)
 		}
 	}
-	if err := s.Marketable(s.DB, o, "hannah@larkmoor.example", ""); err != store.ErrErased {
+	if err := s.Marketable(s.DB, o, "hannah@larkmoor.example", ""); !errors.Is(err, store.ErrErased) {
 		t.Errorf("an erased address is marketable: %v", err)
 	}
 
@@ -289,7 +290,7 @@ func TestTheListHoldsAtItsEdges(t *testing.T) {
 	if err := s.UnsubscribeByToken(token); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Marketable(s.DB, o, "sven@nordkap.example", ""); err != marketing.ErrSuppressed {
+	if err := s.Marketable(s.DB, o, "sven@nordkap.example", ""); !errors.Is(err, marketing.ErrSuppressed) {
 		t.Errorf("an unsubscribe after the row was taken off was lost: %v", err)
 	}
 

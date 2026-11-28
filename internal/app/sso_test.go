@@ -9,7 +9,9 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
+	"maps"
 	"math/big"
 	"net/http"
 	"net/http/cookiejar"
@@ -128,9 +130,7 @@ func (p *fakeIdP) idToken(asked url.Values) string {
 	if p.nonce != "" {
 		claims["nonce"] = p.nonce
 	}
-	for k, v := range p.claims {
-		claims[k] = v
-	}
+	maps.Copy(claims, p.claims)
 	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: p.key}, (&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", "k"))
 	if err != nil {
 		p.t.Fatal(err)
@@ -202,7 +202,7 @@ func newBrowser(t *testing.T, base string) *browser {
 
 func (b *browser) get(path string) (code int, body, location string) {
 	b.t.Helper()
-	req, _ := http.NewRequest("GET", b.base+path, nil)
+	req, _ := http.NewRequest(http.MethodGet, b.base+path, nil)
 	res, err := b.c.Do(req)
 	if err != nil {
 		b.t.Fatal(err)
@@ -477,9 +477,7 @@ func connected(t *testing.T, srv *httptest.Server, dns map[string][]string, s *S
 		t.Fatalf("verifying %s: %d %s", domain, code, body)
 	}
 	in := map[string]any{"issuer": p.srv.URL, "client_id": "client", "client_secret": "secret"}
-	for k, v := range rules {
-		in[k] = v
-	}
+	maps.Copy(in, rules)
 	if code, body := owner.send("PUT", base, in); code != http.StatusOK {
 		t.Fatalf("saving the connection: %d %s", code, body)
 	}
@@ -646,7 +644,7 @@ func TestRequiredSingleSignOn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req, _ := http.NewRequest("GET", srv.URL+"/o/alpha/api/v1/due?step=linkedin", nil)
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/o/alpha/api/v1/due?step=linkedin", nil)
 	req.Header.Set("Authorization", "Bearer "+secret)
 	if res, err := http.DefaultClient.Do(req); err != nil || res.StatusCode != http.StatusOK {
 		t.Fatalf("an API key where single sign-on is required: %v %v", res.Status, err)
@@ -973,7 +971,7 @@ func TestAnAccountWithNoPasswordIsRefusedAsSlowlyAsAnyOther(t *testing.T) {
 	}
 	timed := func(email string) time.Duration {
 		start := time.Now()
-		if _, _, err := s.Login(email, "a guess at it"); err != identity.ErrWrongLogin {
+		if _, _, err := s.Login(email, "a guess at it"); !errors.Is(err, identity.ErrWrongLogin) {
 			t.Fatalf("signing in as %s: %v", email, err)
 		}
 		return time.Since(start)

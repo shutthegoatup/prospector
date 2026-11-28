@@ -28,7 +28,7 @@ const SnapshotSchema = `create table if not exists contacts (
   linkedin_added text, email_sent text, followup_sent text, replied text, declined text, hold text
 );`
 
-var SnapshotColumns = append(Columns[:len(Columns):len(Columns)], LaterColumns...)
+var SnapshotColumns = append(slices.Clip(Columns), LaterColumns...)
 
 var snapshotExtraColumns = SnapshotColumns[21:]
 

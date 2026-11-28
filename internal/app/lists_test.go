@@ -80,7 +80,7 @@ func TestPipelineInSQL(t *testing.T) {
 	t.Parallel()
 	s := tempStore(t)
 	o := mustOrg(t, s, "alpha")
-	day := store.Str("2026-01-05")
+	day := new("2026-01-05")
 	people := map[string][]store.Contact{
 		"Nobody yet":         nil,
 		"Untouched":          {{}},
@@ -162,7 +162,7 @@ func TestStageFilterPagesInSQL(t *testing.T) {
 	// Every tenth company is in outreach, so the filter's matches are spread far past one page.
 	for i, c := range seedCompanies(t, s, o.ID, 700, prospecting.CompanyQualified, "") {
 		if i%10 == 9 {
-			seedContact(t, s, store.Contact{OrgID: o.ID, CompanyID: &c.ID, Key: c.Name, LinkedinAdded: store.Str("2026-01-05")})
+			seedContact(t, s, store.Contact{OrgID: o.ID, CompanyID: &c.ID, Key: c.Name, LinkedinAdded: new("2026-01-05")})
 		}
 	}
 	rows, pg, err := s.Companies(o.ID, "", "", "outreach", 2)
@@ -185,7 +185,7 @@ func TestResearchIsPaged(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		seedContact(t, s, store.Contact{OrgID: o.ID, CompanyID: &c.ID, Key: c.Name, Person: store.Str("Person at " + c.Name), Status: store.ContactSuggested})
+		seedContact(t, s, store.Contact{OrgID: o.ID, CompanyID: &c.ID, Key: c.Name, Person: new("Person at " + c.Name), Status: store.ContactSuggested})
 	}
 	if n := s.ResearchCount(o.ID, "review"); n != 230 {
 		t.Fatalf("the count is the whole list, not a page of it: %d", n)
@@ -248,10 +248,10 @@ func TestSearch(t *testing.T) {
 		return c
 	}
 	lark := add(a, store.Company{Name: "Larkmoor Yachts", Domain: "larkmoor.example", Why: `Sells "made to order" hulls`},
-		store.Contact{Person: store.Str("Hannah Pryce, Head of Marketing"), Email: store.Str("hannah@larkmoor.example")})
+		store.Contact{Person: new("Hannah Pryce, Head of Marketing"), Email: new("hannah@larkmoor.example")})
 	add(a, store.Company{Name: "Fenwick Kitchens", Domain: "fenwick.example", Why: "Configurator is 100% custom_built"},
-		store.Contact{Person: store.Str("Björn Ødegård"), Email: store.Str("bjorn@fenwick.example")})
-	add(b, store.Company{Name: "Larkmoor Yachts", Domain: "larkmoor.example"}, store.Contact{Person: store.Str("Hannah Pryce")})
+		store.Contact{Person: new("Björn Ødegård"), Email: new("bjorn@fenwick.example")})
+	add(b, store.Company{Name: "Larkmoor Yachts", Domain: "larkmoor.example"}, store.Contact{Person: new("Hannah Pryce")})
 
 	search := func(q string) string {
 		t.Helper()

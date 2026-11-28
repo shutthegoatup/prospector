@@ -53,15 +53,6 @@ func loginWait(failures int) time.Duration {
 	return min(maxLoginWait, time.Second<<min(failures-freeAttempts, 10))
 }
 
-func (g *loginGuard) wait(email string) time.Duration {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if f := g.fails[loginKey(email)]; f != nil {
-		return max(0, f.until.Sub(g.clock()))
-	}
-	return 0
-}
-
 // begin returns how long this attempt must wait, or 0 to let it through. Letting one
 // through books the wait a failure would earn, so attempts made in parallel are refused.
 func (g *loginGuard) begin(email string) time.Duration {

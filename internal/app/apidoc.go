@@ -67,7 +67,7 @@ type APIField struct {
 
 func apiDocOf(spec *openapi3.T) APIDoc {
 	doc := APIDoc{Title: spec.Info.Title, Version: spec.Info.Version}
-	for _, p := range strings.Split(strings.TrimSpace(spec.Info.Description), "\n\n") {
+	for p := range strings.SplitSeq(strings.TrimSpace(spec.Info.Description), "\n\n") {
 		doc.Intro = append(doc.Intro, strings.Join(strings.Fields(p), " "))
 	}
 	for _, s := range identity.Scopes {
@@ -309,7 +309,7 @@ func curlOf(base string, o APIOp) string {
 	path := strings.ReplaceAll(o.Path, "{org}", "your-org")
 	var b strings.Builder
 	b.WriteString("curl")
-	if o.Method != "GET" {
+	if o.Method != http.MethodGet {
 		b.WriteString(" -X " + o.Method)
 	}
 	b.WriteString(" " + strings.TrimRight(base, "/") + path + " \\\n  -H \"Authorization: Bearer $PROSPECTOR_KEY\"")

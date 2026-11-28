@@ -49,7 +49,7 @@ func TestACallerPastItsBurstWaitsAndOthersDont(t *testing.T) {
 			t.Fatalf("request %d of the burst: %d %s", i+1, code, body)
 		}
 	}
-	req, _ := http.NewRequest("GET", agents, nil)
+	req, _ := http.NewRequest(http.MethodGet, agents, nil)
 	req.Header.Set("Authorization", "Bearer "+busy)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 func walkRuns(t *testing.T, s *Store, org int64, limit int) []research.Run {
 	var all []research.Run
 	before := time.Time{}
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		runs, _, next := s.Runs(org, before, limit)
 		all = append(all, runs...)
 		if next.IsZero() {

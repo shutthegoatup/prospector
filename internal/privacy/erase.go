@@ -62,7 +62,8 @@ func (s *PrivacyStore) ErasePerson(org, id int64, actor string) error {
 		if err := tx.Where("org_id = ? and contact_id = ?", org, id).Find(&suggested).Error; err != nil {
 			return err
 		}
-		addresses := store.Deref(c.Email)
+		var addresses strings.Builder
+		addresses.WriteString(store.Deref(c.Email))
 		hashes := store.Identifiers(org, store.DisplayName(c), store.Deref(c.Maker), store.Deref(c.Email), store.Deref(c.Linkedin))
 		for _, sg := range suggested {
 			if sg.Decision == prospecting.SuggestionDismissed {
@@ -70,7 +71,7 @@ func (s *PrivacyStore) ErasePerson(org, id int64, actor string) error {
 			}
 			switch sg.Field {
 			case "email":
-				addresses += " " + sg.Value
+				addresses.WriteString(" " + sg.Value)
 				hashes = append(hashes, store.Identifiers(org, "", "", sg.Value, "")...)
 			case "linkedin":
 				hashes = append(hashes, store.Identifiers(org, "", "", "", sg.Value)...)
@@ -81,7 +82,7 @@ func (s *PrivacyStore) ErasePerson(org, id int64, actor string) error {
 		}
 		// What they wrote to us goes too, whether or not it was matched to them.
 		gone := tx.Where("org_id = ? and contact_id = ?", org, id)
-		emails := store.EmailRe.FindAllString(strings.ToLower(addresses), -1)
+		emails := store.EmailRe.FindAllString(strings.ToLower(addresses.String()), -1)
 		if len(emails) > 0 {
 			gone = tx.Where("org_id = ? and (contact_id = ? or email in ?)", org, id, emails)
 		}

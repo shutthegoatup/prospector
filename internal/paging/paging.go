@@ -6,8 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"math"
-	"net/http"
-	"strconv"
 
 	"github.com/shutthegoatup/prospector/internal/say"
 )
@@ -56,30 +54,6 @@ func (p Page) At(n int) ([]int64, error) {
 		}
 	}
 	return out, nil
-}
-
-// FromRequest reads limit and cursor from a request's query.
-func FromRequest(r *http.Request) (Page, error) {
-	p := Page{Cursor: r.URL.Query().Get("cursor")}
-	if raw := r.URL.Query().Get("limit"); raw != "" {
-		n, err := strconv.Atoi(raw)
-		if err != nil || n < 1 {
-			return p, say.New("limit is a whole number, 1 or more")
-		}
-		p.Limit = n
-	}
-	return p, nil
-}
-
-// LinkNext names the next page in a Link header (RFC 8288), for clients that follow
-// those and don't read the body's next_cursor.
-func LinkNext(w http.ResponseWriter, r *http.Request, next string) {
-	if next == "" {
-		return
-	}
-	q := r.URL.Query()
-	q.Set("cursor", next)
-	w.Header().Set("Link", "<"+r.URL.Path+"?"+q.Encode()+`>; rel="next"`)
 }
 
 // RanOut is where a cursor stands once an oldest-first list has run out.

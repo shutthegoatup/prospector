@@ -1,6 +1,7 @@
 package onboarding
 
 import (
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
@@ -176,8 +177,11 @@ func (s *CustomerStore) RevokeCustomer(org, grant int64, actor string) error {
 			return err
 		}
 		var c store.Contact
-		if err := tx.Where("org_id = ? and id = ?", org, g.ContactID).First(&c).Error; err != nil {
+		// A grant can outlive its contact, which leaves nobody's history to note it in.
+		if err := tx.Where("org_id = ? and id = ?", org, g.ContactID).First(&c).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
+		} else if err != nil {
+			return err
 		}
 		return s.Log(tx, org, c.ID, c.CompanyID, actor, "onboard:revoke", nil)
 	})

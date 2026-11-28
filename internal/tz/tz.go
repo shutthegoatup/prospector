@@ -14,7 +14,7 @@ var countryTag = regexp.MustCompile(`\(([A-Z]{2})(?:/[A-Z]{2})?[,)]`)
 // (XX) country tag in the maker name. Where a number or country spans several zones,
 // the zone of libphonenumber's example number for that country breaks the tie.
 func Guess(phone, maker string) *string {
-	first := strings.SplitN(phone, "/", 2)[0]
+	first, _, _ := strings.Cut(phone, "/")
 	if n, err := phonenumbers.Parse(first, ""); err == nil && phonenumbers.IsPossibleNumber(n) {
 		// Mobile and toll-free ranges outside North America say nothing about where the person is.
 		switch phonenumbers.GetNumberType(n) {

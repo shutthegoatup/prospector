@@ -285,8 +285,6 @@ func Logged(res *gorm.DB) error {
 
 func Today() string { return time.Now().Format("2006-01-02") }
 
-func Str(v string) *string { return &v }
-
 // NonEmpty is Python's nullif(v, ”).
 func NonEmpty(v string) *string {
 	if v == "" {

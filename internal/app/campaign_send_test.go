@@ -128,7 +128,7 @@ func TestACampaignIsSentOnceToEachPersonThroughTheOrganisationsOwnServer(t *test
 	if err := s.UnsubscribeByToken(token); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Marketable(s.DB, o, m.To, ""); err != marketing.ErrSuppressed {
+	if err := s.Marketable(s.DB, o, m.To, ""); !errors.Is(err, marketing.ErrSuppressed) {
 		t.Errorf("after unsubscribing by the mail's link: %v", err)
 	}
 }
@@ -316,12 +316,10 @@ func TestACampaignSentTwiceAtOnceIsSentOnce(t *testing.T) {
 	var wg sync.WaitGroup
 	results := make(chan error, 4)
 	for range 4 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err := s.SendCampaign(o, c.ID, "Ada Lovelace")
 			results <- err
-		}()
+		})
 	}
 	wg.Wait()
 	close(results)

@@ -155,7 +155,7 @@ func TestABrowserWithAnOldDeviceCookieStillCountsByItself(t *testing.T) {
 	}
 	try := func(devices ...string) int {
 		t.Helper()
-		req, _ := http.NewRequest("POST", srv.URL+"/api/v1/session", strings.NewReader(`{"email": "ada@example.com", "password": "a password of her own"}`))
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/session", strings.NewReader(`{"email": "ada@example.com", "password": "a password of her own"}`))
 		req.Header.Set("content-type", "application/json")
 		for _, d := range devices {
 			req.AddCookie(&http.Cookie{Name: deviceCookie, Value: d})

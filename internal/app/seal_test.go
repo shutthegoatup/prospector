@@ -322,3 +322,19 @@ func inked(t *testing.T, file string) (w, h, x0, y0, x1, y1 int) {
 	}
 	return w, h, x0, y0, x1, y1
 }
+
+// stampPDF draws each stamp onto its page, as fillIn does, and writes the document out.
+func stampPDF(doc []byte, stamps []signing.Stamp) ([]byte, error) {
+	rc, err := signing.ReadForSealing(doc)
+	if err != nil {
+		return nil, err
+	}
+	if err := signing.FillIn(rc, stamps); err != nil {
+		return nil, err
+	}
+	var out bytes.Buffer
+	if err := api.WriteContext(context.Background(), rc, &out); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
+}

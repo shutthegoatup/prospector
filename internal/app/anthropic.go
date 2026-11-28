@@ -54,8 +54,7 @@ func (a *App) claudeClient(c *store.Agent, key string) anthropic.Client {
 
 // claudeErr gives an SDK failure the shape the run waits on or ends with.
 func claudeErr(err error) error {
-	var refused *anthropic.Error
-	if errors.As(err, &refused) {
+	if refused, ok := errors.AsType[*anthropic.Error](err); ok {
 		e := &endpointError{Status: refused.StatusCode, Message: strings.Join(strings.Fields(refused.Message), " ")}
 		if r := []rune(e.Message); len(r) > 200 {
 			e.Message = string(r[:200]) + "…"
@@ -127,7 +126,7 @@ type claudeChat struct {
 
 func (a *App) newClaudeChat(c *store.Agent, key string, tools []toolDef, system, opening string) *claudeChat {
 	params := anthropic.BetaMessageNewParams{
-		Model:     anthropic.Model(c.Model),
+		Model:     c.Model,
 		MaxTokens: claudeMaxTokens,
 		System:    []anthropic.BetaTextBlockParam{{Text: system}},
 		Tools:     claudeTools(tools),

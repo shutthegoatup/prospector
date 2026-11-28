@@ -60,11 +60,6 @@ func newStore(c *store.Core) *Store {
 	return s
 }
 
-// through is the same store working through db, such as a transaction.
-func (s *Store) through(db *gorm.DB) *Store {
-	return newStore(&store.Core{DB: db, Keyring: s.Keyring, DNS: s.DNS})
-}
-
 var models = []any{&store.User{}, &store.Org{}, &store.Membership{}, &store.Session{}, &store.APIKey{},
 	&store.Company{}, &store.Fact{}, &store.Contact{}, &store.Event{}, &store.Erasure{}, &store.Identity{}, &store.SSOConnection{}, &store.SSODomain{}, &store.Enquiry{}, &store.EnquiryMessage{}, &store.Suppression{}, &store.UnsubscribeLink{}, &store.Campaign{}, &store.CampaignRecipient{}, &store.Agreement{}, &store.AgreementFile{}, &store.AgreementRecipient{}, &store.AgreementField{}, &store.AgreementEvent{}, &store.SealKey{}, &store.Suggestion{},
 	&store.Task{}, &store.TaskRequest{}, &store.TaskNote{}, &store.RequestClaim{}, &store.PasswordToken{}, &store.OrgMail{}, &store.Agent{}, &store.AgentRun{}, &store.Deal{}, &store.Subscription{}, &store.Onboarding{}, &store.OnboardingStep{}, &store.CustomerGrant{}, &store.CustomerLink{}, &store.CustomerSession{}, &store.MailDomain{}, &store.Enricher{}, &store.EnrichUsage{}, &store.Offering{}, &store.Verdict{}, &store.Role{}, &store.BounceHook{}}

@@ -33,7 +33,7 @@ func (s apiServer) GetNav(ctx context.Context, _ api.GetNavRequestObject) (api.G
 		out.Orgs = append(out.Orgs, api.NavOrg{Id: o.ID, Slug: o.Slug, Name: o.Name, Color: o.Color, Role: api.NavOrgRole(o.Role)})
 	}
 	out.Role = api.NavRole(q.Member.Role)
-	for _, ar := range strings.Fields(q.Member.Areas) {
+	for ar := range strings.FieldsSeq(q.Member.Areas) {
 		out.Areas = append(out.Areas, api.NavAreas(ar))
 	}
 	out.Sales, out.Support, out.Owner = q.Member.Works(identity.AreaSales), q.Member.Works(identity.AreaSupport), q.Owner()

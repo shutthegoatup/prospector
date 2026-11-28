@@ -141,7 +141,7 @@ func (s *EnquiryStore) AddEnquiry(org int64, via string, in EnquiryIn) (*store.E
 		if e.ContactID != nil {
 			contact = *e.ContactID
 		}
-		return s.Log(tx, org, contact, e.CompanyID, via, "enquiry", store.Str(kindLabel(e.Kind)))
+		return s.Log(tx, org, contact, e.CompanyID, via, "enquiry", new(kindLabel(e.Kind)))
 	})
 }
 

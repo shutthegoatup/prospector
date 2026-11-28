@@ -379,7 +379,7 @@ func TestSeveralAgentsWorkOneTaskEachOnItsOwnRequest(t *testing.T) {
 		msgs := messagesOf(body)
 		var opened research.TaskOut
 		if text := fmt.Sprint(msgs[1]["content"]); strings.Contains(text, "{") {
-			json.Unmarshal([]byte(text[strings.Index(text, "{"):]), &opened)
+			json.Unmarshal([]byte(text[strings.IndexByte(text, '{'):]), &opened)
 		}
 		mu.Lock()
 		claimed[float64(opened.Claimed)] = true
@@ -500,15 +500,13 @@ func TestOnlyOneRunStartsOnATask(t *testing.T) {
 	var mu sync.Mutex
 	started := 0
 	for range 8 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if _, err := r.a.StartRun(r.o.ID, r.task.ID, r.agent, "Ada Lovelace"); err == nil {
 				mu.Lock()
 				started++
 				mu.Unlock()
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	close(release)
@@ -599,8 +597,7 @@ func TestTheAgentCantCiteAPageItWasntShownAnyOtherWay(t *testing.T) {
 	fake := newFakeEndpoint(t)
 	r := newRunSetup(t, fake)
 	fake.chat = func(n int, _ map[string]any) (int, string) {
-		switch n {
-		case 0:
+		if n == 0 {
 			return 200, chatTools("add_company", `{"name":"Ghost Yachts","platform":"Made-up Platform","built_by":"Invented Agency"}`)
 		}
 		return 200, chatTools("finish_request", fmt.Sprintf(`{"request":%d}`, r.brief))

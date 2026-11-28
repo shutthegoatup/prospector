@@ -146,7 +146,7 @@ func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
 
 // listModels asks the endpoint which models it offers (GET /models).
 func (a *App) listModels(ctx context.Context, base, key string) ([]string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", base+"/models", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/models", nil)
 	if err != nil {
 		return nil, err
 	}

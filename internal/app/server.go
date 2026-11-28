@@ -552,7 +552,7 @@ func serve(a *App, addr string) error {
 	if a.mail != nil && a.base == "" {
 		log.Print("PROSPECTOR_URL isn't set: mail is off, because an emailed link needs the address to point at")
 	}
-	ln, err := net.Listen("tcp", addr)
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", addr)
 	if err != nil {
 		return err
 	}

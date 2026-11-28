@@ -85,7 +85,7 @@ func (s *ProspectingStore) KeepFind(org int64, who store.Actor, contact int64, f
 		if made, err = s.suggestOne(tx, who, c, field, value, status, "", kind); err != nil {
 			return err
 		}
-		return s.LogAs(tx, org, c.ID, c.CompanyID, who, "enrich:"+field, store.Str(kind+": "+LookupFound))
+		return s.LogAs(tx, org, c.ID, c.CompanyID, who, "enrich:"+field, new(kind+": "+LookupFound))
 	})
 }
 

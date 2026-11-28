@@ -34,7 +34,7 @@ func parseKeys(spec string) (*store.Keyring, error) {
 		return nil, nil
 	}
 	k := &store.Keyring{ByKID: map[string]store.SecretKey{}}
-	for _, entry := range strings.Split(spec, ",") {
+	for entry := range strings.SplitSeq(spec, ",") {
 		version, material, ok := strings.Cut(strings.TrimSpace(entry), ":")
 		if !ok {
 			return nil, errors.New(`PROSPECTOR_SECRET_KEYS: an entry looks like "<version>:<64 hex characters>"`)

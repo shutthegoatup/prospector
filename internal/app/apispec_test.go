@@ -163,7 +163,7 @@ func TestAnAPICallRefusedBeforeItsOperationIsStillAProblem(t *testing.T) {
 		"a body that isn't JSON":     {"/o/alpha/api/v1/people", "text/plain", http.StatusUnsupportedMediaType},
 		"an organisation not theirs": {"/o/nope/api/v1/people", "application/json", http.StatusNotFound},
 	} {
-		req, _ := http.NewRequest("POST", srv.URL+c.path, strings.NewReader("{}"))
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+c.path, strings.NewReader("{}"))
 		req.Header.Set("Content-Type", c.contentType)
 		res, err := client.Do(req)
 		if err != nil {

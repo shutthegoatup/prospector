@@ -44,15 +44,15 @@ type apiServer struct {
 // newAPIServer hands each product's operations the part of the store they use.
 func newAPIServer(a *App) apiServer {
 	return apiServer{a: a,
-		ResearchAPI:   research.ResearchAPI{Research: &a.s.ResearchStore, Finding: &a.s.ProspectingStore, Records: &a.s.CRMStore, Runs: a},
-		PrivacyAPI:    privacy.PrivacyAPI{Store: &a.s.PrivacyStore},
-		CRMAPI:        crm.CRMAPI{Records: &a.s.CRMStore},
-		SigningAPI:    signing.SigningAPI{Store: &a.s.AgreementStore},
-		TicketsAPI:    tickets.TicketsAPI{Enquiries: &a.s.EnquiryStore, Mail: a},
+		ResearchAPI: research.ResearchAPI{Research: &a.s.ResearchStore, Finding: &a.s.ProspectingStore, Records: &a.s.CRMStore, Runs: a},
+		PrivacyAPI:  privacy.PrivacyAPI{Store: &a.s.PrivacyStore},
+		CRMAPI:      crm.CRMAPI{Records: &a.s.CRMStore},
+		SigningAPI:  signing.SigningAPI{Store: &a.s.AgreementStore},
+		Enquiries:   &a.s.EnquiryStore, Mail: a,
 		OnboardingAPI: onboarding.OnboardingAPI{Steps: &a.s.OnboardingStore, Customers: &a.s.CustomerStore, App: a},
 		MarketingAPI:  marketing.MarketingAPI{Campaigns: &a.s.OutreachStore, Suppression: &a.s.SuppressionStore, App: a},
-		SalesAPI: sales.SalesAPI{Pipeline: &a.s.DealStore, Subscriptions: &a.s.SubscriptionStore,
-			People: &a.s.CRMStore, Onboarding: &a.s.OnboardingStore},
+		Pipeline:      &a.s.DealStore, Subscriptions: &a.s.SubscriptionStore,
+		People: &a.s.CRMStore, Onboarding: &a.s.OnboardingStore,
 	}
 }
 

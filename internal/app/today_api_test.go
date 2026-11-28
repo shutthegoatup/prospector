@@ -75,7 +75,7 @@ func TestTodaysQueueIsInTheAPI(t *testing.T) {
 		t.Errorf("a next step should come first, got %s", all.Items[0].Step)
 	}
 	add := cardOf(t, all, "linkedin")
-	if !strings.Contains(add.Text, add.Name[:strings.Index(add.Name, " ")]) || add.OpenLabel != "Open + copy" && add.OpenLabel != "Search + copy" {
+	if !strings.Contains(add.Text, strings.Fields(add.Name)[0]) || add.OpenLabel != "Open + copy" && add.OpenLabel != "Search + copy" {
 		t.Errorf("a LinkedIn add should carry the templated note and how to open them: %+v", add)
 	}
 	email := cardOf(t, all, "email")

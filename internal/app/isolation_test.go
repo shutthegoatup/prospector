@@ -77,15 +77,15 @@ type intruder struct {
 func (in *intruder) value(t reflect.Type, name string, own bool) reflect.Value {
 	v := reflect.New(t).Elem()
 	switch {
-	case t == reflect.TypeOf(&store.Org{}):
+	case t == reflect.TypeFor[*store.Org]():
 		return reflect.ValueOf(in.org)
-	case t == reflect.TypeOf(time.Time{}):
+	case t == reflect.TypeFor[time.Time]():
 		return reflect.ValueOf(time.Now())
-	case t == reflect.TypeOf([]store.Contact{}):
+	case t == reflect.TypeFor[[]store.Contact]():
 		// A person from the first organisation, as a page might hand back.
 		return reflect.ValueOf([]store.Contact{{ID: 1, OrgID: 1}})
 	}
-	switch t.Kind() {
+	switch t.Kind() { //nolint:exhaustive // The store's methods take no other kinds; the rest stay zero.
 	case reflect.Int64, reflect.Int:
 		v.SetInt(1)
 	case reflect.Bool:
@@ -138,7 +138,7 @@ func (in *intruder) call(s *Store, m reflect.Method) (said string, fell bool) {
 		args = append(args, arg)
 	}
 	for _, out := range m.Func.Call(args) {
-		if _, isErr := out.Interface().(error); isErr {
+		if _, isErr := reflect.TypeAssert[error](out); isErr {
 			continue
 		}
 		if text, err := json.Marshal(out.Interface()); err == nil {
@@ -158,7 +158,7 @@ func everyWay(s *Store, undo bool, m reflect.Method, org *store.Org, do func(sai
 		switch k := m.Type.In(j); {
 		case k.Kind() == reflect.String:
 			own++
-		case k.Kind() == reflect.Struct || k.Kind() == reflect.Pointer && k != reflect.TypeOf(&store.Org{}):
+		case k.Kind() == reflect.Struct || k.Kind() == reflect.Pointer && k != reflect.TypeFor[*store.Org]():
 			nested = true
 		}
 	}
@@ -427,15 +427,14 @@ var saysNothingBack = map[string]bool{
 
 func TestNoMethodReachesIntoAnotherOrganisation(t *testing.T) {
 	t.Parallel()
-	storeType := reflect.TypeOf(&Store{})
+	storeType := reflect.TypeFor[*Store]()
 	var methods []reflect.Method
-	for i := range storeType.NumMethod() {
-		m := storeType.Method(i)
+	for m := range storeType.Methods() {
 		// Not queries of their own but what the store's code writes them with (withinTheStore).
 		if acrossOrganisations[m.Name] || withinTheStore[m.Name] {
 			continue
 		}
-		if m.Type.NumIn() < 2 || (m.Type.In(1).Kind() != reflect.Int64 && m.Type.In(1) != reflect.TypeOf(&store.Org{})) {
+		if m.Type.NumIn() < 2 || (m.Type.In(1).Kind() != reflect.Int64 && m.Type.In(1) != reflect.TypeFor[*store.Org]()) {
 			t.Errorf("Store.%s doesn't take its organisation first: give it one, or name it in acrossOrganisations if it isn't about one", m.Name)
 			continue
 		}
@@ -501,4 +500,9 @@ func tryMethodsAsAnotherOrganisation(t *testing.T, methods []reflect.Method) {
 				"give the test's words or rows what it needs, or name it in saysNothingBack", m.Name)
 		}
 	}
+}
+
+// through is the same store working through db, such as a transaction.
+func (s *Store) through(db *gorm.DB) *Store {
+	return newStore(&store.Core{DB: db, Keyring: s.Keyring, DNS: s.DNS})
 }

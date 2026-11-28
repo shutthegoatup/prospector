@@ -73,7 +73,7 @@ func TestTheShellSaysWhichLanguageToDrawIn(t *testing.T) {
 func TestALanguageIsPickedOnlyByName(t *testing.T) {
 	t.Parallel()
 	_, _, srv, _ := signedIn(t)
-	req, _ := http.NewRequest("GET", srv.URL+"/login", nil)
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/login", nil)
 	req.Header.Set("Accept-Language", strings.Join(request.Locales.Pseudo, ","))
 	res, err := noRedirects().Do(req)
 	if err != nil {
@@ -120,7 +120,7 @@ func TestAProblemIsInTheLanguageThePagesAre(t *testing.T) {
 func TestAProblemPageIsInTheReadersLanguage(t *testing.T) {
 	t.Parallel()
 	_, _, srv, _ := signedIn(t)
-	req, _ := http.NewRequest("GET", srv.URL+"/reset/not-a-token", nil)
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/reset/not-a-token", nil)
 	req.Header.Set("Accept", "text/html")
 	req.AddCookie(&http.Cookie{Name: request.LangCookie, Value: "en-XA"})
 	res, err := http.DefaultClient.Do(req)

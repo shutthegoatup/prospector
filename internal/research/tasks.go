@@ -82,7 +82,7 @@ func RunsOf(events []store.Event) []Run {
 		for id := range o.tasks {
 			o.run.Tasks = append(o.run.Tasks, id)
 		}
-		sort.Slice(o.run.Tasks, func(i, j int) bool { return o.run.Tasks[i] < o.run.Tasks[j] })
+		slices.Sort(o.run.Tasks)
 		done = append(done, o.run)
 	}
 	for _, e := range events {

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"gorm.io/gorm"
+
 	"github.com/shutthegoatup/prospector/internal/mailer"
 	"github.com/shutthegoatup/prospector/internal/marketing"
 	"github.com/shutthegoatup/prospector/internal/say"
@@ -46,8 +48,11 @@ var (
 // mail exchanger, as a relay.
 func (a *App) campaignMail(org int64) (*mailer.Server, error) {
 	m, err := a.s.OrgMail(org)
-	if err != nil {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
+	}
+	if err != nil {
+		return nil, err
 	}
 	if m.Username == "" || m.Port == 25 {
 		return nil, errCampaignSubmission

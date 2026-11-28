@@ -209,7 +209,7 @@ func pageText(body []byte, base *url.URL) (string, string, [][2]string) {
 	hidden := map[string]bool{"script": true, "style": true, "noscript": true, "svg": true, "template": true}
 	block := map[string]bool{"p": true, "div": true, "br": true, "li": true, "tr": true, "h1": true, "h2": true, "h3": true, "h4": true, "section": true, "article": true, "header": true, "footer": true, "address": true}
 	for {
-		switch tt := z.Next(); tt {
+		switch tt := z.Next(); tt { //nolint:exhaustive // Comments and doctypes say nothing a reader sees.
 		case html.ErrorToken:
 			return cut(oneLine(title.String()), 300), tidyText(text.String()), links
 		case html.StartTagToken, html.SelfClosingTagToken:
@@ -282,7 +282,7 @@ func pageText(body []byte, base *url.URL) (string, string, [][2]string) {
 func tidyText(s string) string {
 	var out []string
 	blank := false
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		line = oneLine(line)
 		if line == "" {
 			blank = len(out) > 0
@@ -308,7 +308,7 @@ func cut(s string, n int) string {
 func utf8Body(body []byte, contentType string) ([]byte, error) {
 	r, err := charset.NewReader(bytes.NewReader(body), contentType)
 	if err != nil {
-		return body, nil
+		return body, nil //nolint:nilerr // A charset it doesn't know is read as it came.
 	}
 	return io.ReadAll(r)
 }
