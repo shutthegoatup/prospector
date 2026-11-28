@@ -47,7 +47,7 @@ func (s *SsoStore) SaveSSO(c *store.SSOConnection, actor string) error {
 			}
 			what = fmt.Sprintf("%s, required: %t, joining: %t", c.Issuer, c.Required, c.AutoJoin)
 		}
-		return s.Log(tx, c.OrgID, 0, nil, actor, "sso:change", &what)
+		return s.Log(tx, c.OrgID, 0, nil, actor, store.ActSSO, &what)
 	})
 }
 
@@ -71,7 +71,7 @@ func (s *SsoStore) AddSSODomain(org int64, domain, actor string) (*store.SSODoma
 		if err := tx.Create(d).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, nil, actor, "sso:add-domain", &domain)
+		return s.Log(tx, org, 0, nil, actor, store.ActSSOAddDomain, &domain)
 	})
 	if store.BreaksRule(err) {
 		err = store.Conflict{Text: say.Errorf("%s is already listed", domain)}
@@ -100,7 +100,7 @@ func (s *SsoStore) VerifySSODomain(org, id int64, at time.Time, actor string) er
 		if res.Error != nil || res.RowsAffected == 0 {
 			return res.Error
 		}
-		return s.Log(tx, org, 0, nil, actor, "sso:verify-domain", &d.Domain)
+		return s.Log(tx, org, 0, nil, actor, store.ActSSOVerify, &d.Domain)
 	})
 }
 
@@ -110,7 +110,7 @@ func (s *SsoStore) RemoveSSODomain(org int64, domain, actor string) error {
 		if res.Error != nil || res.RowsAffected == 0 {
 			return res.Error
 		}
-		return s.Log(tx, org, 0, nil, actor, "sso:remove-domain", &domain)
+		return s.Log(tx, org, 0, nil, actor, store.ActSSORemove, &domain)
 	})
 }
 
@@ -174,7 +174,7 @@ func (s *SsoStore) SSOUser(org *store.Org, c *store.SSO, who *Outsider, email st
 		if err := tx.Create(&store.Membership{OrgID: org.ID, UserID: u.ID, Role: "member", CallerName: u.Name}).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org.ID, 0, nil, "sso", "member:join", &u.Email)
+		return s.Log(tx, org.ID, 0, nil, "sso", store.ActMemberJoin, &u.Email)
 	})
 	return u, err
 }

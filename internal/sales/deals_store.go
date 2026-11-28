@@ -66,7 +66,7 @@ func (s *DealStore) SetDeal(tx *gorm.DB, org, contact int64, field, value, actor
 	if err := tx.Model(&d).Updates(updates).Error; err != nil {
 		return err
 	}
-	return s.Log(tx, org, contact, c.CompanyID, actor, "deal:"+field, store.NonEmpty(logged))
+	return s.Log(tx, org, contact, c.CompanyID, actor, store.DealField.Of(field), store.NonEmpty(logged))
 }
 
 // OtherDeals are the renewals, expansions and further deals, by the stage each stands
@@ -135,7 +135,7 @@ func (s *DealStore) StartDeal(org, contact int64, kind, actor string) (*store.De
 		if err := tx.Create(&d).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, contact, c.CompanyID, actor, "deal:start", &kind)
+		return s.Log(tx, org, contact, c.CompanyID, actor, store.ActDealStart, &kind)
 	})
 	if err != nil {
 		return nil, err
@@ -207,7 +207,7 @@ func (s *DealStore) changeDeal(tx *gorm.DB, org, id int64, field, value, actor s
 		if err := tx.Model(&d).Updates(updates).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, c.ID, c.CompanyID, actor, "deal:"+field, store.NonEmpty(logged))
+		return s.Log(tx, org, c.ID, c.CompanyID, actor, store.DealField.Of(field), store.NonEmpty(logged))
 	}
 }
 
@@ -222,6 +222,6 @@ func (s *DealStore) RemoveDeal(org, id int64, actor string) error {
 		if err := tx.Delete(&d).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, c.ID, c.CompanyID, actor, "deal:remove", &d.Kind)
+		return s.Log(tx, org, c.ID, c.CompanyID, actor, store.ActDealDrop, &d.Kind)
 	})
 }

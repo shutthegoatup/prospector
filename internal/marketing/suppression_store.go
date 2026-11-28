@@ -34,7 +34,7 @@ func (s *SuppressionStore) Suppress(org int64, address, actor string) (*store.Su
 			return nil
 		}
 		// Not the address: the history would keep it after they were erased.
-		return s.Log(tx, org, 0, nil, actor, "suppression:add", nil)
+		return s.Log(tx, org, 0, nil, actor, store.ActSuppressionAdd, nil)
 	})
 	return row, err
 }
@@ -88,7 +88,7 @@ func (s *SuppressionStore) Unsuppress(org, id int64, actor string) error {
 			return say.New("they asked themselves not to be mailed, by unsubscribing or marking a mail as spam, so only they can be mailed again by signing up again")
 		}
 		// Not the address: the history would keep it after they were erased.
-		return s.Log(tx, org, 0, nil, actor, "suppression:remove", &row.Reason)
+		return s.Log(tx, org, 0, nil, actor, store.ActSuppressionRemove, &row.Reason)
 	})
 }
 

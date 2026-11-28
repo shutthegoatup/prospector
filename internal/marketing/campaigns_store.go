@@ -52,7 +52,7 @@ func (s *OutreachStore) AddCampaign(org int64, in CampaignIn, actor string) (*st
 		if err := tx.Create(&c).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, nil, actor, "campaign:add", &c.Name)
+		return s.Log(tx, org, 0, nil, actor, store.ActCampaignAdd, &c.Name)
 	})
 }
 
@@ -118,7 +118,7 @@ func (s *OutreachStore) RemoveCampaign(org, id int64, actor string) error {
 			}
 			return say.New("only a draft can be removed; one that went is kept as a record of what was sent")
 		}
-		return s.Log(tx, org, 0, nil, actor, "campaign:remove", &c.Name)
+		return s.Log(tx, org, 0, nil, actor, store.ActCampaignRemove, &c.Name)
 	})
 }
 

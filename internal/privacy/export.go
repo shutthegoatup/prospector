@@ -118,7 +118,7 @@ func (s *PrivacyStore) ExportPerson(org, id int64, actor string) (*PersonExport,
 		for _, e := range events {
 			out.History = append(out.History, ExportEvent{At: e.At, By: e.User, Action: e.Action, Value: store.Deref(e.Value)})
 		}
-		return s.Log(tx, org, id, c.CompanyID, actor, "export", nil)
+		return s.Log(tx, org, id, c.CompanyID, actor, store.ActExport, nil)
 	})
 	if err != nil {
 		return nil, err
@@ -244,7 +244,7 @@ type ExportRecord struct {
 func (s *PrivacyStore) ExportOrg(org int64, actor string) (*OrgExport, error) {
 	out := &OrgExport{ExportedAt: time.Now().UTC(), Members: []ExportMember{}, Keys: []ExportKey{}, History: []ExportRecord{}}
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
-		if err := s.Log(tx, org, 0, nil, actor, "export:org", nil); err != nil {
+		if err := s.Log(tx, org, 0, nil, actor, store.ActExportOrg, nil); err != nil {
 			return err
 		}
 		var o store.Org
@@ -313,7 +313,7 @@ func (s *PrivacyStore) ExportOrg(org int64, actor string) (*OrgExport, error) {
 			return err
 		}
 		for _, e := range events {
-			if e.Action == "erase" {
+			if e.Action == store.ActErase.String() {
 				out.Erased++
 			}
 			out.History = append(out.History, ExportRecord{ExportEvent{At: e.At, By: e.User, Action: e.Action, Value: store.Deref(e.Value)}, e.ContactID, e.CompanyID, e.TaskID})

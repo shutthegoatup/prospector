@@ -328,7 +328,7 @@ func (s *ProspectingStore) SetCompanyStage(org, id int64, stage, fit, actor stri
 		if res.Error != nil || res.RowsAffected == 0 {
 			return store.Missing(res.Error, "no company %d", id)
 		}
-		return s.Log(tx, org, 0, &id, actor, "company:"+stage, store.NonEmpty(fit))
+		return s.Log(tx, org, 0, &id, actor, store.CompanyTo.Of(stage), store.NonEmpty(fit))
 	})
 }
 
@@ -452,7 +452,7 @@ func (s *ProspectingStore) suggest(tx *gorm.DB, who store.Actor, p store.Contact
 		return false, err
 	}
 	// The detail itself stays out of the history.
-	return true, s.LogAs(tx, p.OrgID, p.ID, p.CompanyID, who, "suggest:"+field, nil)
+	return true, s.LogAs(tx, p.OrgID, p.ID, p.CompanyID, who, store.Suggested.Of(field), nil)
 }
 
 // Pending groups the suggestions still waiting by the person they are for.
@@ -512,7 +512,7 @@ func (s *ProspectingStore) DecideSuggestion(org, id int64, decision, actor strin
 			if err := tx.Where("org_id = ? and id = ?", org, sg.ContactID).Limit(1).Find(&c).Error; err != nil {
 				return err
 			}
-			return s.Log(tx, org, c.ID, c.CompanyID, actor, "dismiss:"+sg.Field, nil)
+			return s.Log(tx, org, c.ID, c.CompanyID, actor, store.Dismissed.Of(sg.Field), nil)
 		}
 		if err := s.CRM.SetContactField(tx, org, sg.ContactID, sg.Field, sg.Value, actor); err != nil {
 			return err
@@ -531,7 +531,7 @@ func (s *ProspectingStore) HeldWhenFound(tx *gorm.DB, org int64, who store.Actor
 		return nil
 	}
 	var before int64
-	if err := tx.Model(&store.Event{}).Where("org_id = ? and task_id = ? and company_id = ? and action not like 'note:%'", org, who.Task, c.ID).
+	if err := tx.Model(&store.Event{}).Where("org_id = ? and task_id = ? and company_id = ? and action not like ?", org, who.Task, c.ID, store.Noted.Like()).
 		Count(&before).Error; err != nil || before > 0 {
 		return err
 	}
@@ -539,7 +539,7 @@ func (s *ProspectingStore) HeldWhenFound(tx *gorm.DB, org int64, who store.Actor
 	if err != nil {
 		return err
 	}
-	return s.LogAs(tx, org, 0, &c.ID, who, ActionHeld, &why)
+	return s.LogAs(tx, org, 0, &c.ID, who, store.ActTaskHeld, &why)
 }
 
 // HeldWhenReached is heldWhenFound for a company an agent reaches through a fact or a
@@ -566,7 +566,7 @@ func (s *ProspectingStore) Withheld(org int64, who store.Actor, why string) {
 	if who.Task == 0 {
 		return
 	}
-	if err := s.LogAs(s.DB, org, 0, nil, who, ActionWithheld, &why); err != nil {
+	if err := s.LogAs(s.DB, org, 0, nil, who, store.ActTaskWithheld, &why); err != nil {
 		log.Printf("counting a refusal for task %d: %v", who.Task, err)
 	}
 }

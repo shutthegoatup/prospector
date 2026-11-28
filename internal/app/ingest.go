@@ -81,7 +81,7 @@ func (s *Store) Import(org int64, p *ImportPayload, actor string) (int64, error)
 		if err := tx.Model(&store.Contact{}).Where("org_id = ?", org).Count(&total).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, 0, nil, actor, "import", new(strconv.FormatInt(total, 10)))
+		return s.Log(tx, org, 0, nil, actor, store.ActImport, new(strconv.FormatInt(total, 10)))
 	})
 	return total, err
 }

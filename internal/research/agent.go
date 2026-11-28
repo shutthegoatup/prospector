@@ -186,9 +186,9 @@ func draftSent(c store.Contact, kind string) string {
 // and imported text leave no edit, so an agent may still improve on them.
 func editedBy(tx *gorm.DB, org, contact int64, field, kind string) (string, error) {
 	var last store.Event
-	err := tx.Where("org_id = ? and contact_id = ? and action in ?", org, contact, []string{"set:" + field, "draft:" + kind}).
+	err := tx.Where("org_id = ? and contact_id = ? and action in ?", org, contact, []string{store.SetField.Of(field).String(), store.Drafted.Of(kind).String()}).
 		Order("at desc, id desc").First(&last).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) || err == nil && last.Action != "set:"+field {
+	if errors.Is(err, gorm.ErrRecordNotFound) || err == nil && last.Action != store.SetField.Of(field).String() {
 		return "", nil
 	}
 	return last.User, err
@@ -361,9 +361,9 @@ func prefixed(prefix, s string) string {
 func KeptValue(e store.Event) *string {
 	v := store.Deref(e.Value)
 	switch {
-	case e.Action == "set:stage" && store.ValidStage(v):
+	case e.Action == store.SetField.Of("stage").String() && store.ValidStage(v):
 		return &v
-	case strings.HasPrefix(e.Action, "mark:") && len(v) >= 10:
+	case store.Marked.Has(e.Action) && len(v) >= 10:
 		if _, err := time.Parse("2006-01-02", v[:10]); err == nil {
 			return new(v[:10])
 		}
