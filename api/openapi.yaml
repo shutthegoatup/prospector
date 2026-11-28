@@ -4885,7 +4885,8 @@ paths:
       description: |
         Gives the address to paste into the webhook settings for the Postmark server your mail goes through,
         with Bounce and Spam Complaint turned on. The address signs in with your organisation's slug and a new
-        secret, shown only now. Making another replaces it, so the old one stops working.
+        secret, shown only now. Making another replaces it; the old one goes on signing in for a day, so
+        bounces posted while Postmark's settings are changed over aren't refused.
 
         An address that bounces for good (Postmark's HardBounce, Blocked or Suppressed) goes on the list not to
         be mailed as `bounced`, and its last campaign mail is marked failed; a soft bounce changes nothing. One
