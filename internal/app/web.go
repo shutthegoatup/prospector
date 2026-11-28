@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/shutthegoatup/prospector/internal/cleantext"
+	"github.com/shutthegoatup/prospector/internal/egress"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/charset"
@@ -64,7 +65,7 @@ func (a *App) pageHTTP() *http.Client {
 	if a.pageClient != nil {
 		return a.pageClient
 	}
-	return publicClient(false)
+	return egress.Client(egress.Options{})
 }
 
 // webCall runs a built-in web tool.
