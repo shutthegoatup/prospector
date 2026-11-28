@@ -1343,6 +1343,10 @@
     "defaultMessage": "{brand} keeps the PDF as uploaded, with its SHA-256, and doesn't read what it says. It is not for deeds, or anything that must be witnessed or notarised. You can set out who signs it and where; sending it for signature comes later.",
     "description": "Under the form to start an agreement. {brand} is the product's name, Prospector"
   },
+  "GhgLQQ": {
+    "defaultMessage": "The address holds its password and is shown only now. If you lose it, connect again: the old one stops working a day later.",
+    "description": "Under the address to paste into Postmark"
+  },
   "GhomIh": {
     "defaultMessage": "The company couldn't be read.",
     "description": "Heading of a company's page when it failed to load"
@@ -1406,10 +1410,6 @@
   "HTJdgK": {
     "defaultMessage": "Unsubscribe",
     "description": "Title of the page an unsubscribe link opens, and its button"
-  },
-  "HU8Z1U": {
-    "defaultMessage": "The address holds its password and is shown only now. If you lose it, connect again: the old one stops working.",
-    "description": "Under the address to paste into Postmark"
   },
   "HVKPd7": {
     "defaultMessage": "Accept",
