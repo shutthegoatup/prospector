@@ -55,7 +55,7 @@ func buildPDF(version string, pages int, note, onPage string) []byte {
 // upload sends raw bytes as the agreement's document, as a key or a member's browser does.
 func upload(t *testing.T, c *http.Client, url, key, contentType string, body []byte) (int, string, http.Header) {
 	t.Helper()
-	req, _ := http.NewRequest("PUT", url, bytes.NewReader(body))
+	req, _ := http.NewRequest(http.MethodPut, url, bytes.NewReader(body))
 	req.Header.Set("Content-Type", contentType)
 	if key != "" {
 		req.Header.Set("Authorization", "Bearer "+key)
@@ -119,7 +119,7 @@ func TestAnAgreementKeepsItsDocumentAsUploaded(t *testing.T) {
 	}
 
 	// It comes back exactly as it went, always as a download.
-	req, _ := http.NewRequest("GET", doc, nil)
+	req, _ := http.NewRequest(http.MethodGet, doc, nil)
 	req.Header.Set("Authorization", "Bearer "+reader)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -192,7 +192,7 @@ func TestAnAgreementIsWorkedFromItsCompanysPage(t *testing.T) {
 		t.Errorf("downloading the document from the page: %d", code)
 	}
 	// Another site can't make a member's browser replace it.
-	req, _ := http.NewRequest("PUT", doc, bytes.NewReader(samplePDF))
+	req, _ := http.NewRequest(http.MethodPut, doc, bytes.NewReader(samplePDF))
 	req.Header.Set("Content-Type", "application/pdf")
 	req.Header.Set("Sec-Fetch-Site", "cross-site")
 	req.Header.Set("Origin", "https://elsewhere.example")

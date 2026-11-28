@@ -140,7 +140,7 @@ func TestTheNavSaysWhatTheSidebarShows(t *testing.T) {
 
 	read := func(c *http.Client, header ...string) api.Nav {
 		t.Helper()
-		req, _ := http.NewRequest("GET", srv.URL+"/o/alpha/api/v1/nav", nil)
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/o/alpha/api/v1/nav", nil)
 		if len(header) == 2 {
 			req.Header.Set(header[0], header[1])
 		}
@@ -226,7 +226,7 @@ func TestStartingAnOrganisationThroughTheAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/orgs", strings.NewReader(`{"name":"Delta"}`))
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/orgs", strings.NewReader(`{"name":"Delta"}`))
 	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("Content-Type", "application/json")
 	res, err := http.DefaultClient.Do(req)

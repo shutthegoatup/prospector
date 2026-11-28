@@ -354,7 +354,7 @@ func (s *CRMStore) QuickAddPerson(o *store.Org, in QuickAdd, actor string) (*sto
 			Person: &person, First: &first, Maker: store.NonEmpty(maker), Linkedin: store.NonEmpty(in.Linkedin),
 			Email: store.NonEmpty(strings.TrimSpace(in.Email)), Note: &note, Title: strings.TrimSpace(in.Title), CompanyID: companyID}
 		if in.Added {
-			out.LinkedinAdded = store.Str(store.Today())
+			out.LinkedinAdded = new(store.Today())
 		}
 		if err := tx.Create(&out).Error; err != nil {
 			return err

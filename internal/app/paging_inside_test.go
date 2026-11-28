@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -20,7 +21,7 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 	co := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Larkmoor", Task: task.ID}))
 	for i := range 5 {
 		must(s.AgentAddFact(o.ID, scout, research.AddFactIn{Company: co.Name, Task: task.ID,
-			FactIn: research.FactIn{Field: "press", Value: fmt.Sprint("Award number ", i), SourceURL: "https://larkmoor.example/news"}}))
+			Field: "press", Value: fmt.Sprint("Award number ", i), SourceURL: "https://larkmoor.example/news"}))
 		must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: co.Name, Name: fmt.Sprintf("Quillon V%cle", rune(0x61+i)),
 			SourceURL: "https://larkmoor.example/team", Task: task.ID}))
 		must(s.AgentNote(o.ID, scout, research.NoteIn{Task: task.ID, Company: co.Name, Kind: "next", Text: fmt.Sprint("Note number ", i)}))
@@ -74,7 +75,7 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 	if len(usual.Facts) != 5 || len(usual.People) != 5 || len(usual.Notes) != research.AgentNotes || usual.NextCursor == "" {
 		t.Fatalf("a company with no limit asked for: %d facts, %d people, %d notes, next %q", len(usual.Facts), len(usual.People), len(usual.Notes), usual.NextCursor)
 	}
-	if _, err := s.AgentCompany(o.ID, scout, co.Name, paging.Page{Cursor: paging.Cursor(1, 2)}); err != paging.ErrCursor {
+	if _, err := s.AgentCompany(o.ID, scout, co.Name, paging.Page{Cursor: paging.Cursor(1, 2)}); !errors.Is(err, paging.ErrCursor) {
 		t.Fatalf("a cursor from another list: %v", err)
 	}
 
@@ -146,7 +147,7 @@ func TestTheListsInsideAnAnswerComeInPages(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, path := range []string{"companies/Larkmoor?limit=2", fmt.Sprintf("tasks/%d?limit=2", task.ID)} {
-		req, _ := http.NewRequest("GET", srv.URL+"/o/alpha/api/v1/"+path, nil)
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/o/alpha/api/v1/"+path, nil)
 		req.Header.Set("Authorization", "Bearer "+key)
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {

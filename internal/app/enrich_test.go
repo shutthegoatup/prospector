@@ -288,7 +288,7 @@ func TestOnlyAKeyGivenTheScopeSpendsOnVendors(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		req, _ := http.NewRequest("POST", api+"/contacts/"+itoa(c.ID)+"/enrich", strings.NewReader(`{"fields":["email"]}`))
+		req, _ := http.NewRequest(http.MethodPost, api+"/contacts/"+itoa(c.ID)+"/enrich", strings.NewReader(`{"fields":["email"]}`))
 		req.Header.Set("authorization", "Bearer "+secret)
 		req.Header.Set("content-type", "application/json")
 		res, err := http.DefaultClient.Do(req)

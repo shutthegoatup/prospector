@@ -594,7 +594,7 @@ func TestACustomersMarksKeepTheHistoryHonest(t *testing.T) {
 	if res, _ := as(t, outsider, "GET", press+"/done"); res.StatusCode != http.StatusMethodNotAllowed || done() {
 		t.Errorf("looking at a button's address: %d, done %v", res.StatusCode, done())
 	}
-	elsewhere, _ := http.NewRequest("POST", press+"/done", nil)
+	elsewhere, _ := http.NewRequest(http.MethodPost, press+"/done", nil)
 	elsewhere.Header.Set("Sec-Fetch-Site", "cross-site")
 	elsewhere.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if res, err := outsider.Do(elsewhere); err != nil || res.StatusCode != http.StatusForbidden || done() {

@@ -123,7 +123,7 @@ func TestACompanyReachedThroughAPersonIsHeldToo(t *testing.T) {
 
 	task := must(s.CreateTask(o.ID, "", "Kitchen makers.", "Ada Lovelace"))
 	must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Belair Kitchens", Name: "Mara Quist", SourceURL: "https://belair.example/team", Task: task.ID}))
-	must(s.AgentAddFact(o.ID, scout, research.AddFactIn{Company: "Fennholt Campers", FactIn: research.FactIn{Field: "size", Value: "12 staff", SourceURL: "https://fennholt.example/about"}, Task: task.ID}))
+	must(s.AgentAddFact(o.ID, scout, research.AddFactIn{Company: "Fennholt Campers", Field: "size", Value: "12 staff", SourceURL: "https://fennholt.example/about", Task: task.ID}))
 	// Added afterwards, it is already this task's: nothing changes.
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Belair Kitchens", Task: task.ID}))
 

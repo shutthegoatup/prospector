@@ -18,7 +18,7 @@ func (s CRMAPI) ListCompanies(ctx context.Context, in api.ListCompaniesRequestOb
 	if p.Stage != "" && !slices.Contains(PipelineStages, string(p.Stage)) {
 		return nil, say.Errorf("no stage %q: one of %v", p.Stage, PipelineStages)
 	}
-	page, err := paging.PageIn(int(p.Limit), string(p.Cursor))
+	page, err := paging.PageIn(p.Limit, p.Cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (s CRMAPI) ListCompanyHistory(ctx context.Context, in api.ListCompanyHistor
 	if err := s.companyHeld(org, in.Id); err != nil {
 		return nil, err
 	}
-	page, err := paging.PageIn(int(in.Params.Limit), string(in.Params.Cursor))
+	page, err := paging.PageIn(in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func (s CRMAPI) ListCompanyNotes(ctx context.Context, in api.ListCompanyNotesReq
 	if err := s.companyHeld(org, in.Id); err != nil {
 		return nil, err
 	}
-	page, err := paging.PageIn(int(in.Params.Limit), string(in.Params.Cursor))
+	page, err := paging.PageIn(in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}

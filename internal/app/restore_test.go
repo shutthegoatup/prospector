@@ -115,7 +115,7 @@ func TestRestoreKeepsHistoryWithItsPerson(t *testing.T) {
 	do(s.InOrg(o.ID).Find(&rows).Error)
 	for i := range rows {
 		if rows[i].ID == jonas.ID {
-			rows[i].Key, rows[i].Person = "omar-haddad", store.Str("Omar Haddad")
+			rows[i].Key, rows[i].Person = "omar-haddad", new("Omar Haddad")
 		}
 	}
 	if _, err := s.ReplaceContacts(o.ID, rows, nil); err != nil {

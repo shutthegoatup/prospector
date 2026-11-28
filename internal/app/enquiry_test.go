@@ -233,7 +233,7 @@ func TestEnquiryFromAProduct(t *testing.T) {
 	api := srv.URL + "/o/alpha/api/v1/enquiries"
 	send := func(key string, in tickets.EnquiryIn) (int, string) {
 		b, _ := json.Marshal(in)
-		req, _ := http.NewRequest("POST", api, strings.NewReader(string(b)))
+		req, _ := http.NewRequest(http.MethodPost, api, strings.NewReader(string(b)))
 		req.Header.Set("content-type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+key)
 		return doRequest(t, req)

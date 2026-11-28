@@ -140,7 +140,7 @@ func TestExportPerson(t *testing.T) {
 		t.Fatalf("the company's history doesn't show that she was exported: %s", history)
 	}
 
-	row := store.Contact{OrgID: o.ID, Key: "pair", File: "test", Person: store.Str("Jonas Weber, CMO; Ines Duarte, Head of Digital")}
+	row := store.Contact{OrgID: o.ID, Key: "pair", File: "test", Person: new("Jonas Weber, CMO; Ines Duarte, Head of Digital")}
 	do(s.DB.Create(&row).Error)
 	both := must(s.ExportPerson(o.ID, row.ID, "ada"))
 	if both.Note == "" {

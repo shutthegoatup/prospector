@@ -17,7 +17,7 @@ func CompanyStem(maker string) string {
 
 func CompetitorHold(r CompanyRow) *string {
 	if strings.Contains(r["fit_reason"], "COMPETITOR") && !strings.Contains(r["fit_reason"], "PARTNER") {
-		return store.Str("competitor")
+		return new("competitor")
 	}
 	return nil
 }

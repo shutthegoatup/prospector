@@ -99,7 +99,7 @@ func TestNoRawDatabaseErrorsGoOut(t *testing.T) {
 		"what another server said":             {errors.New("the mail server refused the password"), 502, 502, "the mail server refused the password"},
 	} {
 		page := httptest.NewRecorder()
-		fail(page, httptest.NewRequest("GET", "/", nil), c.err, c.given)
+		fail(page, httptest.NewRequest(http.MethodGet, "/", nil), c.err, c.given)
 		body := strings.TrimSpace(page.Body.String())
 		if page.Code != c.code || body != c.text || raw.MatchString(body) {
 			t.Errorf("%s, to a page: %d %q, want %d %q", name, page.Code, body, c.code, c.text)
@@ -128,7 +128,7 @@ func TestNoRawDatabaseErrorsGoOut(t *testing.T) {
 	}
 
 	api := httptest.NewRecorder()
-	apiFail(api, httptest.NewRequest("POST", "/o/alpha/api/v1/companies", nil), clash)
+	apiFail(api, httptest.NewRequest(http.MethodPost, "/o/alpha/api/v1/companies", nil), clash)
 	if api.Code != http.StatusConflict || !strings.Contains(api.Body.String(), sayTaken) || raw.MatchString(api.Body.String()) {
 		t.Errorf("to an API caller: %d %s", api.Code, api.Body)
 	}

@@ -36,12 +36,12 @@ func TestEachRoleAtACompanyIsPursuedOrJunkedOnItsOwn(t *testing.T) {
 	task := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find contract roles", "Ada"))
 	scout := store.Actor{Name: "agent:scout", KeyID: 3}
 	north := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Northwind Payments", Domain: "northwind.example", Task: task.ID}))
-	lead := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: task.ID, RoleIn: research.RoleIn{
-		Title: "Lead platform engineer (contract, 6 months)", SourceURL: "https://northwind.example/jobs/1", Details: "£700/day, outside IR35"}}))
-	plain := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: task.ID, RoleIn: research.RoleIn{
-		Title: "Platform engineer (contract)", SourceURL: "https://northwind.example/jobs/2"}}))
-	if again := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: task.ID, RoleIn: research.RoleIn{
-		Title: "Lead platform engineer", SourceURL: "https://northwind.example/jobs/1/"}})); !again.Existed || again.ID != lead.ID {
+	lead := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: task.ID,
+		Title: "Lead platform engineer (contract, 6 months)", SourceURL: "https://northwind.example/jobs/1", Details: "£700/day, outside IR35"}))
+	plain := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: task.ID,
+		Title: "Platform engineer (contract)", SourceURL: "https://northwind.example/jobs/2"}))
+	if again := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: task.ID,
+		Title: "Lead platform engineer", SourceURL: "https://northwind.example/jobs/1/"})); !again.Existed || again.ID != lead.ID {
 		t.Fatalf("the same posting again should be the role already here: %+v", again)
 	}
 	if err := s.JudgeCompany(o.ID, cto.ID, north.ID, prospecting.CompanyRejected, "", "CTO hired in September", "Ada"); err != nil {
@@ -87,8 +87,8 @@ func TestEachRoleAtACompanyIsPursuedOrJunkedOnItsOwn(t *testing.T) {
 	if len(detail.Roles) != 2 || detail.Roles[1].Stage != research.RoleJunked || detail.Roles[1].Reason != "Inside IR35 after all" {
 		t.Fatalf("get_company should list the roles with the junked one's reason: %+v", detail.Roles)
 	}
-	_, err = s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: task.ID, RoleIn: research.RoleIn{
-		Title: "Platform engineer (contract)", SourceURL: "https://northwind.example/jobs/2"}})
+	_, err = s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: task.ID,
+		Title: "Platform engineer (contract)", SourceURL: "https://northwind.example/jobs/2"})
 	var refused store.Conflict
 	if !errors.As(err, &refused) || !strings.Contains(err.Error(), "Inside IR35 after all") {
 		t.Fatalf("a junked role added again should be refused with why: %v", err)
@@ -115,8 +115,8 @@ func TestEachRoleAtACompanyIsPursuedOrJunkedOnItsOwn(t *testing.T) {
 	}
 
 	// A new role there is worth having, and brings the company back for review.
-	fresh := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: itoa(north.ID), Task: task.ID, RoleIn: research.RoleIn{
-		Title: "AWS landing zone engineer", SourceURL: "https://northwind.example/jobs/3"}}))
+	fresh := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: itoa(north.ID), Task: task.ID,
+		Title: "AWS landing zone engineer", SourceURL: "https://northwind.example/jobs/3"}))
 	if fresh.Existed || fresh.Stage != research.RoleReview {
 		t.Fatalf("a new role: %+v", fresh)
 	}
@@ -133,8 +133,8 @@ func TestANewRoleAtACompanyRuledOutIsANewFindForTheTask(t *testing.T) {
 	scout := store.Actor{Name: "agent:scout"}
 	first := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find contract roles", "Ada"))
 	north := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Northwind Payments", Task: first.ID}))
-	old := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: first.ID, RoleIn: research.RoleIn{
-		Title: "Platform engineer", SourceURL: "https://northwind.example/jobs/2"}}))
+	old := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: first.ID,
+		Title: "Platform engineer", SourceURL: "https://northwind.example/jobs/2"}))
 	must(s.JudgeRole(o.ID, old.ID, research.RoleJunked, "", "Ada"))
 	if err := s.SetTaskClosed(o.ID, first.ID, true, "Ada"); err != nil {
 		t.Fatal(err)
@@ -146,8 +146,8 @@ func TestANewRoleAtACompanyRuledOutIsANewFindForTheTask(t *testing.T) {
 		strings.Contains(brief.Offering.Guidance, "skip one rejected") {
 		t.Fatalf("an agent on a task for an offering with roles should be told to add each role: %+v", brief.Offering)
 	}
-	must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: next.ID, RoleIn: research.RoleIn{
-		Title: "AWS landing zone engineer", SourceURL: "https://northwind.example/jobs/3"}}))
+	must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: next.ID,
+		Title: "AWS landing zone engineer", SourceURL: "https://northwind.example/jobs/3"}))
 	v := must(s.Task(o.ID, next.ID, time.Now()))
 	if len(v.Companies) != 1 || v.Companies[0].ID != north.ID || len(v.LeftOut()) != 0 {
 		t.Fatalf("a new role at a company whose roles were all junked should count as found, not left out: %+v left out %+v", v.Companies, v.LeftOut())
@@ -169,7 +169,7 @@ func TestRolesAreKeptOnlyForAnOfferingThatHasThem(t *testing.T) {
 	}
 	own := must(s.CreateTask(o.ID, "", "Find clients", "Ada"))
 	if _, err := s.AgentAddRole(o.ID, store.Actor{Name: "agent:scout"}, research.AddRoleIn{Company: "Northwind Payments", Task: own.ID,
-		RoleIn: research.RoleIn{Title: "Platform engineer", SourceURL: "https://northwind.example/jobs/2"}}); err == nil {
+		Title: "Platform engineer", SourceURL: "https://northwind.example/jobs/2"}); err == nil {
 		t.Fatal("add_role on a task for the organisation's own")
 	}
 
@@ -216,8 +216,8 @@ func TestANewRoleAtACompanyAlreadyPursuedWaitsForReview(t *testing.T) {
 	scout := store.Actor{Name: "agent:scout"}
 	first := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find contract roles", "Ada"))
 	north := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Northwind Payments", Task: first.ID}))
-	lead := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: first.ID, RoleIn: research.RoleIn{
-		Title: "Lead platform engineer", SourceURL: "https://northwind.example/jobs/1"}}))
+	lead := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: first.ID,
+		Title: "Lead platform engineer", SourceURL: "https://northwind.example/jobs/1"}))
 	must(s.JudgeRole(o.ID, lead.ID, research.RolePursued, "", "Ada"))
 	if v := verdictFor(t, s, o.ID, roles.ID, north.ID); v.Stage != prospecting.CompanyQualified {
 		t.Fatalf("a pursued role: %+v", v)
@@ -228,8 +228,8 @@ func TestANewRoleAtACompanyAlreadyPursuedWaitsForReview(t *testing.T) {
 
 	next := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find more contract roles", "Ada"))
 	must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Northwind Payments", Task: next.ID}))
-	fresh := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: next.ID, RoleIn: research.RoleIn{
-		Title: "AWS landing zone engineer", SourceURL: "https://northwind.example/jobs/3"}}))
+	fresh := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: next.ID,
+		Title: "AWS landing zone engineer", SourceURL: "https://northwind.example/jobs/3"}))
 	if v := verdictFor(t, s, o.ID, roles.ID, north.ID); v.Stage != prospecting.CompanyReview {
 		t.Fatalf("a new role at a company already pursued should wait in review, or nobody is asked about it: %+v", v)
 	}
@@ -255,8 +255,8 @@ func TestAVerdictThatFollowsRolesIsntSetByHand(t *testing.T) {
 	task := must(s.CreateTaskFor(o.ID, roles.ID, "", "Find contract roles", "Ada"))
 	north := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Northwind Payments", Task: task.ID}))
 	harbour := must(s.AgentAddCompany(o.ID, scout, research.AddCompanyIn{Name: "Harbour Analytics", Task: task.ID}))
-	junked := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: task.ID, RoleIn: research.RoleIn{
-		Title: "Platform engineer (contract)", SourceURL: "https://northwind.example/jobs/2"}}))
+	junked := must(s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: task.ID,
+		Title: "Platform engineer (contract)", SourceURL: "https://northwind.example/jobs/2"}))
 	must(s.JudgeRole(o.ID, junked.ID, research.RoleJunked, "Inside IR35", "Ada"))
 
 	var refused store.Conflict
@@ -264,8 +264,8 @@ func TestAVerdictThatFollowsRolesIsntSetByHand(t *testing.T) {
 		t.Fatalf("qualifying by hand a company whose roles decide: %v", err)
 	}
 	// The same role on a job board is still the junked one.
-	_, err := s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: task.ID, RoleIn: research.RoleIn{
-		Title: "platform  engineer (Contract)", SourceURL: "https://jobs.example/northwind/123?utm_source=feed"}})
+	_, err := s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Northwind Payments", Task: task.ID,
+		Title: "platform  engineer (Contract)", SourceURL: "https://jobs.example/northwind/123?utm_source=feed"})
 	if !errors.As(err, &refused) || !strings.Contains(err.Error(), "Inside IR35") {
 		t.Fatalf("a junked role found on another page should still be refused: %v", err)
 	}
@@ -274,8 +274,8 @@ func TestAVerdictThatFollowsRolesIsntSetByHand(t *testing.T) {
 	if err := s.JudgeCompany(o.ID, roles.ID, harbour.ID, prospecting.CompanyRejected, "", "Never again", "Ada"); err != nil {
 		t.Fatal(err)
 	}
-	_, err = s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Harbour Analytics", Task: task.ID, RoleIn: research.RoleIn{
-		Title: "Data platform engineer", SourceURL: "https://harbour.example/jobs/1"}})
+	_, err = s.AgentAddRole(o.ID, scout, research.AddRoleIn{Company: "Harbour Analytics", Task: task.ID,
+		Title: "Data platform engineer", SourceURL: "https://harbour.example/jobs/1"})
 	if !errors.As(err, &refused) || !strings.Contains(err.Error(), "Never again") {
 		t.Fatalf("a role at a company a person rejected: %v", err)
 	}

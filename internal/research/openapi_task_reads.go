@@ -14,7 +14,7 @@ import (
 
 func (s ResearchAPI) ListTasks(ctx context.Context, in api.ListTasksRequestObject) (api.ListTasksResponseObject, error) {
 	q := request.ReqFrom(ctx)
-	page, err := paging.PageIn(int(in.Params.Limit), string(in.Params.Cursor))
+	page, err := paging.PageIn(in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (s ResearchAPI) ListTasks(ctx context.Context, in api.ListTasksRequestObjec
 
 func (s ResearchAPI) GetTask(ctx context.Context, in api.GetTaskRequestObject) (api.GetTaskResponseObject, error) {
 	q := request.ReqFrom(ctx)
-	page, err := paging.PageIn(int(in.Params.Limit), string(in.Params.Cursor))
+	page, err := paging.PageIn(in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func (s ResearchAPI) ListLeftOut(ctx context.Context, in api.ListLeftOutRequestO
 		return nil, err
 	}
 	left := v.LeftOut()
-	page, next, err := paging.ListPage(left, int(in.Params.Limit), string(in.Params.Cursor))
+	page, next, err := paging.ListPage(left, in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}

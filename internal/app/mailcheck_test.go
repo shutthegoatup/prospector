@@ -153,22 +153,22 @@ func TestTheDaysCardWarnsOfADetailThatCantBeRight(t *testing.T) {
 		}
 		return strings.Join(out, " | ")
 	}
-	got := texts(store.Contact{Key: "hannah", Email: store.Str("hannah@larkmoor.example"), Phone: store.Str("+44 1234 (switchboard)")}, map[string]bool{"larkmoor.example": true})
+	got := texts(store.Contact{Key: "hannah", Email: new("hannah@larkmoor.example"), Phone: new("+44 1234 (switchboard)")}, map[string]bool{"larkmoor.example": true})
 	for _, want := range []string{"larkmoor.example takes no mail", "Phone number isn't one any country uses"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("no %q in %q", want, got)
 		}
 	}
-	got = texts(store.Contact{Key: "hannah", Email: store.Str("info@larkmoor.example"), Phone: store.Str("+44 20 7946 0958")}, nil)
+	got = texts(store.Contact{Key: "hannah", Email: new("info@larkmoor.example"), Phone: new("+44 20 7946 0958")}, nil)
 	if !strings.Contains(got, "info@larkmoor.example is a shared inbox: ask for Hannah's own") || strings.Contains(got, "Phone number") || strings.Contains(got, "takes no mail") {
 		t.Errorf("a shared inbox and a good number: %q", got)
 	}
 	for _, good := range []string{"+44 (0)20 7946 0958", "+44 20 7946 0958 ext. 214", "+1 212 555 0123 / +1 212 555 0199"} {
-		if got := texts(store.Contact{Key: "hannah", Phone: store.Str(good)}, nil); strings.Contains(got, "Phone number") {
+		if got := texts(store.Contact{Key: "hannah", Phone: new(good)}, nil); strings.Contains(got, "Phone number") {
 			t.Errorf("%s: %q", good, got)
 		}
 	}
-	if got := texts(store.Contact{Key: "org:larkmoor", Email: store.Str("info@larkmoor.example"), Phone: store.Str("020 7946 0958")}, nil); strings.Contains(got, "shared inbox") || strings.Contains(got, "Phone number") {
+	if got := texts(store.Contact{Key: "org:larkmoor", Email: new("info@larkmoor.example"), Phone: new("020 7946 0958")}, nil); strings.Contains(got, "shared inbox") || strings.Contains(got, "Phone number") {
 		t.Errorf("a company's own inbox, or a number without a country code: %q", got)
 	}
 }

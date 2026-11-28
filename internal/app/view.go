@@ -116,7 +116,7 @@ func forPerson(c store.Contact, people []privacy.Person) store.Contact {
 		if p == nil {
 			return nil
 		}
-		return store.Str(word.ReplaceAllLiteralString(*p, toFirst))
+		return new(word.ReplaceAllLiteralString(*p, toFirst))
 	}
 	c.First, c.Note, c.Body, c.Followup = &toFirst, swap(c.Note), swap(c.Body), swap(c.Followup)
 	return c
@@ -259,7 +259,7 @@ func MakeCard(step string, raw store.Contact, v request.Voice, now time.Time, no
 	if l := localTime(store.Deref(c.Tz), now); l != nil {
 		card.State = l.State
 	}
-	for _, u := range strings.Split(store.Deref(c.Sources), "\n") {
+	for u := range strings.SplitSeq(store.Deref(c.Sources), "\n") {
 		if u != "" {
 			card.SourceList = append(card.SourceList, u)
 		}
@@ -352,7 +352,7 @@ func profileHref(c store.Contact) string {
 	if u := safeHref(store.Deref(c.Linkedin)); u != "#" {
 		return u
 	}
-	name := strings.SplitN(store.Deref(c.Person), ",", 2)[0]
+	name, _, _ := strings.Cut(store.Deref(c.Person), ",")
 	words := strings.Join(strings.Fields(name+" "+store.Deref(c.Maker)), " ")
 	if words == "" {
 		return "#"

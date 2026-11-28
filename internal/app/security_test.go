@@ -296,7 +296,7 @@ func TestMCPSessionsBelongToOneKey(t *testing.T) {
 	}
 	defer session.Close()
 	replay := func(key string) int {
-		req, _ := http.NewRequest("POST", endpoint, strings.NewReader(`{"jsonrpc":"2.0","id":99,"method":"tools/list"}`))
+		req, _ := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(`{"jsonrpc":"2.0","id":99,"method":"tools/list"}`))
 		req.Header.Set("Authorization", "Bearer "+key)
 		req.Header.Set("content-type", "application/json")
 		req.Header.Set("Accept", "application/json, text/event-stream")
@@ -315,7 +315,7 @@ func TestMCPSessionsBelongToOneKey(t *testing.T) {
 	if code := replay(other); code != http.StatusForbidden {
 		t.Fatalf("another key used the session: %d", code)
 	}
-	closing, _ := http.NewRequest("DELETE", endpoint, nil)
+	closing, _ := http.NewRequest(http.MethodDelete, endpoint, nil)
 	closing.Header.Set("Authorization", "Bearer "+other)
 	closing.Header.Set("Mcp-Session-Id", session.ID())
 	closed, err := http.DefaultClient.Do(closing)
@@ -364,7 +364,7 @@ func TestOnlyAssetsAreKeptByABrowser(t *testing.T) {
 		"/assets/css/output.css":                   "no-cache",
 		"/assets/css/output.css?v=" + assetVersion: "public, max-age=31536000, immutable",
 	} {
-		req, _ := http.NewRequest("GET", srv.URL+path, nil)
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+path, nil)
 		req.Header.Set("Authorization", "Bearer "+key)
 		who := http.DefaultClient
 		if !strings.Contains(path, "/api/") {
@@ -386,7 +386,7 @@ func TestTransportHeaders(t *testing.T) {
 	t.Parallel()
 	_, _, srv, _ := signedIn(t)
 	get := func(proto string) http.Header {
-		req, _ := http.NewRequest("GET", srv.URL+"/healthz", nil)
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/healthz", nil)
 		if proto != "" {
 			req.Header.Set("X-Forwarded-Proto", proto)
 		}
@@ -688,7 +688,8 @@ func TestContentPolicy(t *testing.T) {
 			t.Errorf("policy %q lacks %q", policy, want)
 		}
 	}
-	if scripts := policy[strings.Index(policy, "script-src"):]; strings.Contains(scripts[:strings.Index(scripts, ";")], "unsafe") {
+	_, scripts, _ := strings.Cut(policy, "script-src")
+	if scripts, _, _ = strings.Cut(scripts, ";"); strings.Contains(scripts, "unsafe") {
 		t.Errorf("the policy allows inline or evaluated scripts: %q", policy)
 	}
 
@@ -1003,7 +1004,7 @@ func TestPublicURL(t *testing.T) {
 	for raw, want := range map[string]string{
 		"":                                 "",
 		"https://prospector.example.com":   "https://prospector.example.com",
-		" https://prospector.example.com/": "https://prospector.example.com",
+		" https://prospector.example.com/": "https://prospector.example.com", //nolint:gocritic // The space is what is being trimmed.
 		"http://10.0.0.5:8766":             "http://10.0.0.5:8766",
 	} {
 		if got, err := publicURL(raw); err != nil || got != want {
@@ -1029,7 +1030,7 @@ func TestPublicURL(t *testing.T) {
 		t.Helper()
 		srv := httptest.NewServer(app.Routes())
 		t.Cleanup(srv.Close)
-		req, _ := http.NewRequest("POST", srv.URL+"/api/v1/session", strings.NewReader(`{"email": "ada@example.com", "password": "correct horse battery"}`))
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/session", strings.NewReader(`{"email": "ada@example.com", "password": "correct horse battery"}`))
 		req.Header.Set("content-type", "application/json")
 		for k, v := range headers {
 			req.Header.Set(k, v)
@@ -1049,7 +1050,7 @@ func TestPublicURL(t *testing.T) {
 	}
 	page := func(srv *httptest.Server, c *http.Cookie, path string) string {
 		t.Helper()
-		req, _ := http.NewRequest("GET", srv.URL+path, nil)
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+path, nil)
 		req.AddCookie(c)
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
@@ -1092,7 +1093,7 @@ func TestPublicURL(t *testing.T) {
 	status := func(app *App, origin string) int {
 		srv := httptest.NewServer(app.Routes())
 		defer srv.Close()
-		req, _ := http.NewRequest("POST", srv.URL+"/api/v1/session", strings.NewReader(`{"email": "ada@example.com", "password": "correct horse battery"}`))
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/session", strings.NewReader(`{"email": "ada@example.com", "password": "correct horse battery"}`))
 		req.Header.Set("content-type", "application/json")
 		req.Header.Set("Origin", origin)
 		res, err := (&http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}).Do(req)
@@ -1166,7 +1167,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 		t.Fatalf("a sign-in from another site, in a browser: %d %s %s, want a problem", code, ctype, body)
 	}
 	if h := func() http.Header {
-		req, _ := http.NewRequest("GET", srv.URL+"/no/such/page", nil)
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/no/such/page", nil)
 		req.Header.Set("Accept", browser["Accept"])
 		res, err := client.Do(req)
 		if err != nil {
@@ -1203,7 +1204,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	// What isn't a plain-text error passes through as it was: a redirect, the sign-in
 	// page's own refusal, and a method the route doesn't take keeping its Allow header.
 	stay := &http.Client{Jar: client.Jar, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	redirect, _ := http.NewRequest("GET", srv.URL+"/o/alpha/", nil)
+	redirect, _ := http.NewRequest(http.MethodGet, srv.URL+"/o/alpha/", nil)
 	redirect.Header.Set("Accept", browser["Accept"])
 	res, err := stay.Do(redirect)
 	if err != nil {
@@ -1213,7 +1214,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	if res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/o/alpha/today" {
 		t.Fatalf("a redirect in a browser: %d to %q", res.StatusCode, res.Header.Get("Location"))
 	}
-	wrong, _ := http.NewRequest("POST", srv.URL+"/api/v1/session", strings.NewReader(`{"email": "ada@example.com", "password": "wrong"}`))
+	wrong, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/session", strings.NewReader(`{"email": "ada@example.com", "password": "wrong"}`))
 	wrong.Header.Set("Accept", browser["Accept"])
 	wrong.Header.Set("content-type", "application/json")
 	res, err = http.DefaultClient.Do(wrong)
@@ -1225,7 +1226,7 @@ func TestProblemsLookLikeTheApp(t *testing.T) {
 	if res.StatusCode != http.StatusUnauthorized || !strings.Contains(string(said), `"type":"/api/problems/wrong_login"`) || styled(string(said)) {
 		t.Fatalf("a wrong password in a browser: %d %s", res.StatusCode, said)
 	}
-	method, _ := http.NewRequest("DELETE", srv.URL+"/login", nil)
+	method, _ := http.NewRequest(http.MethodDelete, srv.URL+"/login", nil)
 	method.Header.Set("Accept", browser["Accept"])
 	method.Header.Set("Sec-Fetch-Site", "same-origin")
 	res, err = client.Do(method)
@@ -1441,7 +1442,7 @@ func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
 	t.Cleanup(srv.Close)
 	try := func(email, password, device string) (int, *http.Cookie) {
 		t.Helper()
-		req, _ := http.NewRequest("POST", srv.URL+"/api/v1/session", bytes.NewReader(must(json.Marshal(map[string]string{"email": email, "password": password}))))
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/session", bytes.NewReader(must(json.Marshal(map[string]string{"email": email, "password": password}))))
 		req.Header.Set("content-type", "application/json")
 		if device != "" {
 			req.AddCookie(&http.Cookie{Name: deviceCookie, Value: device})
@@ -1526,7 +1527,7 @@ func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	change, _ := http.NewRequest("PUT", srv.URL+"/api/v1/password", strings.NewReader(`{"current":"correct horse battery","new":"bob's new password"}`))
+	change, _ := http.NewRequest(http.MethodPut, srv.URL+"/api/v1/password", strings.NewReader(`{"current":"correct horse battery","new":"bob's new password"}`))
 	change.Header.Set("content-type", "application/json")
 	change.AddCookie(&http.Cookie{Name: sessionCookie, Value: session})
 	changed, err := http.DefaultClient.Do(change)
@@ -1571,4 +1572,13 @@ func TestKnownBrowserIsntHeldUpByGuessing(t *testing.T) {
 	if code, fresh := try("ada@example.com", "a different password", issued.Value); code != http.StatusOK || fresh == nil {
 		t.Fatalf("signing in after a password change: %d, new device cookie: %v", code, fresh != nil)
 	}
+}
+
+func (g *loginGuard) wait(email string) time.Duration {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if f := g.fails[loginKey(email)]; f != nil {
+		return max(0, f.until.Sub(g.clock()))
+	}
+	return 0
 }

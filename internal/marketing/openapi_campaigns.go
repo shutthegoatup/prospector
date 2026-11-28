@@ -2,6 +2,7 @@ package marketing
 
 import (
 	"context"
+	"maps"
 
 	"github.com/shutthegoatup/prospector/api"
 
@@ -30,9 +31,7 @@ func (s MarketingAPI) tallied(org int64, list []store.Campaign) ([]api.Campaign,
 	out := make([]api.Campaign, 0, len(list))
 	for _, c := range list {
 		o := campaignOut(c)
-		for status, n := range tally[c.ID] {
-			o.Mail[status] = n
-		}
+		maps.Copy(o.Mail, tally[c.ID])
 		out = append(out, o)
 	}
 	return out, nil

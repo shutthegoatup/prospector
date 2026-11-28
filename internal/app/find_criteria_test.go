@@ -69,8 +69,8 @@ func TestEachCriterionIsMetNotMetOrNotFound(t *testing.T) {
 	}
 
 	// A later answer stands for the criterion: the agent found the CRM after all.
-	if _, err := s.AgentAddFact(o.ID, bot, research.AddFactIn{Company: "Tidewater Skiffs", FactIn: research.FactIn{Field: "crm",
-		Value: "An advert asks for experience with a named CRM", SourceURL: "https://jobs.example/tidewater/42", Inferred: true}}); err != nil {
+	if _, err := s.AgentAddFact(o.ID, bot, research.AddFactIn{Company: "Tidewater Skiffs", Field: "crm",
+		Value: "An advert asks for experience with a named CRM", SourceURL: "https://jobs.example/tidewater/42", Inferred: true}); err != nil {
 		t.Fatal(err)
 	}
 	found = prospecting.AssetsFound(o.Settings, must(s.Facts(o.ID, out.ID)))

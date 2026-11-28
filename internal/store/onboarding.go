@@ -57,7 +57,7 @@ const MaxOnboardingSteps = 40
 // counted from the start, can be left out too.
 func (s OrgSettings) Onboarding() ([]StepPlan, error) {
 	var out []StepPlan
-	for _, line := range strings.Split(s.OnboardingSteps, "\n") {
+	for line := range strings.SplitSeq(s.OnboardingSteps, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue

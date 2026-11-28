@@ -125,7 +125,7 @@ func TestFrontPageEnquiryForm(t *testing.T) {
 	}
 
 	// What the form's script sends, as the browser sends it from this same address.
-	req, _ := http.NewRequest("POST", srv.URL+"/o/alpha/intake", strings.NewReader(`{"kind":"demo","name":"Hannah Pryce","email":"hannah@quay.example","message":"Could we see it running?","trap":""}`))
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/o/alpha/intake", strings.NewReader(`{"kind":"demo","name":"Hannah Pryce","email":"hannah@quay.example","message":"Could we see it running?","trap":""}`))
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Origin", srv.URL)
 	req.Header.Set("Sec-Fetch-Site", "same-origin")

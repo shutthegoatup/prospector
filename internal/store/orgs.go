@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -18,7 +19,7 @@ const ProofLife = 24 * time.Hour
 // Proofs reads SSOOrgs: each organisation with when its proof runs out, as ",3:1795600000,".
 func (sess *Session) Proofs() map[int64]int64 {
 	out := map[int64]int64{}
-	for _, part := range strings.Split(sess.SSOOrgs, ",") {
+	for part := range strings.SplitSeq(sess.SSOOrgs, ",") {
 		org, until, ok := strings.Cut(part, ":")
 		o, err1 := strconv.ParseInt(org, 10, 64)
 		u, err2 := strconv.ParseInt(until, 10, 64)
@@ -44,14 +45,7 @@ func (sess *Session) Proves(org int64) bool { return sess.Proofs()[org] > time.N
 
 func (sess *Session) Opens(org int64) bool { return !sess.Limited || sess.Proves(org) }
 
-func (k *APIKey) Has(scope string) bool {
-	for _, s := range strings.Split(k.Scopes, " ") {
-		if s == scope {
-			return true
-		}
-	}
-	return false
-}
+func (k *APIKey) Has(scope string) bool { return slices.Contains(strings.Split(k.Scopes, " "), scope) }
 
 func HashToken(t string) string {
 	h := sha256.Sum256([]byte(t))

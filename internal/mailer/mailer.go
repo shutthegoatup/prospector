@@ -211,7 +211,7 @@ func Compose(from, to *mail.Address, m Message, now time.Time) []byte {
 // printableASCII is text a header can carry as it is: no control characters, nothing
 // outside ASCII.
 func printableASCII(s string) bool {
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] < 0x21 || s[i] > 0x7e {
 			return false
 		}

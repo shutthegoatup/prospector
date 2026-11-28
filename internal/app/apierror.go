@@ -171,8 +171,7 @@ func throttledFor(seconds int) typed {
 // apiFail answers an API caller with what went wrong. A failure of the server's own is
 // logged and not described: its text can carry internals.
 func apiFail(w http.ResponseWriter, r *http.Request, err error) {
-	var t typed
-	if errors.As(err, &t) {
+	if t, ok := errors.AsType[typed](err); ok {
 		if t.retry > 0 {
 			w.Header().Set("Retry-After", strconv.Itoa(t.retry))
 		}

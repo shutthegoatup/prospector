@@ -51,7 +51,7 @@ func flags(args []string) (map[string]string, []string) {
 }
 
 func remote(method, url string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequest(method, url, body)
+	req, err := http.NewRequestWithContext(context.Background(), method, url, body)
 	if err != nil {
 		return nil, err
 	}

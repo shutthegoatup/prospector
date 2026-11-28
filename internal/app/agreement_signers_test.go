@@ -218,7 +218,7 @@ func TestAnOperationWithoutAKeyScopeRefusesKeys(t *testing.T) {
 	}
 	ctx := context.WithValue(context.Background(), request.ReqKey{}, &request.Req{Key: &store.APIKey{Scopes: strings.Join(all, " ")}})
 	w := httptest.NewRecorder()
-	if _, err := handler(ctx, w, httptest.NewRequest("POST", "/", nil), nil); err != nil {
+	if _, err := handler(ctx, w, httptest.NewRequest(http.MethodPost, "/", nil), nil); err != nil {
 		t.Fatal(err)
 	}
 	if ran || w.Code != http.StatusForbidden {

@@ -116,7 +116,7 @@ func TestWhateverAnAgentWorksOnForAnOfferingWaitsInItsReview(t *testing.T) {
 	must(s.AgentAddContact(o, scout, prospecting.AddContactIn{Company: "Quayside Talent", Name: "Rhea Moss", Title: "Contract lead",
 		SourceURL: "https://quayside.example/team", Task: task.ID}))
 	must(s.AgentAddFact(o.ID, scout, research.AddFactIn{Company: "Fernhill Search", Task: task.ID,
-		FactIn: research.FactIn{Field: "agency_focus", Value: "Contract cloud roles", SourceURL: "https://fernhill.example/practice"}}))
+		Field: "agency_focus", Value: "Contract cloud roles", SourceURL: "https://fernhill.example/practice"}))
 
 	waiting := map[string]bool{}
 	for _, v := range must(s.Judged(o.ID, agencies.ID, prospecting.CompanyReview)) {

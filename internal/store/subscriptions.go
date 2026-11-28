@@ -130,7 +130,7 @@ func (s Subscription) Terms(start time.Time, each func(first, last time.Time) bo
 	}
 	from := start
 	// Bounded so a date centuries off can't spin: 2,400 terms is 200 years of months.
-	for i := 0; i < 2400; i++ {
+	for i := range 2400 {
 		// Every boundary is counted from the start, so a 31st doesn't drift to the 28th for good.
 		next := AddMonths(start, length+step*i)
 		if each(from, next.AddDate(0, 0, -1)) || (s.Then == ThenEnds && s.TermMonths > 0) {

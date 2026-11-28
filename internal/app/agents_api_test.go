@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"maps"
 	"net/http"
 	"strings"
 	"testing"
@@ -20,9 +21,7 @@ func TestTheAPISaysWhatEachAgentsCardSays(t *testing.T) {
 	o := must(s.OrgBySlug("alpha"))
 	settings := func(name string, extra map[string]any) map[string]any {
 		body := map[string]any{"name": name, "base_url": fake.srv.URL + "/v1", "api_key": agentTestKey, "model": "router/auto"}
-		for k, v := range extra {
-			body[k] = v
-		}
+		maps.Copy(body, extra)
 		return body
 	}
 	if code, body := saveAgentAt(t, ada, srv.URL, settings("Local", map[string]any{"thinking_off": true})); code != http.StatusOK {
@@ -112,7 +111,7 @@ func TestWhatAgentsDidIsInTheAPI(t *testing.T) {
 	}
 	var seen []api.AgentEvent
 	cursor := ""
-	for pages := 0; pages < 5; pages++ {
+	for range 5 {
 		_, body = call(t, ada, "GET", srv.URL+"/o/alpha/api/v1/agent-activity?limit=20&cursor="+cursor, "", nil)
 		var page struct {
 			Items      []api.AgentEvent

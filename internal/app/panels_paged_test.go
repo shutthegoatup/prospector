@@ -22,7 +22,7 @@ func TestACompanysHistoryAndNotesHavePages(t *testing.T) {
 		if i%2 == 1 {
 			action = "set:phone"
 		}
-		events = append(events, store.Event{OrgID: o.ID, CompanyID: &co.ID, User: "Nia", Action: action, Value: store.Str(fmt.Sprint("2020-01-", 10+i%10)),
+		events = append(events, store.Event{OrgID: o.ID, CompanyID: &co.ID, User: "Nia", Action: action, Value: new(fmt.Sprint("2020-01-", 10+i%10)),
 			At: time.Date(2020, 1, 1, 0, i, 0, 0, time.UTC)})
 	}
 	if err := s.DB.CreateInBatches(events, 50).Error; err != nil {
@@ -78,7 +78,7 @@ func TestAgentActivityHasPages(t *testing.T) {
 	s, o, srv, client := signedIn(t)
 	events := make([]store.Event, prospecting.ActivityPageSize+4)
 	for i := range events {
-		events[i] = store.Event{OrgID: o.ID, User: "agent:scout", Action: "add:fact", Value: store.Str(fmt.Sprint("fact number ", i, ".")),
+		events[i] = store.Event{OrgID: o.ID, User: "agent:scout", Action: "add:fact", Value: new(fmt.Sprint("fact number ", i, ".")),
 			At: time.Date(2020, 1, 1, 0, i, 0, 0, time.UTC)}
 	}
 	if err := s.DB.CreateInBatches(events, 50).Error; err != nil {
@@ -108,9 +108,9 @@ func TestAgentActivityPagesThroughEventsAtTheSameMoment(t *testing.T) {
 	var events []store.Event
 	for i := range 7 {
 		// Three moments, two or three events in each.
-		events = append(events, store.Event{OrgID: o.ID, User: "agent:scout", Action: "add:fact", Value: store.Str(fmt.Sprint("fact ", i)), At: at.Add(time.Duration(i/3) * time.Minute)})
+		events = append(events, store.Event{OrgID: o.ID, User: "agent:scout", Action: "add:fact", Value: new(fmt.Sprint("fact ", i)), At: at.Add(time.Duration(i/3) * time.Minute)})
 	}
-	events = append(events, store.Event{OrgID: o.ID, User: "Ada Lovelace", Action: "note", Value: store.Str("by hand"), At: at})
+	events = append(events, store.Event{OrgID: o.ID, User: "Ada Lovelace", Action: "note", Value: new("by hand"), At: at})
 	if err := s.DB.Create(&events).Error; err != nil {
 		t.Fatal(err)
 	}

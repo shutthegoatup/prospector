@@ -14,7 +14,7 @@ import (
 
 func (s ResearchAPI) AgentSearch(ctx context.Context, in api.AgentSearchRequestObject) (api.AgentSearchResponseObject, error) {
 	q := request.ReqFrom(ctx)
-	page, err := paging.PageIn(int(in.Params.Limit), string(in.Params.Cursor))
+	page, err := paging.PageIn(in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func (s ResearchAPI) AgentSearch(ctx context.Context, in api.AgentSearchRequestO
 
 func (s ResearchAPI) AgentCompany(ctx context.Context, in api.AgentCompanyRequestObject) (api.AgentCompanyResponseObject, error) {
 	q := request.ReqFrom(ctx)
-	page, err := paging.PageIn(int(in.Params.Limit), string(in.Params.Cursor))
+	page, err := paging.PageIn(in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (s ResearchAPI) AgentCompany(ctx context.Context, in api.AgentCompanyReques
 
 func (s ResearchAPI) AgentDue(ctx context.Context, in api.AgentDueRequestObject) (api.AgentDueResponseObject, error) {
 	q := request.ReqFrom(ctx)
-	page, err := paging.PageIn(int(in.Params.Limit), string(in.Params.Cursor))
+	page, err := paging.PageIn(in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}

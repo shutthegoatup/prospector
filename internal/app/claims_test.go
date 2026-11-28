@@ -130,11 +130,9 @@ func TestOnlyOneOfManyAgentsWinsARequest(t *testing.T) {
 	errs := make([]error, agents)
 	var wg sync.WaitGroup
 	for i := range agents {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			won[i], errs[i] = s.Claim(o.ID, task.ID, request, store.Actor{Name: "agent:" + strings.Repeat("x", i+1), KeyID: int64(i + 1)}, now)
-		}()
+		})
 	}
 	wg.Wait()
 	winners := 0

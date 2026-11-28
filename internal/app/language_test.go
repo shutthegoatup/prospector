@@ -27,7 +27,7 @@ func translatedInto(t *testing.T, translated ...string) {
 // accept.
 func inLanguage(t *testing.T, c *http.Client, u, accept string) (string, string) {
 	t.Helper()
-	req, _ := http.NewRequest("GET", u, nil)
+	req, _ := http.NewRequest(http.MethodGet, u, nil)
 	req.Header.Set("Accept-Language", accept)
 	res, err := c.Do(req)
 	if err != nil {
@@ -106,7 +106,7 @@ func TestAResetIsMailedInItsOwnersLanguage(t *testing.T) {
 	if code, _ := call(t, ada, "PATCH", srv.URL+"/o/alpha/api/v1/me", "application/json", map[string]string{"language": "en-XA"}); code != http.StatusOK {
 		t.Fatalf("choosing a language: %d", code)
 	}
-	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/password-resets", strings.NewReader(`{"email": "ada@example.com"}`))
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/password-resets", strings.NewReader(`{"email": "ada@example.com"}`))
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Accept-Language", "de")
 	res, err := http.DefaultClient.Do(req)
@@ -166,7 +166,7 @@ func TestAnOrganisationSpeaksToItsOutsidersInItsLanguage(t *testing.T) {
 	if got, _ := inLanguage(t, outsider, srv.URL+"/u/"+token, "ja"); got != "en-XA" {
 		t.Errorf("an unsubscribe page: %s", got)
 	}
-	req, _ := http.NewRequest("POST", srv.URL+"/u/"+token, nil)
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/u/"+token, nil)
 	req.Header.Set("Accept-Language", "ja")
 	res, err := outsider.Do(req)
 	if err != nil {

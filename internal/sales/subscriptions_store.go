@@ -306,7 +306,7 @@ func (s *SubscriptionStore) StartRenewal(org, subscription, contact int64, actor
 		if err := tx.Create(&d).Error; err != nil {
 			return err
 		}
-		return s.Log(tx, org, contact, c.CompanyID, actor, "deal:start", store.Str("renewal"))
+		return s.Log(tx, org, contact, c.CompanyID, actor, "deal:start", new("renewal"))
 	})
 	if err != nil {
 		return nil, err

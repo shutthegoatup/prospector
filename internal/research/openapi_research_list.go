@@ -16,7 +16,7 @@ import (
 
 func (s ResearchAPI) ListResearch(ctx context.Context, in api.ListResearchRequestObject) (api.ListResearchResponseObject, error) {
 	q := request.ReqFrom(ctx)
-	page, err := paging.PageIn(int(in.Params.Limit), string(in.Params.Cursor))
+	page, err := paging.PageIn(in.Params.Limit, in.Params.Cursor)
 	if err != nil {
 		return nil, err
 	}

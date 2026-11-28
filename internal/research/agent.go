@@ -365,7 +365,7 @@ func KeptValue(e store.Event) *string {
 		return &v
 	case strings.HasPrefix(e.Action, "mark:") && len(v) >= 10:
 		if _, err := time.Parse("2006-01-02", v[:10]); err == nil {
-			return store.Str(v[:10])
+			return new(v[:10])
 		}
 	}
 	return nil

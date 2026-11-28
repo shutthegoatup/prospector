@@ -42,7 +42,7 @@ func (set OrgSettings) Listed(email, link string) error {
 		if entry == "" {
 			continue
 		}
-		hit := false
+		var hit bool
 		switch want := LinkedinPath(entry); {
 		case want != "":
 			hit = profile == want || strings.HasPrefix(profile, want+"/")

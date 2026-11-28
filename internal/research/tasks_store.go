@@ -88,8 +88,7 @@ func (s *ResearchStore) OnTask(org int64, who store.Actor, task int64) (store.Ac
 	}
 	// Only a release from before offerings could have removed one an open task is for.
 	if _, err := s.offeringOf(org, t.OfferingID); err != nil {
-		var gone store.NotFound
-		if errors.As(err, &gone) {
+		if _, ok := errors.AsType[store.NotFound](err); ok {
 			return who, store.Conflict{Text: say.Errorf("the offering task %d was finding companies for has been removed: stop, and leave a note saying so", task)}
 		}
 		return who, err
@@ -200,8 +199,7 @@ func (s *ResearchStore) SetTaskClosed(org, task int64, closed bool, by string) e
 		}
 		if !closed && t.OfferingID != 0 {
 			if _, err := crm.HeldOffering(tx, org, t.OfferingID); err != nil {
-				var gone store.NotFound
-				if errors.As(err, &gone) {
+				if _, ok := errors.AsType[store.NotFound](err); ok {
 					return store.Conflict{Text: say.New("the offering this task was finding companies for has been removed: start a new task instead")}
 				}
 				return err
@@ -1125,7 +1123,7 @@ func (s *ResearchStore) addRole(tx *gorm.DB, org int64, o *store.Offering, compa
 	if err := tx.Create(&r).Error; err != nil {
 		return nil, false, err
 	}
-	if err := s.LogAs(tx, org, 0, &company, who, "add:role", store.Str(o.Name+": "+r.Title)); err != nil {
+	if err := s.LogAs(tx, org, 0, &company, who, "add:role", new(o.Name+": "+r.Title)); err != nil {
 		return nil, false, err
 	}
 	return &r, false, s.followRoles(tx, org, o, company, who.Name)
@@ -1182,7 +1180,7 @@ func (s *ResearchStore) AddRole(org, offering, company int64, in RoleIn, actor s
 		if err := store.Hold(tx, &store.Company{}, org, company); err != nil {
 			return err
 		}
-		if _, err := s.companyIn(tx, org, company); err != nil {
+		if err := s.companyIn(tx, org, company); err != nil {
 			return err
 		}
 		o, err := rolesOffering(tx, org, offering)
@@ -1201,12 +1199,13 @@ func (s *ResearchStore) AddRole(org, offering, company int64, in RoleIn, actor s
 	return r, err
 }
 
-func (s *ResearchStore) companyIn(tx *gorm.DB, org, id int64) (*store.Company, error) {
+// companyIn refuses a company that isn't the organisation's.
+func (s *ResearchStore) companyIn(tx *gorm.DB, org, id int64) error {
 	var c store.Company
 	if err := tx.Where("org_id = ? and id = ?", org, id).First(&c).Error; err != nil {
-		return nil, store.Missing(err, "no company %d", id)
+		return store.Missing(err, "no company %d", id)
 	}
-	return &c, nil
+	return nil
 }
 
 // JudgeRole pursues or junks a role, or puts it back up for review, and brings the
@@ -1255,7 +1254,7 @@ func (s *ResearchStore) JudgeRole(org, id int64, stage, reason, actor string) (*
 
 // Roles are a company's roles for every offering, or for one when offering is set.
 func (s *ResearchStore) Roles(org, company int64, offering *int64) ([]store.Role, error) {
-	if _, err := s.companyIn(s.DB, org, company); err != nil {
+	if err := s.companyIn(s.DB, org, company); err != nil {
 		return nil, err
 	}
 	q := s.InOrg(org).Where("company_id = ?", company)
@@ -1411,7 +1410,7 @@ func (s *ResearchStore) AgentAddCompany(org int64, who store.Actor, in AddCompan
 		if !created {
 			action = "add:facts"
 		}
-		return s.LogAs(tx, org, 0, &c.ID, who, action, store.Str(fmt.Sprintf("%s, %d facts", c.Name, added)))
+		return s.LogAs(tx, org, 0, &c.ID, who, action, new(fmt.Sprintf("%s, %d facts", c.Name, added)))
 	})
 	return &out, err
 }
@@ -1447,7 +1446,7 @@ func (s *ResearchStore) AgentAddFact(org int64, who store.Actor, in AddFactIn) (
 		if had {
 			return s.matched(tx, org, who, 0, &c.ID)
 		}
-		return s.LogAs(tx, org, 0, &c.ID, who, "add:fact", store.Str(f.Field))
+		return s.LogAs(tx, org, 0, &c.ID, who, "add:fact", new(f.Field))
 	})
 	return &out, err
 }
@@ -1521,7 +1520,7 @@ func (s *ResearchStore) AgentAddContact(o *store.Org, who store.Actor, in prospe
 		contact := store.Contact{OrgID: o.ID, Key: crm.UniqueKey(tx, o.ID, store.PersonKey(in.Name)), File: "added by " + who.Name,
 			Person: &person, First: &first, Maker: &c.Name, CompanyID: &c.ID, Title: strings.TrimSpace(in.Title),
 			Email: store.NonEmpty(strings.TrimSpace(in.Email)), EmailStatus: in.EmailStatus, Linkedin: store.NonEmpty(strings.TrimSpace(in.Linkedin)),
-			Phone: store.NonEmpty(strings.TrimSpace(in.Phone)), Sources: store.Str(strings.TrimSpace(in.SourceURL)), Status: store.ContactSuggested, OfferingID: who.Offering}
+			Phone: store.NonEmpty(strings.TrimSpace(in.Phone)), Sources: new(strings.TrimSpace(in.SourceURL)), Status: store.ContactSuggested, OfferingID: who.Offering}
 		contact.Tz = tz.Guess(in.Phone, "("+c.Country+")")
 		if err := tx.Create(&contact).Error; err != nil {
 			return err

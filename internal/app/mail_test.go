@@ -152,7 +152,7 @@ func TestMailIsOffUntilConfigured(t *testing.T) {
 func TestAResetIsMailedInTheLanguageItWasAskedIn(t *testing.T) {
 	t.Parallel()
 	_, srv, _, box := mailSite(t, nil)
-	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/password-resets", strings.NewReader(`{"email": "ada@example.com"}`))
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/password-resets", strings.NewReader(`{"email": "ada@example.com"}`))
 	req.Header.Set("content-type", "application/json")
 	req.AddCookie(&http.Cookie{Name: request.LangCookie, Value: "en-XA"})
 	res, err := http.DefaultClient.Do(req)
@@ -179,7 +179,7 @@ func TestPasswordReset(t *testing.T) {
 	box.take(t, 0)
 
 	// The link points at PROSPECTOR_URL whatever host the request named.
-	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/password-resets", strings.NewReader(`{"email": "Ada@Example.com"}`))
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/password-resets", strings.NewReader(`{"email": "Ada@Example.com"}`))
 	req.Header.Set("content-type", "application/json")
 	req.Host = "evil.example"
 	res, err := http.DefaultClient.Do(req)
@@ -241,7 +241,7 @@ func TestPasswordReset(t *testing.T) {
 		t.Errorf("the link worked twice: %d", code)
 	}
 	// A browser is told what happened to the link, on a page like the rest.
-	req, _ = http.NewRequest("GET", srv.URL+link, nil)
+	req, _ = http.NewRequest(http.MethodGet, srv.URL+link, nil)
 	req.Header.Set("Accept", "text/html")
 	res, err = http.DefaultClient.Do(req)
 	if err != nil {
@@ -283,7 +283,7 @@ func TestSignedOutFormsRefuseOtherSites(t *testing.T) {
 	s, srv, _, box := mailSite(t, nil)
 	token := must(s.InviteToken(must(s.UserByEmail("ada@example.com")).ID))
 	for _, path := range []string{"/api/v1/password-resets", "/api/v1/password-resets/" + token} {
-		req, _ := http.NewRequest("POST", srv.URL+path, strings.NewReader(`{"email": "ada@example.com", "password": "chosen by another site"}`))
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+path, strings.NewReader(`{"email": "ada@example.com", "password": "chosen by another site"}`))
 		req.Header.Set("content-type", "application/json")
 		req.Header.Set("Sec-Fetch-Site", "cross-site")
 		req.Header.Set("Origin", "https://evil.example")

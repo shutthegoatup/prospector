@@ -26,7 +26,7 @@ func TestAnAgentsWritesAnswerAsTheyAlwaysHave(t *testing.T) {
 	}
 	post := func(key, path, contentType, body string) (int, string) {
 		t.Helper()
-		req, _ := http.NewRequest("POST", srv.URL+"/o/alpha/api/v1/"+path, strings.NewReader(body))
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/o/alpha/api/v1/"+path, strings.NewReader(body))
 		if contentType != "" {
 			req.Header.Set("Content-Type", contentType)
 		}
@@ -116,7 +116,7 @@ func TestAnAgentsWritesAnswerAsTheyAlwaysHave(t *testing.T) {
 		if code, body := post(reader, path, "application/json", "{}"); code != http.StatusForbidden || !strings.Contains(body, scope) {
 			t.Errorf("POST %s with a key lacking %s: %d %s", path, scope, code, body)
 		}
-		req, _ := http.NewRequest("POST", srv.URL+"/o/alpha/api/v1/"+path, strings.NewReader("{}"))
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/o/alpha/api/v1/"+path, strings.NewReader("{}"))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Origin", srv.URL)
 		res, err := client.Do(req)

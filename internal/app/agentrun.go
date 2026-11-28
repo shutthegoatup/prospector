@@ -849,8 +849,7 @@ func (u *unreachable) Unwrap() error { return u.err }
 // Anything else, such as a wrong key or model, or an answer that isn't a completion,
 // won't pass by waiting, so the run ends saying why.
 func passing(err error) bool {
-	var refused *endpointError
-	if errors.As(err, &refused) {
+	if refused, ok := errors.AsType[*endpointError](err); ok {
 		return refused.Status == http.StatusTooManyRequests || refused.Status == http.StatusRequestTimeout || refused.Status >= 500
 	}
 	var away *unreachable
@@ -866,7 +865,7 @@ func backoff(n int) time.Duration {
 func (a *App) completeOnce(ctx context.Context, base, key string, body []byte) (*chatReply, error) {
 	ctx, cancel := context.WithTimeout(ctx, completionLimit)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "POST", base+"/chat/completions", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}

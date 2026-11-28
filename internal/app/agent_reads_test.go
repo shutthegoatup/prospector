@@ -40,7 +40,7 @@ func TestAnAgentsReadsAnswerAsTheyAlwaysHave(t *testing.T) {
 	}
 	get := func(key, path string) (*http.Response, string) {
 		t.Helper()
-		req, _ := http.NewRequest("GET", srv.URL+"/o/alpha/api/v1/"+path, nil)
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/o/alpha/api/v1/"+path, nil)
 		if key != "" {
 			req.Header.Set("Authorization", "Bearer "+key)
 		}
@@ -102,7 +102,7 @@ func TestAnAgentsReadsAnswerAsTheyAlwaysHave(t *testing.T) {
 			t.Errorf("%s with a key lacking read: %d %q", path, res.StatusCode, res.Header.Get("WWW-Authenticate"))
 		}
 		// A person signed in has the app's own pages for these; the routes are for keys.
-		req, _ := http.NewRequest("GET", srv.URL+"/o/alpha/api/v1/"+path, nil)
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/o/alpha/api/v1/"+path, nil)
 		res, err := client.Do(req)
 		if err != nil {
 			t.Fatal(err)

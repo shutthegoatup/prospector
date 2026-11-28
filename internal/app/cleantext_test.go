@@ -31,7 +31,7 @@ func TestTextArrivesWithoutWhatPostgresWontKeep(t *testing.T) {
 
 	// A key holder's body is read as JSON whatever it says it is, so it is cleaned too.
 	key, _, _ := s.CreateKey(o.ID, "bot", []string{"read", "research:write"}, "test")
-	req, _ := http.NewRequest("POST", srv.URL+"/o/alpha/api/v1/companies", strings.NewReader(`{"name":"Quay\u0000 Marine"}`))
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/o/alpha/api/v1/companies", strings.NewReader(`{"name":"Quay\u0000 Marine"}`))
 	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("Content-Type", "application/x-json")
 	res, err := http.DefaultClient.Do(req)

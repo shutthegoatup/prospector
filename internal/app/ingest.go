@@ -93,10 +93,10 @@ func upsertDraft(tx *gorm.DB, org int64, d Draft) error {
 	var c store.Contact
 	err := tx.Where("org_id = ? and key = ?", org, d.Key).First(&c).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		c = store.Contact{OrgID: org, Key: d.Key, File: d.File, Section: store.Str(d.Section), Fit: store.Str(d.Fit), Maker: store.Str(d.Maker),
-			Person: store.Str(d.Person), First: store.Str(d.First), Linkedin: store.Str(d.Linkedin), Email: store.Str(d.Email),
-			Note: store.Str(d.Note), Subject: store.Str(d.Subject), Body: store.Str(d.Body), Followup: store.Str(d.Followup),
-			Flags: store.Str(d.Flags), Hold: d.Hold, Sources: store.NonEmpty(d.Sources), Phone: store.NonEmpty(d.Phone)}
+		c = store.Contact{OrgID: org, Key: d.Key, File: d.File, Section: new(d.Section), Fit: new(d.Fit), Maker: new(d.Maker),
+			Person: new(d.Person), First: new(d.First), Linkedin: new(d.Linkedin), Email: new(d.Email),
+			Note: new(d.Note), Subject: new(d.Subject), Body: new(d.Body), Followup: new(d.Followup),
+			Flags: new(d.Flags), Hold: d.Hold, Sources: store.NonEmpty(d.Sources), Phone: store.NonEmpty(d.Phone)}
 		return tx.Create(&c).Error
 	}
 	if err != nil {
@@ -175,8 +175,8 @@ func importCompanies(tx *gorm.DB, org int64, companies []privacy.CompanyRow) err
 		var c store.Contact
 		err := tx.Where("org_id = ? and key = ?", org, "org:"+name).First(&c).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c = store.Contact{OrgID: org, Key: "org:" + name, File: "prospects.csv", Fit: store.Str(r["priority"]), Maker: store.Str(name),
-				Person: store.Str(""), First: store.Str(""), Linkedin: &linkedin, Flags: store.Str(strings.Join(flags, "\n")),
+			c = store.Contact{OrgID: org, Key: "org:" + name, File: "prospects.csv", Fit: new(r["priority"]), Maker: new(name),
+				Person: new(""), First: new(""), Linkedin: &linkedin, Flags: new(strings.Join(flags, "\n")),
 				Sources: store.NonEmpty(sources), Hold: hold}
 			if err := tx.Create(&c).Error; err != nil {
 				return err
@@ -186,7 +186,7 @@ func importCompanies(tx *gorm.DB, org int64, companies []privacy.CompanyRow) err
 		if err != nil {
 			return err
 		}
-		c.Fit, c.Flags = store.Str(r["priority"]), store.Str(strings.Join(flags, "\n"))
+		c.Fit, c.Flags = new(r["priority"]), new(strings.Join(flags, "\n"))
 		if c.Sources == nil {
 			c.Sources = store.NonEmpty(sources)
 		}

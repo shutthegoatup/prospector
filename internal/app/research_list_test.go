@@ -107,8 +107,8 @@ func TestTheResearchQueueIsInTheAPI(t *testing.T) {
 	}
 
 	// What else the page shows of a company: its other facts and its people, with what waits.
-	if _, err := s.AgentAddFact(o.ID, bot, research.AddFactIn{Company: "Corran Craft", FactIn: research.FactIn{Field: "team_page",
-		Value: "Lists the sales team", SourceURL: "https://corran.example/team"}}); err != nil {
+	if _, err := s.AgentAddFact(o.ID, bot, research.AddFactIn{Company: "Corran Craft", Field: "team_page",
+		Value: "Lists the sales team", SourceURL: "https://corran.example/team"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.AgentAddContact(o, bot, prospecting.AddContactIn{Company: "Corran Craft", Name: "Mairi Corran", Title: "Head of sales",

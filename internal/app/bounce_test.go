@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"maps"
 	"net/http"
 	"strings"
@@ -20,7 +21,7 @@ import (
 func postmark(t *testing.T, site, slug, secret string, record map[string]any) int {
 	t.Helper()
 	body, _ := json.Marshal(record)
-	req, _ := http.NewRequest("POST", site+"/hooks/postmark", bytes.NewReader(body))
+	req, _ := http.NewRequest(http.MethodPost, site+"/hooks/postmark", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth(slug, secret)
 	res, err := http.DefaultClient.Do(req)
@@ -194,11 +195,11 @@ func TestABounceIsKeptBesideWhyTheyAreOnTheList(t *testing.T) {
 	}
 	g := must(s.Gate(s.DB, o))
 	for _, addr := range []string{"first@larkmoor.example", "then@larkmoor.example", "added@larkmoor.example"} {
-		if err := g.WhyFor(store.KindService, addr, ""); err != marketing.ErrBounced {
+		if err := g.WhyFor(store.KindService, addr, ""); !errors.Is(err, marketing.ErrBounced) {
 			t.Errorf("a service notice to %s, which bounced: %v", addr, err)
 		}
 	}
-	if err := g.WhyFor(store.KindService, "spam@larkmoor.example", ""); err != marketing.ErrComplained {
+	if err := g.WhyFor(store.KindService, "spam@larkmoor.example", ""); !errors.Is(err, marketing.ErrComplained) {
 		t.Errorf("a service notice to someone who complained: %v", err)
 	}
 }

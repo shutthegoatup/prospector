@@ -1,9 +1,27 @@
 version: "2"
 
 linters:
-  # errcheck, govet, ineffassign, staticcheck and unused.
+  # errcheck, govet, ineffassign, staticcheck and unused, and the ones below: each catches
+  # Go that has a plainer or safer form, or a mistake vet doesn't look for.
   default: standard
+  enable:
+    - copyloopvar
+    - errorlint
+    - exhaustive
+    - gocritic
+    - intrange
+    - modernize
+    - nilerr
+    - noctx
+    - sqlclosecheck
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - wastedassign
   settings:
+    exhaustive:
+      # A switch with a default has said what the rest do.
+      default-signifies-exhaustive: true
     errcheck:
       # Closing what has been read, saying goodbye to a mail server after it took the
       # message, and writing into a buffer can't lose anything worth reporting.
@@ -21,7 +39,16 @@ linters:
           funcs:
             - github.com/shutthegoatup/prospector/internal/say.Errorf
   exclusions:
+    paths:
+      - api/api.gen.go
+      - web/node_modules
     rules:
+      # A test's request needs no context of its own to cancel.
+      - path: _test\.go
+        linters: [noctx]
+      # A test helper may always be handed the same thing, or hand back more than one test reads.
+      - path: _test\.go
+        linters: [unparam]
       # A test's dropped error shows up as the test failing.
       - path: _test\.go
         linters: [errcheck]

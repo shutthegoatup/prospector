@@ -1,6 +1,9 @@
 package paging
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestACursorIsOnlyWhatAListGaveOut(t *testing.T) {
 	t.Parallel()
@@ -11,7 +14,7 @@ func TestACursorIsOnlyWhatAListGaveOut(t *testing.T) {
 		t.Fatalf("a cursor read back: %v %v", at, err)
 	}
 	for _, bad := range []string{"nonsense", Cursor(7), Cursor(1, 2, 3), Cursor(-1, 2), "W10", "!!"} {
-		if _, err := (Page{Cursor: bad}).At(2); err != ErrCursor {
+		if _, err := (Page{Cursor: bad}).At(2); !errors.Is(err, ErrCursor) {
 			t.Errorf("cursor %q was taken: %v", bad, err)
 		}
 	}

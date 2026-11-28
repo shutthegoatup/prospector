@@ -5,6 +5,7 @@
 package dbtest
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -102,7 +103,7 @@ func emptying(template string) (string, error) {
 	}
 	defer func() { _ = db.Close() }()
 	var stmt string
-	return stmt, db.QueryRow(`select 'set session_replication_role = replica; '
+	return stmt, db.QueryRowContext(context.Background(), `select 'set session_replication_role = replica; '
 		|| (select string_agg('delete from ' || quote_ident(tablename), '; ') from pg_tables where schemaname = current_schema() and tablename <> 'goose_db_version')
 		|| coalesce('; ' || (select string_agg('alter sequence ' || quote_ident(sequencename) || ' restart', '; ') from pg_sequences where schemaname = current_schema() and sequencename <> 'goose_db_version_id_seq'), '')`).
 		Scan(&stmt)
@@ -125,7 +126,7 @@ func (s *Server) Borrow(t testing.TB) string {
 		if err := s.runSQL(name, s.empty); err != nil {
 			// A copy that couldn't be emptied would hand the next test its rows.
 			s.drop(name)
-			if _, err := s.admin.Exec("create database " + name + " template " + s.template); err != nil {
+			if _, err := s.admin.ExecContext(context.Background(), "create database "+name+" template "+s.template); err != nil {
 				t.Errorf("replacing database %s: %v", name, err)
 			}
 		}
@@ -137,7 +138,7 @@ func (s *Server) Borrow(t testing.TB) string {
 func (s *Server) Fresh(t testing.TB) string {
 	t.Helper()
 	name := s.template + "_" + randomHex()
-	if _, err := s.admin.Exec("create database " + name + " template " + s.template); err != nil {
+	if _, err := s.admin.ExecContext(context.Background(), "create database "+name+" template "+s.template); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.drop(name) })
@@ -148,7 +149,7 @@ func (s *Server) Fresh(t testing.TB) string {
 func (s *Server) Bare(t testing.TB) string {
 	t.Helper()
 	name := s.template + "_bare_" + randomHex()
-	if _, err := s.admin.Exec("create database " + name); err != nil {
+	if _, err := s.admin.ExecContext(context.Background(), "create database "+name); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.drop(name) })
@@ -167,7 +168,7 @@ func (s *Server) create(name, from string) error {
 	if from != "" {
 		stmt += " template " + from
 	}
-	if _, err := s.admin.Exec(stmt); err != nil {
+	if _, err := s.admin.ExecContext(context.Background(), stmt); err != nil {
 		return err
 	}
 	s.made = append(s.made, name)
@@ -180,12 +181,12 @@ func (s *Server) runSQL(name, stmt string) error {
 		return err
 	}
 	defer func() { _ = db.Close() }()
-	_, err = db.Exec(stmt)
+	_, err = db.ExecContext(context.Background(), stmt)
 	return err
 }
 
 func (s *Server) drop(name string) {
-	if _, err := s.admin.Exec("drop database if exists " + name + " with (force)"); err != nil {
+	if _, err := s.admin.ExecContext(context.Background(), "drop database if exists "+name+" with (force)"); err != nil {
 		fmt.Fprintln(os.Stderr, "dropping", name+":", err)
 	}
 }
@@ -193,10 +194,11 @@ func (s *Server) drop(name string) {
 // clearStale drops what runs killed by a timeout or a panic left behind. Only those
 // begun over an hour ago: a newer one may belong to a run in another session.
 func (s *Server) clearStale() {
-	rows, err := s.admin.Query("select datname from pg_database where datname like $1", prefix+"%")
+	rows, err := s.admin.QueryContext(context.Background(), "select datname from pg_database where datname like $1", prefix+"%")
 	if err != nil {
 		return
 	}
+	defer func() { _ = rows.Close() }()
 	var stale []string
 	for rows.Next() {
 		var name string
@@ -208,7 +210,6 @@ func (s *Server) clearStale() {
 			stale = append(stale, name)
 		}
 	}
-	_ = rows.Close()
 	for _, name := range stale {
 		s.drop(name)
 	}

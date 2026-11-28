@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -89,7 +90,7 @@ func TestAListLeftWholeComesOutAPageAtATime(t *testing.T) {
 	if page, next, err := paging.ListPage(all, 0, ""); err != nil || len(page) != 5 || next != "" {
 		t.Fatalf("a list that fits the usual page: %v %q %v", page, next, err)
 	}
-	if _, _, err := paging.ListPage(all, 2, "nonsense"); err != paging.ErrCursor {
+	if _, _, err := paging.ListPage(all, 2, "nonsense"); !errors.Is(err, paging.ErrCursor) {
 		t.Fatalf("a made-up cursor: %v", err)
 	}
 	if page, next, _ := paging.ListPage(all, 2, paging.Cursor(99)); len(page) != 0 || next != "" {
@@ -122,7 +123,7 @@ func TestTheAPIsListsWalkToTheirEnd(t *testing.T) {
 		seen, pages := map[string]bool{}, 0
 		byLink := base + list + "?limit=2"
 		for byLink != "" {
-			req, _ := http.NewRequest("GET", byLink, nil)
+			req, _ := http.NewRequest(http.MethodGet, byLink, nil)
 			req.Header.Set("Authorization", "Bearer "+key)
 			res, err := http.DefaultClient.Do(req)
 			if err != nil {
@@ -172,7 +173,7 @@ func TestTheAPIsListsWalkToTheirEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	read, cursor := map[string]bool{}, ""
-	for pages := 0; pages < 10; pages++ {
+	for range 10 {
 		code, body := asKey(t, "GET", base+"enquiries?state=open&limit=2&cursor="+cursor, reader(key), nil)
 		var page struct {
 			Items      []map[string]any `json:"items"`
@@ -196,7 +197,7 @@ func TestTheAPIsListsWalkToTheirEnd(t *testing.T) {
 		t.Fatalf("closing enquiries while walking them read %d of 5", len(read))
 	}
 	for _, bad := range []string{"agents?cursor=nonsense", "enquiries?cursor=nonsense", "agents?limit=lots", "agents?limit=-1", "enquiries?limit=-1"} {
-		req, _ := http.NewRequest("GET", base+bad, nil)
+		req, _ := http.NewRequest(http.MethodGet, base+bad, nil)
 		req.Header.Set("Authorization", "Bearer "+key)
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
